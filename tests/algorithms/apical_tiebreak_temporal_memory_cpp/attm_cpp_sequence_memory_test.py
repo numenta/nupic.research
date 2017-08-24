@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2017, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2016-2017, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -20,33 +20,30 @@
 # ----------------------------------------------------------------------
 
 """
-Run the apical tiebreak sequence tests on the ExtendedTemporalMemory.
+Run the sequence memory tests on the C++ ExtendedTemporalMemory.
 """
 
 import unittest
 
-from htmresearch_core.experimental import ExtendedTemporalMemory
+from htmresearch_core.experimental import ApicalTiebreakSequenceMemory
 
-from htmresearch.support.shared_tests.apical_tiebreak_sequences_test_base import (
-  ApicalTiebreakSequencesTestBase)
+from htmresearch.support.shared_tests.sequence_memory_test_base import (
+  SequenceMemoryTestBase)
 
 
-
-class ExtendedTM_ApicalTiebreakSequencesTests(ApicalTiebreakSequencesTestBase,
-                                              unittest.TestCase):
+class ExtendedTM_SequenceMemoryTests(SequenceMemoryTestBase,
+                                     unittest.TestCase):
   """
-  Run the apical tiebreak sequence tests on the ExtendedTemporalMemory.
+  Run the sequence memory tests on the C++ ExtendedTemporalMemory.
   """
 
-  def constructTM(self, columnCount, apicalInputSize, cellsPerColumn,
-                  initialPermanence, connectedPermanence, minThreshold,
-                  sampleSize, permanenceIncrement, permanenceDecrement,
+  def constructTM(self, columnCount, cellsPerColumn, initialPermanence,
+                  connectedPermanence, minThreshold, sampleSize,
+                  permanenceIncrement, permanenceDecrement,
                   predictedSegmentDecrement, activationThreshold, seed):
 
     params = {
       "columnCount": columnCount,
-      "basalInputSize": columnCount * cellsPerColumn,
-      "apicalInputSize": apicalInputSize,
       "cellsPerColumn": cellsPerColumn,
       "initialPermanence": initialPermanence,
       "connectedPermanence": connectedPermanence,
@@ -54,26 +51,17 @@ class ExtendedTM_ApicalTiebreakSequencesTests(ApicalTiebreakSequencesTestBase,
       "sampleSize": sampleSize,
       "permanenceIncrement": permanenceIncrement,
       "permanenceDecrement": permanenceDecrement,
-      "predictedSegmentDecrement": predictedSegmentDecrement,
+      "basalPredictedSegmentDecrement": predictedSegmentDecrement,
       "activationThreshold": activationThreshold,
       "seed": seed,
       "learnOnOneCell": False,
     }
 
-    self.tm = ExtendedTemporalMemory(**params)
+    self.tm = ApicalTiebreakSequenceMemory(**params)
 
 
-  def compute(self, activeColumns, apicalInput, learn):
-
-    activeColumns = sorted(activeColumns)
-    apicalInput = sorted(apicalInput)
-
-    self.tm.compute(activeColumns,
-                    basalInput=self.tm.getActiveCells(),
-                    basalGrowthCandidates=self.tm.getWinnerCells(),
-                    apicalInput=apicalInput,
-                    apicalGrowthCandidates=apicalInput,
-                    learn=learn)
+  def compute(self, activeColumns, learn):
+    self.tm.compute(sorted(activeColumns), learn=learn)
 
 
   def reset(self):

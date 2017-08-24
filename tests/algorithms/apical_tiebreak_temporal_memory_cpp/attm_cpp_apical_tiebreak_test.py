@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2016-2017, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2017, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -20,31 +20,32 @@
 # ----------------------------------------------------------------------
 
 """
-Run the sequence memory tests on the C++ ExtendedTemporalMemory.
+Run the apical tiebreak tests on the ExtendedTemporalMemory.
 """
 
 import unittest
 
-from htmresearch_core.experimental import ExtendedTemporalMemory
+from htmresearch_core.experimental import ApicalTiebreakPairMemory
+from htmresearch.support.shared_tests.apical_tiebreak_test_base import (
+  ApicalTiebreakTestBase)
 
-from htmresearch.support.shared_tests.sequence_memory_test_base import (
-  SequenceMemoryTestBase)
 
-
-class ExtendedTM_SequenceMemoryTests(SequenceMemoryTestBase,
+class ExtendedTM_ApicalTiebreakTests(ApicalTiebreakTestBase,
                                      unittest.TestCase):
   """
-  Run the sequence memory tests on the C++ ExtendedTemporalMemory.
+  Run the apical tiebreak tests on the C++ ExtendedTemporalMemory.
   """
 
-  def constructTM(self, columnCount, cellsPerColumn, initialPermanence,
-                  connectedPermanence, minThreshold, sampleSize,
-                  permanenceIncrement, permanenceDecrement,
-                  predictedSegmentDecrement, activationThreshold, seed):
+  def constructTM(self, columnCount, basalInputSize, apicalInputSize,
+                  cellsPerColumn, initialPermanence, connectedPermanence,
+                  minThreshold, sampleSize, permanenceIncrement,
+                  permanenceDecrement, predictedSegmentDecrement,
+                  activationThreshold, seed):
 
     params = {
       "columnCount": columnCount,
-      "basalInputSize": columnCount * cellsPerColumn,
+      "basalInputSize": basalInputSize,
+      "apicalInputSize": apicalInputSize,
       "cellsPerColumn": cellsPerColumn,
       "initialPermanence": initialPermanence,
       "connectedPermanence": connectedPermanence,
@@ -52,24 +53,22 @@ class ExtendedTM_SequenceMemoryTests(SequenceMemoryTestBase,
       "sampleSize": sampleSize,
       "permanenceIncrement": permanenceIncrement,
       "permanenceDecrement": permanenceDecrement,
-      "predictedSegmentDecrement": predictedSegmentDecrement,
+      "basalPredictedSegmentDecrement": predictedSegmentDecrement,
       "activationThreshold": activationThreshold,
       "seed": seed,
       "learnOnOneCell": False,
     }
 
-    self.tm = ExtendedTemporalMemory(**params)
+    self.tm = ApicalTiebreakPairMemory(**params)
 
 
-  def compute(self, activeColumns, learn):
-    self.tm.compute(sorted(activeColumns),
-                    basalInput=self.tm.getActiveCells(),
-                    basalGrowthCandidates=self.tm.getWinnerCells(),
-                    learn=learn)
+  def compute(self, activeColumns, basalInput, apicalInput, learn):
 
+    activeColumns = sorted(activeColumns)
+    basalInput = sorted(basalInput)
+    apicalInput = sorted(apicalInput)
 
-  def reset(self):
-    self.tm.reset()
+    self.tm.compute(activeColumns, basalInput, apicalInput)
 
 
   def getActiveCells(self):
