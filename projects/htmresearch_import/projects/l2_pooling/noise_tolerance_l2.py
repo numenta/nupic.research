@@ -1,5 +1,5 @@
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2016, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2016 - 2017, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -27,12 +27,14 @@ sample sizes.
 """
 
 from collections import defaultdict
+import json
 import math
 import random
 import os
 import time
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from htmresearch.algorithms.column_pooler import ColumnPooler
 from htmresearch.frameworks.layers.sensor_placement import greedySensorPositions
@@ -70,8 +72,8 @@ def noisy(pattern, noiseLevel, totalNumCells):
   @param totalNumCells (int)
   The number of cells in the SDR, active and inactive
 
-  @return (set)
-  A noisy set of active indices
+  @return (numpy array)
+  A noisy list of active indices
   """
   n = int(noiseLevel * len(pattern))
 
@@ -86,11 +88,11 @@ def noisy(pattern, noiseLevel, totalNumCells):
         noised.add(v)
         break
 
-  return noised
+  return np.array(sorted(noised), dtype="uint32")
 
 
 def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
-                 noiseSigma, numInitialTraversals):
+                 noiseSigma, numInitialTraversals, noiseEverywhere):
   """
   Touch every point on an object 'numInitialTraversals' times, then evaluate
   whether it has inferred the object by touching every point once more and
@@ -118,10 +120,16 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
   @param numInitialTraversals (int)
   The number of times to traverse the object before testing whether the object
   has been inferred.
+
+  @param noiseEverywhere (bool)
+  If true, add noise to every column's input, and record accuracy of every
+  column. If false, add noise to one column's input, and only record accuracy
+  of that column.
   """
 
   # For each column, keep a mapping from feature-location names to their SDRs
-  layer4sdr = lambda : set(random.sample(xrange(L4_CELL_COUNT), 40))
+  layer4sdr = lambda : np.array(sorted(random.sample(xrange(L4_CELL_COUNT),
+                                                     40)), dtype="uint32")
   featureLocationSDRs = [defaultdict(layer4sdr) for _ in xrange(numColumns)]
 
   params = {"inputWidth": L4_CELL_COUNT,
@@ -166,7 +174,12 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
     # traversals" into a "number of touches" according to the number of sensors.
     numTouchesPerTraversal = len(featureLocations) / float(numColumns)
     numInitialTouches = int(math.ceil(numInitialTraversals * numTouchesPerTraversal))
-    numTestTouches = int(math.ceil(1 * numTouchesPerTraversal))
+
+    if noiseEverywhere:
+      numTestTouches = int(math.ceil(1 * numTouchesPerTraversal))
+    else:
+      numTestTouches = len(featureLocations)
+
     for touch in xrange(numInitialTouches + numTestTouches):
       sensorPositions = next(sensorPositionsIterator)
 
@@ -175,13 +188,14 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
       for _ in xrange(3):
         allLateralInputs = [l2.getActiveCells() for l2 in l2Columns]
         for columnNumber, l2 in enumerate(l2Columns):
-          noiseLevel = random.gauss(noiseMu, noiseSigma)
-          noiseLevel = max(0.0, min(1.0, noiseLevel))
-
           position = sensorPositions[columnNumber]
           featureLocationName = featureLocations[position]
           feedforwardInput = featureLocationSDRs[columnNumber][featureLocationName]
-          feedforwardInput = noisy(feedforwardInput, noiseLevel, L4_CELL_COUNT)
+
+          if noiseEverywhere or columnNumber == 0:
+            noiseLevel = random.gauss(noiseMu, noiseSigma)
+            noiseLevel = max(0.0, min(1.0, noiseLevel))
+            feedforwardInput = noisy(feedforwardInput, noiseLevel, L4_CELL_COUNT)
 
           lateralInputs = [lateralInput
                            for i, lateralInput in enumerate(allLateralInputs)
@@ -190,17 +204,22 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
           l2.compute(feedforwardInput, lateralInputs, learn=False)
 
       if touch >= numInitialTouches:
-        for columnNumber, l2 in enumerate(l2Columns):
-          activeCells = set(l2.getActiveCells())
-          correctCells = objectL2Representations[objectName][columnNumber]
-
+        if noiseEverywhere:
+          for columnNumber, l2 in enumerate(l2Columns):
+            activeCells = set(l2.getActiveCells())
+            correctCells = objectL2Representations[objectName][columnNumber]
+            results.append((len(activeCells & correctCells),
+                            len(activeCells - correctCells)))
+        else:
+          activeCells = set(l2Columns[0].getActiveCells())
+          correctCells = objectL2Representations[objectName][0]
           results.append((len(activeCells & correctCells),
                           len(activeCells - correctCells)))
 
   return results
 
 
-def varyNumColumns(noiseSigma):
+def plotSuccessRate_varyNumColumns(noiseSigma, noiseEverywhere):
   """
   Run and plot the experiment, varying the number of cortical columns.
   """
@@ -214,7 +233,7 @@ def varyNumColumns(noiseSigma):
 
   results = defaultdict(list)
 
-  for trial in xrange(5):
+  for trial in xrange(1):
     print "trial", trial
     objectDescriptions = createRandomObjectDescriptions(10, 10)
 
@@ -222,7 +241,8 @@ def varyNumColumns(noiseSigma):
       print "numColumns", numColumns
       for noiseLevel in noiseLevels:
         r = doExperiment(numColumns, l2Overrides, objectDescriptions,
-                         noiseLevel, noiseSigma, numInitialTraversals=6)
+                         noiseLevel, noiseSigma, numInitialTraversals=6,
+                         noiseEverywhere=noiseEverywhere)
         results[(numColumns, noiseLevel)].extend(r)
 
   #
@@ -266,7 +286,7 @@ def varyNumColumns(noiseSigma):
   print "Saved file %s" % plotPath
 
 
-def varyDistalSampleSize(noiseSigma):
+def plotSuccessRate_varyDistalSampleSize(noiseSigma, noiseEverywhere):
   """
   Run and plot the experiment, varying the distal sample size.
   """
@@ -281,7 +301,7 @@ def varyDistalSampleSize(noiseSigma):
 
   results = defaultdict(list)
 
-  for trial in xrange(5):
+  for trial in xrange(1):
     print "trial", trial
     objectDescriptions = createRandomObjectDescriptions(10, 10)
 
@@ -290,7 +310,8 @@ def varyDistalSampleSize(noiseSigma):
       l2Overrides = {"sampleSizeDistal": sampleSizeDistal}
       for noiseLevel in noiseLevels:
         r = doExperiment(numColumns, l2Overrides, objectDescriptions,
-                         noiseLevel, noiseSigma, numInitialTraversals=6)
+                         noiseLevel, noiseSigma, numInitialTraversals=6,
+                         noiseEverywhere=noiseEverywhere)
         results[(sampleSizeDistal, noiseLevel)].extend(r)
 
   #
@@ -334,7 +355,7 @@ def varyDistalSampleSize(noiseSigma):
   print "Saved file %s" % plotPath
 
 
-def varyProximalSampleSize(noiseSigma):
+def plotSuccessRate_varyProximalSampleSize(noiseSigma, noiseEverywhere):
   """
   Run and plot the experiment, varying the proximal sample size.
   """
@@ -349,7 +370,7 @@ def varyProximalSampleSize(noiseSigma):
 
   results = defaultdict(list)
 
-  for trial in xrange(5):
+  for trial in xrange(1):
     print "trial", trial
     objectDescriptions = createRandomObjectDescriptions(10, 10)
 
@@ -358,7 +379,8 @@ def varyProximalSampleSize(noiseSigma):
       l2Overrides = {"sampleSizeProximal": sampleSizeProximal}
       for noiseLevel in noiseLevels:
         r = doExperiment(numColumns, l2Overrides, objectDescriptions,
-                         noiseLevel, noiseSigma, numInitialTraversals=6)
+                         noiseLevel, noiseSigma, numInitialTraversals=6,
+                         noiseEverywhere=noiseEverywhere)
         results[(sampleSizeProximal, noiseLevel)].extend(r)
 
   #
@@ -402,25 +424,81 @@ def varyProximalSampleSize(noiseSigma):
   print "Saved file %s" % plotPath
 
 
+def logCellActivity_varyNumColumns(noiseSigma, noiseEverywhere):
+  """
+  Run the experiment, varying the column counts, and save each
+    [# correctly active cells, # incorrectly active cells]
+  pair to a JSON file that can be visualized.
+  """
+  noiseLevels = [0.30, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
+  l2Overrides = {"sampleSizeDistal": 20}
+  columnCounts = [1, 2, 3, 4, 5]
+
+  results = defaultdict(list)
+
+  for trial in xrange(1):
+    print "trial", trial
+    objectDescriptions = createRandomObjectDescriptions(10, 10)
+
+    for numColumns in columnCounts:
+      print "numColumns", numColumns
+      for noiseLevel in noiseLevels:
+        r = doExperiment(numColumns, l2Overrides, objectDescriptions,
+                         noiseLevel, noiseSigma, numInitialTraversals=6,
+                         noiseEverywhere=noiseEverywhere)
+        results[(numColumns, noiseLevel)].extend(r)
+
+  d = []
+  for (numColumns, noiseLevel), cellCounts in results.iteritems():
+    d.append({"numColumns": numColumns,
+              "noiseLevel": noiseLevel,
+              "results": cellCounts})
+
+  filename = os.path.join("plots",
+                          "varyColumns_sigma%.2f_%s.json"
+                          % (noiseSigma, time.strftime("%Y%m%d-%H%M%S")))
+  with open(filename, "w") as fout:
+    json.dump(d, fout)
+
+  print "Wrote to", filename
+  print "Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html"
+
+
 
 if __name__ == "__main__":
 
   # Plot the accuracy of inference when noise is added, varying the number of
-  # cortical columns. We find that when noise is a Gaussian random variable that
-  # is independently applied to different columns, the accuracy improves with
-  # more cortical columns.
-  varyNumColumns(noiseSigma=0.0)
-  varyNumColumns(noiseSigma=0.1)
-  varyNumColumns(noiseSigma=0.2)
+  # cortical columns. We find that when noise is applied at a constant equal
+  # rate for each column, the accuracy only improves slightly with more cortical
+  # columns.
+  plotSuccessRate_varyNumColumns(noiseSigma=0.0, noiseEverywhere=True)
+
+  # Change noise to a Gaussian random variable that is independently applied to
+  # different columns. We find that the accuracy now improves with more cortical
+  # columns. This means that noisy sensors benefit from having lateral input
+  # from non-noisy sensors. The sensors that happen to have high noise levels
+  # take advantage of the sensors that happen to have low noise levels, so the
+  # array as a whole can partially guard itself from noise.
+  plotSuccessRate_varyNumColumns(noiseSigma=0.1, noiseEverywhere=True)
+  plotSuccessRate_varyNumColumns(noiseSigma=0.2, noiseEverywhere=True)
 
   # Plot the accuracy of inference when noise is added, varying the ratio of the
   # proximal threshold to the proximal synapse sample size. We find that this
   # ratio does more than any other parameter to determine at what noise level
   # the accuracy drop-off occurs.
-  varyProximalSampleSize(noiseSigma=0.1)
+  plotSuccessRate_varyProximalSampleSize(noiseSigma=0.1, noiseEverywhere=True)
 
   # Plot the accuracy of inference when noise is added, varying the ratio of the
   # distal segment activation threshold to the distal synapse sample size. We
   # find that increasing this ratio provides additional noise tolerance on top
   # of the noise tolerance provided by proximal connections.
-  varyDistalSampleSize(noiseSigma=0.1)
+  plotSuccessRate_varyDistalSampleSize(noiseSigma=0.1, noiseEverywhere=True)
+
+  # Observe the impact of columns without noisy input on columns with noisy
+  # input. Add constant noise to one column's input, and don't add noise for the
+  # other columns. Observe what happens as more non-noisy columns are added. We
+  # find that the lateral input from other columns can help correctly active
+  # cells inhibit cells that shouldn't be active, but it doesn't help increase
+  # the number of correctly active cells. So the accuracy of inference is
+  # improved, but the confidence of the inference isn't.
+  logCellActivity_varyNumColumns(noiseSigma=0.0, noiseEverywhere=False)
