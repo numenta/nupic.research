@@ -116,17 +116,17 @@ class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
     print(json.dumps(locationInWorld), file=self.out)
 
 
-  def afterLocationShift(self, deltaLocation):
+  def afterLocationShift(self, displacement):
     print("shift", file=self.out)
 
     cellsByModule = [module.getActiveCells().tolist()
                      for module in self.locationModules]
     print(json.dumps(cellsByModule), file=self.out)
 
-    pointsByModule = []
+    phasesByModule = []
     for module in self.locationModules:
-      pointsByModule.append(module.activePoints.tolist())
-    print(json.dumps(pointsByModule), file=self.out)
+      phasesByModule.append(module.activePhases.tolist())
+    print(json.dumps(phasesByModule), file=self.out)
 
     activeLocationCells = self.exp.getActiveLocationCells()
 
@@ -140,7 +140,7 @@ class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
     print(json.dumps(decodings), file=self.out)
 
 
-  def afterLocationAnchor(self, anchorInput):
+  def afterLocationAnchor(self, anchorInput, **kwargs):
     print("locationLayer", file=self.out)
 
     cellsByModule = []
@@ -174,10 +174,10 @@ class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
 
     print(json.dumps(cellsByModule), file=self.out)
 
-    pointsByModule = []
+    phasesByModule = []
     for module in self.locationModules:
-      pointsByModule.append(module.activePoints.tolist())
-    print(json.dumps(pointsByModule), file=self.out)
+      phasesByModule.append(module.activePhases.tolist())
+    print(json.dumps(phasesByModule), file=self.out)
 
 
     activeLocationCells = self.exp.getActiveLocationCells()
