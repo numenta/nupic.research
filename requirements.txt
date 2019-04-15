@@ -27,7 +27,7 @@ tqdm>=4.31.1
 librosa>=0.6.2
 scikit-image>=0.14.1
 requests>=2.21.0
-ray[debug]>=0.6.5
+ray>=0.6.5
 torch>=1.0.1
 torchvision>=0.2.2
 nupic.torch
