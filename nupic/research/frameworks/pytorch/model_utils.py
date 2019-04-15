@@ -97,8 +97,7 @@ def evaluateModel(model, loader, device, criterion=F.nll_loss, progress=None):
   :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
   :type progress: dict or None
 
-  :return: dictionary with computed "accuracy", "loss", "total_correct". The
-           loss value is computed using :func:`torch.nn.functional.nll_loss`
+  :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
   :rtype: dict
   """
   model.eval()
@@ -120,9 +119,6 @@ def evaluateModel(model, loader, device, criterion=F.nll_loss, progress=None):
   if progress is not None:
     loader.close()
 
-  loss /= dataset_len
-  accuracy = correct / dataset_len
-
   return {"total_correct": correct,
-          "loss": loss,
-          "accuracy": accuracy}
+          "mean_loss": loss / dataset_len,
+          "mean_accuracy": correct / dataset_len}
