@@ -22,7 +22,7 @@
 
 import argparse
 import configparser
-import os
+import time
 
 import ray
 import torch.nn as nn
@@ -30,9 +30,10 @@ import torch.optim as optim
 from nupic.torch.modules import (KWinners, SparseWeights, Flatten, KWinners2d, rezeroWeights, updateBoostStrength)
 from ray import tune
 from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.model_utils import *
-
+from nupic.research.frameworks.pytorch.image_transforms import *
 
 def CNNSize(width, kernel_size, padding=1, stride=1):
   return (width - kernel_size + 2 * padding) / stride + 1
@@ -51,19 +52,22 @@ class TinyCIFAR(tune.Trainable):
 
     # Get trial parameters
     seed = config["seed"]
-    datadir = config["datadir"]
+    self.data_dir = config["data_dir"]
 
-    # Training parameters
+    # Training / testing parameters
     batch_size = config["batch_size"]
-    self.batches_in_epoch = config["batches_in_epoch"]
-    first_epoch_batch_size = config["first_epoch_batch_size"]
-    self.batches_in_first_epoch = config["batches_in_first_epoch"]
+    first_epoch_batch_size = config.get("first_epoch_batch_size", batch_size)
+    self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
+    self.batches_in_first_epoch = config.get("batches_in_first_epoch", self.batches_in_epoch)
 
-    test_batch_size = config["test_batch_size"]
-    self.test_batches_in_epoch = config["test_batches_in_epoch"]
+    self.test_batch_size = config["test_batch_size"]
+    self.test_batches_in_epoch = config.get("test_batches_in_epoch", sys.maxsize)
+    self.noise_values = config.get("noise_values", [0.0, 0.1])
+    self.loss_function = torch.nn.functional.cross_entropy
 
     learning_rate = config["learning_rate"]
     momentum = config["momentum"]
+
 
     # Network parameters
     network_type = config["network_type"]
@@ -104,17 +108,14 @@ class TinyCIFAR(tune.Trainable):
       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
-    train_dataset = datasets.CIFAR10(datadir, train=True,
+    train_dataset = datasets.CIFAR10(self.data_dir, train=True,
                                      transform=self.transform_train)
-    test_dataset = datasets.CIFAR10(datadir, train=False,
-                                    transform=self.transform_test)
 
     self.train_loader = torch.utils.data.DataLoader(
       train_dataset, batch_size=batch_size, shuffle=True)
-    self.test_loader = torch.utils.data.DataLoader(
-      test_dataset, batch_size=test_batch_size, shuffle=True)
     self.first_loader = torch.utils.data.DataLoader(
       train_dataset, batch_size=first_epoch_batch_size, shuffle=True)
+    self.test_loaders = self.createTestLoaders(self.noise_values)
 
     if network_type == "tiny_sparse":
       self.createTinySparseModel()
@@ -122,6 +123,33 @@ class TinyCIFAR(tune.Trainable):
 
     self.optimizer = optim.SGD(self.model.parameters(), lr=learning_rate,
                                momentum=momentum)
+
+
+  def createTestLoaders(self, noise_values):
+    """
+    Create a list of data loaders, one for each noise value
+    """
+    print("Creating test loaders for noise values:", noise_values)
+    loaders = []
+    for noise in noise_values:
+
+      transform_noise_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        RandomNoise(noise,
+                    highValue=0.5 + 2 * 0.20,
+                    lowValue=0.5 - 2 * 0.2,
+                    ),
+      ])
+
+      testset = datasets.CIFAR10(root=self.data_dir,
+                                 train=False,
+                                 transform=transform_noise_test)
+      loaders.append(
+        DataLoader(testset, batch_size=self.test_batch_size, shuffle=False)
+      )
+
+    return loaders
 
 
   def createTinySparseModel(self):
@@ -186,6 +214,7 @@ class TinyCIFAR(tune.Trainable):
 
 
   def _train(self):
+    t1 = time.time()
     if self._iteration == 0:
       train_loader = self.first_loader
       batches_in_epoch = self.batches_in_first_epoch
@@ -196,15 +225,38 @@ class TinyCIFAR(tune.Trainable):
     trainModel(model=self.model, loader=train_loader,
                optimizer=self.optimizer, device=self.device,
                batches_in_epoch=batches_in_epoch,
-               criterion=torch.nn.functional.cross_entropy)
+               criterion=self.loss_function)
     self.model.apply(rezeroWeights)
     self.model.apply(updateBoostStrength)
+    trainTime = time.time() - t1
 
-    ret = evaluateModel(model=self.model, loader=self.test_loader,
-                         batches_in_epoch=self.test_batches_in_epoch,
-                         device=self.device,
-                         )
+    ret = self._runNoiseTests(self.noise_values, self.test_loaders)
+    ret['epoch_time_train'] = trainTime
+    ret['epoch_time'] = time.time() - t1
     print(self._iteration, ret)
+    return ret
+
+
+  def _runNoiseTests(self, noiseValues, loaders):
+    """
+    Test the model with different noise values and return test metrics.
+    """
+    ret = {
+      'noise_values': noiseValues,
+      'noise_accuracies': [],
+    }
+    for noise, loader in zip(noiseValues, loaders):
+      testResult = evaluateModel(
+        model=self.model,
+        loader=loader,
+        device=self.device,
+        batches_in_epoch=self.test_batches_in_epoch,
+        criterion=self.loss_function
+      )
+      ret['noise_accuracies'].append(testResult['mean_accuracy'])
+      if noise == 0.0:
+        ret.update(testResult)
+
     return ret
 
 
@@ -296,7 +348,8 @@ def parse_options():
                          help="number of gpus you want to use")
   optparser.add_argument("-e", "--experiment",
                          action="append", dest="experiments",
-                         help="run only selected experiments, by default run all experiments in config file.")
+                         help="run only selected experiments, by default run "
+                              "all experiments in config file.")
 
   return optparser.parse_args()
 
@@ -309,13 +362,12 @@ if __name__ == "__main__":
   configs = parse_config(options.config, options.experiments)
 
   # Use configuration file location as the project location.
-  # Ray Tune default working directory is "~/ray_results"
   projectDir = os.path.dirname(options.config.name)
   projectDir = os.path.abspath(projectDir)
 
-  # Download dataset once
-  datadir = os.path.join(projectDir, "data")
-  train_dataset = datasets.CIFAR10(datadir, download=True, train=True)
+  # Pre-download dataset
+  data_dir = os.path.join(projectDir, "data")
+  train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
 
   # Initialize ray cluster
   ray.init(num_cpus=options.num_cpus,
@@ -333,9 +385,9 @@ if __name__ == "__main__":
     if not os.path.isabs(path):
       config["path"] = os.path.join(projectDir, path)
 
-    datadir = config.get("datadir", "data")
-    if not os.path.isabs(datadir):
-      config["datadir"] = os.path.join(projectDir, datadir)
+    data_dir = config.get("data_dir", "data")
+    if not os.path.isabs(data_dir):
+      config["data_dir"] = os.path.join(projectDir, data_dir)
 
     # When running multiple hyperparameter searches on different experiments,
     # ray.tune will run one experiment at the time. We use "ray.remote" to
