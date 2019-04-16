@@ -103,3 +103,8 @@ venv.bak/
 # mypy
 .mypy_cache/
 .idea
+/projects/ray_tune_example/mnist/results
+/projects/whydense/cifar/data
+.DS_Store
+/projects/ray_tune_example/mnist/data
+/projects/whydense/cifar/results

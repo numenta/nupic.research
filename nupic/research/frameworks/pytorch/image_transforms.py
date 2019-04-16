@@ -21,35 +21,41 @@
 import os
 
 import numpy as np
-import skimage.io
-
+from torchvision.utils import save_image
 
 
 class RandomNoise(object):
   """
-  An image transform that adds noise to random pixels in the image.
+  Add noise to random pixels in images
   """
 
 
   def __init__(self,
                noiselevel=0.0,
-               whiteValue=0.1307 + 2 * 0.3081,
+               highValue=0.1307 + 2 * 0.3081,
+               lowValue=0.1307 + 2*0.3081,
                logDir=None, logProbability=0.01):
     """
+    An image transform that adds noise to random elements in the image array.
+    Half the time the noise value is highValue and the other half it is
+    lowValue (by default highValue and lowValue are the same). Suggested values
+    are 'mean +/- 2*stdev'
+
     :param noiselevel:
-      From 0 to 1. For each pixel, set its value to whiteValue with this
-      probability. Suggested whiteVolue is 'mean + 2*stdev'
+      From 0 to 1. For each pixel, set its value to a noise value with this
+      probability.
 
     :param logDir:
-      If set to a directory name, then will save a random sample of the images
-      to this directory.
+      If set to a directory name, then save a random sample of the images to
+      this directory.
 
     :param logProbability:
       The percentage of samples to save to the log directory.
 
     """
     self.noiseLevel = noiselevel
-    self.whiteValue = whiteValue
+    self.highValue = highValue
+    self.lowValue = lowValue
     self.iteration = 0
     self.logDir = logDir
     self.logProbability = logProbability
@@ -57,10 +63,12 @@ class RandomNoise(object):
 
   def __call__(self, image):
     self.iteration += 1
-    a = image.view(-1)
-    numNoiseBits = int(a.shape[0] * self.noiseLevel)
-    noise = np.random.permutation(a.shape[0])[0:numNoiseBits]
-    a[noise] = self.whiteValue
+    if self.noiseLevel > 0.0:
+      a = image.view(-1)
+      numNoiseBits = int(a.shape[0] * self.noiseLevel)
+      permutedIndices = np.random.permutation(a.shape[0])
+      a[permutedIndices[0:numNoiseBits // 2]] = self.highValue
+      a[permutedIndices[numNoiseBits // 2:numNoiseBits]] = self.lowValue
 
     # Save a subset of the images for debugging
     if self.logDir is not None:
@@ -68,6 +76,6 @@ class RandomNoise(object):
         outfile = os.path.join(self.logDir,
                                "im_noise_" + str(int(self.noiseLevel * 100)) + "_"
                                + str(self.iteration).rjust(6, '0') + ".png")
-        skimage.io.imsave(outfile, image.view(28, 28))
+        save_image(image, outfile)
 
     return image
