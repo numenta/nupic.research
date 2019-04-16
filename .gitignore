@@ -103,3 +103,5 @@ venv.bak/
 # mypy
 .mypy_cache/
 .idea
+/projects/ray_tune_example/mnist/results
+/projects/whydense/cifar/data
