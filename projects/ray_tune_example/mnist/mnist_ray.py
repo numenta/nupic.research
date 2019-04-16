@@ -76,7 +76,7 @@ class TrainMNIST(tune.Trainable):
 
     xforms = transforms.Compose([transforms.ToTensor(),
                                  transforms.Normalize((0.1307,), (0.3081,))])
-    train_dataset = datasets.MNIST(datadir, train=True, download=True, transform=xforms)
+    train_dataset = datasets.MNIST(datadir, train=True, transform=xforms)
     test_dataset = datasets.MNIST(datadir, train=False, transform=xforms)
 
     self.train_loader = torch.utils.data.DataLoader(
@@ -245,6 +245,10 @@ if __name__ == "__main__":
   # Ray Tune default working directory is "~/ray_results"
   projectDir = os.path.dirname(options.config.name)
   projectDir = os.path.abspath(projectDir)
+
+  # Pre-download dataset
+  datadir = os.path.join(projectDir, "data")
+  train_dataset = datasets.MNIST(datadir, download=True, train=True)
 
   # Initialize ray cluster
   ray.init(num_cpus=options.num_cpus,
