@@ -248,7 +248,7 @@ if __name__ == "__main__":
 
   # Pre-download dataset
   datadir = os.path.join(projectDir, "data")
-  train_dataset = datasets.CIFAR10(datadir, download=True, train=True)
+  train_dataset = datasets.MNIST(datadir, download=True, train=True)
 
   # Initialize ray cluster
   ray.init(num_cpus=options.num_cpus,
