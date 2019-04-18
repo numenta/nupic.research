@@ -48,10 +48,10 @@ setup(
   long_description=readme,
   long_description_content_type="text/markdown",
   version=nupic.research.__version__,
-  packages=find_namespace_packages(exclude=["tests", "projects"]),
+  packages=find_namespace_packages(include=["nupic.*"]),
   install_requires=requirements,
   dependency_links=[
-    "git+https://github.com/numenta/nupic.torch.git@master#egg=nupic.torch"
+    "git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch"
   ],
   python_requires=">=3.6, <4",
   classifiers=[

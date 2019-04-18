@@ -108,3 +108,5 @@ venv.bak/
 .DS_Store
 /projects/ray_tune_example/mnist/data
 /projects/whydense/cifar/results
+.domino*
+domino*
