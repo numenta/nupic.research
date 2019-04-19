@@ -40,6 +40,18 @@ class TinyCIFAR(object):
   """
   Generic class for creating tiny CIFAR models. This can be used with Ray tune
   or PyExperimentSuite, to run a single trial or repetition of a network.
+
+  The correct way to use this from the outside is:
+
+    model = TinyCIFAR()
+    model.model_setup(config_dict)
+
+    for epoch in range(10):
+      model.train_epoch(epoch)
+    model.model_save(path)
+
+    new_model = TinyCIFAR()
+    new_model = model.model_restore(path)
   """
 
   def __init__(self):
@@ -50,8 +62,6 @@ class TinyCIFAR(object):
     """
     This should be called at the beginning of each repetition with a dict
     containing all the parameters required to setup the trial.
-
-    :param config:
     """
     # Get trial parameters
     seed = config["seed"]
@@ -127,16 +137,79 @@ class TinyCIFAR(object):
       train_dataset, batch_size=first_epoch_batch_size, shuffle=True,
       # num_workers=1
     )
-    self.test_loaders = self.createTestLoaders(self.noise_values)
+    self.test_loaders = self._createTestLoaders(self.noise_values)
 
     if network_type == "tiny_sparse":
-      self.createTinySparseModel()
+      self._createTinySparseModel()
 
     self.optimizer = self._createOptimizer(self.model)
     self.lr_scheduler = self._createLearningRateScheduler(self.optimizer)
 
 
-  def createTestLoaders(self, noise_values):
+  def train_epoch(self, epoch):
+    """
+    This should be called to do one epoch of training.
+
+    Returns:
+        A dict that describes training progress.
+        The dict includes the key 'stop'. If set to one, this network
+        should be stopped early. Training is not progressing well enough.
+    """
+    t1 = time.time()
+    if epoch == 0:
+      train_loader = self.first_loader
+      batches_in_epoch = self.batches_in_first_epoch
+    else:
+      train_loader = self.train_loader
+      batches_in_epoch = self.batches_in_epoch
+
+    self._preEpoch()
+    trainModel(model=self.model, loader=train_loader,
+               optimizer=self.optimizer, device=self.device,
+               batches_in_epoch=batches_in_epoch,
+               criterion=self.loss_function)
+    self.model.apply(rezeroWeights)
+    self.model.apply(updateBoostStrength)
+    trainTime = time.time() - t1
+
+    ret = self._runNoiseTests(self.noise_values, self.test_loaders)
+
+    # Early stopping criterion
+    if epoch > 1 and abs(ret['mean_accuracy'] - 0.1) < 0.01:
+      ret['stop'] = 1
+    else:
+      ret['stop'] = 0
+
+    ret['epoch_time_train'] = trainTime
+    ret['epoch_time'] = time.time() - t1
+    ret["learning_rate"] = self.lr_scheduler.get_lr()[0]
+    print(epoch, ret)
+    return ret
+
+
+  def model_save(self, checkpoint_dir):
+    """
+    Save the model in this directory.
+    :param checkpoint_dir:
+
+    :return: str: The return value is expected to be the checkpoint path that
+    can be later passed to `model_restore()`.
+    """
+    checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
+    torch.save(self.model.state_dict(), checkpoint_path)
+    return checkpoint_path
+
+
+  def model_restore(self, checkpoint_path):
+    """
+
+    :param checkpoint_path: Loads model from this checkpoint path
+    :return:
+    """
+    self.model.load_state_dict(checkpoint_path)
+
+
+  def _createTestLoaders(self, noise_values):
     """
     Create a list of data loaders, one for each noise value
     """
@@ -165,7 +238,7 @@ class TinyCIFAR(object):
     return loaders
 
 
-  def createTinySparseModel(self):
+  def _createTinySparseModel(self):
     prev_w = self.w
     cnn_output_len = []
     for i, (ks,ch) in enumerate(zip(self.kernel_size, self.out_channels)):
@@ -245,47 +318,6 @@ class TinyCIFAR(object):
                                            gamma=self.learning_rate_gamma)
 
 
-  def train_epoch(self, epoch):
-    """
-    This should be called to do one epoch of training.
-
-    Returns:
-        A dict that describes training progress.
-        The dict includes the key 'stop'. If set to one, this network
-        should be stopped early. Training is not progressing well enough.
-    """
-    t1 = time.time()
-    if epoch == 0:
-      train_loader = self.first_loader
-      batches_in_epoch = self.batches_in_first_epoch
-    else:
-      train_loader = self.train_loader
-      batches_in_epoch = self.batches_in_epoch
-
-    self._preEpoch()
-    trainModel(model=self.model, loader=train_loader,
-               optimizer=self.optimizer, device=self.device,
-               batches_in_epoch=batches_in_epoch,
-               criterion=self.loss_function)
-    self.model.apply(rezeroWeights)
-    self.model.apply(updateBoostStrength)
-    trainTime = time.time() - t1
-
-    ret = self._runNoiseTests(self.noise_values, self.test_loaders)
-
-    # Early stopping criterion
-    if epoch > 1 and abs(ret['mean_accuracy'] - 0.1) < 0.01:
-      ret['stop'] = 1
-    else:
-      ret['stop'] = 0
-
-    ret['epoch_time_train'] = trainTime
-    ret['epoch_time'] = time.time() - t1
-    ret["learning_rate"] = self.lr_scheduler.get_lr()[0]
-    print(epoch, ret)
-    return ret
-
-
   def _runNoiseTests(self, noiseValues, loaders):
     """
     Test the model with different noise values and return test metrics.
@@ -318,25 +350,4 @@ class TinyCIFAR(object):
     if self.lr_scheduler is not None:
       self.lr_scheduler.step()
 
-
-  def model_save(self, checkpoint_dir):
-    """
-    Save the model in this directory.
-    :param checkpoint_dir:
-
-    :return: str: The return value is expected to be the checkpoint path that
-    can be later passed to `model_restore()`.
-    """
-    checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-    torch.save(self.model.state_dict(), checkpoint_path)
-    return checkpoint_path
-
-
-  def model_restore(self, checkpoint_path):
-    """
-
-    :param checkpoint_path: Loads model from this checkpoint path
-    :return:
-    """
-    self.model.load_state_dict(checkpoint_path)
 
