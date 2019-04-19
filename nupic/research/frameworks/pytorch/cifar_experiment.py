@@ -181,7 +181,7 @@ class TinyCIFAR(object):
     ret['epoch_time_train'] = trainTime
     ret['epoch_time'] = time.time() - t1
     ret["learning_rate"] = self.lr_scheduler.get_lr()[0]
-    print(epoch, ret)
+    # print(epoch, ret)
     return ret
 
 
