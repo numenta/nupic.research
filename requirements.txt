@@ -19,15 +19,14 @@
 #  http://numenta.org/licenses/
 #
 # ------------------------------------------------------------------------------
-numpy>=1.16.2
-matplotlib>=2.1.0
-pandas>=0.18.1
-tabulate>=0.7.5
-tqdm>=4.31.1
-librosa>=0.6.2
-scikit-image>=0.14.1
-requests>=2.21.0
-ray>=0.6.5
-torch>=1.0.1
-torchvision>=0.2.2
+numpy
+matplotlib
+pandas
+tabulate
+librosa
+scikit-image
+requests
+ray
+torch
+torchvision
 nupic.torch
