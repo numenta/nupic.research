@@ -20,36 +20,39 @@
 # Original Code here:
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
-import argparse
-import configparser
 import time
 
-import ray
+import torch
 import torch.nn as nn
-import torch.optim as optim
 from nupic.torch.modules import (KWinners, SparseWeights, Flatten, KWinners2d, rezeroWeights, updateBoostStrength)
-from ray import tune
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.model_utils import *
 from nupic.research.frameworks.pytorch.image_transforms import *
 
+
 def CNNSize(width, kernel_size, padding=1, stride=1):
   return (width - kernel_size + 2 * padding) / stride + 1
 
 
-class TinyCIFAR(tune.Trainable):
+class TinyCIFAR(object):
   """
-  ray.tune trainable class:
-  - Override _setup to reset the experiment for each trial.
-  - Override _train to train and evaluate each epoch
-  - Override _save and _restore to serialize the model
+  Generic class for creating tiny CIFAR models. This can be used with Ray tune
+  or PyExperimentSuite, to run a single trial or repetition of a network.
   """
 
+  def __init__(self):
+    pass
 
-  def _setup(self, config):
 
+  def model_setup(self, config):
+    """
+    This should be called at the beginning of each repetition with a dict
+    containing all the parameters required to setup the trial.
+
+    :param config:
+    """
     # Get trial parameters
     seed = config["seed"]
     self.data_dir = config["data_dir"]
@@ -58,16 +61,18 @@ class TinyCIFAR(tune.Trainable):
     batch_size = config["batch_size"]
     first_epoch_batch_size = config.get("first_epoch_batch_size", batch_size)
     self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
-    self.batches_in_first_epoch = config.get("batches_in_first_epoch", self.batches_in_epoch)
+    self.batches_in_first_epoch = config.get("batches_in_first_epoch",
+                                             self.batches_in_epoch)
 
     self.test_batch_size = config["test_batch_size"]
     self.test_batches_in_epoch = config.get("test_batches_in_epoch", sys.maxsize)
     self.noise_values = config.get("noise_values", [0.0, 0.1])
-    self.loss_function = torch.nn.functional.cross_entropy
+    self.loss_function = nn.functional.cross_entropy
 
-    learning_rate = config["learning_rate"]
-    momentum = config["momentum"]
-
+    self.learning_rate = config["learning_rate"]
+    self.momentum = config["momentum"]
+    self.weight_decay = config.get("weight_decay", 0.0005)
+    self.learning_rate_gamma = config.get("learning_rate_gamma", 0.9)
 
     # Network parameters
     network_type = config["network_type"]
@@ -89,11 +94,14 @@ class TinyCIFAR(tune.Trainable):
     self.linear_k = config["linear_k"]
     self.output_size = config.get("output_size", 10)
 
+    print("setup: Torch device count=", torch.cuda.device_count())
     torch.manual_seed(seed)
     if torch.cuda.is_available():
+      print("setup: Using cuda")
       self.device = torch.device("cuda")
       torch.cuda.manual_seed(seed)
     else:
+      print("setup: Using cpu")
       self.device = torch.device("cpu")
 
     self.transform_train = transforms.Compose([
@@ -112,17 +120,20 @@ class TinyCIFAR(tune.Trainable):
                                      transform=self.transform_train)
 
     self.train_loader = torch.utils.data.DataLoader(
-      train_dataset, batch_size=batch_size, shuffle=True)
+      train_dataset, batch_size=batch_size, shuffle=True,
+      # num_workers=1
+    )
     self.first_loader = torch.utils.data.DataLoader(
-      train_dataset, batch_size=first_epoch_batch_size, shuffle=True)
+      train_dataset, batch_size=first_epoch_batch_size, shuffle=True,
+      # num_workers=1
+    )
     self.test_loaders = self.createTestLoaders(self.noise_values)
 
     if network_type == "tiny_sparse":
       self.createTinySparseModel()
 
-
-    self.optimizer = optim.SGD(self.model.parameters(), lr=learning_rate,
-                               momentum=momentum)
+    self.optimizer = self._createOptimizer(self.model)
+    self.lr_scheduler = self._createLearningRateScheduler(self.optimizer)
 
 
   def createTestLoaders(self, noise_values):
@@ -146,7 +157,9 @@ class TinyCIFAR(tune.Trainable):
                                  train=False,
                                  transform=transform_noise_test)
       loaders.append(
-        DataLoader(testset, batch_size=self.test_batch_size, shuffle=False)
+        DataLoader(testset, batch_size=self.test_batch_size,
+                   # num_workers=1,
+                   shuffle=False)
       )
 
     return loaders
@@ -213,15 +226,43 @@ class TinyCIFAR(tune.Trainable):
     self.model.to(self.device)
 
 
-  def _train(self):
+  def _createOptimizer(self, model):
+    """
+    Create a new instance of the optimizer
+    """
+    return torch.optim.SGD(model.parameters(),
+                           lr=self.learning_rate,
+                           momentum=self.momentum,
+                           weight_decay=self.weight_decay)
+
+
+  def _createLearningRateScheduler(self, optimizer):
+    """
+    Creates the learning rate scheduler and attach the optimizer
+    """
+    return torch.optim.lr_scheduler.StepLR(optimizer,
+                                           step_size=1,
+                                           gamma=self.learning_rate_gamma)
+
+
+  def train_epoch(self, epoch):
+    """
+    This should be called to do one epoch of training.
+
+    Returns:
+        A dict that describes training progress.
+        The dict includes the key 'stop'. If set to one, this network
+        should be stopped early. Training is not progressing well enough.
+    """
     t1 = time.time()
-    if self._iteration == 0:
+    if epoch == 0:
       train_loader = self.first_loader
       batches_in_epoch = self.batches_in_first_epoch
     else:
       train_loader = self.train_loader
       batches_in_epoch = self.batches_in_epoch
 
+    self._preEpoch()
     trainModel(model=self.model, loader=train_loader,
                optimizer=self.optimizer, device=self.device,
                batches_in_epoch=batches_in_epoch,
@@ -231,9 +272,17 @@ class TinyCIFAR(tune.Trainable):
     trainTime = time.time() - t1
 
     ret = self._runNoiseTests(self.noise_values, self.test_loaders)
+
+    # Early stopping criterion
+    if epoch > 1 and abs(ret['mean_accuracy'] - 0.1) < 0.01:
+      ret['stop'] = 1
+    else:
+      ret['stop'] = 0
+
     ret['epoch_time_train'] = trainTime
     ret['epoch_time'] = time.time() - t1
-    print(self._iteration, ret)
+    ret["learning_rate"] = self.lr_scheduler.get_lr()[0]
+    print(epoch, ret)
     return ret
 
 
@@ -245,6 +294,8 @@ class TinyCIFAR(tune.Trainable):
       'noise_values': noiseValues,
       'noise_accuracies': [],
     }
+    accuracy = 0.0
+    loss = 0.0
     for noise, loader in zip(noiseValues, loaders):
       testResult = evaluateModel(
         model=self.model,
@@ -253,149 +304,39 @@ class TinyCIFAR(tune.Trainable):
         batches_in_epoch=self.test_batches_in_epoch,
         criterion=self.loss_function
       )
+      accuracy += testResult['mean_accuracy']
+      loss += testResult['mean_loss']
       ret['noise_accuracies'].append(testResult['mean_accuracy'])
-      if noise == 0.0:
-        ret.update(testResult)
 
+    ret['mean_accuracy'] = accuracy / len(noiseValues)
+    ret['noise_accuracy'] = ret['noise_accuracies'][-1]
+    ret['mean_loss'] = loss / len(noiseValues)
     return ret
 
 
-  def _save(self, checkpoint_dir):
+  def _preEpoch(self):
+    if self.lr_scheduler is not None:
+      self.lr_scheduler.step()
+
+
+  def model_save(self, checkpoint_dir):
+    """
+    Save the model in this directory.
+    :param checkpoint_dir:
+
+    :return: str: The return value is expected to be the checkpoint path that
+    can be later passed to `model_restore()`.
+    """
     checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
     torch.save(self.model.state_dict(), checkpoint_path)
     return checkpoint_path
 
 
-  def _restore(self, checkpoint_path):
+  def model_restore(self, checkpoint_path):
+    """
+
+    :param checkpoint_path: Loads model from this checkpoint path
+    :return:
+    """
     self.model.load_state_dict(checkpoint_path)
 
-
-
-@ray.remote
-def run_experiment(config, trainable):
-  """
-  Run a single tune experiment in parallel as a "remote" function.
-
-  :param config: The experiment configuration
-  :type config: dict
-  :param trainable: tune.Trainable class with your experiment
-  :type trainable: :class:`ray.tune.Trainable`
-  """
-  # Stop criteria. Default to total number of iterations/epochs
-  stop_criteria = {
-    "training_iteration": config.get("iterations")
-  }
-  stop_criteria.update(config.get("stop", {}))
-
-  tune.run(
-    trainable,
-    name=config["name"],
-    local_dir=config["path"],
-    stop=stop_criteria,
-    config=config,
-    num_samples=config.get("repetitions", 1),
-    search_alg=config.get("search_alg", None),
-    scheduler=config.get("scheduler", None),
-    trial_executor=config.get("trial_executor", None),
-    checkpoint_at_end=config.get("checkpoint_at_end", False),
-    checkpoint_freq=config.get("checkpoint_freq", 0),
-    resume=config.get("resume", False),
-    reuse_actors=config.get("reuse_actors", False),
-    verbose=config.get("verbose", 0)
-  )
-
-
-
-def parse_config(config_file, experiments=None):
-  """
-  Parse configuration file optionally filtering for specific experiments/sections
-  :param config_file: Configuration file
-  :param experiments: Optional list of experiments
-  :return: Dictionary with the parsed configuration
-  """
-  cfgparser = configparser.ConfigParser()
-  cfgparser.read_file(config_file)
-
-  params = {}
-  for exp in cfgparser.sections():
-    if not experiments or exp in experiments:
-      values = cfgparser.defaults()
-      values.update(dict(cfgparser.items(exp)))
-      item = {}
-      for k, v in values.items():
-        try:
-          item[k] = eval(v)
-        except (NameError, SyntaxError):
-          item[k] = v
-
-      params[exp] = item
-
-  return params
-
-
-
-def parse_options():
-  """ parses the command line options for different settings. """
-  optparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  optparser.add_argument("-c", "--config", dest="config", type=open,
-                         default="tiny_experiments.cfg",
-                         help="your experiments config file")
-  optparser.add_argument("-n", "--num_cpus", dest="num_cpus", type=int,
-                         default=os.cpu_count(),
-                         help="number of cpus you want to use")
-  optparser.add_argument("-g", "--num_gpus", dest="num_gpus", type=int,
-                         default=torch.cuda.device_count(),
-                         help="number of gpus you want to use")
-  optparser.add_argument("-e", "--experiment",
-                         action="append", dest="experiments",
-                         help="run only selected experiments, by default run "
-                              "all experiments in config file.")
-
-  return optparser.parse_args()
-
-
-
-if __name__ == "__main__":
-
-  # Load and parse command line option and experiment configurations
-  options = parse_options()
-  configs = parse_config(options.config, options.experiments)
-
-  # Use configuration file location as the project location.
-  projectDir = os.path.dirname(options.config.name)
-  projectDir = os.path.abspath(projectDir)
-
-  # Pre-download dataset
-  data_dir = os.path.join(projectDir, "data")
-  train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
-
-  # Initialize ray cluster
-  ray.init(num_cpus=options.num_cpus,
-           num_gpus=options.num_gpus,
-           local_mode=options.num_cpus == 1)
-
-  # Run all experiments in parallel
-  results = []
-  for exp in configs:
-    config = configs[exp]
-    config["name"] = exp
-
-    # Make sure local directories are relative to the project location
-    path = config.get("path", "results")
-    if not os.path.isabs(path):
-      config["path"] = os.path.join(projectDir, path)
-
-    data_dir = config.get("data_dir", "data")
-    if not os.path.isabs(data_dir):
-      config["data_dir"] = os.path.join(projectDir, data_dir)
-
-    # When running multiple hyperparameter searches on different experiments,
-    # ray.tune will run one experiment at the time. We use "ray.remote" to
-    # run each tune experiment in parallel as a "remote" function and wait until
-    # all experiments complete
-    results.append(run_experiment.remote(config, TinyCIFAR))
-
-  # Wait for all experiments to complete
-  ray.get(results)
-
-  ray.shutdown()
