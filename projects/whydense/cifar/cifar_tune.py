@@ -35,34 +35,6 @@ from nupic.research.frameworks.pytorch.cifar_experiment import TinyCIFAR
 import configparser
 
 
-def parse_config(config_file, experiments=None):
-  """
-  Parse configuration file optionally filtering for specific experiments/sections
-  :param config_file: Configuration file
-  :param experiments: Optional list of experiments
-  :return: Dictionary with the parsed configuration
-  """
-  cfgparser = configparser.ConfigParser()
-  cfgparser.read_file(config_file)
-
-  params = {}
-  for exp in cfgparser.sections():
-    if not experiments or exp in experiments:
-      values = cfgparser.defaults()
-      values.update(dict(cfgparser.items(exp)))
-      item = {}
-      for k, v in values.items():
-        try:
-          item[k] = eval(v)
-        except (NameError, SyntaxError):
-          item[k] = v
-
-      params[exp] = item
-
-  return params
-
-
-
 class CIFARTune(TinyCIFAR, tune.Trainable):
   """
   ray.tune trainable class:
@@ -147,6 +119,32 @@ def run_experiment(config, trainable):
     reuse_actors=config.get("reuse_actors", False),
     verbose=config.get("verbose", 0)
   )
+
+def parse_config(config_file, experiments=None):
+  """
+  Parse configuration file optionally filtering for specific experiments/sections
+  :param config_file: Configuration file
+  :param experiments: Optional list of experiments
+  :return: Dictionary with the parsed configuration
+  """
+  cfgparser = configparser.ConfigParser()
+  cfgparser.read_file(config_file)
+
+  params = {}
+  for exp in cfgparser.sections():
+    if not experiments or exp in experiments:
+      values = cfgparser.defaults()
+      values.update(dict(cfgparser.items(exp)))
+      item = {}
+      for k, v in values.items():
+        try:
+          item[k] = eval(v)
+        except (NameError, SyntaxError):
+          item[k] = v
+
+      params[exp] = item
+
+  return params
 
 
 def parse_options():
