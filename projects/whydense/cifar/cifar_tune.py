@@ -37,7 +37,7 @@ import configparser
 
 class CIFARTune(TinyCIFAR, tune.Trainable):
   """
-  ray.tune trainable class:
+  ray.tune trainable class for running small CIFAR models:
   - Override _setup to reset the experiment for each trial.
   - Override _train to train and evaluate each epoch
   - Override _save and _restore to serialize the model
@@ -59,7 +59,7 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
 
 
   def _train(self):
-    """Implement train().
+    """Implement train() for a single epoch.
 
     Returns:
         A dict that describes training progress."""
