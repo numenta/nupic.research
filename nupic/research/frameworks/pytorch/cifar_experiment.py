@@ -51,7 +51,7 @@ class TinyCIFAR(object):
     model.model_save(path)
 
     new_model = TinyCIFAR()
-    new_model = model.model_restore(path)
+    new_model.model_restore(path)
   """
 
   def __init__(self):
@@ -131,11 +131,9 @@ class TinyCIFAR(object):
 
     self.train_loader = torch.utils.data.DataLoader(
       train_dataset, batch_size=batch_size, shuffle=True,
-      # num_workers=1
     )
     self.first_loader = torch.utils.data.DataLoader(
       train_dataset, batch_size=first_epoch_batch_size, shuffle=True,
-      # num_workers=1
     )
     self.test_loaders = self._createTestLoaders(self.noise_values)
 
@@ -148,10 +146,10 @@ class TinyCIFAR(object):
 
   def train_epoch(self, epoch):
     """
-    This should be called to do one epoch of training.
+    This should be called to do one epoch of training and testing.
 
     Returns:
-        A dict that describes training progress.
+        A dict that describes progress of this epoch.
         The dict includes the key 'stop'. If set to one, this network
         should be stopped early. Training is not progressing well enough.
     """
@@ -195,18 +193,20 @@ class TinyCIFAR(object):
     :return: str: The return value is expected to be the checkpoint path that
     can be later passed to `model_restore()`.
     """
-    checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-    torch.save(self.model.state_dict(), checkpoint_path)
+    # checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
+    # torch.save(self.model.state_dict(), checkpoint_path)
+    checkpoint_path = os.path.join(checkpoint_dir, "model.pt")
+    torch.save(self.model, checkpoint_path)
     return checkpoint_path
 
 
   def model_restore(self, checkpoint_path):
     """
-
     :param checkpoint_path: Loads model from this checkpoint path
     :return:
     """
-    self.model.load_state_dict(checkpoint_path)
+    self.model = torch.load(checkpoint_path, map_location=self.device)
+    # self.model.load_state_dict(checkpoint_path)
 
 
   def _createTestLoaders(self, noise_values):
@@ -230,9 +230,7 @@ class TinyCIFAR(object):
                                  train=False,
                                  transform=transform_noise_test)
       loaders.append(
-        DataLoader(testset, batch_size=self.test_batch_size,
-                   # num_workers=1,
-                   shuffle=False)
+        DataLoader(testset, batch_size=self.test_batch_size, shuffle=False)
       )
 
     return loaders
