@@ -66,6 +66,7 @@ class TinyCIFAR(object):
     # Get trial parameters
     seed = config["seed"]
     self.data_dir = config["data_dir"]
+    self.model_filename = config.get("model_filename", "model.pt")
 
     # Training / testing parameters
     batch_size = config["batch_size"]
@@ -104,6 +105,7 @@ class TinyCIFAR(object):
     self.linear_k = config["linear_k"]
     self.output_size = config.get("output_size", 10)
 
+    # Setup devices, model, and dataloaders
     print("setup: Torch device count=", torch.cuda.device_count())
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -195,7 +197,7 @@ class TinyCIFAR(object):
     """
     # checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
     # torch.save(self.model.state_dict(), checkpoint_path)
-    checkpoint_path = os.path.join(checkpoint_dir, "model.pt")
+    checkpoint_path = os.path.join(checkpoint_dir, self.model_filename)
     torch.save(self.model, checkpoint_path)
     return checkpoint_path
 
