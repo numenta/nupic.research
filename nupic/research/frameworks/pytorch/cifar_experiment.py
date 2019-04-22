@@ -195,9 +195,9 @@ class TinyCIFAR(object):
     can be later passed to `model_restore()`.
     """
     # checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-    # torch.save(self.model.state_dict(), checkpoint_path)
+    # torch.save(self.model, checkpoint_path)
     checkpoint_path = os.path.join(checkpoint_dir, self.model_filename)
-    torch.save(self.model, checkpoint_path)
+    torch.save(self.model.state_dict(), checkpoint_path)
     return checkpoint_path
 
 
@@ -206,8 +206,9 @@ class TinyCIFAR(object):
     :param checkpoint_path: Loads model from this checkpoint path
     :return:
     """
-    self.model = torch.load(checkpoint_path, map_location=self.device)
-    # self.model.load_state_dict(checkpoint_path)
+    # self.model = torch.load(checkpoint_path, map_location=self.device)
+    checkpoint_file = os.path.join(checkpoint_path, self.model_filename)
+    self.model.load_state_dict(torch.load(checkpoint_file, map_location=self.device))
 
 
   def _createTestLoaders(self, noise_values):
