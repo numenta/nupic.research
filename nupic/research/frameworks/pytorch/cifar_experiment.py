@@ -132,10 +132,10 @@ class TinyCIFAR(object):
                                      transform=self.transform_train)
 
     self.train_loader = torch.utils.data.DataLoader(
-      train_dataset, batch_size=batch_size, shuffle=True,
+      train_dataset, batch_size=batch_size, shuffle=True
     )
     self.first_loader = torch.utils.data.DataLoader(
-      train_dataset, batch_size=first_epoch_batch_size, shuffle=True,
+      train_dataset, batch_size=first_epoch_batch_size, shuffle=True
     )
     self.test_loaders = self._createTestLoaders(self.noise_values)
 
@@ -168,8 +168,7 @@ class TinyCIFAR(object):
                optimizer=self.optimizer, device=self.device,
                batches_in_epoch=batches_in_epoch,
                criterion=self.loss_function)
-    self.model.apply(rezeroWeights)
-    self.model.apply(updateBoostStrength)
+    self._postEpoch()
     trainTime = time.time() - t1
 
     ret = self._runNoiseTests(self.noise_values, self.test_loaders)
@@ -350,4 +349,8 @@ class TinyCIFAR(object):
     if self.lr_scheduler is not None:
       self.lr_scheduler.step()
 
+
+  def _postEpoch(self):
+    self.model.apply(rezeroWeights)
+    self.model.apply(updateBoostStrength)
 
