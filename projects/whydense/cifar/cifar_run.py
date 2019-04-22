@@ -33,9 +33,6 @@ from nupic.research.support.parse_config import parse_config
 def trainModels(configs, projectDir):
   """
   Run all the training experiments specified in configs
-  :param configs:
-  :param projectDir:
-  :return:
   """
   # Pre-download dataset
   data_dir = os.path.join(projectDir, "data")
@@ -71,12 +68,6 @@ def parse_options():
   optparser.add_argument("-c", "--config", dest="config", type=open,
                          default="tiny_experiments.cfg",
                          help="your experiments config file")
-  optparser.add_argument("-n", "--num_cpus", dest="num_cpus", type=int,
-                         default=os.cpu_count(),
-                         help="number of cpus you want to use")
-  optparser.add_argument("-g", "--num_gpus", dest="num_gpus", type=int,
-                         default=torch.cuda.device_count(),
-                         help="number of gpus you want to use")
   optparser.add_argument("-e", "--experiment",
                          action="append", dest="experiments",
                          help="run only selected experiments, by default run "
