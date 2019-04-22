@@ -30,6 +30,41 @@ from nupic.research.frameworks.pytorch.cifar_experiment import TinyCIFAR
 from nupic.research.support.parse_config import parse_config
 
 
+def trainModels(configs, projectDir):
+  """
+  Run all the training experiments specified in configs
+  :param configs:
+  :param projectDir:
+  :return:
+  """
+  # Pre-download dataset
+  data_dir = os.path.join(projectDir, "data")
+  train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
+
+
+  # Run all experiments in serial
+  for exp in configs:
+    config = configs[exp]
+    config["name"] = exp
+
+    # Make sure local directories are relative to the project location
+    path = config.get("path", "results")
+    if not os.path.isabs(path):
+      config["path"] = os.path.join(projectDir, path)
+
+    data_dir = config.get("data_dir", "data")
+    if not os.path.isabs(data_dir):
+      config["data_dir"] = os.path.join(projectDir, data_dir)
+
+    model = TinyCIFAR()
+    model.model_setup(config)
+    for epoch in range(config['iterations']):
+      ret = model.train_epoch(epoch)
+      print(ret)
+
+    model.model_save(path)
+
+
 def parse_options():
   """ parses the command line options for different settings. """
   optparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -63,32 +98,5 @@ if __name__ == "__main__":
   projectDir = os.path.dirname(options.config.name)
   projectDir = os.path.abspath(projectDir)
 
-  # Pre-download dataset
-  data_dir = os.path.join(projectDir, "data")
-  train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
 
-
-  # Run all experiments in serial
-  results = []
-  for exp in configs:
-    config = configs[exp]
-    config["name"] = exp
-
-    # Make sure local directories are relative to the project location
-    path = config.get("path", "results")
-    if not os.path.isabs(path):
-      config["path"] = os.path.join(projectDir, path)
-
-    data_dir = config.get("data_dir", "data")
-    if not os.path.isabs(data_dir):
-      config["data_dir"] = os.path.join(projectDir, data_dir)
-
-    model = TinyCIFAR()
-    model.model_setup(config)
-    for epoch in range(config['iterations']):
-      ret = model.train_epoch(epoch)
-      print(ret)
-
-    model.model_save(path)
-
-
+  trainModels(configs, projectDir=projectDir)
