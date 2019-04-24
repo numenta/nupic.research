@@ -22,14 +22,18 @@
 
 import argparse
 
+import numpy as np
 from torchvision import datasets
 
 from nupic.research.frameworks.pytorch.model_utils import *
 from nupic.research.frameworks.pytorch.image_transforms import *
-from nupic.research.frameworks.pytorch.cifar_experiment import TinyCIFAR
+from nupic.research.frameworks.pytorch.cifar_experiment import (
+  TinyCIFAR, create_test_loaders
+)
 from nupic.research.support.parse_config import parse_config
 
 
+# This hook records the activations within specific intermediate layers
 activation = {}
 def get_activation(name):
     def hook(model, input, output):
@@ -37,41 +41,72 @@ def get_activation(name):
     return hook
 
 
-def evaluateNoiseSensitivity(model, noise_datasets, layer):
-  print("Layer=", layer)
-  model.eval()
+def evaluateSensitivityOneImage(idx, model, noise_datasets, layer,
+                                noise_tolerance_sum):
+  """
+  For a given image and layer, compute the noise tolerance of this layer for
+  each noise dataset. If d_i is the activity of this layer for dataset i, we
+  compute the noise tolerance for each dataset is computed as:
 
-  with torch.no_grad():
-    images = []
-    targets = []
-    outputs = []
-    activations = []
+      noise_tolerance[i] = dot(d_0, d_i) / dot(d_0, d_0)
 
-    for d in noise_datasets:
+  The noise_tolerance is added to noise_tolerance_sum:
+      noise_tolerance_sum[i] += noise_tolerance[i]
 
-      data, target = d[0]
-      data = data.unsqueeze(0)
-      images.append(data)
-      targets.append(target)
+  Here we assume that noise_datasets[0] is a zero noise dataset. If layer ==
+  "image" then we compute the noise tolerance of the noisy images themselves. We
+  assume the model is already in eval/no_grad state.
 
+  Return a numpy array containing the noise tolerance for each dataset.
+  """
+  activations = []
+  targets = []
+  dot0 = 0.0
+  for d, dataset in enumerate(noise_datasets):
+
+    data, target = dataset[idx]
+    data = data.unsqueeze(0)
+    targets.append(target)
+
+    if layer == "image":
+      x = data
+    else:
       layer.register_forward_hook(get_activation(layer))
-
       output = model(data)
-      outputs.append(output)
       x = activation[layer]
-      x = x.view(-1)
-      activations.append(x)
 
-      pred = output.max(1, keepdim=True)[1]
-      # correct = pred.eq(target.view_as(pred)).sum().item()
+    x = x.view(-1)
+    activations.append(x)
 
-    print(activations[0].shape)
-    print(activations[0].nonzero().size(0), activations[1].nonzero().size(0))
-    print(activations[0].sum(), activations[1].sum())
-    print((activations[0] - activations[1]).abs().sum())
-    print(activations[0].dot(activations[0]), activations[0].dot(activations[1]))
-    print(images[0].sum(), images[1].sum())
-    print(targets[0], targets[1])
+    if d == 0:
+      dot0 = activations[0].dot(activations[0])
+
+    noise_tolerance_sum[d] += activations[0].dot(x) / dot0
+
+  # print(activations[0].sum(), activations[1].sum())
+  # print((activations[0] - activations[1]).abs().sum())
+
+  # Ensure the targets are all the same
+  assert (len(set(targets)) == 1)
+
+  return noise_tolerance_sum
+
+
+
+def evaluateNoiseSensitivity(model, noise_datasets, layer_name, numImages=10):
+  if layer_name == "image":
+    layer = layer_name
+  else:
+    layer = model.__getattr__(layer_name)
+
+  model.eval()
+  with torch.no_grad():
+
+    dots = np.zeros(len(noise_datasets))
+    for i in range(numImages):
+      evaluateSensitivityOneImage(i, model, noise_datasets, layer, dots)
+
+    print("layer:", layer_name, "mean dots: ", dots / numImages)
 
 
 def testModel(config, projectDir, checkpoint_path=None):
@@ -100,15 +135,25 @@ def testModel(config, projectDir, checkpoint_path=None):
   print("Done")
 
   # Create new loaders with batch size 1
-  loaders = tiny_cifar._createTestLoaders(tiny_cifar.noise_values, batch_size=1)
+  noise_values = [0.0, 0.05, 0.1, 0.15, 0.2]
+  loaders = create_test_loaders(noise_values, batch_size=1,
+                                data_dir=tiny_cifar.data_dir)
   noise_datasets = [l.dataset for l in loaders]
 
+
+  # Test noise sensitivity for different layers
+  numImages = 500
   model = tiny_cifar.model
-  modules_to_check = ['cnn_0', 'kwinners_2d_0']
+
+  evaluateNoiseSensitivity(model=tiny_cifar.model, noise_datasets=noise_datasets,
+                           layer_name="image", numImages=numImages)
+
+  modules_to_check = ["cnn_0", "avgpool_0", "kwinners_2d_0", "flatten",
+                      "linear", "kwinners_linear"]
   for m in modules_to_check:
     if m in model._modules.keys():
       evaluateNoiseSensitivity(model=tiny_cifar.model, noise_datasets=noise_datasets,
-                               layer=model.__getattr__(m))
+                               layer_name=m, numImages=numImages)
 
 
 
@@ -127,7 +172,6 @@ def parse_options():
                               "all experiments in config file.")
 
   return optparser.parse_args()
-
 
 
 if __name__ == "__main__":
