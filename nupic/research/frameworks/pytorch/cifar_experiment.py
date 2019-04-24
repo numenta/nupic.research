@@ -24,7 +24,10 @@ import time
 
 import torch
 import torch.nn as nn
-from nupic.torch.modules import (KWinners, SparseWeights, Flatten, KWinners2d, rezeroWeights, updateBoostStrength)
+from nupic.torch.modules import (
+  SparseWeights, SparseWeights2d,
+  Flatten, KWinners2d, KWinners,
+  rezeroWeights, updateBoostStrength)
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
@@ -95,9 +98,11 @@ class TinyCIFAR(object):
 
     # CNN parameters - these are lists, one for each CNN layer
     self.cnn_k = config["cnn_k"]
-    self.kernel_size = config.get("kernel_size", [3, 3])
-    self.out_channels = config.get("out_channels", [32, 32])
-    self.in_channels = [inChannels] + self.out_channels
+    self.cnn_kernel_sizes = config.get("cnn_kernel_size", [3] * len(self.cnn_k))
+    self.cnn_out_channels = config.get("cnn_out_channels", [32] * len(self.cnn_k))
+    self.cnn_weight_sparsity = config.get("cnn_weight_sparsity",
+                                          [1.0]*len(self.cnn_k))
+    self.in_channels = [inChannels] + self.cnn_out_channels
 
     # Linear parameters
     self.weight_sparsity = config["weight_sparsity"]
@@ -206,11 +211,12 @@ class TinyCIFAR(object):
     :param checkpoint_path: Loads model from this checkpoint path
     :return:
     """
+    print("loading from", checkpoint_path)
     self.model = torch.load(checkpoint_path, map_location=self.device)
     # self.model.load_state_dict(checkpoint_path)
 
 
-  def _createTestLoaders(self, noise_values):
+  def _createTestLoaders(self, noise_values, batch_size=None):
     """
     Create a list of data loaders, one for each noise value
     """
@@ -231,7 +237,9 @@ class TinyCIFAR(object):
                                  train=False,
                                  transform=transform_noise_test)
       loaders.append(
-        DataLoader(testset, batch_size=self.test_batch_size, shuffle=False)
+        DataLoader(testset,
+                   batch_size=batch_size or self.test_batch_size,
+                   shuffle=False)
       )
 
     return loaders
@@ -240,8 +248,14 @@ class TinyCIFAR(object):
   def _createTinySparseModel(self):
     prev_w = self.w
     cnn_output_len = []
-    for i, (ks,ch) in enumerate(zip(self.kernel_size, self.out_channels)):
-      cnn_w = CNNSize(prev_w, ks) // 2
+    padding = []
+    for i, (kernel_size, ch) in enumerate(zip(self.cnn_kernel_sizes,
+                                              self.cnn_out_channels)):
+      if kernel_size == 3:
+        padding.append(1)
+      else:
+        padding.append(2)
+      cnn_w = CNNSize(prev_w, kernel_size, padding=padding[-1]) // 2
       cnn_output_len.append(int(ch * (cnn_w) ** 2))
       prev_w = cnn_w
 
@@ -250,21 +264,27 @@ class TinyCIFAR(object):
     self.model = nn.Sequential()
 
     for c, l in enumerate(cnn_output_len):
-      # Sparse CNN layer
-      self.model.add_module("cnn_"+str(c),
-                            nn.Conv2d(in_channels=self.in_channels[c],
-                                      out_channels=self.out_channels[c],
-                                      kernel_size=self.kernel_size[c],
-                                      padding=1, bias=False))
-      self.model.add_module("bn_"+str(c),
-                            nn.BatchNorm2d(self.out_channels[c])),
-      self.model.add_module("maxpool_"+str(c),
-                            nn.MaxPool2d(kernel_size=2))
 
+      # Sparse CNN layer
+      conv2d = nn.Conv2d(in_channels=self.in_channels[c],
+                         out_channels=self.cnn_out_channels[c],
+                         kernel_size=self.cnn_kernel_sizes[c],
+                         padding=padding[c], bias=False)
+      if self.cnn_weight_sparsity[c] < 1.0:
+        conv2d = SparseWeights2d(conv2d,
+                                 weightSparsity=self.cnn_weight_sparsity[c])
+      self.model.add_module("cnn_"+str(c), conv2d)
+
+      # Batch norm plus average pooling
+      self.model.add_module("bn_" + str(c),
+                            nn.BatchNorm2d(self.cnn_out_channels[c])),
+      self.model.add_module("avgpool_"+str(c), nn.AvgPool2d(kernel_size=2))
+
+      # K-winners, if required
       if self.cnn_k[c] < 1.0:
         self.model.add_module("kwinners_2d_"+str(c),
                               KWinners2d(n=cnn_output_len[c],
-                                         channels=self.out_channels[c],
+                                         channels=self.cnn_out_channels[c],
                                          k=int(self.cnn_k[c] * cnn_output_len[c]),
                                          kInferenceFactor=self.k_inference_factor,
                                          boostStrength=self.boost_strength,
