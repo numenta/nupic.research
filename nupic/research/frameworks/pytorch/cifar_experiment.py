@@ -39,6 +39,34 @@ def CNNSize(width, kernel_size, padding=1, stride=1):
   return (width - kernel_size + 2 * padding) / stride + 1
 
 
+def create_test_loaders(noise_values, batch_size, data_dir):
+  """
+  Create a list of data loaders, one for each noise value
+  """
+  print("Creating test loaders for noise values:", noise_values)
+  loaders = []
+  for noise in noise_values:
+
+    transform_noise_test = transforms.Compose([
+      transforms.ToTensor(),
+      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+      RandomNoise(noise,
+                  highValue=0.5 + 2 * 0.20,
+                  lowValue=0.5 - 2 * 0.2,
+                  ),
+    ])
+
+    testset = datasets.CIFAR10(root=data_dir,
+                               train=False,
+                               transform=transform_noise_test)
+    loaders.append(
+      DataLoader(testset, batch_size=batch_size, shuffle=False)
+    )
+
+  return loaders
+
+
+
 class TinyCIFAR(object):
   """
   Generic class for creating tiny CIFAR models. This can be used with Ray tune
@@ -142,7 +170,9 @@ class TinyCIFAR(object):
     self.first_loader = torch.utils.data.DataLoader(
       train_dataset, batch_size=first_epoch_batch_size, shuffle=True
     )
-    self.test_loaders = self._createTestLoaders(self.noise_values)
+    self.test_loaders = create_test_loaders(self.noise_values,
+                                            self.test_batch_size,
+                                            self.data_dir)
 
     if network_type == "tiny_sparse":
       self._createTinySparseModel()
@@ -214,35 +244,6 @@ class TinyCIFAR(object):
     print("loading from", checkpoint_path)
     self.model = torch.load(checkpoint_path, map_location=self.device)
     # self.model.load_state_dict(checkpoint_path)
-
-
-  def _createTestLoaders(self, noise_values, batch_size=None):
-    """
-    Create a list of data loaders, one for each noise value
-    """
-    print("Creating test loaders for noise values:", noise_values)
-    loaders = []
-    for noise in noise_values:
-
-      transform_noise_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        RandomNoise(noise,
-                    highValue=0.5 + 2 * 0.20,
-                    lowValue=0.5 - 2 * 0.2,
-                    ),
-      ])
-
-      testset = datasets.CIFAR10(root=self.data_dir,
-                                 train=False,
-                                 transform=transform_noise_test)
-      loaders.append(
-        DataLoader(testset,
-                   batch_size=batch_size or self.test_batch_size,
-                   shuffle=False)
-      )
-
-    return loaders
 
 
   def _createTinySparseModel(self):
