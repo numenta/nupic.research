@@ -2,28 +2,49 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tabulate
 import click
 from ray.tune.commands import _get_experiment_state
 from ray.tune.commands import *
 
+def print_df_tabular(df):
+  headers = list(df.columns)
+  headers.remove("name")
+  headers.insert(0, "name")
+
+  table = [headers]
+  for i, row in df.iterrows():
+    table.append([row[n] for n in headers])
+  print(tabulate(table, headers="firstrow", tablefmt="grid"))
 
 
 class experimentBrowser(object):
 
   def __init__(self, experiment_path):
-    # list of keys, that had to be renamed because they contained spaces
     self.experiment_path = os.path.abspath(experiment_path)
     self.experiment_state = _get_experiment_state(
       self.experiment_path, exit_on_fail=True)
+    print("Examining experiments in ",
+          self.experiment_state["runner_data"]["_session_str"])
     checkpoint_dicts = self.experiment_state["checkpoints"]
     checkpoint_dicts = [flatten_dict(g) for g in checkpoint_dicts]
+
     self.progress = {}
+    self.exp_directories = {}
+    self.checkpoint_directories = {}
     for exp in checkpoint_dicts:
-      csv = os.path.join(exp["logdir"], "progress.csv")
+      exp_dir = os.path.basename(exp["logdir"])
+      csv = os.path.join(experiment_path, exp_dir, "progress.csv")
       self.progress[exp["experiment_tag"]] = pd.read_csv(csv)
-      print(exp["experiment_tag"],
-            self.progress[exp["experiment_tag"]].mean_accuracy.max()
-            )
+      self.exp_directories[exp["experiment_tag"]] = os.path.abspath(
+        os.path.join(experiment_path, exp_dir))
+
+      # Figure out checkpoint file if it exists
+      cd = os.path.abspath(
+        os.path.join(experiment_path, exp_dir, "checkpoint_20"))
+      self.checkpoint_directories[exp["experiment_tag"]] = os.path.abspath(
+        os.path.join(experiment_path, exp_dir, "checkpoint_20", "model.pt"))
+
 
   def get_value(self, exp_substring="", tag="mean_accuracy", which='max'):
     """
@@ -59,6 +80,18 @@ class experimentBrowser(object):
 
     return p
 
+  def get_checkpoint_file(self, exp_substring=""):
+    """
+    For every experiment whose name matches exp_substring, return the
+    full path to the checkpoint file. Returns a list of paths.
+    """
+    # Collect experiment names that match exp at all
+    exps = [e for e in self.progress if exp_substring in e]
+
+    paths = [self.checkpoint_directories[e] for e in exps]
+
+    return paths
+
 
 @click.command()
 @click.argument("experiment_path", required=True, type=str)
@@ -71,7 +104,7 @@ def summarize_trials(experiment_path, name, tag, which):
     p = browser.get_value(exp_substring=name, tag=tag, which=which)
     p.sort_values(tag, axis=0, ascending=False,
                  inplace=True, na_position='last')
-    print(p)
+    print_df_tabular(p)
 
 
 if __name__ == "__main__":
