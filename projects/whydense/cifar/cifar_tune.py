@@ -34,6 +34,10 @@ from nupic.research.frameworks.pytorch.cifar_experiment import TinyCIFAR
 
 import configparser
 
+import logging
+
+# Remove annoying messages saying training is taking too long
+logging.getLogger("ray.tune.util").setLevel(logging.ERROR)
 
 class CIFARTune(TinyCIFAR, tune.Trainable):
   """
@@ -65,7 +69,7 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
         A dict that describes training progress."""
 
     ret = self.train_epoch(self._iteration)
-    print(ret)
+    print("epoch", self._iteration, ":", ret)
     return ret
 
 

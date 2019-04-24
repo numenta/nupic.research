@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tabulate
+import pprint
 import click
 from ray.tune.commands import _get_experiment_state
 from ray.tune.commands import *
@@ -105,6 +106,8 @@ def summarize_trials(experiment_path, name, tag, which):
     p.sort_values(tag, axis=0, ascending=False,
                  inplace=True, na_position='last')
     print_df_tabular(p)
+    print("Checkpoints:")
+    pprint.pprint(browser.get_checkpoint_file(name))
 
 
 if __name__ == "__main__":
