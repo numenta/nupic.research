@@ -64,7 +64,9 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
     Returns:
         A dict that describes training progress."""
 
-    return self.train_epoch(self._iteration)
+    ret = self.train_epoch(self._iteration)
+    print(ret)
+    return ret
 
 
   def _save(self, checkpoint_dir):
