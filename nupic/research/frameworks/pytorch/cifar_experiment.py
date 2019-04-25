@@ -98,6 +98,7 @@ class TinyCIFAR(object):
     seed = config["seed"]
     self.data_dir = config["data_dir"]
     self.model_filename = config.get("model_filename", "model.pt")
+    self.iterations = config["iterations"]
 
     # Training / testing parameters
     batch_size = config["batch_size"]
@@ -290,6 +291,8 @@ class TinyCIFAR(object):
                                          kInferenceFactor=self.k_inference_factor,
                                          boostStrength=self.boost_strength,
                                          boostStrengthFactor=self.boost_strength_factor))
+      else:
+        self.model.add_module("ReLU_"+str(c), nn.ReLU())
 
 
     # Flatten CNN output before passing to linear layer
@@ -310,6 +313,8 @@ class TinyCIFAR(object):
                                    kInferenceFactor=self.k_inference_factor,
                                    boostStrength=self.boost_strength,
                                    boostStrengthFactor=self.boost_strength_factor))
+    else:
+      self.model.add_module("Linear_ReLU", nn.ReLU())
 
     # Output layer
     self.model.add_module("output", nn.Linear(self.linear_n, self.output_size))
