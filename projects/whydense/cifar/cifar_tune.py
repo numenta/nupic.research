@@ -21,7 +21,6 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import argparse
-import time
 
 import ray
 from ray import tune
@@ -88,6 +87,12 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
     self.model_restore(checkpoint)
 
 
+  def _stop(self):
+    """Subclasses should override this for any cleanup on stop."""
+    if self._iteration < self.iterations:
+      print("CIFARTune: stopping early at epoch {}".format(self._iteration))
+
+
 @ray.remote
 def run_experiment(config, trainable):
   """
@@ -117,6 +122,8 @@ def run_experiment(config, trainable):
                            time_attr="training_iteration",
                            reward_attr='mean_accuracy',
                            min_samples_required=3,
+                           grace_period=10,
+                           verbose=False,
                          )),
     trial_executor=config.get("trial_executor", None),
     checkpoint_at_end=config.get("checkpoint_at_end", False),

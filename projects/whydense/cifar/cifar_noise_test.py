@@ -42,16 +42,16 @@ def get_activation(name):
 
 
 def evaluateSensitivityOneImage(idx, model, noise_datasets, layer,
-                                noise_tolerance_sum):
+                                relative_dot_product_sum):
   """
   For a given image and layer, compute the noise tolerance of this layer for
   each noise dataset. If d_i is the activity of this layer for dataset i, we
-  compute the noise tolerance for each dataset is computed as:
+  compute the relative dot product for each dataset is computed as:
 
-      noise_tolerance[i] = dot(d_0, d_i) / dot(d_0, d_0)
+      relative_dot_product[i] = dot(d_0, d_i) / dot(d_0, d_0)
 
   The noise_tolerance is added to noise_tolerance_sum:
-      noise_tolerance_sum[i] += noise_tolerance[i]
+      relative_dot_product_sum[i] += noise_tolerance[i]
 
   Here we assume that noise_datasets[0] is a zero noise dataset. If layer ==
   "image" then we compute the noise tolerance of the noisy images themselves. We
@@ -81,7 +81,7 @@ def evaluateSensitivityOneImage(idx, model, noise_datasets, layer,
     if d == 0:
       dot0 = activations[0].dot(activations[0])
 
-    noise_tolerance_sum[d] += activations[0].dot(x) / dot0
+    relative_dot_product_sum[d] += activations[0].dot(x) / dot0
 
   # print(activations[0].sum(), activations[1].sum())
   # print((activations[0] - activations[1]).abs().sum())
@@ -89,7 +89,7 @@ def evaluateSensitivityOneImage(idx, model, noise_datasets, layer,
   # Ensure the targets are all the same
   assert (len(set(targets)) == 1)
 
-  return noise_tolerance_sum
+  return relative_dot_product_sum
 
 
 
@@ -148,8 +148,9 @@ def testModel(config, projectDir, checkpoint_path=None):
   evaluateNoiseSensitivity(model=tiny_cifar.model, noise_datasets=noise_datasets,
                            layer_name="image", numImages=numImages)
 
-  modules_to_check = ["cnn_0", "avgpool_0", "kwinners_2d_0", "flatten",
-                      "linear", "kwinners_linear"]
+  modules_to_check = ["cnn_0", "avgpool_0", "kwinners_2d_0",
+                      "cnn_1", "avgpool_1", "kwinners_2d_1",
+                      "flatten", "linear", "kwinners_linear"]
   for m in modules_to_check:
     if m in model._modules.keys():
       evaluateNoiseSensitivity(model=tiny_cifar.model, noise_datasets=noise_datasets,

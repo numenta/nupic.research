@@ -21,6 +21,7 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import time
+import random
 
 import torch
 import torch.nn as nn
@@ -95,7 +96,7 @@ class TinyCIFAR(object):
     containing all the parameters required to setup the trial.
     """
     # Get trial parameters
-    seed = config["seed"]
+    seed = config.get("seed", random.randint(0, 10000))
     self.data_dir = config["data_dir"]
     self.model_filename = config.get("model_filename", "model.pt")
     self.iterations = config["iterations"]
@@ -116,6 +117,7 @@ class TinyCIFAR(object):
     self.momentum = config["momentum"]
     self.weight_decay = config.get("weight_decay", 0.0005)
     self.learning_rate_gamma = config.get("learning_rate_gamma", 0.9)
+    self.last_noise_results = None
 
     # Network parameters
     network_type = config["network_type"]
@@ -207,7 +209,7 @@ class TinyCIFAR(object):
     self._postEpoch()
     trainTime = time.time() - t1
 
-    ret = self._runNoiseTests(self.noise_values, self.test_loaders)
+    ret = self._runNoiseTests(self.noise_values, self.test_loaders, epoch)
 
     # Early stopping criterion
     if epoch > 1 and abs(ret['mean_accuracy'] - 0.1) < 0.01:
@@ -343,31 +345,39 @@ class TinyCIFAR(object):
                                            gamma=self.learning_rate_gamma)
 
 
-  def _runNoiseTests(self, noiseValues, loaders):
+  def _runNoiseTests(self, noiseValues, loaders, epoch):
     """
     Test the model with different noise values and return test metrics.
     """
-    ret = {
-      'noise_values': noiseValues,
-      'noise_accuracies': [],
-    }
-    accuracy = 0.0
-    loss = 0.0
-    for noise, loader in zip(noiseValues, loaders):
-      testResult = evaluateModel(
-        model=self.model,
-        loader=loader,
-        device=self.device,
-        batches_in_epoch=self.test_batches_in_epoch,
-        criterion=self.loss_function
-      )
-      accuracy += testResult['mean_accuracy']
-      loss += testResult['mean_loss']
-      ret['noise_accuracies'].append(testResult['mean_accuracy'])
+    ret = self.last_noise_results
 
-    ret['mean_accuracy'] = accuracy / len(noiseValues)
-    ret['noise_accuracy'] = ret['noise_accuracies'][-1]
-    ret['mean_loss'] = loss / len(noiseValues)
+    # Just do noise tests every 3 iterations, about a 2X overall speedup
+    if epoch % 3 == 0 or ret is None:
+      ret = {
+        'noise_values': noiseValues,
+        'noise_accuracies': [],
+      }
+      accuracy = 0.0
+      loss = 0.0
+      for noise, loader in zip(noiseValues, loaders):
+        testResult = evaluateModel(
+          model=self.model,
+          loader=loader,
+          device=self.device,
+          batches_in_epoch=self.test_batches_in_epoch,
+          criterion=self.loss_function
+        )
+        accuracy += testResult['mean_accuracy']
+        loss += testResult['mean_loss']
+        ret['noise_accuracies'].append(testResult['mean_accuracy'])
+
+      ret['mean_accuracy'] = accuracy / len(noiseValues)
+      ret['test_accuracy'] = ret['noise_accuracies'][0]
+      ret['noise_accuracy'] = ret['noise_accuracies'][-1]
+      ret['mean_loss'] = loss / len(noiseValues)
+
+      self.last_noise_results = ret
+
     return ret
 
 
