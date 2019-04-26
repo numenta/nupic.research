@@ -235,18 +235,33 @@ class TinyCIFAR(object):
     # checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
     # torch.save(self.model.state_dict(), checkpoint_path)
     checkpoint_path = os.path.join(checkpoint_dir, self.model_filename)
-    torch.save(self.model, checkpoint_path)
+
+    # Use the slow method if filename ends with .pt
+    if checkpoint_path.endswith(".pt"):
+      torch.save(self.model, checkpoint_path)
+    else:
+      torch.save(self.model.state_dict(), checkpoint_path)
+
     return checkpoint_path
 
 
   def model_restore(self, checkpoint_path):
     """
-    :param checkpoint_path: Loads model from this checkpoint path
-    :return:
+    :param checkpoint_path: Loads model from this checkpoint path.
+    If path is a directory, will append the parameter model_filename
+
     """
     print("loading from", checkpoint_path)
-    self.model = torch.load(checkpoint_path, map_location=self.device)
-    # self.model.load_state_dict(checkpoint_path)
+    if os.path.isdir(checkpoint_path):
+      checkpoint_file = os.path.join(checkpoint_path, self.model_filename)
+    else:
+      checkpoint_file = checkpoint_path
+
+    # Use the slow method if filename ends with .pt
+    if checkpoint_file.endswith(".pt"):
+      self.model = torch.load(checkpoint_file, map_location=self.device)
+    else:
+      self.model.load_state_dict(torch.load(checkpoint_file, map_location=self.device))
 
 
   def _createTinySparseModel(self):
