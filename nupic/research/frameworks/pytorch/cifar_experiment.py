@@ -250,6 +250,8 @@ class TinyCIFAR(object):
 
 
   def _createTinySparseModel(self):
+
+    # Figure out some numbers we'll need later on.
     prev_w = self.w
     cnn_output_len = []
     padding = []
@@ -264,9 +266,10 @@ class TinyCIFAR(object):
       prev_w = cnn_w
 
 
-    # Create simple sparse model
+    # Create simple CNN model, with options for sparsity
     self.model = nn.Sequential()
 
+    # Create each CNN layer
     for c, l in enumerate(cnn_output_len):
 
       # Sparse CNN layer
