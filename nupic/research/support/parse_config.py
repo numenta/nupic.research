@@ -20,11 +20,13 @@
 
 import configparser
 
-def parse_config(config_file, experiments=None):
+def parse_config(config_file, experiments=None, globals=None, locals=None):
   """
   Parse configuration file optionally filtering for specific experiments/sections
   :param config_file: Configuration file
   :param experiments: Optional list of experiments
+  :param globals: global symbol table to use during `eval`
+  :param locals: local symbol table to use during `eval`
   :return: Dictionary with the parsed configuration
   """
   cfgparser = configparser.ConfigParser()
@@ -38,7 +40,7 @@ def parse_config(config_file, experiments=None):
       item = {}
       for k, v in values.items():
         try:
-          item[k] = eval(v)
+          item[k] = eval(v, globals, locals)
         except (NameError, SyntaxError):
           item[k] = v
 
