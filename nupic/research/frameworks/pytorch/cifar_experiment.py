@@ -21,10 +21,14 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import time
+import random
 
 import torch
 import torch.nn as nn
-from nupic.torch.modules import (KWinners, SparseWeights, Flatten, KWinners2d, rezeroWeights, updateBoostStrength)
+from nupic.torch.modules import (
+  SparseWeights, SparseWeights2d,
+  Flatten, KWinners2d, KWinners,
+  rezeroWeights, updateBoostStrength)
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
@@ -34,6 +38,34 @@ from nupic.research.frameworks.pytorch.image_transforms import *
 
 def CNNSize(width, kernel_size, padding=1, stride=1):
   return (width - kernel_size + 2 * padding) / stride + 1
+
+
+def create_test_loaders(noise_values, batch_size, data_dir):
+  """
+  Create a list of data loaders, one for each noise value
+  """
+  print("Creating test loaders for noise values:", noise_values)
+  loaders = []
+  for noise in noise_values:
+
+    transform_noise_test = transforms.Compose([
+      transforms.ToTensor(),
+      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+      RandomNoise(noise,
+                  highValue=0.5 + 2 * 0.20,
+                  lowValue=0.5 - 2 * 0.2,
+                  ),
+    ])
+
+    testset = datasets.CIFAR10(root=data_dir,
+                               train=False,
+                               transform=transform_noise_test)
+    loaders.append(
+      DataLoader(testset, batch_size=batch_size, shuffle=False)
+    )
+
+  return loaders
+
 
 
 class TinyCIFAR(object):
@@ -64,9 +96,10 @@ class TinyCIFAR(object):
     containing all the parameters required to setup the trial.
     """
     # Get trial parameters
-    seed = config["seed"]
+    seed = config.get("seed", random.randint(0, 10000))
     self.data_dir = config["data_dir"]
-    self.model_filename = config.get("model_filename", "model.pt")
+    self.model_filename = config.get("model_filename", "model.pth")
+    self.iterations = config["iterations"]
 
     # Training / testing parameters
     batch_size = config["batch_size"]
@@ -84,6 +117,7 @@ class TinyCIFAR(object):
     self.momentum = config["momentum"]
     self.weight_decay = config.get("weight_decay", 0.0005)
     self.learning_rate_gamma = config.get("learning_rate_gamma", 0.9)
+    self.last_noise_results = None
 
     # Network parameters
     network_type = config["network_type"]
@@ -95,9 +129,11 @@ class TinyCIFAR(object):
 
     # CNN parameters - these are lists, one for each CNN layer
     self.cnn_k = config["cnn_k"]
-    self.kernel_size = config.get("kernel_size", [3, 3])
-    self.out_channels = config.get("out_channels", [32, 32])
-    self.in_channels = [inChannels] + self.out_channels
+    self.cnn_kernel_sizes = config.get("cnn_kernel_size", [3] * len(self.cnn_k))
+    self.cnn_out_channels = config.get("cnn_out_channels", [32] * len(self.cnn_k))
+    self.cnn_weight_sparsity = config.get("cnn_weight_sparsity",
+                                          [1.0]*len(self.cnn_k))
+    self.in_channels = [inChannels] + self.cnn_out_channels
 
     # Linear parameters
     self.weight_sparsity = config["weight_sparsity"]
@@ -137,7 +173,9 @@ class TinyCIFAR(object):
     self.first_loader = torch.utils.data.DataLoader(
       train_dataset, batch_size=first_epoch_batch_size, shuffle=True
     )
-    self.test_loaders = self._createTestLoaders(self.noise_values)
+    self.test_loaders = create_test_loaders(self.noise_values,
+                                            self.test_batch_size,
+                                            self.data_dir)
 
     if network_type == "tiny_sparse":
       self._createTinySparseModel()
@@ -171,7 +209,7 @@ class TinyCIFAR(object):
     self._postEpoch()
     trainTime = time.time() - t1
 
-    ret = self._runNoiseTests(self.noise_values, self.test_loaders)
+    ret = self._runNoiseTests(self.noise_values, self.test_loaders, epoch)
 
     # Early stopping criterion
     if epoch > 1 and abs(ret['mean_accuracy'] - 0.1) < 0.01:
@@ -195,81 +233,85 @@ class TinyCIFAR(object):
     can be later passed to `model_restore()`.
     """
     # checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-    # torch.save(self.model, checkpoint_path)
+    # torch.save(self.model.state_dict(), checkpoint_path)
     checkpoint_path = os.path.join(checkpoint_dir, self.model_filename)
-    torch.save(self.model.state_dict(), checkpoint_path)
+
+    # Use the slow method if filename ends with .pt
+    if checkpoint_path.endswith(".pt"):
+      torch.save(self.model, checkpoint_path)
+    else:
+      torch.save(self.model.state_dict(), checkpoint_path)
+
     return checkpoint_path
 
 
   def model_restore(self, checkpoint_path):
     """
-    :param checkpoint_path: Loads model from this checkpoint path
-    :return:
+    :param checkpoint_path: Loads model from this checkpoint path.
+    If path is a directory, will append the parameter model_filename
+
     """
-    # self.model = torch.load(checkpoint_path, map_location=self.device)
-    checkpoint_file = os.path.join(checkpoint_path, self.model_filename)
-    self.model.load_state_dict(torch.load(checkpoint_file, map_location=self.device))
+    print("loading from", checkpoint_path)
+    if os.path.isdir(checkpoint_path):
+      checkpoint_file = os.path.join(checkpoint_path, self.model_filename)
+    else:
+      checkpoint_file = checkpoint_path
 
-
-  def _createTestLoaders(self, noise_values):
-    """
-    Create a list of data loaders, one for each noise value
-    """
-    print("Creating test loaders for noise values:", noise_values)
-    loaders = []
-    for noise in noise_values:
-
-      transform_noise_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        RandomNoise(noise,
-                    highValue=0.5 + 2 * 0.20,
-                    lowValue=0.5 - 2 * 0.2,
-                    ),
-      ])
-
-      testset = datasets.CIFAR10(root=self.data_dir,
-                                 train=False,
-                                 transform=transform_noise_test)
-      loaders.append(
-        DataLoader(testset, batch_size=self.test_batch_size, shuffle=False)
-      )
-
-    return loaders
+    # Use the slow method if filename ends with .pt
+    if checkpoint_file.endswith(".pt"):
+      self.model = torch.load(checkpoint_file, map_location=self.device)
+    else:
+      self.model.load_state_dict(torch.load(checkpoint_file, map_location=self.device))
 
 
   def _createTinySparseModel(self):
+
+    # Figure out some numbers we'll need later on.
     prev_w = self.w
     cnn_output_len = []
-    for i, (ks,ch) in enumerate(zip(self.kernel_size, self.out_channels)):
-      cnn_w = CNNSize(prev_w, ks) // 2
+    padding = []
+    for i, (kernel_size, ch) in enumerate(zip(self.cnn_kernel_sizes,
+                                              self.cnn_out_channels)):
+      if kernel_size == 3:
+        padding.append(1)
+      else:
+        padding.append(2)
+      cnn_w = CNNSize(prev_w, kernel_size, padding=padding[-1]) // 2
       cnn_output_len.append(int(ch * (cnn_w) ** 2))
       prev_w = cnn_w
 
 
-    # Create simple sparse model
+    # Create simple CNN model, with options for sparsity
     self.model = nn.Sequential()
 
+    # Create each CNN layer
     for c, l in enumerate(cnn_output_len):
-      # Sparse CNN layer
-      self.model.add_module("cnn_"+str(c),
-                            nn.Conv2d(in_channels=self.in_channels[c],
-                                      out_channels=self.out_channels[c],
-                                      kernel_size=self.kernel_size[c],
-                                      padding=1, bias=False))
-      self.model.add_module("bn_"+str(c),
-                            nn.BatchNorm2d(self.out_channels[c])),
-      self.model.add_module("maxpool_"+str(c),
-                            nn.MaxPool2d(kernel_size=2))
 
+      # Sparse CNN layer
+      conv2d = nn.Conv2d(in_channels=self.in_channels[c],
+                         out_channels=self.cnn_out_channels[c],
+                         kernel_size=self.cnn_kernel_sizes[c],
+                         padding=padding[c], bias=False)
+      if self.cnn_weight_sparsity[c] < 1.0:
+        conv2d = SparseWeights2d(conv2d,
+                                 weightSparsity=self.cnn_weight_sparsity[c])
+      self.model.add_module("cnn_"+str(c), conv2d)
+
+      # Batch norm plus average pooling
+      self.model.add_module("bn_" + str(c),
+                            nn.BatchNorm2d(self.cnn_out_channels[c])),
+      self.model.add_module("avgpool_"+str(c), nn.AvgPool2d(kernel_size=2))
+
+      # K-winners, if required
       if self.cnn_k[c] < 1.0:
         self.model.add_module("kwinners_2d_"+str(c),
-                              KWinners2d(n=cnn_output_len[c],
-                                         channels=self.out_channels[c],
-                                         k=int(self.cnn_k[c] * cnn_output_len[c]),
+                              KWinners2d(percent_on=self.cnn_k[c],
+                                         channels=self.cnn_out_channels[c],
                                          kInferenceFactor=self.k_inference_factor,
                                          boostStrength=self.boost_strength,
                                          boostStrengthFactor=self.boost_strength_factor))
+      else:
+        self.model.add_module("ReLU_"+str(c), nn.ReLU())
 
 
     # Flatten CNN output before passing to linear layer
@@ -286,10 +328,12 @@ class TinyCIFAR(object):
     if self.linear_k < 1.0:
       self.model.add_module("kwinners_linear",
                           KWinners(n=self.linear_n,
-                                   k=int(self.linear_k * self.linear_n),
+                                   percent_on=self.linear_k,
                                    kInferenceFactor=self.k_inference_factor,
                                    boostStrength=self.boost_strength,
                                    boostStrengthFactor=self.boost_strength_factor))
+    else:
+      self.model.add_module("Linear_ReLU", nn.ReLU())
 
     # Output layer
     self.model.add_module("output", nn.Linear(self.linear_n, self.output_size))
@@ -318,31 +362,39 @@ class TinyCIFAR(object):
                                            gamma=self.learning_rate_gamma)
 
 
-  def _runNoiseTests(self, noiseValues, loaders):
+  def _runNoiseTests(self, noiseValues, loaders, epoch):
     """
     Test the model with different noise values and return test metrics.
     """
-    ret = {
-      'noise_values': noiseValues,
-      'noise_accuracies': [],
-    }
-    accuracy = 0.0
-    loss = 0.0
-    for noise, loader in zip(noiseValues, loaders):
-      testResult = evaluateModel(
-        model=self.model,
-        loader=loader,
-        device=self.device,
-        batches_in_epoch=self.test_batches_in_epoch,
-        criterion=self.loss_function
-      )
-      accuracy += testResult['mean_accuracy']
-      loss += testResult['mean_loss']
-      ret['noise_accuracies'].append(testResult['mean_accuracy'])
+    ret = self.last_noise_results
 
-    ret['mean_accuracy'] = accuracy / len(noiseValues)
-    ret['noise_accuracy'] = ret['noise_accuracies'][-1]
-    ret['mean_loss'] = loss / len(noiseValues)
+    # Just do noise tests every 3 iterations, about a 2X overall speedup
+    if epoch % 3 == 0 or ret is None:
+      ret = {
+        'noise_values': noiseValues,
+        'noise_accuracies': [],
+      }
+      accuracy = 0.0
+      loss = 0.0
+      for noise, loader in zip(noiseValues, loaders):
+        testResult = evaluateModel(
+          model=self.model,
+          loader=loader,
+          device=self.device,
+          batches_in_epoch=self.test_batches_in_epoch,
+          criterion=self.loss_function
+        )
+        accuracy += testResult['mean_accuracy']
+        loss += testResult['mean_loss']
+        ret['noise_accuracies'].append(testResult['mean_accuracy'])
+
+      ret['mean_accuracy'] = accuracy / len(noiseValues)
+      ret['test_accuracy'] = ret['noise_accuracies'][0]
+      ret['noise_accuracy'] = ret['noise_accuracies'][-1]
+      ret['mean_loss'] = loss / len(noiseValues)
+
+      self.last_noise_results = ret
+
     return ret
 
 
