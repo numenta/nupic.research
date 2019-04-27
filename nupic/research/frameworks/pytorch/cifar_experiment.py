@@ -98,7 +98,7 @@ class TinyCIFAR(object):
     # Get trial parameters
     seed = config.get("seed", random.randint(0, 10000))
     self.data_dir = config["data_dir"]
-    self.model_filename = config.get("model_filename", "model.pt")
+    self.model_filename = config.get("model_filename", "model.pth")
     self.iterations = config["iterations"]
 
     # Training / testing parameters
@@ -305,9 +305,8 @@ class TinyCIFAR(object):
       # K-winners, if required
       if self.cnn_k[c] < 1.0:
         self.model.add_module("kwinners_2d_"+str(c),
-                              KWinners2d(n=cnn_output_len[c],
+                              KWinners2d(percent_on=self.cnn_k[c],
                                          channels=self.cnn_out_channels[c],
-                                         k=int(self.cnn_k[c] * cnn_output_len[c]),
                                          kInferenceFactor=self.k_inference_factor,
                                          boostStrength=self.boost_strength,
                                          boostStrengthFactor=self.boost_strength_factor))
@@ -329,7 +328,7 @@ class TinyCIFAR(object):
     if self.linear_k < 1.0:
       self.model.add_module("kwinners_linear",
                           KWinners(n=self.linear_n,
-                                   k=int(self.linear_k * self.linear_n),
+                                   percent_on=self.linear_k,
                                    kInferenceFactor=self.k_inference_factor,
                                    boostStrength=self.boost_strength,
                                    boostStrengthFactor=self.boost_strength_factor))
