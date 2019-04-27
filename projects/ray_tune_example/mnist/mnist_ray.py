@@ -59,8 +59,8 @@ class TrainMNIST(tune.Trainable):
     boost_strength = config["boost_strength"]
     boost_strength_factor = config["boost_strength_factor"]
     n = config["n"]
-    k = config["k"]
-    cnn_k = config["cnn_k"]
+    percent_on = config["percent_on"]
+    cnn_percent_on = config["cnn_percent_on"]
     k_inference_factor = config["k_inference_factor"]
     kernel_size = config["kernel_size"]
     out_channels = config["out_channels"]
@@ -89,34 +89,44 @@ class TrainMNIST(tune.Trainable):
     # Create simple sparse model
     self.model = nn.Sequential()
 
-    # Sparse CNN layer
-    self.model.add_module("sparsecnn",
+    # CNN layer
+    self.model.add_module("cnn",
                           nn.Conv2d(in_channels=inChannels,
                                     out_channels=out_channels,
                                     kernel_size=kernel_size))
-    self.model.add_module("kwinners_cnn",
-                          KWinners2d(n=cnn_output_len,
-                                     channels=out_channels,
-                                     k=cnn_k, kInferenceFactor=k_inference_factor,
-                                     boostStrength=boost_strength,
-                                     boostStrengthFactor=boost_strength_factor))
+
+    if cnn_percent_on < 1.0:
+      self.model.add_module("kwinners_cnn",
+                            KWinners2d(percent_on=cnn_percent_on,
+                                       channels=out_channels,
+                                       kInferenceFactor=k_inference_factor,
+                                       boostStrength=boost_strength,
+                                       boostStrengthFactor=boost_strength_factor))
+    else:
+      self.model.add_module("ReLU_cnn", nn.ReLU())
+
     self.model.add_module("maxpool", nn.MaxPool2d(kernel_size=2))
 
     # Flatten max pool output before passing to linear layer
     self.model.add_module("flatten", Flatten())
 
-    # Sparse Linear layer
+    # Linear layer
     linear = nn.Linear(cnn_output_len, n)
     if weight_sparsity < 1.0:
       self.model.add_module("sparse_linear",
                             SparseWeights(linear, weight_sparsity))
+    else:
+      self.model.add_module("linear", linear)
+
+    if percent_on < 1.0:
       self.model.add_module("kwinners_kinear",
-                            KWinners(n=n, k=k,
+                            KWinners(n=n,
+                                     percent_on=percent_on,
                                      kInferenceFactor=k_inference_factor,
                                      boostStrength=boost_strength,
                                      boostStrengthFactor=boost_strength_factor))
     else:
-      self.model.add_module("linear", linear)
+      self.model.add_module("Linear_ReLU", nn.ReLU())
 
     # Output layer
     self.model.add_module("fc", nn.Linear(n, output_size))
@@ -138,7 +148,8 @@ class TrainMNIST(tune.Trainable):
     self.model.apply(rezeroWeights)
     self.model.apply(updateBoostStrength)
 
-    return evaluateModel(model=self.model, loader=self.test_loader,
+    return evaluateModel(model=self.model,
+                         loader=self.test_loader,
                          device=self.device)
 
 
