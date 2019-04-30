@@ -55,18 +55,23 @@ class ExperimentBrowser(object):
       # we need to switch to the directory in order for glob to work.
       ed = os.path.abspath(os.path.join(self.experiment_path, exp_dir))
       os.chdir(ed)
-      cd = max(glob.glob("checkpoint*"))
-      cf = glob.glob(os.path.join(cd, "*.pt"))
-      cf.append(glob.glob(os.path.join(cd, "*.pth")))
-      if len(cf) > 0:
-        self.checkpoint_directories[exp["experiment_tag"]] = os.path.abspath(cf[0])
+      cds = glob.glob("checkpoint*")
+      if len(cds) > 0:
+        cd = max(cds)
+        cf = glob.glob(os.path.join(cd, "*.pt"))
+        cf += glob.glob(os.path.join(cd, "*.pth"))
+        if len(cf) > 0:
+          self.checkpoint_directories[exp["experiment_tag"]] = os.path.join(
+            ed, cf[0])
+        else:
+          self.checkpoint_directories[exp["experiment_tag"]] = ""
       else:
         self.checkpoint_directories[exp["experiment_tag"]] = ""
 
-      # Read in the configs for this experiment
-      paramsFile = os.path.join(self.experiment_path, exp_dir, "params.json")
-      with open(paramsFile) as f:
-        self.params[exp["experiment_tag"]] = json.load(f)
+        # Read in the configs for this experiment
+        paramsFile = os.path.join(self.experiment_path, exp_dir, "params.json")
+        with open(paramsFile) as f:
+          self.params[exp["experiment_tag"]] = json.load(f)
 
 
   def get_value(self, exp_substring="", tag="mean_accuracy", which='max'):
@@ -145,7 +150,7 @@ class ExperimentBrowser(object):
 @click.command()
 @click.argument("experiment_path", required=True, type=str)
 @click.option('--name', default="", help='The substring to match')
-@click.option('--tag', default="mean_accuracy", help='The tag to extract')
+@click.option('--tag', default="test_accuracy", help='The tag to extract')
 @click.option('--which', default="max", help='The function to use for extracting')
 def summarize_trials(experiment_path, name, tag, which):
     """Summarizes trials in the directory subtree starting at the given path."""
