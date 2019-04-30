@@ -162,7 +162,8 @@ class ExperimentBrowser(object):
 @click.command()
 @click.argument("experiment_path", required=True, type=str)
 @click.option('--name', default="", help='The substring to match')
-@click.option('--tag', default="test_accuracy", help='The tag to extract and sort by')
+@click.option('--tag', default="noise_accuracy",
+              help='The tag to sort by (also added to list if not present)')
 @click.option('--which', default="max", help='The function to use for extracting')
 def summarize_trials(experiment_path, name, tag, which):
     """Summarizes trials in the directory subtree starting at the given path."""

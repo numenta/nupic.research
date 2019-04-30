@@ -217,7 +217,7 @@ class TinyCIFAR(object):
     # Hard coded early stopping criteria
     if (
           (epoch > 2 and abs(ret['mean_accuracy'] - 0.1) < 0.01)
-          or (epoch > 10 and ret['noise_accuracy'] < 0.50)
+          or (epoch > 10 and ret['noise_accuracy'] < 0.45)
           or (epoch > 30 and ret['noise_accuracy'] < 0.59)
     ):
       ret['stop'] = 1
