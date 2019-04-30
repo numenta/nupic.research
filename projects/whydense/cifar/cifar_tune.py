@@ -38,6 +38,25 @@ import logging
 # Remove annoying messages saying training is taking too long
 logging.getLogger("ray.tune.util").setLevel(logging.ERROR)
 
+
+def trial_name_string(trial):
+  """
+  Args:
+      trial (Trial): A generated trial object.
+
+  Returns:
+      trial_name (str): String representation of Trial.
+  """
+  s = str(trial)
+  chars = "{}[]() ,="
+  for c in chars:
+    s = s.replace(c, "_")
+
+  if len(s) > 85:
+    s = s[0:75] + "_" + s[-10:]
+  return s
+
+
 class CIFARTune(TinyCIFAR, tune.Trainable):
   """
   ray.tune trainable class for running small CIFAR models:
@@ -109,6 +128,8 @@ def run_experiment(config, trainable):
   }
   stop_criteria.update(config.get("stop", {}))
 
+  print("gpu usage:",config.get("num_gpus", 0) / config.get("num_cpus", 1))
+
   tune.run(
     trainable,
     name=config["name"],
@@ -120,17 +141,21 @@ def run_experiment(config, trainable):
     scheduler=config.get("scheduler",
                          MedianStoppingRule(
                            time_attr="training_iteration",
-                           reward_attr='mean_accuracy',
+                           reward_attr='noise_accuracy',
                            min_samples_required=3,
-                           grace_period=10,
+                           grace_period=20,
                            verbose=False,
                          )),
+    trial_name_creator=tune.function(trial_name_string),
     trial_executor=config.get("trial_executor", None),
     checkpoint_at_end=config.get("checkpoint_at_end", False),
     checkpoint_freq=config.get("checkpoint_freq", 0),
     resume=config.get("resume", False),
     reuse_actors=config.get("reuse_actors", False),
-    verbose=config.get("verbose", 0)
+    verbose=config.get("verbose", 0),
+    resources_per_trial={
+      "cpu": 1, "gpu": config.get("num_gpus", 0) / config.get("num_cpus", 1)
+    }
   )
 
 def parse_config(config_file, experiments=None):
@@ -167,7 +192,7 @@ def parse_options():
                          default="tiny_experiments.cfg",
                          help="your experiments config file")
   optparser.add_argument("-n", "--num_cpus", dest="num_cpus", type=int,
-                         default=os.cpu_count(),
+                         default=os.cpu_count()-1,
                          help="number of cpus you want to use")
   optparser.add_argument("-g", "--num_gpus", dest="num_gpus", type=int,
                          default=torch.cuda.device_count(),
@@ -206,6 +231,8 @@ if __name__ == "__main__":
   for exp in configs:
     config = configs[exp]
     config["name"] = exp
+    config["num_cpus"] = options.num_cpus
+    config["num_gpus"] = options.num_gpus
 
     # Make sure local directories are relative to the project location
     path = config.get("path", "results")
