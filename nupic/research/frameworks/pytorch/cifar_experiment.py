@@ -92,6 +92,8 @@ class TinyCIFAR(object):
 
   def model_setup(self, config):
     """
+    Tons of parameters!
+
     This should be called at the beginning of each repetition with a dict
     containing all the parameters required to setup the trial.
     """
@@ -120,7 +122,7 @@ class TinyCIFAR(object):
     self.last_noise_results = None
 
     # Network parameters
-    network_type = config["network_type"]
+    network_type = config.get("network_type", "vgg")
     inChannels, self.h, self.w = config["input_shape"]
 
     self.boost_strength = config["boost_strength"]
@@ -140,6 +142,10 @@ class TinyCIFAR(object):
     self.linear_weight_sparsity = config["weight_sparsity"]
     self.linear_n = config["linear_n"]
     self.linear_percent_on = config["linear_percent_on"]
+    if isinstance(self.linear_n, int):
+      self.linear_n = [self.linear_n]
+      self.linear_percent_on = [self.linear_percent_on]
+      self.linear_weight_sparsity = [self.linear_weight_sparsity]
     self.output_size = config.get("output_size", 10)
 
     # Setup devices, model, and dataloaders
@@ -178,9 +184,7 @@ class TinyCIFAR(object):
                                             self.test_batch_size,
                                             self.data_dir)
 
-    if network_type == "tiny_sparse":
-      self._createTinySparseModel()
-    elif network_type == "vgg":
+    if network_type == "vgg":
       self._create_vgg_model()
 
     self.optimizer = self._createOptimizer(self.model)
@@ -365,85 +369,6 @@ class TinyCIFAR(object):
 
     # Output layer
     self.model.add_module("output", nn.Linear(input_size, self.output_size))
-
-    print(self.model)
-
-    self.model.to(self.device)
-
-
-  def _createTinySparseModel(self):
-
-    # Figure out some numbers we'll need later on.
-    prev_w = self.w
-    cnn_output_len = []
-    padding = []
-    for i, (kernel_size, ch) in enumerate(zip(self.cnn_kernel_sizes,
-                                              self.cnn_out_channels)):
-      if kernel_size == 3:
-        padding.append(1)
-      else:
-        padding.append(2)
-      cnn_w = CNNSize(prev_w, kernel_size, padding=padding[-1]) // 2
-      cnn_output_len.append(int(ch * (cnn_w) ** 2))
-      prev_w = cnn_w
-
-
-    # Create simple CNN model, with options for sparsity
-    self.model = nn.Sequential()
-
-    # Create each CNN layer
-    for c, l in enumerate(cnn_output_len):
-
-      # Sparse CNN layer
-      conv2d = nn.Conv2d(in_channels=self.in_channels[c],
-                         out_channels=self.cnn_out_channels[c],
-                         kernel_size=self.cnn_kernel_sizes[c],
-                         padding=padding[c], bias=False)
-      if self.cnn_weight_sparsity[c] < 1.0:
-        conv2d = SparseWeights2d(conv2d,
-                                 weightSparsity=self.cnn_weight_sparsity[c])
-      self.model.add_module("cnn_"+str(c), conv2d)
-
-      # Batch norm plus average pooling
-      self.model.add_module("bn_" + str(c),
-                            nn.BatchNorm2d(self.cnn_out_channels[c])),
-      self.model.add_module("avgpool_"+str(c), nn.AvgPool2d(kernel_size=2))
-
-      # K-winners, if required
-      if self.cnn_percent_on[c] < 1.0:
-        self.model.add_module("kwinners_2d_"+str(c),
-                              KWinners2d(percent_on=self.cnn_percent_on[c],
-                                         channels=self.cnn_out_channels[c],
-                                         kInferenceFactor=self.k_inference_factor,
-                                         boostStrength=self.boost_strength,
-                                         boostStrengthFactor=self.boost_strength_factor))
-      else:
-        self.model.add_module("ReLU_"+str(c), nn.ReLU())
-
-
-    # Flatten CNN output before passing to linear layer
-    self.model.add_module("flatten", Flatten())
-
-    # Linear layer
-    linear = nn.Linear(cnn_output_len[-1], self.linear_n)
-    if self.linear_weight_sparsity < 1.0:
-      self.model.add_module("linear",
-                            SparseWeights(linear, self.linear_weight_sparsity))
-    else:
-      self.model.add_module("linear", linear)
-
-    if self.linear_percent_on < 1.0:
-      self.model.add_module("kwinners_linear",
-                          KWinners(n=self.linear_n,
-                                   percent_on=self.linear_percent_on,
-                                   kInferenceFactor=self.k_inference_factor,
-                                   boostStrength=self.boost_strength,
-                                   boostStrengthFactor=self.boost_strength_factor))
-    else:
-      self.model.add_module("Linear_ReLU", nn.ReLU())
-
-    # Output layer
-    self.model.add_module("output", nn.Linear(self.linear_n, self.output_size))
 
     print(self.model)
 
