@@ -57,7 +57,10 @@ def trainModels(configs, projectDir):
     model.model_setup(config)
     for epoch in range(config['iterations']):
       ret = model.train_epoch(epoch)
-      print(ret)
+      print("epoch=", epoch, ":", ret)
+      if ret['stop'] == 1:
+        print("Stopping early!")
+        break
 
     model.model_save(path)
 

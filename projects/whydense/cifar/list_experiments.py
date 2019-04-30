@@ -39,12 +39,12 @@ class ExperimentBrowser(object):
 
 
   def _read_experiment(self, experiment_state):
-    print("Reading experiment:",
-          experiment_state["runner_data"]["_session_str"])
     checkpoint_dicts = experiment_state["checkpoints"]
     checkpoint_dicts = [flatten_dict(g) for g in checkpoint_dicts]
 
     for exp in checkpoint_dicts:
+      if exp.get("logdir", None) is None:
+        continue
       exp_dir = os.path.basename(exp["logdir"])
       csv = os.path.join(self.experiment_path, exp_dir, "progress.csv")
       self.progress[exp["experiment_tag"]] = pd.read_csv(csv)
@@ -55,21 +55,28 @@ class ExperimentBrowser(object):
       # we need to switch to the directory in order for glob to work.
       ed = os.path.abspath(os.path.join(self.experiment_path, exp_dir))
       os.chdir(ed)
-      cd = max(glob.glob("checkpoint*"))
-      cf = glob.glob(os.path.join(cd, "*.pt"))
-      cf.append(glob.glob(os.path.join(cd, "*.pth")))
-      if len(cf) > 0:
-        self.checkpoint_directories[exp["experiment_tag"]] = os.path.abspath(cf[0])
+      cds = glob.glob("checkpoint*")
+      if len(cds) > 0:
+        cd = max(cds)
+        cf = glob.glob(os.path.join(cd, "*.pt"))
+        cf += glob.glob(os.path.join(cd, "*.pth"))
+        if len(cf) > 0:
+          self.checkpoint_directories[exp["experiment_tag"]] = os.path.join(
+            ed, cf[0])
+        else:
+          self.checkpoint_directories[exp["experiment_tag"]] = ""
       else:
         self.checkpoint_directories[exp["experiment_tag"]] = ""
 
-      # Read in the configs for this experiment
-      paramsFile = os.path.join(self.experiment_path, exp_dir, "params.json")
-      with open(paramsFile) as f:
-        self.params[exp["experiment_tag"]] = json.load(f)
+        # Read in the configs for this experiment
+        paramsFile = os.path.join(self.experiment_path, exp_dir, "params.json")
+        with open(paramsFile) as f:
+          self.params[exp["experiment_tag"]] = json.load(f)
 
 
-  def get_value(self, exp_substring="", tag="mean_accuracy", which='max'):
+  def get_value(self, exp_substring="",
+                tags=["test_accuracy", "noise_accuracy"],
+                which='max'):
     """
     For every experiment whose name matches exp_substring, scan the history
     and return the appropriate value associated with tag.
@@ -85,20 +92,30 @@ class ExperimentBrowser(object):
     exps = [e for e in self.progress if exp_substring in e]
 
     # empty histories always return None
-    p = pd.DataFrame(columns=['name', tag])
+    columns = ['name']
+    for tag in tags:
+      columns.append(tag)
+      if which in ["max", "min"]:
+        columns.append("epoch_"+str(tag))
+    p = pd.DataFrame(columns=columns)
     for e in exps:
-      if which == "max":
-        v = self.progress[e][tag].max()
-      elif which == "min":
-        v = self.progress[e][tag].min()
-      elif which == "median":
-        v = self.progress[e][tag].median()
-      elif which == "last":
-        v = self.progress[e][tag].iloc[-1]
-      else:
-        raise RuntimeError("Invalid value for which='{}'".format(which))
+      values = [e]
+      for tag in tags:
+        if which == "max":
+          values.append(self.progress[e][tag].max())
+          v = self.progress[e][tag].idxmax()
+          values.append(v)
+        elif which == "min":
+          values.append(self.progress[e][tag].min())
+          values.append(self.progress[e][tag].idxmin())
+        elif which == "median":
+          values.append(self.progress[e][tag].median())
+        elif which == "last":
+          values.append(self.progress[e][tag].iloc[-1])
+        else:
+          raise RuntimeError("Invalid value for which='{}'".format(which))
 
-      p1 = pd.DataFrame([[e, v]], columns=['name', tag])
+      p1 = pd.DataFrame([values], columns=columns)
       p = p.append(p1)
 
     return p
@@ -145,17 +162,20 @@ class ExperimentBrowser(object):
 @click.command()
 @click.argument("experiment_path", required=True, type=str)
 @click.option('--name', default="", help='The substring to match')
-@click.option('--tag', default="mean_accuracy", help='The tag to extract')
+@click.option('--tag', default="noise_accuracy",
+              help='The tag to sort by (also added to list if not present)')
 @click.option('--which', default="max", help='The function to use for extracting')
 def summarize_trials(experiment_path, name, tag, which):
     """Summarizes trials in the directory subtree starting at the given path."""
     browser = ExperimentBrowser(experiment_path)
-    p = browser.get_value(exp_substring=name, tag=tag, which=which)
+    tags = ["test_accuracy", "noise_accuracy"]
+    if tag not in tags: tags.append(tag)
+    p = browser.get_value(exp_substring=name, tags=tags, which=which)
     p.sort_values(tag, axis=0, ascending=False,
                  inplace=True, na_position='last')
     print_df_tabular(p)
-    print("Checkpoints:")
-    pprint.pprint(browser.get_checkpoint_file(name))
+    # print("Checkpoints:")
+    # pprint.pprint(browser.get_checkpoint_file(name))
 
 
 if __name__ == "__main__":
