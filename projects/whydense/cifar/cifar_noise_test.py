@@ -22,7 +22,6 @@
 
 import argparse
 
-import numpy as np
 from torchvision import datasets
 
 from nupic.research.frameworks.pytorch.model_utils import *
@@ -85,6 +84,7 @@ def evaluateSensitivityOneImage(idx, model, noise_datasets, layer,
 
   # print(activations[0].sum(), activations[1].sum())
   # print((activations[0] - activations[1]).abs().sum())
+  # print("\nnon-zeros for ",layer,activations[0].nonzero().size(0), activations[1].nonzero().size(0))
 
   # Ensure the targets are all the same
   assert (len(set(targets)) == 1)
@@ -109,13 +109,14 @@ def evaluateNoiseSensitivity(model, noise_datasets, layer_name, numImages=10):
     print("layer:", layer_name, "mean dots: ", dots / numImages)
 
 
-def testModel(config, projectDir, checkpoint_path=None):
+def testModel(config, options, projectDir):
   """
   Test a pretrained network, specified in this config against noisy vectors
   """
+
   # Pre-download dataset
   data_dir = os.path.join(projectDir, "data")
-  train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
+  _ = datasets.CIFAR10(data_dir, download=True, train=False)
 
   # Make sure local directories are relative to the project location
   path = config.get("path", "results")
@@ -129,10 +130,8 @@ def testModel(config, projectDir, checkpoint_path=None):
   # Load the pretrained model
   tiny_cifar = TinyCIFAR()
   tiny_cifar.model_setup(config)
-  checkpoint_path = checkpoint_path or os.path.join(path, tiny_cifar.model_filename)
-  print("Loading model")
-  tiny_cifar.model_restore(checkpoint_path)
-  print("Done")
+  tiny_cifar.model_restore(options.checkpoint_path or
+                           os.path.join(path, tiny_cifar.model_filename))
 
   # Create new loaders with batch size 1
   noise_values = [0.0, 0.05, 0.1, 0.15, 0.2]
@@ -142,11 +141,10 @@ def testModel(config, projectDir, checkpoint_path=None):
 
 
   # Test noise sensitivity for different layers
-  numImages = 500
   model = tiny_cifar.model
 
   evaluateNoiseSensitivity(model=tiny_cifar.model, noise_datasets=noise_datasets,
-                           layer_name="image", numImages=numImages)
+                           layer_name="image", numImages=options.num_images)
 
   modules_to_check = ["cnn_0", "avgpool_0", "kwinners_2d_0",
                       "cnn_1", "avgpool_1", "kwinners_2d_1",
@@ -154,7 +152,7 @@ def testModel(config, projectDir, checkpoint_path=None):
   for m in modules_to_check:
     if m in model._modules.keys():
       evaluateNoiseSensitivity(model=tiny_cifar.model, noise_datasets=noise_datasets,
-                               layer_name=m, numImages=numImages)
+                               layer_name=m, numImages=options.num_images)
 
 
 
@@ -167,6 +165,9 @@ def parse_options():
   optparser.add_argument("-m", "--model_file", dest="checkpoint_path",
                          default=None,
                          help="The checkpoint file for the model")
+  optparser.add_argument("-n", "--num_images", dest="num_images",
+                         default=1,
+                         help="The number of images to test")
   optparser.add_argument("-e", "--experiment",
                          action="append", dest="experiments",
                          help="run only selected experiments, by default run "
@@ -192,6 +193,4 @@ if __name__ == "__main__":
     config = configs[exp]
     config["name"] = exp
 
-    testModel(config,
-              projectDir=projectDir,
-              checkpoint_path=options.checkpoint_path)
+    testModel(config, options, projectDir=projectDir)
