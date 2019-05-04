@@ -7,13 +7,12 @@ import glob
 import tabulate
 import pprint
 import click
-from ray.tune.commands import _get_experiment_state
 from ray.tune.commands import *
 
 def print_df_tabular(df):
   headers = list(df.columns)
-  headers.remove("name")
-  headers.insert(0, "name")
+  headers.remove("Experiment Name")
+  headers.insert(0, "Experiment Name")
 
   table = [headers]
   for i, row in df.iterrows():
@@ -23,7 +22,12 @@ def print_df_tabular(df):
 
 
 
-class ExperimentBrowser(object):
+class RayTuneExperimentBrowser(object):
+
+  """
+  Class for browsing and manipulating experiment results directories created
+  by Ray Tune.
+  """
 
   def __init__(self, experiment_path):
     self.experiment_path = os.path.abspath(experiment_path)
@@ -68,10 +72,10 @@ class ExperimentBrowser(object):
       else:
         self.checkpoint_directories[exp["experiment_tag"]] = ""
 
-        # Read in the configs for this experiment
-        paramsFile = os.path.join(self.experiment_path, exp_dir, "params.json")
-        with open(paramsFile) as f:
-          self.params[exp["experiment_tag"]] = json.load(f)
+      # Read in the configs for this experiment
+      paramsFile = os.path.join(self.experiment_path, exp_dir, "params.json")
+      with open(paramsFile) as f:
+        self.params[exp["experiment_tag"]] = json.load(f)
 
 
   def get_value(self, exp_substring="",
@@ -92,7 +96,7 @@ class ExperimentBrowser(object):
     exps = [e for e in self.progress if exp_substring in e]
 
     # empty histories always return None
-    columns = ['name']
+    columns = ['Experiment Name']
     for tag in tags:
       columns.append(tag)
       if which in ["max", "min"]:
@@ -119,6 +123,7 @@ class ExperimentBrowser(object):
       p = p.append(p1)
 
     return p
+
 
   def get_checkpoint_file(self, exp_substring=""):
     """
@@ -159,6 +164,44 @@ class ExperimentBrowser(object):
     return experiment_states
 
 
+  def get_parameters(self, sorted_experiments):
+    for i,e in sorted_experiments.iterrows():
+      if e['Experiment Name'] in self.params:
+        params = self.params[e['Experiment Name']]
+        print(params['cnn_percent_on'][0])
+
+    print('noise_accuracy')
+    for i,e in sorted_experiments.iterrows():
+      print(e['noise_accuracy'])
+
+
+  def best_experiments(self, min_test_accuracy=0.86, min_noise_accuracy=0.785):
+    """
+    Return a dataframe containing all experiments whose best test_accuracy and
+    noise_accuracy are above the specified thresholds.
+    """
+    best_accuracies = self.get_value()
+    best_accuracies.sort_values("noise_accuracy", axis=0, ascending=False,
+                 inplace=True, na_position='last')
+    columns = best_accuracies.columns
+    best_experiments = pd.DataFrame(columns=columns)
+    for i, row in best_accuracies.iterrows():
+      if ((row["test_accuracy"] > min_test_accuracy)
+           and (row["noise_accuracy"] > min_noise_accuracy)):
+        best_experiments = best_experiments.append(row)
+
+    return best_experiments
+
+
+  def prune_checkpoints(self, max_test_accuracy=0.86, max_noise_accuracy=0.785):
+    """
+    TODO: delete the checkpoints for all models whose best test_accuracy and
+    noise_accuracy are below the specified thresholds.
+    """
+    pass
+
+
+
 @click.command()
 @click.argument("experiment_path", required=True, type=str)
 @click.option('--name', default="", help='The substring to match')
@@ -167,15 +210,22 @@ class ExperimentBrowser(object):
 @click.option('--which', default="max", help='The function to use for extracting')
 def summarize_trials(experiment_path, name, tag, which):
     """Summarizes trials in the directory subtree starting at the given path."""
-    browser = ExperimentBrowser(experiment_path)
+    browser = RayTuneExperimentBrowser(experiment_path)
     tags = ["test_accuracy", "noise_accuracy"]
     if tag not in tags: tags.append(tag)
     p = browser.get_value(exp_substring=name, tags=tags, which=which)
     p.sort_values(tag, axis=0, ascending=False,
                  inplace=True, na_position='last')
     print_df_tabular(p)
+
+    print("\nThe very best experiments:")
+    best_experiments = browser.best_experiments()
+    print_df_tabular(best_experiments)
     # print("Checkpoints:")
     # pprint.pprint(browser.get_checkpoint_file(name))
+
+    print("Params:")
+    browser.get_parameters(p)
 
 
 if __name__ == "__main__":
