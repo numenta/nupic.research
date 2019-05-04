@@ -137,6 +137,7 @@ class TinyCIFAR(object):
                                           [1.0] * len(self.cnn_percent_on))
     self.in_channels = [inChannels] + self.cnn_out_channels
     self.block_sizes = config.get("block_sizes", [1] * len(self.cnn_percent_on))
+    self.use_max_pooling = config.get("use_max_pooling", False)
 
     # Linear parameters
     self.linear_weight_sparsity = config["weight_sparsity"]
@@ -208,7 +209,6 @@ class TinyCIFAR(object):
       train_loader = self.train_loader
       batches_in_epoch = self.batches_in_epoch
 
-    self._preEpoch()
     trainModel(model=self.model, loader=train_loader,
                optimizer=self.optimizer, device=self.device,
                batches_in_epoch=batches_in_epoch,
@@ -216,13 +216,13 @@ class TinyCIFAR(object):
     self._postEpoch()
     trainTime = time.time() - t1
 
-    ret = self._runNoiseTests(self.noise_values, self.test_loaders, epoch)
+    ret = self.run_noise_tests(self.noise_values, self.test_loaders, epoch)
 
     # Hard coded early stopping criteria
     if (
           (epoch > 2 and abs(ret['mean_accuracy'] - 0.1) < 0.01)
-          or (epoch > 10 and ret['noise_accuracy'] < 0.45)
-          or (epoch > 30 and ret['noise_accuracy'] < 0.59)
+          or (epoch > 10 and ret['noise_accuracy'] < 0.50)
+          or (epoch > 30 and ret['noise_accuracy'] < 0.60)
     ):
       ret['stop'] = 1
     else:
@@ -299,7 +299,10 @@ class TinyCIFAR(object):
     self.model.add_module("bn_" + index_str, nn.BatchNorm2d(out_channels)),
 
     if add_pooling:
-      self.model.add_module("avgpool_" + index_str, nn.AvgPool2d(kernel_size=2))
+      if self.use_max_pooling:
+        self.model.add_module("maxpool_" + index_str, nn.MaxPool2d(kernel_size=2))
+      else:
+        self.model.add_module("avgpool_" + index_str, nn.AvgPool2d(kernel_size=2))
 
     if percent_on < 1.0:
       self.model.add_module(
@@ -394,7 +397,7 @@ class TinyCIFAR(object):
                                            gamma=self.learning_rate_gamma)
 
 
-  def _runNoiseTests(self, noiseValues, loaders, epoch):
+  def run_noise_tests(self, noiseValues, loaders, epoch):
     """
     Test the model with different noise values and return test metrics.
     """
@@ -430,12 +433,9 @@ class TinyCIFAR(object):
     return ret
 
 
-  def _preEpoch(self):
+  def _postEpoch(self):
     if self.lr_scheduler is not None:
       self.lr_scheduler.step()
-
-
-  def _postEpoch(self):
     self.model.apply(rezeroWeights)
     self.model.apply(updateBoostStrength)
 
