@@ -19,8 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import logging
+import random
 import sys
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -129,3 +131,19 @@ def evaluateModel(model, loader, device,
   return {"total_correct": correct,
           "mean_loss": loss / dataset_len,
           "mean_accuracy": correct / dataset_len}
+
+
+
+def setRandomSeed(seed):
+  """
+  Set pytorch random seed.
+  See https://pytorch.org/docs/stable/notes/randomness.html
+  """
+  random.seed(seed)
+  np.random.seed(seed)
+  torch.manual_seed(seed)
+  if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(seed)
+  if torch.backends.cudnn.is_available():
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
