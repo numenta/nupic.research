@@ -19,7 +19,6 @@
 #
 
 import logging
-import os
 import time
 
 import torch
@@ -29,6 +28,7 @@ import torch.nn as nn
 import torch.optim
 from torchvision import datasets, transforms
 
+from nupic.research.frameworks.pytorch.image_transforms import *
 from nupic.research.frameworks.pytorch.model_utils import (
   trainModel, evaluateModel, setRandomSeed)
 
@@ -94,7 +94,6 @@ class MobileNetCIFAR10(object):
     if torch.cuda.device_count() > 1:
       self.model = torch.nn.DataParallel(self.model)
 
-    self.epoch = 0
     self.batches_in_epoch = config["batches_in_epoch"]
     self.batches_in_first_epoch = config["batches_in_first_epoch"]
     self.test_batches_in_epoch = config["test_batches_in_epoch"]
@@ -103,7 +102,6 @@ class MobileNetCIFAR10(object):
 
 
   def train(self, epoch):
-    self.epoch = epoch
     if epoch == 0:
       train_loader = self.first_loader
       batches_in_epoch = self.batches_in_first_epoch
@@ -124,9 +122,11 @@ class MobileNetCIFAR10(object):
     self.logger.info("training duration: %s", time.time() - t0)
 
 
-  def test(self, epoch):
+  def test(self, loader=None):
     t0 = time.time()
-    results = evaluateModel(model=self.model, loader=self.test_loaders,
+    if loader is None:
+      loader = self.test_loader
+    results = evaluateModel(model=self.model, loader=loader,
                             device=self.device,
                             batches_in_epoch=self.test_batches_in_epoch,
                             criterion=self.loss_function)
@@ -137,13 +137,13 @@ class MobileNetCIFAR10(object):
 
 
   def save(self, checkpoint_path):
-    checkpoint_path = os.path.join(checkpoint_path, "model.{0}.pt".format(self.epoch))
+    checkpoint_path = os.path.join(checkpoint_path, "model.pt")
     torch.save(self.model.state_dict(), checkpoint_path)
     return checkpoint_path
 
 
-  def restore(self, checkpoint_path, epoch):
-    checkpoint_path = os.path.join(checkpoint_path, "model.{0}.pt".format(epoch))
+  def restore(self, checkpoint_path):
+    checkpoint_path = os.path.join(checkpoint_path, "model.pt")
     self.model.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
 
 
@@ -169,6 +169,14 @@ class MobileNetCIFAR10(object):
       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
       # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     ]
+
+    # Add noise
+    noise = config.get("noise", 0.0)
+    if noise > 0.0:
+      transform.append(RandomNoise(noise,
+                                   highValue=0.5 + 2 * 0.2,
+                                   lowValue=0.5 - 2 * 0.2))
+
     train_dataset = datasets.CIFAR10(data_dir, train=True,
                                      transform=transforms.Compose(transform))
     test_dataset = datasets.CIFAR10(data_dir, train=False,
@@ -178,9 +186,9 @@ class MobileNetCIFAR10(object):
                                                     batch_size=batch_size,
                                                     shuffle=True)
 
-    self.test_loaders = torch.utils.data.DataLoader(test_dataset,
-                                                    batch_size=test_batch_size,
-                                                    shuffle=False)
+    self.test_loader = torch.utils.data.DataLoader(test_dataset,
+                                                   batch_size=test_batch_size,
+                                                   shuffle=False)
 
     if first_epoch_batch_size != batch_size:
       self.first_loader = torch.utils.data.DataLoader(train_dataset,
