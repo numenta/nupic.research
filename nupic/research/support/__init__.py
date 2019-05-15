@@ -17,3 +17,5 @@
 #
 #  http://numenta.org/licenses/
 #
+from .parse_config import parse_config
+from .ray_utils import load_ray_tune_experiment

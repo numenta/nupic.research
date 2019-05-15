@@ -24,9 +24,11 @@ import ray
 import ray.tune as tune
 import torch
 from torchvision import datasets
+
 from nupic.research.frameworks.pytorch.image_transforms import *
 from nupic.research.support.parse_config import parse_config
 from projects.whydense.cifar.mobilenet_cifar import MobileNetCIFAR10
+
 
 
 class MobileNetTune(tune.Trainable):
@@ -53,15 +55,15 @@ class MobileNetTune(tune.Trainable):
 
   def _train(self):
     self.experiment.train(self._iteration)
-    return self.experiment.test(self._iteration)
+    return self.experiment.test()
 
 
   def _save(self, checkpoint_dir):
     return self.experiment.save(checkpoint_dir)
 
 
-  def _restore(self, checkpoint):
-    self.experiment.restore(checkpoint, self._iteration)
+  def _restore(self, checkpoint_dir):
+    self.experiment.restore(checkpoint_dir)
 
 
 
