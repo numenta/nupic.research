@@ -21,10 +21,12 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import argparse
+import os
 
 import ray
 from ray import tune
 from ray.tune.schedulers import *
+import torch
 from torchvision import datasets
 
 from nupic.research.frameworks.pytorch.model_utils import *
@@ -128,8 +130,6 @@ def run_experiment(config, trainable):
   }
   stop_criteria.update(config.get("stop", {}))
 
-  print("gpu usage:",config.get("num_gpus", 0) / config.get("num_cpus", 1))
-
   tune.run(
     trainable,
     name=config["name"],
@@ -154,7 +154,8 @@ def run_experiment(config, trainable):
     reuse_actors=config.get("reuse_actors", False),
     verbose=config.get("verbose", 0),
     resources_per_trial={
-      "cpu": 1, "gpu": config.get("num_gpus", 0) / config.get("num_cpus", 1)
+      "cpu": 1, "gpu": 0.5  # We seem to be able to run about two trials per GPU
+      # "cpu": 1, "gpu": config.get("num_gpus", 0) / config.get("num_cpus", 1)
     }
   )
 
@@ -208,6 +209,7 @@ def parse_options():
 
 if __name__ == "__main__":
 
+  print("Using torch version", torch.__version__)
   print("Torch device count=", torch.cuda.device_count())
   # Load and parse command line option and experiment configurations
   options = parse_options()
@@ -222,9 +224,12 @@ if __name__ == "__main__":
   train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
 
   # Initialize ray cluster
-  ray.init(num_cpus=options.num_cpus,
-           num_gpus=options.num_gpus,
-           local_mode=options.num_cpus == 1)
+  if "REDIS_ADDRESS" in os.environ:
+    ray.init(redis_address=os.environ["REDIS_ADDRESS"], include_webui=True)
+  else:
+    ray.init(num_cpus=options.num_cpus,
+             num_gpus=options.num_gpus,
+             local_mode=options.num_cpus == 1)
 
   # Run all experiments in parallel
   results = []
