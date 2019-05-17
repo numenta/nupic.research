@@ -21,6 +21,7 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import argparse
+import json
 
 from torchvision import datasets
 
@@ -42,7 +43,7 @@ def trainModels(configs, projectDir):
   # Run all experiments in serial
   for exp in configs:
     config = configs[exp]
-    config["name"] = exp
+    if "name" not in config: config["name"] = exp
 
     # Make sure local directories are relative to the project location
     path = config.get("path", "results")
@@ -68,9 +69,12 @@ def trainModels(configs, projectDir):
 def parse_options():
   """ parses the command line options for different settings. """
   optparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  optparser.add_argument("-c", "--config", dest="config", type=open,
-                         default="tiny_experiments.cfg",
-                         help="your experiments config file")
+  optparser.add_argument("-c", "--config", dest="config", type=str,
+                         default="",
+                         help="your experiment config file")
+  optparser.add_argument("-p", "--params", dest="params", type=str,
+                         default="",
+                         help="your experiment params json file")
   optparser.add_argument("-e", "--experiment",
                          action="append", dest="experiments",
                          help="run only selected experiments, by default run "
@@ -82,14 +86,27 @@ def parse_options():
 
 if __name__ == "__main__":
 
-
+  print("Using torch version", torch.__version__)
   print("Torch device count=", torch.cuda.device_count())
   # Load and parse command line option and experiment configurations
   options = parse_options()
-  configs = parse_config(options.config, options.experiments)
+  if options.config != "":
+    with open(options.config) as f:
+      configs = parse_config(f, options.experiments)
+    projectDir = os.path.dirname(options.config)
+
+  elif options.params != "":
+    with open(options.params) as f:
+      params = json.load(f)
+      params["data_dir"] = os.path.abspath(os.path.join(".", "data"))
+      params["path"] = os.path.abspath(os.path.dirname(options.params))
+      configs = {params["name"]: params}
+    projectDir = "."
+
+  else:
+    raise RuntimeError("Either a .cfg or a params .json file must be specified")
 
   # Use configuration file location as the project location.
-  projectDir = os.path.dirname(options.config.name)
   projectDir = os.path.abspath(projectDir)
 
 
