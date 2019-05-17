@@ -170,6 +170,10 @@ class RayTuneExperimentBrowser(object):
         params = self.params[e['Experiment Name']]
         print(params['cnn_percent_on'][0])
 
+    print('test_accuracy')
+    for i,e in sorted_experiments.iterrows():
+      print(e['test_accuracy'])
+
     print('noise_accuracy')
     for i,e in sorted_experiments.iterrows():
       print(e['noise_accuracy'])
@@ -221,11 +225,11 @@ def summarize_trials(experiment_path, name, tag, which):
     print("\nThe very best experiments:")
     best_experiments = browser.best_experiments()
     print_df_tabular(best_experiments)
-    # print("Checkpoints:")
-    # pprint.pprint(browser.get_checkpoint_file(name))
+    print("Checkpoints:")
+    pprint.pprint(browser.get_checkpoint_file(name))
 
-    print("Params:")
-    browser.get_parameters(p)
+    # print("Params:")
+    # browser.get_parameters(p)
 
 
 if __name__ == "__main__":
