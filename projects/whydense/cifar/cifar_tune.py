@@ -150,6 +150,8 @@ def run_experiment(config, trainable):
     trial_executor=config.get("trial_executor", None),
     checkpoint_at_end=config.get("checkpoint_at_end", False),
     checkpoint_freq=config.get("checkpoint_freq", 0),
+    upload_dir=config.get("upload_dir", None),
+    sync_function=config.get("sync_function", None),
     resume=config.get("resume", False),
     reuse_actors=config.get("reuse_actors", False),
     verbose=config.get("verbose", 0),
