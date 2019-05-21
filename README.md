@@ -6,13 +6,13 @@ This repository contains the code for experimental algorithm work done internall
 Open Research
 ==============
 
-We have released all our commercial HTM algorithm code to the open source community within NuPIC. The NuPIC open source community continues to maintain and improve that regularly (see https://discourse.numenta.org for discussions on that codebase. Internally we continue to evolve our theory towards a full blown cortical framework.
+We are dramatically open with our research. We even release our day to day research code into this repository. It contains experimental algorithm code done internally at Numenta. It includes prototypes and experiments with different algorithm implementations.
 
-We get a lot of questions about it and we wondered whether it is possible to be even more open about that work. Could we release our day to day research code in a public repository? Would people get confused? Would it slow us down?
+Please see this blog entry (link to https://numenta.com/blog/2018/10/22/framework_for_intelligence_commitment_to_open_science/) for a discussion on our commitment to Open Science and Open Research.
 
-We decided to go ahead and create nupic.research. It contains experimental algorithm code done internally at Numenta. The code includes prototypes and experiments with different algorithm implementations.
+The NuPIC open source community continues to maintain and improve our more stable older algorithms. See https://discourse.numenta.org for discussions on that codebase - you can also post your research related questions there.
 
-Our research ideas are constantly in flux as we tweak and experiment. This is all temporary, ever-changing experimental code, which poses some challenges. Hence the following DISCLAIMERS:
+The ideas in this repository are constantly in flux as we tweak and experiment. Hence the following DISCLAIMERS:
 
  
 What you should understand about this repository
