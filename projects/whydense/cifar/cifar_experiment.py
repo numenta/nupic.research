@@ -121,6 +121,7 @@ class TinyCIFAR(object):
     self.weight_decay = config.get("weight_decay", 0.0005)
     self.learning_rate_gamma = config.get("learning_rate_gamma", 0.9)
     self.last_noise_results = None
+    self.lr_step_schedule = config.get("lr_step_schedule", None)
 
     # Network parameters
     network_type = config.get("network_type", "vgg")
@@ -188,7 +189,6 @@ class TinyCIFAR(object):
 
     if network_type == "vgg":
       self._create_vgg_model()
-      self._initialize_weights()
 
     self.optimizer = self._createOptimizer(self.model)
     self.lr_scheduler = self._createLearningRateScheduler(self.optimizer)
@@ -215,17 +215,20 @@ class TinyCIFAR(object):
                optimizer=self.optimizer, device=self.device,
                batches_in_epoch=batches_in_epoch,
                criterion=self.loss_function)
-    self._postEpoch()
+    self._postEpoch(epoch)
     trainTime = time.time() - t1
 
     ret = self.run_noise_tests(self.noise_values, self.test_loaders, epoch)
 
     # Hard coded early stopping criteria
     if (
-          (epoch > 2 and abs(ret['mean_accuracy'] - 0.1) < 0.01)
-          or (epoch > 10 and ret['noise_accuracy'] < 0.40)
-          or (epoch > 30 and ret['noise_accuracy'] < 0.44)
-          or (epoch > 40 and ret['noise_accuracy'] < 0.50)
+          (epoch > 3 and abs(ret['mean_accuracy'] - 0.1) < 0.01)
+          # or (ret['noise_accuracy'] > 0.66 and ret['test_accuracy'] > 0.91)
+          or (ret['noise_accuracy'] > 0.69 and ret['test_accuracy'] > 0.91)
+          or (ret['noise_accuracy'] > 0.65 and ret['test_accuracy'] > 0.92)
+          # or (epoch > 10 and ret['noise_accuracy'] < 0.40)
+          # or (epoch > 30 and ret['noise_accuracy'] < 0.44)
+          # or (epoch > 40 and ret['noise_accuracy'] < 0.50)
     ):
       ret['stop'] = 1
     else:
@@ -233,7 +236,7 @@ class TinyCIFAR(object):
 
     ret['epoch_time_train'] = trainTime
     ret['epoch_time'] = time.time() - t1
-    ret["learning_rate"] = self.lr_scheduler.get_lr()[0]
+    ret["learning_rate"] = self.learning_rate
     # print(epoch, ret)
     return ret
 
@@ -384,6 +387,8 @@ class TinyCIFAR(object):
 
     self.model.to(self.device)
 
+    self._initialize_weights()
+
 
   def _createOptimizer(self, model):
     """
@@ -399,9 +404,26 @@ class TinyCIFAR(object):
     """
     Creates the learning rate scheduler and attach the optimizer
     """
-    return torch.optim.lr_scheduler.StepLR(optimizer,
-                                           step_size=1,
-                                           gamma=self.learning_rate_gamma)
+    if self.lr_step_schedule is not None:
+      return torch.optim.lr_scheduler.StepLR(optimizer,
+                                             step_size=1,
+                                             gamma=self.learning_rate_gamma)
+    else:
+      return None
+
+
+  def _adjust_learning_rate(self, optimizer, epoch):
+    if self.lr_step_schedule is not None:
+      if epoch in self.lr_step_schedule:
+        self.learning_rate *= self.learning_rate_gamma
+        print("Reducing learning rate to:", self.learning_rate)
+        for param_group in optimizer.param_groups:
+          param_group['lr'] = self.learning_rate
+    else:
+      if self.lr_scheduler is not None:
+        self.lr_scheduler.step()
+        self.learning_rate = self.lr_scheduler.get_lr()[0]
+        print("Reducing learning rate to:", self.learning_rate)
 
 
   def run_noise_tests(self, noiseValues, loaders, epoch):
@@ -440,9 +462,12 @@ class TinyCIFAR(object):
     return ret
 
 
-  def _postEpoch(self):
-    if self.lr_scheduler is not None:
-      self.lr_scheduler.step()
+  def _postEpoch(self, epoch):
+    """
+    The set of actions to do after each epoch of training: adjust learning rate,
+    rezero sparse weights, and update boost strengths.
+    """
+    self._adjust_learning_rate(self.optimizer, epoch)
     self.model.apply(rezeroWeights)
     self.model.apply(updateBoostStrength)
 
