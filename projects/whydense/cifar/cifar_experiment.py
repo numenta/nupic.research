@@ -224,7 +224,8 @@ class TinyCIFAR(object):
     if (
           (epoch > 3 and abs(ret['mean_accuracy'] - 0.1) < 0.01)
           # or (ret['noise_accuracy'] > 0.66 and ret['test_accuracy'] > 0.91)
-          or (ret['noise_accuracy'] > 0.70 and ret['test_accuracy'] > 0.90)
+          or (ret['noise_accuracy'] > 0.69 and ret['test_accuracy'] > 0.91)
+          or (ret['noise_accuracy'] > 0.65 and ret['test_accuracy'] > 0.92)
           # or (epoch > 10 and ret['noise_accuracy'] < 0.40)
           # or (epoch > 30 and ret['noise_accuracy'] < 0.44)
           # or (epoch > 40 and ret['noise_accuracy'] < 0.50)

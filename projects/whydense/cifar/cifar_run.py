@@ -27,7 +27,7 @@ from torchvision import datasets
 
 from nupic.research.frameworks.pytorch.model_utils import *
 from nupic.research.frameworks.pytorch.image_transforms import *
-from nupic.research.frameworks.pytorch.cifar_experiment import TinyCIFAR
+from projects.whydense.cifar.cifar_experiment import TinyCIFAR
 from nupic.research.support.parse_config import parse_config
 
 
