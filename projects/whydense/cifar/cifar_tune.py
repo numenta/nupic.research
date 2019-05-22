@@ -21,17 +21,15 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import argparse
-import os
 
 import ray
 from ray import tune
 from ray.tune.schedulers import *
-import torch
 from torchvision import datasets
 
 from nupic.research.frameworks.pytorch.model_utils import *
 from nupic.research.frameworks.pytorch.image_transforms import *
-from nupic.research.frameworks.pytorch.cifar_experiment import TinyCIFAR
+from projects.whydense.cifar.cifar_experiment import TinyCIFAR
 
 import configparser
 
@@ -234,6 +232,9 @@ if __name__ == "__main__":
     ray.init(num_cpus=options.num_cpus,
              num_gpus=options.num_gpus,
              local_mode=options.num_cpus == 1)
+
+  if len(configs) == 0:
+    print("No matching experiments found!")
 
   # Run all experiments in parallel
   results = []
