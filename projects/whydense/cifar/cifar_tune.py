@@ -21,17 +21,15 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import argparse
-import os
 
 import ray
 from ray import tune
 from ray.tune.schedulers import *
-import torch
 from torchvision import datasets
 
 from nupic.research.frameworks.pytorch.model_utils import *
 from nupic.research.frameworks.pytorch.image_transforms import *
-from nupic.research.frameworks.pytorch.cifar_experiment import TinyCIFAR
+from projects.whydense.cifar.cifar_experiment import TinyCIFAR
 
 import configparser
 
