@@ -228,9 +228,6 @@ def summarize_trials(experiment_path, name, tag, which):
     print("Checkpoints:")
     pprint.pprint(browser.get_checkpoint_file(name))
 
-    # print("Params:")
-    # browser.get_parameters(p)
-
 
 if __name__ == "__main__":
     summarize_trials()
