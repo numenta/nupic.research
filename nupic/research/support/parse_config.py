@@ -35,7 +35,7 @@ def parse_config(config_file, experiments=None, globals=None, locals=None):
   params = {}
   for exp in cfgparser.sections():
     if not experiments or exp in experiments:
-      values = cfgparser.defaults()
+      values = dict(cfgparser.defaults())
       values.update(dict(cfgparser.items(exp)))
       item = {}
       for k, v in values.items():
