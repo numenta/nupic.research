@@ -63,7 +63,8 @@ def trainModels(configs, projectDir):
         print("Stopping early!")
         break
 
-    model.model_save(path)
+    if config.get("checkpoint_at_end", False):
+      model.model_save(path)
 
 
 def parse_options():

@@ -21,6 +21,7 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import time
+import math
 import random
 
 import torch
@@ -187,6 +188,7 @@ class TinyCIFAR(object):
 
     if network_type == "vgg":
       self._create_vgg_model()
+      self._initialize_weights()
 
     self.optimizer = self._createOptimizer(self.model)
     self.lr_scheduler = self._createLearningRateScheduler(self.optimizer)
@@ -221,8 +223,9 @@ class TinyCIFAR(object):
     # Hard coded early stopping criteria
     if (
           (epoch > 2 and abs(ret['mean_accuracy'] - 0.1) < 0.01)
-          or (epoch > 10 and ret['noise_accuracy'] < 0.50)
-          or (epoch > 30 and ret['noise_accuracy'] < 0.60)
+          or (epoch > 10 and ret['noise_accuracy'] < 0.40)
+          or (epoch > 30 and ret['noise_accuracy'] < 0.44)
+          or (epoch > 40 and ret['noise_accuracy'] < 0.50)
     ):
       ret['stop'] = 1
     else:
@@ -300,9 +303,9 @@ class TinyCIFAR(object):
 
     if add_pooling:
       if self.use_max_pooling:
-        self.model.add_module("maxpool_" + index_str, nn.MaxPool2d(kernel_size=2))
+        self.model.add_module("maxpool_" + index_str, nn.MaxPool2d(kernel_size=2, stride=2))
       else:
-        self.model.add_module("avgpool_" + index_str, nn.AvgPool2d(kernel_size=2))
+        self.model.add_module("avgpool_" + index_str, nn.AvgPool2d(kernel_size=2, stride=2))
 
     if percent_on < 1.0:
       self.model.add_module(
@@ -313,7 +316,7 @@ class TinyCIFAR(object):
                    boostStrength=self.boost_strength,
                    boostStrengthFactor=self.boost_strength_factor))
     else:
-      self.model.add_module("ReLU_" + index_str, nn.ReLU())
+      self.model.add_module("ReLU_" + index_str, nn.ReLU(inplace=True))
 
 
   def _create_vgg_model(self):
@@ -326,12 +329,14 @@ class TinyCIFAR(object):
     """
 
     # Here we require exactly 3 blocks
-    assert(len(self.block_sizes) == 3)
+    # assert(len(self.block_sizes) == 3)
 
     # Create simple CNN model, with options for sparsity
     self.model = nn.Sequential()
 
     in_channels = 3
+    output_size = 32*32
+    output_units = output_size * in_channels
     for l, block_size in enumerate(self.block_sizes):
       for b in range(block_size):
         self._add_cnn_layer(
@@ -344,12 +349,14 @@ class TinyCIFAR(object):
           add_pooling=b==block_size-1,
         )
         in_channels = self.cnn_out_channels[l]
+      output_size = int(output_size / 4)
+      output_units = output_size * in_channels
 
     # Flatten CNN output before passing to linear layer
     self.model.add_module("flatten", Flatten())
 
     # Linear layer
-    input_size = 16*in_channels
+    input_size = output_units
     for l, linear_n in enumerate(self.linear_n):
       linear = nn.Linear(input_size, linear_n)
       if self.linear_weight_sparsity[l] < 1.0:
@@ -439,3 +446,18 @@ class TinyCIFAR(object):
     self.model.apply(rezeroWeights)
     self.model.apply(updateBoostStrength)
 
+
+  def _initialize_weights(self):
+    for m in self.model.modules():
+      if isinstance(m, nn.Conv2d):
+        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+        m.weight.data.normal_(0, math.sqrt(2. / n))
+        if m.bias is not None:
+          m.bias.data.zero_()
+      elif isinstance(m, nn.BatchNorm2d):
+        m.weight.data.fill_(1)
+        m.bias.data.zero_()
+      elif isinstance(m, nn.Linear):
+        n = m.weight.size(1)
+        m.weight.data.normal_(0, 0.01)
+        m.bias.data.zero_()
