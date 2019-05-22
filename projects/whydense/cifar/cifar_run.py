@@ -27,7 +27,7 @@ from torchvision import datasets
 
 from nupic.research.frameworks.pytorch.model_utils import *
 from nupic.research.frameworks.pytorch.image_transforms import *
-from nupic.research.frameworks.pytorch.cifar_experiment import TinyCIFAR
+from projects.whydense.cifar.cifar_experiment import TinyCIFAR
 from nupic.research.support.parse_config import parse_config
 
 
@@ -41,6 +41,9 @@ def trainModels(configs, projectDir):
 
 
   # Run all experiments in serial
+  if len(configs) == 0:
+    print("No experiments to run!")
+
   for exp in configs:
     config = configs[exp]
     if "name" not in config: config["name"] = exp
@@ -59,9 +62,9 @@ def trainModels(configs, projectDir):
     for epoch in range(config['iterations']):
       ret = model.train_epoch(epoch)
       print("epoch=", epoch, ":", ret)
-      if ret['stop'] == 1:
-        print("Stopping early!")
-        break
+      # if ret['stop'] == 1:
+      #   print("Stopping early!")
+      #   break
 
     if config.get("checkpoint_at_end", False):
       model.model_save(path)
