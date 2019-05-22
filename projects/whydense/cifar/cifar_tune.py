@@ -235,6 +235,9 @@ if __name__ == "__main__":
              num_gpus=options.num_gpus,
              local_mode=options.num_cpus == 1)
 
+  if len(configs) == 0:
+    print("No matching experiments found!")
+
   # Run all experiments in parallel
   results = []
   for exp in configs:
