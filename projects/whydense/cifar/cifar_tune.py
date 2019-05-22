@@ -159,7 +159,6 @@ def run_experiment(config, trainable):
       # With lots of trials, optimal seems to be 0.5, or 2 trials per GPU
       # If num trials <= num GPUs, 1.0 is better
       "cpu": 1, "gpu": config.get("gpu_percentage", 0.5),
-      # "cpu": 1, "gpu": config.get("num_gpus", 0) / config.get("num_cpus", 1)
     }
   )
 
