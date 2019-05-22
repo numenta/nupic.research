@@ -287,7 +287,7 @@ def run_noise_tests(config, options, projectDir):
 
   print("Running full noise tests using noise values", noise_values)
 
-  ret = tiny_cifar.run_noise_tests(noise_values, loaders, 100)
+  ret = tiny_cifar.run_noise_tests(noise_values, loaders, 300)
 
   print(ret)
 
