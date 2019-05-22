@@ -156,8 +156,9 @@ def run_experiment(config, trainable):
     reuse_actors=config.get("reuse_actors", False),
     verbose=config.get("verbose", 0),
     resources_per_trial={
-      "cpu": 1, "gpu": 0.5  # We seem to be able to run about two trials per GPU
-      # "cpu": 1, "gpu": config.get("num_gpus", 0) / config.get("num_cpus", 1)
+      # With lots of trials, optimal seems to be 0.5, or 2 trials per GPU
+      # If num trials <= num GPUs, 1.0 is better
+      "cpu": 1, "gpu": config.get("gpu_percentage", 0.5),
     }
   )
 
@@ -211,8 +212,6 @@ def parse_options():
 
 if __name__ == "__main__":
 
-  print("Using torch version", torch.__version__)
-  print("Torch device count=", torch.cuda.device_count())
   # Load and parse command line option and experiment configurations
   options = parse_options()
   configs = parse_config(options.config, options.experiments)
@@ -224,6 +223,9 @@ if __name__ == "__main__":
   # Pre-download dataset
   data_dir = os.path.join(projectDir, "data")
   train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
+
+  print("Using torch version", torch.__version__)
+  print("Torch device count=", torch.cuda.device_count())
 
   # Initialize ray cluster
   if "REDIS_ADDRESS" in os.environ:
@@ -240,6 +242,7 @@ if __name__ == "__main__":
     config["name"] = exp
     config["num_cpus"] = options.num_cpus
     config["num_gpus"] = options.num_gpus
+    print("GPU percentage=", config.get("gpu_percentage", 0.5))
 
     # Make sure local directories are relative to the project location
     path = config.get("path", "results")
