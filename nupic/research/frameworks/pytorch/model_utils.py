@@ -224,7 +224,7 @@ def add_sparse_linear_layer(network, suffix, input_size, linear_n, dropout,
     network.add_module("linear{}".format(suffix), linear)
 
   if dropout > 0.0:
-    network.linearSdr.add_module("linear{}_dropout".format(suffix),
+    network.add_module("linear{}_dropout".format(suffix),
                                  nn.Dropout(dropout))
 
   if 0 < percent_on < 1.0:

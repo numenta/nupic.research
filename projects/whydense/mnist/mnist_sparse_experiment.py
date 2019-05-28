@@ -261,7 +261,6 @@ class MNISTSparseExperiment(object):
     ret = {}
 
     # Test with noise
-    total_correct = 0
     for noise in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]:
       self.logger.info("Noise: %s", noise)
       transform = transforms.Compose([
@@ -274,7 +273,6 @@ class MNISTSparseExperiment(object):
         batch_size=self.test_batch_size, shuffle=True)
 
       testResult = self.test(test_loader)
-      total_correct += testResult["total_correct"]
       ret[noise] = testResult
 
     return ret
