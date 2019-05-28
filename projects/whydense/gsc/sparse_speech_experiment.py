@@ -153,14 +153,17 @@ class SparseSpeechExperiment(object):
     else:
       raise RuntimeError("Unknown model type")
 
-    if torch.cuda.is_available():
+    self.use_cuda = torch.cuda.is_available()
+    self.logger.debug("use_cuda %s", self.use_cuda)
+    if self.use_cuda:
       self.device = torch.device("cuda")
       model = model.cuda()
     else:
       self.device = torch.device("cpu")
 
+    self.logger.debug("device %s", self.device)
     if torch.cuda.device_count() > 1:
-      self.logger.debug("Using", torch.cuda.device_count(), "GPUs")
+      self.logger.debug("Using %s GPUs", torch.cuda.device_count())
       model = torch.nn.DataParallel(model)
 
     self.model = model
@@ -265,10 +268,10 @@ class SparseSpeechExperiment(object):
     # Update dataset epoch when using pre-processed speech dataset
     if self.use_preprocessed_dataset:
       t2 = time.time()
-      self.train_loader.dataset.next_epoch()
-      self.validation_loader.dataset.next_epoch()
-      self.test_loader.dataset.next_epoch()
-      self.bg_noise_loader.dataset.next_epoch()
+      self.train_loader.dataset.next_seed()
+      self.validation_loader.dataset.next_seed()
+      self.test_loader.dataset.next_seed()
+      self.bg_noise_loader.dataset.next_seed()
       self.logger.debug("Dataset Load time = {0:.3f} secs, ".format(time.time() - t2))
 
 
@@ -349,8 +352,6 @@ class SparseSpeechExperiment(object):
     """
     Test the model with different noise values and return test metrics.
     """
-    if self.use_preprocessed_dataset:
-      raise NotImplementedError("Noise tests requires raw data")
 
     ret = {}
     testDataDir = os.path.join(self.dataDir, "test")

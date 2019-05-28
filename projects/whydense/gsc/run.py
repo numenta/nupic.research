@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 import json
 import os
+import subprocess
 
 import ray
 import ray.tune as tune
@@ -79,17 +80,30 @@ def run_noise_test(config):
     # For each checkpoint select the epoch with the best accuracy as the best epoch
     best_result = max(results, key=lambda x: x["mean_accuracy"])
     best_epoch = best_result["training_iteration"]
+    best_config = best_result["config"]
+
+    # Update path
+    best_config["path"] = config["path"]
+    best_config["data_dir"] = config["data_dir"]
 
     # Load pre-trained model from checkpoint and run noise test on it
     logdir = os.path.join(experiment_path, os.path.basename(checkpoint["logdir"]))
     checkpoint_path = os.path.join(logdir, "checkpoint_{}".format(best_epoch))
-    experiment = SparseSpeechExperiment(config)
+    experiment = SparseSpeechExperiment(best_config)
     experiment.restore(checkpoint_path)
 
     # Save noise results in checkpoint log dir
     noise_test = os.path.join(logdir, "noise.json")
     with open(noise_test, "w") as f:
       json.dump(experiment.runNoiseTests(), f)
+
+  # Upload results to S3
+  sync_function = config.get("sync_function", None)
+  if sync_function is not None:
+    upload_dir = config["upload_dir"]
+    final_cmd = sync_function.format(local_dir=experiment_path,
+                                     remote_dir=upload_dir)
+    subprocess.Popen(final_cmd, shell=True)
 
 
 @click.group(chain=True)
@@ -126,8 +140,6 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
   if show_list:
     print("Experiments:", list(configs.keys()))
     return
-
-  print("experiments =", list(configs.keys()))
 
   # Initialize ray cluster
   if redis_address is not None:
@@ -208,13 +220,17 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
 
   # Load and parse experiment configurations
   configs = parse_config(config, experiments, globals=globals())
-  print("experiments =", list(configs.keys()))
 
   # Initialize ray cluster
   if redis_address is not None:
     ray.init(redis_address=redis_address, include_webui=True)
   else:
     ray.init(num_cpus=num_cpus, num_gpus=num_gpus, local_mode=num_cpus == 1)
+
+  # FIXME: Update remote function resource usage
+  num_gpus = float(num_gpus / num_cpus)
+  run_noise_test._num_gpus = num_gpus
+  run_noise_test.num_cpus = 1
 
   # Run experiments
   results = []
@@ -230,9 +246,6 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
     data_dir = config.get("data_dir", "data")
     if not os.path.isabs(data_dir):
       config["data_dir"] = os.path.join(project_dir, data_dir)
-
-    # Avoid "tune.sample_from"
-    config["seed"] = 18
 
     # Run each experiment in parallel
     results.append(run_noise_test.remote(config))
