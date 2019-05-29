@@ -26,16 +26,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from nupic.torch.modules import (
-  SparseWeights2d, KWinners2d, Flatten, SparseWeights, KWinners,
-  updateBoostStrength, rezeroWeights
-)
+from nupic.torch.modules import Flatten, updateBoostStrength, rezeroWeights
 from torchvision import datasets, transforms
 
 from nupic.research.frameworks.pytorch.dataset_utils import createValidationDataSampler
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.model_utils import (
-  trainModel, evaluateModel, setRandomSeed
+  trainModel, evaluateModel, setRandomSeed, add_sparse_linear_layer,
+  add_sparse_cnn_layer
 )
 
 
@@ -52,89 +50,6 @@ def getLogger(name, verbose):
     logger.setLevel(logging.DEBUG)
 
   return logger
-
-
-def add_cnn_layer(network, suffix, in_channels, out_channels,
-                  use_batch_norm, weight_sparsity, percent_on,
-                  k_inference_factor, boost_strength, boost_strength_factor):
-  """
-
-  Add sparse cnn layer to network
-
-  :param network: The network to add the sparse layer to
-  :param suffix: Layer suffix. Used to name its components
-  :param in_channels: input channels
-  :param out_channels: output channels
-  :param use_batch_norm: whether or not to use batch norm
-  :param weight_sparsity: Pct of weights that are allowed to be non-zero
-  :param percent_on: Pct of ON (non-zero) units
-  :param k_inference_factor: During inference we increase percent_on by this factor
-  :param boost_strength: boost strength (0.0 implies no boosting)
-  :param boost_strength_factor: boost strength is multiplied by this factor after each epoch
-  """
-  cnn = nn.Conv2d(in_channels=in_channels,
-                  out_channels=out_channels,
-                  kernel_size=5,
-                  padding=0,
-                  stride=1)
-  if 0 < weight_sparsity < 1.:
-    sparseCNN = SparseWeights2d(cnn, weight_sparsity)
-    network.add_module("cnnSdr{}_cnn".format(suffix), sparseCNN)
-  else:
-    network.add_module("cnnSdr{}_cnn".format(suffix), cnn)
-
-  if use_batch_norm:
-    bn = nn.BatchNorm2d(out_channels, affine=False)
-    network.add_module("cnnSdr{}_bn".format(suffix), bn)
-
-  # Max pool
-  maxpool = nn.MaxPool2d(kernel_size=2)
-  network.add_module("cnnSdr{}_maxpool".format(suffix), maxpool)
-
-  if 0 < percent_on < 1.0:
-    kwinner = KWinners2d(channels=out_channels,
-                         percent_on=percent_on,
-                         kInferenceFactor=k_inference_factor,
-                         boostStrength=boost_strength,
-                         boostStrengthFactor=boost_strength_factor)
-    network.add_module("cnnSdr{}_kwinner".format(suffix), kwinner)
-  else:
-    network.add_module("cnnSdr{}_relu".format(suffix), nn.ReLU())
-
-
-def add_linear_layer(network, suffix, input_size, linear_n, weight_sparsity,
-                     percent_on, k_inference_factor, boost_strength,
-                     boost_strength_factor):
-  """
-  Add sparse linear layer to network
-  :param network: The network to add the sparse layer to
-  :param suffix: Layer suffix. Used to name its components
-  :param input_size: Input size
-  :param linear_n: Number of units
-  :param weight_sparsity: Pct of weights that are allowed to be non-zero
-  :param percent_on: Pct of ON (non-zero) units
-  :param k_inference_factor: During inference we increase percent_on by this factor
-  :param boost_strength: boost strength (0.0 implies no boosting)
-  :param boost_strength_factor: boost strength is multiplied by this factor after each epoch
-  """
-  linear = nn.Linear(input_size, linear_n)
-  if 0 < weight_sparsity < 1.0:
-    network.add_module("linear{}".format(suffix),
-                       SparseWeights(linear, weight_sparsity))
-  else:
-    network.add_module("linear{}".format(suffix), linear)
-
-  if 0 < percent_on < 1.0:
-    network.add_module("linear{}_kwinners".format(suffix),
-                       KWinners(n=linear_n,
-                                percent_on=percent_on,
-                                kInferenceFactor=k_inference_factor,
-                                boostStrength=boost_strength,
-                                boostStrengthFactor=boost_strength_factor))
-
-
-  else:
-    network.add_module("linear{}_relu".format(suffix), nn.ReLU())
 
 
 class MNISTSparseExperiment(object):
@@ -178,6 +93,8 @@ class MNISTSparseExperiment(object):
     boost_strength_factor = config["boost_strength_factor"]
     k_inference_factor = config["k_inference_factor"]
     use_batch_norm = config["use_batch_norm"]
+    dropout = config.get("dropout", 0.0)
+
 
     model = nn.Sequential()
 
@@ -187,15 +104,15 @@ class MNISTSparseExperiment(object):
     if cnn_layers > 0:
       for i in range(cnn_layers):
         in_channels, height, width = input_shape
-        add_cnn_layer(network=model, suffix=i + 1,
-                      in_channels=in_channels,
-                      out_channels=cnn_out_channels[i],
-                      use_batch_norm=use_batch_norm,
-                      weight_sparsity=cnn_weight_sparsity,
-                      percent_on=cnn_percent_on[i],
-                      k_inference_factor=k_inference_factor,
-                      boost_strength=boost_strength,
-                      boost_strength_factor=boost_strength_factor)
+        add_sparse_cnn_layer(network=model, suffix=i + 1,
+                             in_channels=in_channels,
+                             out_channels=cnn_out_channels[i],
+                             use_batch_norm=use_batch_norm,
+                             weight_sparsity=cnn_weight_sparsity,
+                             percent_on=cnn_percent_on[i],
+                             k_inference_factor=k_inference_factor,
+                             boost_strength=boost_strength,
+                             boost_strength_factor=boost_strength_factor)
 
         # Feed this layer output into next layer input
         in_channels = cnn_out_channels[i]
@@ -211,13 +128,14 @@ class MNISTSparseExperiment(object):
     # Add Linear layers
     input_size = np.prod(input_shape)
     for i in range(len(linear_n)):
-      add_linear_layer(network=model, suffix=i + 1, input_size=input_size,
-                       linear_n=linear_n[i],
-                       weight_sparsity=weight_sparsity,
-                       percent_on=linear_percent_on[i],
-                       k_inference_factor=k_inference_factor,
-                       boost_strength=boost_strength,
-                       boost_strength_factor=boost_strength_factor)
+      add_sparse_linear_layer(network=model, suffix=i + 1, input_size=input_size,
+                              linear_n=linear_n[i],
+                              dropout=dropout,
+                              weight_sparsity=weight_sparsity,
+                              percent_on=linear_percent_on[i],
+                              k_inference_factor=k_inference_factor,
+                              boost_strength=boost_strength,
+                              boost_strength_factor=boost_strength_factor)
       input_size = linear_n[i]
 
     # Output layer
@@ -234,7 +152,7 @@ class MNISTSparseExperiment(object):
       self.logger.debug("Using", torch.cuda.device_count(), "GPUs")
       model = torch.nn.DataParallel(model)
 
-    self.model = model.to(self.device)
+    self.model = model
     self.logger.debug("Model: %s", self.model)
     self.learning_rate = config["learning_rate"]
     self.momentum = config["momentum"]
@@ -343,7 +261,6 @@ class MNISTSparseExperiment(object):
     ret = {}
 
     # Test with noise
-    total_correct = 0
     for noise in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]:
       self.logger.info("Noise: %s", noise)
       transform = transforms.Compose([
@@ -356,7 +273,6 @@ class MNISTSparseExperiment(object):
         batch_size=self.test_batch_size, shuffle=True)
 
       testResult = self.test(test_loader)
-      total_correct += testResult["total_correct"]
       ret[noise] = testResult
 
     return ret

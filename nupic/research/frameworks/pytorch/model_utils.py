@@ -24,11 +24,14 @@ import sys
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+from nupic.torch.modules import (
+  SparseWeights, KWinners, KWinners2d, SparseWeights2d
+)
 from tqdm import tqdm
 
 logging.basicConfig(level=logging.ERROR)
-
 
 
 def trainModel(model, loader, optimizer, device, criterion=F.nll_loss,
@@ -83,7 +86,6 @@ def trainModel(model, loader, optimizer, device, criterion=F.nll_loss,
     loader.close()
 
 
-
 def evaluateModel(model, loader, device,
                   batches_in_epoch=sys.maxsize,
                   criterion=F.nll_loss, progress=None):
@@ -128,10 +130,10 @@ def evaluateModel(model, loader, device,
   if progress is not None:
     loader.close()
 
-  return {"total_correct": correct,
-          "mean_loss": loss / dataset_len,
-          "mean_accuracy": correct / dataset_len}
-
+  return {
+    "total_correct": correct,
+    "mean_loss": loss / dataset_len,
+    "mean_accuracy": correct / dataset_len}
 
 
 def setRandomSeed(seed):
@@ -147,3 +149,92 @@ def setRandomSeed(seed):
   if torch.backends.cudnn.is_available():
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def add_sparse_cnn_layer(network, suffix, in_channels, out_channels,
+                         use_batch_norm, weight_sparsity, percent_on,
+                         k_inference_factor, boost_strength,
+                         boost_strength_factor):
+  """
+
+  Add sparse cnn layer to network
+
+  :param network: The network to add the sparse layer to
+  :param suffix: Layer suffix. Used to name its components
+  :param in_channels: input channels
+  :param out_channels: output channels
+  :param use_batch_norm: whether or not to use batch norm
+  :param weight_sparsity: Pct of weights that are allowed to be non-zero
+  :param percent_on: Pct of ON (non-zero) units
+  :param k_inference_factor: During inference we increase percent_on by this factor
+  :param boost_strength: boost strength (0.0 implies no boosting)
+  :param boost_strength_factor: boost strength is multiplied by this factor after each epoch
+  """
+  cnn = nn.Conv2d(in_channels=in_channels,
+                  out_channels=out_channels,
+                  kernel_size=5,
+                  padding=0,
+                  stride=1)
+  if 0 < weight_sparsity < 1.:
+    sparseCNN = SparseWeights2d(cnn, weight_sparsity)
+    network.add_module("cnnSdr{}_cnn".format(suffix), sparseCNN)
+  else:
+    network.add_module("cnnSdr{}_cnn".format(suffix), cnn)
+
+  if use_batch_norm:
+    bn = nn.BatchNorm2d(out_channels, affine=False)
+    network.add_module("cnnSdr{}_bn".format(suffix), bn)
+
+  # Max pool
+  maxpool = nn.MaxPool2d(kernel_size=2)
+  network.add_module("cnnSdr{}_maxpool".format(suffix), maxpool)
+
+  if 0 < percent_on < 1.0:
+    kwinner = KWinners2d(channels=out_channels,
+                         percent_on=percent_on,
+                         kInferenceFactor=k_inference_factor,
+                         boostStrength=boost_strength,
+                         boostStrengthFactor=boost_strength_factor)
+    network.add_module("cnnSdr{}_kwinner".format(suffix), kwinner)
+  else:
+    network.add_module("cnnSdr{}_relu".format(suffix), nn.ReLU())
+
+
+def add_sparse_linear_layer(network, suffix, input_size, linear_n, dropout,
+                            weight_sparsity, percent_on, k_inference_factor,
+                            boost_strength, boost_strength_factor):
+  """
+  Add sparse linear layer to network
+  :param network: The network to add the sparse layer to
+  :param suffix: Layer suffix. Used to name its components
+  :param input_size: Input size
+  :param linear_n: Number of units
+  :param dropout: dropout value
+  :param weight_sparsity: Pct of weights that are allowed to be non-zero
+  :param percent_on: Pct of ON (non-zero) units
+  :param k_inference_factor: During inference we increase percent_on by this factor
+  :param boost_strength: boost strength (0.0 implies no boosting)
+  :param boost_strength_factor: boost strength is multiplied by this factor after each epoch
+  """
+  linear = nn.Linear(input_size, linear_n)
+  if 0 < weight_sparsity < 1.0:
+    network.add_module("linear{}".format(suffix),
+                       SparseWeights(linear, weight_sparsity))
+  else:
+    network.add_module("linear{}".format(suffix), linear)
+
+  if dropout > 0.0:
+    network.add_module("linear{}_dropout".format(suffix),
+                                 nn.Dropout(dropout))
+
+  if 0 < percent_on < 1.0:
+    network.add_module("linear{}_kwinners".format(suffix),
+                       KWinners(n=linear_n,
+                                percent_on=percent_on,
+                                kInferenceFactor=k_inference_factor,
+                                boostStrength=boost_strength,
+                                boostStrengthFactor=boost_strength_factor))
+
+
+  else:
+    network.add_module("linear{}_relu".format(suffix), nn.ReLU())

@@ -21,6 +21,8 @@
 # ----------------------------------------------------------------------
 import json
 import os
+import re
+from itertools import groupby
 
 import click
 import numpy as np
@@ -48,6 +50,10 @@ def main(config, experiments, tablefmt):
   # Load and parse experiment configurations
   configs = parse_config(config, experiments, globals=globals())
 
+  # Select tags ignoring seed
+  key_func = lambda x: re.split("[,_]", re.sub(",|\\d+_|seed=\\d+", "",
+                                               x["experiment_tag"]))
+
   for exp in configs:
     config = configs[exp]
 
@@ -59,30 +65,36 @@ def main(config, experiments, tablefmt):
     # Go through all checkpoints in the experiment
     all_checkpoints = experiment_state["checkpoints"]
 
-    numExps = len(all_checkpoints)
-    testScores = np.zeros(numExps)
-    noiseScores = np.zeros(numExps)
+    # Group checkpoints by tags
+    checkpoint_groups = {k[0]: list(v) for k, v in groupby(
+      sorted(all_checkpoints, key=key_func), key=key_func)}
 
-    for i, checkpoint in enumerate(all_checkpoints):
-      results = checkpoint["results"]
-      if results is None:
-        continue
+    for tag in checkpoint_groups:
+      checkpoints = checkpoint_groups[tag]
+      numExps = len(checkpoints)
+      testScores = np.zeros(numExps)
+      noiseScores = np.zeros(numExps)
 
-      # For each checkpoint select the epoch with the best accuracy as the best epoch
-      best_result = max(results, key=lambda x: x["mean_accuracy"])
-      testScores[i] = best_result["mean_accuracy"] * 100.0
+      for i, checkpoint in enumerate(checkpoints):
+        results = checkpoint["results"]
+        if results is None:
+          continue
 
-      # Load noise score
-      logdir = os.path.join(experiment_path, os.path.basename(checkpoint["logdir"]))
-      filename = os.path.join(logdir, "noise.json")
-      with open(filename, "r") as f:
-        noise = json.load(f)
+        # For each checkpoint select the epoch with the best accuracy as the best epoch
+        best_result = max(results, key=lambda x: x["mean_accuracy"])
+        testScores[i] = best_result["mean_accuracy"] * 100.0
 
-      noiseScores[i] = sum([x["total_correct"] for x in list(noise.values())])
+        # Load noise score
+        logdir = os.path.join(experiment_path, os.path.basename(checkpoint["logdir"]))
+        filename = os.path.join(logdir, "noise.json")
+        with open(filename, "r") as f:
+          noise = json.load(f)
 
-    test_score = u"{0:.2f} ± {1:.2f}".format(testScores.mean(), testScores.std())
-    noise_score = u"{0:,.0f} ± {1:.2f}".format(noiseScores.mean(), noiseScores.std())
-    testScoresTable.append([exp, test_score, noise_score])
+        noiseScores[i] = sum([x["total_correct"] for x in list(noise.values())])
+
+      test_score = u"{0:.2f} ± {1:.2f}".format(testScores.mean(), testScores.std())
+      noise_score = u"{0:,.0f} ± {1:.2f}".format(noiseScores.mean(), noiseScores.std())
+      testScoresTable.append(["{} {}".format(exp, tag), test_score, noise_score])
 
   print()
   print(tabulate(testScoresTable, headers="firstrow", tablefmt=tablefmt))
