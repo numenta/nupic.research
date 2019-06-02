@@ -138,17 +138,13 @@ def run_experiment(config, trainable):
     search_alg=config.get("search_alg", None),
     scheduler=config.get("scheduler",
                          AsyncHyperBandScheduler(
-                           reward_attr='noise_accuracy',
+                           reward_attr='mean_accuracy',
                            time_attr="training_iteration",
-                           max_t=200
+                           brackets = 2,
+                           grace_period=max(1, int(config.get("iterations", 10)/10)),
+                           reduction_factor=3,
+                           max_t=config.get("iterations", 10)
                          )),
-                         # MedianStoppingRule(
-                         #   time_attr="training_iteration",
-                         #   reward_attr='noise_accuracy',
-                         #   min_samples_required=3,
-                         #   grace_period=20,
-                         #   verbose=False,
-                         # )),
     trial_name_creator=tune.function(trial_name_string),
     trial_executor=config.get("trial_executor", None),
     checkpoint_at_end=config.get("checkpoint_at_end", False),
@@ -159,11 +155,12 @@ def run_experiment(config, trainable):
     reuse_actors=config.get("reuse_actors", False),
     verbose=config.get("verbose", 0),
     resources_per_trial={
-      # With lots of trials, optimal seems to be 0.5, or 2 trials per GPU
-      # If num trials <= num GPUs, 1.0 is better
-      # "cpu": 1, "gpu": config.get("gpu_percentage", 0.5),
-      "cpu": 1, "gpu": config.get("gpu_percentage", 1.0), # for p2.xlarge
-    }
+      "cpu": config.get("cpu_percentage", 1.0), 
+      "gpu": config.get("gpu_percentage", 1.0),
+    },
+    # # added parameters to allow monitoring through REST API
+    # with_server=True, 
+    # server_port=4321,  
   )
 
 def parse_config(config_file, experiments=None):
@@ -213,7 +210,6 @@ def parse_options():
   return optparser.parse_args()
 
 
-
 if __name__ == "__main__":
 
   # Load and parse command line option and experiment configurations
@@ -248,13 +244,20 @@ if __name__ == "__main__":
     print("GPU percentage=", config.get("gpu_percentage", 0.5))
 
     # Make sure local directories are relative to the project location
-    path = config.get("path", "results")
+    path = os.path.expanduser(config.get("path", "results"))
     if not os.path.isabs(path):
       config["path"] = os.path.join(projectDir, path)
 
     data_dir = os.path.expanduser(config.get("data_dir", "data"))
     if not os.path.isabs(data_dir):
       config["data_dir"] = os.path.join(projectDir, data_dir)
+
+    # Pre-download dataset
+    dataset = config.get("dataset", 'CIFAR10')
+    if not hasattr(datasets, dataset):
+      (print("Dataset {} is not available in PyTorch.Please choose a valid dataset."
+        .format(dataset)))
+    getattr(datasets, dataset)(root=data_dir)
 
     # When running multiple hyperparameter searches on different experiments,
     # ray.tune will run one experiment at the time. We use "ray.remote" to
