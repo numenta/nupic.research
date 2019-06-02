@@ -23,6 +23,7 @@
 import time
 import math
 import random
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -36,10 +37,16 @@ from torch.utils.data import DataLoader
 from nupic.research.frameworks.pytorch.model_utils import *
 from nupic.research.frameworks.pytorch.image_transforms import *
 
+from collections import deque
+
+# monkey patch ReduceLROnPlateau, no get_lr implemented 
+def get_lr(self):
+    for param_group in self.optimizer.param_groups:
+        return param_group['lr']
+torch.optim.lr_scheduler.ReduceLROnPlateau.get_lr = get_lr
 
 def CNNSize(width, kernel_size, padding=1, stride=1):
   return (width - kernel_size + 2 * padding) / stride + 1
-
 
 def create_test_loaders(dataset, noise_values, batch_size, data_dir):
   """
@@ -60,14 +67,12 @@ def create_test_loaders(dataset, noise_values, batch_size, data_dir):
 
     testset = getattr(datasets, dataset)(root=data_dir,
                                          train=False,
-                                         download=True,
                                          transform=transform_noise_test)
     loaders.append(
       DataLoader(testset, batch_size=batch_size, shuffle=False)
     )
 
   return loaders
-
 
 
 class TinyCIFAR(object):
@@ -118,7 +123,7 @@ class TinyCIFAR(object):
     self.loss_function = nn.functional.cross_entropy
 
     self.learning_rate = config["learning_rate"]
-    self.momentum = config["momentum"]
+    self.momentum = config.get("momentum", 0.5)
     self.weight_decay = config.get("weight_decay", 0.0005)
     self.learning_rate_gamma = config.get("learning_rate_gamma", 0.9)
     self.last_noise_results = None
@@ -151,6 +156,7 @@ class TinyCIFAR(object):
       self.linear_percent_on = [self.linear_percent_on]
       self.linear_weight_sparsity = [self.linear_weight_sparsity]
     self.output_size = config.get("output_size", 10)
+    self.optimizer_alg = config.get("optimizer", 'SGD')
 
     # Setup devices, model, and dataloaders
     print("setup: Torch device count=", torch.cuda.device_count())
@@ -179,13 +185,8 @@ class TinyCIFAR(object):
     self.output_size = config.get("output_size", 10)
     self.dataset = config.get("dataset", 'CIFAR10')
 
-    if not hasattr(datasets, self.dataset):
-      (print("Dataset {} is not available in PyTorch.Please choose a valid dataset."
-        .format(self.dataset)))
-
     train_dataset = getattr(datasets, self.dataset)(self.data_dir, 
                                                     train=True,
-                                                    download=True, 
                                                     transform=self.transform_train)
 
     self.train_loader = torch.utils.data.DataLoader(
@@ -202,9 +203,14 @@ class TinyCIFAR(object):
     if network_type == "vgg":
       self._create_vgg_model()
 
-    self.optimizer = self._createOptimizer(self.model)
+    self.optimizer = self._createOptimizer(self.model, self.optimizer_alg)
     self.lr_scheduler = self._createLearningRateScheduler(self.optimizer)
 
+    # adding track of losses for early stopping 
+    self.mean_losses = deque(maxlen=max(3,int(self.iterations/10)))
+    self.bad_epoches = 0
+    self.grace_period = max(1, int(self.iterations/5))
+    self.patience = 3
 
   def train_epoch(self, epoch):
     """
@@ -227,28 +233,13 @@ class TinyCIFAR(object):
                optimizer=self.optimizer, device=self.device,
                batches_in_epoch=batches_in_epoch,
                criterion=self.loss_function)
-    self._postEpoch(epoch)
+
     trainTime = time.time() - t1
 
     ret = self.run_noise_tests(self.noise_values, self.test_loaders, epoch)
+    self._postEpoch(epoch, ret['mean_loss'])
 
-    # Hard coded early stopping criteria
-    # commenting out hard coded, use a more dynamic early stopping criteria
-    # see options available in Ray
-    # if (
-    #       (epoch > 3 and abs(ret['mean_accuracy'] - 0.1) < 0.01)
-    #       # or (ret['noise_accuracy'] > 0.66 and ret['test_accuracy'] > 0.91)
-    #       or (ret['noise_accuracy'] > 0.69 and ret['test_accuracy'] > 0.91)
-    #       or (ret['noise_accuracy'] > 0.65 and ret['test_accuracy'] > 0.92)
-    #       # or (epoch > 10 and ret['noise_accuracy'] < 0.40)
-    #       # or (epoch > 30 and ret['noise_accuracy'] < 0.44)
-    #       # or (epoch > 40 and ret['noise_accuracy'] < 0.50)
-    # ):
-    #   ret['stop'] = 1
-    # else:
-    #   ret['stop'] = 0
-
-    ret['stop'] = 0 # run anyhow
+    ret['stop'] = self._early_stopping(epoch, ret['mean_loss'])
     ret['epoch_time_train'] = trainTime
     ret['epoch_time'] = time.time() - t1
     ret["learning_rate"] = self.learning_rate
@@ -405,41 +396,73 @@ class TinyCIFAR(object):
     self._initialize_weights()
 
 
-  def _createOptimizer(self, model):
+  def _createOptimizer(self, model, optimizer='Adam'):
     """
     Create a new instance of the optimizer
     """
-    return torch.optim.SGD(model.parameters(),
-                           lr=self.learning_rate,
-                           momentum=self.momentum,
-                           weight_decay=self.weight_decay)
+    if optimizer == 'SGD':
+      return torch.optim.SGD(model.parameters(),
+                             lr=self.learning_rate,
+                             momentum=self.momentum,
+                             weight_decay=self.weight_decay)
+    elif optimizer == 'Adam':
+      return torch.optim.Adam(model.parameters(),
+                             lr=self.learning_rate,
+                             betas=(0.9, 0.999),
+                             weight_decay=self.weight_decay)
+    else:
+      raise ValueError("{} is not a valid optimizer".format(optimizer))
 
 
-  def _createLearningRateScheduler(self, optimizer):
+  def _createLearningRateScheduler(self, optimizer, scheduler='ReduceLROnPlateau'):
     """
-    Creates the learning rate scheduler and attach the optimizer
+      Creates the learning rate scheduler and attach the optimizer
+      If step schedule is a list, don't create a scheduler
     """
-    if self.lr_step_schedule is not None:
-      return torch.optim.lr_scheduler.StepLR(optimizer,
-                                             step_size=1,
-                                             gamma=self.learning_rate_gamma)
+    if self.lr_step_schedule and not isinstance(self.lr_step_schedule, list):
+      if scheduler == 'StepLR':
+        return torch.optim.lr_scheduler.StepLR(optimizer,
+                                               step_size=1,
+                                               gamma=self.learning_rate_gamma)
+      elif scheduler == 'ReduceLROnPlateau':
+        return torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                          mode='min', # loss
+                                                          patience=5,
+                                                          threshold=1e-4,
+                                                          factor=self.learning_rate_gamma)
+      else:
+        raise ValueError("{} is not a valid learning rate scheduler".format(scheduler))
     else:
       return None
 
+  def _adjust_learning_rate(self, optimizer, epoch, metric):
+    """ Accepts a schedule either as a list of steps or a boolean """ 
 
-  def _adjust_learning_rate(self, optimizer, epoch):
-    if self.lr_step_schedule is not None:
+    if self.lr_step_schedule and isinstance(self.lr_step_schedule, list):
       if epoch in self.lr_step_schedule:
         self.learning_rate *= self.learning_rate_gamma
         print("Reducing learning rate to:", self.learning_rate)
         for param_group in optimizer.param_groups:
           param_group['lr'] = self.learning_rate
     else:
-      if self.lr_scheduler is not None:
-        self.lr_scheduler.step()
-        self.learning_rate = self.lr_scheduler.get_lr()[0]
-        print("Reducing learning rate to:", self.learning_rate)
+      if self.lr_scheduler:
+        self.lr_scheduler.step(metric)
+        self.learning_rate = np.mean(self.lr_scheduler.get_lr())
 
+  def _early_stopping(self, epoch, metric):
+    """ Custom early stopping based on moving median """ 
+
+    self.mean_losses.append(metric)
+    if metric >= np.median(self.mean_losses):
+      self.bad_epoches += 1
+    else:
+      self.bad_epoches = 0
+
+    if epoch > self.grace_period:
+      if self.bad_epoches > self.patience:
+        return 1
+
+    return 0        
 
   def run_noise_tests(self, noiseValues, loaders, epoch):
     """
@@ -477,13 +500,15 @@ class TinyCIFAR(object):
 
     return ret
 
+  def _postEpoch(self, epoch, metric):
+    """
+    The set of actions to do after each epoch of training: 
+      1.adjust learning rate,
+      2.rezero sparse weights, 
+      3. and update boost strengths.
+    """
 
-  def _postEpoch(self, epoch):
-    """
-    The set of actions to do after each epoch of training: adjust learning rate,
-    rezero sparse weights, and update boost strengths.
-    """
-    self._adjust_learning_rate(self.optimizer, epoch)
+    self._adjust_learning_rate(self.optimizer, epoch, metric)
     self.model.apply(rezeroWeights)
     self.model.apply(updateBoostStrength)
 
