@@ -1,0 +1,16 @@
+sphinx>=2
+sphinx-autobuild
+recommonmark
+m2r
+numpy
+matplotlib
+pandas
+tabulate
+librosa
+scikit-image
+requests
+ray
+torch
+torchvision
+nupic.torch
+
