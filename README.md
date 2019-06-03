@@ -12,8 +12,12 @@ Please see this [blog entry](https://numenta.com/blog/2018/10/22/framework_for_i
 
 The NuPIC open source community continues to maintain and improve our more stable older algorithms. See https://discourse.numenta.org for discussions on that codebase - you can also post your research related questions there.
 
-The ideas in this repository are constantly in flux as we tweak and experiment. Hence the following DISCLAIMERS:
+Papers
+======
 
+If you are interested in scripts and code used in published papers, [this repository](https://github.com/numenta/htmpapers) contains reproducible code for selected Numenta papers.
+
+The ideas in this repository are constantly in flux as we tweak and experiment. Hence the following DISCLAIMERS:
  
 What you should understand about this repository
 ================================================
