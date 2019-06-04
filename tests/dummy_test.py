@@ -19,9 +19,12 @@
 #
 import unittest
 
-@unittest.skip("Placeholder test used to keep pytest from returning "
-               "'error code 5 : no tests ran'. It should be removed once we "
-               "have real tests")
+
+@unittest.skip(
+    "Placeholder test used to keep pytest from returning "
+    "'error code 5 : no tests ran'. It should be removed once we "
+    "have real tests"
+)
 def test_placeholder():
     pass
 

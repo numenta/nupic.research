@@ -18,5 +18,9 @@
 #  http://numenta.org/licenses/
 #
 
-from .mobilenetv1 import (MobileNetV1, SeparableConvolution2d,
-                          MobileNetV1SparsePoint, MobileNetV1SparseDepth)
+from .mobilenetv1 import (
+    MobileNetV1,
+    mobile_net_v1_sparse_depth,
+    mobile_net_v1_sparse_point,
+    separable_convolution2d,
+)
