@@ -21,7 +21,7 @@
 # ------------------------------------------------------------------------------
 from os import path
 
-from setuptools import setup, find_namespace_packages
+from setuptools import setup
 
 import nupic.research
 
@@ -29,43 +29,47 @@ ROOT = path.abspath(path.dirname(__file__))
 
 # Get requirements from file
 with open(path.join(ROOT, "requirements.txt")) as f:
-  requirements = [line.strip() for line in f.readlines()
-                  if not line.startswith("#")]
+    requirements = [line.strip() for line in f.readlines() if not line.startswith("#")]
 
+# Get requirements-dev from file
+with open(path.join(ROOT, "requirements-dev.txt")) as f:
+    requirements_dev = [
+        line.strip() for line in f.readlines() if not line.startswith("#")
+    ]
 
 # Get the long description from the README file
 with open(path.join(ROOT, "README.md")) as f:
-  readme = f.read()
+    readme = f.read()
 
 setup(
-  name="nupic.research",
-  author="Numenta",
-  author_email="help@numenta.org",
-  license="AGPLv3",
-  platforms=["any"],
-  url="https://github.com/numenta/nupic.research",
-  description="Numenta Experimental Research Code",
-  long_description=readme,
-  long_description_content_type="text/markdown",
-  version=nupic.research.__version__,
-  packages=find_namespace_packages(include=["nupic.*"]),
-  install_requires=requirements,
-  dependency_links=[
-    "git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch"
-  ],
-  python_requires=">=3.6, <4",
-  classifiers=[
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-    "Operating System :: OS Independent",
-    "Environment :: Console",
-    "Intended Audience :: Science/Research",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence"
-  ],
-  project_urls={
-    "Bug Reports": "https://github.com/numenta/nupic.research/issues",
-    "Source": "https://github.com/numenta/nupic.research",
-  },
-  test_suite="tests",
-  tests_require=["pytest>=4.4.0"]
+    name="nupic.research",
+    author="Numenta",
+    author_email="help@numenta.org",
+    license="AGPLv3",
+    platforms=["any"],
+    url="https://github.com/numenta/nupic.research",
+    description="Numenta Experimental Research Code",
+    long_description=readme,
+    long_description_content_type="text/markdown",
+    version=nupic.research.__version__,
+    packages=["nupic"],
+    install_requires=requirements,
+    dependency_links=["git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch"],
+    python_requires=">=3.6, <4",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: GNU Affero General Public License v3 or later "
+        "(AGPLv3+)",
+        "Operating System :: OS Independent",
+        "Environment :: Console",
+        "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    ],
+    project_urls={
+        "Bug Reports": "https://github.com/numenta/nupic.research/issues",
+        "Source": "https://github.com/numenta/nupic.research",
+    },
+    test_suite="tests",
+    tests_require=["pytest>=4.4.0"],
+    extras_require={"dev": requirements_dev},
 )
