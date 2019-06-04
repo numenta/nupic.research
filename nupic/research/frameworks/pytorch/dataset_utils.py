@@ -27,7 +27,7 @@ from torch.utils.data import Dataset, Subset
 
 
 def create_validation_data_sampler(dataset, ratio):
-    """Create `torch.utils.data.Sampler`s used to split the dataset into 2
+    """Create `torch.utils.data.Sampler` used to split the dataset into 2
     ramdom sampled subsets. The first should used for training and the second
     for validation.
 
