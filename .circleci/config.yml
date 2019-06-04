@@ -1,0 +1,140 @@
+# ----------------------------------------------------------------------
+# Numenta Platform for Intelligent Computing (NuPIC)
+# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# with Numenta, Inc., for a separate license for this software code, the
+# following terms and conditions apply:
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero Public License version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Affero Public License for more details.
+#
+# You should have received a copy of the GNU Affero Public License
+# along with this program.  If not, see http://www.gnu.org/licenses.
+#
+# http://numenta.org/licenses/
+# ----------------------------------------------------------------------
+
+version: 2
+
+jobs:
+
+  checkout_code:
+    working_directory: ~/nupic.research
+    machine: true
+    steps:
+      - restore_cache:
+          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - checkout
+      - save_cache:
+          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+          paths:
+            - ~/nupic.research
+
+  install_dependencies:
+    working_directory: ~/nupic.research
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - restore_cache:
+          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - restore_cache:
+          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+      - run: pip install --user flake8-formatter-junit-xml
+      - run: pip install --user -r requirements-dev.txt -r requirements.txt
+      - save_cache:
+          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          paths:
+            - ~/.local
+            - ~/.cache
+
+  validate_contributor:
+    working_directory: ~/nupic.research
+    machine: true
+    steps:
+      - restore_cache:
+          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - run:
+          name: Validate contributor license
+          command: ci/validate-contributor.sh
+
+  check_style:
+    working_directory: ~/nupic.research
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - restore_cache:
+          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - restore_cache:
+          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+      - run:
+          name: Check Style
+          command: |
+            mkdir -p test_results/flake8
+            ~/.local/bin/flake8 --show-source --format junit-xml --output-file test_results/flake8/results.xml nupic tests projects
+      - store_test_results:
+          path: test_results
+
+  test:
+    working_directory: ~/nupic.research
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - restore_cache:
+          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - restore_cache:
+          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+      - run:
+          name: Run python tests
+          environment:
+            PYTEST_ADDOPTS: --junitxml=test_results/pytest/results.xml --verbose
+          command: |
+            mkdir -p test_results/pytest
+            python setup.py test
+      - store_test_results:
+          path: test_results
+
+  build:
+    working_directory: ~/nupic.research
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - restore_cache:
+          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - restore_cache:
+          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+      - run:
+          name: Build wheel
+          environment:
+            VERBOSE: 1
+          command: python setup.py bdist_wheel
+      - store_artifacts:
+          path: dist
+
+
+workflows:
+  version: 2
+
+  validate-build-test:
+    jobs:
+      - checkout_code
+      - validate_contributor:
+          requires:
+            - checkout_code
+      - install_dependencies:
+          requires:
+            - validate_contributor
+      - check_style:
+          requires:
+            - install_dependencies
+      - test:
+          requires:
+            - install_dependencies
+      - build:
+          requires:
+            - check_style
+            - test
