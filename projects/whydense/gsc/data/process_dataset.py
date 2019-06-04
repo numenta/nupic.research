@@ -19,10 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 """
-Pre-process google commands dataset applying multiple transformations
-to the original .wav files and saving them as pickled dictionaries
+Pre-process google commands dataset applying multiple transformations to the
+original .wav files and saving them as pickled dictionaries.
 """
 import argparse
+import gc
 import itertools
 import multiprocessing as mp
 import os
@@ -30,162 +31,207 @@ import pickle
 import sys
 import traceback
 
-import gc
 from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.audio_transforms import *
-from nupic.research.frameworks.pytorch.speech_commands_dataset import BackgroundNoiseDataset
+from nupic.research.frameworks.pytorch.audio_transforms import (
+    AddBackgroundNoiseOnSTFT,
+    ChangeAmplitude,
+    ChangeSpeedAndPitchAudio,
+    DeleteSTFT,
+    FixAudioLength,
+    FixSTFTDimension,
+    LoadAudio,
+    StretchAudioOnSTFT,
+    TimeshiftAudioOnSTFT,
+    ToMelSpectrogram,
+    ToMelSpectrogramFromSTFT,
+    ToSTFT,
+    ToTensor,
+)
+from nupic.research.frameworks.pytorch.speech_commands_dataset import (
+    BackgroundNoiseDataset,
+)
 
 # Multiprocess shared variable used to update the progress
 progress = None
 
 
 def transform_folder(args):
-  """
-  Transform all the files in the source dataset for the given command and save
-  the results as a single pickle file in the destination dataset
-  :param args: tuple with the following arguments:
-               - the command name: 'zero', 'one', 'two', ...
-               - transforms to apply to wav file
-               - full path of the source dataset
-               - full path of the destination dataset
-  """
-  command, (transform, src, dest) = args
-  try:
-    print(progress.value, "remaining")
+    """Transform all the files in the source dataset for the given command and
+    save the results as a single pickle file in the destination dataset.
 
-    # Apply transformations to all files
-    data = []
-    data_dir = os.path.join(src, command)
-    for filename in os.listdir(data_dir):
-      path = os.path.join(data_dir, filename)
-      data.append(transform({
-                              'path': path}))
+    :param args: tuple with the following arguments:
+                 - the command name: 'zero', 'one', 'two', ...
+                 - transforms to apply to wav file
+                 - full path of the source dataset
+                 - full path of the destination dataset
+    """
+    command, (transform, src, dest) = args
+    try:
+        print(progress.value, "remaining")
 
-    # Save results
-    pickleFile = os.path.join(dest, "{}.pkl".format(command))
-    gc.disable()
-    with open(pickleFile, "wb") as f:
-      pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
-    gc.enable()
+        # Apply transformations to all files
+        data = []
+        data_dir = os.path.join(src, command)
+        for filename in os.listdir(data_dir):
+            path = os.path.join(data_dir, filename)
+            data.append(transform({"path": path}))
 
-    # Update progress
-    with progress.get_lock():
-      progress.value -= 1
+        # Save results
+        pickle_file = os.path.join(dest, "{}.pkl".format(command))
+        gc.disable()
+        with open(pickle_file, "wb") as f:
+            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+        gc.enable()
 
-  except Exception as e:
-    print(command, e, file=sys.stderr)
-    traceback.print_exc()
+        # Update progress
+        with progress.get_lock():
+            progress.value -= 1
+
+    except Exception as e:
+        print(command, e, file=sys.stderr)
+        traceback.print_exc()
 
 
 def main():
-  parser = argparse.ArgumentParser(
-    description='Pre-process google commands dataset.')
-  parser.add_argument('--source', '-s', type=str, required=True,
-                      help='the path to the root folder of the google commands '
-                           'train dataset.')
-  parser.add_argument('--dest', '-d', type=str, required=True,
-                      help='the path where to stored the transformed dataset')
-  parser.add_argument('-sample_rate', '-sr', type=int,
-                      default=16000,
-                      help='target sampling rate')
-  args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Pre-process google commands dataset.")
+    parser.add_argument(
+        "--source",
+        "-s",
+        type=str,
+        required=True,
+        help="the path to the root folder of the google commands " "train dataset.",
+    )
+    parser.add_argument(
+        "--dest",
+        "-d",
+        type=str,
+        required=True,
+        help="the path where to stored the transformed dataset",
+    )
+    parser.add_argument(
+        "-sample_rate", "-sr", type=int, default=16000, help="target sampling rate"
+    )
+    args = parser.parse_args()
 
-  # Dataset folders
-  noise_folder = os.path.join(args.source, '_background_noise_')
-  train_folder = os.path.join(args.source, 'train')
-  valid_folder = os.path.join(args.source, 'valid')
-  test_folder = os.path.join(args.source, 'test')
+    # Dataset folders
+    noise_folder = os.path.join(args.source, "_background_noise_")
+    train_folder = os.path.join(args.source, "train")
+    valid_folder = os.path.join(args.source, "valid")
+    test_folder = os.path.join(args.source, "test")
 
-  dest_noise_folder = os.path.join(args.dest, 'noise')
-  dest_train_folder = os.path.join(args.dest, 'train')
-  dest_valid_folder = os.path.join(args.dest, 'valid')
-  dest_test_folder = os.path.join(args.dest, 'test')
+    dest_noise_folder = os.path.join(args.dest, "noise")
+    dest_train_folder = os.path.join(args.dest, "train")
+    dest_valid_folder = os.path.join(args.dest, "valid")
+    dest_test_folder = os.path.join(args.dest, "test")
 
-  # Dataset transforms
-  n_mels = 32
-  trainingTransform = transforms.Compose([
-    LoadAudio(),
-    ChangeAmplitude(),
-    ChangeSpeedAndPitchAudio(),
-    FixAudioLength(),
-    ToSTFT(),
-    StretchAudioOnSTFT(),
-    TimeshiftAudioOnSTFT(),
-    FixSTFTDimension(),
-    ToMelSpectrogramFromSTFT(n_mels=n_mels),
-    DeleteSTFT(),
-    ToTensor('mel_spectrogram', 'input')
-  ])
-  testFeatureTransform = transforms.Compose([
-    LoadAudio(),
-    FixAudioLength(),
-    ToMelSpectrogram(n_mels=n_mels),
-    ToTensor('mel_spectrogram', 'input')
-  ])
+    # Dataset transforms
+    n_mels = 32
+    training_transform = transforms.Compose(
+        [
+            LoadAudio(),
+            ChangeAmplitude(),
+            ChangeSpeedAndPitchAudio(),
+            FixAudioLength(),
+            ToSTFT(),
+            StretchAudioOnSTFT(),
+            TimeshiftAudioOnSTFT(),
+            FixSTFTDimension(),
+            ToMelSpectrogramFromSTFT(n_mels=n_mels),
+            DeleteSTFT(),
+            ToTensor("mel_spectrogram", "input"),
+        ]
+    )
+    test_feature_transform = transforms.Compose(
+        [
+            LoadAudio(),
+            FixAudioLength(),
+            ToMelSpectrogram(n_mels=n_mels),
+            ToTensor("mel_spectrogram", "input"),
+        ]
+    )
 
-  bg_dataset = BackgroundNoiseDataset(
-    noise_folder,
-    transforms.Compose([FixAudioLength(), ToSTFT()]),
-  )
-  bgNoiseTransform = transforms.Compose([
-    LoadAudio(),
-    FixAudioLength(),
-    ToSTFT(),
-    AddBackgroundNoiseOnSTFT(bg_dataset),
-    ToMelSpectrogramFromSTFT(n_mels=n_mels),
-    DeleteSTFT(),
-    ToTensor('mel_spectrogram', 'input')
-  ])
+    bg_dataset = BackgroundNoiseDataset(
+        noise_folder, transforms.Compose([FixAudioLength(), ToSTFT()])
+    )
+    bg_noise_transform = transforms.Compose(
+        [
+            LoadAudio(),
+            FixAudioLength(),
+            ToSTFT(),
+            AddBackgroundNoiseOnSTFT(bg_dataset),
+            ToMelSpectrogramFromSTFT(n_mels=n_mels),
+            DeleteSTFT(),
+            ToTensor("mel_spectrogram", "input"),
+        ]
+    )
 
-  # Create transformation tuples in the following format: (transform, src, dest)
-  transformations = zip(
-    [trainingTransform, testFeatureTransform, testFeatureTransform, bgNoiseTransform],
-    [train_folder, test_folder, valid_folder, test_folder],
-    [dest_train_folder, dest_test_folder, dest_valid_folder, dest_noise_folder])
+    # Create transformation tuples in the following format: (transform, src, dest)
+    transformations = zip(
+        [
+            training_transform,
+            test_feature_transform,
+            test_feature_transform,
+            bg_noise_transform,
+        ],
+        [train_folder, test_folder, valid_folder, test_folder],
+        [dest_train_folder, dest_test_folder, dest_valid_folder, dest_noise_folder],
+    )
 
-  # Prepare transformations parameters for background process pool applying
-  # transformations on every command
-  params = list(itertools.product(['zero', 'one', 'two', 'three', 'four',
-                                   'five', 'six', 'seven', 'eight', 'nine'],
-                                  transformations))
+    # Prepare transformations parameters for background process pool applying
+    # transformations on every command
+    params = list(
+        itertools.product(
+            [
+                "zero",
+                "one",
+                "two",
+                "three",
+                "four",
+                "five",
+                "six",
+                "seven",
+                "eight",
+                "nine",
+            ],
+            transformations,
+        )
+    )
 
-  # Create destination folders before starting the background processes to avoid
-  # race condition
-  destination_folders = [dest_train_folder, dest_test_folder, dest_valid_folder,
-                         dest_noise_folder]
-  for folder in destination_folders:
-    if not os.path.exists(folder):
-      os.makedirs(folder)
+    # Create destination folders before starting the background processes to avoid
+    # race condition
+    destination_folders = [
+        dest_train_folder,
+        dest_test_folder,
+        dest_valid_folder,
+        dest_noise_folder,
+    ]
+    for folder in destination_folders:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
 
-  # Run transformations in parallel updating the shared 'progress' variable
-  global progress
-  progress = mp.Value('i', len(params))
-  pool = mp.Pool()
-  pool.map(transform_folder, params)
+    # Run transformations in parallel updating the shared 'progress' variable
+    global progress
+    progress = mp.Value("i", len(params))
+    pool = mp.Pool()
+    pool.map(transform_folder, params)
 
-  # Save transformed silence
-  with open("{}/silence.pkl".format(dest_train_folder), "wb") as f:
-    silence = trainingTransform({
-                                  'path': '',
-                                  'sample_rate': args.sample_rate})
-    pickle.dump(silence, f, pickle.HIGHEST_PROTOCOL)
+    # Save transformed silence
+    with open("{}/silence.pkl".format(dest_train_folder), "wb") as f:
+        silence = training_transform({"path": "", "sample_rate": args.sample_rate})
+        pickle.dump(silence, f, pickle.HIGHEST_PROTOCOL)
 
-  with open("{}/silence.pkl".format(dest_noise_folder), "wb") as f:
-    silence = bgNoiseTransform({
-                                 'path': '',
-                                 'sample_rate': args.sample_rate})
-    pickle.dump(silence, f, pickle.HIGHEST_PROTOCOL)
+    with open("{}/silence.pkl".format(dest_noise_folder), "wb") as f:
+        silence = bg_noise_transform({"path": "", "sample_rate": args.sample_rate})
+        pickle.dump(silence, f, pickle.HIGHEST_PROTOCOL)
 
-  silence = testFeatureTransform({
-                                   'path': '',
-                                   'sample_rate': args.sample_rate})
-  with open("{}/silence.pkl".format(dest_valid_folder), "wb") as f:
-    pickle.dump(silence, f, pickle.HIGHEST_PROTOCOL)
+    silence = test_feature_transform({"path": "", "sample_rate": args.sample_rate})
+    with open("{}/silence.pkl".format(dest_valid_folder), "wb") as f:
+        pickle.dump(silence, f, pickle.HIGHEST_PROTOCOL)
 
-  with open("{}/silence.pkl".format(dest_test_folder), "wb") as f:
-    pickle.dump(silence, f, pickle.HIGHEST_PROTOCOL)
+    with open("{}/silence.pkl".format(dest_test_folder), "wb") as f:
+        pickle.dump(silence, f, pickle.HIGHEST_PROTOCOL)
 
 
-if __name__ == '__main__':
-  main()
+if __name__ == "__main__":
+    main()

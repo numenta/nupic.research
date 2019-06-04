@@ -18,107 +18,120 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-"""
-Splits the google speech commands into train, validation and test sets.
+"""Splits the google speech commands into train, validation and test sets.
 
 In the small case, it will only create files for the categories listed
-in smallCategories.  In this case it will create a subdirectory for all files
-that are unused.
-
+in small_categories.  In this case it will create a subdirectory for all
+files that are unused.
 """
 
 import argparse
 import os
 import shutil
 
-smallCategories = ['eight', 'nine', 'three', 'one', 'zero',
-                   'seven', 'two', 'six', 'five', 'four']
+small_categories = [
+    "eight",
+    "nine",
+    "three",
+    "one",
+    "zero",
+    "seven",
+    "two",
+    "six",
+    "five",
+    "four",
+]
 
 
 def remove_unused_directories(src_folder, categories):
-  """
-  list all directories.
-  Remove all that are not in categories list (excluding background noise)
-  :param src_folder:
-  :param categories:
-  :return:
-  """
-  files = os.listdir(src_folder)
-  os.mkdir("unused")
-  for name in files:
-    full_path = os.path.join(src_folder, name)
-    if os.path.isdir(full_path):
-      if not (name in categories or name == "_background_noise_"):
-        newPath = os.path.join("unused", name)
-        print("moving: ", full_path, "-->", newPath)
-        shutil.move(full_path, newPath)
+    """list all directories. Remove all that are not in categories list
+    (excluding background noise)
+
+    :param src_folder:
+    :param categories:
+    :return:
+    """
+    files = os.listdir(src_folder)
+    os.mkdir("unused")
+    for name in files:
+        full_path = os.path.join(src_folder, name)
+        if os.path.isdir(full_path):
+            if not (name in categories or name == "_background_noise_"):
+                new_path = os.path.join("unused", name)
+                print("moving: ", full_path, "-->", new_path)
+                shutil.move(full_path, new_path)
 
 
 def move_files(src_folder, to_folder, list_file):
-  with open(list_file) as f:
-    for line in f.readlines():
-      line = line.rstrip()
-      dirname = os.path.dirname(line)
-      dest = os.path.join(to_folder, dirname)
-      if not os.path.exists(dest):
-        os.mkdir(dest)
-      shutil.move(os.path.join(src_folder, line), dest)
+    with open(list_file) as f:
+        for line in f.readlines():
+            line = line.rstrip()
+            dirname = os.path.dirname(line)
+            dest = os.path.join(to_folder, dirname)
+            if not os.path.exists(dest):
+                os.mkdir(dest)
+            shutil.move(os.path.join(src_folder, line), dest)
 
 
 def move_directories(src_folder, to_folder, categories):
-  for name in categories:
-    src = os.path.join(src_folder, name)
-    newPath = os.path.join(to_folder, name)
-    print("moving: ", src, "-->", newPath)
-    shutil.move(src, newPath)
+    for name in categories:
+        src = os.path.join(src_folder, name)
+        new_path = os.path.join(to_folder, name)
+        print("moving: ", src, "-->", new_path)
+        shutil.move(src, new_path)
 
 
-if __name__ == '__main__':
-  parser = argparse.ArgumentParser(
-    description='Split google commands train dataset.')
-  parser.add_argument('--root', type=str,
-                      default="speech_commands_test",
-                      help='the path to the root folder of the google commands train dataset.')
-  parser.add_argument('--size', type=str,
-                      default="small",
-                      help="size of generated dataset: 'small' or 'normal'")
-  args = parser.parse_args()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Split google commands train dataset.")
+    parser.add_argument(
+        "--root",
+        type=str,
+        default="speech_commands_test",
+        help="the path to the root folder of the google commands train dataset.",
+    )
+    parser.add_argument(
+        "--size",
+        type=str,
+        default="small",
+        help="size of generated dataset: 'small' or 'normal'",
+    )
+    args = parser.parse_args()
 
-  if args.size == "normal":
-    assert (False, "Unimplemented!")
-    remove_unused_directories(args.root, smallCategories)
+    if args.size == "normal":
+        raise NotImplementedError
+        remove_unused_directories(args.root, small_categories)
 
-    validation_files_list = os.path.join('validation_list_10cats.txt')
-    test_files_list = os.path.join('testing_list_10cats.txt')
+        validation_files_list = os.path.join("validation_list_10cats.txt")
+        test_files_list = os.path.join("testing_list_10cats.txt")
 
-    valid_folder = os.path.join(args.root, 'valid')
-    test_folder = os.path.join(args.root, 'test')
-    train_folder = os.path.join(args.root, 'train')
+        valid_folder = os.path.join(args.root, "valid")
+        test_folder = os.path.join(args.root, "test")
+        train_folder = os.path.join(args.root, "train")
 
-    os.mkdir(valid_folder)
-    os.mkdir(test_folder)
-    os.mkdir(train_folder)
+        os.mkdir(valid_folder)
+        os.mkdir(test_folder)
+        os.mkdir(train_folder)
 
-    move_files(args.root, test_folder, test_files_list)
-    move_files(args.root, valid_folder, validation_files_list)
-    move_directories(args.root, train_folder, smallCategories)
+        move_files(args.root, test_folder, test_files_list)
+        move_files(args.root, valid_folder, validation_files_list)
+        move_directories(args.root, train_folder, small_categories)
 
-  elif args.size == "small":
-    remove_unused_directories(args.root, smallCategories)
+    elif args.size == "small":
+        remove_unused_directories(args.root, small_categories)
 
-    validation_files_list = os.path.join('validation_list_10cats.txt')
-    test_files_list = os.path.join('testing_list_10cats.txt')
+        validation_files_list = os.path.join("validation_list_10cats.txt")
+        test_files_list = os.path.join("testing_list_10cats.txt")
 
-    valid_folder = os.path.join(args.root, 'valid')
-    test_folder = os.path.join(args.root, 'test')
-    train_folder = os.path.join(args.root, 'train')
+        valid_folder = os.path.join(args.root, "valid")
+        test_folder = os.path.join(args.root, "test")
+        train_folder = os.path.join(args.root, "train")
 
-    os.mkdir(valid_folder)
-    os.mkdir(test_folder)
-    os.mkdir(train_folder)
+        os.mkdir(valid_folder)
+        os.mkdir(test_folder)
+        os.mkdir(train_folder)
 
-    move_files(args.root, test_folder, test_files_list)
-    move_files(args.root, valid_folder, validation_files_list)
-    move_directories(args.root, train_folder, smallCategories)
+        move_files(args.root, test_folder, test_files_list)
+        move_files(args.root, valid_folder, validation_files_list)
+        move_directories(args.root, train_folder, small_categories)
 
-    print("Categories not used are in 'unused' - you may want to delete them")
+        print("Categories not used are in 'unused' - you may want to delete them")
