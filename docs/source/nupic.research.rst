@@ -1,5 +1,5 @@
 nupic.research
-=============
+==============
 
 .. automodule:: nupic.research
     :members:
