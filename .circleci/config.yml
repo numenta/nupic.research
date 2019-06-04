@@ -45,7 +45,9 @@ jobs:
       - restore_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run: pip install --user flake8-formatter-junit-xml
-      - run: pip install --user -r requirements-dev.txt -r requirements.txt
+      - run: pip install --user -r requirements-dev.txt
+      - run: pip install --user ray
+      - run: python setup.py install --user
       - save_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
           paths:
