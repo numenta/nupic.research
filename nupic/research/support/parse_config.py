@@ -20,32 +20,32 @@
 
 import configparser
 
-def parse_config(config_file, experiments=None, globals=None, locals=None):
-  """
-  Parse configuration file optionally filtering for specific experiments/sections
-  :param config_file: Configuration file
-  :param experiments: Optional list of experiments
-  :param globals: global symbol table to use during `eval`
-  :param locals: local symbol table to use during `eval`
-  :return: Dictionary with the parsed configuration
-  """
-  cfgparser = configparser.ConfigParser()
-  cfgparser.read_file(config_file)
 
-  params = {}
-  for exp in cfgparser.sections():
-    if not experiments or exp in experiments:
-      values = dict(cfgparser.defaults())
-      values.update(dict(cfgparser.items(exp)))
-      item = {}
-      for k, v in values.items():
-        try:
-          item[k] = eval(v, globals, locals)
-        except (NameError, SyntaxError):
-          item[k] = v
+def parse_config(config_file, experiments=None, globals_param=None, locals_param=None):
+    """Parse configuration file optionally filtering for specific
+    experiments/sections.
 
-      params[exp] = item
+    :param config_file: Configuration file
+    :param experiments: Optional list of experiments
+    :param globals_param: global symbol table to use during `eval`
+    :param locals_param: local symbol table to use during `eval`
+    :return: Dictionary with the parsed configuration
+    """
+    cfgparser = configparser.ConfigParser()
+    cfgparser.read_file(config_file)
 
-  return params
+    params = {}
+    for exp in cfgparser.sections():
+        if not experiments or exp in experiments:
+            values = dict(cfgparser.defaults())
+            values.update(dict(cfgparser.items(exp)))
+            item = {}
+            for k, v in values.items():
+                try:
+                    item[k] = eval(v, globals_param, locals_param)
+                except (NameError, SyntaxError):
+                    item[k] = v
 
+            params[exp] = item
 
+    return params
