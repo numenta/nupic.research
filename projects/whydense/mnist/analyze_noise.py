@@ -23,136 +23,137 @@ import logging
 import os
 
 import click
+import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
 from torchvision import datasets, transforms
 
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-from nupic.research.support import parse_config, load_ray_tune_experiment
+from nupic.research.support import load_ray_tune_experiment, parse_config
 
 logging.basicConfig(level=logging.ERROR)
 
-import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
-import pandas as pd
 
-NOISE_VALUES = ["0.0", "0.05", "0.1", "0.15", "0.2", "0.25", "0.3", "0.35",
-                "0.4", "0.45", "0.5"]
+NOISE_VALUES = [
+    "0.0",
+    "0.05",
+    "0.1",
+    "0.15",
+    "0.2",
+    "0.25",
+    "0.3",
+    "0.35",
+    "0.4",
+    "0.45",
+    "0.5",
+]
 
 EXPERIMENTS = {
-  "denseCNN1": {
-    "label": "dense-CNN1",
-    "linestyle": "--",
-    "marker": "o"
-  },
-
-  "denseCNN2": {
-    "label": "dense-CNN2",
-    "linestyle": "--",
-    "marker": "x"
-  },
-
-  "sparseCNN1": {
-    "label": "sparse-CNN1",
-    "linestyle": "-",
-    "marker": "*"
-  },
-
-  "sparseCNN2": {
-    "label": "sparse-CNN2",
-    "linestyle": "-",
-    "marker": "x"
-  },
+    "denseCNN1": {"label": "dense-CNN1", "linestyle": "--", "marker": "o"},
+    "denseCNN2": {"label": "dense-CNN2", "linestyle": "--", "marker": "x"},
+    "sparseCNN1": {"label": "sparse-CNN1", "linestyle": "-", "marker": "*"},
+    "sparseCNN2": {"label": "sparse-CNN2", "linestyle": "-", "marker": "x"},
 }
 
 
-def plotNoiseCurve(configs, results, plotPath):
-  fig, ax = plt.subplots()
-  fig.suptitle("Accuracy vs noise")
-  ax.set_xlabel("Noise")
-  ax.set_ylabel("Accuracy (percent)")
-  for exp in configs:
-    df = pd.DataFrame.from_dict(results[exp], orient='index')
-    ax.plot(df["mean_accuracy"], **EXPERIMENTS[exp])
+def plot_noise_curve(configs, results, plot_path):
+    fig, ax = plt.subplots()
+    fig.suptitle("Accuracy vs noise")
+    ax.set_xlabel("Noise")
+    ax.set_ylabel("Accuracy (percent)")
+    for exp in configs:
+        df = pd.DataFrame.from_dict(results[exp], orient="index")
+        ax.plot(df["mean_accuracy"], **EXPERIMENTS[exp])
 
-  # ax.xaxis.set_ticks(np.arange(0.0, 0.5 + 0.1, 0.1))
-  plt.legend()
-  plt.grid(axis='y')
-  plt.savefig(plotPath)
-  plt.close()
+    # ax.xaxis.set_ticks(np.arange(0.0, 0.5 + 0.1, 0.1))
+    plt.legend()
+    plt.grid(axis="y")
+    plt.savefig(plot_path)
+    plt.close()
 
 
-def plotImagesWithNoise(datadir, noise_values, plotPath):
-  """
-  Plot Sample MNIST images with noise
-  """
+def plot_images_with_noise(datadir, noise_values, plot_path):
+    """Plot Sample MNIST images with noise."""
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
+    dataset = datasets.MNIST(datadir, train=False, download=True, transform=transform)
 
-  transform = transforms.Compose([transforms.ToTensor(),
-                                  transforms.Normalize((0.1307,), (0.3081,))])
-  dataset = datasets.MNIST(datadir, train=False, download=True,
-                           transform=transform)
+    num_noise = len(noise_values)
+    fig = plt.figure(figsize=(num_noise, 4))
+    for y in range(4):
+        for x in range(num_noise):
+            transform.transforms.append(
+                RandomNoise(noise_values[x], high_value=0.1307 + 2 * 0.3081)
+            )
+            img, _ = dataset[y]
+            transform.transforms.pop()
 
-  num_noise = len(noise_values)
-  fig = plt.figure(figsize=(num_noise, 4))
-  for y in range(4):
-    for x in range(num_noise):
-      transform.transforms.append(
-        RandomNoise(noise_values[x], highValue=0.1307 + 2 * 0.3081))
-      img, _ = dataset[y]
-      transform.transforms.pop()
+            ax = fig.add_subplot(4, num_noise, y * num_noise + x + 1)
+            ax.set_axis_off()
+            ax.imshow(img.numpy().reshape((28, 28)), cmap="gray")
+            if y == 0:
+                ax.set_title("{0}%".format(noise_values[x] * 100))
 
-      ax = fig.add_subplot(4, num_noise, y * num_noise + x + 1)
-      ax.set_axis_off()
-      ax.imshow(img.numpy().reshape((28, 28)), cmap='gray')
-      if y == 0:
-        ax.set_title("{0}%".format(noise_values[x] * 100))
-
-  plt.tight_layout()
-  plt.savefig(plotPath)
-  plt.close()
+    plt.tight_layout()
+    plt.savefig(plot_path)
+    plt.close()
 
 
 @click.command()
-@click.option("-c", "--config", metavar="FILE", type=open,
-              default="experiments.cfg", show_default=True,
-              help="your experiments config file")
+@click.option(
+    "-c",
+    "--config",
+    metavar="FILE",
+    type=open,
+    default="experiments.cfg",
+    show_default=True,
+    help="your experiments config file",
+)
 def main(config):
-  # Use configuration file location as the project location.
-  project_dir = os.path.dirname(config.name)
-  project_dir = os.path.abspath(project_dir)
+    # Use configuration file location as the project location.
+    project_dir = os.path.dirname(config.name)
+    project_dir = os.path.abspath(project_dir)
 
-  # Plot noisy images
-  data_dir = os.path.join(project_dir, "data")
-  plotPath = os.path.join(project_dir, "mnist_images_with_noise.pdf")
-  plotImagesWithNoise(datadir=data_dir,
-                      noise_values=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
-                      plotPath=plotPath)
+    # Plot noisy images
+    data_dir = os.path.join(project_dir, "data")
+    plot_path = os.path.join(project_dir, "mnist_images_with_noise.pdf")
+    plot_images_with_noise(
+        datadir=data_dir,
+        noise_values=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
+        plot_path=plot_path,
+    )
 
-  # Load and parse experiment configurations
-  configs = parse_config(config_file=config,
-                         experiments=list(EXPERIMENTS.keys()),
-                         globals=globals())
+    # Load and parse experiment configurations
+    configs = parse_config(
+        config_file=config,
+        experiments=list(EXPERIMENTS.keys()),
+        globals_param=globals(),
+    )
 
-  results = {}
-  for exp in configs:
-    config = configs[exp]
+    results = {}
+    for exp in configs:
+        config = configs[exp]
 
-    # Load experiment data
-    experiment_path = os.path.join(project_dir, config["path"], exp)
-    experiment_state = load_ray_tune_experiment(
-      experiment_path=experiment_path, load_results=True)
+        # Load experiment data
+        experiment_path = os.path.join(project_dir, config["path"], exp)
+        experiment_state = load_ray_tune_experiment(
+            experiment_path=experiment_path, load_results=True
+        )
 
-    # Load noise score from the first checkpoint
-    checkpoint = experiment_state["checkpoints"][0]
-    logdir = os.path.join(experiment_path, os.path.basename(checkpoint["logdir"]))
-    filename = os.path.join(logdir, "noise.json")
-    with open(filename, "r") as f:
-      results[exp] = json.load(f)
+        # Load noise score from the first checkpoint
+        checkpoint = experiment_state["checkpoints"][0]
+        logdir = os.path.join(experiment_path, os.path.basename(checkpoint["logdir"]))
+        filename = os.path.join(logdir, "noise.json")
+        with open(filename, "r") as f:
+            results[exp] = json.load(f)
 
-  plotPath = os.path.join(project_dir, "accuracy_vs_noise.pdf")
-  plotNoiseCurve(configs=configs, results=results, plotPath=plotPath)
+    plot_path = os.path.join(project_dir, "accuracy_vs_noise.pdf")
+    plot_noise_curve(configs=configs, results=results, plot_path=plot_path)
 
 
-if __name__ == '__main__':
-  main()
+if __name__ == "__main__":
+    main()

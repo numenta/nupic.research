@@ -28,77 +28,106 @@ import click
 import numpy as np
 from tabulate import tabulate
 
-from nupic.research.support import parse_config, load_ray_tune_experiment
+from nupic.research.support import load_ray_tune_experiment, parse_config
 
 
 @click.command(help="Train models")
-@click.option("-c", "--config", type=open, default="experiments.cfg",
-              show_default=True, help="your experiments config file")
-@click.option("-e", "--experiment", "experiments", multiple=True,
-              help="run only selected experiments, by default run all "
-                   "experiments in config file.")
-@click.option("-f", "--format", "tablefmt", help="Table format",
-              type=click.Choice(choices=['grid', 'latex']), show_default=True,
-              default="grid")
+@click.option(
+    "-c",
+    "--config",
+    type=open,
+    default="experiments.cfg",
+    show_default=True,
+    help="your experiments config file",
+)
+@click.option(
+    "-e",
+    "--experiment",
+    "experiments",
+    multiple=True,
+    help="run only selected experiments, by default run all "
+    "experiments in config file.",
+)
+@click.option(
+    "-f",
+    "--format",
+    "tablefmt",
+    help="Table format",
+    type=click.Choice(choices=["grid", "latex"]),
+    show_default=True,
+    default="grid",
+)
 def main(config, experiments, tablefmt):
-  # Use configuration file location as the project location.
-  project_dir = os.path.dirname(config.name)
-  project_dir = os.path.abspath(project_dir)
-  print("project_dir =", project_dir)
-  testScoresTable = [["Network", "Test Score", "Noise Score"]]
+    # Use configuration file location as the project location.
+    project_dir = os.path.dirname(config.name)
+    project_dir = os.path.abspath(project_dir)
+    print("project_dir =", project_dir)
+    test_scores_table = [["Network", "Test Score", "Noise Score"]]
 
-  # Load and parse experiment configurations
-  configs = parse_config(config, experiments, globals=globals())
+    # Load and parse experiment configurations
+    configs = parse_config(config, experiments, globals_param=globals())
 
-  # Select tags ignoring seed
-  key_func = lambda x: re.split("[,_]", re.sub(",|\\d+_|seed=\\d+", "",
-                                               x["experiment_tag"]))
+    # Select tags ignoring seed
+    def key_func(x):
+        re.split("[,_]", re.sub(",|\\d+_|seed=\\d+", "", x["experiment_tag"]))
 
-  for exp in configs:
-    config = configs[exp]
+    for exp in configs:
+        config = configs[exp]
 
-    # Load experiment data
-    experiment_path = os.path.join(project_dir, config["path"], exp)
-    experiment_state = load_ray_tune_experiment(
-      experiment_path=experiment_path, load_results=True)
+        # Load experiment data
+        experiment_path = os.path.join(project_dir, config["path"], exp)
+        experiment_state = load_ray_tune_experiment(
+            experiment_path=experiment_path, load_results=True
+        )
 
-    # Go through all checkpoints in the experiment
-    all_checkpoints = experiment_state["checkpoints"]
+        # Go through all checkpoints in the experiment
+        all_checkpoints = experiment_state["checkpoints"]
 
-    # Group checkpoints by tags
-    checkpoint_groups = {k[0]: list(v) for k, v in groupby(
-      sorted(all_checkpoints, key=key_func), key=key_func)}
+        # Group checkpoints by tags
+        checkpoint_groups = {
+            k[0]: list(v)
+            for k, v in groupby(sorted(all_checkpoints, key=key_func), key=key_func)
+        }
 
-    for tag in checkpoint_groups:
-      checkpoints = checkpoint_groups[tag]
-      numExps = len(checkpoints)
-      testScores = np.zeros(numExps)
-      noiseScores = np.zeros(numExps)
+        for tag in checkpoint_groups:
+            checkpoints = checkpoint_groups[tag]
+            num_exps = len(checkpoints)
+            test_scores = np.zeros(num_exps)
+            noise_scores = np.zeros(num_exps)
 
-      for i, checkpoint in enumerate(checkpoints):
-        results = checkpoint["results"]
-        if results is None:
-          continue
+            for i, checkpoint in enumerate(checkpoints):
+                results = checkpoint["results"]
+                if results is None:
+                    continue
 
-        # For each checkpoint select the epoch with the best accuracy as the best epoch
-        best_result = max(results, key=lambda x: x["mean_accuracy"])
-        testScores[i] = best_result["mean_accuracy"] * 100.0
+                # For each checkpoint select the epoch with the best accuracy as
+                # the best epoch
+                best_result = max(results, key=lambda x: x["mean_accuracy"])
+                test_scores[i] = best_result["mean_accuracy"] * 100.0
 
-        # Load noise score
-        logdir = os.path.join(experiment_path, os.path.basename(checkpoint["logdir"]))
-        filename = os.path.join(logdir, "noise.json")
-        with open(filename, "r") as f:
-          noise = json.load(f)
+                # Load noise score
+                logdir = os.path.join(
+                    experiment_path, os.path.basename(checkpoint["logdir"])
+                )
+                filename = os.path.join(logdir, "noise.json")
+                with open(filename, "r") as f:
+                    noise = json.load(f)
 
-        noiseScores[i] = sum([x["total_correct"] for x in list(noise.values())])
+                noise_scores[i] = sum(x["total_correct"] for x in list(noise.values()))
 
-      test_score = u"{0:.2f} ± {1:.2f}".format(testScores.mean(), testScores.std())
-      noise_score = u"{0:,.0f} ± {1:.2f}".format(noiseScores.mean(), noiseScores.std())
-      testScoresTable.append(["{} {}".format(exp, tag), test_score, noise_score])
+            test_score = "{0:.2f} ± {1:.2f}".format(
+                test_scores.mean(), test_scores.std()
+            )
+            noise_score = "{0:,.0f} ± {1:.2f}".format(
+                noise_scores.mean(), noise_scores.std()
+            )
+            test_scores_table.append(
+                ["{} {}".format(exp, tag), test_score, noise_score]
+            )
 
-  print()
-  print(tabulate(testScoresTable, headers="firstrow", tablefmt=tablefmt))
+    print()
+    print(tabulate(test_scores_table, headers="firstrow", tablefmt=tablefmt))
 
 
-if __name__ == '__main__':
-  main()
+if __name__ == "__main__":
+    main()

@@ -19,31 +19,39 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-"""
-Modified from torchvision
-"""
+"""Modified from torchvision."""
 
-import torch.nn as nn
 import math
 
+import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models.resnet import (
-    BasicBlock, resnet18, resnet34, resnet50, resnet101, resnet152,
+    BasicBlock,
+    resnet18,
+    resnet34,
+    resnet50,
+    resnet101,
+    resnet152,
 )
 
-
-__all__ = ['ResNet', 'resnet9', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
-           'resnet152']
+__all__ = [
+    "ResNet",
+    "resnet9",
+    "resnet18",
+    "resnet34",
+    "resnet50",
+    "resnet101",
+    "resnet152",
+]
 
 
 class ResNet(nn.Module):
-
     def __init__(self, block, layers, num_classes=1000, in_channels=3):
         self.inplanes = 64
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=7, stride=2,
-                               padding=3,
-                               bias=False)
+        self.conv1 = nn.Conv2d(
+            in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -57,34 +65,39 @@ class ResNet(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
+                m.weight.data.normal_(0, math.sqrt(2.0 / n))
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
         # Some additional useful stuff
-        self.learningIterations = 0
+        self.learning_iterations = 0
 
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(
+                    self.inplanes,
+                    planes * block.expansion,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False,
+                ),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample))
         self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
+        for _ in range(1, blocks):
             layers.append(block(self.inplanes, planes))
 
         return nn.Sequential(*layers)
 
     def forward(self, x):
         if self.training:
-            self.learningIterations += x.shape[0]
+            self.learning_iterations += x.shape[0]
 
         x = self.conv1(x)
         x = self.bn1(x)
@@ -103,29 +116,26 @@ class ResNet(nn.Module):
 
         return x
 
-    def getLearningIterations(self):
-        return self.learningIterations
+    def post_epoch(self):
+        """Does nothing.
 
-
-    def postEpoch(self):
-        """
-        Does nothing. For compatibility with our scripts.
+        For compatibility with our scripts.
         """
         pass
 
-    def maxEntropy(self):
-        """
-        Does nothing. For compatibility with our scripts.
+    def max_entropy(self):
+        """Does nothing.
+
+        For compatibility with our scripts.
         """
         return 0
-
 
     def entropy(self):
-        """
-        Does nothing. For compatibility with our scripts.
+        """Does nothing.
+
+        For compatibility with our scripts.
         """
         return 0
-
 
 
 def resnet9(pretrained=False, **kwargs):
@@ -136,4 +146,3 @@ def resnet9(pretrained=False, **kwargs):
     """
     model = ResNet(BasicBlock, [1, 1, 1, 1], **kwargs)
     return model
-
