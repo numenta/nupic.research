@@ -23,13 +23,16 @@ version: 2
 
 jobs:
 
-  checkout_code:
+  validate_contributor:
     working_directory: ~/nupic.research
     machine: true
     steps:
       - restore_cache:
           key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
       - checkout
+      - run:
+          name: Validate contributor license
+          command: ci/validate-contributor.sh
       - save_cache:
           key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
           paths:
@@ -53,16 +56,6 @@ jobs:
           paths:
             - ~/.local
             - ~/.cache
-
-  validate_contributor:
-    working_directory: ~/nupic.research
-    machine: true
-    steps:
-      - restore_cache:
-          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
-      - run:
-          name: Validate contributor license
-          command: ci/validate-contributor.sh
 
   check_style:
     working_directory: ~/nupic.research
@@ -123,10 +116,7 @@ workflows:
 
   validate-build-test:
     jobs:
-      - checkout_code
-      - validate_contributor:
-          requires:
-            - checkout_code
+      - validate_contributor
       - install_dependencies:
           requires:
             - validate_contributor

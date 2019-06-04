@@ -106,7 +106,7 @@ def evaluate_model(
     :param loader: test dataset loader
     :type loader: :class:`torch.utils.data.DataLoader`
     :param device: device to use ('cpu' or 'cuda')
-    :type device: :class:`torch.device
+    :type device: :class:`torch.device`
     :param batches_in_epoch: Max number of mini batches to test on.
     :type batches_in_epoch: int
     :param criterion: loss function to use
