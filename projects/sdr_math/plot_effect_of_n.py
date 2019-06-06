@@ -28,8 +28,8 @@ import os
 import plotly.graph_objs as go
 import plotly.plotly as py
 
-plotly_user = os.environ['PLOTLY_USERNAME']
-plotly_api_key = os.environ['PLOTLY_API_KEY']
+plotly_user = os.environ["PLOTLY_USERNAME"]
+plotly_api_key = os.environ["PLOTLY_API_KEY"]
 
 py.sign_in(plotly_user, plotly_api_key)
 
@@ -209,9 +209,9 @@ trace1 = go.Scatter(
     y=errors_a64,
     x=list_of_n_values,
     line=dict(
-        color='rgb(0, 0, 0)',
+        color="rgb(0, 0, 0)",
         width=3,
-        shape='spline'
+        shape="spline"
     ),
     name="a=64"
 )
@@ -220,9 +220,9 @@ trace2 = go.Scatter(
     y=errors_a128,
     x=list_of_n_values[1:],
     line=dict(
-        color='rgb(0, 0, 0)',
+        color="rgb(0, 0, 0)",
         width=3,
-        shape='spline'
+        shape="spline"
     ),
     name="a=128"
 )
@@ -231,9 +231,9 @@ trace3 = go.Scatter(
     y=errors_a256,
     x=list_of_n_values[1:],
     line=dict(
-        color='rgb(0, 0, 0)',
+        color="rgb(0, 0, 0)",
         width=3,
-        shape='spline'
+        shape="spline"
     ),
     name="a=256"
 )
@@ -242,10 +242,10 @@ trace4 = go.Scatter(
     y=errors_half_of_n,
     x=list_of_n_values[1:],
     line=dict(
-        color='rgb(0, 0, 0)',
+        color="rgb(0, 0, 0)",
         width=3,
-        dash='dash',
-        shape='spline',
+        dash="dash",
+        shape="spline",
     ),
     name="a=0.25*N"
 )
@@ -253,22 +253,22 @@ trace4 = go.Scatter(
 data = [trace1, trace2, trace3, trace4]
 
 layout = go.Layout(
-    title='',
+    title="",
     showlegend=False,
     autosize=False,
     width=855,
     height=700,
     xaxis=dict(
-        title='Vector length (n)',
+        title="Vector length (n)",
         titlefont=dict(
-            family='Arial',
+            family="Arial",
             size=26,
-            color='rgb(0, 0, 0)',
+            color="rgb(0, 0, 0)",
         ),
         tickfont=dict(
-            family='Arial',
+            family="Arial",
             size=16,
-            color='rgb(0, 0, 0)',
+            color="rgb(0, 0, 0)",
         ),
         exponentformat="none",
         dtick=1000,
@@ -276,19 +276,19 @@ layout = go.Layout(
         range=[0, 10000],
     ),
     yaxis=dict(
-        title='Probability of false positives',
-        type='log',
-        exponentformat='power',
+        title="Probability of false positives",
+        type="log",
+        exponentformat="power",
         autorange=True,
         titlefont=dict(
-            family='Arial',
+            family="Arial",
             size=26,
-            color='rgb(0, 0, 0)',
+            color="rgb(0, 0, 0)",
         ),
         tickfont=dict(
-            family='Arial',
+            family="Arial",
             size=16,
-            color='rgb(0, 0, 0)',
+            color="rgb(0, 0, 0)",
         ),
         showline=True,
     ),
@@ -296,63 +296,63 @@ layout = go.Layout(
         dict(
             x=2988,
             y=0.1143,
-            xref='x',
-            yref='paper',
-            text='active bits = 64',
+            xref="x",
+            yref="paper",
+            text="active bits = 64",
             showarrow=False,
-            align='center',
+            align="center",
             textangle=0,
             borderwidth=1,
             borderpad=1,
-            bgcolor='rgba(0, 0, 0, 0)',
+            bgcolor="rgba(0, 0, 0, 0)",
             opacity=1
         ),
     ]
     #   dict(
     #         x=17103,
     #         y=0.259,
-    #         xref='x',
-    #         yref='paper',
-    #         text='$a = 128$',
+    #         xref="x",
+    #         yref="paper",
+    #         text="$a = 128$",
     #         showarrow=False,
     #         # font=dict(
     #         #     family='',
     #         #     size=24,
     #         #     color=''
     #         # ),
-    #         align='center',
+    #         align="center",
     #         textangle=0,
     #         # bordercolor='',
     #         borderwidth=1,
     #         borderpad=1,
-    #         bgcolor='rgba(0, 0, 0, 0)',
+    #         bgcolor="rgba(0, 0, 0, 0)",
     #         opacity=1
     #     ),
     #   dict(
     #         x=17132,
     #         y=0.411,
-    #         xref='x',
-    #         yref='paper',
-    #         text='$a = 256$',
+    #         xref="x",
+    #         yref="paper",
+    #         text="$a = 256$",
     #         showarrow=False,
     #         # font=dict(
     #         #     family='',
     #         #     size=24,
     #         #     color=''
     #         # ),
-    #         align='center',
+    #         align="center",
     #         textangle=0,
     #         # bordercolor='',
     #         borderwidth=1,
     #         borderpad=1,
-    #         bgcolor='rgba(0, 0, 0, 0)',
+    #         bgcolor="rgba(0, 0, 0, 0)",
     #         opacity=1
     #     ),
     #   dict(
     #         x=16845,
     #         y=0.933,
-    #         xref='x',
-    #         yref='paper',
+    #         xref="x",
+    #         yref="paper",
     #         text="$a = \\frac{n}{2}$",
     #         showarrow=False,
     #         # font=dict(
@@ -360,12 +360,12 @@ layout = go.Layout(
     #         #     size=24,
     #         #     color=''
     #         # ),
-    #         align='center',
+    #         align="center",
     #         textangle=0,
     #         # bordercolor='',
     #         borderwidth=1,
     #         borderpad=1,
-    #         bgcolor='rgba(0, 0, 0, 0)',
+    #         bgcolor="rgba(0, 0, 0, 0)",
     #         opacity=1
     #     )
     #   ]
@@ -375,4 +375,4 @@ fig = go.Figure(data=data, layout=layout)
 plot_url = py.plot(fig, auto_open=False)
 print("url=", plot_url)
 figure = py.get_figure(plot_url)
-py.image.save_as(figure, 'images/effect_of_n.pdf', scale=4)
+py.image.save_as(figure, "images/effect_of_n.pdf", scale=4)
