@@ -92,35 +92,35 @@ ax.set_yscale("log")
 
 ax.scatter(list_of_n_values[0:3], experimental_errors_a64,
            label="a=64 (predicted)",
-           marker="o", color='black')
+           marker="o", color="black")
 ax.scatter(list_of_n_values[0:9], experimental_errors_a128,
-           label="a=128 (predicted)", marker="o", color='black')
+           label="a=128 (predicted)", marker="o", color="black")
 ax.scatter(list_of_n_values, experimental_errors_a256,
            label="a=256 (predicted)",
-           marker="o", color='black')
+           marker="o", color="black")
 
-ax.plot(list_of_n_values, errors_dense, 'k:', label="a=n/2 (predicted)",
-        color='black')
+ax.plot(list_of_n_values, errors_dense, "k:", label="a=n/2 (predicted)",
+        color="black")
 
-ax.plot(list_of_n_values[0:3], theoretical_errors_a64, 'k:',
+ax.plot(list_of_n_values[0:3], theoretical_errors_a64, "k:",
         label="a=64 (observed)")
-ax.plot(list_of_n_values[0:9], theoretical_errors_a128, 'k:',
-        label="a=128 (observed)", color='black')
-ax.plot(list_of_n_values, theoretical_errors_a256, 'k:',
+ax.plot(list_of_n_values[0:9], theoretical_errors_a128, "k:",
+        label="a=128 (observed)", color="black")
+ax.plot(list_of_n_values, theoretical_errors_a256, "k:",
         label="a=256 (observed)")
 
 ax.annotate(r"$a = 64$", xy=(list_of_n_values[2], theoretical_errors_a64[-1]),
             xytext=(-5, 2), textcoords="offset points", ha="right",
-            color='black')
+            color="black")
 ax.annotate(r"$a = 128$", xy=(list_of_n_values[8], theoretical_errors_a64[-1]),
-            ha="center", color='black')
+            ha="center", color="black")
 ax.annotate(r"$a = 256$", xy=(list_of_n_values[-1], theoretical_errors_a64[-1]),
             xytext=(-10, 0), textcoords="offset points", ha="center",
-            color='black')
+            color="black")
 ax.annotate(r"$a = \frac{n}{2}$",
             xy=(list_of_n_values[-2], experimental_errors_a256[2]),
             xytext=(-10, 0), textcoords="offset points", ha="center",
-            color='black')
+            color="black")
 
 plt.minorticks_off()
 plt.grid(True, alpha=0.3)
