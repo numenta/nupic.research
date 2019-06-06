@@ -23,14 +23,15 @@
 # error rates as a function of N, the dimensionality of the vectors.  I'm sorry
 # this code is so ugly.
 
-import plotly.plotly as py
-import plotly.graph_objs as go
 import os
 
-plotlyUser = os.environ['PLOTLY_USERNAME']
-plotlyAPIKey = os.environ['PLOTLY_API_KEY']
+import plotly.graph_objs as go
+import plotly.plotly as py
 
-py.sign_in(plotlyUser, plotlyAPIKey)
+plotly_user = os.environ['PLOTLY_USERNAME']
+plotly_api_key = os.environ['PLOTLY_API_KEY']
+
+py.sign_in(plotly_user, plotly_api_key)
 
 # Calculated error values
 
