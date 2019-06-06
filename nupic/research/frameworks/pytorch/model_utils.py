@@ -127,14 +127,13 @@ def evaluate_model(
 
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(loader):
+            if batch_idx >= batches_in_epoch:
+                break
             data, target = data.to(device), target.to(device)
             output = model(data)
             loss += criterion(output, target, reduction="sum").item()
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum().item()
-
-            if batch_idx >= batches_in_epoch:
-                break
 
     if progress is not None:
         loader.close()
