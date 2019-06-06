@@ -36,7 +36,6 @@ def train_models(configs, project_dir):
     """Run all the training experiments specified in configs."""
     # download dataset
     data_dir = os.path.join(project_dir, "data")
-    datasets.MNIST(data_dir, download=True, train=True)
 
     # Run all experiments in serial
     if len(configs) == 0:
@@ -68,7 +67,7 @@ def train_models(configs, project_dir):
             ret = exp.test_epoch()
 
             # To tensorboard
-            writer.add_scalars("%s/test" % config["name"], ret, epoch)
+            writer.add_scalar("%s/%s_loss" % (config.get('dataset'), config.get('name')), ret['loss'], epoch)
 
         if config.get("checkpoint_at_end", False):
             exp.model_save(path)

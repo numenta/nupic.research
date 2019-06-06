@@ -9,9 +9,27 @@ import os
 from torchvision import datasets, transforms
 import numpy as np
 
-class Net(nn.Module):
+class TestCIFAR(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
+        super(TestCIFAR, self).__init__()
+        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
+
+    def forward(self, x):
+        x = F.max_pool2d(F.relu(self.conv1(x)), 2, 2)
+        x = F.max_pool2d(F.relu(self.conv2(x)), 2, 2)
+        x = x.view(-1, 16 * 5 * 5)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return F.log_softmax(x, dim=1)
+
+class TestMNIST(nn.Module):
+    def __init__(self):
+        super(TestMNIST, self).__init__()
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4*4*50, 500)
@@ -126,26 +144,44 @@ class WeightInitExperiment(nn.Module):
     def model_setup(self, config):
         seed = config.get("seed", random.randint(0, 10000))
         torch.manual_seed(seed)
+        dataset = config.get('dataset')
 
-        self.model = Net()
+        self.model = TestMNIST() if dataset == 'mnist' else TestCIFAR()
 
         use_cuda = config.get('use_cuda')
         self.device = torch.device("cuda" if use_cuda else "cpu")
 
         kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-        self.train_loader = torch.utils.data.DataLoader(
-            datasets.MNIST('./data', train=True, download=True,
-                           transform=transforms.Compose([
-                               transforms.ToTensor(),
-                               transforms.Normalize((0.1307,), (0.3081,))
-                           ])),
-            batch_size=config.get("batch_size"), shuffle=True, **kwargs)
-        self.test_loader = torch.utils.data.DataLoader(
-            datasets.MNIST('./data', train=False, transform=transforms.Compose([
-                               transforms.ToTensor(),
-                               transforms.Normalize((0.1307,), (0.3081,))
-                           ])),
-            batch_size=config.get("test_batch_size"), shuffle=True, **kwargs)
+        if dataset == 'mnist':
+            mnist_transforms = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.1307,), (0.3081,))
+            ])
+            self.train_loader = torch.utils.data.DataLoader(
+                datasets.MNIST('./data', train=True, download=True,
+                               transform=mnist_transforms),
+                               batch_size=config.get("batch_size"), 
+                               shuffle=True, **kwargs)
+            self.test_loader = torch.utils.data.DataLoader(
+                datasets.MNIST('./data', train=False, transform=mnist_transforms),
+                               batch_size=config.get("test_batch_size"), 
+                               shuffle=True, **kwargs)
+        elif dataset == 'cifar':
+            cifar_transforms = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+            ])
+            self.train_loader = torch.utils.data.DataLoader(
+                datasets.CIFAR10('./data', train=True, download=True,
+                                 transform=cifar_transforms),
+                                 batch_size=config.get("batch_size"), 
+                                 shuffle=True, **kwargs)
+            self.test_loader = torch.utils.data.DataLoader(
+                datasets.CIFAR10('./data', train=False, 
+                                 transform=cifar_transforms),
+                                 batch_size=config.get("test_batch_size"), 
+                                 shuffle=True, **kwargs)
+
         self.optimizer = optim.SGD(self.parameters(), lr=config.get('learning_rate'), momentum=config.get('momentum'))
 
         weight_init = config.get('weight_init')
@@ -201,6 +237,5 @@ class WeightInitExperiment(nn.Module):
             test_loss, correct, len(self.test_loader.dataset),
             100. * correct / len(self.test_loader.dataset)))
         ret['loss'] = test_loss
-        ret['correct'] = correct
         return ret
 
