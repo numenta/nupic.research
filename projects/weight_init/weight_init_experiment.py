@@ -140,47 +140,46 @@ class WeightInitExperiment(nn.Module):
         super(WeightInitExperiment, self).__init__()
 
         self.model_filename = "weight_init_exp.pt"
+        self.data_dir = None
 
     def model_setup(self, config):
+        self.data_dir = os.path.expanduser(config.get("data_dir", "data"))
+
         seed = config.get("seed", random.randint(0, 10000))
         torch.manual_seed(seed)
         dataset = config.get('dataset')
 
-        self.model = TestMNIST() if dataset == 'mnist' else TestCIFAR()
+        self.model = TestMNIST() if dataset == 'MNIST' else TestCIFAR()
 
         use_cuda = config.get('use_cuda')
         self.device = torch.device("cuda" if use_cuda else "cpu")
 
-        kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-        if dataset == 'mnist':
-            mnist_transforms = transforms.Compose([
+        transforms = None
+        if dataset == 'MNIST':
+            transforms = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize((0.1307,), (0.3081,))
             ])
-            self.train_loader = torch.utils.data.DataLoader(
-                datasets.MNIST('./data', train=True, download=True,
-                               transform=mnist_transforms),
-                               batch_size=config.get("batch_size"), 
-                               shuffle=True, **kwargs)
-            self.test_loader = torch.utils.data.DataLoader(
-                datasets.MNIST('./data', train=False, transform=mnist_transforms),
-                               batch_size=config.get("test_batch_size"), 
-                               shuffle=True, **kwargs)
-        elif dataset == 'cifar':
-            cifar_transforms = transforms.Compose([
+        elif dataset == 'CIFAR10':
+            transforms = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ])
-            self.train_loader = torch.utils.data.DataLoader(
-                datasets.CIFAR10('./data', train=True, download=True,
-                                 transform=cifar_transforms),
-                                 batch_size=config.get("batch_size"), 
-                                 shuffle=True, **kwargs)
-            self.test_loader = torch.utils.data.DataLoader(
-                datasets.CIFAR10('./data', train=False, 
-                                 transform=cifar_transforms),
-                                 batch_size=config.get("test_batch_size"), 
-                                 shuffle=True, **kwargs)
+
+        train_dataset = getattr(datasets, self.dataset)(
+            self.data_dir, train=True, transform=transforms
+        )
+        test_dataset = getattr(datasets, self.dataset)(
+            self.data_dir, train=False, transform=transforms
+        )
+
+        kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+        self.train_loader = torch.utils.data.DataLoader(train_dataset,
+                           batch_size=config.get("batch_size"), 
+                           shuffle=True, **kwargs)
+        self.test_loader = torch.utils.data.DataLoader(test_dataset,
+                           batch_size=config.get("test_batch_size"), 
+                           shuffle=True, **kwargs)
 
         self.optimizer = optim.SGD(self.parameters(), lr=config.get('learning_rate'), momentum=config.get('momentum'))
 
