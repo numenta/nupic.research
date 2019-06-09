@@ -58,7 +58,8 @@ def create_test_loaders(dataset, noise_values, batch_size, data_dir):
 
     transform_noise_test = transforms.Compose([
       transforms.ToTensor(),
-      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+      transforms.Normalize((0.50707516, 0.48654887, 0.44091784), 
+                           (0.26733429, 0.25643846, 0.27615047)),
       RandomNoise(noise,
                   highValue=0.5 + 2 * 0.20,
                   lowValue=0.5 - 2 * 0.2,
@@ -173,12 +174,15 @@ class TinyCIFAR(object):
       transforms.RandomCrop(32, padding=4),
       transforms.RandomHorizontalFlip(),
       transforms.ToTensor(),
-      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+      # can store stats in database or dynamically obtain
+      transforms.Normalize((0.50707516, 0.48654887, 0.44091784), 
+                           (0.26733429, 0.25643846, 0.27615047)),
     ])
 
     self.transform_test = transforms.Compose([
       transforms.ToTensor(),
-      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+      transforms.Normalize((0.50707516, 0.48654887, 0.44091784), 
+                           (0.26733429, 0.25643846, 0.27615047)),
     ])
 
     # added custom dataset and output sizes to reuse model
@@ -207,8 +211,9 @@ class TinyCIFAR(object):
     self.lr_scheduler = self._createLearningRateScheduler(self.optimizer)
 
     # adding track of losses for early stopping 
-    self.mean_losses = deque(maxlen=max(3,int(self.iterations/10)))
-    self.bad_epoches = 0
+    # self.mean_losses = deque(maxlen=max(3,int(self.iterations/10)))
+    self.mean_losses = deque(maxlen=self.iterations)
+    self.bad_epochs = 0
     self.grace_period = max(1, int(self.iterations/5))
     self.patience = 3
 
@@ -413,7 +418,6 @@ class TinyCIFAR(object):
     else:
       raise ValueError("{} is not a valid optimizer".format(optimizer))
 
-
   def _createLearningRateScheduler(self, optimizer, scheduler='ReduceLROnPlateau'):
     """
       Creates the learning rate scheduler and attach the optimizer
@@ -428,7 +432,7 @@ class TinyCIFAR(object):
         return torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                           mode='min', # loss
                                                           patience=5,
-                                                          threshold=1e-4,
+                                                          threshold=1e-2,
                                                           factor=self.learning_rate_gamma)
       else:
         raise ValueError("{} is not a valid learning rate scheduler".format(scheduler))
@@ -454,12 +458,12 @@ class TinyCIFAR(object):
 
     self.mean_losses.append(metric)
     if metric >= np.median(self.mean_losses):
-      self.bad_epoches += 1
+      self.bad_epochs += 1
     else:
-      self.bad_epoches = 0
+      self.bad_epochs = 0
 
     if epoch > self.grace_period:
-      if self.bad_epoches > self.patience:
+      if self.bad_epochs > self.patience:
         return 1
 
     return 0        
