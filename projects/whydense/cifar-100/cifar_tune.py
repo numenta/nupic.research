@@ -136,15 +136,15 @@ def run_experiment(config, trainable):
     config=config,
     num_samples=config.get("repetitions", 1),
     search_alg=config.get("search_alg", None),
-    scheduler=config.get("scheduler",
-                         AsyncHyperBandScheduler(
-                           reward_attr='mean_accuracy',
-                           time_attr="training_iteration",
-                           brackets = 2,
-                           grace_period=max(1, int(config.get("iterations", 10)/10)),
-                           reduction_factor=3,
-                           max_t=config.get("iterations", 10)
-                         )),
+    # scheduler=config.get("scheduler",
+    #                      AsyncHyperBandScheduler(
+    #                        reward_attr='mean_accuracy',
+    #                        time_attr="training_iteration",
+    #                        brackets = 2,
+    #                        grace_period=max(1, int(config.get("iterations", 10)/10)),
+    #                        reduction_factor=3,
+    #                        max_t=config.get("iterations", 10)
+    #                      )),
     trial_name_creator=tune.function(trial_name_string),
     trial_executor=config.get("trial_executor", None),
     checkpoint_at_end=config.get("checkpoint_at_end", False),
