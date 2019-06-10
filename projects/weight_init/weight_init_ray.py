@@ -105,7 +105,6 @@ class WeightInitTune(TinyCIFARWeightInit, tune.Trainable):
             print("WeightInitTune: stopping early at epoch {}".format(self._iteration))
 
 
-
 @ray.remote
 def run_experiment(config, trainable):
     """Run a single tune experiment in parallel as a "remote" function.
@@ -151,7 +150,7 @@ def run_experiment(config, trainable):
             # If num trials <= num GPUs, 1.0 is better
             "cpu": 1,
             "gpu": config.get("gpu_percentage", 0.5),
-        },      
+        },
     )
 
 
