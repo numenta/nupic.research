@@ -25,11 +25,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import numpy as np
 import random
 import os
 import math
 import sys
 import time
+import requests
 
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -500,6 +502,9 @@ class TinyCIFARWeightInit(object):
         if self.weight_init == 'lsuv':
             initializer = LSUVWeightInit(self.model, self.train_loader, device=self.device)
             initializer.initialize()
+        elif self.weight_init == 'grassmannian':
+            initializer = GrassmannianWeightInit(self.model)
+            initializer.initialize()
         elif self.weight_init == 'default':
             for m in self.model.modules():
                 if isinstance(m, nn.Conv2d):
@@ -514,6 +519,37 @@ class TinyCIFARWeightInit(object):
                     n = m.weight.size(1)
                     m.weight.data.normal_(0, 0.01)
                     m.bias.data.zero_()
+
+
+class GrassmannianWeightInit(object):
+    '''
+    Set first conv layer weights to Grassmannian
+    From the paper by J. H. Conway, R. H. Hardin and N. J. A. Sloane 
+    '''
+    def __init__(self, model):
+        self.model = model
+
+    def grassmannian_extract(self, N, k_size, num_channels):
+        '''
+        Download packed subspace from Sloane
+        '''
+        target_url = 'http://neilsloane.com/grass/dim{}/grassc.{}.{}.{}.txt'.format(k_size, k_size, num_channels, N)
+        response = requests.get(target_url)
+        list_str = response.text.split('\n')[0:num_channels*k_size*N]
+        K = int(np.sqrt(k_size))
+        w_mat = np.float_(list_str).reshape(N, K, K, num_channels)
+        return w_mat
+
+    def initialize(self):
+        for m in self.model.modules():
+            if isinstance(m, nn.Conv2d):
+                n_filters = m.out_channels
+                n_input = m.in_channels
+                k = m.kernel_size[0]
+                W = self.grassmannian_extract(n_filters, k*k, n_input)
+                m.weight.data = torch.from_numpy(W).float()
+                # Break after first Conv layer
+                break
 
 
 class LSUVWeightInit(object):
@@ -534,9 +570,16 @@ class LSUVWeightInit(object):
             'layers_done': -1,
             'hook_idx': 0,
             'counter_to_apply_correction': 0,
-            'correction_needed': False
+            'correction_needed': False,
+            'n_layers': 0
         }
         print("Starting LSUV weight init...")
+
+    def count_conv_fc(self, m):
+        if isinstance(m, nn.Conv2d) or isinstance(m, SparseWeights2d) or \
+                isinstance(m, nn.Linear) or \
+                isinstance(m, SparseWeights):
+            self.lsuv_data['n_layers'] += 1
 
     def store_activations(self, module, input, output):
         # Store output of this layer on each forward pass
@@ -553,9 +596,13 @@ class LSUVWeightInit(object):
             self.lsuv_data['hook_idx'] += 1
 
     def update_weights(self, m):
+        if self.lsuv_data['hook'] is None:
+            return
         if not self.lsuv_data['correction_needed']:
             return
-        if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        if isinstance(m, nn.Conv2d) or isinstance(m, SparseWeights2d) or \
+                isinstance(m, nn.Linear) or \
+                isinstance(m, SparseWeights):
             if self.lsuv_data['counter_to_apply_correction'] < self.lsuv_data['hook_idx']:
                 self.lsuv_data['counter_to_apply_correction'] += 1
             else:
@@ -576,8 +623,9 @@ class LSUVWeightInit(object):
         self.model.eval()
         self.model.apply(self.orthogonal_weight_init)
         data_iter = iter(self.data_loader)
+        n_conv_fc = self.model.apply(self.count_conv_fc)
 
-        for idx, layer in enumerate(self.model.children()):
+        for idx in range(self.lsuv_data['n_layers']):
             self.model.apply(self.add_hook)
             data, target = next(data_iter)
             data, target = data.to(self.device), target.to(self.device)
