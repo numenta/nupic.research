@@ -20,19 +20,17 @@
 # Original Code here:
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 from __future__ import print_function
-import argparse
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import numpy as np
-import random
-import os
+
 import math
+import os
+import random
 import sys
 import time
-import requests
 
+import numpy as np
+import requests
+import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -163,7 +161,7 @@ class TinyCIFARWeightInit(object):
             self.linear_weight_sparsity = [self.linear_weight_sparsity]
         self.output_size = config.get("output_size", 10)
 
-        self.weight_init = config.get('weight_init')
+        self.weight_init = config.get("weight_init")
 
         # Setup devices, model, and dataloaders
         print("setup: Torch device count=", torch.cuda.device_count())
@@ -248,12 +246,12 @@ class TinyCIFARWeightInit(object):
         # Hard coded early stopping criteria for quicker experimentation
         if (
             (epoch > 3 and abs(ret["mean_accuracy"] - 0.1) < 0.01)
-             # or (ret['noise_accuracy'] > 0.66 and ret['test_accuracy'] > 0.91)
+            # or (ret['noise_accuracy'] > 0.66 and ret['test_accuracy'] > 0.91)
             or (ret["noise_accuracy"] > 0.69 and ret["test_accuracy"] > 0.91)
             or (ret["noise_accuracy"] > 0.62 and ret["test_accuracy"] > 0.92)
-            # or (epoch > 10 and ret['noise_accuracy'] < 0.40)
-            # or (epoch > 30 and ret['noise_accuracy'] < 0.44)
-            # or (epoch > 40 and ret['noise_accuracy'] < 0.50)
+            # or (epoch > 10 and ret["noise_accuracy"] < 0.40)
+            # or (epoch > 30 and ret["noise_accuracy"] < 0.44)
+            # or (epoch > 40 and ret["noise_accuracy"] < 0.50)
         ):
             ret["stop"] = 1
         else:
@@ -499,14 +497,15 @@ class TinyCIFARWeightInit(object):
         self.model.apply(update_boost_strength)
 
     def _initialize_weights(self):
-        if self.weight_init == 'lsuv':
+        if self.weight_init == "lsuv":
             initializer = LSUVWeightInit(
-                self.model, self.train_loader, device=self.device)
+                self.model, self.train_loader, device=self.device
+            )
             initializer.initialize()
-        elif self.weight_init == 'grassmannian':
+        elif self.weight_init == "grassmannian":
             initializer = GrassmannianWeightInit(self.model, device=self.device)
             initializer.initialize()
-        elif self.weight_init == 'default':
+        elif self.weight_init == "default":
             for m in self.model.modules():
                 if isinstance(m, nn.Conv2d):
                     n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -523,25 +522,26 @@ class TinyCIFARWeightInit(object):
 
 
 class GrassmannianWeightInit(object):
-    '''
+    """
     Set first conv layer weights to Grassmannian
-    From the paper by J. H. Conway, R. H. Hardin and N. J. A. Sloane 
-    '''
+    From the paper by J. H. Conway, R. H. Hardin and N. J. A. Sloane
+    """
 
     def __init__(self, model, device=None):
         self.model = model
         self.device = device
 
-    def grassmannian_extract(self, N, k_size, num_channels):
-        '''
+    def grassmannian_extract(self, n, k_size, num_channels):
+        """
         Download packed subspace from Sloane (http://neilsloane.com/grass/)
-        '''
-        target_url = 'http://neilsloane.com/grass/dim{}/grassc.{}.{}.{}.txt'.format(
-            k_size, k_size, num_channels, N)
+        """
+        target_url = "http://neilsloane.com/grass/dim{}/grassc.{}.{}.{}.txt".format(
+            k_size, k_size, num_channels, n
+        )
         response = requests.get(target_url)
-        list_str = response.text.split('\n')[0:num_channels * k_size * N]
-        K = int(np.sqrt(k_size))
-        w_mat = np.float_(list_str).reshape(N, K, K, num_channels)
+        list_str = response.text.split("\n")[0 : num_channels * k_size * n]
+        k = int(np.sqrt(k_size))
+        w_mat = np.float_(list_str).reshape(n, k, k, num_channels)
         print("Downloaded weights of shape: %s" % str(w_mat.shape))
         return w_mat
 
@@ -551,17 +551,17 @@ class GrassmannianWeightInit(object):
                 n_filters = m.out_channels
                 n_input = m.in_channels
                 k = m.kernel_size[0]
-                W = self.grassmannian_extract(n_filters, k * k, n_input)
-                m.weight.data = torch.from_numpy(W).float().to(self.device)
+                w = self.grassmannian_extract(n_filters, k * k, n_input)
+                m.weight.data = torch.from_numpy(w).float().to(self.device)
                 # Break after first Conv layer
                 break
 
 
 class LSUVWeightInit(object):
-    '''
+    """
     Layer-sequential unit variance (LSUV) initialization from Mishkin and Matas 2016
     https://arxiv.org/abs/1511.06422
-    '''
+    """
 
     def __init__(self, model, data_loader, device=None):
         self.model = model
@@ -569,50 +569,56 @@ class LSUVWeightInit(object):
         self.device = device
         # Holder for parameters needed for LSUV init
         self.lsuv_data = {
-            'act_dict': None,  # Output
-            'hook': None,  # Forward hook,
-            'current_coef': None,  # Mult for weights
-            'layers_done': -1,
-            'hook_idx': 0,
-            'correction_counter': 0,
-            'correction_needed': False,
-            'n_layers': 0
+            "act_dict": None,  # Output
+            "hook": None,  # Forward hook,
+            "current_coef": None,  # Mult for weights
+            "layers_done": -1,
+            "hook_idx": 0,
+            "correction_counter": 0,
+            "correction_needed": False,
+            "n_layers": 0,
         }
         print("Starting LSUV weight init...")
 
     def count_conv_fc(self, m):
-        if isinstance(m, nn.Conv2d) or isinstance(m, SparseWeights2d) or \
-                isinstance(m, nn.Linear) or \
-                isinstance(m, SparseWeights):
-            self.lsuv_data['n_layers'] += 1
+        if (
+            isinstance(m, nn.Conv2d)
+            or isinstance(m, SparseWeights2d)
+            or isinstance(m, nn.Linear)
+            or isinstance(m, SparseWeights)
+        ):
+            self.lsuv_data["n_layers"] += 1
 
-    def store_activations(self, module, input, output):
+    def store_activations(self, module, _input, _output):
         # Store output of this layer on each forward pass
-        self.lsuv_data['act_dict'] = output.data.cpu().numpy()
+        self.lsuv_data["act_dict"] = _output.data.cpu().numpy()
 
     def add_hook(self, m):
-        '''
+        """
         Add forward hook to each layer
-        '''
-        if self.lsuv_data['hook_idx'] > self.lsuv_data['layers_done']:
-            self.lsuv_data['hook'] = m.register_forward_hook(self.store_activations)
+        """
+        if self.lsuv_data["hook_idx"] > self.lsuv_data["layers_done"]:
+            self.lsuv_data["hook"] = m.register_forward_hook(self.store_activations)
         else:
             # Done, skip
-            self.lsuv_data['hook_idx'] += 1
+            self.lsuv_data["hook_idx"] += 1
 
     def update_weights(self, m):
-        if self.lsuv_data['hook'] is None:
+        if self.lsuv_data["hook"] is None:
             return
-        if not self.lsuv_data['correction_needed']:
+        if not self.lsuv_data["correction_needed"]:
             return
-        if isinstance(m, nn.Conv2d) or isinstance(m, SparseWeights2d) or \
-                isinstance(m, nn.Linear) or \
-                isinstance(m, SparseWeights):
-            if self.lsuv_data['correction_counter'] < self.lsuv_data['hook_idx']:
-                self.lsuv_data['correction_counter'] += 1
+        if (
+            isinstance(m, nn.Conv2d)
+            or isinstance(m, SparseWeights2d)
+            or isinstance(m, nn.Linear)
+            or isinstance(m, SparseWeights)
+        ):
+            if self.lsuv_data["correction_counter"] < self.lsuv_data["hook_idx"]:
+                self.lsuv_data["correction_counter"] += 1
             else:
-                m.weight.data *= self.lsuv_data['current_coef']
-                self.lsuv_data['correction_needed'] = False
+                m.weight.data *= self.lsuv_data["current_coef"]
+                self.lsuv_data["correction_needed"] = False
 
     def orthogonal_weight_init(self, m):
         # Fill with semi-orthogonal matrix as per Saxe et al 2013
@@ -628,38 +634,38 @@ class LSUVWeightInit(object):
         self.model.eval()
         self.model.apply(self.orthogonal_weight_init)
         data_iter = iter(self.data_loader)
-        n_conv_fc = self.model.apply(self.count_conv_fc)
+        self.model.apply(self.count_conv_fc)
 
-        for idx in range(self.lsuv_data['n_layers']):
+        for _idx in range(self.lsuv_data["n_layers"]):
             self.model.apply(self.add_hook)
             data, target = next(data_iter)
             data, target = data.to(self.device), target.to(self.device)
-            out = self.model(data)
+            self.model(data)
             attempts = 0
-            current_sd = self.lsuv_data.get('act_dict').std()
+            current_sd = self.lsuv_data.get("act_dict").std()
             while abs(current_sd - 1.0) >= tol_var and (attempts < max_attempts):
-                self.lsuv_data['current_coef'] = 1. / (current_sd + 1e-8)
-                self.lsuv_data['correction_needed'] = True
+                self.lsuv_data["current_coef"] = 1.0 / (current_sd + 1e-8)
+                self.lsuv_data["correction_needed"] = True
 
                 self.model.apply(self.update_weights)
 
                 data, target = next(data_iter)
                 data, target = data.to(self.device), target.to(self.device)
-                out = self.model(data)
-                current_sd = self.lsuv_data.get('act_dict').std()  # Repeated code?
-                print('std at layer ', idx, ' = ', current_sd,
-                      'mean = ', self.lsuv_data['act_dict'].mean())
+                self.model(data)
+                current_sd = self.lsuv_data.get("act_dict").std()  # Repeated code?
                 attempts += 1
             if attempts == max_attempts:
-                print("Failed to converge after %d attempts, sd: %.3f" %
-                      (attempts, current_sd))
+                print(
+                    "Failed to converge after %d attempts, sd: %.3f"
+                    % (attempts, current_sd)
+                )
             else:
                 print("Converged after %d attempts, sd: %.3f" % (attempts, current_sd))
 
             # Remove forward hook
-            if self.lsuv_data['hook'] is not None:
-                self.lsuv_data['hook'].remove()
-            self.lsuv_data['hook'] = None
-            self.lsuv_data['layers_done'] += 1
-            self.lsuv_data['hook_idx'] = 0
-            self.lsuv_data['correction_counter'] = 0
+            if self.lsuv_data["hook"] is not None:
+                self.lsuv_data["hook"].remove()
+            self.lsuv_data["hook"] = None
+            self.lsuv_data["layers_done"] += 1
+            self.lsuv_data["hook_idx"] = 0
+            self.lsuv_data["correction_counter"] = 0
