@@ -26,15 +26,10 @@ import os
 
 import ray
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
 from ray import tune
 from ray.tune.schedulers import MedianStoppingRule
-from torchvision import datasets, transforms
-import random
+from torchvision import datasets
 
-from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from weight_init_experiment import TinyCIFARWeightInit
 
 
