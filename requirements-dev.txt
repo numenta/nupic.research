@@ -74,3 +74,6 @@ flake8-print
 
 # Check the PEP-8 naming conventions
 pep8-naming
+
+# Check string quotes
+flake8-quotes
