@@ -503,7 +503,7 @@ class TinyCIFARWeightInit(object):
             initializer = LSUVWeightInit(self.model, self.train_loader, device=self.device)
             initializer.initialize()
         elif self.weight_init == 'grassmannian':
-            initializer = GrassmannianWeightInit(self.model)
+            initializer = GrassmannianWeightInit(self.model, device=self.device)
             initializer.initialize()
         elif self.weight_init == 'default':
             for m in self.model.modules():
@@ -526,18 +526,20 @@ class GrassmannianWeightInit(object):
     Set first conv layer weights to Grassmannian
     From the paper by J. H. Conway, R. H. Hardin and N. J. A. Sloane 
     '''
-    def __init__(self, model):
+    def __init__(self, model, device=None):
         self.model = model
+        self.device = device
 
     def grassmannian_extract(self, N, k_size, num_channels):
         '''
-        Download packed subspace from Sloane
+        Download packed subspace from Sloane (http://neilsloane.com/grass/)
         '''
         target_url = 'http://neilsloane.com/grass/dim{}/grassc.{}.{}.{}.txt'.format(k_size, k_size, num_channels, N)
         response = requests.get(target_url)
         list_str = response.text.split('\n')[0:num_channels*k_size*N]
         K = int(np.sqrt(k_size))
         w_mat = np.float_(list_str).reshape(N, K, K, num_channels)
+        print("Downloaded weights of shape: %s" % str(w_mat.shape))
         return w_mat
 
     def initialize(self):
@@ -547,7 +549,7 @@ class GrassmannianWeightInit(object):
                 n_input = m.in_channels
                 k = m.kernel_size[0]
                 W = self.grassmannian_extract(n_filters, k*k, n_input)
-                m.weight.data = torch.from_numpy(W).float()
+                m.weight.data = torch.from_numpy(W).float().to(self.device)
                 # Break after first Conv layer
                 break
 
