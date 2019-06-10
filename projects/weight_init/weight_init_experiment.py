@@ -161,7 +161,7 @@ class TinyCIFARWeightInit(object):
             self.linear_weight_sparsity = [self.linear_weight_sparsity]
         self.output_size = config.get("output_size", 10)
 
-        self.weight_init = config.get("weight_init")
+        self.weight_init = config.get("weight_init", "default")
 
         # Setup devices, model, and dataloaders
         print("setup: Torch device count=", torch.cuda.device_count())
@@ -523,7 +523,7 @@ class TinyCIFARWeightInit(object):
 
 class GrassmannianWeightInit(object):
     """
-    Set first conv layer weights to Grassmannian
+    Set first conv layer weights to Grassmannian as per Prabhu and Yap 2019
     From the paper by J. H. Conway, R. H. Hardin and N. J. A. Sloane
     """
 
