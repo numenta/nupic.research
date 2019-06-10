@@ -30,11 +30,30 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from ray import tune
+from ray.tune.schedulers import MedianStoppingRule
 from torchvision import datasets, transforms
 import random
 
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from weight_init_experiment import TinyCIFARWeightInit
+
+
+def trial_name_string(trial):
+    """
+    Args:
+      trial (Trial): A generated trial object.
+
+    Returns:
+      trial_name (str): String representation of Trial.
+    """
+    s = str(trial)
+    chars = "{}[]() ,="
+    for c in chars:
+        s = s.replace(c, "_")
+
+    if len(s) > 85:
+        s = s[0:75] + "_" + s[-10:]
+    return s
 
 
 class WeightInitTune(TinyCIFARWeightInit, tune.Trainable):
@@ -64,7 +83,9 @@ class WeightInitTune(TinyCIFARWeightInit, tune.Trainable):
         Returns:
             A dict that describes training progress.
         """
-        return self.train_epoch(self._iteration)
+        ret = self.train_epoch(self._iteration)
+        print("epoch", self._iteration, ":", ret)
+        return ret
 
     def _save(self, checkpoint_dir):
         return self.model_save(checkpoint_dir)
@@ -106,10 +127,22 @@ def run_experiment(config, trainable):
         config=config,
         num_samples=config.get("repetitions", 1),
         search_alg=config.get("search_alg", None),
-        scheduler=config.get("scheduler", None),
+        scheduler=config.get(
+            "scheduler",
+            MedianStoppingRule(
+                time_attr="training_iteration",
+                reward_attr="noise_accuracy",
+                min_samples_required=3,
+                grace_period=20,
+                verbose=False,
+            ),
+        ),
+        trial_name_creator=tune.function(trial_name_string),
         trial_executor=config.get("trial_executor", None),
         checkpoint_at_end=config.get("checkpoint_at_end", False),
         checkpoint_freq=config.get("checkpoint_freq", 0),
+        upload_dir=config.get("upload_dir", None),
+        sync_function=config.get("sync_function", None),
         resume=config.get("resume", False),
         reuse_actors=config.get("reuse_actors", False),
         verbose=config.get("verbose", 0),
@@ -118,7 +151,7 @@ def run_experiment(config, trainable):
             # If num trials <= num GPUs, 1.0 is better
             "cpu": 1,
             "gpu": config.get("gpu_percentage", 0.5),
-        },        
+        },      
     )
 
 

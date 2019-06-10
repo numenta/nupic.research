@@ -26,7 +26,7 @@ head_node:
     KeyName: ray-autoscaler_us-west-2 
 
     # 4 CPU, 1 GPU (NVIDIA K80)
-    InstanceType: p2.xlarge 
+    InstanceType: p3.2xlarge 
     
     # 100G disk size
     BlockDeviceMappings:
