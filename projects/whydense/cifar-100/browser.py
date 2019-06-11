@@ -1,3 +1,25 @@
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+#
+# Original Code here:
+# https://github.com/pytorch/examples/blob/master/mnist/main.py
+
 """
   Module for browsing and manipulating experiment results directories created
   by Ray Tune.
@@ -65,25 +87,6 @@ def _read_experiment(experiment_state, experiment_path):
       progress[exp_tag] = pd.read_csv(csv)
       exp_directories[exp_tag] = os.path.abspath(
         os.path.join(experiment_path, exp_dir))
-
-      # comment out on checkpoint recover for now
-      # # Figure out checkpoint file (.pt or .pth) if it exists. For some reason
-      # # we need to switch to the directory in order for glob to work.
-      # checkpoint_directories = {}
-      # ed = os.path.abspath(os.path.join(experiment_path, exp_dir))
-      # os.chdir(ed)
-      # cds = glob.glob("checkpoint*")
-      # if len(cds) > 0:
-      #   cd = max(cds)
-      #   cf = glob.glob(os.path.join(cd, "*.pt"))
-      #   cf += glob.glob(os.path.join(cd, "*.pth"))
-      #   if len(cf) > 0:
-      #     checkpoint_directories[exp_tag] = os.path.join(
-      #       ed, cf[0])
-      #   else:
-      #     checkpoint_directories[exp_tag] = ""
-      # else:
-      #   checkpoint_directories[exp_tag] = ""
 
       # Read in the configs for this experiment
       paramsFile = os.path.join(experiment_path, exp_dir, "params.json")
@@ -231,31 +234,3 @@ def get_parameters(sorted_experiments):
   print('noise_accuracy')
   for i,e in sorted_experiments.iterrows():
     print(e['noise_accuracy'])  
-
-# def best_experiments(min_test_accuracy=0.86, min_noise_accuracy=0.785, sort_by="noise_accuracy"):
-#   """
-#   Return a dataframe containing all experiments whose best test_accuracy and
-#   noise_accuracy are above the specified thresholds.
-#   """
-#   best_accuracies = self._get_value()
-#   best_accuracies.sort_values(sort_by, axis=0, ascending=False,
-#                inplace=True, na_position='last')
-#   columns = best_accuracies.columns
-#   best_experiments = pd.DataFrame(columns=columns)
-#   for i, row in best_accuracies.iterrows():
-#     if ((row["test_accuracy"] > min_test_accuracy)
-#          and (row["noise_accuracy"] > min_noise_accuracy)):
-#       best_experiments = best_experiments.append(row)
-
-#   return best_experiments
-
-
-# def prune_checkpoints(max_test_accuracy=0.86, max_noise_accuracy=0.785):
-#   """
-#   TODO: delete the checkpoints for all models whose best test_accuracy and
-#   noise_accuracy are below the specified thresholds.
-#   """
-#   pass
-
-
-

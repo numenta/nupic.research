@@ -129,6 +129,7 @@ class TinyCIFAR(object):
     self.learning_rate_gamma = config.get("learning_rate_gamma", 0.9)
     self.last_noise_results = None
     self.lr_step_schedule = config.get("lr_step_schedule", None)
+    self.early_stopping = config.get("early_stopping", None)
 
     # Network parameters
     network_type = config.get("network_type", "vgg")
@@ -244,7 +245,10 @@ class TinyCIFAR(object):
     ret = self.run_noise_tests(self.noise_values, self.test_loaders, epoch)
     self._postEpoch(epoch, ret['mean_loss'])
 
-    ret['stop'] = self._early_stopping(epoch, ret['mean_loss'])
+    if self.early_stopping:
+      ret['stop'] = self._early_stopping(epoch, ret['mean_loss'])
+    else:
+      ret['stop'] = 0
     ret['epoch_time_train'] = trainTime
     ret['epoch_time'] = time.time() - t1
     ret["learning_rate"] = self.learning_rate
