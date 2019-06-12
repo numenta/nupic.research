@@ -8,7 +8,7 @@ def topk(a, b):
     """
     values, indices = torch.topk(a, b)
     length = a.size()[-1]
-    arr = torch.zeros(length)
+    arr = a.new_zeros(length)  # Zeros, conserve device
     arr[indices[-1]] = 1
     return arr
 
@@ -38,19 +38,17 @@ class RSMLayer(torch.nn.Module):
         self.linear_b = nn.Linear(total_cells, total_cells)  # Recurrent weights (per cell)
         self.linear_d = nn.Linear(m, D_in)  # Decoding through bottleneck
 
-        self.x_b = torch.zeros(total_cells, requires_grad=False)  # Memory state (m x n)
-
-        self.z_a = torch.zeros(m, requires_grad=True)
-        self.z_b = torch.zeros(total_cells, requires_grad=True)
-        self.sigma = torch.zeros(total_cells, requires_grad=True)
-        self.pi = torch.zeros(total_cells, requires_grad=False)  # Grad unneeded?
-        self.lambda_i = torch.zeros(total_cells, requires_grad=False)  # Grad unneeded?
-        self.M_pi = torch.zeros(total_cells, requires_grad=False)  # Grad unneeded?
-        self.M_lambda = torch.zeros(total_cells, requires_grad=False)
-        self.phi = torch.zeros(total_cells, requires_grad=False)  # Inhibition
-        self.psi = torch.zeros(total_cells, requires_grad=False)  # Recurrent integration
-        self.y = torch.zeros(total_cells, requires_grad=True)
-        self.y_lambda = torch.zeros(total_cells, requires_grad=True)
+        self.register_buffer('z_a', torch.zeros(m, requires_grad=False))
+        self.register_buffer('z_b', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('pi', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('lambda_i', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('M_pi', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('M_lambda', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('sigma', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('y', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('x_b', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('phi', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('psi', torch.zeros(total_cells, requires_grad=False))
 
     def _group_max(self, activity):
         """
@@ -68,13 +66,12 @@ class RSMLayer(torch.nn.Module):
 
         # Can we vectorize across multiple batches?
         batch_size = batch_x.size(0)
-        x_a_pred = torch.zeros(batch_size, self.D_in)
+        x_a_pred = batch_x.new_zeros((batch_size, self.D_in))  # Conserve device
 
         for i, x in enumerate(batch_x):
             # Forward pass over one input
 
             self.z_a = self.linear_a(x.flatten())  # m
-
             self.z_b = self.linear_b(self.x_b)  # total_cells
 
             # z_a repeated (column weights shared by each cell in group)
@@ -90,7 +87,7 @@ class RSMLayer(torch.nn.Module):
             self.M_lambda = topk(self.lambda_i, self.k)  # Mask: most active group (m)
 
             # Mask-based sparsening
-            self.y = torch.tanh(self.M_pi * self.M_lambda.repeat(self.n) * self.sigma)  # 1 x total_cells
+            self.y = nn.functional.tanh(self.M_pi * self.M_lambda.repeat(self.n) * self.sigma)  # 1 x total_cells
 
             # Get updated psi (memory state), decay if inactive
             self.psi = torch.max(self.psi * self.eps, self.y)
@@ -107,9 +104,9 @@ class RSMLayer(torch.nn.Module):
             self.x_b = self.x_b.detach()
 
             # Decode prediction
-            self.y_lambda = self._group_max(self.y)
+            y_lambda = self._group_max(self.y)
 
-            x_a_pred[i, :] = self.linear_d(self.y_lambda)
+            x_a_pred[i, :] = self.linear_d(y_lambda)
         return x_a_pred
 
 

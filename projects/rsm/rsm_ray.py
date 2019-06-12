@@ -251,16 +251,16 @@ if __name__ == "__main__":
         config["num_gpus"] = options.num_gpus
 
         # Make sure local directories are relative to the project location
-        path = os.path.expanduser(config.get("path", "results"))
+        path = os.path.expanduser(config.get("path", "~/nta/results"))
         if not os.path.isabs(path):
             config["path"] = os.path.join(project_dir, path)
 
-        data_dir = os.path.expanduser(config.get("data_dir", "data"))
+        data_dir = os.path.expanduser(config.get("data_dir", "~/nta/datasets"))
         if not os.path.isabs(data_dir):
             config["data_dir"] = os.path.join(project_dir, data_dir)
 
         # Pre-download dataset
-        dataset = config.get("dataset", "CIFAR10")
+        dataset = config.get("dataset", "MNIST")
         if not hasattr(datasets, dataset):
             (
                 print(
