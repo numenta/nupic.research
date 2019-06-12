@@ -10,14 +10,12 @@ from torch.utils.data import DataLoader
 from torch import nn
 from torchvision import datasets, transforms
 import torchvision.utils as vutils
-from tensorboardX import SummaryWriter
+
 
 from rsm import RSMLayer
 from rsm_samplers import MNISTSequenceSampler, mnist_pred_sequence_collate
 
-DATA_DIR = '~/nta/datasets'
-RESULTS_DIR = '/Users/jgordon/nta/results'
-
+# RESULTS_DIR = '/Users/jgordon/nta/results'
 # writer = SummaryWriter(logdir=RESULTS_DIR + "/RSM")
 writer = None
 
@@ -29,7 +27,7 @@ class RSMExperiment(object):
     network.
     """
 
-    def __init__(self, config):
+    def __init__(self, config=None):
         self.data_dir = config.get("data_dir", "data")
         self.model_filename = config.get("model_filename", "model.pth")
         self.iterations = config.get("iterations", 200)
@@ -40,7 +38,7 @@ class RSMExperiment(object):
 
         # Data parameters
         self.input_size = config.get("input_size", (1, 28, 28))
-        self.sequences = config.get("sequences", "[[0, 1, 2, 3]]")
+        self.sequences = config.get("sequences", [[0, 1, 2, 3]])
 
         self.learning_rate = config.get("learning_rate", 0.1)
         self.momentum = config.get("momentum", 0.9)
@@ -77,7 +75,7 @@ class RSMExperiment(object):
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-4)
 
         # Build sampler / data loader
-        self.dataset = datasets.MNIST(DATA_DIR, download=True,
+        self.dataset = datasets.MNIST(self.data_dir, download=True,
                                       train=True, transform=transforms.Compose([
                                           transforms.ToTensor(),
                                           transforms.Normalize((0.1307,), (0.3081,))
@@ -183,7 +181,10 @@ if __name__ == '__main__':
     print("Using torch version", torch.__version__)
     print("Torch device count=%d" % torch.cuda.device_count())
 
-    exp = RSMExperiment()
-    exp.model_setup()
-    for epoch in range(50):
+    config = {
+        'data_dir': os.path.expanduser('~/nta/datasets')
+    }
+    exp = RSMExperiment(config)
+    exp.model_setup(config)
+    for epoch in range(2):
         exp.train_epoch(epoch)
