@@ -22,12 +22,14 @@ class RSMExperiment(object):
     """
 
     def __init__(self, config=None):
-        self.use_tensorboardx = config.get('use_tensorboardx', False)
-
         self.data_dir = config.get("data_dir", "data")
         self.path = config.get("path", "results")
         self.model_filename = config.get("model_filename", "model.pth")
+        self.graph_filename = config.get("graph_filename", "rsm.onnx")
+        self.save_onnx_graph_at_checkpoint = config.get("save_onnx_graph_at_checkpoint", False)
         self.exp_name = config.get("name", "exp")
+        self.writer = None
+
         self.iterations = config.get("iterations", 200)
 
         # Training / testing parameters
@@ -64,14 +66,15 @@ class RSMExperiment(object):
 
         # Build model and optimizer
         self.d_in = reduce(lambda x, y: x * y, self.input_size)
-        self.model = RSMLayer(D_in=self.d_in, m=self.m_groups,
+        self.model = RSMLayer(D_in=self.d_in, 
+                              m=self.m_groups,
                               n=self.n_cells_per_groups,
                               k=self.k_winners,
                               gamma=self.gamma,
                               eps=self.eps)
         self.model.to(self.device)
 
-        self.criterion = torch.nn.MSELoss(reduction='sum')
+        self.criterion = torch.nn.MSELoss(reduction='mean')
         if self.optimizer_type == 'adam':
             self.optimizer = torch.optim.Adam(self.model.parameters(), 
                                               lr=self.learning_rate)
@@ -94,12 +97,6 @@ class RSMExperiment(object):
                                        batch_size=pred_batch_size,
                                        sampler=self.sampler,
                                        collate_fn=mnist_pred_sequence_collate)
-
-        if self.use_tensorboardx:
-            from tensorboardX import SummaryWriter
-            self.writer = SummaryWriter(logdir=self.path + "/" + self.exp_name)
-            dummy_input = (torch.rand(1, 1, 28, 28),)
-            self.writer.add_graph(self.model, dummy_input, True)
 
     def _view_batch(self, image_batch):
         return image_batch.reshape(self.batch_size, 1, 28, 28)
@@ -139,18 +136,21 @@ class RSMExperiment(object):
             input_batch = self._view_batch(inputs)
             pred_batch = self._view_batch(x_a_pred)
             if epoch % 5 == 0 and batch_idx == 10:
-                if self.use_tensorboardx:
-                    self.writer.add_image('inputs', vutils.make_grid(input_batch, scale_each=True, normalize=True), epoch)
-                    self.writer.add_image('preds', vutils.make_grid(pred_batch, scale_each=True, normalize=True), epoch)
-                else:
-                    vutils.save_image(input_batch, '%s/input_e%d.png' % (self.path, epoch), scale_each=True, normalize=True)
-                    vutils.save_image(pred_batch, '%s/pred_e%d.png' % (self.path, epoch), scale_each=True, normalize=True)
+                vutils.save_image(input_batch, '%s/input_e%d.png' % (self.path, epoch), scale_each=True, normalize=True)
+                vutils.save_image(pred_batch, '%s/pred_e%d.png' % (self.path, epoch), scale_each=True, normalize=True)
+
+                ret['img_inputs'] = vutils.make_grid(input_batch).squeeze(2)
+                ret['img_preds'] = vutils.make_grid(pred_batch).squeeze(2)
+                ret['hist_w_a'] = self.model.linear_a.weight
+                ret['hist_w_b'] = self.model.linear_b.weight
+                ret['hist_w_d'] = self.model.linear_d.weight
                 # ret['input'] = input_grid
                 # ret['prediction'] = pred_grid
 
             # Zero gradients, perform a backward pass, and update the weights.
             self.optimizer.zero_grad()
             loss.backward()
+            loss.detach()  # Possibly needed to reduce memory reqs
             self.optimizer.step()
             if batch_idx >= self.batches_in_epoch:
                 break
@@ -164,9 +164,7 @@ class RSMExperiment(object):
         ret["epoch_time_train"] = train_time
         ret["epoch_time"] = time.time() - t1
         ret["learning_rate"] = self.learning_rate
-        print(epoch, ret)
-        # if self.use_tensorboardx:
-        #     self.writer.add_scalars(self.exp_name, ret, epoch)
+        print(epoch, ret['loss'])
         return ret
 
     def _post_epoch(self, epoch):
@@ -193,6 +191,11 @@ class RSMExperiment(object):
             torch.save(self.model, checkpoint_path)
         else:
             torch.save(self.model.state_dict(), checkpoint_path)
+
+        if self.save_onnx_graph_at_checkpoint:
+            dummy_input = (torch.rand(1, 1, 28, 28),)
+            torch.onnx.export(self.model, dummy_input, self.graph_filename, 
+                              verbose=True)
 
         return checkpoint_path
 

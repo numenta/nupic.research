@@ -27,7 +27,8 @@ import os
 import ray
 import torch
 from ray import tune
-from ray.tune.schedulers import MedianStoppingRule
+from ray.tune.logger import JsonLogger, CSVLogger
+from tf_logger_plus import TFLoggerPlus
 from torchvision import datasets
 
 from rsm_experiment import RSMExperiment
@@ -79,7 +80,6 @@ class RSMTune(RSMExperiment, tune.Trainable):
             A dict that describes training progress.
         """
         ret = self.train_epoch(self._iteration)
-        print("epoch", self._iteration, ":", ret)
         return ret
 
     def _save(self, checkpoint_dir):
@@ -120,16 +120,6 @@ def run_experiment(config, trainable):
         stop=stop_criteria,
         config=config,
         num_samples=config.get("repetitions", 1),
-        # scheduler=config.get(
-        #     "scheduler",
-        #     MedianStoppingRule(
-        #         time_attr="training_iteration",
-        #         reward_attr="noise_accuracy",
-        #         min_samples_required=3,
-        #         grace_period=20,
-        #         verbose=False,
-        #     ),
-        # ),
         trial_name_creator=tune.function(trial_name_string),
         trial_executor=config.get("trial_executor", None),
         checkpoint_at_end=config.get("checkpoint_at_end", False),
@@ -138,6 +128,7 @@ def run_experiment(config, trainable):
         sync_function=config.get("sync_function", None),
         resume=config.get("resume", False),
         reuse_actors=config.get("reuse_actors", False),
+        loggers=(JsonLogger, CSVLogger, TFLoggerPlus),
         verbose=config.get("verbose", 0),
         resources_per_trial={
             # With lots of trials, optimal seems to be 0.5, or 2 trials per GPU

@@ -33,20 +33,22 @@ class RSMLayer(torch.nn.Module):
         self.D_in = D_in
 
         total_cells = m * n
+
         self.linear_a = nn.Linear(D_in, m)  # Input weights (shared per group / proximal)
         self.linear_b = nn.Linear(total_cells, total_cells)  # Recurrent weights (per cell)
         self.linear_d = nn.Linear(m, D_in)  # Decoding through bottleneck
 
         self.register_buffer('z_a', torch.zeros(m, requires_grad=True))
         self.register_buffer('z_b', torch.zeros(total_cells, requires_grad=True))
-        self.register_buffer('pi', torch.zeros(total_cells, requires_grad=False))
-        self.register_buffer('lambda_i', torch.zeros(total_cells, requires_grad=False))
+        # self.register_buffer('pi', torch.zeros(total_cells, requires_grad=False))
+        # self.register_buffer('lambda_i', torch.zeros(total_cells, requires_grad=False))
         self.register_buffer('M_pi', torch.zeros(total_cells, requires_grad=False))
         self.register_buffer('M_lambda', torch.zeros(total_cells, requires_grad=False))
-        self.register_buffer('sigma', torch.zeros(total_cells, requires_grad=True))
-        self.register_buffer('y', torch.zeros(total_cells, requires_grad=True))
-        self.register_buffer('y_lambda', torch.zeros(m, requires_grad=True))
+        self.register_buffer('sigma', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('y', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('y_lambda', torch.zeros(m, requires_grad=False))
         self.register_buffer('x_b', torch.zeros(total_cells, requires_grad=False))
+
         self.register_buffer('phi', torch.zeros(total_cells, requires_grad=False))
         self.register_buffer('psi', torch.zeros(total_cells, requires_grad=False))
 
@@ -78,13 +80,13 @@ class RSMLayer(torch.nn.Module):
             self.sigma = self.z_a.repeat(1, self.n) + self.z_b  # Weighted sum for each cell j in group i (mxn)
 
             # Apply inhibition and shift to be non-neg
-            self.pi = (1 - self.phi) * (self.sigma - self.sigma.min() + 1)
+            pi = (1 - self.phi) * (self.sigma - self.sigma.min() + 1)
 
             # Group-wise max pooling
-            self.lambda_i = self._group_max(self.pi)
+            lambda_i = self._group_max(pi)
 
-            self.M_pi = topk(self.pi, 1, dim=1)  # Mask: most active cell in group (total_cells)
-            self.M_lambda = topk(self.lambda_i, self.k, dim=0)  # Mask: most active group (m)
+            self.M_pi = topk(pi, 1, dim=1)  # Mask: most active cell in group (total_cells)
+            self.M_lambda = topk(lambda_i, self.k, dim=0)  # Mask: most active group (m)
 
             # Mask-based sparsening
             self.y = torch.tanh(self.M_pi * self.M_lambda.repeat(self.n) * self.sigma)  # 1 x total_cells
@@ -101,32 +103,26 @@ class RSMLayer(torch.nn.Module):
                 alpha = 1.0
             self.x_b = self.psi / alpha  # Normalizing scalar (force sum(x_b) == 1)
 
-            # Detach hidden recurrent hidden layer to avoid 
+            # Detach recurrent hidden layer to avoid 
             # "Trying to backward through the graph a second time" recursion error
             self.x_b = self.x_b.detach()
 
-            # Decode prediction
+            # Decode prediction through group-wise max bottleneck
             self.y_lambda = self._group_max(self.y)
-
             x_a_pred[i, :] = self.linear_d(self.y_lambda)
+
         return x_a_pred
 
 
 if __name__ == "__main__":
-    # batch_size is batch size; D_in is input dimension;
-    # H is hidden dimension; D_out is output dimension.
     batch_size, D_in = 50, 64
 
     # Create random Tensors to hold inputs and outputs
     x = torch.randn(batch_size, D_in)
     y = torch.randn(batch_size, D_in)
 
-    # Construct our model by instantiating the class defined above
     model = RSMLayer(D_in)
 
-    # Construct our loss function and an Optimizer. The call to model.parameters()
-    # in the SGD constructor will contain the learnable parameters of the two
-    # nn.Linear modules which are members of the model.
     criterion = torch.nn.MSELoss(reduction='sum')
     optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
     for t in range(500):
