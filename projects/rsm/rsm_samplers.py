@@ -61,6 +61,7 @@ class MNISTSequenceSampler(Sampler):
 
 
 def mnist_pred_sequence_collate(batch):
+    # Predictive auto-encoder, targets are next image in sequence
     inputs = [item[0] for item in batch[:-1]]
     targets = [item[0] for item in batch[1:]]
     return [torch.stack(inputs, 0), torch.stack(targets, 0)]

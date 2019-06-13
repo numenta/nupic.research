@@ -2,7 +2,6 @@ import random
 import os
 import time
 import sys
-import json
 from functools import reduce
 
 import torch
@@ -11,13 +10,8 @@ from torch import nn
 from torchvision import datasets, transforms
 import torchvision.utils as vutils
 
-
 from rsm import RSMLayer
 from rsm_samplers import MNISTSequenceSampler, mnist_pred_sequence_collate
-
-# RESULTS_DIR = '/Users/jgordon/nta/results'
-# writer = SummaryWriter(logdir=RESULTS_DIR + "/RSM")
-writer = None
 
 
 class RSMExperiment(object):
@@ -28,8 +22,12 @@ class RSMExperiment(object):
     """
 
     def __init__(self, config=None):
+        self.use_tensorboardx = config.get('use_tensorboardx', False)
+
         self.data_dir = config.get("data_dir", "data")
+        self.path = config.get("path", "results")
         self.model_filename = config.get("model_filename", "model.pth")
+        self.exp_name = config.get("name", "exp")
         self.iterations = config.get("iterations", 200)
 
         # Training / testing parameters
@@ -42,6 +40,7 @@ class RSMExperiment(object):
 
         self.learning_rate = config.get("learning_rate", 0.1)
         self.momentum = config.get("momentum", 0.9)
+        self.optimizer_type = config.get("optimizer", "adam")
 
         self.m_groups = config.get("m_groups", 200)
         self.n_cells_per_groups = config.get("n_cells_per_groups", 6)
@@ -50,7 +49,8 @@ class RSMExperiment(object):
         self.eps = config.get("eps", 0.5)
 
         self.loss_function = nn.functional.mse_loss
-        # self.lr_step_schedule = config.get("lr_step_schedule", None)
+        self.lr_step_schedule = config.get("lr_step_schedule", None)
+        self.learning_rate_gamma = config.get("learning_rate_gamma", 0.1)
 
     def model_setup(self, config):
         seed = config.get("seed", random.randint(0, 10000))
@@ -72,7 +72,13 @@ class RSMExperiment(object):
         self.model.to(self.device)
 
         self.criterion = torch.nn.MSELoss(reduction='sum')
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-4)
+        if self.optimizer_type == 'adam':
+            self.optimizer = torch.optim.Adam(self.model.parameters(), 
+                                              lr=self.learning_rate)
+        else:
+            self.optimizer = torch.optim.SGD(self.model.parameters(), 
+                                             lr=self.learning_rate,
+                                             momentum=self.momentum)
 
         # Build sampler / data loader
         self.dataset = datasets.MNIST(self.data_dir, download=True,
@@ -89,8 +95,22 @@ class RSMExperiment(object):
                                        sampler=self.sampler,
                                        collate_fn=mnist_pred_sequence_collate)
 
+        if self.use_tensorboardx:
+            from tensorboardX import SummaryWriter
+            self.writer = SummaryWriter(logdir=self.path + "/" + self.exp_name)
+            dummy_input = (torch.rand(1, 1, 28, 28),)
+            self.writer.add_graph(self.model, dummy_input, True)
+
     def _view_batch(self, image_batch):
         return image_batch.reshape(self.batch_size, 1, 28, 28)
+
+    def _adjust_learning_rate(self, optimizer, epoch):
+        if self.lr_step_schedule is not None:
+            if epoch in self.lr_step_schedule:
+                self.learning_rate *= self.learning_rate_gamma
+                print("Reducing learning rate to:", self.learning_rate)
+                for param_group in optimizer.param_groups:
+                    param_group["lr"] = self.learning_rate
 
     def train_epoch(self, epoch):
         """This should be called to do one epoch of training and testing.
@@ -103,6 +123,7 @@ class RSMExperiment(object):
         t1 = time.time()
 
         ret = {}
+        total_loss = 0.0
 
         for batch_idx, (inputs, targets) in enumerate(self.train_loader):
 
@@ -112,30 +133,48 @@ class RSMExperiment(object):
             x_a_pred = self.model(inputs)
 
             loss = self.criterion(x_a_pred, targets.reshape(self.batch_size, self.d_in))
+            total_loss += loss.cpu().item()
 
             # Try to update board images on batch 10, each 5 epochs
+            input_batch = self._view_batch(inputs)
+            pred_batch = self._view_batch(x_a_pred)
             if epoch % 5 == 0 and batch_idx == 10:
-                pred_grid = vutils.make_grid(self._view_batch(x_a_pred),
-                                             normalize=True, scale_each=True)
-                input_grid = vutils.make_grid(self._view_batch(inputs),
-                                              normalize=True, scale_each=True)
-                ret['input'] = input_grid
-                ret['prediction'] = pred_grid
+                if self.use_tensorboardx:
+                    self.writer.add_image('inputs', vutils.make_grid(input_batch, scale_each=True, normalize=True), epoch)
+                    self.writer.add_image('preds', vutils.make_grid(pred_batch, scale_each=True, normalize=True), epoch)
+                else:
+                    vutils.save_image(input_batch, '%s/input_e%d.png' % (self.path, epoch), scale_each=True, normalize=True)
+                    vutils.save_image(pred_batch, '%s/pred_e%d.png' % (self.path, epoch), scale_each=True, normalize=True)
+                # ret['input'] = input_grid
+                # ret['prediction'] = pred_grid
 
             # Zero gradients, perform a backward pass, and update the weights.
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            if batch_idx >= self.batches_in_epoch:
+                break
 
         train_time = time.time() - t1
+        self._post_epoch(epoch)
 
         ret["stop"] = 0
 
+        ret['loss'] = total_loss
         ret["epoch_time_train"] = train_time
         ret["epoch_time"] = time.time() - t1
         ret["learning_rate"] = self.learning_rate
         print(epoch, ret)
+        # if self.use_tensorboardx:
+        #     self.writer.add_scalars(self.exp_name, ret, epoch)
         return ret
+
+    def _post_epoch(self, epoch):
+        """
+        The set of actions to do after each epoch of training: adjust learning
+        rate, rezero sparse weights, and update boost strengths.
+        """
+        self._adjust_learning_rate(self.optimizer, epoch)
 
     def model_save(self, checkpoint_dir):
         """Save the model in this directory.
@@ -176,14 +215,20 @@ class RSMExperiment(object):
                 torch.load(checkpoint_file, map_location=self.device)
             )
 
+    def model_cleanup(self):
+        if self.writer:
+            self.writer.close()
+
 
 if __name__ == '__main__':
     print("Using torch version", torch.__version__)
     print("Torch device count=%d" % torch.cuda.device_count())
 
     config = {
-        'data_dir': os.path.expanduser('~/nta/datasets')
+        'data_dir': os.path.expanduser('~/nta/datasets'),
+        'path': os.path.expanduser('~/nta/results')
     }
+
     exp = RSMExperiment(config)
     exp.model_setup(config)
     for epoch in range(2):

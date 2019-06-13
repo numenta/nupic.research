@@ -2,14 +2,13 @@ import torch
 from torch import nn
 
 
-def topk(a, b):
+def topk(a, b, dim=0):
     """
     Return a 1 for the top b elements in the last dim of a, 0 otherwise
     """
     values, indices = torch.topk(a, b)
-    length = a.size()[-1]
-    arr = a.new_zeros(length)  # Zeros, conserve device
-    arr[indices[-1]] = 1
+    arr = a.new_zeros(a.size())  # Zeros, conserve device
+    arr = arr.scatter(dim, indices, 1)
     return arr
 
 
@@ -38,14 +37,15 @@ class RSMLayer(torch.nn.Module):
         self.linear_b = nn.Linear(total_cells, total_cells)  # Recurrent weights (per cell)
         self.linear_d = nn.Linear(m, D_in)  # Decoding through bottleneck
 
-        self.register_buffer('z_a', torch.zeros(m, requires_grad=False))
-        self.register_buffer('z_b', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('z_a', torch.zeros(m, requires_grad=True))
+        self.register_buffer('z_b', torch.zeros(total_cells, requires_grad=True))
         self.register_buffer('pi', torch.zeros(total_cells, requires_grad=False))
         self.register_buffer('lambda_i', torch.zeros(total_cells, requires_grad=False))
         self.register_buffer('M_pi', torch.zeros(total_cells, requires_grad=False))
         self.register_buffer('M_lambda', torch.zeros(total_cells, requires_grad=False))
-        self.register_buffer('sigma', torch.zeros(total_cells, requires_grad=False))
-        self.register_buffer('y', torch.zeros(total_cells, requires_grad=False))
+        self.register_buffer('sigma', torch.zeros(total_cells, requires_grad=True))
+        self.register_buffer('y', torch.zeros(total_cells, requires_grad=True))
+        self.register_buffer('y_lambda', torch.zeros(m, requires_grad=True))
         self.register_buffer('x_b', torch.zeros(total_cells, requires_grad=False))
         self.register_buffer('phi', torch.zeros(total_cells, requires_grad=False))
         self.register_buffer('psi', torch.zeros(total_cells, requires_grad=False))
@@ -83,11 +83,11 @@ class RSMLayer(torch.nn.Module):
             # Group-wise max pooling
             self.lambda_i = self._group_max(self.pi)
 
-            self.M_pi = topk(self.pi, 1)  # Mask: most active cell in group (total_cells)
-            self.M_lambda = topk(self.lambda_i, self.k)  # Mask: most active group (m)
+            self.M_pi = topk(self.pi, 1, dim=1)  # Mask: most active cell in group (total_cells)
+            self.M_lambda = topk(self.lambda_i, self.k, dim=0)  # Mask: most active group (m)
 
             # Mask-based sparsening
-            self.y = nn.functional.tanh(self.M_pi * self.M_lambda.repeat(self.n) * self.sigma)  # 1 x total_cells
+            self.y = torch.tanh(self.M_pi * self.M_lambda.repeat(self.n) * self.sigma)  # 1 x total_cells
 
             # Get updated psi (memory state), decay if inactive
             self.psi = torch.max(self.psi * self.eps, self.y)
@@ -96,17 +96,19 @@ class RSMLayer(torch.nn.Module):
             self.phi = torch.max(self.phi * self.gamma, self.y)
 
             # Update recurrent input / output x_b
-            alpha = 1  # Normalizing scalar (force sum(x_b) == 1)
-            self.x_b = alpha * self.psi
+            alpha = self.psi.sum()
+            if not alpha:
+                alpha = 1.0
+            self.x_b = self.psi / alpha  # Normalizing scalar (force sum(x_b) == 1)
 
             # Detach hidden recurrent hidden layer to avoid 
             # "Trying to backward through the graph a second time" recursion error
             self.x_b = self.x_b.detach()
 
             # Decode prediction
-            y_lambda = self._group_max(self.y)
+            self.y_lambda = self._group_max(self.y)
 
-            x_a_pred[i, :] = self.linear_d(y_lambda)
+            x_a_pred[i, :] = self.linear_d(self.y_lambda)
         return x_a_pred
 
 
