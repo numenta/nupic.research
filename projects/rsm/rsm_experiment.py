@@ -98,8 +98,11 @@ class RSMExperiment(object):
                                        sampler=self.sampler,
                                        collate_fn=mnist_pred_sequence_collate)
 
-    def _view_batch(self, image_batch):
-        return image_batch.reshape(self.batch_size, 1, 28, 28)
+    def _image_grid(self, image_batch):
+        batch = image_batch.reshape(self.batch_size, 1, 28, 28)
+        # make_grid returns 3 channels? -- mean
+        grid = vutils.make_grid(batch, normalize=True, padding=5).mean(dim=0)  
+        return grid
 
     def _adjust_learning_rate(self, optimizer, epoch):
         if self.lr_step_schedule is not None:
@@ -127,31 +130,27 @@ class RSMExperiment(object):
             # Shifted input/label sequence (generate image of next item)
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            x_a_pred = self.model(inputs)
+            x_a_pred, x_b, phi, psi = self.model(inputs)
 
             loss = self.criterion(x_a_pred, targets.reshape(self.batch_size, self.d_in))
             total_loss += loss.cpu().item()
-
-            # Try to update board images on batch 10, each 5 epochs
-            input_batch = self._view_batch(inputs)
-            pred_batch = self._view_batch(x_a_pred)
-            if epoch % 5 == 0 and batch_idx == 10:
-                vutils.save_image(input_batch, '%s/input_e%d.png' % (self.path, epoch), scale_each=True, normalize=True)
-                vutils.save_image(pred_batch, '%s/pred_e%d.png' % (self.path, epoch), scale_each=True, normalize=True)
-
-                ret['img_inputs'] = vutils.make_grid(input_batch).squeeze(2)
-                ret['img_preds'] = vutils.make_grid(pred_batch).squeeze(2)
-                ret['hist_w_a'] = self.model.linear_a.weight
-                ret['hist_w_b'] = self.model.linear_b.weight
-                ret['hist_w_d'] = self.model.linear_d.weight
-                # ret['input'] = input_grid
-                # ret['prediction'] = pred_grid
 
             # Zero gradients, perform a backward pass, and update the weights.
             self.optimizer.zero_grad()
             loss.backward()
             loss.detach()  # Possibly needed to reduce memory reqs
             self.optimizer.step()
+
+            # Try to update board images on batch 10, each 5 epochs
+            # input_batch = self._view_batch(inputs)
+            # pred_batch = self._view_batch(x_a_pred)
+            if epoch % 5 == 0 and batch_idx == 10:
+                ret['img_inputs'] = self._image_grid(inputs).cpu()
+                ret['img_preds'] = self._image_grid(x_a_pred).cpu()
+                ret['hist_w_a'] = self.model.linear_a.weight.cpu()
+                ret['hist_w_b'] = self.model.linear_b.weight.cpu()
+                ret['hist_w_d'] = self.model.linear_d.weight.cpu()
+
             if batch_idx >= self.batches_in_epoch:
                 break
 

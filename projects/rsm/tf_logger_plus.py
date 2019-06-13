@@ -19,18 +19,19 @@ def to_tf_values(result, path, histo_bins=1000):
     for attr, value in result.items():
         if value is not None:
             if attr.startswith('img_'):
-                for nr, img in enumerate(value):
-                    # Write the image to a string
-                    s = BytesIO()
-                    plt.imsave(s, np.array(img), format='png')
+                # for nr, img in enumerate(value):
+                # Write the image to a string
+                s = BytesIO()
+                img = np.array(value)
+                plt.imsave(s, img, format='png')
 
-                    # Create an Image object
-                    img_sum = tf.Summary.Image(encoded_image_string=s.getvalue(),
-                                               height=img.shape[0],
-                                               width=img.shape[1])
-                    # Create a Summary value
-                    values.append(tf.Summary.Value(tag="/".join(path + [attr, str(nr)]),
-                                                   image=img_sum))
+                # Create an Image object
+                img_sum = tf.Summary.Image(encoded_image_string=s.getvalue(),
+                                           height=img.shape[0],
+                                           width=img.shape[1])
+                # Create a Summary value
+                values.append(tf.Summary.Value(tag="/".join(path + [attr]),
+                                               image=img_sum))
             elif attr.startswith('hist_'):
                 # Convert to a numpy array
                 value_np = np.array(value)
