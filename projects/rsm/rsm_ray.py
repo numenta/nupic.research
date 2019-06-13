@@ -98,7 +98,7 @@ class RSMTune(RSMExperiment, tune.Trainable):
         """Subclasses should override this for any cleanup on stop."""
         if self._iteration < self.iterations:
             print("RSMTune: stopping early at epoch {}".format(self._iteration))
-
+        self.model_cleanup()
 
 @ray.remote
 def run_experiment(config, trainable):
@@ -120,17 +120,16 @@ def run_experiment(config, trainable):
         stop=stop_criteria,
         config=config,
         num_samples=config.get("repetitions", 1),
-        search_alg=config.get("search_alg", None),
-        scheduler=config.get(
-            "scheduler",
-            MedianStoppingRule(
-                time_attr="training_iteration",
-                reward_attr="noise_accuracy",
-                min_samples_required=3,
-                grace_period=20,
-                verbose=False,
-            ),
-        ),
+        # scheduler=config.get(
+        #     "scheduler",
+        #     MedianStoppingRule(
+        #         time_attr="training_iteration",
+        #         reward_attr="noise_accuracy",
+        #         min_samples_required=3,
+        #         grace_period=20,
+        #         verbose=False,
+        #     ),
+        # ),
         trial_name_creator=tune.function(trial_name_string),
         trial_executor=config.get("trial_executor", None),
         checkpoint_at_end=config.get("checkpoint_at_end", False),
@@ -253,7 +252,8 @@ if __name__ == "__main__":
         # Make sure local directories are relative to the project location
         path = os.path.expanduser(config.get("path", "~/nta/results"))
         if not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+            path = os.path.join(project_dir, path)
+        config["path"] = path
 
         data_dir = os.path.expanduser(config.get("data_dir", "~/nta/datasets"))
         if not os.path.isabs(data_dir):
