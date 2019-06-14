@@ -28,6 +28,7 @@ class RSMExperiment(object):
         self.graph_filename = config.get("graph_filename", "rsm.onnx")
         self.save_onnx_graph_at_checkpoint = config.get("save_onnx_graph_at_checkpoint", False)
         self.exp_name = config.get("name", "exp")
+        self.debug = config.get("debug", False)
         self.writer = None
 
         self.iterations = config.get("iterations", 200)
@@ -45,7 +46,7 @@ class RSMExperiment(object):
         self.optimizer_type = config.get("optimizer", "adam")
 
         self.m_groups = config.get("m_groups", 200)
-        self.n_cells_per_groups = config.get("n_cells_per_groups", 6)
+        self.n_cells_per_group = config.get("n_cells_per_group", 6)
         self.k_winners = config.get("k_winners", 25)
         self.gamma = config.get("gamma", 0.5)
         self.eps = config.get("eps", 0.5)
@@ -68,10 +69,11 @@ class RSMExperiment(object):
         self.d_in = reduce(lambda x, y: x * y, self.input_size)
         self.model = RSMLayer(D_in=self.d_in, 
                               m=self.m_groups,
-                              n=self.n_cells_per_groups,
+                              n=self.n_cells_per_group,
                               k=self.k_winners,
                               gamma=self.gamma,
-                              eps=self.eps)
+                              eps=self.eps,
+                              debug=self.debug)
         self.model.to(self.device)
 
         self.criterion = torch.nn.MSELoss(reduction='mean')
