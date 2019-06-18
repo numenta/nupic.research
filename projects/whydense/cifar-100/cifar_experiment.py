@@ -60,7 +60,9 @@ def cnn_size(width, kernel_size, padding=1, stride=1):
 
 
 def create_test_loaders(dataset, noise_values, batch_size, data_dir):
-    """Create a list of data loaders, one for each noise value."""
+    """
+    Create a list of data loaders, one for each noise value
+    """
     print("Creating test loaders for noise values:", noise_values)
     loaders = []
     for noise in noise_values:
@@ -69,7 +71,8 @@ def create_test_loaders(dataset, noise_values, batch_size, data_dir):
             [
                 transforms.ToTensor(),
                 transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                    (0.50707516, 0.48654887, 0.44091784),
+                    (0.26733429, 0.25643846, 0.27615047),
                 ),
                 RandomNoise(noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2),
             ]
@@ -84,31 +87,32 @@ def create_test_loaders(dataset, noise_values, batch_size, data_dir):
 
 
 class TinyCIFAR(object):
-    """Generic class for creating tiny CIFAR models. This can be used with Ray
-    tune or PyExperimentSuite, to run a single trial or repetition of a
-    network.
+    """
+    Generic class for creating tiny CIFAR models. This can be used with Ray tune
+    or PyExperimentSuite, to run a single trial or repetition of a network.
 
     The correct way to use this from the outside is:
 
-      model = TinyCIFAR()
-      model.model_setup(config_dict)
+    model = TinyCIFAR()
+    model.model_setup(config_dict)
 
-      for epoch in range(10):
-        model.train_epoch(epoch)
-      model.model_save(path)
+    for epoch in range(10):
+      model.train_epoch(epoch)
+    model.model_save(path)
 
-      new_model = TinyCIFAR()
-      new_model.model_restore(path)
+    new_model = TinyCIFAR()
+    new_model.model_restore(path)
     """
 
     def __init__(self):
         pass
 
     def model_setup(self, config):
-        """Tons of parameters!
+        """
+        Tons of parameters!
 
-        This should be called at the beginning of each repetition with a
-        dict containing all the parameters required to setup the trial.
+        This should be called at the beginning of each repetition with a dict
+        containing all the parameters required to setup the trial.
         """
         # Get trial parameters
         seed = config.get("seed", random.randint(0, 10000))
@@ -135,6 +139,7 @@ class TinyCIFAR(object):
         self.learning_rate_gamma = config.get("learning_rate_gamma", 0.9)
         self.last_noise_results = None
         self.lr_step_schedule = config.get("lr_step_schedule", None)
+        self.early_stopping = config.get("early_stopping", None)
 
         # Network parameters
         network_type = config.get("network_type", "vgg")
@@ -186,8 +191,10 @@ class TinyCIFAR(object):
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
+                # can store stats in database or dynamically obtain
                 transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                    (0.50707516, 0.48654887, 0.44091784),
+                    (0.26733429, 0.25643846, 0.27615047),
                 ),
             ]
         )
@@ -196,7 +203,8 @@ class TinyCIFAR(object):
             [
                 transforms.ToTensor(),
                 transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                    (0.50707516, 0.48654887, 0.44091784),
+                    (0.26733429, 0.25643846, 0.27615047),
                 ),
             ]
         )
@@ -226,18 +234,20 @@ class TinyCIFAR(object):
         self.lr_scheduler = self._create_learning_rate_scheduler(self.optimizer)
 
         # adding track of losses for early stopping
-        self.mean_losses = deque(maxlen=max(3, int(self.iterations / 10)))
-        self.bad_epoches = 0
+        # self.mean_losses = deque(maxlen=max(3,int(self.iterations/10)))
+        self.mean_losses = deque(maxlen=self.iterations)
+        self.bad_epochs = 0
         self.grace_period = max(1, int(self.iterations / 5))
         self.patience = 3
 
     def train_epoch(self, epoch):
-        """This should be called to do one epoch of training and testing.
+        """
+        This should be called to do one epoch of training and testing.
 
         Returns:
-            A dict that describes progress of this epoch.
-            The dict includes the key 'stop'. If set to one, this network
-            should be stopped early. Training is not progressing well enough.
+        A dict that describes progress of this epoch.
+        The dict includes the key 'stop'. If set to one, this network
+        should be stopped early. Training is not progressing well enough.
         """
         t1 = time.time()
         if epoch == 0:
@@ -261,7 +271,10 @@ class TinyCIFAR(object):
         ret = self.run_noise_tests(self.noise_values, self.test_loaders, epoch)
         self._post_epoch(epoch, ret["mean_loss"])
 
-        ret["stop"] = self._early_stopping(epoch, ret["mean_loss"])
+        if self.early_stopping:
+            ret["stop"] = self._early_stopping(epoch, ret["mean_loss"])
+        else:
+            ret["stop"] = 0
         ret["epoch_time_train"] = train_time
         ret["epoch_time"] = time.time() - t1
         ret["learning_rate"] = self.learning_rate
@@ -269,8 +282,8 @@ class TinyCIFAR(object):
         return ret
 
     def model_save(self, checkpoint_dir):
-        """Save the model in this directory.
-
+        """
+        Save the model in this directory.
         :param checkpoint_dir:
 
         :return: str: The return value is expected to be the checkpoint path that
@@ -291,7 +304,8 @@ class TinyCIFAR(object):
     def model_restore(self, checkpoint_path):
         """
         :param checkpoint_path: Loads model from this checkpoint path.
-            If path is a directory, will append the parameter model_filename
+        If path is a directory, will append the parameter model_filename
+
         """
         print("loading from", checkpoint_path)
         if os.path.isdir(checkpoint_path):
@@ -317,7 +331,9 @@ class TinyCIFAR(object):
         weight_sparsity,
         add_pooling,
     ):
-        """Add a single CNN layer to our modules."""
+        """
+        Add a single CNN layer to our modules
+        """
         # Add CNN layer
         if kernel_size == 3:
             padding = 1
@@ -430,7 +446,9 @@ class TinyCIFAR(object):
         self._initialize_weights()
 
     def _create_optimizer(self, model, optimizer="Adam"):
-        """Create a new instance of the optimizer."""
+        """
+        Create a new instance of the optimizer
+        """
         if optimizer == "SGD":
             return torch.optim.SGD(
                 model.parameters(),
@@ -450,8 +468,8 @@ class TinyCIFAR(object):
 
     def _create_learning_rate_scheduler(self, optimizer, scheduler="ReduceLROnPlateau"):
         """
-        Creates the learning rate scheduler and attach the optimizer If step
-        schedule is a list, don't create a scheduler.
+        Creates the learning rate scheduler and attach the optimizer
+        If step schedule is a list, don't create a scheduler
         """
         if self.lr_step_schedule and not isinstance(self.lr_step_schedule, list):
             if scheduler == "StepLR":
@@ -463,7 +481,7 @@ class TinyCIFAR(object):
                     optimizer,
                     mode="min",  # loss
                     patience=5,
-                    threshold=1e-4,
+                    threshold=1e-2,
                     factor=self.learning_rate_gamma,
                 )
             else:
@@ -474,9 +492,7 @@ class TinyCIFAR(object):
             return None
 
     def _adjust_learning_rate(self, optimizer, epoch, metric):
-        """
-        Accepts a schedule either as a list of steps or a boolean.
-        """
+        """Accepts a schedule either as a list of steps or a boolean"""
         if self.lr_step_schedule and isinstance(self.lr_step_schedule, list):
             if epoch in self.lr_step_schedule:
                 self.learning_rate *= self.learning_rate_gamma
@@ -489,17 +505,15 @@ class TinyCIFAR(object):
                 self.learning_rate = np.mean(self.lr_scheduler.get_lr())
 
     def _early_stopping(self, epoch, metric):
-        """
-        Custom early stopping based on moving median.
-        """
+        """Custom early stopping based on moving median"""
         self.mean_losses.append(metric)
         if metric >= np.median(self.mean_losses):
-            self.bad_epoches += 1
+            self.bad_epochs += 1
         else:
-            self.bad_epoches = 0
+            self.bad_epochs = 0
 
         if epoch > self.grace_period:
-            if self.bad_epoches > self.patience:
+            if self.bad_epochs > self.patience:
                 return 1
 
         return 0
@@ -540,9 +554,9 @@ class TinyCIFAR(object):
     def _post_epoch(self, epoch, metric):
         """
         The set of actions to do after each epoch of training:
-          1.adjust learning rate,
-          2.rezero sparse weights,
-          3. and update boost strengths.
+        1.adjust learning rate,
+        2.rezero sparse weights,
+        3. and update boost strengths.
         """
         self._adjust_learning_rate(self.optimizer, epoch, metric)
         self.model.apply(rezero_weights)
