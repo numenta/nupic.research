@@ -34,15 +34,15 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-from nupic.research.frameworks.pytorch.model_utils import evaluateModel, trainModel
+from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from nupic.torch.modules import (
     Flatten,
     KWinners,
     KWinners2d,
     SparseWeights,
     SparseWeights2d,
-    rezeroWeights,
-    updateBoostStrength,
+    rezero_weights,
+    update_boost_strength,
 )
 
 
@@ -74,7 +74,7 @@ def create_test_loaders(dataset, noise_values, batch_size, data_dir):
                     (0.50707516, 0.48654887, 0.44091784),
                     (0.26733429, 0.25643846, 0.27615047),
                 ),
-                RandomNoise(noise, highValue=0.5 + 2 * 0.20, lowValue=0.5 - 2 * 0.2),
+                RandomNoise(noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2),
             ]
         )
 
@@ -257,7 +257,7 @@ class TinyCIFAR(object):
             train_loader = self.train_loader
             batches_in_epoch = self.batches_in_epoch
 
-        trainModel(
+        train_model(
             model=self.model,
             loader=train_loader,
             optimizer=self.optimizer,
@@ -344,7 +344,7 @@ class TinyCIFAR(object):
             in_channels, out_channels, kernel_size=kernel_size, padding=padding
         )
         if weight_sparsity < 1.0:
-            conv2d = SparseWeights2d(conv2d, weightSparsity=weight_sparsity)
+            conv2d = SparseWeights2d(conv2d, weight_sparsity=weight_sparsity)
         self.model.add_module("cnn_" + index_str, conv2d)
 
         self.model.add_module("bn_" + index_str, nn.BatchNorm2d(out_channels)),
@@ -365,9 +365,9 @@ class TinyCIFAR(object):
                 KWinners2d(
                     percent_on=percent_on,
                     channels=out_channels,
-                    kInferenceFactor=self.k_inference_factor,
-                    boostStrength=self.boost_strength,
-                    boostStrengthFactor=self.boost_strength_factor,
+                    k_inference_factor=self.k_inference_factor,
+                    boost_strength=self.boost_strength,
+                    boost_strength_factor=self.boost_strength_factor,
                 ),
             )
         else:
@@ -426,9 +426,9 @@ class TinyCIFAR(object):
                     KWinners(
                         n=linear_n,
                         percent_on=self.linear_percent_on[l],
-                        kInferenceFactor=self.k_inference_factor,
-                        boostStrength=self.boost_strength,
-                        boostStrengthFactor=self.boost_strength_factor,
+                        k_inference_factor=self.k_inference_factor,
+                        boost_strength=self.boost_strength,
+                        boost_strength_factor=self.boost_strength_factor,
                     ),
                 )
             else:
@@ -531,7 +531,7 @@ class TinyCIFAR(object):
             accuracy = 0.0
             loss = 0.0
             for _noise, loader in zip(noise_values, loaders):
-                test_result = evaluateModel(
+                test_result = evaluate_model(
                     model=self.model,
                     loader=loader,
                     device=self.device,
@@ -559,8 +559,8 @@ class TinyCIFAR(object):
         3. and update boost strengths.
         """
         self._adjust_learning_rate(self.optimizer, epoch, metric)
-        self.model.apply(rezeroWeights)
-        self.model.apply(updateBoostStrength)
+        self.model.apply(rezero_weights)
+        self.model.apply(update_boost_strength)
 
     def _initialize_weights(self):
         for m in self.model.modules():
