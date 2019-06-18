@@ -20,30 +20,29 @@
 # Original Code here:
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
-import math
-import os
-import random
-import sys
 import time
-from collections import deque
-
+import math
+import random
 import numpy as np
+
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
-
-from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from nupic.torch.modules import (
-    Flatten,
-    KWinners,
-    KWinners2d,
     SparseWeights,
     SparseWeights2d,
-    rezero_weights,
-    update_boost_strength,
+    Flatten,
+    KWinners2d,
+    KWinners,
+    rezeroWeights,
+    updateBoostStrength,
 )
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+
+from nupic.research.frameworks.pytorch.model_utils import *
+from nupic.research.frameworks.pytorch.image_transforms import *
+
+from collections import deque
 
 
 # monkey patch ReduceLROnPlateau, no get_lr implemented
@@ -55,12 +54,14 @@ def get_lr(self):
 torch.optim.lr_scheduler.ReduceLROnPlateau.get_lr = get_lr
 
 
-def cnn_size(width, kernel_size, padding=1, stride=1):
+def CNNSize(width, kernel_size, padding=1, stride=1):
     return (width - kernel_size + 2 * padding) / stride + 1
 
 
 def create_test_loaders(dataset, noise_values, batch_size, data_dir):
-    """Create a list of data loaders, one for each noise value."""
+    """
+  Create a list of data loaders, one for each noise value
+  """
     print("Creating test loaders for noise values:", noise_values)
     loaders = []
     for noise in noise_values:
@@ -69,9 +70,10 @@ def create_test_loaders(dataset, noise_values, batch_size, data_dir):
             [
                 transforms.ToTensor(),
                 transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                    (0.50707516, 0.48654887, 0.44091784),
+                    (0.26733429, 0.25643846, 0.27615047),
                 ),
-                RandomNoise(noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2),
+                RandomNoise(noise, highValue=0.5 + 2 * 0.20, lowValue=0.5 - 2 * 0.2),
             ]
         )
 
@@ -84,32 +86,33 @@ def create_test_loaders(dataset, noise_values, batch_size, data_dir):
 
 
 class TinyCIFAR(object):
-    """Generic class for creating tiny CIFAR models. This can be used with Ray
-    tune or PyExperimentSuite, to run a single trial or repetition of a
-    network.
-
-    The correct way to use this from the outside is:
-
-      model = TinyCIFAR()
-      model.model_setup(config_dict)
-
-      for epoch in range(10):
-        model.train_epoch(epoch)
-      model.model_save(path)
-
-      new_model = TinyCIFAR()
-      new_model.model_restore(path)
     """
+  Generic class for creating tiny CIFAR models. This can be used with Ray tune
+  or PyExperimentSuite, to run a single trial or repetition of a network.
+
+  The correct way to use this from the outside is:
+
+    model = TinyCIFAR()
+    model.model_setup(config_dict)
+
+    for epoch in range(10):
+      model.train_epoch(epoch)
+    model.model_save(path)
+
+    new_model = TinyCIFAR()
+    new_model.model_restore(path)
+  """
 
     def __init__(self):
         pass
 
     def model_setup(self, config):
-        """Tons of parameters!
-
-        This should be called at the beginning of each repetition with a
-        dict containing all the parameters required to setup the trial.
         """
+    Tons of parameters!
+
+    This should be called at the beginning of each repetition with a dict
+    containing all the parameters required to setup the trial.
+    """
         # Get trial parameters
         seed = config.get("seed", random.randint(0, 10000))
         self.data_dir = os.path.expanduser(config.get("data_dir", "data"))
@@ -135,10 +138,11 @@ class TinyCIFAR(object):
         self.learning_rate_gamma = config.get("learning_rate_gamma", 0.9)
         self.last_noise_results = None
         self.lr_step_schedule = config.get("lr_step_schedule", None)
+        self.early_stopping = config.get("early_stopping", None)
 
         # Network parameters
         network_type = config.get("network_type", "vgg")
-        in_channels, self.h, self.w = config["input_shape"]
+        inChannels, self.h, self.w = config["input_shape"]
 
         self.boost_strength = config["boost_strength"]
         self.boost_strength_factor = config["boost_strength_factor"]
@@ -155,7 +159,7 @@ class TinyCIFAR(object):
         self.cnn_weight_sparsity = config.get(
             "cnn_weight_sparsity", [1.0] * len(self.cnn_percent_on)
         )
-        self.in_channels = [in_channels] + self.cnn_out_channels
+        self.in_channels = [inChannels] + self.cnn_out_channels
         self.block_sizes = config.get("block_sizes", [1] * len(self.cnn_percent_on))
         self.use_max_pooling = config.get("use_max_pooling", False)
 
@@ -186,8 +190,10 @@ class TinyCIFAR(object):
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
+                # can store stats in database or dynamically obtain
                 transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                    (0.50707516, 0.48654887, 0.44091784),
+                    (0.26733429, 0.25643846, 0.27615047),
                 ),
             ]
         )
@@ -196,7 +202,8 @@ class TinyCIFAR(object):
             [
                 transforms.ToTensor(),
                 transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                    (0.50707516, 0.48654887, 0.44091784),
+                    (0.26733429, 0.25643846, 0.27615047),
                 ),
             ]
         )
@@ -222,23 +229,25 @@ class TinyCIFAR(object):
         if network_type == "vgg":
             self._create_vgg_model()
 
-        self.optimizer = self._create_optimizer(self.model, self.optimizer_alg)
-        self.lr_scheduler = self._create_learning_rate_scheduler(self.optimizer)
+        self.optimizer = self._createOptimizer(self.model, self.optimizer_alg)
+        self.lr_scheduler = self._createLearningRateScheduler(self.optimizer)
 
         # adding track of losses for early stopping
-        self.mean_losses = deque(maxlen=max(3, int(self.iterations / 10)))
-        self.bad_epoches = 0
+        # self.mean_losses = deque(maxlen=max(3,int(self.iterations/10)))
+        self.mean_losses = deque(maxlen=self.iterations)
+        self.bad_epochs = 0
         self.grace_period = max(1, int(self.iterations / 5))
         self.patience = 3
 
     def train_epoch(self, epoch):
-        """This should be called to do one epoch of training and testing.
-
-        Returns:
-            A dict that describes progress of this epoch.
-            The dict includes the key 'stop'. If set to one, this network
-            should be stopped early. Training is not progressing well enough.
         """
+    This should be called to do one epoch of training and testing.
+
+    Returns:
+        A dict that describes progress of this epoch.
+        The dict includes the key 'stop'. If set to one, this network
+        should be stopped early. Training is not progressing well enough.
+    """
         t1 = time.time()
         if epoch == 0:
             train_loader = self.first_loader
@@ -247,7 +256,7 @@ class TinyCIFAR(object):
             train_loader = self.train_loader
             batches_in_epoch = self.batches_in_epoch
 
-        train_model(
+        trainModel(
             model=self.model,
             loader=train_loader,
             optimizer=self.optimizer,
@@ -256,26 +265,29 @@ class TinyCIFAR(object):
             criterion=self.loss_function,
         )
 
-        train_time = time.time() - t1
+        trainTime = time.time() - t1
 
         ret = self.run_noise_tests(self.noise_values, self.test_loaders, epoch)
-        self._post_epoch(epoch, ret["mean_loss"])
+        self._postEpoch(epoch, ret["mean_loss"])
 
-        ret["stop"] = self._early_stopping(epoch, ret["mean_loss"])
-        ret["epoch_time_train"] = train_time
+        if self.early_stopping:
+            ret["stop"] = self._early_stopping(epoch, ret["mean_loss"])
+        else:
+            ret["stop"] = 0
+        ret["epoch_time_train"] = trainTime
         ret["epoch_time"] = time.time() - t1
         ret["learning_rate"] = self.learning_rate
         # print(epoch, ret)
         return ret
 
     def model_save(self, checkpoint_dir):
-        """Save the model in this directory.
-
-        :param checkpoint_dir:
-
-        :return: str: The return value is expected to be the checkpoint path that
-        can be later passed to `model_restore()`.
         """
+    Save the model in this directory.
+    :param checkpoint_dir:
+
+    :return: str: The return value is expected to be the checkpoint path that
+    can be later passed to `model_restore()`.
+    """
         # checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
         # torch.save(self.model.state_dict(), checkpoint_path)
         checkpoint_path = os.path.join(checkpoint_dir, self.model_filename)
@@ -290,9 +302,10 @@ class TinyCIFAR(object):
 
     def model_restore(self, checkpoint_path):
         """
-        :param checkpoint_path: Loads model from this checkpoint path.
-            If path is a directory, will append the parameter model_filename
-        """
+    :param checkpoint_path: Loads model from this checkpoint path.
+    If path is a directory, will append the parameter model_filename
+
+    """
         print("loading from", checkpoint_path)
         if os.path.isdir(checkpoint_path):
             checkpoint_file = os.path.join(checkpoint_path, self.model_filename)
@@ -317,7 +330,10 @@ class TinyCIFAR(object):
         weight_sparsity,
         add_pooling,
     ):
-        """Add a single CNN layer to our modules."""
+        """
+    Add a single CNN layer to our modules
+    """
+
         # Add CNN layer
         if kernel_size == 3:
             padding = 1
@@ -328,7 +344,7 @@ class TinyCIFAR(object):
             in_channels, out_channels, kernel_size=kernel_size, padding=padding
         )
         if weight_sparsity < 1.0:
-            conv2d = SparseWeights2d(conv2d, weight_sparsity=weight_sparsity)
+            conv2d = SparseWeights2d(conv2d, weightSparsity=weight_sparsity)
         self.model.add_module("cnn_" + index_str, conv2d)
 
         self.model.add_module("bn_" + index_str, nn.BatchNorm2d(out_channels)),
@@ -349,9 +365,9 @@ class TinyCIFAR(object):
                 KWinners2d(
                     percent_on=percent_on,
                     channels=out_channels,
-                    k_inference_factor=self.k_inference_factor,
-                    boost_strength=self.boost_strength,
-                    boost_strength_factor=self.boost_strength_factor,
+                    kInferenceFactor=self.k_inference_factor,
+                    boostStrength=self.boost_strength,
+                    boostStrengthFactor=self.boost_strength_factor,
                 ),
             )
         else:
@@ -359,12 +375,13 @@ class TinyCIFAR(object):
 
     def _create_vgg_model(self):
         """
-        block_sizes = [1,1,1] - number of CNN layers in each block
-        cnn_out_channels = [c1, c2, c3] - # out_channels in each layer of this block
-        cnn_kernel_size = [k1, k2, k3] - kernel_size in each layer of this block
-        cnn_weight_sparsity = [w1, w2, w3] - weight sparsity of each layer of this block
-        cnn_percent_on = [p1, p2, p3] - percent_on in each layer of this block
-        """
+    block_sizes = [1,1,1] - number of CNN layers in each block
+    cnn_out_channels = [c1, c2, c3] - # out_channels in each layer of this block
+    cnn_kernel_size = [k1, k2, k3] - kernel_size in each layer of this block
+    cnn_weight_sparsity = [w1, w2, w3] - weight sparsity of each layer of this block
+    cnn_percent_on = [p1, p2, p3] - percent_on in each layer of this block
+    """
+
         # Here we require exactly 3 blocks
         # assert(len(self.block_sizes) == 3)
 
@@ -410,9 +427,9 @@ class TinyCIFAR(object):
                     KWinners(
                         n=linear_n,
                         percent_on=self.linear_percent_on[l],
-                        k_inference_factor=self.k_inference_factor,
-                        boost_strength=self.boost_strength,
-                        boost_strength_factor=self.boost_strength_factor,
+                        kInferenceFactor=self.k_inference_factor,
+                        boostStrength=self.boost_strength,
+                        boostStrengthFactor=self.boost_strength_factor,
                     ),
                 )
             else:
@@ -429,8 +446,10 @@ class TinyCIFAR(object):
 
         self._initialize_weights()
 
-    def _create_optimizer(self, model, optimizer="Adam"):
-        """Create a new instance of the optimizer."""
+    def _createOptimizer(self, model, optimizer="Adam"):
+        """
+    Create a new instance of the optimizer
+    """
         if optimizer == "SGD":
             return torch.optim.SGD(
                 model.parameters(),
@@ -448,11 +467,11 @@ class TinyCIFAR(object):
         else:
             raise ValueError("{} is not a valid optimizer".format(optimizer))
 
-    def _create_learning_rate_scheduler(self, optimizer, scheduler="ReduceLROnPlateau"):
+    def _createLearningRateScheduler(self, optimizer, scheduler="ReduceLROnPlateau"):
         """
-        Creates the learning rate scheduler and attach the optimizer If step
-        schedule is a list, don't create a scheduler.
-        """
+      Creates the learning rate scheduler and attach the optimizer
+      If step schedule is a list, don't create a scheduler
+    """
         if self.lr_step_schedule and not isinstance(self.lr_step_schedule, list):
             if scheduler == "StepLR":
                 return torch.optim.lr_scheduler.StepLR(
@@ -463,7 +482,7 @@ class TinyCIFAR(object):
                     optimizer,
                     mode="min",  # loss
                     patience=5,
-                    threshold=1e-4,
+                    threshold=1e-2,
                     factor=self.learning_rate_gamma,
                 )
             else:
@@ -474,9 +493,8 @@ class TinyCIFAR(object):
             return None
 
     def _adjust_learning_rate(self, optimizer, epoch, metric):
-        """
-        Accepts a schedule either as a list of steps or a boolean.
-        """
+        """ Accepts a schedule either as a list of steps or a boolean """
+
         if self.lr_step_schedule and isinstance(self.lr_step_schedule, list):
             if epoch in self.lr_step_schedule:
                 self.learning_rate *= self.learning_rate_gamma
@@ -489,64 +507,64 @@ class TinyCIFAR(object):
                 self.learning_rate = np.mean(self.lr_scheduler.get_lr())
 
     def _early_stopping(self, epoch, metric):
-        """
-        Custom early stopping based on moving median.
-        """
+        """ Custom early stopping based on moving median """
+
         self.mean_losses.append(metric)
         if metric >= np.median(self.mean_losses):
-            self.bad_epoches += 1
+            self.bad_epochs += 1
         else:
-            self.bad_epoches = 0
+            self.bad_epochs = 0
 
         if epoch > self.grace_period:
-            if self.bad_epoches > self.patience:
+            if self.bad_epochs > self.patience:
                 return 1
 
         return 0
 
-    def run_noise_tests(self, noise_values, loaders, epoch):
+    def run_noise_tests(self, noiseValues, loaders, epoch):
         """
-        Test the model with different noise values and return test metrics.
-        """
+    Test the model with different noise values and return test metrics.
+    """
         ret = self.last_noise_results
 
         # Just do noise tests every 3 iterations, about a 2X overall speedup
         # back to 1 temporarily
         if epoch % 1 == 0 or ret is None:
-            ret = {"noise_values": noise_values, "noise_accuracies": []}
+            ret = {"noise_values": noiseValues, "noise_accuracies": []}
             accuracy = 0.0
             loss = 0.0
-            for _noise, loader in zip(noise_values, loaders):
-                test_result = evaluate_model(
+            for noise, loader in zip(noiseValues, loaders):
+                testResult = evaluateModel(
                     model=self.model,
                     loader=loader,
                     device=self.device,
                     batches_in_epoch=self.test_batches_in_epoch,
                     criterion=self.loss_function,
                 )
-                accuracy += test_result["mean_accuracy"]
-                loss += test_result["mean_loss"]
-                ret["noise_accuracies"].append(test_result["mean_accuracy"])
+                accuracy += testResult["mean_accuracy"]
+                loss += testResult["mean_loss"]
+                ret["noise_accuracies"].append(testResult["mean_accuracy"])
 
-            ret["mean_accuracy"] = accuracy / len(noise_values)
+            ret["mean_accuracy"] = accuracy / len(noiseValues)
             ret["test_accuracy"] = ret["noise_accuracies"][0]
             ret["noise_accuracy"] = ret["noise_accuracies"][-1]
-            ret["mean_loss"] = loss / len(noise_values)
+            ret["mean_loss"] = loss / len(noiseValues)
 
             self.last_noise_results = ret
 
         return ret
 
-    def _post_epoch(self, epoch, metric):
+    def _postEpoch(self, epoch, metric):
         """
-        The set of actions to do after each epoch of training:
-          1.adjust learning rate,
-          2.rezero sparse weights,
-          3. and update boost strengths.
-        """
+    The set of actions to do after each epoch of training:
+      1.adjust learning rate,
+      2.rezero sparse weights,
+      3. and update boost strengths.
+    """
+
         self._adjust_learning_rate(self.optimizer, epoch, metric)
-        self.model.apply(rezero_weights)
-        self.model.apply(update_boost_strength)
+        self.model.apply(rezeroWeights)
+        self.model.apply(updateBoostStrength)
 
     def _initialize_weights(self):
         for m in self.model.modules():
