@@ -28,10 +28,9 @@ import os
 import ray
 import torch
 from ray import tune
-from ray.tune.schedulers import AsyncHyperBandScheduler
 from torchvision import datasets
 
-from .cifar_experiment import TinyCIFAR  # changed to local
+from cifar_experiment import TinyCIFAR  # changed to local
 
 # Remove annoying messages saying training is taking too long
 logging.getLogger("ray.tune.util").setLevel(logging.ERROR)
@@ -56,8 +55,8 @@ def trial_name_string(trial):
 
 
 class CIFARTune(TinyCIFAR, tune.Trainable):
-    """ray.tune trainable class for running small CIFAR models:
-
+    """
+    ray.tune trainable class for running small CIFAR models:
     - Override _setup to reset the experiment for each trial.
     - Override _train to train and evaluate each epoch
     - Override _save and _restore to serialize the model
@@ -71,8 +70,8 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
         """Custom initialization.
 
         Args:
-            config (dict): Hyperparameters and other configs given.
-                Copy of `self.config`.
+        config (dict): Hyperparameters and other configs given.
+            Copy of `self.config`.
         """
         self.model_setup(config)
 
@@ -80,7 +79,7 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
         """Implement train() for a single epoch.
 
         Returns:
-            A dict that describes training progress.
+        A dict that describes training progress.
         """
         ret = self.train_epoch(self._iteration)
         print("epoch", self._iteration, ":", ret)
@@ -106,7 +105,8 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
 
 @ray.remote
 def run_experiment(config, trainable):
-    """Run a single tune experiment in parallel as a "remote" function.
+    """
+    Run a single tune experiment in parallel as a "remote" function.
 
     :param config: The experiment configuration
     :type config: dict
@@ -125,17 +125,16 @@ def run_experiment(config, trainable):
         config=config,
         num_samples=config.get("repetitions", 1),
         search_alg=config.get("search_alg", None),
-        scheduler=config.get(
-            "scheduler",
-            AsyncHyperBandScheduler(
-                reward_attr="mean_accuracy",
-                time_attr="training_iteration",
-                brackets=2,
-                grace_period=max(1, int(config.get("iterations", 10) / 10)),
-                reduction_factor=3,
-                max_t=config.get("iterations", 10),
-            ),
-        ),
+        # scheduler=config.get("scheduler",
+        #                      AsyncHyperBandScheduler(
+        #                        reward_attr='mean_accuracy',
+        #                        time_attr="training_iteration",
+        #                        brackets = 2,
+        #                        grace_period=\
+        #                        max(1, int(config.get("iterations", 10)/10)),
+        #                        reduction_factor=3,
+        #                        max_t=config.get("iterations", 10)
+        #                      )),
         trial_name_creator=tune.function(trial_name_string),
         trial_executor=config.get("trial_executor", None),
         checkpoint_at_end=config.get("checkpoint_at_end", False),
@@ -156,9 +155,8 @@ def run_experiment(config, trainable):
 
 
 def parse_config(config_file, experiments=None):
-    """Parse configuration file optionally filtering for specific
-    experiments/sections.
-
+    """
+    Parse configuration file optionally filtering for specific experiments/sections
     :param config_file: Configuration file
     :param experiments: Optional list of experiments
     :return: Dictionary with the parsed configuration
@@ -184,7 +182,7 @@ def parse_config(config_file, experiments=None):
 
 
 def parse_options():
-    """parses the command line options for different settings."""
+    """Parses the command line options for different settings."""
     optparser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -271,12 +269,7 @@ if __name__ == "__main__":
         # Pre-download dataset
         dataset = config.get("dataset", "CIFAR10")
         if not hasattr(datasets, dataset):
-            (
-                print(
-                    "Dataset {} is not available in PyTorch.Please choose a "
-                    "valid dataset.".format(dataset)
-                )
-            )
+            print("Dataset {} not available in PyTorch".format(dataset))
         getattr(datasets, dataset)(root=data_dir)
 
         # When running multiple hyperparameter searches on different experiments,
