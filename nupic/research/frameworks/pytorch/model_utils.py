@@ -74,6 +74,8 @@ def train_model(
             loader.total = batches_in_epoch
 
     for batch_idx, (data, target) in enumerate(loader):
+        if batch_idx >= batches_in_epoch:
+            break
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
         output = model(data)
@@ -83,8 +85,6 @@ def train_model(
 
         if batch_callback is not None:
             batch_callback(model=model, batch_idx=batch_idx)
-        if batch_idx >= batches_in_epoch:
-            break
 
     if progress_bar is not None:
         loader.n = loader.total
