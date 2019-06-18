@@ -21,33 +21,28 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 """
-  Module for browsing and manipulating experiment results directories created
-  by Ray Tune.
+Module for browsing and manipulating experiment results directories created
+by Ray Tune.
 
-  Converted to a module
+Converted to a module
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-import os
 import glob
-import tabulate
-import pprint
-import click
+import json
+import os
+import warnings
+
 import numpy as np
 import pandas as pd
-from ray.tune.commands import *
-
-import warnings
+from ray.tune.commands import flatten_dict
 
 warnings.filterwarnings("ignore")
 
 
 def load(experiment_path):
-    """ Load a single experiment into a dataframe """
-
+    """Load a single experiment into a dataframe"""
     experiment_path = os.path.abspath(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
 
@@ -65,8 +60,7 @@ def load(experiment_path):
 
 
 def load_many(experiment_paths):
-    """ Load several experiments into a single dataframe"""
-
+    """Load several experiments into a single dataframe"""
     dataframes = [load(path) for path in experiment_paths]
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
@@ -93,35 +87,27 @@ def _read_experiment(experiment_state, experiment_path):
             )
 
             # Read in the configs for this experiment
-            paramsFile = os.path.join(experiment_path, exp_dir, "params.json")
-            with open(paramsFile) as f:
+            params_file = os.path.join(experiment_path, exp_dir, "params.json")
+            with open(params_file) as f:
                 params[exp_tag] = json.load(f)
 
     return progress, params
 
 
-def _get_value(
-    progress,
-    params,
-    exp_name,
-    exp_substring="",
-    tags=["test_accuracy", "noise_accuracy", "mean_accuracy"],
-    which="max",
-):
+def _get_value(progress, params, exp_name, exp_substring="", which="max"):
     """
-  For every experiment whose name matches exp_substring, scan the history
-  and return the appropriate value associated with tag.
-  'which' can be one of the following:
+    For every experiment whose name matches exp_substring, scan the history
+    and return the appropriate value associated with tag.
+    'which' can be one of the following:
       last: returns the last value
        min: returns the minimum value
        max: returns the maximum value
     median: returns the median value
 
-  Returns a pandas dataframe with two columns containing name and tag value
+    Returns a pandas dataframe with two columns containing name and tag value
 
-  Modified to run once per experiment state
-  """
-
+    Modified to run once per experiment state
+    """
     # Collect experiment names that match exp at all
     exps = [e for e in progress if exp_substring in e]
 
@@ -129,6 +115,7 @@ def _get_value(
     columns = ["Experiment Name"]
 
     # add the columns names for main tags
+    tags = ["test_accuracy", "noise_accuracy", "mean_accuracy"]
     for tag in tags:
         columns.append(tag)
         columns.append(tag + "_" + which)
@@ -199,24 +186,11 @@ def _get_value(
     return p
 
 
-def get_checkpoint_file(exp_substring=""):
-    """
-  For every experiment whose name matches exp_substring, return the
-  full path to the checkpoint file. Returns a list of paths.
-  """
-    # Collect experiment names that match exp at all
-    exps = [e for e in progress if exp_substring in e]
-
-    paths = [self.checkpoint_directories[e] for e in exps]
-
-    return paths
-
-
 def _get_experiment_states(experiment_path, exit_on_fail=False):
     """
-  Return every experiment state JSON file in the path as a list of dicts.
-  The list is sorted such that newer experiments appear later.
-  """
+    Return every experiment state JSON file in the path as a list of dicts.
+    The list is sorted such that newer experiments appear later.
+    """
     experiment_path = os.path.expanduser(experiment_path)
     experiment_state_paths = glob.glob(
         os.path.join(experiment_path, "experiment_state*.json")
@@ -226,26 +200,10 @@ def _get_experiment_states(experiment_path, exit_on_fail=False):
         print("No experiment state found for experiment {}".format(experiment_path))
         return []
 
-    experiment_state_paths = list(experiment_state_paths)
-    experiment_state_paths.sort()
+    experiment_state_paths = sorted(experiment_state_paths)
     experiment_states = []
     for experiment_filename in list(experiment_state_paths):
         with open(experiment_filename) as f:
             experiment_states.append((json.load(f), experiment_filename))
 
     return experiment_states
-
-
-def get_parameters(sorted_experiments):
-    for i, e in sorted_experiments.iterrows():
-        if e["Experiment Name"] in params:
-            params = params[e["Experiment Name"]]
-            print(params["cnn_percent_on"][0])
-
-    print("test_accuracy")
-    for i, e in sorted_experiments.iterrows():
-        print(e["test_accuracy"])
-
-    print("noise_accuracy")
-    for i, e in sorted_experiments.iterrows():
-        print(e["noise_accuracy"])
