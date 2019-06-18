@@ -21,7 +21,6 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import argparse
-import configparser
 import os
 
 import ray
@@ -29,8 +28,8 @@ import torch
 from ray import tune
 from ray.tune.logger import JsonLogger, CSVLogger
 from tf_logger_plus import TFLoggerPlus
-from torchvision import datasets
 
+from nupic.research.support.parse_config import parse_config
 from rsm_experiment import RSMExperiment
 
 
@@ -100,6 +99,7 @@ class RSMTune(RSMExperiment, tune.Trainable):
             print("RSMTune: stopping early at epoch {}".format(self._iteration))
         self.model_cleanup()
 
+
 @ray.remote
 def run_experiment(config, trainable):
     """Run a single tune experiment in parallel as a "remote" function.
@@ -139,34 +139,6 @@ def run_experiment(config, trainable):
     )
 
 
-def parse_config(config_file, experiments=None):
-    """Parse configuration file optionally filtering for specific
-    experiments/sections.
-
-    :param config_file: Configuration file
-    :param experiments: Optional list of experiments
-    :return: Dictionary with the parsed configuration
-    """
-    cfgparser = configparser.ConfigParser()
-    cfgparser.read_file(config_file)
-
-    params = {}
-    for exp in cfgparser.sections():
-        if not experiments or exp in experiments:
-            values = cfgparser.defaults()
-            values.update(dict(cfgparser.items(exp)))
-            item = {}
-            for k, v in values.items():
-                try:
-                    item[k] = eval(v)
-                except (NameError, SyntaxError):
-                    item[k] = v
-
-            params[exp] = item
-
-    return params
-
-
 def parse_options():
     """parses the command line options for different settings."""
     optparser = argparse.ArgumentParser(
@@ -204,6 +176,18 @@ def parse_options():
         help="run only selected experiments, by default run all experiments in "
         "config file.",
     )
+    optparser.add_argument(
+        "-r",
+        "--resume",
+        dest="resume",
+        help="resume from checkpoint if found"
+    )
+    optparser.add_argument(
+        "-p",
+        "--predict",
+        dest="predict",
+        help="run prediction on trained model"
+    )
 
     return optparser.parse_args()
 
@@ -236,9 +220,14 @@ if __name__ == "__main__":
     results = []
     for exp in configs:
         config = configs[exp]
+        print("-" * 20)
+        print(exp)
+        print("-" * 20)
         config["name"] = exp
         config["num_cpus"] = options.num_cpus
         config["num_gpus"] = options.num_gpus
+        config["resume"] = options.resume
+        config["predict"] = options.predict
 
         # Make sure local directories are relative to the project location
         path = os.path.expanduser(config.get("path", "~/nta/results"))
@@ -248,18 +237,8 @@ if __name__ == "__main__":
 
         data_dir = os.path.expanduser(config.get("data_dir", "~/nta/datasets"))
         if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
-
-        # Pre-download dataset
-        dataset = config.get("dataset", "MNIST")
-        if not hasattr(datasets, dataset):
-            (
-                print(
-                    "Dataset {} is not available in PyTorch.Please choose a "
-                    "valid dataset.".format(dataset)
-                )
-            )
-        getattr(datasets, dataset)(root=data_dir, download=True)
+            data_dir = os.path.join(project_dir, data_dir)
+        config["data_dir"] = data_dir
 
         # When running multiple hyperparameter searches on different experiments,
         # ray.tune will run one experiment at the time. We use "ray.remote" to

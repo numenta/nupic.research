@@ -5,8 +5,6 @@ import logging
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-import torch
-
 from ray.tune.logger import Logger
 from ray.tune.result import TRAINING_ITERATION, TIME_TOTAL_S, TIMESTEPS_TOTAL
 
@@ -46,10 +44,6 @@ def to_tf_values(result, path, histo_bins=1000):
                 hist.num = int(np.prod(value_np.shape))
                 hist.sum = float(np.sum(value_np))
                 hist.sum_squares = float(np.sum(value_np**2))
-
-                # Requires equal number as bins, where the first goes from -DBL_MAX to bin_edges[1]
-                # See https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/framework/summary.proto#L30
-                # Thus, we drop the start of the first bin
                 bin_edges = bin_edges[1:]
 
                 # Add bin edges and counts
