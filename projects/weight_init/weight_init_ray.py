@@ -22,18 +22,15 @@
 
 import argparse
 import configparser
-import logging
 import os
 
 import ray
 import torch
 from ray import tune
+from ray.tune.schedulers import MedianStoppingRule
 from torchvision import datasets
 
-from cifar_experiment import TinyCIFAR  # changed to local
-
-# Remove annoying messages saying training is taking too long
-logging.getLogger("ray.tune.util").setLevel(logging.ERROR)
+from weight_init_experiment import TinyCIFARWeightInit
 
 
 def trial_name_string(trial):
@@ -54,24 +51,24 @@ def trial_name_string(trial):
     return s
 
 
-class CIFARTune(TinyCIFAR, tune.Trainable):
-    """
-    ray.tune trainable class for running small CIFAR models:
+class WeightInitTune(TinyCIFARWeightInit, tune.Trainable):
+    """ray.tune trainable class for running small CIFAR models:
+
     - Override _setup to reset the experiment for each trial.
     - Override _train to train and evaluate each epoch
     - Override _save and _restore to serialize the model
     """
 
     def __init__(self, config=None, logger_creator=None):
-        TinyCIFAR.__init__(self)
+        TinyCIFARWeightInit.__init__(self)
         tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
 
     def _setup(self, config):
         """Custom initialization.
 
         Args:
-        config (dict): Hyperparameters and other configs given.
-            Copy of `self.config`.
+            config (dict): Hyperparameters and other configs given.
+                Copy of `self.config`.
         """
         self.model_setup(config)
 
@@ -79,7 +76,7 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
         """Implement train() for a single epoch.
 
         Returns:
-        A dict that describes training progress.
+            A dict that describes training progress.
         """
         ret = self.train_epoch(self._iteration)
         print("epoch", self._iteration, ":", ret)
@@ -100,13 +97,12 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
     def _stop(self):
         """Subclasses should override this for any cleanup on stop."""
         if self._iteration < self.iterations:
-            print("CIFARTune: stopping early at epoch {}".format(self._iteration))
+            print("WeightInitTune: stopping early at epoch {}".format(self._iteration))
 
 
 @ray.remote
 def run_experiment(config, trainable):
-    """
-    Run a single tune experiment in parallel as a "remote" function.
+    """Run a single tune experiment in parallel as a "remote" function.
 
     :param config: The experiment configuration
     :type config: dict
@@ -125,16 +121,16 @@ def run_experiment(config, trainable):
         config=config,
         num_samples=config.get("repetitions", 1),
         search_alg=config.get("search_alg", None),
-        # scheduler=config.get("scheduler",
-        #                      AsyncHyperBandScheduler(
-        #                        reward_attr='mean_accuracy',
-        #                        time_attr="training_iteration",
-        #                        brackets = 2,
-        #                        grace_period=\
-        #                        max(1, int(config.get("iterations", 10)/10)),
-        #                        reduction_factor=3,
-        #                        max_t=config.get("iterations", 10)
-        #                      )),
+        scheduler=config.get(
+            "scheduler",
+            MedianStoppingRule(
+                time_attr="training_iteration",
+                reward_attr="noise_accuracy",
+                min_samples_required=3,
+                grace_period=20,
+                verbose=False,
+            ),
+        ),
         trial_name_creator=tune.function(trial_name_string),
         trial_executor=config.get("trial_executor", None),
         checkpoint_at_end=config.get("checkpoint_at_end", False),
@@ -145,18 +141,18 @@ def run_experiment(config, trainable):
         reuse_actors=config.get("reuse_actors", False),
         verbose=config.get("verbose", 0),
         resources_per_trial={
-            "cpu": config.get("cpu_percentage", 1.0),
-            "gpu": config.get("gpu_percentage", 1.0),
+            # With lots of trials, optimal seems to be 0.5, or 2 trials per GPU
+            # If num trials <= num GPUs, 1.0 is better
+            "cpu": 1,
+            "gpu": config.get("gpu_percentage", 0.5),
         },
-        # # added parameters to allow monitoring through REST API
-        # with_server=True,
-        # server_port=4321,
     )
 
 
 def parse_config(config_file, experiments=None):
-    """
-    Parse configuration file optionally filtering for specific experiments/sections
+    """Parse configuration file optionally filtering for specific
+    experiments/sections.
+
     :param config_file: Configuration file
     :param experiments: Optional list of experiments
     :return: Dictionary with the parsed configuration
@@ -182,7 +178,7 @@ def parse_config(config_file, experiments=None):
 
 
 def parse_options():
-    """Parses the command line options for different settings."""
+    """parses the command line options for different settings."""
     optparser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -191,7 +187,7 @@ def parse_options():
         "--config",
         dest="config",
         type=open,
-        default="tiny_experiments.cfg",
+        default="experiments.cfg",
         help="your experiments config file",
     )
     optparser.add_argument(
@@ -215,20 +211,20 @@ def parse_options():
         "--experiment",
         action="append",
         dest="experiments",
-        help="run only selected experiments, by default run "
-        "all experiments in config file.",
+        help="run only selected experiments, by default run all experiments in "
+        "config file.",
     )
 
     return optparser.parse_args()
 
 
 if __name__ == "__main__":
-
     # Load and parse command line option and experiment configurations
     options = parse_options()
     configs = parse_config(options.config, options.experiments)
 
     # Use configuration file location as the project location.
+    # Ray Tune default working directory is "~/ray_results"
     project_dir = os.path.dirname(options.config.name)
     project_dir = os.path.abspath(project_dir)
 
@@ -239,14 +235,12 @@ if __name__ == "__main__":
     if "REDIS_ADDRESS" in os.environ:
         ray.init(redis_address=os.environ["REDIS_ADDRESS"], include_webui=True)
     else:
+        # Initialize ray cluster
         ray.init(
             num_cpus=options.num_cpus,
             num_gpus=options.num_gpus,
             local_mode=options.num_cpus == 1,
         )
-
-    if len(configs) == 0:
-        print("No matching experiments found!")
 
     # Run all experiments in parallel
     results = []
@@ -255,7 +249,6 @@ if __name__ == "__main__":
         config["name"] = exp
         config["num_cpus"] = options.num_cpus
         config["num_gpus"] = options.num_gpus
-        print("GPU percentage=", config.get("gpu_percentage", 0.5))
 
         # Make sure local directories are relative to the project location
         path = os.path.expanduser(config.get("path", "results"))
@@ -269,14 +262,19 @@ if __name__ == "__main__":
         # Pre-download dataset
         dataset = config.get("dataset", "CIFAR10")
         if not hasattr(datasets, dataset):
-            print("Dataset {} not available in PyTorch".format(dataset))
-        getattr(datasets, dataset)(root=data_dir)
+            (
+                print(
+                    "Dataset {} is not available in PyTorch.Please choose a "
+                    "valid dataset.".format(dataset)
+                )
+            )
+        getattr(datasets, dataset)(root=data_dir, download=True)
 
         # When running multiple hyperparameter searches on different experiments,
         # ray.tune will run one experiment at the time. We use "ray.remote" to
         # run each tune experiment in parallel as a "remote" function and wait until
         # all experiments complete
-        results.append(run_experiment.remote(config, CIFARTune))
+        results.append(run_experiment.remote(config, WeightInitTune))
 
     # Wait for all experiments to complete
     ray.get(results)
