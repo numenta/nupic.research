@@ -24,17 +24,19 @@ import argparse
 import json
 import os.path
 
-import torch
+from torchvision import datasets
 
+from nupic.research.frameworks.pytorch.model_utils import *
+from nupic.research.frameworks.pytorch.image_transforms import *
+from cifar_experiment import TinyCIFAR
 from nupic.research.support.parse_config import parse_config
 
-from .cifar_experiment import TinyCIFAR
 
+def trainModels(configs, projectDir):
+    """
+  Run all the training experiments specified in configs
+  """
 
-def train_models(configs, project_dir):
-    """
-    Run all the training experiments specified in configs.
-    """
     # Run all experiments in serial
     if len(configs) == 0:
         print("No experiments to run!")
@@ -47,12 +49,12 @@ def train_models(configs, project_dir):
         # Make sure local directories are relative to the project location
         path = config.get("path", "results")
         if not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+            config["path"] = os.path.join(projectDir, path)
 
         # allow to refer to home directory
         data_dir = os.path.expanduser(config.get("data_dir", "data"))
         if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
+            config["data_dir"] = os.path.join(projectDir, data_dir)
 
         model = TinyCIFAR()
         model.model_setup(config)
@@ -68,7 +70,7 @@ def train_models(configs, project_dir):
 
 
 def parse_options():
-    """parses the command line options for different settings."""
+    """ parses the command line options for different settings. """
     optparser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -109,7 +111,7 @@ if __name__ == "__main__":
     if options.config != "":
         with open(options.config) as f:
             configs = parse_config(f, options.experiments)
-        project_dir = os.path.dirname(options.config)
+        projectDir = os.path.dirname(options.config)
 
     elif options.params != "":
         with open(options.params) as f:
@@ -117,12 +119,12 @@ if __name__ == "__main__":
             params["data_dir"] = os.path.abspath(os.path.join(".", "data"))
             params["path"] = os.path.abspath(os.path.dirname(options.params))
             configs = {params["name"]: params}
-        project_dir = "."
+        projectDir = "."
 
     else:
         raise RuntimeError("Either a .cfg or a params .json file must be specified")
 
     # Use configuration file location as the project location.
-    project_dir = os.path.abspath(project_dir)
+    projectDir = os.path.abspath(projectDir)
 
-    train_models(configs, project_dir=project_dir)
+    trainModels(configs, projectDir=projectDir)

@@ -21,17 +21,19 @@
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import argparse
-import configparser
-import logging
-import os
 
 import ray
-import torch
 from ray import tune
-from ray.tune.schedulers import AsyncHyperBandScheduler
+from ray.tune.schedulers import *
 from torchvision import datasets
 
-from .cifar_experiment import TinyCIFAR  # changed to local
+from nupic.research.frameworks.pytorch.model_utils import *
+from nupic.research.frameworks.pytorch.image_transforms import *
+from cifar_experiment import TinyCIFAR  # changed to local
+
+import configparser
+
+import logging
 
 # Remove annoying messages saying training is taking too long
 logging.getLogger("ray.tune.util").setLevel(logging.ERROR)
@@ -39,12 +41,12 @@ logging.getLogger("ray.tune.util").setLevel(logging.ERROR)
 
 def trial_name_string(trial):
     """
-    Args:
+  Args:
       trial (Trial): A generated trial object.
 
-    Returns:
+  Returns:
       trial_name (str): String representation of Trial.
-    """
+  """
     s = str(trial)
     chars = "{}[]() ,="
     for c in chars:
@@ -56,12 +58,12 @@ def trial_name_string(trial):
 
 
 class CIFARTune(TinyCIFAR, tune.Trainable):
-    """ray.tune trainable class for running small CIFAR models:
-
-    - Override _setup to reset the experiment for each trial.
-    - Override _train to train and evaluate each epoch
-    - Override _save and _restore to serialize the model
     """
+  ray.tune trainable class for running small CIFAR models:
+  - Override _setup to reset the experiment for each trial.
+  - Override _train to train and evaluate each epoch
+  - Override _save and _restore to serialize the model
+  """
 
     def __init__(self, config=None, logger_creator=None):
         TinyCIFAR.__init__(self)
@@ -70,18 +72,18 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
     def _setup(self, config):
         """Custom initialization.
 
-        Args:
-            config (dict): Hyperparameters and other configs given.
-                Copy of `self.config`.
-        """
+    Args:
+        config (dict): Hyperparameters and other configs given.
+            Copy of `self.config`.
+    """
         self.model_setup(config)
 
     def _train(self):
         """Implement train() for a single epoch.
 
-        Returns:
-            A dict that describes training progress.
-        """
+    Returns:
+        A dict that describes training progress."""
+
         ret = self.train_epoch(self._iteration)
         print("epoch", self._iteration, ":", ret)
         return ret
@@ -92,10 +94,11 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
     def _restore(self, checkpoint):
         """Subclasses should override this to implement restore().
 
-        Args:
-            checkpoint (str | dict): Value as returned by `_save`.
-                If a string, then it is the checkpoint path.
-        """
+    Args:
+        checkpoint (str | dict): Value as returned by `_save`.
+            If a string, then it is the checkpoint path.
+    """
+
         self.model_restore(checkpoint)
 
     def _stop(self):
@@ -106,13 +109,14 @@ class CIFARTune(TinyCIFAR, tune.Trainable):
 
 @ray.remote
 def run_experiment(config, trainable):
-    """Run a single tune experiment in parallel as a "remote" function.
-
-    :param config: The experiment configuration
-    :type config: dict
-    :param trainable: tune.Trainable class with your experiment
-    :type trainable: :class:`ray.tune.Trainable`
     """
+  Run a single tune experiment in parallel as a "remote" function.
+
+  :param config: The experiment configuration
+  :type config: dict
+  :param trainable: tune.Trainable class with your experiment
+  :type trainable: :class:`ray.tune.Trainable`
+  """
     # Stop criteria. Default to total number of iterations/epochs
     stop_criteria = {"training_iteration": config.get("iterations")}
     stop_criteria.update(config.get("stop", {}))
@@ -125,17 +129,16 @@ def run_experiment(config, trainable):
         config=config,
         num_samples=config.get("repetitions", 1),
         search_alg=config.get("search_alg", None),
-        scheduler=config.get(
-            "scheduler",
-            AsyncHyperBandScheduler(
-                reward_attr="mean_accuracy",
-                time_attr="training_iteration",
-                brackets=2,
-                grace_period=max(1, int(config.get("iterations", 10) / 10)),
-                reduction_factor=3,
-                max_t=config.get("iterations", 10),
-            ),
-        ),
+        # scheduler=config.get("scheduler",
+        #                      AsyncHyperBandScheduler(
+        #                        reward_attr='mean_accuracy',
+        #                        time_attr="training_iteration",
+        #                        brackets = 2,
+        #                        grace_period=\
+        #                        max(1, int(config.get("iterations", 10)/10)),
+        #                        reduction_factor=3,
+        #                        max_t=config.get("iterations", 10)
+        #                      )),
         trial_name_creator=tune.function(trial_name_string),
         trial_executor=config.get("trial_executor", None),
         checkpoint_at_end=config.get("checkpoint_at_end", False),
@@ -156,13 +159,12 @@ def run_experiment(config, trainable):
 
 
 def parse_config(config_file, experiments=None):
-    """Parse configuration file optionally filtering for specific
-    experiments/sections.
-
-    :param config_file: Configuration file
-    :param experiments: Optional list of experiments
-    :return: Dictionary with the parsed configuration
     """
+  Parse configuration file optionally filtering for specific experiments/sections
+  :param config_file: Configuration file
+  :param experiments: Optional list of experiments
+  :return: Dictionary with the parsed configuration
+  """
     cfgparser = configparser.ConfigParser()
     cfgparser.read_file(config_file)
 
@@ -184,7 +186,7 @@ def parse_config(config_file, experiments=None):
 
 
 def parse_options():
-    """parses the command line options for different settings."""
+    """ parses the command line options for different settings. """
     optparser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -231,8 +233,8 @@ if __name__ == "__main__":
     configs = parse_config(options.config, options.experiments)
 
     # Use configuration file location as the project location.
-    project_dir = os.path.dirname(options.config.name)
-    project_dir = os.path.abspath(project_dir)
+    projectDir = os.path.dirname(options.config.name)
+    projectDir = os.path.abspath(projectDir)
 
     print("Using torch version", torch.__version__)
     print("Torch device count=", torch.cuda.device_count())
@@ -262,21 +264,16 @@ if __name__ == "__main__":
         # Make sure local directories are relative to the project location
         path = os.path.expanduser(config.get("path", "results"))
         if not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+            config["path"] = os.path.join(projectDir, path)
 
         data_dir = os.path.expanduser(config.get("data_dir", "data"))
         if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
+            config["data_dir"] = os.path.join(projectDir, data_dir)
 
         # Pre-download dataset
         dataset = config.get("dataset", "CIFAR10")
         if not hasattr(datasets, dataset):
-            (
-                print(
-                    "Dataset {} is not available in PyTorch.Please choose a "
-                    "valid dataset.".format(dataset)
-                )
-            )
+            print("Dataset {} not available in PyTorch".format(dataset))
         getattr(datasets, dataset)(root=data_dir)
 
         # When running multiple hyperparameter searches on different experiments,
