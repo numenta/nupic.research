@@ -33,9 +33,8 @@ from projects.whydense.cifar.cifar_experiment import TinyCIFAR
 
 def train_models(configs, project_dir):
     """Run all the training experiments specified in configs."""
-    # download dataset
+    # Default data dir if not specified
     data_dir = os.path.join(os.environ["HOME"], "nta", "data")
-    datasets.CIFAR10(data_dir, download=True, train=True)
 
     # Run all experiments in serial
     if len(configs) == 0:
@@ -55,6 +54,7 @@ def train_models(configs, project_dir):
             config["data_dir"] = data_dir
         if not os.path.isabs(config["data_dir"]):
             config["data_dir"] = os.path.abspath(config["data_dir"])
+        datasets.CIFAR10(data_dir, download=True, train=True)
 
         model = TinyCIFAR()
         model.model_setup(config)
