@@ -52,7 +52,7 @@ import time
 from multiprocessing import Pool
 
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa E402
 import numpy as np  # noqa E402
 import torch  # noqa E402
@@ -120,7 +120,7 @@ def get_permuted_tensors(w, kw, n, m2, noise_pct):
 def plot_dot(dot, title="Histogram of dot products",
              path="dot.pdf"):
     bins = np.linspace(dot.min(), dot.max(), 100)
-    plt.hist(dot, bins, alpha=0.5, label='All cols')
+    plt.hist(dot, bins, alpha=0.5, label="All cols")
     plt.title(title)
     plt.xlabel("Dot product")
     plt.ylabel("Number")
@@ -481,25 +481,25 @@ def plot_matches(list_of_n_values, errors,
     ax.set_ylabel("Frequency of matches")
     ax.set_yscale("log")
 
-    ax.plot(list_of_n_values, errors[0, :], 'k:',
-            label="a=64 (predicted)", marker="o", color='black')
-    ax.plot(list_of_n_values, errors[1, :], 'k:',
-            label="a=128 (predicted)", marker="o", color='black')
-    ax.plot(list_of_n_values, errors[2, :], 'k:',
-            label="a=256 (predicted)", marker="o", color='black')
-    ax.plot(list_of_n_values, errors[3, :], 'k:',
-            label="a=n/2 (predicted)", marker="o", color='black')
+    ax.plot(list_of_n_values, errors[0, :], "k:",
+            label="a=64 (predicted)", marker="o", color="black")
+    ax.plot(list_of_n_values, errors[1, :], "k:",
+            label="a=128 (predicted)", marker="o", color="black")
+    ax.plot(list_of_n_values, errors[2, :], "k:",
+            label="a=256 (predicted)", marker="o", color="black")
+    ax.plot(list_of_n_values, errors[3, :], "k:",
+            label="a=n/2 (predicted)", marker="o", color="black")
 
     ax.annotate(r"$a = 64$", xy=(list_of_n_values[3] + 100, errors[0, 3]),
                 xytext=(-5, 2), textcoords="offset points", ha="left",
-                color='black')
+                color="black")
     ax.annotate(r"$a = 128$", xy=(list_of_n_values[3] + 100, errors[1, 3]),
-                ha="left", color='black')
+                ha="left", color="black")
     ax.annotate(r"$a = 256$", xy=(list_of_n_values[3] + 100, errors[2, 3]),
-                ha="left", color='black')
+                ha="left", color="black")
     ax.annotate(r"$a = \frac{n}{2}$",
                 xy=(list_of_n_values[3] + 100, errors[3, 3] / 2.0),
-                ha="left", color='black')
+                ha="left", color="black")
 
     ax.minorticks_off()
     ax.grid(True, alpha=0.3)
@@ -520,23 +520,23 @@ def plot_scaled_matches(list_of_scales, errors,
     ax.set_ylabel("Frequency of matches")
     ax.set_yscale("log")
 
-    ax.plot(list_of_scales, errors[0, :], 'k:',
-            label="a=64", marker="o", color='black')
-    ax.plot(list_of_scales, errors[1, :], 'k:',
-            label="a=128", marker="o", color='black')
-    ax.plot(list_of_scales, errors[2, :], 'k:',
-            label="a=256", marker="o", color='black')
+    ax.plot(list_of_scales, errors[0, :], "k:",
+            label="a=64", marker="o", color="black")
+    ax.plot(list_of_scales, errors[1, :], "k:",
+            label="a=128", marker="o", color="black")
+    ax.plot(list_of_scales, errors[2, :], "k:",
+            label="a=256", marker="o", color="black")
 
     ax.annotate(r"$a=64$",
                 xy=(list_of_scales[1] + 0.2, errors[0, 1]),
                 xytext=(-5, 2), textcoords="offset points", ha="left",
-                color='black')
+                color="black")
     ax.annotate(r"$a=128$",
                 xy=(list_of_scales[1] - 0.1, (2 * errors[1, 1] + errors[1, 2]) / 3.0),
-                ha="left", color='black')
+                ha="left", color="black")
     ax.annotate(r"$a=256$",
                 xy=(list_of_scales[1] - 0.1, (errors[2, 1] + errors[2, 2]) / 2.0),
-                ha="left", color='black')
+                ha="left", color="black")
 
     ax.minorticks_off()
     ax.grid(True, alpha=0.3)
@@ -551,8 +551,8 @@ def plot_theta_distribution(kw, file_name="images/theta_distribution.pdf"):
 
     # Plot histogram of overlaps
     bins = np.linspace(float(the_dots.min()), float(the_dots.max()), 50)
-    plt.hist(the_dots, bins, alpha=0.5, label='Dot products')
-    plt.legend(loc='upper right')
+    plt.hist(the_dots, bins, alpha=0.5, label="Dot products")
+    plt.legend(loc="upper right")
     plt.xlabel("Dot product")
     plt.ylabel("Frequency")
     plt.title("Distribution of dot products, kw=" + str(kw))
@@ -568,7 +568,7 @@ def plot_false_matches(list_of_noise, errors, kw,
     ax.set_xlabel("Pct of components set to zero")
     ax.set_ylabel("Frequency of false negatives")
 
-    ax.plot(list_of_noise, errors, 'k:', marker="o", color='black')
+    ax.plot(list_of_noise, errors, "k:", marker="o", color="black")
 
     plt.minorticks_off()
     plt.grid(True, alpha=0.3)
@@ -628,7 +628,7 @@ def create_pregenerated_graphs():
                   "images/scalar_matches_kw" + str(kw) + ".pdf")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # The main graphs (takes about 12-15 mins each)
     #
     # compute_match_probabilities(kw=32, num_trials=3000)
