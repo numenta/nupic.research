@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 def to_tf_values(result, path, histo_bins=1000):
-    # Adapted from: https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514#file-tensorboard_logging-py-L41
+    # Adapted from: https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514#file-tensorboard_logging-py-L41  # noqa
     values = []
     for attr, value in result.items():
         if value is not None:
