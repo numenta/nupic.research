@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2018, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -32,7 +32,19 @@ logger = logging.getLogger(__name__)
 
 
 def to_tf_values(result, path, histo_bins=1000):
-    # Adapted from: https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514#file-tensorboard_logging-py-L41  # noqa
+    """
+    Adapted from [1], generate a list of tf.Summary.Value() objects that Tensorboard
+    will display under scalars, images, histograms, & distributions tabs.
+
+    We manually generate the summary objects from raw data passed from tune via the logger.
+
+    Currently supports:
+        * Scalar (any prefix, already supported by TFLogger)
+        * Image ("img_" prefix)
+        * Histograms ("hist_" prefix)
+    
+    [1] https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514#file-tensorboard_logging-py-L41  # noqa
+    """
     values = []
     for attr, value in result.items():
         if value is not None:
