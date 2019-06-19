@@ -29,7 +29,7 @@ def show_predictions(config):
     exp.model_restore(config.get('checkpoint'))
 
     corpus = lang_util.Corpus(config.get("data_dir") + "/PTB")
-    data = corpus.valid
+    data = corpus.valid.to(exp.device)
 
     exp.model.eval()
     with torch.no_grad():
@@ -81,12 +81,14 @@ def parse_options():
         dest="experiments",
         help="run only selected experiments, by default run all experiments in "
         "config file.",
+        required=True
     )
     optparser.add_argument(
         "-C",
         "--checkpoint",
         dest="checkpoint",
-        help="resume from checkpoint if found"
+        help="resume from checkpoint if found",
+        required=True
     )
     return optparser.parse_args()
 

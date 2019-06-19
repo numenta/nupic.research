@@ -68,6 +68,36 @@ def pred_sequence_collate(batch):
     return [torch.stack(inputs, 0), torch.stack(targets, 0), torch.LongTensor(target_labels)]
 
 
+class LangSequenceSampler(Sampler):
+    """
+    """
+
+    def __init__(self, data_source, batch_size=64):
+        super(LangSequenceSampler, self).__init__(data_source)
+        self.data_source = data_source
+        self.batch_size = batch_size
+        self.cursor = 0
+
+    def __iter__(self):
+        # Cleaner?
+        while True:
+            st = self.cursor * self.batch_size
+            # Batch is batch_size + 1 to allow next word prediction
+            # Collate function will reduce to batch_size
+            en = st + self.batch_size + 1
+            if en > len(self.data_source) - 1:
+                st = 0
+                en = self.batch_size + 1
+                self.cursor = 0
+            batch = self.data_source[st:en]
+            self.cursor += 1
+            yield batch
+        return
+
+    def __len__(self):
+        return len(self.data_source)
+
+
 def language_pred_sequence_collate(batch):
     # Predictive auto-encoder, targets are next image in sequence
     inputs = batch[:-1]
