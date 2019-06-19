@@ -46,16 +46,17 @@ corrupted version of Xw will still match Xw.
 S controls the scale of Xi relative to Xw. By varying S, we can plot the
 effect of scaling on the match probabilities.
 
+isort:skip_file
 """
 import time
 from multiprocessing import Pool
 
 import matplotlib
-matplotlib.use('Agg') # noqa E402 I001
-from matplotlib.figure import figaspect # noqa E402 I001
-import matplotlib.pyplot as plt # noqa E402 I001
-import numpy as np
-import torch
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt  # noqa E402
+import numpy as np  # noqa E402
+import torch  # noqa E402
+from matplotlib.figure import figaspect  # noqa E402
 
 
 def get_sparse_tensor(num_nonzeros, input_size, output_size,
@@ -630,11 +631,11 @@ def create_pregenerated_graphs():
 if __name__ == '__main__':
     # The main graphs (takes about 12-15 mins each)
     #
-    compute_match_probabilities(kw=32, num_trials=3000)
-    compute_scaled_probabilities(num_trials=3000)
+    # compute_match_probabilities(kw=32, num_trials=3000)
+    # compute_scaled_probabilities(num_trials=3000)
 
     # These are graphs using pregenerated numbers for the above
-    # create_pregenerated_graphs()
+    create_pregenerated_graphs()
 
     # theta, _ = get_theta(32)
     # compute_match_probability_omega(32.0, 32, theta)
