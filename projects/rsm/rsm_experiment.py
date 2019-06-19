@@ -13,7 +13,12 @@ import torchvision.utils as vutils
 
 import lang_util
 from rsm import RSMLayer
-from rsm_samplers import MNISTSequenceSampler, pred_sequence_collate, language_pred_sequence_collate
+from rsm_samplers import (
+    MNISTSequenceSampler, 
+    pred_sequence_collate, 
+    LangSequenceSampler,
+    language_pred_sequence_collate
+)
 
 
 class RSMExperiment(object):
@@ -32,6 +37,7 @@ class RSMExperiment(object):
         self.save_onnx_graph_at_checkpoint = config.get("save_onnx_graph_at_checkpoint", False)
         self.exp_name = config.get("name", "exp")
         self.batch_log_interval = config.get("batch_log_interval", 0)
+        self.eval_interval = config.get("eval_interval", 5)
         self.debug = config.get("debug", False)
         self.writer = None
 
@@ -107,11 +113,13 @@ class RSMExperiment(object):
             penn_treebank_dataset(self.data_dir + '/PTB', train=True)
             # Encode
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
+            train_sampler = LangSequenceSampler(corpus.train, batch_size=self.batch_size)
             self.train_loader = DataLoader(corpus.train,
-                                           batch_size=pred_batch_size,
+                                           batch_sampler=train_sampler,
                                            collate_fn=language_pred_sequence_collate)
-            self.test_loader = DataLoader(corpus.valid,
-                                          batch_size=pred_batch_size,
+            test_sampler = LangSequenceSampler(corpus.test, batch_size=self.batch_size)
+            self.test_loader = DataLoader(corpus.test,
+                                          batch_sampler=test_sampler,
                                           collate_fn=language_pred_sequence_collate)
 
     def _get_loss_function(self):
@@ -184,30 +192,54 @@ class RSMExperiment(object):
                 for param_group in optimizer.param_groups:
                     param_group["lr"] = self.learning_rate
 
+    def _maybe_resize_target_batch(self, targets):
+        if targets.dim() > 1:
+            targets = targets.reshape(self.batch_size, self.d_in)
+
+        if self.model.embedding:
+            # Target is embedded input x
+            targets = self.model.embedding(targets).detach()
+
+        return targets
+
     def _eval(self):
         ret = {}
         if self.test_loader:
             with torch.no_grad():
                 total_loss = 0.0
+                total_samples = 0.0
+                correct_samples = 0.0
+                total_pred_loss = 0.0
                 for batch_idx, (inputs, targets, target_labels) in enumerate(self.test_loader):
+
+                    # Forward
                     inputs = inputs.to(self.device)
                     targets = targets.to(self.device)
+                    target_labels = target_labels.to(self.device)
                     x_a_next, x_bs, predictor_outs, phi, psi = self.model(inputs)
 
-                    if targets.dim() > 1:
-                        targets = targets.reshape(self.batch_size, self.d_in)
-
-                    if self.model.embedding:
-                        # Target is embedded input x
-                        targets = self.model.embedding(targets).detach()
-
+                    # Loss
+                    targets = self._maybe_resize_target_batch(targets)
                     batch_loss = self.loss(x_a_next, targets)
                     total_loss += batch_loss.item()
+
+                    if self.model.predictor:
+                        pred_batch_loss = self.predictor_loss(predictor_outs, target_labels)
+                        _, class_predictions = torch.max(predictor_outs, 1)
+                        total_samples += target_labels.size(0)
+                        correct_samples += (class_predictions == target_labels).sum().item()
+                        total_pred_loss += pred_batch_loss.item()
+
                     if batch_idx >= self.batches_in_epoch:
                         break
+
                 ret['test_loss'] = total_loss / (batch_idx + 1)
+
+                test_pred_loss = total_pred_loss / (batch_idx + 1)
+                ret['test_pred_acc'] = 100 * correct_samples / total_samples
                 if self.dataset_kind == 'ptb':
-                    ret['test_ppl'] = math.exp(ret['test_loss'])
+                    ret['test_ppl'] = math.exp(test_pred_loss)
+
         return ret
 
     def train_epoch(self, epoch):
@@ -221,11 +253,9 @@ class RSMExperiment(object):
         t1 = time.time()
 
         ret = {}
-        total_loss = 0.0
 
-        # Prediction performance
-        total_samples = 0.0
-        correct_samples = 0.0
+        # Performance metrics
+        total_loss = total_samples = correct_samples = total_pred_loss = 0.0
 
         for batch_idx, (inputs, targets, target_labels) in enumerate(self.train_loader):
 
@@ -237,19 +267,10 @@ class RSMExperiment(object):
             target_labels = target_labels.to(self.device)
             x_a_next, x_bs, predictor_outs, phi, psi = self.model(inputs)
 
-            if targets.dim() > 1:
-                targets = targets.reshape(self.batch_size, self.d_in)
-
-            if self.model.embedding:
-                # Target is embedded input x
-                targets = self.model.embedding(targets).detach()
-
+            # Loss
+            targets = self._maybe_resize_target_batch(targets)
             batch_loss = self.loss(x_a_next, targets)
             total_loss += batch_loss.item()
-
-            # Backward pass + optimize
-            batch_loss.backward()
-            # self.loss.detach()  # Possibly needed to reduce memory reqs
 
             # Backward for predictor
             if self.model.predictor:
@@ -257,9 +278,10 @@ class RSMExperiment(object):
                 _, class_predictions = torch.max(predictor_outs, 1)
                 total_samples += target_labels.size(0)
                 correct_samples += (class_predictions == target_labels).sum().item()
-                ret['pred_acc'] = 100 * correct_samples / total_samples
-                ret['pred_loss'] = pred_batch_loss.item()
-                pred_batch_loss.backward()
+                total_pred_loss += pred_batch_loss.item()
+                batch_loss += pred_batch_loss
+
+            batch_loss.backward()  # Both losses combined in single backward pass
 
             self.optimizer.step()
 
@@ -277,10 +299,13 @@ class RSMExperiment(object):
                 break
 
             if self.batch_log_interval and batch_idx % self.batch_log_interval == 0:
-                print("Finished batch %d, batch loss: %.5f" % (batch_idx, batch_loss.item()))
+                print("Finished batch %d" % batch_idx)
+                if self.model.predictor:
+                    acc = 100 * correct_samples / total_samples
+                    print("Partial train predictor accuracy: %.3f%%" % acc)
 
-        if epoch % 5 == 0:
-            # Evaluate each 5 epochs
+        if self.eval_interval and epoch % self.eval_interval == 0:
+            # Evaluate each x epochs
             ret.update(self._eval())
 
         train_time = time.time() - t1
@@ -289,6 +314,11 @@ class RSMExperiment(object):
         ret["stop"] = 0
 
         ret['train_loss'] = total_loss / (batch_idx + 1)
+        train_pred_loss = total_pred_loss / (batch_idx + 1)
+        ret['train_pred_acc'] = 100 * correct_samples / total_samples
+        if self.dataset_kind == 'ptb':
+            ret['train_ppl'] = math.exp(train_pred_loss)
+
         ret["epoch_time_train"] = train_time
         ret["epoch_time"] = time.time() - t1
         ret["learning_rate"] = self.learning_rate
