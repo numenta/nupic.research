@@ -6,12 +6,11 @@ import pickle
 import torch
 
 import lang_util
-from rsm import RSMLayer
 from rsm_experiment import RSMExperiment
 from nupic.research.support.parse_config import parse_config
 
 
-# Fix for UnicodeDecodeError in torch.load
+# Fix for UnicodeDecodeError in torch.load (maybe?)
 pickle.load = partial(pickle.load, encoding="latin1")
 pickle.Unpickler = partial(pickle.Unpickler, encoding="latin1")
 
@@ -29,9 +28,10 @@ def show_predictions(config):
     exp.model_restore(config.get('checkpoint'))
 
     corpus = lang_util.Corpus(config.get("data_dir") + "/PTB")
-    data = corpus.valid.to(exp.device)
+    data = corpus.test.to(exp.device)
 
     exp.model.eval()
+    exp.predictor.eval()
     with torch.no_grad():
 
         for i in range(n_batches):
@@ -40,7 +40,8 @@ def show_predictions(config):
             input_ = id_batch.reshape((batch_size, 1))
             print("IN", corpus.read_out(input_))
             phi = psi = x_b = None
-            x_a_preds, x_b, predictor_outs, phi, psi = exp.model(input_, x_b, phi, psi)
+            x_a_preds, x_b, phi, psi = exp.model(input_, x_b, phi, psi)
+            predictor_outs = exp.predictor(x_b)
             max_probs = predictor_outs.argmax(dim=1)
             print("PRED", corpus.read_out(max_probs))
 

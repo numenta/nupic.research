@@ -4,8 +4,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from rsm_predictor import RSMPredictor
-
 
 def topk_mask(a, b, dim=0, softmax=False):
     """
@@ -63,11 +61,10 @@ class ActiveDendriteLayer(torch.nn.Module):
 
 
 class RSMLayer(torch.nn.Module):
-    def __init__(self, d_in=28 * 28, d_out=28 * 28, m=200, n=6, k=25, 
+    def __init__(self, d_in=28 * 28, d_out=28 * 28, m=200, n=6, k=25,
                  k_winner_cells=1, gamma=0.5, eps=0.5, activation_fn='tanh',
                  cell_winner_softmax=False, active_dendrites=None,
-                 col_output_cells=None, predictor_hidden_size=None,
-                 predictor_output_size=None,
+                 col_output_cells=None,
                  embed_dim=0, vocab_size=0, debug=False, **kwargs):
         """
         RSM Layer as specified by Rawlinson et al 2019
@@ -89,10 +86,6 @@ class RSMLayer(torch.nn.Module):
         self.eps = eps
         self.d_in = d_in
         self.d_out = d_out
-
-        # Predictor
-        self.predictor_hidden_size = predictor_hidden_size
-        self.predictor_output_size = predictor_output_size
 
         # Tweaks
         self.activation_fn = activation_fn
@@ -118,13 +111,6 @@ class RSMLayer(torch.nn.Module):
             self.linear_b = nn.Linear(self.total_cells, self.total_cells)  # Recurrent weights (per cell)
         self.linear_d = nn.Linear(m, d_out)  # Decoding through bottleneck
 
-        # Predictor network
-        self.predictor = None
-        if predictor_hidden_size:
-            self.predictor = RSMPredictor(d_in=self.m * self.n,
-                                          d_out=self.predictor_output_size,
-                                          hidden_size=self.predictor_hidden_size)
-
     def _debug_log(self, tensor_dict):
         if self.debug:
             for name, t in tensor_dict.items():
@@ -135,6 +121,13 @@ class RSMLayer(torch.nn.Module):
                     size = t.size()
                     _type = t.dtype
                 print([name, t, size, _type])
+
+    def _track_weights(self):
+        ret = {}
+        ret['hist_w_a'] = self.linear_a.weight.cpu()
+        ret['hist_w_b'] = self.linear_b.weight.cpu()
+        ret['hist_w_d'] = self.linear_d.weight.cpu()
+        return ret
 
     def _group_max(self, activity):
         """
@@ -148,9 +141,10 @@ class RSMLayer(torch.nn.Module):
         """
         Compute sigma (weighted sum for each cell j in group i (mxn))
         """
-        sigma = self.linear_a(x).view(self.m, 1).repeat(1, self.n)  # z_a (repeated for each cell, mxn)
-        self._debug_log({'z_a': sigma})
-        sigma += self.linear_b(x_b).view(self.m, self.n)  # z_b (sigma now dim mxn)
+        z_a = self.linear_a(x).view(self.m, 1).repeat(1, self.n)  # z_a (repeated for each cell, mxn)
+        self._debug_log({'z_a': z_a})
+        z_b = self.linear_b(x_b).view(self.m, self.n)  # z_b (sigma now dim mxn)
+        sigma = z_a + z_b
         self._debug_log({'z_a + z_b = sigma': sigma})
         return sigma
 
@@ -196,32 +190,35 @@ class RSMLayer(torch.nn.Module):
 
     def _update_memory_and_inhibition(self, y, phi, psi):
         # Get updated psi (memory state), decay inactive inactive
-        psi *= self.eps
-        psi = torch.max(psi, y)
+        # psi *= self.eps
+        psi = torch.max(psi * self.eps, y)
 
         # Update phi for next step (decay inactive cells)
-        phi *= self.gamma
-        phi = torch.max(phi, y)
+        # phi *= self.gamma
+        phi = torch.max(phi * self.gamma, y)
 
         return (phi, psi)
 
-    def forward(self, batch_x, x_b=None, phi=None, psi=None):
+    def init_hidden(self, batch_size):
+        # TODO: Update with batch_size
+        weight = next(self.parameters())
+        x_b = weight.new_zeros(self.total_cells, dtype=torch.float32, requires_grad=False)
+        phi = weight.new_zeros((self.m, self.n), dtype=torch.float32, requires_grad=False)
+        psi = weight.new_zeros((self.m, self.n), dtype=torch.float32, requires_grad=False)
+        return (x_b, phi, psi)
+
+    def forward(self, batch_x, hidden):
         """
         :param x: Input batch (batch_size, d_in, or Tensor of word ids if using embedding)
-        """
-        if not x_b:
-            x_b = batch_x.new_zeros(self.total_cells, dtype=torch.float32, requires_grad=False)
-        if not phi:
-            phi = batch_x.new_zeros((self.m, self.n), dtype=torch.float32, requires_grad=False)
-        if not psi:
-            psi = batch_x.new_zeros((self.m, self.n), dtype=torch.float32, requires_grad=False)
 
+        TODO: Update to take batch_x of dim (seq_len, batch, input_size), parallel to LSTM
+        """
         # Can we vectorize across multiple batches?
         batch_size = batch_x.size(0)
         x_a_nexts = []
-        x_bs = []  # Return x_b for each item in batch for predictor network
-        predictor_outs = []
         batch_x.new_zeros((batch_size, self.d_in))  # Conserve device
+        x_b, phi, psi = hidden
+        x_bs = []
 
         for i, x in enumerate(batch_x):
             self._debug_log({'i': i, 'x': x})
@@ -246,12 +243,6 @@ class RSMLayer(torch.nn.Module):
             x_b = (psi / alpha).flatten()  # Normalizing scalar (force sum(x_b) == 1)
             self._debug_log({'x_b': x_b})
 
-            if self.predictor:
-                # Generate predictor output
-                x_b = x_b.detach()  # Prevent backprop from predictor into RSM
-                predictor_output = self.predictor(x_b)
-                predictor_outs.append(predictor_output)
-
             # Detach recurrent hidden layer to avoid 
             # "Trying to backward through the graph a second time" recursion error
             y = y.detach()
@@ -262,7 +253,8 @@ class RSMLayer(torch.nn.Module):
             x_a_nexts.append(x_a_next)
             x_bs.append(x_b)
 
-        return (torch.stack(x_a_nexts), torch.stack(x_bs), torch.stack(predictor_outs), phi, psi)
+        hidden = (x_b, phi, psi)
+        return (torch.stack(x_a_nexts), hidden, torch.stack(x_bs))
 
 
 if __name__ == "__main__":
