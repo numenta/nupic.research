@@ -64,42 +64,61 @@ def pred_sequence_collate(batch):
     # Predictive auto-encoder, targets are next image in sequence
     inputs = [item[0] for item in batch[:-1]]
     targets = [item[0] for item in batch[1:]]
-    target_labels = [item[1] for item in batch[1:]]
-    return [torch.stack(inputs, 0), torch.stack(targets, 0), torch.LongTensor(target_labels)]
+    pred_targets = [item[1] for item in batch[1:]]
+    return [torch.stack(inputs, 0), torch.stack(targets, 0), torch.LongTensor(pred_targets)]
 
 
 class LangSequenceSampler(Sampler):
     """
     """
 
-    def __init__(self, data_source, batch_size=64):
+    def __init__(self, data_source, batch_size=64, seq_length=35, parallel_seq=False):
         super(LangSequenceSampler, self).__init__(data_source)
         self.data_source = data_source
         self.batch_size = batch_size
-        self.cursor = 0
+        self.seq_length = seq_length
+        self.parallel_seq = parallel_seq
+        if self.parallel_seq:
+            # Convert to 3-dim tensor for nn.LSTM
+            self.data_source = self.batchify(self.data_source)
+
+    def batchify(self, data):
+        """
+        Ref: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
+        """
+        # Work out how cleanly we can divide the dataset into bsz parts.
+        nbatch = data.size(0) // self.batch_size
+        # Trim off any extra elements that wouldn't cleanly fit (remainders).
+        data = data.narrow(0, 0, nbatch * self.batch_size)
+        # Evenly divide the data across the self.batch_size batches.
+        data = data.view(self.batch_size, -1).t().contiguous()
+        return data
+
+    def get_parallel_batch(self, i):
+        seq_len = min(self.seq_length, len(self.data_source) - 1 - i)
+        data = self.data_source[i:i + seq_len]
+        target = self.data_source[i + 1: i + 1 + seq_len].view(-1)
+        return data, target
 
     def __iter__(self):
-        # Cleaner?
-        while True:
-            st = self.cursor * self.batch_size
-            # Batch is batch_size + 1 to allow next word prediction
-            # Collate function will reduce to batch_size
-            en = st + self.batch_size + 1
-            if en > len(self.data_source) - 1:
-                st = 0
-                en = self.batch_size + 1
-                self.cursor = 0
-            batch = self.data_source[st:en]
-            self.cursor += 1
-            yield batch
+        if self.parallel_seq:
+            for i in range(0, self.data_source.size(0), self.seq_length):
+                yield self.get_parallel_batch(i)
+        else:
+            n_batches = len(self)
+            for i in range(n_batches):
+                st = i * self.batch_size
+                # Batch is batch_size + 1 to allow next word prediction
+                en = st + self.batch_size + 1
+                batch = self.data_source[st:en]
+                yield batch
         return
 
     def __len__(self):
-        return len(self.data_source)
+        return len(self.data_source) // self.batch_size
 
 
 def language_pred_sequence_collate(batch):
-    # Predictive auto-encoder, targets are next image in sequence
-    inputs = batch[:-1]
-    targets = batch[1:]
-    return [torch.stack(inputs, 0), torch.stack(targets, 0), torch.stack(targets, 0)]
+    data, target = batch
+    return (data, target, target)
+

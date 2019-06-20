@@ -7,18 +7,23 @@ from functools import reduce
 
 import torch
 from torchnlp.datasets import penn_treebank_dataset
+from torchnlp.samplers import BPTTBatchSampler
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import torchvision.utils as vutils
 
 import lang_util
+from ptb_lstm import LSTMModel
 from rsm import RSMLayer
+from rsm_predictor import RSMPredictor
 from rsm_samplers import (
     MNISTSequenceSampler, 
     pred_sequence_collate, 
     LangSequenceSampler,
     language_pred_sequence_collate
 )
+
+torch.autograd.set_detect_anomaly(True)
 
 
 class RSMExperiment(object):
@@ -31,13 +36,14 @@ class RSMExperiment(object):
     def __init__(self, config=None):
         self.data_dir = config.get("data_dir", "data")
         self.path = config.get("path", "results")
-        self.model_filename = config.get("model_filename", "model.pt")
-        self.pred_model_filename = config.get("pred_model_filename", "pred_model.pt")
+        self.model_filename = config.get("model_filename", "model.pth")
+        self.pred_model_filename = config.get("pred_model_filename", "pred_model.pth")
         self.graph_filename = config.get("graph_filename", "rsm.onnx")
         self.save_onnx_graph_at_checkpoint = config.get("save_onnx_graph_at_checkpoint", False)
         self.exp_name = config.get("name", "exp")
         self.batch_log_interval = config.get("batch_log_interval", 0)
         self.eval_interval = config.get("eval_interval", 5)
+        self.model_kind = config.get("model_kind", "rsm")
         self.debug = config.get("debug", False)
         self.writer = None
 
@@ -47,6 +53,8 @@ class RSMExperiment(object):
         # Training / testing parameters
         self.batch_size = config.get("batch_size", 128)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
+        self.eval_batches_in_epoch = config.get("eval_batches_in_epoch", self.batches_in_epoch)
+        self.seq_length = config.get("seq_length", 35)
 
         # Data parameters
         self.input_size = config.get("input_size", (1, 28, 28))
@@ -82,11 +90,15 @@ class RSMExperiment(object):
         self.lr_step_schedule = config.get("lr_step_schedule", None)
         self.learning_rate_gamma = config.get("learning_rate_gamma", 0.1)
 
+        # Training state
+        self.best_val_loss = None
+        self.do_anneal_learning = False
+
     def _build_dataloader(self):
         # Extra element for sequential prediction labels
         pred_batch_size = self.batch_size + 1
 
-        self.test_loader = None
+        self.val_loader = None
         if self.dataset_kind == 'mnist':
             self.dataset = datasets.MNIST(self.data_dir, download=True,
                                           train=True, transform=transforms.Compose([
@@ -104,34 +116,50 @@ class RSMExperiment(object):
                                            batch_size=pred_batch_size,
                                            sampler=self.sampler,
                                            collate_fn=pred_sequence_collate)
-            self.test_loader = DataLoader(self.test_dataset,
-                                          batch_size=pred_batch_size,
-                                          sampler=self.sampler,
-                                          collate_fn=pred_sequence_collate)
+            self.val_loader = DataLoader(self.test_dataset,
+                                         batch_size=pred_batch_size,
+                                         sampler=self.sampler,
+                                         collate_fn=pred_sequence_collate)
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
             penn_treebank_dataset(self.data_dir + '/PTB', train=True)
             # Encode
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
-            train_sampler = LangSequenceSampler(corpus.train, batch_size=self.batch_size)
+            train_sampler = LangSequenceSampler(corpus.train, batch_size=self.batch_size, 
+                                                seq_length=self.seq_length,
+                                                parallel_seq=self.model_kind == 'lstm')
             self.train_loader = DataLoader(corpus.train,
                                            batch_sampler=train_sampler,
                                            collate_fn=language_pred_sequence_collate)
-            test_sampler = LangSequenceSampler(corpus.test, batch_size=self.batch_size)
-            self.test_loader = DataLoader(corpus.test,
-                                          batch_sampler=test_sampler,
-                                          collate_fn=language_pred_sequence_collate)
+            val_sampler = LangSequenceSampler(corpus.test, batch_size=self.batch_size,
+                                              seq_length=self.seq_length,
+                                              parallel_seq=self.model_kind == 'lstm')
+            self.val_loader = DataLoader(corpus.test,
+                                         batch_sampler=val_sampler,
+                                         collate_fn=language_pred_sequence_collate)
 
     def _get_loss_function(self):
-        # self.loss = None
-        # if self.loss_function == "Perplexity":
-        #     self.loss = lang_util.Perplexity()
-        # else:
         self.loss = getattr(torch.nn, self.loss_function)(reduction='mean')
         self.predictor_loss = None
-        if self.model.predictor:
-            # Currently using same loss function for both predictor and RSM
+        if self.predictor:
             self.predictor_loss = torch.nn.CrossEntropyLoss()
+
+    def _get_optimizer(self):
+        self.pred_optimizer = None
+        if self.optimizer_type == 'adam':
+            self.optimizer = torch.optim.Adam(self.model.parameters(),
+                                              lr=self.learning_rate)
+            if self.predictor:
+                self.pred_optimizer = torch.optim.Adam(self.predictor.parameters(),
+                                                       lr=self.learning_rate)
+        else:
+            self.optimizer = torch.optim.SGD(self.model.parameters(),
+                                             lr=self.learning_rate,
+                                             momentum=self.momentum)
+            if self.predictor:
+                self.pred_optimizer = torch.optim.SGD(self.predictor.parameters(),
+                                                      lr=self.learning_rate,
+                                                      momentum=self.momentum)
 
     def model_setup(self, config):
         seed = config.get("seed", random.randint(0, 10000))
@@ -148,35 +176,43 @@ class RSMExperiment(object):
 
         # Build model and optimizer
         self.d_in = reduce(lambda x, y: x * y, self.input_size)
-        self.model = RSMLayer(d_in=self.d_in,
-                              d_out=self.d_in,
-                              m=self.m_groups,
-                              n=self.n_cells_per_group,
-                              k=self.k_winners,
-                              k_winner_cells=self.k_winner_cells,
-                              cell_winner_softmax=self.cell_winner_softmax,
-                              gamma=self.gamma,
-                              eps=self.eps,
-                              activation_fn=self.activation_fn,
-                              active_dendrites=self.active_dendrites,
-                              col_output_cells=self.col_output_cells,
-                              embed_dim=self.embed_dim,
-                              vocab_size=self.vocab_size,
-                              predictor_hidden_size=self.predictor_hidden_size,
-                              predictor_output_size=self.predictor_output_size,
-                              debug=self.debug)
+        self.d_out = config.get("output_size", self.d_in)
+
+        self.predictor = None
+        if self.model_kind == "rsm":
+            self.model = RSMLayer(d_in=self.d_in,
+                                  d_out=self.d_out,
+                                  m=self.m_groups,
+                                  n=self.n_cells_per_group,
+                                  k=self.k_winners,
+                                  k_winner_cells=self.k_winner_cells,
+                                  cell_winner_softmax=self.cell_winner_softmax,
+                                  gamma=self.gamma,
+                                  eps=self.eps,
+                                  activation_fn=self.activation_fn,
+                                  active_dendrites=self.active_dendrites,
+                                  col_output_cells=self.col_output_cells,
+                                  embed_dim=self.embed_dim,
+                                  vocab_size=self.vocab_size,
+                                  debug=self.debug)
+
+            if self.predictor_hidden_size:
+                self.predictor = RSMPredictor(d_in=self.m_groups * self.n_cells_per_group,
+                                              d_out=self.predictor_output_size,
+                                              hidden_size=self.predictor_hidden_size)
+                self.predictor.to(self.device)
+
+        elif self.model_kind == "lstm":
+            self.model = LSTMModel(vocab_size=self.vocab_size,
+                                   emb_size=self.embed_dim,
+                                   nhid=200,
+                                   dropout=0.5,
+                                   nlayers=2)
 
         self.model.to(self.device)
 
         self._get_loss_function()
-
-        if self.optimizer_type == 'adam':
-            self.optimizer = torch.optim.Adam(self.model.parameters(), 
-                                              lr=self.learning_rate)
-        else:
-            self.optimizer = torch.optim.SGD(self.model.parameters(), 
-                                             lr=self.learning_rate,
-                                             momentum=self.momentum)
+        self._get_optimizer()
 
     def _image_grid(self, image_batch):
         batch = image_batch.reshape(self.batch_size, 1, 28, 28)
@@ -184,61 +220,81 @@ class RSMExperiment(object):
         grid = vutils.make_grid(batch, normalize=True, padding=5).mean(dim=0)  
         return grid
 
+    def _repackage_hidden(self, h):
+        """Wraps hidden states in new Tensors, to detach them from their history."""
+        if isinstance(h, torch.Tensor):
+            return h.detach()
+        else:
+            return tuple(self._repackage_hidden(v) for v in h)
+
     def _adjust_learning_rate(self, optimizer, epoch):
-        if self.lr_step_schedule is not None:
-            if epoch in self.lr_step_schedule:
-                self.learning_rate *= self.learning_rate_gamma
-                print("Reducing learning rate to:", self.learning_rate)
-                for param_group in optimizer.param_groups:
-                    param_group["lr"] = self.learning_rate
+        if self.do_anneal_learning:
+            self.learning_rate *= self.learning_rate_gamma
+            self.do_anneal_learning = False
+            print("Reducing learning rate by gamma %.2f to: %.5f" % (self.learning_rate_gamma, self.learning_rate))
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = self.learning_rate
 
-    def _maybe_resize_target_batch(self, targets):
-        if targets.dim() > 1:
-            targets = targets.reshape(self.batch_size, self.d_in)
-
-        if self.model.embedding:
-            # Target is embedded input x
-            targets = self.model.embedding(targets).detach()
-
-        return targets
+    def _maybe_resize_outputs_targets(self, x_a_next, targets):
+        if self.model_kind == "lstm":
+            x_a_next = x_a_next.view(-1, self.vocab_size)
+        else:
+            if targets.dim() > 1:
+                targets = targets.reshape(self.batch_size, self.d_in)
+        return x_a_next, targets
 
     def _eval(self):
         ret = {}
-        if self.test_loader:
-            with torch.no_grad():
-                total_loss = 0.0
-                total_samples = 0.0
-                correct_samples = 0.0
-                total_pred_loss = 0.0
-                for batch_idx, (inputs, targets, target_labels) in enumerate(self.test_loader):
+        print("Evaluating...")
+        self.model.eval()
+        if self.predictor:
+            self.predictor.eval()
 
-                    # Forward
-                    inputs = inputs.to(self.device)
-                    targets = targets.to(self.device)
-                    target_labels = target_labels.to(self.device)
-                    x_a_next, x_bs, predictor_outs, phi, psi = self.model(inputs)
+        with torch.no_grad():
+            total_loss = 0.0
+            total_samples = 0.0
+            correct_samples = 0.0
+            total_pred_loss = 0.0
 
-                    # Loss
-                    targets = self._maybe_resize_target_batch(targets)
-                    batch_loss = self.loss(x_a_next, targets)
-                    total_loss += batch_loss.item()
+            hidden = self.model.init_hidden(self.batch_size)
 
-                    if self.model.predictor:
-                        pred_batch_loss = self.predictor_loss(predictor_outs, target_labels)
-                        _, class_predictions = torch.max(predictor_outs, 1)
-                        total_samples += target_labels.size(0)
-                        correct_samples += (class_predictions == target_labels).sum().item()
-                        total_pred_loss += pred_batch_loss.item()
+            for batch_idx, (inputs, targets, pred_targets) in enumerate(self.val_loader):
 
-                    if batch_idx >= self.batches_in_epoch:
-                        break
+                # Forward
+                inputs = inputs.to(self.device)
+                targets = targets.to(self.device)
+                pred_targets = pred_targets.to(self.device)
+                x_a_next, hidden, x_bs = self.model(inputs, hidden)
 
-                ret['test_loss'] = total_loss / (batch_idx + 1)
+                # Loss
+                x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
+                loss = self.loss(x_a_next, targets)
+                total_loss += loss.item()
 
+                if self.predictor:
+                    predictor_outputs = self.predictor(x_bs.detach())
+                    pred_batch_loss = self.predictor_loss(predictor_outputs, pred_targets)
+                    _, class_predictions = torch.max(predictor_outputs, 1)
+                    total_samples += pred_targets.size(0)
+                    correct_samples += (class_predictions == pred_targets).sum().item()
+                    total_pred_loss += pred_batch_loss.item()
+
+                hidden = self._repackage_hidden(hidden)
+                if batch_idx >= self.eval_batches_in_epoch:
+                    break
+
+            ret['val_loss'] = val_loss = total_loss / (batch_idx + 1)
+            ret['val_ppl'] = lang_util.perpl(val_loss)
+            if self.predictor:
                 test_pred_loss = total_pred_loss / (batch_idx + 1)
-                ret['test_pred_acc'] = 100 * correct_samples / total_samples
-                if self.dataset_kind == 'ptb':
-                    ret['test_ppl'] = math.exp(test_pred_loss)
+                ret['val_pred_ppl'] = lang_util.perpl(test_pred_loss)
+                ret['val_pred_acc'] = 100 * correct_samples / total_samples
+
+            if not self.best_val_loss or val_loss < self.best_val_loss:
+                self.best_val_loss = val_loss
+            else:
+                if self.learning_rate_gamma:
+                    self.do_anneal_learning = True  # Reduce LR during post_epoch
 
         return ret
 
@@ -254,45 +310,67 @@ class RSMExperiment(object):
 
         ret = {}
 
+        self.model.train()
+        if self.predictor:
+            self.predictor.train()
+
         # Performance metrics
         total_loss = total_samples = correct_samples = total_pred_loss = 0.0
 
-        for batch_idx, (inputs, targets, target_labels) in enumerate(self.train_loader):
+        hidden = self.model.init_hidden(self.batch_size)
+
+        for batch_idx, (inputs, targets, pred_targets) in enumerate(self.train_loader):
+            # Parallelized inputs are of shape (seq_len, batch, input_size)
+
+            hidden = self._repackage_hidden(hidden)
 
             self.optimizer.zero_grad()
+            if self.pred_optimizer:
+                self.pred_optimizer.zero_grad()
 
             # Forward
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            target_labels = target_labels.to(self.device)
-            x_a_next, x_bs, predictor_outs, phi, psi = self.model(inputs)
+            pred_targets = pred_targets.to(self.device)
+            x_a_next, hidden, x_bs = self.model(inputs, hidden)
 
             # Loss
-            targets = self._maybe_resize_target_batch(targets)
-            batch_loss = self.loss(x_a_next, targets)
-            total_loss += batch_loss.item()
+            x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
+            loss = self.loss(x_a_next, targets)
+            total_loss += loss.item()
 
-            # Backward for predictor
-            if self.model.predictor:
-                pred_batch_loss = self.predictor_loss(predictor_outs, target_labels)
-                _, class_predictions = torch.max(predictor_outs, 1)
-                total_samples += target_labels.size(0)
-                correct_samples += (class_predictions == target_labels).sum().item()
-                total_pred_loss += pred_batch_loss.item()
-                batch_loss += pred_batch_loss
+            # RSM backward + optimize
+            loss.backward()
 
-            batch_loss.backward()  # Both losses combined in single backward pass
+            if self.model_kind == "lstm":
+                # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.25)
+                for p in self.model.parameters():
+                    p.data.add_(-self.learning_rate, p.grad.data)
+            else:
+                self.optimizer.step()
 
-            self.optimizer.step()
+            # Predictor network
+            _pred_batch_loss = None
+            if self.predictor:
+                predictor_outputs = self.predictor(x_bs.detach())
+                pred_batch_loss = self.predictor_loss(predictor_outputs, pred_targets)
+                _, class_predictions = torch.max(predictor_outputs, 1)
+                total_samples += pred_targets.size(0)
+                correct_samples += (class_predictions == pred_targets).sum().item()
+                _pred_batch_loss = pred_batch_loss.item()
+                total_pred_loss += _pred_batch_loss
+
+                # Predictor backward + optimize
+                pred_batch_loss.backward()
+                self.pred_optimizer.step()
 
             # Update board images on batch 10, each 5 epochs
             if epoch % 5 == 0 and batch_idx == 10:
                 if self.dataset_kind == 'mnist':
                     ret['img_inputs'] = self._image_grid(inputs).cpu()
                     ret['img_preds'] = self._image_grid(x_a_next).cpu()
-                ret['hist_w_a'] = self.model.linear_a.weight.cpu()
-                ret['hist_w_b'] = self.model.linear_b.weight.cpu()
-                ret['hist_w_d'] = self.model.linear_d.weight.cpu()
+                ret.update(self.model._track_weights())
 
             if batch_idx >= self.batches_in_epoch:
                 print("Stopping after %d batches in epoch %d" % (self.batches_in_epoch, epoch))
@@ -300,9 +378,10 @@ class RSMExperiment(object):
 
             if self.batch_log_interval and batch_idx % self.batch_log_interval == 0:
                 print("Finished batch %d" % batch_idx)
-                if self.model.predictor:
+                if self.predictor:
                     acc = 100 * correct_samples / total_samples
-                    print("Partial train predictor accuracy: %.3f%%" % acc)
+                    batch_ppl = math.exp(_pred_batch_loss)
+                    print("Partial train predictor accuracy: %.3f%%, batch PPL: %.1f" % (acc, batch_ppl))
 
         if self.eval_interval and epoch % self.eval_interval == 0:
             # Evaluate each x epochs
@@ -313,11 +392,12 @@ class RSMExperiment(object):
 
         ret["stop"] = 0
 
-        ret['train_loss'] = total_loss / (batch_idx + 1)
-        train_pred_loss = total_pred_loss / (batch_idx + 1)
-        ret['train_pred_acc'] = 100 * correct_samples / total_samples
-        if self.dataset_kind == 'ptb':
-            ret['train_ppl'] = math.exp(train_pred_loss)
+        ret['train_loss'] = train_loss = total_loss / (batch_idx + 1)
+        ret['train_ppl'] = lang_util.perpl(train_loss)
+        if self.predictor:
+            train_pred_loss = total_pred_loss / (batch_idx + 1)
+            ret['train_pred_ppl'] = lang_util.perpl(train_pred_loss)
+            ret['train_pred_acc'] = 100 * correct_samples / total_samples
 
         ret["epoch_time_train"] = train_time
         ret["epoch_time"] = time.time() - t1
@@ -341,11 +421,16 @@ class RSMExperiment(object):
         can be later passed to `model_restore()`.
         """
         checkpoint_file = os.path.join(checkpoint_dir, self.model_filename)
-
         if checkpoint_file.endswith(".pt"):
             torch.save(self.model, checkpoint_file)
         else:
             torch.save(self.model.state_dict(), checkpoint_file)
+        if self.predictor:
+            checkpoint_file = os.path.join(checkpoint_dir, self.pred_model_filename)
+            if checkpoint_file.endswith(".pt"):
+                torch.save(self.predictor, checkpoint_file)
+            else:
+                torch.save(self.predictor.state_dict(), checkpoint_file)
 
         if self.save_onnx_graph_at_checkpoint:
             dummy_input = (torch.rand(1, 1, 28, 28),)
@@ -361,11 +446,17 @@ class RSMExperiment(object):
         """
         print("Loading from", checkpoint_path)
         checkpoint_file = os.path.join(checkpoint_path, self.model_filename)
-        # Use the slow method if filename ends with .pt
         if checkpoint_file.endswith(".pt"):
             self.model = torch.load(checkpoint_file, map_location=self.device)
         else:
             self.model.load_state_dict(
+                torch.load(checkpoint_file, map_location=self.device)
+            )
+        checkpoint_file = os.path.join(checkpoint_path, self.pred_model_filename)
+        if checkpoint_file.endswith(".pt"):
+            self.predictor = torch.load(checkpoint_file, map_location=self.device)
+        else:
+            self.predictor.load_state_dict(
                 torch.load(checkpoint_file, map_location=self.device)
             )
         return self.model
