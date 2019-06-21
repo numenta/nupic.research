@@ -7,15 +7,13 @@ from functools import reduce
 
 import torch
 from torchnlp.datasets import penn_treebank_dataset
-from torchnlp.samplers import BPTTBatchSampler
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import torchvision.utils as vutils
 
 import lang_util
 from ptb_lstm import LSTMModel
-from rsm import RSMLayer
-from rsm_predictor import RSMPredictor
+from rsm import RSMLayer, RSMPredictor
 from rsm_samplers import (
     MNISTSequenceSampler, 
     pred_sequence_collate, 
@@ -127,13 +125,13 @@ class RSMExperiment(object):
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
             train_sampler = LangSequenceSampler(corpus.train, batch_size=self.batch_size, 
                                                 seq_length=self.seq_length,
-                                                parallel_seq=self.model_kind == 'lstm')
+                                                parallel_seq=True)
             self.train_loader = DataLoader(corpus.train,
                                            batch_sampler=train_sampler,
                                            collate_fn=language_pred_sequence_collate)
             val_sampler = LangSequenceSampler(corpus.test, batch_size=self.batch_size,
                                               seq_length=self.seq_length,
-                                              parallel_seq=self.model_kind == 'lstm')
+                                              parallel_seq=True)
             self.val_loader = DataLoader(corpus.test,
                                          batch_sampler=val_sampler,
                                          collate_fn=language_pred_sequence_collate)
@@ -236,12 +234,24 @@ class RSMExperiment(object):
                 param_group["lr"] = self.learning_rate
 
     def _maybe_resize_outputs_targets(self, x_a_next, targets):
-        if self.model_kind == "lstm":
-            x_a_next = x_a_next.view(-1, self.vocab_size)
-        else:
-            if targets.dim() > 1:
-                targets = targets.reshape(self.batch_size, self.d_in)
+        x_a_next = x_a_next.view(-1, self.vocab_size)
         return x_a_next, targets
+
+    def _do_prediction(self, x_bs, pred_targets, total_samples, correct_samples, 
+                       total_pred_loss, train=False):
+        if self.predictor:
+            predictor_outputs = self.predictor(x_bs.detach())
+            predictor_outputs = predictor_outputs.view(-1, predictor_outputs.size(2))
+            pred_loss = self.predictor_loss(predictor_outputs, pred_targets)
+            _, class_predictions = torch.max(predictor_outputs, 1)
+            total_samples += pred_targets.size(0)
+            correct_samples += (class_predictions == pred_targets).sum().item()
+            total_pred_loss += pred_loss.item()
+            if train:
+                # Predictor backward + optimize
+                pred_loss.backward()
+                self.pred_optimizer.step()
+        return total_samples, correct_samples, total_pred_loss
 
     def _eval(self):
         ret = {}
@@ -271,13 +281,8 @@ class RSMExperiment(object):
                 loss = self.loss(x_a_next, targets)
                 total_loss += loss.item()
 
-                if self.predictor:
-                    predictor_outputs = self.predictor(x_bs.detach())
-                    pred_batch_loss = self.predictor_loss(predictor_outputs, pred_targets)
-                    _, class_predictions = torch.max(predictor_outputs, 1)
-                    total_samples += pred_targets.size(0)
-                    correct_samples += (class_predictions == pred_targets).sum().item()
-                    total_pred_loss += pred_batch_loss.item()
+                total_samples, correct_samples, total_pred_loss = self._do_prediction(
+                    x_bs, pred_targets, total_samples, correct_samples, total_pred_loss)
 
                 hidden = self._repackage_hidden(hidden)
                 if batch_idx >= self.eval_batches_in_epoch:
@@ -350,20 +355,9 @@ class RSMExperiment(object):
             else:
                 self.optimizer.step()
 
-            # Predictor network
-            _pred_batch_loss = None
-            if self.predictor:
-                predictor_outputs = self.predictor(x_bs.detach())
-                pred_batch_loss = self.predictor_loss(predictor_outputs, pred_targets)
-                _, class_predictions = torch.max(predictor_outputs, 1)
-                total_samples += pred_targets.size(0)
-                correct_samples += (class_predictions == pred_targets).sum().item()
-                _pred_batch_loss = pred_batch_loss.item()
-                total_pred_loss += _pred_batch_loss
-
-                # Predictor backward + optimize
-                pred_batch_loss.backward()
-                self.pred_optimizer.step()
+            total_samples, correct_samples, total_pred_loss = self._do_prediction(
+                x_bs, pred_targets, total_samples, correct_samples, total_pred_loss,
+                train=True)
 
             # Update board images on batch 10, each 5 epochs
             if epoch % 5 == 0 and batch_idx == 10:
@@ -380,8 +374,7 @@ class RSMExperiment(object):
                 print("Finished batch %d" % batch_idx)
                 if self.predictor:
                     acc = 100 * correct_samples / total_samples
-                    batch_ppl = math.exp(_pred_batch_loss)
-                    print("Partial train predictor accuracy: %.3f%%, batch PPL: %.1f" % (acc, batch_ppl))
+                    print("Partial train predictor accuracy: %.3f%%" % (acc))
 
         if self.eval_interval and epoch % self.eval_interval == 0:
             # Evaluate each x epochs
