@@ -74,13 +74,9 @@ class LangSequenceSampler(Sampler):
 
     def __init__(self, data_source, batch_size=64, seq_length=35, parallel_seq=False):
         super(LangSequenceSampler, self).__init__(data_source)
-        self.data_source = data_source
         self.batch_size = batch_size
         self.seq_length = seq_length
-        self.parallel_seq = parallel_seq
-        if self.parallel_seq:
-            # Convert to 3-dim tensor for nn.LSTM
-            self.data_source = self.batchify(self.data_source)
+        self.data_source = self.batchify(data_source)
 
     def batchify(self, data):
         """
@@ -94,24 +90,12 @@ class LangSequenceSampler(Sampler):
         data = data.view(self.batch_size, -1).t().contiguous()
         return data
 
-    def get_parallel_batch(self, i):
-        seq_len = min(self.seq_length, len(self.data_source) - 1 - i)
-        data = self.data_source[i:i + seq_len]
-        target = self.data_source[i + 1: i + 1 + seq_len].view(-1)
-        return data, target
-
     def __iter__(self):
-        if self.parallel_seq:
-            for i in range(0, self.data_source.size(0), self.seq_length):
-                yield self.get_parallel_batch(i)
-        else:
-            n_batches = len(self)
-            for i in range(n_batches):
-                st = i * self.batch_size
-                # Batch is batch_size + 1 to allow next word prediction
-                en = st + self.batch_size + 1
-                batch = self.data_source[st:en]
-                yield batch
+        for i in range(0, self.data_source.size(0), self.seq_length):
+            seq_len = min(self.seq_length, len(self.data_source) - 1 - i)
+            data = self.data_source[i:i + seq_len]
+            target = self.data_source[i + 1: i + 1 + seq_len].view(-1)
+            yield data, target
         return
 
     def __len__(self):
