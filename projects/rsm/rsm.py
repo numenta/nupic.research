@@ -218,11 +218,9 @@ class RSMLayer(torch.nn.Module):
 
     def _update_memory_and_inhibition(self, y, phi, psi):
         # Get updated psi (memory state), decay inactive inactive
-        # psi *= self.eps
         psi = torch.max(psi * self.eps, y)
 
         # Update phi for next step (decay inactive cells)
-        # phi *= self.gamma
         phi = torch.max(phi * self.gamma, y)
 
         return (phi, psi)
@@ -241,7 +239,6 @@ class RSMLayer(torch.nn.Module):
         """
         seq_len = x_a_batch.size(0)
         bsz = x_a_batch.size(1)
-        print('seq_len', seq_len, 'bsz', bsz)
 
         output = None
         x_bs = None
@@ -289,10 +286,7 @@ class RSMLayer(torch.nn.Module):
                 x_bs = torch.cat((x_bs, x_b))
 
         hidden = (x_b, phi, psi)
-        #     x_b.view(bsz, self.total_cells),
-        #     phi.view(bsz, self.total_cells),
-        #     psi.view(bsz, self.total_cells)
-        # )
+
 
         return (output.view(seq_len, bsz, self.d_out), hidden, x_bs.view(seq_len, bsz, self.total_cells))
 

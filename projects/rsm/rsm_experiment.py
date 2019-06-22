@@ -3,11 +3,11 @@ import os
 import time
 import sys
 import math
-from functools import reduce
+from functools import reduce, partial
 
 import torch
 from torchnlp.datasets import penn_treebank_dataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, BatchSampler
 from torchvision import datasets, transforms
 import torchvision.utils as vutils
 
@@ -17,8 +17,8 @@ from rsm import RSMLayer, RSMPredictor
 from rsm_samplers import (
     MNISTSequenceSampler, 
     pred_sequence_collate, 
-    LangSequenceSampler,
-    language_pred_sequence_collate
+    PTBSequenceSampler,
+    ptb_pred_sequence_collate
 )
 
 torch.autograd.set_detect_anomaly(True)
@@ -109,35 +109,34 @@ class RSMExperiment(object):
                                                    transforms.Normalize((0.1307,), (0.3081,))
                                                ]),)
 
-            train_sampler = MNISTSequenceSampler(self.dataset, 
-                                                 sequences=self.sequences,
-                                                 batch_size=self.batch_size,
-                                                 randomize_sequences=self.randomize_sequences)
+            self.sampler = MNISTSequenceSampler(self.dataset, 
+                                                sequences=self.sequences,
+                                                batch_size=self.batch_size,
+                                                randomize_sequences=self.randomize_sequences)
+            batch_sampler = BatchSampler(self.sampler, batch_size=self.sampler.seq_length * self.batch_size + 1, drop_last=True)
             self.train_loader = DataLoader(self.dataset,
-                                           batch_sampler=train_sampler,
-                                           collate_fn=pred_sequence_collate)
-            val_sampler = MNISTSequenceSampler(self.dataset, 
-                                               sequences=self.sequences,
-                                               batch_size=self.batch_size,
-                                               randomize_sequences=self.randomize_sequences)
+                                           batch_sampler=batch_sampler,
+                                           collate_fn=partial(pred_sequence_collate, 
+                                                              bsz=self.batch_size,
+                                                              seq_length=self.sampler.seq_length))
             self.val_loader = DataLoader(self.test_dataset,
-                                         batch_sampler=val_sampler,
+                                         batch_sampler=batch_sampler,
                                          collate_fn=pred_sequence_collate)
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
             penn_treebank_dataset(self.data_dir + '/PTB', train=True)
             # Encode
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
-            train_sampler = LangSequenceSampler(corpus.train, batch_size=self.batch_size, 
-                                                seq_length=self.seq_length)
+            train_sampler = PTBSequenceSampler(corpus.train, batch_size=self.batch_size, 
+                                               seq_length=self.seq_length)
             self.train_loader = DataLoader(corpus.train,
                                            batch_sampler=train_sampler,
-                                           collate_fn=language_pred_sequence_collate)
-            val_sampler = LangSequenceSampler(corpus.test, batch_size=self.batch_size,
-                                              seq_length=self.seq_length)
+                                           collate_fn=ptb_pred_sequence_collate)
+            val_sampler = PTBSequenceSampler(corpus.test, batch_size=self.batch_size,
+                                             seq_length=self.seq_length)
             self.val_loader = DataLoader(corpus.test,
                                          batch_sampler=val_sampler,
-                                         collate_fn=language_pred_sequence_collate)
+                                         collate_fn=ptb_pred_sequence_collate)
 
     def _get_loss_function(self):
         self.loss = getattr(torch.nn, self.loss_function)(reduction='mean')
@@ -216,7 +215,7 @@ class RSMExperiment(object):
         self._get_optimizer()
 
     def _image_grid(self, image_batch):
-        batch = image_batch.reshape(self.batch_size, 1, 28, 28)
+        batch = image_batch.reshape(self.batch_size * self.sampler.seq_length, 1, 28, 28)
         # make_grid returns 3 channels? -- mean
         grid = vutils.make_grid(batch, normalize=True, padding=5).mean(dim=0)  
         return grid
@@ -237,14 +236,17 @@ class RSMExperiment(object):
                 param_group["lr"] = self.learning_rate
 
     def _maybe_resize_outputs_targets(self, x_a_next, targets):
-        x_a_next = x_a_next.view(-1, self.vocab_size)
+        x_a_next = x_a_next.view(-1, self.d_out)
+        if self.dataset_kind == 'mnist':
+            targets = targets.view(-1, self.d_out)
         return x_a_next, targets
 
     def _do_prediction(self, x_bs, pred_targets, total_samples, correct_samples, 
                        total_pred_loss, train=False):
         if self.predictor:
             predictor_outputs = self.predictor(x_bs.detach())
-            predictor_outputs = predictor_outputs.view(-1, predictor_outputs.size(2))
+            # Needed for PTB?
+            # predictor_outputs = predictor_outputs.view(-1, predictor_outputs.size(2))
             pred_loss = self.predictor_loss(predictor_outputs, pred_targets)
             _, class_predictions = torch.max(predictor_outputs, 1)
             total_samples += pred_targets.size(0)
