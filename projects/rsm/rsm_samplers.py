@@ -66,53 +66,39 @@ class MNISTSequenceSampler(Sampler):
             self.label_cursors[digit] = cursor = 0
         return indices[cursor].item()
 
-    def _get_sequence(self):
-        input_seq = []
-        digit_seq = []
-        for i in range(self.seq_length + 1):
-            digit = self._get_next_digit()
-            next_sample_id = self._get_sample(digit)
-            input_seq.append(next_sample_id)
-            digit_seq.append(digit)
-            self.label_cursors[digit] += 1
-        return input_seq, digit_seq
-
     def __iter__(self):
         while True:
-            input_id_batch = []
-            digit_batch = []
-            for j in range(self.bsz):
-                input_id_seq, digit_seq = self._get_sequence()
-                input_id_batch.extend(input_id_seq)
-                digit_batch.extend(digit_seq)
-            yield input_id_batch, torch.randn(4)
+            digit = self._get_next_digit()
+            next_sample_id = self._get_sample(digit)
+            yield next_sample_id
         return
 
     def __len__(self):
         return len(self.data_source)
 
 
-def pred_sequence_collate(batch):
-    # Batch is a list of (image, label) tuples
-    # Offset target batch by 1 to get next image predictions
-    # batch = batch.view(self.seq_length, self.bsz)
-    print('batch', batch)
-    data = torch.stack([s[0].flatten() for s in batch[:-1]], 0)
-    target = torch.stack([s[0].flatten() for s in batch[1:]], 0)
-    pred_target = torch.tensor([s[1] for s in batch[1:]])
-    print('data', data.size())
-    print('pred_target', pred_target.size())
-    # data = input_images.view(self.seq_length + 1, self.bsz, -1)
-    # targets = torch.tensor(digit_batch).view(self.seq_length + 1, self.bsz)
+def pred_sequence_collate(batch, bsz=4, seq_length=3):
+    """
+    Batch returned from sampler is a list of (image, label) tuples
+    Offset target batch by 1 to get next image predictions
+
+    Returns a 3-tuple which is iterated by the loader:
+        data (sl x bs x pixels)
+        target (sl x bs x pixels)
+        pred_target (sl x bs x 1)  Label (digit)
+    """
+    data = torch.stack([s[0] for s in batch[:-1]], 0).view(seq_length, bsz, -1)
+    target = torch.stack([s[0] for s in batch[1:]], 0).view(seq_length, bsz, -1)
+    pred_target = torch.tensor([s[1] for s in batch[1:]]).view(seq_length, bsz)
     return (data, target, pred_target)
 
 
-class LangSequenceSampler(Sampler):
+class PTBSequenceSampler(Sampler):
     """
     """
 
     def __init__(self, data_source, batch_size=64, seq_length=35):
-        super(LangSequenceSampler, self).__init__(data_source)
+        super(PTBSequenceSampler, self).__init__(data_source)
         self.bsz = batch_size
         self.seq_length = seq_length
         self.data_source = self.batchify(data_source)
@@ -141,7 +127,7 @@ class LangSequenceSampler(Sampler):
         return len(self.data_source) // self.bsz
 
 
-def language_pred_sequence_collate(batch):
+def ptb_pred_sequence_collate(batch):
     data, target = batch
     return (data, target, target)
 
