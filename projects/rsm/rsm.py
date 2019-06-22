@@ -237,13 +237,11 @@ class RSMLayer(torch.nn.Module):
 
     def forward(self, x_a_batch, hidden):
         """
-        :param x_a_batch: Input batch of seq_len sequences (seq_len, batch_size, d_in)
-
-        TODO: Update to take x_a_batch of dim (seq_len, batch, input_size), parallel to LSTM
+        :param x_a_batch: Input batch of batch_size seq_len sequences (seq_len, batch_size, d_in)
         """
-        # Can we vectorize across multiple batches?
         seq_len = x_a_batch.size(0)
         bsz = x_a_batch.size(1)
+        print('seq_len', seq_len, 'bsz', bsz)
 
         output = None
         x_bs = None
