@@ -57,6 +57,7 @@ class RSMExperiment(object):
         # Data parameters
         self.input_size = config.get("input_size", (1, 28, 28))
         self.sequences = config.get("sequences", [[0, 1, 2, 3]])
+        self.randomize_sequences = config.get("randomize_sequences", False)
 
         self.learning_rate = config.get("learning_rate", 0.1)
         self.momentum = config.get("momentum", 0.9)
@@ -94,7 +95,6 @@ class RSMExperiment(object):
 
     def _build_dataloader(self):
         # Extra element for sequential prediction labels
-        pred_batch_size = self.batch_size + 1
 
         self.val_loader = None
         if self.dataset_kind == 'mnist':
@@ -109,14 +109,19 @@ class RSMExperiment(object):
                                                    transforms.Normalize((0.1307,), (0.3081,))
                                                ]),)
 
-            self.sampler = MNISTSequenceSampler(self.dataset, sequences=self.sequences)
+            train_sampler = MNISTSequenceSampler(self.dataset, 
+                                                 sequences=self.sequences,
+                                                 batch_size=self.batch_size,
+                                                 randomize_sequences=self.randomize_sequences)
             self.train_loader = DataLoader(self.dataset,
-                                           batch_size=pred_batch_size,
-                                           sampler=self.sampler,
+                                           batch_sampler=train_sampler,
                                            collate_fn=pred_sequence_collate)
+            val_sampler = MNISTSequenceSampler(self.dataset, 
+                                               sequences=self.sequences,
+                                               batch_size=self.batch_size,
+                                               randomize_sequences=self.randomize_sequences)
             self.val_loader = DataLoader(self.test_dataset,
-                                         batch_size=pred_batch_size,
-                                         sampler=self.sampler,
+                                         batch_sampler=val_sampler,
                                          collate_fn=pred_sequence_collate)
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
@@ -124,14 +129,12 @@ class RSMExperiment(object):
             # Encode
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
             train_sampler = LangSequenceSampler(corpus.train, batch_size=self.batch_size, 
-                                                seq_length=self.seq_length,
-                                                parallel_seq=True)
+                                                seq_length=self.seq_length)
             self.train_loader = DataLoader(corpus.train,
                                            batch_sampler=train_sampler,
                                            collate_fn=language_pred_sequence_collate)
             val_sampler = LangSequenceSampler(corpus.test, batch_size=self.batch_size,
-                                              seq_length=self.seq_length,
-                                              parallel_seq=True)
+                                              seq_length=self.seq_length)
             self.val_loader = DataLoader(corpus.test,
                                          batch_sampler=val_sampler,
                                          collate_fn=language_pred_sequence_collate)
