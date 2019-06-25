@@ -27,8 +27,8 @@ from nupic.torch.modules import Flatten, KWinners2d, SparseWeights, SparseWeight
 
 def _sparsify_relu(parent, relu_names, channels, percent_on, k_inference_factor,
                    boost_strength, boost_strength_factor, duty_cycle_period):
-    """
-    Replace ReLU with k-winners where percent_on < 1.0
+    """Replace ReLU with k-winners where percent_on < 1.0.
+
     :param parent: Parent Layer containing the ReLU modules to be replaced
     :param relu_names: List of ReLU module names to be replaced.
     :param channels: List of input channels for each k-winner.
@@ -55,8 +55,8 @@ def _sparsify_relu(parent, relu_names, channels, percent_on, k_inference_factor,
 
 
 def _sparsify_cnn(parent, cnn_names, weight_sparsity):
-    """
-    Enforce weight sparsity on the given cnn modules during training
+    """Enforce weight sparsity on the given cnn modules during training.
+
     :param parent: Parent Layer containing the CNN modules to sparsify
     :param cnn_names: List of CNN module names to sparsify
     :param weight_sparsity: Percent of weights that are allowed to be non-zero
@@ -70,8 +70,8 @@ def _sparsify_cnn(parent, cnn_names, weight_sparsity):
 
 
 def _sparsify_linear(parent, linear_names, weight_sparsity):
-    """
-    Enforce weight sparsity on the given linear modules during training
+    """Enforce weight sparsity on the given linear modules during training.
+
     :param parent: Parent Layer containing the Linear modules to sparsify
     :param linear_names: List of Linear module names to sparsify
     :param weight_sparsity: Percent of weights that are allowed to be non-zero
@@ -85,12 +85,12 @@ def _sparsify_linear(parent, linear_names, weight_sparsity):
 
 
 class DenseNetCIFAR(nn.Sequential):
-    """
-    DenseNet_ CIFAR model. Based on :mod:`torchvision.models.densenet` blocks.
-    See original `densenet.lua`_ implementation for more details
+    """DenseNet_ CIFAR model. Based on :mod:`torchvision.models.densenet`
+    blocks. See original `densenet.lua`_ implementation for more details.
 
     .. _DenseNet: https://arxiv.org/abs/1608.06993
     .. _`densenet.lua`: https://github.com/liuzhuang13/DenseNet/blob/master/models/densenet.lua # noqa
+
     :param block_config: how many layers in each pooling block. If None compute from `depth`
     :param depth: DenseNet network depth. If None then `block_config` must be given
     :param growth_rate: how many filters to add each layer (`k` in paper)
@@ -161,9 +161,8 @@ class DenseNetCIFAR(nn.Sequential):
 
 
 class NoSoDenseNetCIFAR(DenseNetCIFAR):
-    """
-    Modified DenseNet_ architecture using sparse dense blocks and sparse
-    transition layers. Inspired by the original `densenet.lua`_ implementation
+    """Modified DenseNet_ architecture using sparse dense blocks and sparse
+    transition layers. Inspired by the original `densenet.lua`_ implementation.
 
     .. _DenseNet: https://arxiv.org/abs/1608.06993
     .. _`densenet.lua`: https://github.com/liuzhuang13/DenseNet/blob/master/models/densenet.lua # noqa
