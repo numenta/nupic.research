@@ -62,6 +62,25 @@ class Corpus(object):
         return ids
 
 
+class BitwiseWordEmbedding(object):
+
+    def __init__(self, vocab_size=10000, dim=28):
+        self.vocab_size = vocab_size
+        self.embedding_dict = {}
+        self.dim = dim
+
+    def generate_embeddings(self):
+        for i in range(self.vocab_size):
+            self.embedding_dict[i] = self.embed(i)
+
+    def embed(self, i):
+        first = "{0:b}".format(i).zfill(self.dim // 2)
+        return first + self.inverse(first)
+
+    def inverse(self, binstr):
+        return ''.join('1' if x == '0' else '0' for x in binstr)
+
+
 def perpl(nll):
     # Avoid overflow
     return math.exp(nll) if nll < 50 else 1000000

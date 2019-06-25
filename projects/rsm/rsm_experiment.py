@@ -14,6 +14,7 @@ import torchvision.utils as vutils
 import lang_util
 from ptb_lstm import LSTMModel
 from rsm import RSMLayer, RSMPredictor
+from viz_util import fig2img, plot_confusion_matrix
 from rsm_samplers import (
     MNISTSequenceSampler, 
     pred_sequence_collate, 
@@ -114,29 +115,35 @@ class RSMExperiment(object):
                                                 batch_size=self.batch_size,
                                                 randomize_sequences=self.randomize_sequences)
             batch_sampler = BatchSampler(self.sampler, batch_size=self.sampler.seq_length * self.batch_size + 1, drop_last=True)
+            collate_fn = partial(pred_sequence_collate, 
+                                 bsz=self.batch_size,
+                                 seq_length=self.sampler.seq_length)
             self.train_loader = DataLoader(self.dataset,
                                            batch_sampler=batch_sampler,
-                                           collate_fn=partial(pred_sequence_collate, 
-                                                              bsz=self.batch_size,
-                                                              seq_length=self.sampler.seq_length))
+                                           collate_fn=collate_fn)
             self.val_loader = DataLoader(self.test_dataset,
                                          batch_sampler=batch_sampler,
-                                         collate_fn=pred_sequence_collate)
+                                         collate_fn=collate_fn)
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
             penn_treebank_dataset(self.data_dir + '/PTB', train=True)
             # Encode
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
-            train_sampler = PTBSequenceSampler(corpus.train, batch_size=self.batch_size, 
-                                               seq_length=self.seq_length)
+            train_sampler = PTBSequenceSampler(corpus.train, batch_size=self.batch_size,
+                                               seq_length=self.seq_length,
+                                               embed_dim=self.embed_dim)
+
+            embedding = lang_util.BitwiseWordEmbedding()
+
+            collate_fn = partial(ptb_pred_sequence_collate, vector_dict=embedding.embedding_dict)
             self.train_loader = DataLoader(corpus.train,
                                            batch_sampler=train_sampler,
-                                           collate_fn=ptb_pred_sequence_collate)
+                                           collate_fn=collate_fn)
             val_sampler = PTBSequenceSampler(corpus.test, batch_size=self.batch_size,
                                              seq_length=self.seq_length)
             self.val_loader = DataLoader(corpus.test,
                                          batch_sampler=val_sampler,
-                                         collate_fn=ptb_pred_sequence_collate)
+                                         collate_fn=collate_fn)
 
     def _get_loss_function(self):
         self.loss = getattr(torch.nn, self.loss_function)(reduction='mean')
@@ -214,10 +221,19 @@ class RSMExperiment(object):
         self._get_loss_function()
         self._get_optimizer()
 
-    def _image_grid(self, image_batch):
-        batch = image_batch.reshape(self.batch_size * self.sampler.seq_length, 1, 28, 28)
-        # make_grid returns 3 channels? -- mean
-        grid = vutils.make_grid(batch, normalize=True, padding=5).mean(dim=0)  
+    def _image_grid(self, image_batch, nrow=12, compare_with=None):
+        side = 28
+        image_batch = image_batch.reshape(self.batch_size * self.sampler.seq_length, 1, side, side)
+        if compare_with is not None:
+            # Interleave comparison images with image_batch
+            compare_with = compare_with.reshape(self.batch_size * self.sampler.seq_length, 1, side, side)
+            batch = torch.empty((image_batch.shape[0] + compare_with.shape[0], image_batch.shape[1], side, side))
+            batch[::2, :, :] = image_batch
+            batch[1::2, :, :] = compare_with
+        else:
+            batch = image_batch
+        # make_grid returns 3 channels? -- mean since grayscale
+        grid = vutils.make_grid(batch, normalize=True, nrow=nrow, padding=5).mean(dim=0)  
         return grid
 
     def _repackage_hidden(self, h):
@@ -237,13 +253,15 @@ class RSMExperiment(object):
 
     def _maybe_resize_outputs_targets(self, x_a_next, targets):
         x_a_next = x_a_next.view(-1, self.d_out)
-        if self.dataset_kind == 'mnist':
-            targets = targets.view(-1, self.d_out)
+        # if self.dataset_kind == 'mnist':
+        targets = targets.view(-1, self.d_out)
         return x_a_next, targets
 
     def _do_prediction(self, x_bs, pred_targets, total_samples, correct_samples, 
-                       total_pred_loss, train=False):
+                       total_pred_loss, train=False, confusion=False):
+        cm_fig = None
         if self.predictor:
+            pred_targets = pred_targets.flatten()
             predictor_outputs = self.predictor(x_bs.detach())
             # Needed for PTB?
             # predictor_outputs = predictor_outputs.view(-1, predictor_outputs.size(2))
@@ -252,11 +270,14 @@ class RSMExperiment(object):
             total_samples += pred_targets.size(0)
             correct_samples += (class_predictions == pred_targets).sum().item()
             total_pred_loss += pred_loss.item()
+            if confusion:
+                class_names = [str(x) for x in range(self.predictor_output_size)]
+                cm_ax, cm_fig = plot_confusion_matrix(pred_targets, class_predictions, class_names, title="Prediction Confusion")
             if train:
                 # Predictor backward + optimize
                 pred_loss.backward()
                 self.pred_optimizer.step()
-        return total_samples, correct_samples, total_pred_loss
+        return total_samples, correct_samples, total_pred_loss, cm_fig
 
     def _eval(self):
         ret = {}
@@ -286,10 +307,20 @@ class RSMExperiment(object):
                 loss = self.loss(x_a_next, targets)
                 total_loss += loss.item()
 
-                total_samples, correct_samples, total_pred_loss = self._do_prediction(
-                    x_bs, pred_targets, total_samples, correct_samples, total_pred_loss)
+                total_samples, correct_samples, total_pred_loss, cm_fig = self._do_prediction(
+                    x_bs, pred_targets, total_samples, correct_samples, total_pred_loss,
+                    confusion=self.dataset_kind == 'mnist')
 
                 hidden = self._repackage_hidden(hidden)
+
+                if batch_idx == 0:
+                    if self.dataset_kind == 'mnist':
+                        ret['img_inputs'] = self._image_grid(inputs).cpu()
+                        ret['img_preds'] = self._image_grid(x_a_next, compare_with=targets, nrow=self.seq_length * 2).cpu()
+                        if cm_fig:
+                            ret['img_confusion'] = fig2img(cm_fig)
+                    ret.update(self.model._track_weights())
+
                 if batch_idx >= self.eval_batches_in_epoch:
                     break
 
@@ -342,10 +373,12 @@ class RSMExperiment(object):
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
             pred_targets = pred_targets.to(self.device)
+
             x_a_next, hidden, x_bs = self.model(inputs, hidden)
 
             # Loss
             x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
+
             loss = self.loss(x_a_next, targets)
             total_loss += loss.item()
 
@@ -360,16 +393,9 @@ class RSMExperiment(object):
             else:
                 self.optimizer.step()
 
-            total_samples, correct_samples, total_pred_loss = self._do_prediction(
+            total_samples, correct_samples, total_pred_loss, _ = self._do_prediction(
                 x_bs, pred_targets, total_samples, correct_samples, total_pred_loss,
                 train=True)
-
-            # Update board images on batch 10, each 5 epochs
-            if epoch % 5 == 0 and batch_idx == 10:
-                if self.dataset_kind == 'mnist':
-                    ret['img_inputs'] = self._image_grid(inputs).cpu()
-                    ret['img_preds'] = self._image_grid(x_a_next).cpu()
-                ret.update(self.model._track_weights())
 
             if batch_idx >= self.batches_in_epoch:
                 print("Stopping after %d batches in epoch %d" % (self.batches_in_epoch, epoch))
