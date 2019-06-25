@@ -24,3 +24,6 @@ from .mobilenetv1 import (
     mobile_net_v1_sparse_point,
     separable_convolution2d,
 )
+from .not_so_densenet import (
+    DenseNetCIFAR, NoSoDenseNetCIFAR
+)
