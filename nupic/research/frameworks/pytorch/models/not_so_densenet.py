@@ -20,8 +20,9 @@
 import math
 
 import torch.nn as nn
-from nupic.torch.modules import Flatten, KWinners2d, SparseWeights, SparseWeights2d
 from torchvision.models.densenet import _DenseBlock, _Transition
+
+from nupic.torch.modules import Flatten, KWinners2d, SparseWeights, SparseWeights2d
 
 
 def _sparsify_relu(parent, relu_names, channels, percent_on, k_inference_factor,
