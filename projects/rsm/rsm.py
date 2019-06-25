@@ -81,10 +81,12 @@ class RSMPredictor(torch.nn.Module):
         """
         Receive input as hidden memory state from RSM, batched
         x is with shape (seq_len, batch_size, total_cells)
+
+        Output is (seq_len * batch_size, d_out)
         """
-        bsz = x.size(0)
+        sl, bsz, _ = x.size()
         x = self.layers(x)
-        return x
+        return x.view(sl * bsz, self.d_out)
 
 
 class RSMLayer(torch.nn.Module):
@@ -123,12 +125,6 @@ class RSMLayer(torch.nn.Module):
 
         self.total_cells = m * n
         self.debug = debug
-
-        self.embedding = None
-        if embed_dim:
-            self.embedding = nn.Embedding(vocab_size, embed_dim)
-            initrange = 0.1
-            self.embedding.weight.data.uniform_(-initrange, initrange)
 
         self.linear_a = nn.Linear(d_in, m)  # Input weights (shared per group / proximal)
         if self.active_dendrites:
@@ -249,9 +245,6 @@ class RSMLayer(torch.nn.Module):
             x_a_row = x_a_batch[seqi, :]
 
             self._debug_log({'seqi': seqi, 'x_a_row': x_a_row})
-            if self.embedding:
-                # Embedded word vector
-                x_a_row = self.embedding(x_a_row)
 
             sigma = self._fc_weighted_ave(x_a_row, x_b, bsz)
             self._debug_log({'sigma': sigma})
@@ -286,7 +279,6 @@ class RSMLayer(torch.nn.Module):
                 x_bs = torch.cat((x_bs, x_b))
 
         hidden = (x_b, phi, psi)
-
 
         return (output.view(seq_len, bsz, self.d_out), hidden, x_bs.view(seq_len, bsz, self.total_cells))
 
