@@ -20,17 +20,16 @@
 import math
 
 import torch.nn as nn
+from nupic.torch.modules import Flatten, KWinners2d, SparseWeights, SparseWeights2d
 from torchvision.models.densenet import _DenseBlock, _Transition
 
-from nupic.torch.modules import Flatten, KWinners2d
 
-
-def _sparsify(parent, relus, channels, percent_on, k_inference_factor,
-              boost_strength, boost_strength_factor, duty_cycle_period):
+def _sparsify_relu(parent, relu_names, channels, percent_on, k_inference_factor,
+                   boost_strength, boost_strength_factor, duty_cycle_period):
     """
-    Find ReLU and replace with k-winners where percent_on < 1.0
-    :param parent: Parent Layer containing the ReLU to be replaced
-    :param relus: List of ReLU module names to be replaced.
+    Replace ReLU with k-winners where percent_on < 1.0
+    :param parent: Parent Layer containing the ReLU modules to be replaced
+    :param relu_names: List of ReLU module names to be replaced.
     :param channels: List of input channels for each k-winner.
     :param percent_on: List of 'percent_on' parameters for each ReLU
     :param k_inference_factor: During inference (training=False) we increase
@@ -39,9 +38,11 @@ def _sparsify(parent, relus, channels, percent_on, k_inference_factor,
     :param boost_strength_factor: Boost strength factor to use [0..1]
     :param duty_cycle_period: The period used to calculate duty cycles
     """
-    for i, name in enumerate(relus):
+    for i, name in enumerate(relu_names):
         if percent_on[i] >= 1.0:
             continue
+
+        assert isinstance(parent.__getattr__(name), nn.ReLU)
         parent.__setattr__(name, KWinners2d(
             channels=channels[i],
             percent_on=percent_on[i],
@@ -50,6 +51,36 @@ def _sparsify(parent, relus, channels, percent_on, k_inference_factor,
             boost_strength_factor=boost_strength_factor,
             duty_cycle_period=duty_cycle_period,
         ))
+
+
+def _sparsify_cnn(parent, cnn_names, weight_sparsity):
+    """
+    Enforce weight sparsity on the given cnn modules during training
+    :param parent: Parent Layer containing the CNN modules to sparsify
+    :param cnn_names: List of CNN module names to sparsify
+    :param weight_sparsity: Percent of weights that are allowed to be non-zero
+    """
+    for i, name in enumerate(cnn_names):
+        if weight_sparsity[i] >= 1.0:
+            continue
+
+        module = parent.__getattr__(name)
+        parent.__setattr__(name, SparseWeights2d(module, weight_sparsity[i]))
+
+
+def _sparsify_linear(parent, linear_names, weight_sparsity):
+    """
+    Enforce weight sparsity on the given linear modules during training
+    :param parent: Parent Layer containing the Linear modules to sparsify
+    :param linear_names: List of Linear module names to sparsify
+    :param weight_sparsity: Percent of weights that are allowed to be non-zero
+    """
+    for i, name in enumerate(linear_names):
+        if weight_sparsity[i] >= 1.0:
+            continue
+
+        module = parent.__getattr__(name)
+        parent.__setattr__(name, SparseWeights(module, weight_sparsity[i]))
 
 
 class DenseNetCIFAR(nn.Sequential):
@@ -146,10 +177,16 @@ class NoSoDenseNetCIFAR(DenseNetCIFAR):
     :param avg_pool_size: Average pool size for last transition layer
     :param dense_percent_on: Percent of units allowed to remain before each
                              convolution layer of the dense layer.
+    :param dense_sparse_weights: Percent of weights that are allowed to be
+                                 non-zero in each CNN of the dense layer
     :param transition_percent_on: Percent of units allowed to remain the
                                   convolution layer of the transition layer
+    :param transition_sparse_weights: Percent of weights that are allowed to be
+                                      non-zero in the CNN of the transition layer
     :param classifier_percent_on: Percent of units allowed to remain after the
                                   last batch norm before the classifier
+    :param classifier_sparse_weights: Percent of weights that are allowed to be
+                                      non-zero in the classifier
     :param k_inference_factor: During inference (training=False) we increase
                                `percent_on` in all sparse layers by this factor
     :param boost_strength: boost strength (0.0 implies no boosting)
@@ -167,8 +204,11 @@ class NoSoDenseNetCIFAR(DenseNetCIFAR):
         bottleneck_size=4,
         avg_pool_size=4,
         dense_percent_on=([1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0]),
+        dense_sparse_weights=([1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0]),
         transition_percent_on=(1.0, 1.0, 1.0),
+        transition_sparse_weights=(1.0, 1.0, 1.0),
         classifier_percent_on=1.0,
+        classifier_sparse_weights=1.0,
         k_inference_factor=1.0,
         boost_strength=1.5,
         boost_strength_factor=0.95,
@@ -183,56 +223,79 @@ class NoSoDenseNetCIFAR(DenseNetCIFAR):
                                                 avg_pool_size=avg_pool_size)
 
         # Sparsify relu after the last batch norm before the classifier
-        _sparsify(parent=self,
-                  relus=["relu"],
-                  channels=[self.norm.num_features],
-                  percent_on=[classifier_percent_on],
-                  k_inference_factor=k_inference_factor,
-                  boost_strength=boost_strength,
-                  boost_strength_factor=boost_strength_factor,
-                  duty_cycle_period=duty_cycle_period)
+        _sparsify_relu(parent=self,
+                       relu_names=["relu"],
+                       channels=[self.norm.num_features],
+                       percent_on=[classifier_percent_on],
+                       k_inference_factor=k_inference_factor,
+                       boost_strength=boost_strength,
+                       boost_strength_factor=boost_strength_factor,
+                       duty_cycle_period=duty_cycle_period)
+
+        # Sparsify the classifier weights
+        _sparsify_linear(parent=self, linear_names=["classifier"],
+                         weight_sparsity=[classifier_sparse_weights])
 
         # Sparsify dense blocks
-        def _is_relu(x):
-            return type(x[1]) == nn.ReLU
+        def _is_denseblock(x):
+            return isinstance(x, _DenseBlock)
 
         def _is_norm(x):
-            return type(x) == nn.BatchNorm2d
+            return isinstance(x, nn.BatchNorm2d)
 
-        def _is_denseblock(x):
-            return type(x) == _DenseBlock
+        def _is_relu(name_child):
+            return isinstance(name_child[1], nn.ReLU)
+
+        def _is_cnn(name_child):
+            return isinstance(name_child[1], nn.Conv2d)
 
         for i, block in enumerate(filter(_is_denseblock, self.children())):
             for layer in block.children():
                 channels = [bn.num_features for bn in
                             filter(_is_norm, layer.children())]
-                relus = [x[0] for x in filter(_is_relu, layer.named_children())]
-                _sparsify(parent=layer,
-                          relus=relus,
-                          channels=channels,
-                          percent_on=dense_percent_on[i],
-                          k_inference_factor=k_inference_factor,
-                          boost_strength=boost_strength,
-                          boost_strength_factor=boost_strength_factor,
-                          duty_cycle_period=duty_cycle_period)
+
+                relu_names = [x[0] for x in filter(_is_relu, layer.named_children())]
+                _sparsify_relu(parent=layer,
+                               relu_names=relu_names,
+                               channels=channels,
+                               percent_on=dense_percent_on[i],
+                               k_inference_factor=k_inference_factor,
+                               boost_strength=boost_strength,
+                               boost_strength_factor=boost_strength_factor,
+                               duty_cycle_period=duty_cycle_period)
+
+                cnn_names = [x[0] for x in filter(_is_cnn, layer.named_children())]
+                _sparsify_cnn(parent=layer, cnn_names=cnn_names,
+                              weight_sparsity=dense_sparse_weights[i])
 
         # Sparsify transition block
         def _is_transition(x):
-            return type(x) == _Transition
+            return isinstance(x, _Transition)
 
-        for i, block in enumerate(filter(_is_transition, self.children())):
-            channels = [bn.num_features for bn in filter(_is_norm, block.children())]
-            relus = [x[0] for x in filter(_is_relu, block.named_children())]
-            _sparsify(parent=block,
-                      relus=relus,
-                      channels=channels,
-                      percent_on=(transition_percent_on[i],) * len(relus),
-                      k_inference_factor=k_inference_factor,
-                      boost_strength=boost_strength,
-                      boost_strength_factor=boost_strength_factor,
-                      duty_cycle_period=duty_cycle_period)
+        for i, transition in enumerate(filter(_is_transition, self.children())):
+            channels = [bn.num_features for bn in
+                        filter(_is_norm, transition.children())]
+            relu_names = [x[0] for x in filter(_is_relu, transition.named_children())]
+            _sparsify_relu(parent=transition,
+                           relu_names=relu_names,
+                           channels=channels,
+                           percent_on=(transition_percent_on[i],) * len(relu_names),
+                           k_inference_factor=k_inference_factor,
+                           boost_strength=boost_strength,
+                           boost_strength_factor=boost_strength_factor,
+                           duty_cycle_period=duty_cycle_period)
+
+            cnn_names = [x[0] for x in filter(_is_cnn, transition.named_children())]
+            _sparsify_cnn(parent=transition, cnn_names=cnn_names,
+                          weight_sparsity=[transition_sparse_weights[i]])
 
 
 if __name__ == "__main__":
-    nsdn = NoSoDenseNetCIFAR()
+    nsdn = NoSoDenseNetCIFAR(
+        classifier_percent_on=0.5,
+        classifier_sparse_weights=0.2,
+        transition_percent_on=(1.0, 0.1, 0.2),
+        transition_sparse_weights=(0.1, 1.0, 0.2),
+        dense_percent_on=([1.0, 1.0], [0.1, 1.0], [0.1, 0.2]),
+        dense_sparse_weights=([1.0, 1.0], [0.1, 1.0], [0.1, 0.2]))
     print(nsdn)
