@@ -14,7 +14,7 @@ import torchvision.utils as vutils
 import lang_util
 from ptb_lstm import LSTMModel
 from rsm import RSMLayer, RSMPredictor
-from viz_util import fig2img, plot_confusion_matrix
+from viz_util import fig2img, plot_confusion_matrix, plot_col_pred_activity_grid
 from rsm_samplers import (
     MNISTSequenceSampler, 
     pred_sequence_collate, 
@@ -94,6 +94,9 @@ class RSMExperiment(object):
         self.best_val_loss = None
         self.do_anneal_learning = False
 
+        # Additional state for vis, etc
+        self.column_activity_by_inputs = {}  # 'digit-digit' -> list of distribution arrays
+
     def _build_dataloader(self):
         # Extra element for sequential prediction labels
 
@@ -104,25 +107,31 @@ class RSMExperiment(object):
                                               transforms.ToTensor(),
                                               transforms.Normalize((0.1307,), (0.3081,))
                                           ]),)
-            self.test_dataset = datasets.MNIST(self.data_dir, download=True,
-                                               transform=transforms.Compose([
-                                                   transforms.ToTensor(),
-                                                   transforms.Normalize((0.1307,), (0.3081,))
-                                               ]),)
+            self.val_dataset = datasets.MNIST(self.data_dir, download=True,
+                                              transform=transforms.Compose([
+                                                  transforms.ToTensor(),
+                                                  transforms.Normalize((0.1307,), (0.3081,))
+                                              ]),)
+            train_sampler = MNISTSequenceSampler(self.dataset, 
+                                                 sequences=self.sequences,
+                                                 batch_size=self.batch_size,
+                                                 randomize_sequences=self.randomize_sequences)
 
-            self.sampler = MNISTSequenceSampler(self.dataset, 
-                                                sequences=self.sequences,
-                                                batch_size=self.batch_size,
-                                                randomize_sequences=self.randomize_sequences)
-            batch_sampler = BatchSampler(self.sampler, batch_size=self.sampler.seq_length * self.batch_size + 1, drop_last=True)
+            train_batch_sampler = BatchSampler(train_sampler, batch_size=self.seq_length * self.batch_size + 1, drop_last=True)
+            val_sampler = MNISTSequenceSampler(self.val_dataset, 
+                                               sequences=self.sequences,
+                                               batch_size=self.batch_size,
+                                               randomize_sequences=self.randomize_sequences)
+            val_batch_sampler = BatchSampler(val_sampler, batch_size=self.seq_length * self.batch_size + 1, drop_last=True)
             collate_fn = partial(pred_sequence_collate, 
                                  bsz=self.batch_size,
-                                 seq_length=self.sampler.seq_length)
+                                 seq_length=train_sampler.seq_length,
+                                 return_inputs=True)
             self.train_loader = DataLoader(self.dataset,
-                                           batch_sampler=batch_sampler,
+                                           batch_sampler=train_batch_sampler,
                                            collate_fn=collate_fn)
-            self.val_loader = DataLoader(self.test_dataset,
-                                         batch_sampler=batch_sampler,
+            self.val_loader = DataLoader(self.val_dataset,
+                                         batch_sampler=val_batch_sampler,
                                          collate_fn=collate_fn)
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
@@ -130,8 +139,7 @@ class RSMExperiment(object):
             # Encode
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
             train_sampler = PTBSequenceSampler(corpus.train, batch_size=self.batch_size,
-                                               seq_length=self.seq_length,
-                                               embed_dim=self.embed_dim)
+                                               seq_length=self.seq_length)
 
             embedding = lang_util.BitwiseWordEmbedding()
 
@@ -223,10 +231,10 @@ class RSMExperiment(object):
 
     def _image_grid(self, image_batch, nrow=12, compare_with=None):
         side = 28
-        image_batch = image_batch.reshape(self.batch_size * self.sampler.seq_length, 1, side, side)
+        image_batch = image_batch.reshape(self.batch_size * self.seq_length, 1, side, side)
         if compare_with is not None:
             # Interleave comparison images with image_batch
-            compare_with = compare_with.reshape(self.batch_size * self.sampler.seq_length, 1, side, side)
+            compare_with = compare_with.reshape(self.batch_size * self.seq_length, 1, side, side)
             batch = torch.empty((image_batch.shape[0] + compare_with.shape[0], image_batch.shape[1], side, side))
             batch[::2, :, :] = image_batch
             batch[1::2, :, :] = compare_with
@@ -256,6 +264,20 @@ class RSMExperiment(object):
         # if self.dataset_kind == 'mnist':
         targets = targets.view(-1, self.d_out)
         return x_a_next, targets
+
+    def _store_col_activity_for_grid(self, x_bs, input_labels, pred_labels):
+        """
+        Aggregate column activity for a supplied batch
+        """
+        for x_b_batch, label_batch, target_batch in zip(x_bs, input_labels, pred_labels):
+            for _x_b, label, target in zip(x_b_batch, label_batch, target_batch):
+                _label = label.item()
+                _label_next = target.item()
+                col_activity = _x_b.detach().view(self.m_groups, -1).max(dim=1).values
+                key = "%d-%d" % (_label, _label_next)
+                if key not in self.column_activity_by_inputs:
+                    self.column_activity_by_inputs[key] = []
+                self.column_activity_by_inputs[key].append(col_activity)
 
     def _do_prediction(self, x_bs, pred_targets, total_samples, correct_samples, 
                        total_pred_loss, train=False, confusion=False):
@@ -294,7 +316,7 @@ class RSMExperiment(object):
 
             hidden = self.model.init_hidden(self.batch_size)
 
-            for batch_idx, (inputs, targets, pred_targets) in enumerate(self.val_loader):
+            for batch_idx, (inputs, targets, pred_targets, input_labels) in enumerate(self.val_loader):
 
                 # Forward
                 inputs = inputs.to(self.device)
@@ -314,11 +336,21 @@ class RSMExperiment(object):
                 hidden = self._repackage_hidden(hidden)
 
                 if batch_idx == 0:
+                    # Produce images only for first batch during eval
                     if self.dataset_kind == 'mnist':
                         ret['img_inputs'] = self._image_grid(inputs).cpu()
                         ret['img_preds'] = self._image_grid(x_a_next, compare_with=targets, nrow=self.seq_length * 2).cpu()
                         if cm_fig:
                             ret['img_confusion'] = fig2img(cm_fig)
+
+                        # Summary of column activation by input & next input
+                        self._store_col_activity_for_grid(x_bs, input_labels, pred_targets)
+                        print('column_activity_by_inputs', self.column_activity_by_inputs)
+                        col_activity_grid = plot_col_pred_activity_grid(self.column_activity_by_inputs, 
+                                                                        n_labels=self.predictor_output_size)
+                        self.column_activity_by_inputs = {}
+                        ret['img_col_activity'] = fig2img(col_activity_grid)
+
                     ret.update(self.model._track_weights())
 
                 if batch_idx >= self.eval_batches_in_epoch:
@@ -360,7 +392,7 @@ class RSMExperiment(object):
 
         hidden = self.model.init_hidden(self.batch_size)
 
-        for batch_idx, (inputs, targets, pred_targets) in enumerate(self.train_loader):
+        for batch_idx, (inputs, targets, pred_targets, _) in enumerate(self.train_loader):
             # Parallelized inputs are of shape (seq_len, batch, input_size)
 
             hidden = self._repackage_hidden(hidden)

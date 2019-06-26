@@ -21,7 +21,7 @@ class MNISTSequenceSampler(Sampler):
 
         self.sequences = sequences
         self.sequence_id = 0  # Of list of sequences passed
-        self.sequence_cursor = -1  # Iterates through each sequence
+        self.sequence_cursor = 0  # Iterates through each sequence
         self.full_sequence = list(chain.from_iterable(self.sequences))
         self.seq_length = len(self.full_sequence)
 
@@ -42,17 +42,16 @@ class MNISTSequenceSampler(Sampler):
         Return next integer digit in full sequence
         """
         current_seq = self.sequences[self.sequence_id]
+        digit = current_seq[self.sequence_cursor]
         self.sequence_cursor += 1
-        if self.sequence_cursor >= len(current_seq) - 1:
-            self.sequence_cursor = -1
+        if self.sequence_cursor > len(current_seq) - 1:
+            self.sequence_cursor = 0
             if self.randomize_sequences:
                 self.sequence_id = self._random_sequence_id()
             else:
                 self.sequence_id += 1
         if self.sequence_id > len(self.sequences) - 1:
             self.sequence_id = 0
-            current_seq = self.sequences[self.sequence_id]
-        digit = current_seq[self.sequence_cursor]
         return digit
 
     def _get_sample(self, digit):
@@ -78,7 +77,7 @@ class MNISTSequenceSampler(Sampler):
         return len(self.data_source)
 
 
-def pred_sequence_collate(batch, bsz=4, seq_length=3):
+def pred_sequence_collate(batch, bsz=4, seq_length=3, return_inputs=False):
     """
     Batch returned from sampler is a list of (image, label) tuples
     Offset target batch by 1 to get next image predictions
@@ -91,37 +90,35 @@ def pred_sequence_collate(batch, bsz=4, seq_length=3):
     data = torch.stack([s[0] for s in batch[:-1]]).view(seq_length, bsz, -1)
     target = torch.stack([s[0] for s in batch[1:]]).view(seq_length, bsz, -1)
     pred_target = torch.tensor([s[1] for s in batch[1:]]).view(seq_length, bsz)
-    return (data, target, pred_target)
+    input_labels = None
+    if return_inputs:
+        input_labels = torch.tensor([s[1] for s in batch[:-1]]).view(seq_length, bsz)
+    return (data, target, pred_target, input_labels)
 
 
 class PTBSequenceSampler(Sampler):
     """
     """
 
-    def __init__(self, data_source, batch_size=64, seq_length=35, embed_dim=100, vocab_size=10000):
+    def __init__(self, data_source, batch_size=64, seq_length=1):
         super(PTBSequenceSampler, self).__init__(data_source)
         self.bsz = batch_size
         self.seq_length = seq_length
-        self.embed_dim = embed_dim
-        self.data_source = self.batchify(data_source)
-
-    def batchify(self, data):
-        """
-        Ref: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
-        """
-        # Work out how cleanly we can divide the dataset into bsz parts.
-        nbatch = data.size(0) // self.bsz
-        # Trim off any extra elements that wouldn't cleanly fit (remainders).
-        data = data.narrow(0, 0, nbatch * self.bsz)
-        # Evenly divide the data across the self.bsz batches.
-        data = data.view(self.bsz, -1).t().contiguous()
-        return data
+        self.data_source = data_source
+        self.data_len = len(self.data_source)
+        # Choose initial random offsets into PTB, one per item in batch
+        batch_offsets = (torch.rand(self.bsz) * (self.data_len-1)).long()
+        # Increment 1 word ID each row/batch
+        inc = torch.arange(0, self.seq_length, dtype=torch.long).expand((self.bsz, self.seq_length)).t()
+        self.batch_idxs = batch_offsets.expand((self.seq_length, self.bsz)) + inc
 
     def __iter__(self):
-        for i in range(0, self.data_source.size(0), self.seq_length):
-            seq_len = min(self.seq_length, len(self.data_source) - 1 - i)
-            data = self.data_source[i:i + seq_len]
-            target = self.data_source[i + 1: i + 1 + seq_len]
+        # Yield a single batch of (seq_len x batch_size) words, each at a different offset into PTB
+        while True:
+            data = self.data_source[self.batch_idxs]
+            target = self.data_source[self.batch_idxs + 1]
+            self.batch_idxs += self.seq_length  # Move down to next sequence (maybe 1 row)
+            self.batch_idxs[self.batch_idxs > (self.data_len - 2)] = 0  # Wrap to start
             yield data, target
         return
 
