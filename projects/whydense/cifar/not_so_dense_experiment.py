@@ -174,12 +174,12 @@ class NotSoDenseExperiment(object):
         )
 
     def pre_epoch(self):
-        self.scheduler.step()
         self.logger.info("learning rate: %s", self.scheduler.get_lr())
 
     def post_epoch(self):
         self.model.apply(rezero_weights)
         self.model.apply(update_boost_strength)
+        self.scheduler.step()
 
 
 @click.command()
