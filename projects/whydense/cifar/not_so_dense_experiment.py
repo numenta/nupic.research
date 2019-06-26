@@ -19,6 +19,7 @@
 #
 import logging
 import os
+import sys
 import time
 
 import click
@@ -62,6 +63,8 @@ class NotSoDenseExperiment(object):
         self.epochs = config["iterations"]
         self.batch_size = config["batch_size"]
         self.test_batch_size = config["test_batch_size"]
+        self.test_batches_in_epoch = config.get("test_batches_in_epoch",
+                                                sys.maxsize)
         data_dir = config["data_dir"]
 
         normalize_tensor = [transforms.ToTensor(),
@@ -85,7 +88,7 @@ class NotSoDenseExperiment(object):
                                         download=False,
                                         transform=transforms.Compose(normalize_tensor))
         self.test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                                       batch_size=self.batch_size,
+                                                       batch_size=self.test_batch_size,
                                                        shuffle=True)
 
         self.model = NoSoDenseNetCIFAR(block_config=config.get("block_config"),
@@ -151,7 +154,9 @@ class NotSoDenseExperiment(object):
         if loader is None:
             loader = self.test_loader
         t0 = time.time()
-        results = evaluate_model(model=self.model, device=self.device, loader=loader)
+        results = evaluate_model(model=self.model, device=self.device,
+                                 loader=loader,
+                                 batches_in_epoch=self.test_batches_in_epoch)
         self.logger.info("testing duration: %s", time.time() - t0)
         self.logger.info("mean_accuracy: %s", results["mean_accuracy"])
         self.logger.info("mean_loss: %s", results["mean_loss"])
