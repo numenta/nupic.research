@@ -222,7 +222,6 @@ class RSMLayer(torch.nn.Module):
         return (phi, psi)
 
     def init_hidden(self, batch_size):
-        # TODO: Update with batch_size
         weight = next(self.parameters())
         x_b = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
         phi = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
@@ -261,13 +260,6 @@ class RSMLayer(torch.nn.Module):
                 alpha = 1.0
             x_b = (psi / alpha)  # Normalizing scalar (force sum(x_b) == 1)
             self._debug_log({'x_b': x_b})
-
-            # Detach recurrent hidden layer to avoid 
-            # "Trying to backward through the graph a second time" recursion error
-            y = y.detach()
-            sigma = sigma.detach()
-            phi = phi.detach()
-            psi = psi.detach()
 
             if output is None:
                 output = x_a_next

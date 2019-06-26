@@ -68,6 +68,7 @@ class BitwiseWordEmbedding(object):
         self.vocab_size = vocab_size
         self.embedding_dict = {}
         self.dim = dim
+        self.generate_embeddings()
 
     def generate_embeddings(self):
         for i in range(self.vocab_size):
@@ -75,10 +76,13 @@ class BitwiseWordEmbedding(object):
 
     def embed(self, i):
         first = "{0:b}".format(i).zfill(self.dim // 2)
-        return first + self.inverse(first)
+        return self.vectorize(first + self.inverse(first))
 
     def inverse(self, binstr):
         return ''.join('1' if x == '0' else '0' for x in binstr)
+
+    def vectorize(self, s):
+        return torch.FloatTensor([1 if x == '1' else 0 for x in s])
 
 
 def perpl(nll):
