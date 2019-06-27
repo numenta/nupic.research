@@ -1,18 +1,12 @@
 from copy import deepcopy
+import matplotlib.pyplot as plt
 
 import torch
 from torch import nn
 import torch.nn.functional as F
 
-
-def topk_mask(a, k, dim=0, softmax=False):
-    """
-    Return a 1 for the top k elements in the last dim of a, 0 otherwise
-    """
-    values, indices = torch.topk(a, k, dim=dim)
-    arr = a.new_zeros(a.size())  # Zeros, conserve device
-    arr.scatter_(dim, indices, 1)
-    return arr
+from viz_util import activity_square
+from nupic.research.frameworks.pytorch.functions import KWinnersMask
 
 
 class LocalLinear(nn.Module):
@@ -94,7 +88,8 @@ class RSMLayer(torch.nn.Module):
                  k_winner_cells=1, gamma=0.5, eps=0.5, activation_fn='tanh',
                  cell_winner_softmax=False, active_dendrites=None,
                  col_output_cells=None,
-                 embed_dim=0, vocab_size=0, debug=False, **kwargs):
+                 embed_dim=0, vocab_size=0, debug=False, visual_debug=False,
+                 **kwargs):
         """
         RSM Layer as specified by Rawlinson et al 2019
 
@@ -125,6 +120,7 @@ class RSMLayer(torch.nn.Module):
 
         self.total_cells = m * n
         self.debug = debug
+        self.visual_debug = visual_debug
 
         self.linear_a = nn.Linear(d_in, m)  # Input weights (shared per group / proximal)
         if self.active_dendrites:
@@ -144,6 +140,18 @@ class RSMLayer(torch.nn.Module):
                     size = t.size()
                     _type = t.dtype
                 print([name, t, size, _type])
+        if self.visual_debug:
+            for name, t in tensor_dict.items():
+                _type = type(t)
+                if isinstance(t, torch.Tensor):
+                    t = t.detach()
+                    t = t.squeeze()
+                    if t.dim() == 1:
+                        t = t.flatten()
+                        size = t.size()
+                        plt.imshow(activity_square(t))
+                        plt.title("%s (%s, %s)" % (name, size, _type))
+                        plt.show()
 
     def _track_weights(self):
         ret = {}
@@ -164,11 +172,29 @@ class RSMLayer(torch.nn.Module):
         """
         Compute sigma (weighted sum for each cell j in group i (mxn))
         """
-        z_a = self.linear_a(x_a).repeat(1, self.n)  # z_a (repeated for each cell)
+        # Col activation from inputs repeated for each cell
+        z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
+        # Cell activation from recurrent input
         z_b = self.linear_b(x_b).view(bsz, self.total_cells)
+        self._debug_log({'z_a': z_a})
         sigma = z_a + z_b
-        self._debug_log({'z_a + z_b = sigma': sigma})
         return sigma  # total_cells x bsz
+
+    def _k_cell_winners(self, pi, bsz, softmax=False):
+        """
+        Make a bsz x total_cells binary mask of top 1 cell in each column
+        """
+        mask = KWinnersMask.apply(pi.view(bsz * self.m, self.n), self.k_winner_cells)
+        mask = mask.view(bsz, self.total_cells)
+        return mask
+
+    def _k_col_winners(self, lambda_i, bsz):
+        """
+        Make a bsz x total_cells binary mask of top self.k columns
+        """
+        mask = KWinnersMask.apply(lambda_i, self.k)
+        mask = mask.view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells)
+        return mask
 
     def _inhibited_masking_and_prediction(self, sigma, phi, bsz):
         """
@@ -189,12 +215,10 @@ class RSMLayer(torch.nn.Module):
         self._debug_log({'lambda_i': lambda_i})
 
         # Mask: most active cell in group
-        M_pi = topk_mask(pi.view(bsz, self.m, self.n), self.k_winner_cells, dim=2, softmax=self.cell_winner_softmax)
-        M_pi = M_pi.view(bsz, self.total_cells)
+        M_pi = self._k_cell_winners(pi, bsz=bsz, softmax=self.cell_winner_softmax)
 
         # Mask: most active group (m)
-        M_lambda = topk_mask(lambda_i, self.k, dim=1).view(bsz, self.m, 1).repeat(1, 1, self.n)
-        M_lambda = M_lambda.view(bsz, self.total_cells)
+        M_lambda = self._k_col_winners(lambda_i, bsz=bsz)
         self._debug_log({'M_pi': M_pi, 'M_lambda': M_lambda})
 
         # Mask-based sparsening

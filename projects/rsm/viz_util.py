@@ -7,6 +7,16 @@ from matplotlib.figure import Figure
 import torch
 
 
+def activity_square(vector):
+    n = len(vector)
+    side = int(np.sqrt(n))
+    if side ** 2 < n:
+        side += 1
+    square = torch.zeros(side ** 2)
+    square[:n] = vector
+    return square.view(side, side)
+
+    
 def fig2img(fig):
     canvas = FigureCanvas(fig)
     canvas.draw()
