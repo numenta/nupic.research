@@ -2,7 +2,6 @@ import random
 import os
 import time
 import sys
-import math
 from functools import reduce, partial
 
 import torch
@@ -16,8 +15,8 @@ from ptb_lstm import LSTMModel
 from rsm import RSMLayer, RSMPredictor
 from viz_util import fig2img, plot_confusion_matrix, plot_col_pred_activity_grid
 from rsm_samplers import (
-    MNISTSequenceSampler, 
-    pred_sequence_collate, 
+    MNISTSequenceSampler,
+    pred_sequence_collate,
     PTBSequenceSampler,
     ptb_pred_sequence_collate
 )
@@ -136,7 +135,6 @@ class RSMExperiment(object):
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
             penn_treebank_dataset(self.data_dir + '/PTB', train=True)
-            # Encode
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
             train_sampler = PTBSequenceSampler(corpus.train, batch_size=self.batch_size,
                                                seq_length=self.seq_length)
@@ -186,13 +184,11 @@ class RSMExperiment(object):
             print("setup: Using cpu")
             self.device = torch.device("cpu")
 
-        # Build sampler / data loader
         self._build_dataloader()
 
         # Build model and optimizer
         self.d_in = reduce(lambda x, y: x * y, self.input_size)
         self.d_out = config.get("output_size", self.d_in)
-
         self.predictor = None
         if self.model_kind == "rsm":
             self.model = RSMLayer(d_in=self.d_in,
@@ -240,7 +236,7 @@ class RSMExperiment(object):
             batch[1::2, :, :] = compare_with
         else:
             batch = image_batch
-        # make_grid returns 3 channels? -- mean since grayscale
+        # make_grid returns 3 channels -- mean since grayscale
         grid = vutils.make_grid(batch, normalize=True, nrow=nrow, padding=5).mean(dim=0)  
         return grid
 
@@ -261,7 +257,6 @@ class RSMExperiment(object):
 
     def _maybe_resize_outputs_targets(self, x_a_next, targets):
         x_a_next = x_a_next.view(-1, self.d_out)
-        # if self.dataset_kind == 'mnist':
         targets = targets.view(-1, self.d_out)
         return x_a_next, targets
 
@@ -285,8 +280,6 @@ class RSMExperiment(object):
         if self.predictor:
             pred_targets = pred_targets.flatten()
             predictor_outputs = self.predictor(x_bs.detach())
-            # Needed for PTB?
-            # predictor_outputs = predictor_outputs.view(-1, predictor_outputs.size(2))
             pred_loss = self.predictor_loss(predictor_outputs, pred_targets)
             _, class_predictions = torch.max(predictor_outputs, 1)
             total_samples += pred_targets.size(0)
@@ -345,7 +338,6 @@ class RSMExperiment(object):
 
                         # Summary of column activation by input & next input
                         self._store_col_activity_for_grid(x_bs, input_labels, pred_targets)
-                        print('column_activity_by_inputs', self.column_activity_by_inputs)
                         col_activity_grid = plot_col_pred_activity_grid(self.column_activity_by_inputs, 
                                                                         n_labels=self.predictor_output_size)
                         self.column_activity_by_inputs = {}
