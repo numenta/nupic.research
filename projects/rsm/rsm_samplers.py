@@ -2,7 +2,28 @@ from itertools import chain
 import random
 
 import torch
-from torch.utils.data import Sampler
+from torch.utils.data import Sampler, BatchSampler
+
+
+class PredictiveBatchSampler(BatchSampler):
+    """
+    Subclass of BatchSampler that avoids skipping an item at the end of each batch
+    full_batch_size is sl x bs
+    """
+
+    def __init__(self, sampler, batch_size):
+        super(PredictiveBatchSampler, self).__init__(sampler, batch_size, True)
+
+    def __iter__(self):
+        batch = []
+        for idx in self.sampler:
+            batch.append(idx)
+            if len(batch) == self.batch_size + 1:
+                yield batch
+                batch = [idx]  # Start next batch with extra item from last
+
+        if len(batch) > 0 and not self.drop_last:
+            yield batch
 
 
 class MNISTSequenceSampler(Sampler):
@@ -11,11 +32,13 @@ class MNISTSequenceSampler(Sampler):
     Draw each digit image (based on label specified by sequence) randomly
     """
 
-    def __init__(self, data_source, sequences=None, batch_size=64, randomize_sequences=False):
+    def __init__(self, data_source, sequences=None, batch_size=64, 
+                 randomize_sequences=False, random_mnist_images=True):
         super(MNISTSequenceSampler, self).__init__(data_source)
         self.data_source = data_source
-        self.bsz = batch_size
+        # self.bsz = batch_size
         self.randomize_sequences = randomize_sequences
+        self.random_mnist_images = random_mnist_images
         self.label_indices = {}  # Digit -> Indices in dataset
         self.label_cursors = {}  # Digit -> Cursor across images for each digit
 
@@ -54,12 +77,14 @@ class MNISTSequenceSampler(Sampler):
             self.sequence_id = 0
         return digit
 
-    def _get_sample(self, digit):
+    def _get_sample_image(self, digit):
         """
         Return a sample image id for digit from MNIST
         """
         cursor = self.label_cursors[digit]
-        self.label_cursors[digit] += 1
+        if self.random_mnist_images:
+            # If not random, always take first digit
+            self.label_cursors[digit] += 1
         indices = self.label_indices[digit]
         if cursor >= len(indices) - 1:
             # Begin sequence from beginning -- should we re-shuffle?
@@ -67,9 +92,11 @@ class MNISTSequenceSampler(Sampler):
         return indices[cursor].item()
 
     def __iter__(self):
+        # Ensure we start at beg of sequence on each enumerate (e.g. epoch)
+        self.sequence_cursor = 0   
         while True:
             digit = self._get_next_digit()
-            next_sample_id = self._get_sample(digit)
+            next_sample_id = self._get_sample_image(digit)
             yield next_sample_id
         return
 
@@ -87,12 +114,13 @@ def pred_sequence_collate(batch, bsz=4, seq_length=3, return_inputs=False):
         target (sl x bs x pixels)
         pred_target (sl x bs x 1)  Label (digit)
     """
-    data = torch.stack([s[0] for s in batch[:-1]]).view(seq_length, bsz, -1)
-    target = torch.stack([s[0] for s in batch[1:]]).view(seq_length, bsz, -1)
-    pred_target = torch.tensor([s[1] for s in batch[1:]]).view(seq_length, bsz)
+    # Transposes needed since batches come in sequential order of size sl * bs
+    data = torch.stack([s[0] for s in batch[:-1]]).view(bsz, seq_length, -1).transpose(0, 1).contiguous()
+    target = torch.stack([s[0] for s in batch[1:]]).view(bsz, seq_length, -1).transpose(0, 1).contiguous()
+    pred_target = torch.tensor([s[1] for s in batch[1:]]).view(bsz, seq_length).t()
     input_labels = None
     if return_inputs:
-        input_labels = torch.tensor([s[1] for s in batch[:-1]]).view(seq_length, bsz)
+        input_labels = torch.tensor([s[1] for s in batch[:-1]]).view(bsz, seq_length).t()
     return (data, target, pred_target, input_labels)
 
 
@@ -107,7 +135,7 @@ class PTBSequenceSampler(Sampler):
         self.data_source = data_source
         self.data_len = len(self.data_source)
         # Choose initial random offsets into PTB, one per item in batch
-        batch_offsets = (torch.rand(self.bsz) * (self.data_len-1)).long()
+        batch_offsets = (torch.rand(self.bsz) * (self.data_len - 1)).long()
         # Increment 1 word ID each row/batch
         inc = torch.arange(0, self.seq_length, dtype=torch.long).expand((self.bsz, self.seq_length)).t()
         self.batch_idxs = batch_offsets.expand((self.seq_length, self.bsz)) + inc

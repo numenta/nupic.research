@@ -68,17 +68,7 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     return ax, fig
 
 
-def activity_square(vector):
-    n = len(vector)
-    side = int(np.sqrt(n))
-    if side ** 2 < n:
-        side += 1
-    square = torch.zeros(side ** 2)
-    square[:n] = vector
-    return square.view(side, side)
-
-
-def plot_col_pred_activity_grid(distrs, n_labels=10):
+def plot_activity_grid(distrs, n_labels=10):
     """
     Plot column activations for each combination of input and actual next input
     Should show mini-column union activity (subsets of column-level activity
@@ -101,4 +91,36 @@ def plot_col_pred_activity_grid(distrs, n_labels=10):
             else:
                 ax.set_axis_off()
 
+    return fig
+
+
+def plot_activity(distrs, n_labels=10, level='column'):
+    """
+    Plot column activations for each combination of input and actual next input
+    Should show mini-column union activity (subsets of column-level activity
+    which predict next input) in the RSM model.
+    """
+    n_plots = len(distrs.keys())
+    fig, axs = plt.subplots(n_plots, 1, dpi=144, gridspec_kw={'hspace': 0.7})
+    pi = 0
+    for i in range(n_labels):
+        for j in range(n_labels):
+            key = '%d-%d' % (i, j)
+            if key in distrs:
+                activity_arr = distrs[key]
+                dist = torch.stack(activity_arr)
+                ax = axs[pi]
+                pi += 1
+                bsz, m, n = dist.size()
+                col_act = dist.max(dim=2).values
+                if level == 'column':
+                    act = col_act
+                elif level == 'cell':
+                    col = col_act.view(bsz, m, 1)
+                    act = torch.cat((dist, col), 2).view(bsz, m, n + 1)
+                mean_act = act.mean(dim=0).cpu()
+                ax.imshow(mean_act.t(), origin='bottom', extent=(0, m-1, 0, n+1))
+                ax.plot([0, m-1], [n, n], linewidth=1)
+                ax.axis('off')
+                ax.set_title(key, fontsize=5)
     return fig

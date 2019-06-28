@@ -6,15 +6,19 @@ from functools import reduce, partial
 
 import torch
 from torchnlp.datasets import penn_treebank_dataset
-from torch.utils.data import DataLoader, BatchSampler
+from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import torchvision.utils as vutils
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+import numpy as np
 
 import lang_util
 from ptb_lstm import LSTMModel
 from rsm import RSMLayer, RSMPredictor
-from viz_util import fig2img, plot_confusion_matrix, plot_col_pred_activity_grid
+from viz_util import fig2img, plot_confusion_matrix, plot_activity
 from rsm_samplers import (
+    PredictiveBatchSampler,
     MNISTSequenceSampler,
     pred_sequence_collate,
     PTBSequenceSampler,
@@ -43,6 +47,7 @@ class RSMExperiment(object):
         self.eval_interval = config.get("eval_interval", 5)
         self.model_kind = config.get("model_kind", "rsm")
         self.debug = config.get("debug", False)
+        self.plot_gradients = config.get("plot_gradients", False)
         self.writer = None
 
         self.iterations = config.get("iterations", 200)
@@ -76,6 +81,8 @@ class RSMExperiment(object):
         self.activation_fn = config.get("activation_fn", 'tanh')
         self.active_dendrites = config.get("active_dendrites", None)
         self.col_output_cells = config.get("col_output_cells", None)
+        self.clear_memory_each_subseq = config.get("clear_memory_each_subseq", False)
+        self.static_digit = config.get("static_digit", False)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -88,13 +95,14 @@ class RSMExperiment(object):
         self.loss_function = config.get("loss_function", "MSELoss")
         self.lr_step_schedule = config.get("lr_step_schedule", None)
         self.learning_rate_gamma = config.get("learning_rate_gamma", 0.1)
+        self.learning_rate_min = config.get("learning_rate_min", 0.0)
 
         # Training state
         self.best_val_loss = None
         self.do_anneal_learning = False
 
         # Additional state for vis, etc
-        self.column_activity_by_inputs = {}  # 'digit-digit' -> list of distribution arrays
+        self.activity_by_inputs = {}  # 'digit-digit' -> list of distribution arrays
 
     def _build_dataloader(self):
         # Extra element for sequential prediction labels
@@ -114,14 +122,17 @@ class RSMExperiment(object):
             train_sampler = MNISTSequenceSampler(self.dataset, 
                                                  sequences=self.sequences,
                                                  batch_size=self.batch_size,
-                                                 randomize_sequences=self.randomize_sequences)
+                                                 randomize_sequences=self.randomize_sequences,
+                                                 random_mnist_images=not self.static_digit)
 
-            train_batch_sampler = BatchSampler(train_sampler, batch_size=self.seq_length * self.batch_size + 1, drop_last=True)
+            train_batch_sampler = PredictiveBatchSampler(train_sampler, batch_size=self.seq_length * self.batch_size)
+
             val_sampler = MNISTSequenceSampler(self.val_dataset, 
                                                sequences=self.sequences,
                                                batch_size=self.batch_size,
-                                               randomize_sequences=self.randomize_sequences)
-            val_batch_sampler = BatchSampler(val_sampler, batch_size=self.seq_length * self.batch_size + 1, drop_last=True)
+                                               randomize_sequences=self.randomize_sequences,
+                                               random_mnist_images=not self.static_digit)
+            val_batch_sampler = PredictiveBatchSampler(val_sampler, batch_size=self.seq_length * self.batch_size)
             collate_fn = partial(pred_sequence_collate, 
                                  bsz=self.batch_size,
                                  seq_length=train_sampler.seq_length,
@@ -227,10 +238,10 @@ class RSMExperiment(object):
 
     def _image_grid(self, image_batch, nrow=12, compare_with=None):
         side = 28
-        image_batch = image_batch.reshape(self.batch_size * self.seq_length, 1, side, side)
+        image_batch = image_batch.transpose(0, 1).reshape(self.batch_size * self.seq_length, 1, side, side)
         if compare_with is not None:
             # Interleave comparison images with image_batch
-            compare_with = compare_with.reshape(self.batch_size * self.seq_length, 1, side, side)
+            compare_with = compare_with.transpose(0, 1).reshape(self.batch_size * self.seq_length, 1, side, side)
             batch = torch.empty((image_batch.shape[0] + compare_with.shape[0], image_batch.shape[1], side, side))
             batch[::2, :, :] = image_batch
             batch[1::2, :, :] = compare_with
@@ -240,6 +251,34 @@ class RSMExperiment(object):
         grid = vutils.make_grid(batch, normalize=True, nrow=nrow, padding=5).mean(dim=0)  
         return grid
 
+    def _plot_grad_flow(self):
+        '''Plots the gradients flowing through different layers in the net during training.
+        Can be used for checking for possible gradient vanishing / exploding problems.
+
+        Usage: Plug this function in Trainer class after loss.backwards() as 
+        "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
+        ave_grads = []
+        max_grads = []
+        layers = []
+        for n, p in self.model.named_parameters():
+            if(p.requires_grad) and ("bias" not in n):
+                layers.append(n)
+                ave_grads.append(p.grad.abs().mean())
+                max_grads.append(p.grad.abs().max())
+        plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
+        plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
+        plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
+        plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+        plt.xlim(left=0, right=len(ave_grads))
+        plt.ylim(bottom = -0.001, top=0.02) # zoom in on the lower gradient regions
+        plt.xlabel("Layers")
+        plt.ylabel("average gradient")
+        plt.title("Gradient flow")
+        plt.grid(True)
+        plt.legend([Line2D([0], [0], color="c", lw=4),
+                    Line2D([0], [0], color="b", lw=4),
+                    Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
+
     def _repackage_hidden(self, h):
         """Wraps hidden states in new Tensors, to detach them from their history."""
         if isinstance(h, torch.Tensor):
@@ -247,12 +286,12 @@ class RSMExperiment(object):
         else:
             return tuple(self._repackage_hidden(v) for v in h)
 
-    def _adjust_learning_rate(self, optimizer, epoch):
-        if self.do_anneal_learning:
+    def _adjust_learning_rate(self, epoch):
+        if self.do_anneal_learning and self.learning_rate > self.learning_rate_min:
             self.learning_rate *= self.learning_rate_gamma
             self.do_anneal_learning = False
             print("Reducing learning rate by gamma %.2f to: %.5f" % (self.learning_rate_gamma, self.learning_rate))
-            for param_group in optimizer.param_groups:
+            for param_group in self.optimizer.param_groups:
                 param_group["lr"] = self.learning_rate
 
     def _maybe_resize_outputs_targets(self, x_a_next, targets):
@@ -260,19 +299,19 @@ class RSMExperiment(object):
         targets = targets.view(-1, self.d_out)
         return x_a_next, targets
 
-    def _store_col_activity_for_grid(self, x_bs, input_labels, pred_labels):
+    def _store_activity_for_viz(self, x_bs, input_labels, pred_labels):
         """
-        Aggregate column activity for a supplied batch
+        Aggregate activity for a supplied batch
         """
         for x_b_batch, label_batch, target_batch in zip(x_bs, input_labels, pred_labels):
             for _x_b, label, target in zip(x_b_batch, label_batch, target_batch):
                 _label = label.item()
                 _label_next = target.item()
-                col_activity = _x_b.detach().view(self.m_groups, -1).max(dim=1).values
+                activity = _x_b.detach().view(self.m_groups, -1)
                 key = "%d-%d" % (_label, _label_next)
-                if key not in self.column_activity_by_inputs:
-                    self.column_activity_by_inputs[key] = []
-                self.column_activity_by_inputs[key].append(col_activity)
+                if key not in self.activity_by_inputs:
+                    self.activity_by_inputs[key] = []
+                self.activity_by_inputs[key].append(activity)
 
     def _do_prediction(self, x_bs, pred_targets, total_samples, correct_samples, 
                        total_pred_loss, train=False, confusion=False):
@@ -318,7 +357,7 @@ class RSMExperiment(object):
                 x_a_next, hidden, x_bs = self.model(inputs, hidden)
 
                 # Loss
-                x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
+                # x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
                 loss = self.loss(x_a_next, targets)
                 total_loss += loss.item()
 
@@ -331,16 +370,17 @@ class RSMExperiment(object):
                 if batch_idx == 0:
                     # Produce images only for first batch during eval
                     if self.dataset_kind == 'mnist':
-                        ret['img_inputs'] = self._image_grid(inputs).cpu()
+                        # ret['img_inputs'] = self._image_grid(inputs).cpu()
                         ret['img_preds'] = self._image_grid(x_a_next, compare_with=targets, nrow=self.seq_length * 2).cpu()
                         if cm_fig:
                             ret['img_confusion'] = fig2img(cm_fig)
 
                         # Summary of column activation by input & next input
-                        self._store_col_activity_for_grid(x_bs, input_labels, pred_targets)
-                        col_activity_grid = plot_col_pred_activity_grid(self.column_activity_by_inputs, 
-                                                                        n_labels=self.predictor_output_size)
-                        self.column_activity_by_inputs = {}
+                        self._store_activity_for_viz(x_bs, input_labels, pred_targets)
+                        col_activity_grid = plot_activity(self.activity_by_inputs, 
+                                                          n_labels=self.predictor_output_size,
+                                                          level='cell')
+                        self.activity_by_inputs = {}
                         ret['img_col_activity'] = fig2img(col_activity_grid)
 
                     ret.update(self.model._track_weights())
@@ -386,7 +426,6 @@ class RSMExperiment(object):
 
         for batch_idx, (inputs, targets, pred_targets, _) in enumerate(self.train_loader):
             # Parallelized inputs are of shape (seq_len, batch, input_size)
-
             hidden = self._repackage_hidden(hidden)
 
             self.optimizer.zero_grad()
@@ -401,13 +440,16 @@ class RSMExperiment(object):
             x_a_next, hidden, x_bs = self.model(inputs, hidden)
 
             # Loss
-            x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
+            # x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
 
             loss = self.loss(x_a_next, targets)
             total_loss += loss.item()
 
             # RSM backward + optimize
             loss.backward()
+
+            if self.plot_gradients:
+                self._plot_gradient_flow()
 
             if self.model_kind == "lstm":
                 # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
@@ -430,6 +472,9 @@ class RSMExperiment(object):
                 if self.predictor:
                     acc = 100 * correct_samples / total_samples
                     print("Partial train predictor accuracy: %.3f%%" % (acc))
+
+            if self.clear_memory_each_subseq:
+                hidden = self.model.init_hidden(self.batch_size)
 
         if self.eval_interval and epoch % self.eval_interval == 0:
             # Evaluate each x epochs
@@ -458,7 +503,7 @@ class RSMExperiment(object):
         The set of actions to do after each epoch of training: adjust learning
         rate, rezero sparse weights, and update boost strengths.
         """
-        self._adjust_learning_rate(self.optimizer, epoch)
+        self._adjust_learning_rate(epoch)
 
     def model_save(self, checkpoint_dir):
         """Save the model in this directory.
