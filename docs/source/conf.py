@@ -98,7 +98,7 @@ html_theme_options = {
     "github_banner": True,
     "github_button": True,
     "github_user": "numenta",
-    "github_repo": "nupic.torch",
+    "github_repo": "nupic.research",
 }
 
 # If true, links to the reST sources are added to the pages.
