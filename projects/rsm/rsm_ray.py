@@ -188,6 +188,20 @@ def parse_options():
         dest="predict",
         help="run prediction on trained model"
     )
+    optparser.add_argument(
+        "-l",
+        "--plot_gradients",
+        dest="plot_gradients",
+        help="Plot gradients for debugging",
+        default=False
+    )
+    optparser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        help="Verbosity",
+        default=0
+    )
 
     return optparser.parse_args()
 
@@ -228,6 +242,8 @@ if __name__ == "__main__":
         config["num_gpus"] = options.num_gpus
         config["resume"] = options.resume
         config["predict"] = options.predict
+        config["plot_gradients"] = options.plot_gradients
+        config["verbose"] = options.verbose
 
         # Make sure local directories are relative to the project location
         path = os.path.expanduser(config.get("path", "~/nta/results"))

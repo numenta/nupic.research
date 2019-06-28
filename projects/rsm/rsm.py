@@ -1,9 +1,11 @@
 from copy import deepcopy
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 import torch
 from torch import nn
 import torch.nn.functional as F
+import numpy as np
 
 from viz_util import activity_square
 from nupic.research.frameworks.pytorch.functions import KWinnersMask
@@ -87,8 +89,8 @@ class RSMLayer(torch.nn.Module):
     def __init__(self, d_in=28 * 28, d_out=28 * 28, m=200, n=6, k=25,
                  k_winner_cells=1, gamma=0.5, eps=0.5, activation_fn='tanh',
                  cell_winner_softmax=False, active_dendrites=None,
-                 col_output_cells=None,
-                 embed_dim=0, vocab_size=0, debug=False, visual_debug=False,
+                 col_output_cells=None, embed_dim=0, vocab_size=0, 
+                 debug=False, visual_debug=False,
                  **kwargs):
         """
         RSM Layer as specified by Rawlinson et al 2019
@@ -186,7 +188,7 @@ class RSMLayer(torch.nn.Module):
         """
         mask = KWinnersMask.apply(pi.view(bsz * self.m, self.n), self.k_winner_cells)
         mask = mask.view(bsz, self.total_cells)
-        return mask
+        return mask.detach()
 
     def _k_col_winners(self, lambda_i, bsz):
         """
@@ -194,15 +196,17 @@ class RSMLayer(torch.nn.Module):
         """
         mask = KWinnersMask.apply(lambda_i, self.k)
         mask = mask.view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells)
-        return mask
+        return mask.detach()
 
     def _inhibited_masking_and_prediction(self, sigma, phi, bsz):
         """
         Compute y_lambda
         """
-        # Apply inhibition and shift to be non-neg
+        # Apply inhibition to non-neg shifted sigma
         pi = (1 - phi) * (sigma - sigma.min() + 1)
         self._debug_log({'pi': pi})
+
+        pi = pi.detach()  # Prevent gradients from flowing through inhibition/masking
 
         if self.col_output_cells:
             max_val = pi.max()
