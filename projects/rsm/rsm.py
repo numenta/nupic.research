@@ -1,14 +1,21 @@
 from copy import deepcopy
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 
 import torch
 from torch import nn
 import torch.nn.functional as F
-import numpy as np
 
 from viz_util import activity_square
-from nupic.research.frameworks.pytorch.functions import KWinnersMask
+
+
+def topk_mask(x, k=2):
+    """
+    Simple functional version of KWinnersMask/KWinners since
+    autograd function apparently not currently exportable by JIT
+    """
+    res = torch.zeros_like(x)
+    topk, indices = x.topk(k, sorted=False)
+    return res.scatter(-1, indices, 1)
 
 
 class LocalLinear(nn.Module):
@@ -155,13 +162,6 @@ class RSMLayer(torch.nn.Module):
                         plt.title("%s (%s, %s)" % (name, size, _type))
                         plt.show()
 
-    def _track_weights(self):
-        ret = {}
-        ret['hist_w_a'] = self.linear_a.weight.cpu()
-        ret['hist_w_b'] = self.linear_b.weight.cpu()
-        ret['hist_w_d'] = self.linear_d.weight.cpu()
-        return ret
-
     def _group_max(self, activity):
         """
         :param activity: activity vector (bsz x total_cells)
@@ -186,7 +186,7 @@ class RSMLayer(torch.nn.Module):
         """
         Make a bsz x total_cells binary mask of top 1 cell in each column
         """
-        mask = KWinnersMask.apply(pi.view(bsz * self.m, self.n), self.k_winner_cells)
+        mask = topk_mask(pi.view(bsz * self.m, self.n), self.k_winner_cells)
         mask = mask.view(bsz, self.total_cells)
         return mask.detach()
 
@@ -194,7 +194,7 @@ class RSMLayer(torch.nn.Module):
         """
         Make a bsz x total_cells binary mask of top self.k columns
         """
-        mask = KWinnersMask.apply(lambda_i, self.k)
+        mask = topk_mask(lambda_i, self.k)
         mask = mask.view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells)
         return mask.detach()
 
@@ -248,13 +248,6 @@ class RSMLayer(torch.nn.Module):
         phi = torch.max(phi * self.gamma, y)
 
         return (phi, psi)
-
-    def init_hidden(self, batch_size):
-        weight = next(self.parameters())
-        x_b = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        phi = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        psi = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        return (x_b, phi, psi)
 
     def forward(self, x_a_batch, hidden):
         """
