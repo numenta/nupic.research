@@ -1,14 +1,21 @@
 from copy import deepcopy
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 
 import torch
 from torch import nn
 import torch.nn.functional as F
-import numpy as np
 
 from viz_util import activity_square
-from nupic.research.frameworks.pytorch.functions import KWinnersMask
+
+
+def topk_mask(x, k=2):
+    """
+    Simple functional version of KWinnersMask/KWinners since
+    autograd function apparently not currently exportable by JIT
+    """
+    res = torch.zeros_like(x)
+    topk, indices = x.topk(k, sorted=False)
+    return res.scatter(-1, indices, 1)
 
 
 class LocalLinear(nn.Module):
@@ -90,7 +97,7 @@ class RSMLayer(torch.nn.Module):
                  k_winner_cells=1, gamma=0.5, eps=0.5, activation_fn='tanh',
                  cell_winner_softmax=False, active_dendrites=None,
                  col_output_cells=None, embed_dim=0, vocab_size=0, 
-                 debug=False, visual_debug=False,
+                 debug=False, visual_debug=False, seq_length=8,
                  **kwargs):
         """
         RSM Layer as specified by Rawlinson et al 2019
@@ -112,6 +119,8 @@ class RSMLayer(torch.nn.Module):
         self.eps = eps
         self.d_in = d_in
         self.d_out = d_out
+
+        self.seq_length = seq_length
 
         # Tweaks
         self.activation_fn = activation_fn
@@ -155,13 +164,6 @@ class RSMLayer(torch.nn.Module):
                         plt.title("%s (%s, %s)" % (name, size, _type))
                         plt.show()
 
-    def _track_weights(self):
-        ret = {}
-        ret['hist_w_a'] = self.linear_a.weight.cpu()
-        ret['hist_w_b'] = self.linear_b.weight.cpu()
-        ret['hist_w_d'] = self.linear_d.weight.cpu()
-        return ret
-
     def _group_max(self, activity):
         """
         :param activity: activity vector (bsz x total_cells)
@@ -186,7 +188,7 @@ class RSMLayer(torch.nn.Module):
         """
         Make a bsz x total_cells binary mask of top 1 cell in each column
         """
-        mask = KWinnersMask.apply(pi.view(bsz * self.m, self.n), self.k_winner_cells)
+        mask = topk_mask(pi.view(bsz * self.m, self.n), self.k_winner_cells)
         mask = mask.view(bsz, self.total_cells)
         return mask.detach()
 
@@ -194,7 +196,7 @@ class RSMLayer(torch.nn.Module):
         """
         Make a bsz x total_cells binary mask of top self.k columns
         """
-        mask = KWinnersMask.apply(lambda_i, self.k)
+        mask = topk_mask(lambda_i, self.k)
         mask = mask.view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells)
         return mask.detach()
 
@@ -249,18 +251,10 @@ class RSMLayer(torch.nn.Module):
 
         return (phi, psi)
 
-    def init_hidden(self, batch_size):
-        weight = next(self.parameters())
-        x_b = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        phi = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        psi = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        return (x_b, phi, psi)
-
     def forward(self, x_a_batch, hidden):
         """
         :param x_a_batch: Input batch of batch_size seq_len sequences (seq_len, batch_size, d_in)
         """
-        seq_len = x_a_batch.size(0)
         bsz = x_a_batch.size(1)
 
         output = None
@@ -268,7 +262,7 @@ class RSMLayer(torch.nn.Module):
 
         x_b, phi, psi = hidden
 
-        for seqi in range(seq_len):
+        for seqi in range(self.seq_length):
             x_a_row = x_a_batch[seqi, :]
 
             self._debug_log({'seqi': seqi, 'x_a_row': x_a_row})
@@ -283,10 +277,7 @@ class RSMLayer(torch.nn.Module):
             self._debug_log({'phi': phi, 'psi': psi})
 
             # Update recurrent input / output x_b
-            alpha = psi.sum()
-            if not alpha:
-                alpha = 1.0
-            x_b = (psi / alpha)  # Normalizing scalar (force sum(x_b) == 1)
+            x_b = psi / (psi.sum() + 1e-9)  # Normalizing scalar (force sum(x_b) == 1), this small enough?
             self._debug_log({'x_b': x_b})
 
             if output is None:
@@ -300,7 +291,7 @@ class RSMLayer(torch.nn.Module):
 
         hidden = (x_b, phi, psi)
 
-        return (output.view(seq_len, bsz, self.d_out), hidden, x_bs.view(seq_len, bsz, self.total_cells))
+        return (output.view(self.seq_length, bsz, self.d_out), hidden, x_bs.view(self.seq_length, bsz, self.total_cells))
 
 
 if __name__ == "__main__":
