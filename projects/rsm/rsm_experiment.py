@@ -220,11 +220,13 @@ class RSMExperiment(object):
                                   col_output_cells=self.col_output_cells,
                                   embed_dim=self.embed_dim,
                                   vocab_size=self.vocab_size,
+                                  seq_length=self.seq_length,
                                   debug=self.debug)
             if self.jit_trace:
                 # Trace model (Can produce ~25% speed improvement)
                 inputs = torch.rand(self.seq_length, self.batch_size, self.d_in)
-                hidden = self._init_hidden()
+                hidden = self._init_hidden(self.batch_size)
+                print(">> Running JIT trace...")
                 self.model = torch.jit.trace(self.model, (inputs, hidden))
 
             if self.predictor_hidden_size:
@@ -311,10 +313,10 @@ class RSMExperiment(object):
         return ret
 
     def _init_hidden(self, batch_size):
-        weight = next(self.model.parameters())
-        x_b = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        phi = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        psi = weight.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
+        param = next(self.model.parameters())
+        x_b = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
+        phi = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
+        psi = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
         return (x_b, phi, psi)
 
     def _maybe_resize_outputs_targets(self, x_a_next, targets):
@@ -449,6 +451,7 @@ class RSMExperiment(object):
 
         for batch_idx, (inputs, targets, pred_targets, _) in enumerate(self.train_loader):
             # Parallelized inputs are of shape (seq_len, batch, input_size)
+
             hidden = self._repackage_hidden(hidden)
 
             self.optimizer.zero_grad()
@@ -464,16 +467,11 @@ class RSMExperiment(object):
 
             # Loss
             # x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
-
             loss = self.loss(x_a_next, targets)
             total_loss += loss.item()
 
             # RSM backward + optimize
             loss.backward()
-
-            if self.plot_gradients:
-                self._plot_gradient_flow()
-
             if self.model_kind == "lstm":
                 # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.25)
@@ -481,6 +479,9 @@ class RSMExperiment(object):
                     p.data.add_(-self.learning_rate, p.grad.data)
             else:
                 self.optimizer.step()
+
+            if self.plot_gradients:
+                self._plot_gradient_flow()
 
             total_samples, correct_samples, total_pred_loss, _ = self._do_prediction(
                 x_bs, pred_targets, total_samples, correct_samples, total_pred_loss,
