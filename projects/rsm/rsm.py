@@ -277,7 +277,8 @@ class RSMLayer(torch.nn.Module):
             self._debug_log({'phi': phi, 'psi': psi})
 
             # Update recurrent input / output x_b
-            x_b = psi / (psi.sum() + 1e-9)  # Normalizing scalar (force sum(x_b) == 1), this small enough?
+            # Normalizing scalar (force sum(x_b) == 1), avoiding div 0... this small enough?
+            x_b = psi / (psi.sum() + 1e-9)
             self._debug_log({'x_b': x_b})
 
             if output is None:
