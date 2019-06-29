@@ -5,7 +5,6 @@ import sys
 from functools import reduce, partial
 
 import torch
-from torchnlp.datasets import penn_treebank_dataset
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import torchvision.utils as vutils
@@ -13,8 +12,8 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 
-import lang_util
-from ptb_lstm import LSTMModel
+from ptb import lang_util
+from ptb.ptb_lstm import LSTMModel
 from rsm import RSMLayer, RSMPredictor
 from viz_util import fig2img, plot_confusion_matrix, plot_activity
 from rsm_samplers import (
@@ -149,6 +148,7 @@ class RSMExperiment(object):
                                          collate_fn=collate_fn)
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
+            from torchnlp.datasets import penn_treebank_dataset
             penn_treebank_dataset(self.data_dir + '/PTB', train=True)
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
             train_sampler = PTBSequenceSampler(corpus.train, batch_size=self.batch_size,
@@ -237,8 +237,10 @@ class RSMExperiment(object):
 
         elif self.model_kind == "lstm":
             self.model = LSTMModel(vocab_size=self.vocab_size,
-                                   emb_size=self.embed_dim,
-                                   nhid=200,
+                                   embed_dim=self.embed_dim,
+                                   nhid=self.m_groups,
+                                   d_in=self.d_in,
+                                   d_out=self.d_out,
                                    dropout=0.5,
                                    nlayers=2)
 
@@ -313,11 +315,14 @@ class RSMExperiment(object):
         return ret
 
     def _init_hidden(self, batch_size):
-        param = next(self.model.parameters())
-        x_b = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        phi = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        psi = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
-        return (x_b, phi, psi)
+        if self.model_kind == 'rsm':
+            param = next(self.model.parameters())
+            x_b = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
+            phi = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
+            psi = param.new_zeros((batch_size, self.total_cells), dtype=torch.float32, requires_grad=False)
+            return (x_b, phi, psi)
+        elif self.model_kind == 'lstm':
+            return self.model.init_hidden(batch_size)
 
     def _maybe_resize_outputs_targets(self, x_a_next, targets):
         x_a_next = x_a_next.view(-1, self.d_out)
@@ -401,12 +406,13 @@ class RSMExperiment(object):
                             ret['img_confusion'] = fig2img(cm_fig)
 
                         # Summary of column activation by input & next input
-                        self._store_activity_for_viz(x_bs, input_labels, pred_targets)
-                        col_activity_grid = plot_activity(self.activity_by_inputs, 
-                                                          n_labels=self.predictor_output_size,
-                                                          level='cell')
-                        self.activity_by_inputs = {}
-                        ret['img_col_activity'] = fig2img(col_activity_grid)
+                        if self.model_kind == 'rsm':
+                            self._store_activity_for_viz(x_bs, input_labels, pred_targets)
+                            col_activity_grid = plot_activity(self.activity_by_inputs, 
+                                                              n_labels=self.predictor_output_size,
+                                                              level='cell')
+                            self.activity_by_inputs = {}
+                            ret['img_col_activity'] = fig2img(col_activity_grid)
 
                     ret.update(self._track_weights())
 
