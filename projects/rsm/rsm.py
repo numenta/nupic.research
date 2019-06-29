@@ -97,7 +97,7 @@ class RSMLayer(torch.nn.Module):
                  k_winner_cells=1, gamma=0.5, eps=0.5, activation_fn='tanh',
                  cell_winner_softmax=False, active_dendrites=None,
                  col_output_cells=None, embed_dim=0, vocab_size=0, 
-                 debug=False, visual_debug=False,
+                 debug=False, visual_debug=False, seq_length=8,
                  **kwargs):
         """
         RSM Layer as specified by Rawlinson et al 2019
@@ -119,6 +119,8 @@ class RSMLayer(torch.nn.Module):
         self.eps = eps
         self.d_in = d_in
         self.d_out = d_out
+
+        self.seq_length = seq_length
 
         # Tweaks
         self.activation_fn = activation_fn
@@ -253,7 +255,6 @@ class RSMLayer(torch.nn.Module):
         """
         :param x_a_batch: Input batch of batch_size seq_len sequences (seq_len, batch_size, d_in)
         """
-        seq_len = x_a_batch.size(0)
         bsz = x_a_batch.size(1)
 
         output = None
@@ -261,7 +262,7 @@ class RSMLayer(torch.nn.Module):
 
         x_b, phi, psi = hidden
 
-        for seqi in range(seq_len):
+        for seqi in range(self.seq_length):
             x_a_row = x_a_batch[seqi, :]
 
             self._debug_log({'seqi': seqi, 'x_a_row': x_a_row})
@@ -276,10 +277,7 @@ class RSMLayer(torch.nn.Module):
             self._debug_log({'phi': phi, 'psi': psi})
 
             # Update recurrent input / output x_b
-            alpha = psi.sum()
-            if not alpha:
-                alpha = 1.0
-            x_b = (psi / alpha)  # Normalizing scalar (force sum(x_b) == 1)
+            x_b = psi / (psi.sum() + 1e-9)  # Normalizing scalar (force sum(x_b) == 1), this small enough?
             self._debug_log({'x_b': x_b})
 
             if output is None:
@@ -293,7 +291,7 @@ class RSMLayer(torch.nn.Module):
 
         hidden = (x_b, phi, psi)
 
-        return (output.view(seq_len, bsz, self.d_out), hidden, x_bs.view(seq_len, bsz, self.total_cells))
+        return (output.view(self.seq_length, bsz, self.d_out), hidden, x_bs.view(self.seq_length, bsz, self.total_cells))
 
 
 if __name__ == "__main__":
