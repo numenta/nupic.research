@@ -41,7 +41,7 @@ config = dict(
     # input_size=784,
     # model params
     # model=tune.grid_search(['BaseModel', 'SparseModel']),
-    model=tune.grid_search("[BaseModel, SparseModel, SETFaster]"),
+    model=tune.grid_search(['BaseModel', 'SparseModel', 'SET_faster']),
     # model='BaseModel',
     debug_sparse=True,
     dataset_name="CIFAR10",
@@ -63,8 +63,8 @@ tune.run(
     config=config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 100},
-    resources_per_trial={"cpu": 1, "gpu": 0.3},
+    stop={"training_iteration": 10},
+    resources_per_trial={"cpu": 1, "gpu": 0},
 )
 
 """"
