@@ -203,7 +203,7 @@ class SparseModel(BaseModel):
                 if train:
                     loss.backward()
                     # zero the gradients for dead connections
-                    for mask, m in zip(masks, self.sparse_modules):
+                    for mask, m in zip(self.masks, self.sparse_modules):
                         m.weight.grad *= mask
                     self.optimizer.step()
 
