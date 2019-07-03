@@ -15,7 +15,7 @@ import numpy as np
 from ptb import lang_util
 from ptb.ptb_lstm import LSTMModel
 from rsm import RSMLayer, RSMPredictor
-from viz_util import fig2img, plot_confusion_matrix, plot_activity
+from util import fig2img, plot_confusion_matrix, plot_activity
 from rsm_samplers import (
     PredictiveBatchSampler,
     MNISTSequenceSampler,
@@ -75,6 +75,7 @@ class RSMExperiment(object):
         self.gamma = config.get("gamma", 0.5)
         self.eps = config.get("eps", 0.5)
         self.k_winner_cells = config.get("k_winner_cells", 1)
+        self.dropout_p = config.get("dropout_p", 0.5)
 
         # Tweaks
         self.cell_winner_softmax = config.get("cell_winner_softmax", False)
@@ -83,6 +84,11 @@ class RSMExperiment(object):
         self.col_output_cells = config.get("col_output_cells", None)
         self.clear_memory_each_subseq = config.get("clear_memory_each_subseq", False)
         self.static_digit = config.get("static_digit", False)
+        self.use_mnist_pct = config.get("use_mnist_pct", 1.0)
+        self.pred_l2_reg = config.get("pred_l2_reg", 1e-5)
+        self.decode_from_full_memory = config.get("decode_from_full_memory", False)
+        self.boost_strat = config.get("boost_strat", "rsm_inhibition")
+        self.col_inhib = config.get("col_inhib", False)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -126,15 +132,22 @@ class RSMExperiment(object):
                                                  sequences=self.sequences,
                                                  batch_size=self.batch_size,
                                                  randomize_sequences=self.randomize_sequences,
-                                                 random_mnist_images=not self.static_digit)
+                                                 random_mnist_images=not self.static_digit,
+                                                 use_mnist_pct=self.use_mnist_pct)
 
             train_batch_sampler = PredictiveBatchSampler(train_sampler, batch_size=self.seq_length * self.batch_size)
 
-            val_sampler = MNISTSequenceSampler(self.val_dataset, 
-                                               sequences=self.sequences,
-                                               batch_size=self.batch_size,
-                                               randomize_sequences=self.randomize_sequences,
-                                               random_mnist_images=not self.static_digit)
+            if self.static_digit:
+                # For static digit paradigm, val & train samplers much match to ensure same digit
+                # prototype used for each sequence item.
+                val_sampler = train_sampler
+            else:
+                val_sampler = MNISTSequenceSampler(self.val_dataset, 
+                                                   sequences=self.sequences,
+                                                   batch_size=self.batch_size,
+                                                   randomize_sequences=self.randomize_sequences,
+                                                   random_mnist_images=not self.static_digit,
+                                                   use_mnist_pct=self.use_mnist_pct)
             val_batch_sampler = PredictiveBatchSampler(val_sampler, batch_size=self.seq_length * self.batch_size)
             collate_fn = partial(pred_sequence_collate, 
                                  bsz=self.batch_size,
@@ -179,7 +192,8 @@ class RSMExperiment(object):
                                               lr=self.learning_rate)
             if self.predictor:
                 self.pred_optimizer = torch.optim.Adam(self.predictor.parameters(),
-                                                       lr=self.learning_rate)
+                                                       lr=self.learning_rate,
+                                                       weight_decay=self.pred_l2_reg)
         else:
             self.optimizer = torch.optim.SGD(self.model.parameters(),
                                              lr=self.learning_rate,
@@ -187,7 +201,8 @@ class RSMExperiment(object):
             if self.predictor:
                 self.pred_optimizer = torch.optim.SGD(self.predictor.parameters(),
                                                       lr=self.learning_rate,
-                                                      momentum=self.momentum)
+                                                      momentum=self.momentum,
+                                                      weight_decay=self.pred_l2_reg)
 
     def model_setup(self, config):
         seed = config.get("seed", random.randint(0, 10000))
@@ -218,8 +233,13 @@ class RSMExperiment(object):
                                   activation_fn=self.activation_fn,
                                   active_dendrites=self.active_dendrites,
                                   col_output_cells=self.col_output_cells,
+                                  dropout_p=self.dropout_p,
+                                  decode_from_full_memory=self.decode_from_full_memory,
+                                  boost_strat=self.boost_strat,
+                                  col_inhib=self.col_inhib,
                                   embed_dim=self.embed_dim,
                                   vocab_size=self.vocab_size,
+                                  bsz=self.batch_size,
                                   seq_length=self.seq_length,
                                   debug=self.debug)
             if self.jit_trace:
@@ -310,8 +330,8 @@ class RSMExperiment(object):
     def _track_weights(self):
         ret = {}
         for name, param in self.model.named_parameters():
-            if hasattr(param, 'weight'):
-                ret[name] = param.weight.cpu()
+            if 'weight' in name:
+                ret['hist_' + name] = param.data.cpu()
         return ret
 
     def _init_hidden(self, batch_size):
@@ -366,7 +386,8 @@ class RSMExperiment(object):
     def _eval(self):
         ret = {}
         print("Evaluating...")
-        self.model.eval()
+        # Disable dropout
+        self.model.eval()  
         if self.predictor:
             self.predictor.eval()
 
@@ -446,7 +467,7 @@ class RSMExperiment(object):
 
         ret = {}
 
-        self.model.train()
+        self.model.train()  # Needed if using dropout
         if self.predictor:
             self.predictor.train()
 
@@ -476,8 +497,12 @@ class RSMExperiment(object):
             loss = self.loss(x_a_next, targets)
             total_loss += loss.item()
 
+            if self.debug:
+                self.model._register_hooks()
+
             # RSM backward + optimize
             loss.backward()
+
             if self.model_kind == "lstm":
                 # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.25)

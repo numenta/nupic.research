@@ -1,11 +1,11 @@
-from copy import deepcopy
 import matplotlib.pyplot as plt
 
 import torch
 from torch import nn
-import torch.nn.functional as F
 
-from viz_util import activity_square
+from active_dendrites import ActiveDendriteLayer
+from util import get_grad_printer, activity_square
+from nupic.torch.modules.k_winners import KWinners
 
 
 def topk_mask(x, k=2):
@@ -16,51 +16,6 @@ def topk_mask(x, k=2):
     res = torch.zeros_like(x)
     topk, indices = x.topk(k, sorted=False)
     return res.scatter(-1, indices, 1)
-
-
-class LocalLinear(nn.Module):
-    """
-    """
-    def __init__(self, in_features, local_features, kernel_size, stride=1, bias=True):
-        super(LocalLinear, self).__init__()
-        self.kernel_size = kernel_size
-        self.stride = stride
-
-        fold_num = (in_features - self.kernel_size) // self.stride + 1
-        self.lc = nn.ModuleList([deepcopy(nn.Linear(kernel_size, local_features, bias=bias))
-                                 for _ in range(fold_num)])
-
-    def forward(self, x):
-        x = x.unfold(-1, size=self.kernel_size, step=self.stride)
-        fold_num = x.shape[1]
-        x = torch.cat([self.lc[i](x[:, i, :]) for i in range(fold_num)], 1)
-        return x
-
-
-class ActiveDendriteLayer(torch.nn.Module):
-    """
-    Local layer for active dendrites. Similar to a non-shared weight version of a
-    2D Conv layer.
-
-    Note that dendrites are fully connected to input, local layer used only for connecting
-    neurons and their dendrites
-    """
-    def __init__(self, input_dim, n_cells=50, n_dendrites=3):
-        super(ActiveDendriteLayer, self).__init__()
-        self.n_cells = n_cells
-        self.n_dendrites = n_dendrites
-
-        total_dendrites = n_dendrites * n_cells
-        self.linear_dend = nn.Linear(input_dim, total_dendrites)
-        self.linear_neuron = LocalLinear(total_dendrites, 1, n_dendrites, stride=n_dendrites)
-
-    def __repr__(self):
-        return "ActiveDendriteLayer neur=%d, dend per neuron=%d" % (self.n_cells, self.n_dendrites)
-
-    def forward(self, x):
-        x = F.relu(self.linear_dend(x))
-        x = self.linear_neuron(x)
-        return x
 
 
 class RSMPredictor(torch.nn.Module):
@@ -97,6 +52,8 @@ class RSMLayer(torch.nn.Module):
                  k_winner_cells=1, gamma=0.5, eps=0.5, activation_fn='tanh',
                  cell_winner_softmax=False, active_dendrites=None,
                  col_output_cells=None, embed_dim=0, vocab_size=0, 
+                 bsz=64, dropout_p=0.5, decode_from_full_memory=False,
+                 boost_strat='rsm_inhibition', col_inhib=False,
                  debug=False, visual_debug=False, seq_length=8,
                  **kwargs):
         """
@@ -119,50 +76,79 @@ class RSMLayer(torch.nn.Module):
         self.eps = eps
         self.d_in = d_in
         self.d_out = d_out
+        self.dropout_p = dropout_p
 
         self.seq_length = seq_length
+        self.total_cells = m * n
+        self.bsz = bsz
+
+        # Buffers / intermediates
+        self.y = torch.zeros((self.bsz, self.total_cells), requires_grad=True)
+        self.sigma = torch.zeros((self.bsz, self.total_cells), requires_grad=True)
 
         # Tweaks
         self.activation_fn = activation_fn
         self.active_dendrites = active_dendrites
         self.col_output_cells = col_output_cells
-
         self.cell_winner_softmax = cell_winner_softmax
+        self.decode_from_full_memory = decode_from_full_memory
+        self.boost_strat = boost_strat
+        self.col_inhib = col_inhib
 
-        self.total_cells = m * n
         self.debug = debug
         self.visual_debug = visual_debug
 
-        self.linear_a = nn.Linear(d_in, m)  # Input weights (shared per group / proximal)
+        self.dropout = nn.Dropout(p=self.dropout_p)
+        # self.kwinners_cell = KWinners(self.total_cells, 0.1)  # TODO: Use this module for col-by-col winners?
+        self.kwinners_col = KWinners(self.m, self.k / self.m)
+        self.linear_a = nn.Linear(d_in, m, bias=False)  # Input weights (shared per group / proximal)
         if self.active_dendrites:
             self.linear_b = ActiveDendriteLayer(self.total_cells, self.total_cells, 
                                                 n_dendrites=self.active_dendrites)
         else:
-            self.linear_b = nn.Linear(self.total_cells, self.total_cells)  # Recurrent weights (per cell)
-        self.linear_d = nn.Linear(m, d_out)  # Decoding through bottleneck
+            self.linear_b = nn.Linear(self.total_cells, self.total_cells, bias=False)  # Recurrent weights (per cell)
 
-    def _debug_log(self, tensor_dict):
+        decode_d_in = self.total_cells if self.decode_from_full_memory else m
+        self.linear_d = nn.Linear(decode_d_in, d_out, bias=False)  # Decoding through bottleneck
+
+    def _debug_log(self, tensor_dict, only_names=None, truncate_len=400):
         if self.debug:
             for name, t in tensor_dict.items():
-                _type = type(t)
-                if _type in [int, float, bool]:
-                    size = '-'
-                else:
-                    size = t.size()
-                    _type = t.dtype
-                print([name, t, size, _type])
+                if not only_names or name in only_names:
+                    _type = type(t)
+                    if _type in [int, float, bool]:
+                        size = '-'
+                    else:
+                        size = t.size()
+                        _type = t.dtype
+                        if t.numel() > truncate_len:
+                            t = "..truncated.."
+                    print([name, t, size, _type])
         if self.visual_debug:
             for name, t in tensor_dict.items():
-                _type = type(t)
-                if isinstance(t, torch.Tensor):
-                    t = t.detach()
-                    t = t.squeeze()
-                    if t.dim() == 1:
-                        t = t.flatten()
-                        size = t.size()
-                        plt.imshow(activity_square(t))
-                        plt.title("%s (%s, %s)" % (name, size, _type))
-                        plt.show()
+                if not only_names or name in only_names:
+                    if isinstance(t, torch.Tensor):
+                        t = t.detach().squeeze()
+                        if t.dim() == 1:
+                            t = t.flatten()
+                            size = t.size()
+                            is_cell_level = t.numel() == self.total_cells
+                            if is_cell_level:
+                                plt.imshow(t.view(self.m, self.n).t(), origin='bottom', extent=(0, self.m-1, 0, self.n))
+                            else:
+                                plt.imshow(activity_square(t))   
+                            tmin = t.min()
+                            tmax = t.max()
+                            plt.title("%s (%s, rng: %.3f-%.3f)" % (name, size, tmin, tmax))
+                            plt.show()
+
+    def _register_hooks(self):
+        """Utility function to call retain_grad and Pytorch's register_hook
+        in a single line
+        """
+        for label, t in [('y', self.y), ('sigma', self.sigma)]:
+            t.retain_grad()
+            t.register_hook(get_grad_printer(label))
 
     def _group_max(self, activity):
         """
@@ -178,27 +164,45 @@ class RSMLayer(torch.nn.Module):
         """
         # Col activation from inputs repeated for each cell
         z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
-        # Cell activation from recurrent input
-        z_b = self.linear_b(x_b).view(bsz, self.total_cells)
-        self._debug_log({'z_a': z_a})
+        # Cell activation from recurrent input (dropped out)
+        z_b = self.linear_b(self.dropout(x_b)).view(bsz, self.total_cells)
+        self._debug_log({'z_a': z_a, 'z_b': z_b})
         sigma = z_a + z_b
-        return sigma  # total_cells x bsz
+        return sigma  # bsz x total_cells
 
-    def _k_cell_winners(self, pi, bsz, softmax=False):
-        """
-        Make a bsz x total_cells binary mask of top 1 cell in each column
-        """
+    def _k_winners(self, sigma, pi, bsz):
+        # Group-wise max pooling
+        lambda_ = self._group_max(pi)
+
+        # Cell-level mask: Make a bsz x total_cells binary mask of top 1 cell in each column
         mask = topk_mask(pi.view(bsz * self.m, self.n), self.k_winner_cells)
-        mask = mask.view(bsz, self.total_cells)
-        return mask.detach()
+        M_pi = mask.view(bsz, self.total_cells).detach()
 
-    def _k_col_winners(self, lambda_i, bsz):
-        """
-        Make a bsz x total_cells binary mask of top self.k columns
-        """
-        mask = topk_mask(lambda_i, self.k)
-        mask = mask.view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells)
-        return mask.detach()
+        if self.boost_strat == 'rsm_inhibition':
+            # Standard RSM-style inhibition via phi matrix
+
+            self._debug_log({'lambda_': lambda_})
+
+            # Column-level mask: Make a bsz x total_cells binary mask of top self.k columns
+            mask = topk_mask(lambda_, self.k)
+            M_lambda = mask.view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells).detach()
+
+            self._debug_log({'M_pi': M_pi, 'M_lambda': M_lambda})
+
+            y_pre_act = M_pi * M_lambda * sigma
+
+            del M_lambda
+
+        elif self.boost_strat == 'dc_boosting':
+            # Experiment with HTM style boosted k-winner
+
+            winning_columns = self.kwinners_col(lambda_).view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells).detach()
+            self._debug_log({'winning_columns': winning_columns})
+            y_pre_act = M_pi * winning_columns * sigma
+
+        del M_pi
+
+        return y_pre_act
 
     def _inhibited_masking_and_prediction(self, sigma, phi, bsz):
         """
@@ -216,38 +220,33 @@ class RSMLayer(torch.nn.Module):
             # Last x cells in each col
             pi[:, -self.col_output_cells:] = max_val
 
-        # Group-wise max pooling
-        lambda_i = self._group_max(pi)
-        self._debug_log({'lambda_i': lambda_i})
-
-        # Mask: most active cell in group
-        M_pi = self._k_cell_winners(pi, bsz=bsz, softmax=self.cell_winner_softmax)
-
-        # Mask: most active group (m)
-        M_lambda = self._k_col_winners(lambda_i, bsz=bsz)
-        self._debug_log({'M_pi': M_pi, 'M_lambda': M_lambda})
+        y_pre_act = self._k_winners(sigma, pi, bsz)
 
         # Mask-based sparsening
         activation = {
             'tanh': torch.tanh,
             'relu': nn.functional.relu
         }[self.activation_fn]
-        y = activation(M_pi * M_lambda * sigma)  # 1 x total_cells
+        self.y = activation(y_pre_act)  # 1 x total_cells
 
         # Decode prediction through group-wise max bottleneck
-        x_a_pred = self.linear_d(self._group_max(y))
+        decode_input = self.y if self.decode_from_full_memory else self._group_max(self.y)
+        x_a_pred = self.linear_d(decode_input)
 
-        del M_pi
-        del M_lambda
+        return (self.y, x_a_pred)
 
-        return (y, x_a_pred)
-
-    def _update_memory_and_inhibition(self, y, phi, psi):
-        # Get updated psi (memory state), decay inactive inactive
+    def _update_memory_and_inhibition(self, y, phi, psi, bsz):
+        # Get updated psi (memory state), decay inactive
         psi = torch.max(psi * self.eps, y)
 
-        # Update phi for next step (decay inactive cells)
-        phi = torch.max(phi * self.gamma, y)
+        # Update phi for next step (decay inhibition cells)
+        col_y = 0
+        if self.col_inhib:
+            # Inhibit full columns (with gain multiplier) in additin to cell level
+            y = y.detach()
+            COL_INH_GAIN = 0.5
+            col_y = COL_INH_GAIN * self._group_max(y).view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells).detach()
+        phi = torch.max(phi * self.gamma, y + col_y)
 
         return (phi, psi)
 
@@ -267,13 +266,13 @@ class RSMLayer(torch.nn.Module):
 
             self._debug_log({'seqi': seqi, 'x_a_row': x_a_row})
 
-            sigma = self._fc_weighted_ave(x_a_row, x_b, bsz)
-            self._debug_log({'sigma': sigma})
+            self.sigma = self._fc_weighted_ave(x_a_row, x_b, bsz)
+            self._debug_log({'sigma': self.sigma})
 
-            y, x_a_next = self._inhibited_masking_and_prediction(sigma, phi, bsz)
-            self._debug_log({'y': y, 'x_a_next': x_a_next})
+            self.y, x_a_next = self._inhibited_masking_and_prediction(self.sigma, phi, bsz)
+            self._debug_log({'y': self.y, 'x_a_next': x_a_next})
 
-            phi, psi = self._update_memory_and_inhibition(y, phi, psi)
+            phi, psi = self._update_memory_and_inhibition(self.y, phi, psi, bsz)
             self._debug_log({'phi': phi, 'psi': psi})
 
             # Update recurrent input / output x_b

@@ -33,7 +33,8 @@ class MNISTSequenceSampler(Sampler):
     """
 
     def __init__(self, data_source, sequences=None, batch_size=64, 
-                 randomize_sequences=False, random_mnist_images=True):
+                 randomize_sequences=False, random_mnist_images=True,
+                 use_mnist_pct=1.0):
         super(MNISTSequenceSampler, self).__init__(data_source)
         self.data_source = data_source
         # self.bsz = batch_size
@@ -47,6 +48,7 @@ class MNISTSequenceSampler(Sampler):
         self.sequence_cursor = 0  # Iterates through each sequence
         self.full_sequence = list(chain.from_iterable(self.sequences))
         self.seq_length = len(self.full_sequence)
+        self.use_mnist_pct = use_mnist_pct
 
         # Get index for each digit (that appears in a passed sequence)
         for seq in sequences:
@@ -54,6 +56,8 @@ class MNISTSequenceSampler(Sampler):
                 if digit not in self.label_indices:
                     mask = (data_source.targets == digit).nonzero().flatten()
                     idx = torch.randperm(mask.size(0))
+                    if self.use_mnist_pct < 1.0:
+                        idx = idx[:int(self.use_mnist_pct * len(idx))]
                     self.label_indices[digit] = mask[idx]
                     self.label_cursors[digit] = 0
 
