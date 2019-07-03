@@ -16,7 +16,7 @@ def activity_square(vector):
     square[:n] = vector
     return square.view(side, side)
 
-    
+
 def fig2img(fig):
     canvas = FigureCanvas(fig)
     canvas.draw()
@@ -124,3 +124,18 @@ def plot_activity(distrs, n_labels=10, level='column'):
                 ax.axis('off')
                 ax.set_title(key, fontsize=5)
     return fig
+
+
+def get_grad_printer(msg):
+    """This function returns a printer function, that prints information about a  tensor's
+    gradient. Used by register_hook in the backward pass.
+    """
+    def printer(grad):
+        if grad.nelement() == 1:
+            print(f"{msg} {grad}")
+        else:
+            print(f"{msg} shape: {grad.shape}"
+                  f" {len(grad.nonzero())}/{grad.numel()} nonzero"
+                  f" max: {grad.max()} min: {grad.min()}"
+                  f" mean: {grad.mean()}")
+    return printer

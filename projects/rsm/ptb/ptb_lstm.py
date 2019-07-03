@@ -52,3 +52,6 @@ class LSTMModel(nn.Module):
 
     def _track_weights(self):
         return {}
+
+    def _register_hooks(self):
+        pass
