@@ -129,7 +129,8 @@ def plot_activity(distrs, n_labels=10, level='column'):
 
 
 def _repr_similarity_grid(ax, activity_arr, cmap=plt.cm.Blues, 
-                          normalize=False, labels=None, title=None):
+                          normalize=False, labels=None, title=None,
+                          fontsize=1.2):
     n_labels = len(labels)
     grid = torch.zeros(n_labels, n_labels)
 
@@ -150,7 +151,7 @@ def _repr_similarity_grid(ax, activity_arr, cmap=plt.cm.Blues,
            # ... and label them with the respective list entries
            xticklabels=labels, yticklabels=labels,
            title=title)
-    ax.tick_params(labelsize=4)
+    ax.tick_params(labelsize=fontsize)
 
     # Rotate the tick labels and set their alignment.
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
@@ -162,11 +163,11 @@ def _repr_similarity_grid(ax, activity_arr, cmap=plt.cm.Blues,
         for j in range(grid.shape[1]):
             ax.text(j, i, format(grid[i, j], '.2f'),
                     ha="center", va="center",
-                    fontsize=4,
+                    fontsize=fontsize,
                     color="white" if grid[i, j] > thresh else "black")
 
 
-def plot_representation_similarity(distrs, n_labels=10, title=None, save=None):
+def plot_representation_similarity(distrs, n_labels=10, title=None, save=None, fontsize=1.3):
     '''
     Plot grid showing representation similarity between distributions passed
     into distrs dict. 
@@ -197,8 +198,8 @@ def plot_representation_similarity(distrs, n_labels=10, title=None, save=None):
                 col_activities.append(col_act)
                 cell_activities.append(cell_act)
 
-    _repr_similarity_grid(axs[0], col_activities, labels=labels, title="Column")
-    _repr_similarity_grid(axs[1], cell_activities, labels=labels, title="Cell")
+    _repr_similarity_grid(axs[0], col_activities, labels=labels, title="Column", fontsize=fontsize)
+    _repr_similarity_grid(axs[1], cell_activities, labels=labels, title="Cell", fontsize=fontsize)
     suptitle = "Repr Similarity (Cos)"
     if title:
         suptitle += " - " + title

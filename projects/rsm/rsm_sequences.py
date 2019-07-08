@@ -14,4 +14,4 @@ def generate_subsequences(start_digits=[0, 1], digits=10, length=4):
     print(seq)
 
 
-generate_subsequences(digits=10)
+generate_subsequences(digits=6)
