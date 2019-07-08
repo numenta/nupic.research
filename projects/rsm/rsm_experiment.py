@@ -15,7 +15,13 @@ import numpy as np
 from ptb import lang_util
 from ptb.ptb_lstm import LSTMModel
 from rsm import RSMLayer, RSMPredictor
-from util import fig2img, plot_confusion_matrix, plot_activity
+from util import (
+    fig2img, 
+    plot_confusion_matrix, 
+    plot_activity, 
+    plot_representation_similarity, 
+    AdamW
+)
 from rsm_samplers import (
     PredictiveBatchSampler,
     MNISTSequenceSampler,
@@ -85,10 +91,11 @@ class RSMExperiment(object):
         self.clear_memory_each_subseq = config.get("clear_memory_each_subseq", False)
         self.static_digit = config.get("static_digit", False)
         self.use_mnist_pct = config.get("use_mnist_pct", 1.0)
-        self.pred_l2_reg = config.get("pred_l2_reg", 1e-5)
+        self.pred_l2_reg = config.get("pred_l2_reg", 0)
         self.decode_from_full_memory = config.get("decode_from_full_memory", False)
         self.boost_strat = config.get("boost_strat", "rsm_inhibition")
-        self.col_inhib = config.get("col_inhib", False)
+        self.pred_gain = config.get("pred_gain", 1.0)
+        self.x_b_norm = config.get("x_b_norm", False)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -194,6 +201,14 @@ class RSMExperiment(object):
                 self.pred_optimizer = torch.optim.Adam(self.predictor.parameters(),
                                                        lr=self.learning_rate,
                                                        weight_decay=self.pred_l2_reg)
+        elif self.optimizer_type == 'adamw':
+            self.optimizer = AdamW(self.model.parameters(),
+                                   lr=self.learning_rate)
+            if self.predictor:
+                self.pred_optimizer = AdamW(self.model.parameters(),
+                                            lr=self.learning_rate,
+                                            weight_decay=self.pred_l2_reg)
+ 
         else:
             self.optimizer = torch.optim.SGD(self.model.parameters(),
                                              lr=self.learning_rate,
@@ -235,8 +250,8 @@ class RSMExperiment(object):
                                   col_output_cells=self.col_output_cells,
                                   dropout_p=self.dropout_p,
                                   decode_from_full_memory=self.decode_from_full_memory,
+                                  x_b_norm=self.x_b_norm,
                                   boost_strat=self.boost_strat,
-                                  col_inhib=self.col_inhib,
                                   embed_dim=self.embed_dim,
                                   vocab_size=self.vocab_size,
                                   bsz=self.batch_size,
@@ -269,19 +284,27 @@ class RSMExperiment(object):
         self._get_loss_function()
         self._get_optimizer()
 
-    def _image_grid(self, image_batch, nrow=12, compare_with=None):
+    def _image_grid(self, image_batch, nrow=12, compare_with=None, compare_correct=None, limit=300):
         side = 28
         image_batch = image_batch.transpose(0, 1).reshape(self.batch_size * self.seq_length, 1, side, side)
         if compare_with is not None:
             # Interleave comparison images with image_batch
             compare_with = compare_with.transpose(0, 1).reshape(self.batch_size * self.seq_length, 1, side, side)
+            max_val = compare_with.max()
+            if compare_correct is not None:
+                compare_correct = compare_correct.transpose(0, 1).reshape(self.batch_size * self.seq_length)
+                # Add 'correct label' to each image (masked by compare_correct)
+                # as 2x2 square 'dot' in upper left corner
+                dot_size = 4
+                gap = 2
+                compare_with[compare_correct, :, gap:gap + dot_size, gap:gap + dot_size] = max_val
             batch = torch.empty((image_batch.shape[0] + compare_with.shape[0], image_batch.shape[1], side, side))
             batch[::2, :, :] = image_batch
             batch[1::2, :, :] = compare_with
         else:
             batch = image_batch
         # make_grid returns 3 channels -- mean since grayscale
-        grid = vutils.make_grid(batch, normalize=True, nrow=nrow, padding=5).mean(dim=0)  
+        grid = vutils.make_grid(batch[:limit], normalize=True, nrow=nrow, padding=5).mean(dim=0)  
         return grid
 
     def _plot_grad_flow(self):
@@ -331,7 +354,10 @@ class RSMExperiment(object):
         ret = {}
         for name, param in self.model.named_parameters():
             if 'weight' in name:
-                ret['hist_' + name] = param.data.cpu()
+                data = param.data.cpu()
+                ret['hist_' + name] = data
+                if self.debug:
+                    print("%s: mean: %.3f std: %.3f" % (name, data.mean(), data.std()))
         return ret
 
     def _init_hidden(self, batch_size):
@@ -367,12 +393,14 @@ class RSMExperiment(object):
                        total_pred_loss, train=False, confusion=False):
         cm_fig = None
         if self.predictor:
+            sl, bs, tc = x_bs.size()
             pred_targets = pred_targets.flatten()
-            predictor_outputs = self.predictor(x_bs.detach())
+            predictor_outputs = self.predictor(x_bs.detach())  # (sl, bs, total_cells) -> (sl*bs, n_labels)
             pred_loss = self.predictor_loss(predictor_outputs, pred_targets)
             _, class_predictions = torch.max(predictor_outputs, 1)
             total_samples += pred_targets.size(0)
-            correct_samples += (class_predictions == pred_targets).sum().item()
+            correct_arr = (class_predictions == pred_targets).view(sl, bs)
+            correct_samples += correct_arr.sum().item()
             total_pred_loss += pred_loss.item()
             if confusion:
                 class_names = [str(x) for x in range(self.predictor_output_size)]
@@ -381,7 +409,7 @@ class RSMExperiment(object):
                 # Predictor backward + optimize
                 pred_loss.backward()
                 self.pred_optimizer.step()
-        return total_samples, correct_samples, total_pred_loss, cm_fig
+        return total_samples, correct_samples, correct_arr, total_pred_loss, cm_fig
 
     def _eval(self):
         ret = {}
@@ -408,11 +436,10 @@ class RSMExperiment(object):
                 x_a_next, hidden, x_bs = self.model(inputs, hidden)
 
                 # Loss
-                # x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
                 loss = self.loss(x_a_next, targets)
                 total_loss += loss.item()
 
-                total_samples, correct_samples, total_pred_loss, cm_fig = self._do_prediction(
+                total_samples, correct_samples, correct_arr, total_pred_loss, cm_fig = self._do_prediction(
                     x_bs, pred_targets, total_samples, correct_samples, total_pred_loss,
                     confusion=self.dataset_kind == 'mnist')
 
@@ -421,8 +448,10 @@ class RSMExperiment(object):
                 if batch_idx == 0:
                     # Produce images only for first batch during eval
                     if self.dataset_kind == 'mnist':
-                        # ret['img_inputs'] = self._image_grid(inputs).cpu()
-                        ret['img_preds'] = self._image_grid(x_a_next, compare_with=targets, nrow=self.seq_length * 2).cpu()
+                        ret['img_preds'] = self._image_grid(x_a_next, 
+                                                            compare_with=targets, 
+                                                            compare_correct=correct_arr,
+                                                            nrow=self.seq_length * 2).cpu()
                         if cm_fig:
                             ret['img_confusion'] = fig2img(cm_fig)
 
@@ -432,8 +461,12 @@ class RSMExperiment(object):
                             col_activity_grid = plot_activity(self.activity_by_inputs, 
                                                               n_labels=self.predictor_output_size,
                                                               level='cell')
-                            self.activity_by_inputs = {}
+                            img_repr_sim = plot_representation_similarity(self.activity_by_inputs,
+                                                                          n_labels=self.predictor_output_size,
+                                                                          title=self.boost_strat)
+                            ret['img_repr_sim'] = fig2img(img_repr_sim)
                             ret['img_col_activity'] = fig2img(col_activity_grid)
+                            self.activity_by_inputs = {}
 
                     ret.update(self._track_weights())
 
@@ -493,7 +526,6 @@ class RSMExperiment(object):
             x_a_next, hidden, x_bs = self.model(inputs, hidden)
 
             # Loss
-            # x_a_next, targets = self._maybe_resize_outputs_targets(x_a_next, targets)
             loss = self.loss(x_a_next, targets)
             total_loss += loss.item()
 
@@ -514,11 +546,11 @@ class RSMExperiment(object):
             if self.plot_gradients:
                 self._plot_gradient_flow()
 
-            total_samples, correct_samples, total_pred_loss, _ = self._do_prediction(
+            total_samples, correct_samples, correct_arr, total_pred_loss, _ = self._do_prediction(
                 x_bs, pred_targets, total_samples, correct_samples, total_pred_loss,
                 train=True)
 
-            if batch_idx >= self.batches_in_epoch:
+            if batch_idx > self.batches_in_epoch:
                 print("Stopping after %d batches in epoch %d" % (self.batches_in_epoch, epoch))
                 break
 
