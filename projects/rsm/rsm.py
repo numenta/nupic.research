@@ -53,7 +53,8 @@ class RSMLayer(torch.nn.Module):
                  k_winner_cells=1, gamma=0.5, eps=0.5, activation_fn='tanh',
                  cell_winner_softmax=False, active_dendrites=None,
                  col_output_cells=None, embed_dim=0, vocab_size=0, 
-                 bsz=64, dropout_p=0.5, decode_from_full_memory=False,
+                 bsz=64, dropout_p=0.0, decode_from_full_memory=False,
+                 predict_memory=False,
                  boost_strat='rsm_inhibition', pred_gain=1.0, x_b_norm=False,
                  debug=False, visual_debug=False, seq_length=8, use_bias=True,
                  **kwargs):
@@ -96,6 +97,7 @@ class RSMLayer(torch.nn.Module):
         self.boost_strat = boost_strat
         self.pred_gain = pred_gain
         self.x_b_norm = x_b_norm
+        self.predict_memory = predict_memory
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -138,7 +140,7 @@ class RSMLayer(torch.nn.Module):
                             if is_cell_level:
                                 plt.imshow(t.view(self.m, self.n).t(), origin='bottom', extent=(0, self.m-1, 0, self.n))
                             else:
-                                plt.imshow(activity_square(t))   
+                                plt.imshow(activity_square(t))
                             tmin = t.min()
                             tmax = t.max()
                             plt.title("%s (%s, rng: %.3f-%.3f)" % (name, size, tmin, tmax))
@@ -275,9 +277,10 @@ class RSMLayer(torch.nn.Module):
             self._debug_log({'phi': phi, 'psi': psi})
 
             # Update recurrent input / output x_b
-            # Normalizing scalar (force sum(x_b) == 1), avoiding div 0... this small enough?
             if self.x_b_norm:
-                x_b = self.pred_gain * psi / (psi.sum() + 1e-9)
+                # Normalizing scalar (force sum(x_b) == 1), avoiding div 0... this small enough?
+                alpha = (psi.sum(dim=1) + 1e-9).unsqueeze(dim=1)
+                x_b = self.pred_gain * psi / alpha
             else:
                 x_b = self.pred_gain * psi
             self._debug_log({'x_b': x_b})

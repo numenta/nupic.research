@@ -96,6 +96,7 @@ class RSMExperiment(object):
         self.boost_strat = config.get("boost_strat", "rsm_inhibition")
         self.pred_gain = config.get("pred_gain", 1.0)
         self.x_b_norm = config.get("x_b_norm", False)
+        self.predict_memory = config.get("predict_memory", False)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -233,7 +234,10 @@ class RSMExperiment(object):
 
         # Build model and optimizer
         self.d_in = reduce(lambda x, y: x * y, self.input_size)
-        self.d_out = config.get("output_size", self.d_in)
+        if self.predict_memory:
+            self.d_out = self.total_cells
+        else:
+            self.d_out = config.get("output_size", self.d_in)
         self.predictor = None
         if self.model_kind == "rsm":
             self.model = RSMLayer(d_in=self.d_in,
@@ -251,6 +255,7 @@ class RSMExperiment(object):
                                   dropout_p=self.dropout_p,
                                   decode_from_full_memory=self.decode_from_full_memory,
                                   x_b_norm=self.x_b_norm,
+                                  predict_memory=self.predict_memory,
                                   boost_strat=self.boost_strat,
                                   embed_dim=self.embed_dim,
                                   vocab_size=self.vocab_size,
@@ -293,11 +298,11 @@ class RSMExperiment(object):
             max_val = compare_with.max()
             if compare_correct is not None:
                 compare_correct = compare_correct.transpose(0, 1).reshape(self.batch_size * self.seq_length)
-                # Add 'correct label' to each image (masked by compare_correct)
-                # as 2x2 square 'dot' in upper left corner
+                # Add 'incorrect label' to each image (masked by inverse of compare_correct)
+                # as 2x2 square 'dot' in upper left corner of falsely predicted targets
                 dot_size = 4
                 gap = 2
-                compare_with[compare_correct, :, gap:gap + dot_size, gap:gap + dot_size] = max_val
+                compare_with[~compare_correct, :, gap:gap + dot_size, gap:gap + dot_size] = max_val
             batch = torch.empty((image_batch.shape[0] + compare_with.shape[0], image_batch.shape[1], side, side))
             batch[::2, :, :] = image_batch
             batch[1::2, :, :] = compare_with
@@ -451,7 +456,7 @@ class RSMExperiment(object):
                         ret['img_preds'] = self._image_grid(x_a_next, 
                                                             compare_with=targets, 
                                                             compare_correct=correct_arr,
-                                                            nrow=self.seq_length * 2).cpu()
+                                                            nrow=4 * 2).cpu()
                         if cm_fig:
                             ret['img_confusion'] = fig2img(cm_fig)
 
@@ -563,7 +568,7 @@ class RSMExperiment(object):
             if self.clear_memory_each_subseq:
                 hidden = self._init_hidden(self.batch_size)
 
-        if self.eval_interval and epoch % self.eval_interval == 0:
+        if self.eval_interval and (epoch == 0 or (epoch + 1) % self.eval_interval == 0):
             # Evaluate each x epochs
             ret.update(self._eval())
 
