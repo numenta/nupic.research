@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import math
 
 import torch
 from torch import nn
@@ -53,8 +54,8 @@ class RSMLayer(torch.nn.Module):
                  cell_winner_softmax=False, active_dendrites=None,
                  col_output_cells=None, embed_dim=0, vocab_size=0, 
                  bsz=64, dropout_p=0.5, decode_from_full_memory=False,
-                 boost_strat='rsm_inhibition', col_inhib=False,
-                 debug=False, visual_debug=False, seq_length=8,
+                 boost_strat='rsm_inhibition', pred_gain=1.0, x_b_norm=False,
+                 debug=False, visual_debug=False, seq_length=8, use_bias=True,
                  **kwargs):
         """
         RSM Layer as specified by Rawlinson et al 2019
@@ -93,23 +94,24 @@ class RSMLayer(torch.nn.Module):
         self.cell_winner_softmax = cell_winner_softmax
         self.decode_from_full_memory = decode_from_full_memory
         self.boost_strat = boost_strat
-        self.col_inhib = col_inhib
+        self.pred_gain = pred_gain
+        self.x_b_norm = x_b_norm
 
         self.debug = debug
         self.visual_debug = visual_debug
 
         self.dropout = nn.Dropout(p=self.dropout_p)
-        # self.kwinners_cell = KWinners(self.total_cells, 0.1)  # TODO: Use this module for col-by-col winners?
+
         self.kwinners_col = KWinners(self.m, self.k / self.m)
-        self.linear_a = nn.Linear(d_in, m, bias=False)  # Input weights (shared per group / proximal)
+        self.linear_a = nn.Linear(d_in, m, bias=use_bias)  # Input weights (shared per group / proximal)
         if self.active_dendrites:
             self.linear_b = ActiveDendriteLayer(self.total_cells, self.total_cells, 
                                                 n_dendrites=self.active_dendrites)
         else:
-            self.linear_b = nn.Linear(self.total_cells, self.total_cells, bias=False)  # Recurrent weights (per cell)
+            self.linear_b = nn.Linear(self.total_cells, self.total_cells, bias=use_bias)  # Recurrent weights (per cell)
 
         decode_d_in = self.total_cells if self.decode_from_full_memory else m
-        self.linear_d = nn.Linear(decode_d_in, d_out, bias=False)  # Decoding through bottleneck
+        self.linear_d = nn.Linear(decode_d_in, d_out, bias=use_bias)  # Decoding through bottleneck
 
     def _debug_log(self, tensor_dict, only_names=None, truncate_len=400):
         if self.debug:
@@ -146,7 +148,11 @@ class RSMLayer(torch.nn.Module):
         """Utility function to call retain_grad and Pytorch's register_hook
         in a single line
         """
-        for label, t in [('y', self.y), ('sigma', self.sigma)]:
+        for label, t in [
+                ('y', self.y), 
+                ('sigma', self.sigma), 
+                ('linear_b', self.linear_b.weight),
+        ]:
             t.retain_grad()
             t.register_hook(get_grad_printer(label))
 
@@ -167,8 +173,8 @@ class RSMLayer(torch.nn.Module):
         # Cell activation from recurrent input (dropped out)
         z_b = self.linear_b(self.dropout(x_b)).view(bsz, self.total_cells)
         self._debug_log({'z_a': z_a, 'z_b': z_b})
-        sigma = z_a + z_b
-        return sigma  # bsz x total_cells
+        self.sigma = z_a + z_b
+        return self.sigma  # bsz x total_cells
 
     def _k_winners(self, sigma, pi, bsz):
         # Group-wise max pooling
@@ -189,16 +195,15 @@ class RSMLayer(torch.nn.Module):
 
             self._debug_log({'M_pi': M_pi, 'M_lambda': M_lambda})
 
-            y_pre_act = M_pi * M_lambda * sigma
+            y_pre_act = M_pi * M_lambda * self.sigma
 
             del M_lambda
 
-        elif self.boost_strat == 'dc_boosting':
-            # Experiment with HTM style boosted k-winner
-
-            winning_columns = self.kwinners_col(lambda_).view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells).detach()
+        elif self.boost_strat == 'col_boosting':
+            # Experiment with HTM style boosted k-winner (TODO: should we prevent BP through masks like RSM?)
+            winning_columns = self.kwinners_col(lambda_).view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells)
             self._debug_log({'winning_columns': winning_columns})
-            y_pre_act = M_pi * winning_columns * sigma
+            y_pre_act = M_pi * winning_columns * self.sigma
 
         del M_pi
 
@@ -209,7 +214,7 @@ class RSMLayer(torch.nn.Module):
         Compute y_lambda
         """
         # Apply inhibition to non-neg shifted sigma
-        pi = (1 - phi) * (sigma - sigma.min() + 1)
+        pi = (1 - phi) * (self.sigma - self.sigma.min() + 1)
         self._debug_log({'pi': pi})
 
         pi = pi.detach()  # Prevent gradients from flowing through inhibition/masking
@@ -220,7 +225,7 @@ class RSMLayer(torch.nn.Module):
             # Last x cells in each col
             pi[:, -self.col_output_cells:] = max_val
 
-        y_pre_act = self._k_winners(sigma, pi, bsz)
+        y_pre_act = self._k_winners(self.sigma, pi, bsz)
 
         # Mask-based sparsening
         activation = {
@@ -240,13 +245,7 @@ class RSMLayer(torch.nn.Module):
         psi = torch.max(psi * self.eps, y)
 
         # Update phi for next step (decay inhibition cells)
-        col_y = 0
-        if self.col_inhib:
-            # Inhibit full columns (with gain multiplier) in additin to cell level
-            y = y.detach()
-            COL_INH_GAIN = 0.5
-            col_y = COL_INH_GAIN * self._group_max(y).view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells).detach()
-        phi = torch.max(phi * self.gamma, y + col_y)
+        phi = torch.max(phi * self.gamma, y)
 
         return (phi, psi)
 
@@ -256,8 +255,8 @@ class RSMLayer(torch.nn.Module):
         """
         bsz = x_a_batch.size(1)
 
-        output = None
-        x_bs = None
+        output = torch.zeros_like(x_a_batch)
+        x_bs = torch.zeros((self.seq_length, bsz, self.total_cells), device=x_a_batch.device)
 
         x_b, phi, psi = hidden
 
@@ -277,21 +276,17 @@ class RSMLayer(torch.nn.Module):
 
             # Update recurrent input / output x_b
             # Normalizing scalar (force sum(x_b) == 1), avoiding div 0... this small enough?
-            x_b = psi / (psi.sum() + 1e-9)
+            if self.x_b_norm:
+                x_b = self.pred_gain * psi / (psi.sum() + 1e-9)
+            else:
+                x_b = self.pred_gain * psi
             self._debug_log({'x_b': x_b})
 
-            if output is None:
-                output = x_a_next
-            else:
-                output = torch.cat((output, x_a_next))
-            if x_bs is None:
-                x_bs = x_b
-            else:
-                x_bs = torch.cat((x_bs, x_b))
+            output[seqi, :] = x_a_next
+            x_bs[seqi, :] = x_b
 
         hidden = (x_b, phi, psi)
-
-        return (output.view(self.seq_length, bsz, self.d_out), hidden, x_bs.view(self.seq_length, bsz, self.total_cells))
+        return (output, hidden, x_bs)
 
 
 if __name__ == "__main__":
