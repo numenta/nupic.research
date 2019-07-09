@@ -125,16 +125,13 @@ class RSMExperiment(object):
 
         self.val_loader = None
         if self.dataset_kind == 'mnist':
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.1307,), (0.3081,))
+            ])
             self.dataset = datasets.MNIST(self.data_dir, download=True,
-                                          train=True, transform=transforms.Compose([
-                                              transforms.ToTensor(),
-                                              transforms.Normalize((0.1307,), (0.3081,))
-                                          ]),)
-            self.val_dataset = datasets.MNIST(self.data_dir, download=True,
-                                              transform=transforms.Compose([
-                                                  transforms.ToTensor(),
-                                                  transforms.Normalize((0.1307,), (0.3081,))
-                                              ]),)
+                                          train=True, transform=transform)
+            self.val_dataset = datasets.MNIST(self.data_dir, download=True, transform=transform)
 
             self.train_sampler = MNISTSequenceSampler(self.dataset, 
                                                       sequences=self.sequences,
@@ -372,11 +369,6 @@ class RSMExperiment(object):
         elif self.model_kind == 'lstm':
             return self.model.init_hidden(batch_size)
 
-    def _maybe_resize_outputs_targets(self, x_a_next, targets):
-        x_a_next = x_a_next.view(-1, self.d_out)
-        targets = targets.view(-1, self.d_out)
-        return x_a_next, targets
-
     def _store_activity_for_viz(self, x_bs, input_labels, pred_labels):
         """
         Aggregate activity for a supplied batch
@@ -414,6 +406,17 @@ class RSMExperiment(object):
         cm_ax, cm_fig = plot_confusion_matrix(pred_targets, class_predictions, class_names, title="Prediction Confusion")
         return cm_fig
 
+    def _compute_loss(self, output, targets, last_output=None, x_b=None):
+        loss = None
+        if self.predict_memory:
+            # Loss computed between x^A generated at last time step and actual x^B
+            if last_output is not None:
+                loss = self.loss(last_output.squeeze(), x_b)
+        else:
+            # Standard next x^A image prediction
+            loss = self.loss(output, targets)
+        return loss
+
     def _eval(self):
         ret = {}
         print("Evaluating...")
@@ -431,6 +434,7 @@ class RSMExperiment(object):
             hidden = self._init_hidden(self.batch_size)
 
             all_x_a_next = all_targets = all_correct_arrs = all_pred_targets = all_class_predictions = None
+            last_output = None
 
             for batch_idx, (inputs, targets, pred_targets, input_labels) in enumerate(self.val_loader):
 
@@ -439,15 +443,15 @@ class RSMExperiment(object):
                 targets = targets.to(self.device)
                 pred_targets = pred_targets.to(self.device)
                 x_a_next, hidden = self.model(inputs, hidden)
+                x_b = hidden[0]
 
                 # Loss
-                loss = self.loss(x_a_next, targets)
-                total_loss += loss.item()
-
-                x_bs = hidden[0]
+                loss = self._compute_loss(x_a_next, targets, last_output=last_output, x_b=x_b)  # Kwargs used only for predict_memory
+                if loss is not None:
+                    total_loss += loss.item()
 
                 total_samples, correct_samples, class_predictions, correct_arr, total_pred_loss, cm_fig = self._do_prediction(
-                    x_bs, pred_targets, total_samples, correct_samples, total_pred_loss)
+                    x_b, pred_targets, total_samples, correct_samples, total_pred_loss)
 
                 hidden = self._repackage_hidden(hidden)
 
@@ -463,17 +467,21 @@ class RSMExperiment(object):
 
                 if self.dataset_kind == 'mnist' and self.model_kind == 'rsm':
                     # Summary of column activation by input & next input
-                    self._store_activity_for_viz(x_bs, input_labels, pred_targets)
+                    self._store_activity_for_viz(x_b, input_labels, pred_targets)
 
                 ret.update(self._track_weights())
+
+                last_output = x_a_next.detach()
 
                 if batch_idx >= self.eval_batches_in_epoch:
                     break
 
+            # After all eval batches, generate stats & figures
             if self.dataset_kind == 'mnist' and self.model_kind == 'rsm':
-                ret['img_preds'] = self._image_grid(all_x_a_next, 
-                                                    compare_with=all_targets, 
-                                                    compare_correct=all_correct_arrs).cpu()
+                if not self.predict_memory:
+                    ret['img_preds'] = self._image_grid(all_x_a_next, 
+                                                        compare_with=all_targets, 
+                                                        compare_correct=all_correct_arrs).cpu()
                 cm_fig = self._confusion_matrix(all_pred_targets, all_class_predictions)
                 ret['img_confusion'] = fig2img(cm_fig)
                 col_activity_grid = plot_activity(self.activity_by_inputs, 
@@ -521,9 +529,10 @@ class RSMExperiment(object):
         total_loss = total_samples = correct_samples = total_pred_loss = 0.0
 
         hidden = self._init_hidden(self.batch_size)
+        last_output = None
 
         for batch_idx, (inputs, targets, pred_targets, _) in enumerate(self.train_loader):
-            # Parallelized inputs are of shape (seq_len, batch, input_size)
+            # Inputs are of shape (batch, input_size)
 
             hidden = self._repackage_hidden(hidden)
 
@@ -536,25 +545,26 @@ class RSMExperiment(object):
             targets = targets.to(self.device)
             pred_targets = pred_targets.to(self.device)
 
-            x_a_next, hidden = self.model(inputs, hidden)
+            output, hidden = self.model(inputs, hidden)
 
             # Loss
-            loss = self.loss(x_a_next, targets)
-            total_loss += loss.item()
+            loss = self._compute_loss(output, targets, last_output=last_output, x_b=hidden[0])  # Kwargs used only for predict_memory
 
             if self.debug:
                 self.model._register_hooks()
 
-            # RSM backward + optimize
-            loss.backward()
+            if loss is not None:
+                total_loss += loss.item()
 
-            if self.model_kind == "lstm":
-                # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.25)
-                for p in self.model.parameters():
-                    p.data.add_(-self.learning_rate, p.grad.data)
-            else:
-                self.optimizer.step()
+                # RSM backward + optimize
+                loss.backward()
+                if self.model_kind == "lstm":
+                    # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.25)
+                    for p in self.model.parameters():
+                        p.data.add_(-self.learning_rate, p.grad.data)
+                else:
+                    self.optimizer.step()
 
             if self.plot_gradients:
                 self._plot_gradient_flow()
@@ -563,6 +573,8 @@ class RSMExperiment(object):
             total_samples, correct_samples, class_predictions, correct_arr, total_pred_loss, _ = self._do_prediction(
                 x_b, pred_targets, total_samples, correct_samples, total_pred_loss,
                 train=True)
+
+            last_output = output.detach()
 
             if batch_idx > self.batches_in_epoch:
                 print("Stopping after %d batches in epoch %d" % (self.batches_in_epoch, epoch))

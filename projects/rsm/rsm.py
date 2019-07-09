@@ -53,7 +53,7 @@ class RSMLayer(torch.nn.Module):
                  cell_winner_softmax=False, active_dendrites=None,
                  col_output_cells=None, embed_dim=0, vocab_size=0, 
                  bsz=64, dropout_p=0.0, decode_from_full_memory=False,
-                 predict_memory=False,
+                 predict_memory=False, debug_log_names=None,
                  boost_strat='rsm_inhibition', pred_gain=1.0, x_b_norm=False,
                  debug=False, visual_debug=False, seq_length=8, use_bias=True,
                  **kwargs):
@@ -100,6 +100,7 @@ class RSMLayer(torch.nn.Module):
 
         self.debug = debug
         self.visual_debug = visual_debug
+        self.debug_log_names = debug_log_names
 
         self.dropout = nn.Dropout(p=self.dropout_p)
 
@@ -114,10 +115,10 @@ class RSMLayer(torch.nn.Module):
         decode_d_in = self.total_cells if self.decode_from_full_memory else m
         self.linear_d = nn.Linear(decode_d_in, d_out, bias=use_bias)  # Decoding through bottleneck
 
-    def _debug_log(self, tensor_dict, only_names=None, truncate_len=400):
+    def _debug_log(self, tensor_dict, truncate_len=400):
         if self.debug:
             for name, t in tensor_dict.items():
-                if not only_names or name in only_names:
+                if not self.debug_log_names or name in self.debug_log_names:
                     _type = type(t)
                     if _type in [int, float, bool]:
                         size = '-'
@@ -129,7 +130,7 @@ class RSMLayer(torch.nn.Module):
                     print([name, t, size, _type])
         if self.visual_debug:
             for name, t in tensor_dict.items():
-                if not only_names or name in only_names:
+                if not self.debug_log_names or name in self.debug_log_names:
                     if isinstance(t, torch.Tensor):
                         t = t.detach().squeeze()
                         if t.dim() == 1:
@@ -237,9 +238,9 @@ class RSMLayer(torch.nn.Module):
 
         # Decode prediction through group-wise max bottleneck
         decode_input = self.y if self.decode_from_full_memory else self._group_max(self.y)
-        x_a_pred = self.linear_d(decode_input)
+        output = self.linear_d(decode_input)
 
-        return (self.y, x_a_pred)
+        return (self.y, output)
 
     def _update_memory_and_inhibition(self, y, phi, psi, bsz):
         # Get updated psi (memory state), decay inactive
@@ -263,8 +264,8 @@ class RSMLayer(torch.nn.Module):
         self.sigma = self._fc_weighted_ave(x_a_batch, x_b, bsz)
         self._debug_log({'sigma': self.sigma})
 
-        self.y, x_a_next = self._inhibited_masking_and_prediction(self.sigma, phi, bsz)
-        self._debug_log({'y': self.y, 'x_a_next': x_a_next})
+        self.y, pred_output = self._inhibited_masking_and_prediction(self.sigma, phi, bsz)
+        self._debug_log({'y': self.y, 'pred_output': pred_output})
 
         phi, psi = self._update_memory_and_inhibition(self.y, phi, psi, bsz)
         self._debug_log({'phi': phi, 'psi': psi})
@@ -278,10 +279,8 @@ class RSMLayer(torch.nn.Module):
             x_b = self.pred_gain * psi
         self._debug_log({'x_b': x_b})
 
-        output = x_a_next
-
         hidden = (x_b, phi, psi)
-        return (output, hidden)
+        return (pred_output, hidden)
 
 
 if __name__ == "__main__":
