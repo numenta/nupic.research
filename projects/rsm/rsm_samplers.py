@@ -29,13 +29,15 @@ class MNISTSequenceSampler(Sampler):
 
         self.sequences = sequences
         self.n_sequences = len(self.sequences)
+        self.seq_lengths = torch.tensor([len(subseq) for subseq in self.sequences])
 
         # Each of these stores both current and next batch state (2 x batch_size)
-        self.sequence_id = torch.stack((self._next_sequence_ids(), self._next_sequence_ids()))  # Iterate over subsequences
-        self.sequence_cursor = torch.stack((torch.zeros(batch_size).long(), torch.ones(batch_size).long()))  # Iterates over sequence items
+        self.sequence_id = torch.stack((self._init_sequence_ids(), self._init_sequence_ids()))  # Iterate over subsequences
+        first_batch_cursors = self._init_sequence_cursors()
+        self.sequence_cursor = torch.stack((first_batch_cursors, first_batch_cursors))  # Iterates over sequence items
+        self._increment_next()
 
-        self.seq_lengths = torch.tensor([len(subseq) for subseq in self.sequences])
-        self.sequences_mat = pad_sequence(torch.tensor(self.sequences), batch_first=True, padding_value=0)
+        self.sequences_mat = pad_sequence(torch.tensor(self.sequences), batch_first=True, padding_value=-1)
 
         # Get index for each digit (that appears in a passed sequence)
         for seq in sequences:
@@ -48,8 +50,23 @@ class MNISTSequenceSampler(Sampler):
                     self.label_indices[digit] = mask[idx]
                     self.label_cursors[digit] = 0
 
-    def _next_sequence_ids(self):
+    def _init_sequence_ids(self):
         return torch.LongTensor(self.bsz).random_(0, self.n_sequences)
+
+    def _init_sequence_cursors(self):
+        lengths = self.seq_lengths[self.sequence_id[0]]
+        cursors = (torch.FloatTensor(self.bsz).uniform_(0, 1) * lengths.float()).long()
+        return cursors
+
+    def _increment_next(self):
+        # Increment cursors and select new random subsequences for those that have terminated
+        self.sequence_cursor[1] += 1
+        roll_mask = self.sequence_cursor[1] >= self.seq_lengths[self.sequence_id[1]]
+
+        if roll_mask.sum() > 0:
+            # Roll items to 0 of randomly chosen next subsequence
+            self.sequence_id[1, roll_mask] = torch.LongTensor(1, roll_mask.sum()).random_(0, self.n_sequences)
+            self.sequence_cursor[1, roll_mask] = 0
 
     def _get_next_batch(self):
         """
@@ -66,14 +83,7 @@ class MNISTSequenceSampler(Sampler):
         self.sequence_id[0] = self.sequence_id[1]
         self.sequence_cursor[0] = self.sequence_cursor[1]
 
-        # Increment cursors and select new random subsequences for those that have terminated
-        self.sequence_cursor[1] += 1
-        roll_mask = self.sequence_cursor[1] >= self.seq_lengths[self.sequence_id[1]]
-
-        if roll_mask.sum() > 0:
-            # Roll items to 0 of randomly chosen next subsequence
-            self.sequence_id[1, roll_mask] = torch.LongTensor(len(roll_mask)).random_(0, self.n_sequences)
-            self.sequence_cursor[1, roll_mask] = 0
+        self._increment_next()
 
         # return (inp_images_batch, tgt_images_batch, tgt_labels_batch, inp_labels_batch)
         return inp_idxs + tgt_idxs
@@ -88,8 +98,10 @@ class MNISTSequenceSampler(Sampler):
             self.label_cursors[digit] += 1
         indices = self.label_indices[digit]
         if cursor >= len(indices) - 1:
-            # Begin sequence from beginning -- should we re-shuffle?
+            # Begin sequence from beginning & shuffle
             self.label_cursors[digit] = cursor = 0
+            idx = torch.randperm(len(self.label_indices[digit]))
+            self.label_indices[digit] = indices = self.label_indices[digit][idx]
         return indices[cursor].item()
 
     def __iter__(self):
