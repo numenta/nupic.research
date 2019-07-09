@@ -23,9 +23,7 @@ from util import (
     AdamW
 )
 from rsm_samplers import (
-    PredictiveBatchSampler,
-    MNISTSequenceSampler,
-    pred_sequence_collate,
+    MNISTSequenceLoader,
     PTBSequenceSampler,
     ptb_pred_sequence_collate
 )
@@ -136,37 +134,24 @@ class RSMExperiment(object):
                                                   transforms.ToTensor(),
                                                   transforms.Normalize((0.1307,), (0.3081,))
                                               ]),)
-            train_sampler = MNISTSequenceSampler(self.dataset, 
-                                                 sequences=self.sequences,
-                                                 batch_size=self.batch_size,
-                                                 randomize_sequences=self.randomize_sequences,
-                                                 random_mnist_images=not self.static_digit,
-                                                 use_mnist_pct=self.use_mnist_pct)
-
-            train_batch_sampler = PredictiveBatchSampler(train_sampler, batch_size=self.seq_length * self.batch_size)
+            self.train_loader = MNISTSequenceLoader(self.dataset, 
+                                                    sequences=self.sequences,
+                                                    batch_size=self.batch_size,
+                                                    randomize_sequences=self.randomize_sequences,
+                                                    random_mnist_images=not self.static_digit,
+                                                    use_mnist_pct=self.use_mnist_pct)
 
             if self.static_digit:
                 # For static digit paradigm, val & train samplers much match to ensure same digit
                 # prototype used for each sequence item.
-                val_sampler = train_sampler
+                self.val_loader = self.train_loader
             else:
-                val_sampler = MNISTSequenceSampler(self.val_dataset, 
-                                                   sequences=self.sequences,
-                                                   batch_size=self.batch_size,
-                                                   randomize_sequences=self.randomize_sequences,
-                                                   random_mnist_images=not self.static_digit,
-                                                   use_mnist_pct=self.use_mnist_pct)
-            val_batch_sampler = PredictiveBatchSampler(val_sampler, batch_size=self.seq_length * self.batch_size)
-            collate_fn = partial(pred_sequence_collate, 
-                                 bsz=self.batch_size,
-                                 seq_length=train_sampler.seq_length,
-                                 return_inputs=True)
-            self.train_loader = DataLoader(self.dataset,
-                                           batch_sampler=train_batch_sampler,
-                                           collate_fn=collate_fn)
-            self.val_loader = DataLoader(self.val_dataset,
-                                         batch_sampler=val_batch_sampler,
-                                         collate_fn=collate_fn)
+                self.val_loader = MNISTSequenceLoader(self.val_dataset, 
+                                                      sequences=self.sequences,
+                                                      batch_size=self.batch_size,
+                                                      randomize_sequences=self.randomize_sequences,
+                                                      random_mnist_images=not self.static_digit,
+                                                      use_mnist_pct=self.use_mnist_pct)
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
             from torchnlp.datasets import penn_treebank_dataset
@@ -289,27 +274,30 @@ class RSMExperiment(object):
         self._get_loss_function()
         self._get_optimizer()
 
-    def _image_grid(self, image_batch, nrow=12, compare_with=None, compare_correct=None, limit=300):
+    def _image_grid(self, image_batch, n_seqs=6, compare_with=None, compare_correct=None, limit_seqlen=50):
+        '''
+        image_batch: n_batches x batch_size x image_dim
+        '''
         side = 28
-        image_batch = image_batch.transpose(0, 1).reshape(self.batch_size * self.seq_length, 1, side, side)
+        image_batch = image_batch[:, :n_seqs].reshape(-1, 1, side, side)
         if compare_with is not None:
             # Interleave comparison images with image_batch
-            compare_with = compare_with.transpose(0, 1).reshape(self.batch_size * self.seq_length, 1, side, side)
+            compare_with = compare_with[:, :n_seqs].reshape(-1, 1, side, side)
             max_val = compare_with.max()
             if compare_correct is not None:
-                compare_correct = compare_correct.transpose(0, 1).reshape(self.batch_size * self.seq_length)
                 # Add 'incorrect label' to each image (masked by inverse of compare_correct)
                 # as 2x2 square 'dot' in upper left corner of falsely predicted targets
                 dot_size = 4
                 gap = 2
-                compare_with[~compare_correct, :, gap:gap + dot_size, gap:gap + dot_size] = max_val
+                incorrect = ~compare_correct[:, :n_seqs].transpose(0, 1).flatten()
+                compare_with[incorrect, :, gap:gap + dot_size, gap:gap + dot_size] = max_val
             batch = torch.empty((image_batch.shape[0] + compare_with.shape[0], image_batch.shape[1], side, side))
             batch[::2, :, :] = image_batch
             batch[1::2, :, :] = compare_with
         else:
             batch = image_batch
         # make_grid returns 3 channels -- mean since grayscale
-        grid = vutils.make_grid(batch[:limit], normalize=True, nrow=nrow, padding=5).mean(dim=0)  
+        grid = vutils.make_grid(batch[:2*limit_seqlen*n_seqs], normalize=True, nrow=n_seqs * 2, padding=5).mean(dim=0)  
         return grid
 
     def _plot_grad_flow(self):
@@ -384,37 +372,38 @@ class RSMExperiment(object):
         """
         Aggregate activity for a supplied batch
         """
-        for x_b_batch, label_batch, target_batch in zip(x_bs, input_labels, pred_labels):
-            for _x_b, label, target in zip(x_b_batch, label_batch, target_batch):
-                _label = label.item()
-                _label_next = target.item()
-                activity = _x_b.detach().view(self.m_groups, -1)
-                key = "%d-%d" % (_label, _label_next)
-                if key not in self.activity_by_inputs:
-                    self.activity_by_inputs[key] = []
-                self.activity_by_inputs[key].append(activity)
+        for _x_b, label, target in zip(x_bs, input_labels, pred_labels):
+            _label = label.item()
+            _label_next = target.item()
+            activity = _x_b.detach().view(self.m_groups, -1)
+            key = "%d-%d" % (_label, _label_next)
+            if key not in self.activity_by_inputs:
+                self.activity_by_inputs[key] = []
+            self.activity_by_inputs[key].append(activity)
 
-    def _do_prediction(self, x_bs, pred_targets, total_samples, correct_samples, 
-                       total_pred_loss, train=False, confusion=False):
+    def _do_prediction(self, x_b, pred_targets, total_samples, correct_samples, 
+                       total_pred_loss, train=False):
         cm_fig = None
         if self.predictor:
-            sl, bs, tc = x_bs.size()
+            bs, tc = x_b.size()
             pred_targets = pred_targets.flatten()
-            predictor_outputs = self.predictor(x_bs.detach())  # (sl, bs, total_cells) -> (sl*bs, n_labels)
+            predictor_outputs = self.predictor(x_b.detach())  # (bs, total_cells) -> (bs, n_labels)
             pred_loss = self.predictor_loss(predictor_outputs, pred_targets)
             _, class_predictions = torch.max(predictor_outputs, 1)
             total_samples += pred_targets.size(0)
-            correct_arr = (class_predictions == pred_targets).view(sl, bs)
+            correct_arr = (class_predictions == pred_targets)
             correct_samples += correct_arr.sum().item()
             total_pred_loss += pred_loss.item()
-            if confusion:
-                class_names = [str(x) for x in range(self.predictor_output_size)]
-                cm_ax, cm_fig = plot_confusion_matrix(pred_targets, class_predictions, class_names, title="Prediction Confusion")
             if train:
                 # Predictor backward + optimize
                 pred_loss.backward()
                 self.pred_optimizer.step()
-        return total_samples, correct_samples, correct_arr, total_pred_loss, cm_fig
+        return total_samples, correct_samples, class_predictions, correct_arr, total_pred_loss, cm_fig
+
+    def _confusion_matrix(self, pred_targets, class_predictions):
+        class_names = [str(x) for x in range(self.predictor_output_size)]
+        cm_ax, cm_fig = plot_confusion_matrix(pred_targets, class_predictions, class_names, title="Prediction Confusion")
+        return cm_fig
 
     def _eval(self):
         ret = {}
@@ -432,51 +421,61 @@ class RSMExperiment(object):
 
             hidden = self._init_hidden(self.batch_size)
 
+            all_x_a_next = all_targets = all_correct_arrs = all_pred_targets = all_class_predictions = None
+
             for batch_idx, (inputs, targets, pred_targets, input_labels) in enumerate(self.val_loader):
 
                 # Forward
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
                 pred_targets = pred_targets.to(self.device)
-                x_a_next, hidden, x_bs = self.model(inputs, hidden)
+                x_a_next, hidden = self.model(inputs, hidden)
 
                 # Loss
                 loss = self.loss(x_a_next, targets)
                 total_loss += loss.item()
 
-                total_samples, correct_samples, correct_arr, total_pred_loss, cm_fig = self._do_prediction(
-                    x_bs, pred_targets, total_samples, correct_samples, total_pred_loss,
-                    confusion=self.dataset_kind == 'mnist')
+                x_bs = hidden[0]
+
+                total_samples, correct_samples, class_predictions, correct_arr, total_pred_loss, cm_fig = self._do_prediction(
+                    x_bs, pred_targets, total_samples, correct_samples, total_pred_loss)
 
                 hidden = self._repackage_hidden(hidden)
 
-                if batch_idx == 0:
-                    # Produce images only for first batch during eval
-                    if self.dataset_kind == 'mnist':
-                        ret['img_preds'] = self._image_grid(x_a_next, 
-                                                            compare_with=targets, 
-                                                            compare_correct=correct_arr,
-                                                            nrow=4 * 2).cpu()
-                        if cm_fig:
-                            ret['img_confusion'] = fig2img(cm_fig)
+                # Save results for image grid & confusion matrix
+                x_a_next.unsqueeze_(0)
+                targets.unsqueeze_(0)
+                correct_arr.unsqueeze_(0)
+                all_x_a_next = x_a_next if all_x_a_next is None else torch.cat((all_x_a_next, x_a_next))
+                all_targets = targets if all_targets is None else torch.cat((all_targets, targets))
+                all_correct_arrs = correct_arr if all_correct_arrs is None else torch.cat((all_correct_arrs, correct_arr))
+                all_pred_targets = pred_targets if all_pred_targets is None else torch.cat((all_pred_targets, pred_targets))                
+                all_class_predictions = class_predictions if all_class_predictions is None else torch.cat((all_class_predictions, class_predictions))                
 
-                        # Summary of column activation by input & next input
-                        if self.model_kind == 'rsm':
-                            self._store_activity_for_viz(x_bs, input_labels, pred_targets)
-                            col_activity_grid = plot_activity(self.activity_by_inputs, 
-                                                              n_labels=self.predictor_output_size,
-                                                              level='cell')
-                            img_repr_sim = plot_representation_similarity(self.activity_by_inputs,
-                                                                          n_labels=self.predictor_output_size,
-                                                                          title=self.boost_strat)
-                            ret['img_repr_sim'] = fig2img(img_repr_sim)
-                            ret['img_col_activity'] = fig2img(col_activity_grid)
-                            self.activity_by_inputs = {}
+                if self.dataset_kind == 'mnist' and self.model_kind == 'rsm':
+                    # Summary of column activation by input & next input
+                    self._store_activity_for_viz(x_bs, input_labels, pred_targets)
 
-                    ret.update(self._track_weights())
+                ret.update(self._track_weights())
 
                 if batch_idx >= self.eval_batches_in_epoch:
                     break
+
+            if self.dataset_kind == 'mnist' and self.model_kind == 'rsm':
+                ret['img_preds'] = self._image_grid(all_x_a_next, 
+                                                    compare_with=all_targets, 
+                                                    compare_correct=all_correct_arrs).cpu()
+                cm_fig = self._confusion_matrix(all_pred_targets, all_class_predictions)
+                ret['img_confusion'] = fig2img(cm_fig)
+                col_activity_grid = plot_activity(self.activity_by_inputs, 
+                                                  n_labels=self.predictor_output_size,
+                                                  level='cell')
+                img_repr_sim = plot_representation_similarity(self.activity_by_inputs,
+                                                              n_labels=self.predictor_output_size,
+                                                              title=self.boost_strat)
+                ret['img_repr_sim'] = fig2img(img_repr_sim)
+                ret['img_col_activity'] = fig2img(col_activity_grid)
+                self.activity_by_inputs = {}
 
             ret['val_loss'] = val_loss = total_loss / (batch_idx + 1)
             ret['val_ppl'] = lang_util.perpl(val_loss)
@@ -528,7 +527,7 @@ class RSMExperiment(object):
             targets = targets.to(self.device)
             pred_targets = pred_targets.to(self.device)
 
-            x_a_next, hidden, x_bs = self.model(inputs, hidden)
+            x_a_next, hidden = self.model(inputs, hidden)
 
             # Loss
             loss = self.loss(x_a_next, targets)
@@ -551,8 +550,9 @@ class RSMExperiment(object):
             if self.plot_gradients:
                 self._plot_gradient_flow()
 
-            total_samples, correct_samples, correct_arr, total_pred_loss, _ = self._do_prediction(
-                x_bs, pred_targets, total_samples, correct_samples, total_pred_loss,
+            x_b = hidden[0]
+            total_samples, correct_samples, class_predictions, correct_arr, total_pred_loss, _ = self._do_prediction(
+                x_b, pred_targets, total_samples, correct_samples, total_pred_loss,
                 train=True)
 
             if batch_idx > self.batches_in_epoch:

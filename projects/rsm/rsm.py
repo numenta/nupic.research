@@ -38,14 +38,13 @@ class RSMPredictor(torch.nn.Module):
 
     def forward(self, x):
         """
-        Receive input as hidden memory state from RSM, batched
-        x is with shape (seq_len, batch_size, total_cells)
+        Receive input as hidden memory state from RSM, batch
+        x^B is with shape (batch_size, total_cells)
 
-        Output is (seq_len * batch_size, d_out)
+        Output is (batch_size, d_out)
         """
-        sl, bsz, _ = x.size()
         x = self.layers(x)
-        return x.view(sl * bsz, self.d_out)
+        return x.view(-1, self.d_out)
 
 
 class RSMLayer(torch.nn.Module):
@@ -253,43 +252,36 @@ class RSMLayer(torch.nn.Module):
 
     def forward(self, x_a_batch, hidden):
         """
-        :param x_a_batch: Input batch of batch_size seq_len sequences (seq_len, batch_size, d_in)
+        :param x_a_batch: Input batch of batch_size items from generating process (batch_size, d_in)
         """
-        bsz = x_a_batch.size(1)
-
-        output = torch.zeros_like(x_a_batch)
-        x_bs = torch.zeros((self.seq_length, bsz, self.total_cells), device=x_a_batch.device)
+        bsz = x_a_batch.size(0)
 
         x_b, phi, psi = hidden
 
-        for seqi in range(self.seq_length):
-            x_a_row = x_a_batch[seqi, :]
+        self._debug_log({'x_a_batch': x_a_batch, 'x_b': x_b})
 
-            self._debug_log({'seqi': seqi, 'x_a_row': x_a_row})
+        self.sigma = self._fc_weighted_ave(x_a_batch, x_b, bsz)
+        self._debug_log({'sigma': self.sigma})
 
-            self.sigma = self._fc_weighted_ave(x_a_row, x_b, bsz)
-            self._debug_log({'sigma': self.sigma})
+        self.y, x_a_next = self._inhibited_masking_and_prediction(self.sigma, phi, bsz)
+        self._debug_log({'y': self.y, 'x_a_next': x_a_next})
 
-            self.y, x_a_next = self._inhibited_masking_and_prediction(self.sigma, phi, bsz)
-            self._debug_log({'y': self.y, 'x_a_next': x_a_next})
+        phi, psi = self._update_memory_and_inhibition(self.y, phi, psi, bsz)
+        self._debug_log({'phi': phi, 'psi': psi})
 
-            phi, psi = self._update_memory_and_inhibition(self.y, phi, psi, bsz)
-            self._debug_log({'phi': phi, 'psi': psi})
+        # Update recurrent input / output x_b
+        if self.x_b_norm:
+            # Normalizing scalar (force sum(x_b) == 1), avoiding div 0... this small enough?
+            alpha = (psi.sum(dim=1) + 1e-9).unsqueeze(dim=1)
+            x_b = self.pred_gain * psi / alpha
+        else:
+            x_b = self.pred_gain * psi
+        self._debug_log({'x_b': x_b})
 
-            # Update recurrent input / output x_b
-            if self.x_b_norm:
-                # Normalizing scalar (force sum(x_b) == 1), avoiding div 0... this small enough?
-                alpha = (psi.sum(dim=1) + 1e-9).unsqueeze(dim=1)
-                x_b = self.pred_gain * psi / alpha
-            else:
-                x_b = self.pred_gain * psi
-            self._debug_log({'x_b': x_b})
-
-            output[seqi, :] = x_a_next
-            x_bs[seqi, :] = x_b
+        output = x_a_next
 
         hidden = (x_b, phi, psi)
-        return (output, hidden, x_bs)
+        return (output, hidden)
 
 
 if __name__ == "__main__":

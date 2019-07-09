@@ -167,7 +167,7 @@ def _repr_similarity_grid(ax, activity_arr, cmap=plt.cm.Blues,
                     color="white" if grid[i, j] > thresh else "black")
 
 
-def plot_representation_similarity(distrs, n_labels=10, title=None, save=None, fontsize=1.3):
+def plot_representation_similarity(distrs, n_labels=10, title=None, save=None, fontsize=1.4):
     '''
     Plot grid showing representation similarity between distributions passed
     into distrs dict. 
