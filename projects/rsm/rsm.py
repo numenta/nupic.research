@@ -175,7 +175,7 @@ class RSMLayer(torch.nn.Module):
         z_b = self.linear_b(self.dropout(x_b)).view(bsz, self.total_cells)
         self._debug_log({'z_a': z_a, 'z_b': z_b})
         self.sigma = z_a + z_b
-        return self.sigma  # bsz x total_cells
+        return self.sigma  # total_cells
 
     def _k_winners(self, sigma, pi, bsz):
         # Group-wise max pooling

@@ -23,7 +23,8 @@ from util import (
     AdamW
 )
 from rsm_samplers import (
-    MNISTSequenceLoader,
+    MNISTSequenceSampler,
+    pred_sequence_collate,
     PTBSequenceSampler,
     ptb_pred_sequence_collate
 )
@@ -134,24 +135,32 @@ class RSMExperiment(object):
                                                   transforms.ToTensor(),
                                                   transforms.Normalize((0.1307,), (0.3081,))
                                               ]),)
-            self.train_loader = MNISTSequenceLoader(self.dataset, 
-                                                    sequences=self.sequences,
-                                                    batch_size=self.batch_size,
-                                                    randomize_sequences=self.randomize_sequences,
-                                                    random_mnist_images=not self.static_digit,
-                                                    use_mnist_pct=self.use_mnist_pct)
 
-            if self.static_digit:
-                # For static digit paradigm, val & train samplers much match to ensure same digit
-                # prototype used for each sequence item.
-                self.val_loader = self.train_loader
-            else:
-                self.val_loader = MNISTSequenceLoader(self.val_dataset, 
+            self.train_sampler = MNISTSequenceSampler(self.dataset, 
                                                       sequences=self.sequences,
                                                       batch_size=self.batch_size,
                                                       randomize_sequences=self.randomize_sequences,
                                                       random_mnist_images=not self.static_digit,
                                                       use_mnist_pct=self.use_mnist_pct)
+
+            if self.static_digit:
+                # For static digit paradigm, val & train samplers much match to ensure same digit
+                # prototype used for each sequence item.
+                self.val_sampler = self.train_sampler
+            else:
+                self.val_sampler = MNISTSequenceSampler(self.val_dataset, 
+                                                        sequences=self.sequences,
+                                                        batch_size=self.batch_size,
+                                                        randomize_sequences=self.randomize_sequences,
+                                                        random_mnist_images=not self.static_digit,
+                                                        use_mnist_pct=self.use_mnist_pct)
+            self.train_loader = DataLoader(self.dataset,
+                                           batch_sampler=self.train_sampler,
+                                           collate_fn=pred_sequence_collate)
+            self.val_loader = DataLoader(self.val_dataset,
+                                         batch_sampler=self.val_sampler,
+                                         collate_fn=pred_sequence_collate)
+
         elif self.dataset_kind == 'ptb':
             # Download "Penn Treebank" dataset
             from torchnlp.datasets import penn_treebank_dataset

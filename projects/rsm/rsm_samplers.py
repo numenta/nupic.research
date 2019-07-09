@@ -6,20 +6,24 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Sampler, DataLoader
 
 
-class MNISTSequenceLoader(DataLoader):
+class MNISTSequenceSampler(Sampler):
     """
     Loop through one or more sequences of digits
     Draw each digit image (based on label specified by sequence) randomly
+
+    TODO: Having this work with a custom DataSet that draws random 
+    MNIST digits may be more appropriate
     """
 
     def __init__(self, data_source, sequences=None, batch_size=64, 
                  randomize_sequences=False, random_mnist_images=True,
                  use_mnist_pct=1.0):
-        super(MNISTSequenceLoader, self).__init__(data_source, batch_size=batch_size)
+        super(MNISTSequenceSampler, self).__init__(data_source)
         self.data_source = data_source
         self.randomize_sequences = randomize_sequences
         self.random_mnist_images = random_mnist_images
         self.use_mnist_pct = use_mnist_pct
+        self.bsz = batch_size
         self.label_indices = {}  # Digit -> Indices in dataset
         self.label_cursors = {}  # Digit -> Cursor across images for each digit
 
@@ -45,20 +49,18 @@ class MNISTSequenceLoader(DataLoader):
                     self.label_cursors[digit] = 0
 
     def _next_sequence_ids(self):
-        return torch.LongTensor(self.batch_size).random_(0, self.n_sequences)
+        return torch.LongTensor(self.bsz).random_(0, self.n_sequences)
 
     def _get_next_batch(self):
         """
         """
         # First row is current inputs
         inp_labels_batch = self.sequences_mat[self.sequence_id[0], self.sequence_cursor[0]]
-        img_idxs = [self._get_sample_image(digit.item()) for digit in inp_labels_batch]
-        inp_images_batch = self.data_source.data[img_idxs].float().view(self.batch_size, -1)
+        inp_idxs = [self._get_sample_image(digit.item()) for digit in inp_labels_batch]
 
         # Second row is next (predicted) inputs
         tgt_labels_batch = self.sequences_mat[self.sequence_id[1], self.sequence_cursor[1]]
-        img_idxs = [self._get_sample_image(digit.item()) for digit in inp_labels_batch]
-        tgt_images_batch = self.data_source.data[img_idxs].float().view(self.batch_size, -1)
+        tgt_idxs = [self._get_sample_image(digit.item()) for digit in tgt_labels_batch]
 
         # Roll next to current
         self.sequence_id[0] = self.sequence_id[1]
@@ -73,7 +75,8 @@ class MNISTSequenceLoader(DataLoader):
             self.sequence_id[1, roll_mask] = torch.LongTensor(len(roll_mask)).random_(0, self.n_sequences)
             self.sequence_cursor[1, roll_mask] = 0
 
-        return inp_images_batch, tgt_images_batch, tgt_labels_batch, inp_labels_batch
+        # return (inp_images_batch, tgt_images_batch, tgt_labels_batch, inp_labels_batch)
+        return inp_idxs + tgt_idxs
 
     def _get_sample_image(self, digit):
         """
@@ -101,8 +104,14 @@ class MNISTSequenceLoader(DataLoader):
 def pred_sequence_collate(batch):
     """
     """
-    print(batch.size())
-    return batch
+    bsz = len(batch) // 2
+    inp_tuples = batch[:bsz]
+    tgt_tuples = batch[bsz:]
+    inp_images_batch = torch.stack([item[0] for item in inp_tuples]).view(bsz, -1)
+    tgt_images_batch = torch.stack([item[0] for item in tgt_tuples]).view(bsz, -1)
+    inp_labels_batch = torch.tensor([item[1] for item in inp_tuples])
+    tgt_labels_batch = torch.tensor([item[1] for item in tgt_tuples])
+    return (inp_images_batch, tgt_images_batch, tgt_labels_batch, inp_labels_batch)
 
 
 class PTBSequenceSampler(Sampler):
