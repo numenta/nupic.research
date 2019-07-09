@@ -2,31 +2,11 @@ from itertools import chain
 import random
 
 import torch
-from torch.utils.data import Sampler, BatchSampler
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import Sampler, DataLoader
 
 
-class PredictiveBatchSampler(BatchSampler):
-    """
-    Subclass of BatchSampler that avoids skipping an item at the end of each batch
-    full_batch_size is sl x bs
-    """
-
-    def __init__(self, sampler, batch_size):
-        super(PredictiveBatchSampler, self).__init__(sampler, batch_size, True)
-
-    def __iter__(self):
-        batch = []
-        for idx in self.sampler:
-            batch.append(idx)
-            if len(batch) == self.batch_size + 1:
-                yield batch
-                batch = [idx]  # Start next batch with extra item from last
-
-        if len(batch) > 0 and not self.drop_last:
-            yield batch
-
-
-class MNISTSequenceSampler(Sampler):
+class MNISTSequenceLoader(DataLoader):
     """
     Loop through one or more sequences of digits
     Draw each digit image (based on label specified by sequence) randomly
@@ -35,20 +15,23 @@ class MNISTSequenceSampler(Sampler):
     def __init__(self, data_source, sequences=None, batch_size=64, 
                  randomize_sequences=False, random_mnist_images=True,
                  use_mnist_pct=1.0):
-        super(MNISTSequenceSampler, self).__init__(data_source)
+        super(MNISTSequenceLoader, self).__init__(data_source, batch_size=batch_size)
         self.data_source = data_source
-        # self.bsz = batch_size
         self.randomize_sequences = randomize_sequences
         self.random_mnist_images = random_mnist_images
+        self.use_mnist_pct = use_mnist_pct
         self.label_indices = {}  # Digit -> Indices in dataset
         self.label_cursors = {}  # Digit -> Cursor across images for each digit
 
         self.sequences = sequences
-        self.sequence_id = 0  # Of list of sequences passed
-        self.sequence_cursor = 0  # Iterates through each sequence
-        self.full_sequence = list(chain.from_iterable(self.sequences))
-        self.seq_length = len(self.full_sequence)
-        self.use_mnist_pct = use_mnist_pct
+        self.n_sequences = len(self.sequences)
+
+        # Each of these stores both current and next batch state (2 x batch_size)
+        self.sequence_id = torch.stack((self._next_sequence_ids(), self._next_sequence_ids()))  # Iterate over subsequences
+        self.sequence_cursor = torch.stack((torch.zeros(batch_size).long(), torch.ones(batch_size).long()))  # Iterates over sequence items
+
+        self.seq_lengths = torch.tensor([len(subseq) for subseq in self.sequences])
+        self.sequences_mat = pad_sequence(torch.tensor(self.sequences), batch_first=True, padding_value=0)
 
         # Get index for each digit (that appears in a passed sequence)
         for seq in sequences:
@@ -61,25 +44,36 @@ class MNISTSequenceSampler(Sampler):
                     self.label_indices[digit] = mask[idx]
                     self.label_cursors[digit] = 0
 
-    def _random_sequence_id(self):
-        return random.randint(0, len(self.sequences) - 1)
+    def _next_sequence_ids(self):
+        return torch.LongTensor(self.batch_size).random_(0, self.n_sequences)
 
-    def _get_next_digit(self):
+    def _get_next_batch(self):
         """
-        Return next integer digit in full sequence
         """
-        current_seq = self.sequences[self.sequence_id]
-        digit = current_seq[self.sequence_cursor]
-        self.sequence_cursor += 1
-        if self.sequence_cursor > len(current_seq) - 1:
-            self.sequence_cursor = 0
-            if self.randomize_sequences:
-                self.sequence_id = self._random_sequence_id()
-            else:
-                self.sequence_id += 1
-        if self.sequence_id > len(self.sequences) - 1:
-            self.sequence_id = 0
-        return digit
+        # First row is current inputs
+        inp_labels_batch = self.sequences_mat[self.sequence_id[0], self.sequence_cursor[0]]
+        img_idxs = [self._get_sample_image(digit.item()) for digit in inp_labels_batch]
+        inp_images_batch = self.data_source.data[img_idxs].float().view(self.batch_size, -1)
+
+        # Second row is next (predicted) inputs
+        tgt_labels_batch = self.sequences_mat[self.sequence_id[1], self.sequence_cursor[1]]
+        img_idxs = [self._get_sample_image(digit.item()) for digit in inp_labels_batch]
+        tgt_images_batch = self.data_source.data[img_idxs].float().view(self.batch_size, -1)
+
+        # Roll next to current
+        self.sequence_id[0] = self.sequence_id[1]
+        self.sequence_cursor[0] = self.sequence_cursor[1]
+
+        # Increment cursors and select new random subsequences for those that have terminated
+        self.sequence_cursor[1] += 1
+        roll_mask = self.sequence_cursor[1] >= self.seq_lengths[self.sequence_id[1]]
+
+        if roll_mask.sum() > 0:
+            # Roll items to 0 of randomly chosen next subsequence
+            self.sequence_id[1, roll_mask] = torch.LongTensor(len(roll_mask)).random_(0, self.n_sequences)
+            self.sequence_cursor[1, roll_mask] = 0
+
+        return inp_images_batch, tgt_images_batch, tgt_labels_batch, inp_labels_batch
 
     def _get_sample_image(self, digit):
         """
@@ -96,36 +90,19 @@ class MNISTSequenceSampler(Sampler):
         return indices[cursor].item()
 
     def __iter__(self):
-        # Ensure we start at beg of sequence on each enumerate (e.g. epoch)
-        self.sequence_cursor = 0   
         while True:
-            digit = self._get_next_digit()
-            next_sample_id = self._get_sample_image(digit)
-            yield next_sample_id
+            yield self._get_next_batch()
         return
 
     def __len__(self):
         return len(self.data_source)
 
 
-def pred_sequence_collate(batch, bsz=4, seq_length=3, return_inputs=False):
+def pred_sequence_collate(batch):
     """
-    Batch returned from sampler is a list of (image, label) tuples
-    Offset target batch by 1 to get next image predictions
-
-    Returns a 3-tuple which is iterated by the loader:
-        data (sl x bs x pixels)
-        target (sl x bs x pixels)
-        pred_target (sl x bs x 1)  Label (digit)
     """
-    # Transposes needed since batches come in sequential order of size sl * bs
-    data = torch.stack([s[0] for s in batch[:-1]]).view(bsz, seq_length, -1).transpose(0, 1).contiguous()
-    target = torch.stack([s[0] for s in batch[1:]]).view(bsz, seq_length, -1).transpose(0, 1).contiguous()
-    pred_target = torch.tensor([s[1] for s in batch[1:]]).view(bsz, seq_length).t()
-    input_labels = None
-    if return_inputs:
-        input_labels = torch.tensor([s[1] for s in batch[:-1]]).view(bsz, seq_length).t()
-    return (data, target, pred_target, input_labels)
+    print(batch.size())
+    return batch
 
 
 class PTBSequenceSampler(Sampler):
