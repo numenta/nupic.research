@@ -36,6 +36,7 @@ class LSTMModel(nn.Module):
 
     def forward(self, input, hidden):
         # Takes input of shape (seq_len, batch, input_size)
+        input = input.view(1, input.size(0), input.size(1))
         if self.encoder:
             emb = self.drop(self.encoder(input))
         else:
@@ -43,7 +44,7 @@ class LSTMModel(nn.Module):
         output, hidden = self.rnn(emb, hidden)
         output = self.drop(output)
         decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))
-        return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden, None
+        return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden
 
     def init_hidden(self, bsz):
         weight = next(self.parameters())

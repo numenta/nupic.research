@@ -95,7 +95,9 @@ class RSMExperiment(object):
         self.boost_strat = config.get("boost_strat", "rsm_inhibition")
         self.pred_gain = config.get("pred_gain", 1.0)
         self.x_b_norm = config.get("x_b_norm", False)
-        self.predict_memory = config.get("predict_memory", False)
+        self.predict_memory = config.get("predict_memory", None)
+        self.mask_shifted_pi = config.get("mask_shifted_pi", False)
+        self.do_inhibition = config.get("do_inhibition", True)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -226,7 +228,7 @@ class RSMExperiment(object):
         # Build model and optimizer
         self.d_in = reduce(lambda x, y: x * y, self.input_size)
         if self.predict_memory:
-            self.d_out = self.total_cells
+            self.d_out = self.total_cells if self.predict_memory == 'cell' else self.m_groups
         else:
             self.d_out = config.get("output_size", self.d_in)
         self.predictor = None
@@ -244,9 +246,11 @@ class RSMExperiment(object):
                                   active_dendrites=self.active_dendrites,
                                   col_output_cells=self.col_output_cells,
                                   dropout_p=self.dropout_p,
+                                  pred_gain=self.pred_gain,
                                   decode_from_full_memory=self.decode_from_full_memory,
                                   x_b_norm=self.x_b_norm,
-                                  predict_memory=self.predict_memory,
+                                  mask_shifted_pi=self.mask_shifted_pi,
+                                  do_inhibition=self.do_inhibition,
                                   boost_strat=self.boost_strat,
                                   embed_dim=self.embed_dim,
                                   vocab_size=self.vocab_size,
@@ -349,7 +353,7 @@ class RSMExperiment(object):
             for param_group in self.optimizer.param_groups:
                 param_group["lr"] = self.learning_rate
 
-    def _track_weights(self):
+    def _track_hists(self):
         ret = {}
         for name, param in self.model.named_parameters():
             if 'weight' in name:
@@ -385,6 +389,7 @@ class RSMExperiment(object):
     def _do_prediction(self, x_b, pred_targets, total_samples, correct_samples, 
                        total_pred_loss, train=False):
         cm_fig = None
+        class_predictions = correct_arr = None
         if self.predictor:
             bs, tc = x_b.size()
             pred_targets = pred_targets.flatten()
@@ -411,7 +416,11 @@ class RSMExperiment(object):
         if self.predict_memory:
             # Loss computed between x^A generated at last time step and actual x^B
             if last_output is not None:
-                loss = self.loss(last_output.squeeze(), x_b)
+                if self.predict_memory == 'cell':
+                    target = x_b.detach()
+                elif self.predict_memory == 'column':
+                    target = x_b.detach().view(-1, self.m_groups, self.n_cells_per_group).max(dim=2).values
+                loss = self.loss(last_output.squeeze(), target)
         else:
             # Standard next x^A image prediction
             loss = self.loss(output, targets)
@@ -469,9 +478,9 @@ class RSMExperiment(object):
                     # Summary of column activation by input & next input
                     self._store_activity_for_viz(x_b, input_labels, pred_targets)
 
-                ret.update(self._track_weights())
+                ret.update(self._track_hists())
 
-                last_output = x_a_next.detach()
+                last_output = x_a_next
 
                 if batch_idx >= self.eval_batches_in_epoch:
                     break
@@ -574,7 +583,7 @@ class RSMExperiment(object):
                 x_b, pred_targets, total_samples, correct_samples, total_pred_loss,
                 train=True)
 
-            last_output = output.detach()
+            last_output = output
 
             if batch_idx > self.batches_in_epoch:
                 print("Stopping after %d batches in epoch %d" % (self.batches_in_epoch, epoch))

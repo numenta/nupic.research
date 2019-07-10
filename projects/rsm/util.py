@@ -70,32 +70,6 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     return ax, fig
 
 
-def plot_activity_grid(distrs, n_labels=10):
-    """
-    Plot column activations for each combination of input and actual next input
-    Should show mini-column union activity (subsets of column-level activity
-    which predict next input) in the RSM model.
-    """
-    fig, axs = plt.subplots(n_labels, n_labels, dpi=200, 
-                            sharex=True, sharey=True,
-                            gridspec_kw={'wspace': 0, 'hspace': 0})
-    for i in range(n_labels):
-        for j in range(n_labels):
-            ax = axs[i][j]
-            ax.axis('off')
-            key = '%d-%d' % (i, j)
-            if key in distrs:
-                activity_arr = distrs[key]
-                ax.set_title("%d -> %d" % (i, j), fontsize=7)
-                dist = torch.stack(activity_arr)
-                mean_act = dist.mean(dim=0)
-                ax.imshow(activity_square(mean_act))
-            else:
-                ax.set_axis_off()
-
-    return fig
-
-
 def plot_activity(distrs, n_labels=10, level='column'):
     """
     Plot column activations for each combination of input and actual next input
@@ -122,7 +96,7 @@ def plot_activity(distrs, n_labels=10, level='column'):
                     act = torch.cat((dist, col), 2).view(bsz, m, n + 1)
                 mean_act = act.mean(dim=0).cpu()
                 ax.imshow(mean_act.t(), origin='bottom', extent=(0, m-1, 0, n+1))
-                ax.plot([0, m-1], [n, n], linewidth=1)
+                ax.plot([0, m-1], [n, n], linewidth=0.4)
                 ax.axis('off')
                 ax.set_title(key, fontsize=5)
     return fig
@@ -143,7 +117,7 @@ def _repr_similarity_grid(ax, activity_arr, cmap=plt.cm.Blues,
                 sim = cosine_similarity(act1, act2, dim=0)
                 grid[i, j] = grid[j, i] = sim
 
-    ax.imshow(grid, interpolation='nearest', cmap=cmap)
+    ax.imshow(grid, interpolation='nearest', cmap=cmap, vmin=0, vmax=1)
     # ax.figure.colorbar(im, ax=ax)
     # We want to show all ticks...
     ax.set(xticks=np.arange(grid.shape[1]),

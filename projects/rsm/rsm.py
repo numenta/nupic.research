@@ -53,7 +53,7 @@ class RSMLayer(torch.nn.Module):
                  cell_winner_softmax=False, active_dendrites=None,
                  col_output_cells=None, embed_dim=0, vocab_size=0, 
                  bsz=64, dropout_p=0.0, decode_from_full_memory=False,
-                 predict_memory=False, debug_log_names=None,
+                 debug_log_names=None, mask_shifted_pi=False, do_inhibition=True,
                  boost_strat='rsm_inhibition', pred_gain=1.0, x_b_norm=False,
                  debug=False, visual_debug=False, seq_length=8, use_bias=True,
                  **kwargs):
@@ -96,7 +96,8 @@ class RSMLayer(torch.nn.Module):
         self.boost_strat = boost_strat
         self.pred_gain = pred_gain
         self.x_b_norm = x_b_norm
-        self.predict_memory = predict_memory
+        self.mask_shifted_pi = mask_shifted_pi
+        self.do_inhibition = do_inhibition
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -135,7 +136,7 @@ class RSMLayer(torch.nn.Module):
                         t = t.detach().squeeze()
                         if t.dim() == 1:
                             t = t.flatten()
-                            size = t.size()
+                            size = t.numel()
                             is_cell_level = t.numel() == self.total_cells
                             if is_cell_level:
                                 plt.imshow(t.view(self.m, self.n).t(), origin='bottom', extent=(0, self.m-1, 0, self.n))
@@ -143,7 +144,8 @@ class RSMLayer(torch.nn.Module):
                                 plt.imshow(activity_square(t))
                             tmin = t.min()
                             tmax = t.max()
-                            plt.title("%s (%s, rng: %.3f-%.3f)" % (name, size, tmin, tmax))
+                            tsum = t.sum()
+                            plt.title("%s (%s, rng: %.3f-%.3f, sum: %.3f)" % (name, size, tmin, tmax, tsum))
                             plt.show()
 
     def _register_hooks(self):
@@ -183,8 +185,12 @@ class RSMLayer(torch.nn.Module):
         lambda_ = self._group_max(pi)
 
         # Cell-level mask: Make a bsz x total_cells binary mask of top 1 cell in each column
-        mask = topk_mask(pi.view(bsz * self.m, self.n), self.k_winner_cells)
-        M_pi = mask.view(bsz, self.total_cells).detach()
+        if self.n == self.k_winner_cells:
+            # Usually just in n=1 case, no need to choose winners
+            M_pi = torch.ones(bsz, self.total_cells)
+        else:
+            mask = topk_mask(pi.view(bsz * self.m, self.n), self.k_winner_cells)
+            M_pi = mask.view(bsz, self.total_cells).detach()
 
         if self.boost_strat == 'rsm_inhibition':
             # Standard RSM-style inhibition via phi matrix
@@ -205,7 +211,8 @@ class RSMLayer(torch.nn.Module):
             # Experiment with HTM style boosted k-winner (TODO: should we prevent BP through masks like RSM?)
             winning_columns = self.kwinners_col(lambda_).view(bsz, self.m, 1).repeat(1, 1, self.n).view(bsz, self.total_cells)
             self._debug_log({'winning_columns': winning_columns})
-            y_pre_act = M_pi * winning_columns * self.sigma
+            premask_act = pi if self.mask_shifted_pi else self.sigma
+            y_pre_act = M_pi * winning_columns * premask_act
 
         del M_pi
 
@@ -216,7 +223,8 @@ class RSMLayer(torch.nn.Module):
         Compute y_lambda
         """
         # Apply inhibition to non-neg shifted sigma
-        pi = (1 - phi) * (self.sigma - self.sigma.min() + 1)
+        inh = (1-phi) if self.do_inhibition else 1
+        pi = inh * (self.sigma - self.sigma.min() + 1)
         self._debug_log({'pi': pi})
 
         pi = pi.detach()  # Prevent gradients from flowing through inhibition/masking
@@ -258,8 +266,9 @@ class RSMLayer(torch.nn.Module):
         bsz = x_a_batch.size(0)
 
         x_b, phi, psi = hidden
+        self._debug_log({'x_b': x_b})
 
-        self._debug_log({'x_a_batch': x_a_batch, 'x_b': x_b})
+        self._debug_log({'x_a_batch': x_a_batch})
 
         self.sigma = self._fc_weighted_ave(x_a_batch, x_b, bsz)
         self._debug_log({'sigma': self.sigma})
@@ -277,7 +286,6 @@ class RSMLayer(torch.nn.Module):
             x_b = self.pred_gain * psi / alpha
         else:
             x_b = self.pred_gain * psi
-        self._debug_log({'x_b': x_b})
 
         hidden = (x_b, phi, psi)
         return (pred_output, hidden)
