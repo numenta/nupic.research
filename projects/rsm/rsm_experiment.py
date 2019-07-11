@@ -23,6 +23,7 @@ from util import (
     AdamW
 )
 from rsm_samplers import (
+    MNISTBufferedDataset,
     MNISTSequenceSampler,
     pred_sequence_collate,
     PTBSequenceSampler,
@@ -98,6 +99,9 @@ class RSMExperiment(object):
         self.predict_memory = config.get("predict_memory", None)
         self.mask_shifted_pi = config.get("mask_shifted_pi", False)
         self.do_inhibition = config.get("do_inhibition", True)
+        self.boost_strength = config.get("boost_strength", 1.0)
+        self.mult_integration = config.get("mult_integration", False)
+        self.noise_buffer = config.get("noise_buffer", False)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -131,15 +135,17 @@ class RSMExperiment(object):
                 transforms.ToTensor(),
                 transforms.Normalize((0.1307,), (0.3081,))
             ])
-            self.dataset = datasets.MNIST(self.data_dir, download=True,
-                                          train=True, transform=transform)
-            self.val_dataset = datasets.MNIST(self.data_dir, download=True, transform=transform)
+            self.dataset = MNISTBufferedDataset(self.data_dir, download=True,
+                                                train=True, transform=transform)
+            self.val_dataset = MNISTBufferedDataset(self.data_dir, download=True, 
+                                                    transform=transform)
 
             self.train_sampler = MNISTSequenceSampler(self.dataset, 
                                                       sequences=self.sequences,
                                                       batch_size=self.batch_size,
                                                       randomize_sequences=self.randomize_sequences,
                                                       random_mnist_images=not self.static_digit,
+                                                      noise_buffer=self.noise_buffer,
                                                       use_mnist_pct=self.use_mnist_pct)
 
             if self.static_digit:
@@ -152,6 +158,7 @@ class RSMExperiment(object):
                                                         batch_size=self.batch_size,
                                                         randomize_sequences=self.randomize_sequences,
                                                         random_mnist_images=not self.static_digit,
+                                                        noise_buffer=self.noise_buffer,
                                                         use_mnist_pct=self.use_mnist_pct)
             self.train_loader = DataLoader(self.dataset,
                                            batch_sampler=self.train_sampler,
@@ -252,6 +259,8 @@ class RSMExperiment(object):
                                   mask_shifted_pi=self.mask_shifted_pi,
                                   do_inhibition=self.do_inhibition,
                                   boost_strat=self.boost_strat,
+                                  boost_strength=self.boost_strength,
+                                  mult_integration=self.mult_integration,
                                   embed_dim=self.embed_dim,
                                   vocab_size=self.vocab_size,
                                   bsz=self.batch_size,
@@ -626,6 +635,7 @@ class RSMExperiment(object):
         rate, rezero sparse weights, and update boost strengths.
         """
         self._adjust_learning_rate(epoch)
+        self.model._post_epoch(epoch)
 
     def model_save(self, checkpoint_dir):
         """Save the model in this directory.
