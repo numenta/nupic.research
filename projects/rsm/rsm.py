@@ -55,6 +55,7 @@ class RSMLayer(torch.nn.Module):
                  bsz=64, dropout_p=0.0, decode_from_full_memory=False,
                  debug_log_names=None, mask_shifted_pi=False, do_inhibition=True,
                  boost_strat='rsm_inhibition', pred_gain=1.0, x_b_norm=False,
+                 boost_strength=1.0, mult_integration=False,
                  debug=False, visual_debug=False, seq_length=8, use_bias=True,
                  **kwargs):
         """
@@ -98,6 +99,8 @@ class RSMLayer(torch.nn.Module):
         self.x_b_norm = x_b_norm
         self.mask_shifted_pi = mask_shifted_pi
         self.do_inhibition = do_inhibition
+        self.boost_strength = boost_strength
+        self.mult_integration = mult_integration
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -105,7 +108,10 @@ class RSMLayer(torch.nn.Module):
 
         self.dropout = nn.Dropout(p=self.dropout_p)
 
-        self.kwinners_col = KWinners(self.m, self.k / self.m)
+        self.kwinners_col = KWinners(self.m, self.k / self.m, 
+                                     boost_strength=self.boost_strength,
+                                     duty_cycle_period=5000,
+                                     boost_strength_factor=1.0)
         self.linear_a = nn.Linear(d_in, m, bias=use_bias)  # Input weights (shared per group / proximal)
         if self.active_dendrites:
             self.linear_b = ActiveDendriteLayer(self.total_cells, self.total_cells, 
@@ -137,7 +143,7 @@ class RSMLayer(torch.nn.Module):
                         if t.dim() == 1:
                             t = t.flatten()
                             size = t.numel()
-                            is_cell_level = t.numel() == self.total_cells
+                            is_cell_level = t.numel() == self.total_cells and self.n > 1
                             if is_cell_level:
                                 plt.imshow(t.view(self.m, self.n).t(), origin='bottom', extent=(0, self.m-1, 0, self.n))
                             else:
@@ -147,6 +153,9 @@ class RSMLayer(torch.nn.Module):
                             tsum = t.sum()
                             plt.title("%s (%s, rng: %.3f-%.3f, sum: %.3f)" % (name, size, tmin, tmax, tsum))
                             plt.show()
+
+    def _post_epoch(self, epoch):
+        self.kwinners_col.update_boost_strength()
 
     def _register_hooks(self):
         """Utility function to call retain_grad and Pytorch's register_hook
@@ -177,7 +186,10 @@ class RSMLayer(torch.nn.Module):
         # Cell activation from recurrent input (dropped out)
         z_b = self.linear_b(self.dropout(x_b)).view(bsz, self.total_cells)
         self._debug_log({'z_a': z_a, 'z_b': z_b})
-        self.sigma = z_a + z_b
+        if self.mult_integration:
+            self.sigma = z_a * z_b
+        else:
+            self.sigma = z_a + z_b
         return self.sigma  # total_cells
 
     def _k_winners(self, sigma, pi, bsz):

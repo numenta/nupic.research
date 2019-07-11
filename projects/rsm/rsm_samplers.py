@@ -1,9 +1,43 @@
-from itertools import chain
-import random
-
+from PIL import Image
 import torch
+import numpy as np
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import Sampler, DataLoader
+from torch.utils.data import Sampler
+from torchvision import datasets
+
+
+class MNISTBufferedDataset(datasets.MNIST):
+
+    def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
+        super(MNISTBufferedDataset, self).__init__(root, train=train, transform=transform, 
+                                                   target_transform=target_transform, download=download)
+
+    def __getitem__(self, index):
+        """
+        Override to allow generation of white noise for index -1
+
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (image, target) where target is index of the target class.
+        """
+        if index == -1:
+            # Noise
+            target = -1
+            img = np.random.rand(28, 28)
+        else:
+            img, target = self.data[index].numpy(), int(self.targets[index])
+
+        img = Image.fromarray(img, mode='L')
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return img, target
 
 
 class MNISTSequenceSampler(Sampler):
@@ -17,16 +51,20 @@ class MNISTSequenceSampler(Sampler):
 
     def __init__(self, data_source, sequences=None, batch_size=64, 
                  randomize_sequences=False, random_mnist_images=True,
-                 use_mnist_pct=1.0):
+                 use_mnist_pct=1.0, noise_buffer=False):
         super(MNISTSequenceSampler, self).__init__(data_source)
         self.data_source = data_source
         self.randomize_sequences = randomize_sequences
         self.random_mnist_images = random_mnist_images
         self.use_mnist_pct = use_mnist_pct
+        self.noise_buffer = noise_buffer
         self.bsz = batch_size
         self.label_indices = {}  # Digit -> Indices in dataset
         self.label_cursors = {}  # Digit -> Cursor across images for each digit
 
+        if self.noise_buffer:
+            for seq in sequences:
+                seq.append(-1)
         self.sequences = sequences
         self.n_sequences = len(self.sequences)
         self.seq_lengths = torch.tensor([len(subseq) for subseq in self.sequences])
@@ -42,7 +80,7 @@ class MNISTSequenceSampler(Sampler):
         # Get index for each digit (that appears in a passed sequence)
         for seq in sequences:
             for digit in seq:
-                if digit not in self.label_indices:
+                if digit != -1 and digit not in self.label_indices:
                     mask = (data_source.targets == digit).nonzero().flatten()
                     idx = torch.randperm(mask.size(0))
                     if self.use_mnist_pct < 1.0:
@@ -92,17 +130,21 @@ class MNISTSequenceSampler(Sampler):
         """
         Return a sample image id for digit from MNIST
         """
-        cursor = self.label_cursors[digit]
-        if self.random_mnist_images:
-            # If not random, always take first digit
-            self.label_cursors[digit] += 1
-        indices = self.label_indices[digit]
-        if cursor >= len(indices) - 1:
-            # Begin sequence from beginning & shuffle
-            self.label_cursors[digit] = cursor = 0
-            idx = torch.randperm(len(self.label_indices[digit]))
-            self.label_indices[digit] = indices = self.label_indices[digit][idx]
-        return indices[cursor].item()
+        if digit == -1:
+            # Generate white noise
+            return -1
+        else:
+            cursor = self.label_cursors[digit]
+            if self.random_mnist_images:
+                # If not random, always take first digit
+                self.label_cursors[digit] += 1
+            indices = self.label_indices[digit]
+            if cursor >= len(indices) - 1:
+                # Begin sequence from beginning & shuffle
+                self.label_cursors[digit] = cursor = 0
+                idx = torch.randperm(len(self.label_indices[digit]))
+                self.label_indices[digit] = indices = self.label_indices[digit][idx]
+            return indices[cursor].item()
 
     def __iter__(self):
         while True:

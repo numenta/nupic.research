@@ -9,11 +9,16 @@ from torch.nn.functional import cosine_similarity
 import math
 
 
-def activity_square(vector):
-    n = len(vector)
+def square_size(n):
     side = int(np.sqrt(n))
     if side ** 2 < n:
         side += 1
+    return side
+
+
+def activity_square(vector):
+    n = len(vector)
+    side = square_size(n)
     square = torch.zeros(side ** 2)
     square[:n] = vector
     return square.view(side, side)
@@ -88,6 +93,7 @@ def plot_activity(distrs, n_labels=10, level='column'):
                 ax = axs[pi]
                 pi += 1
                 bsz, m, n = dist.size()
+                # no_columns = n == 1
                 col_act = dist.max(dim=2).values
                 if level == 'column':
                     act = col_act
@@ -104,6 +110,7 @@ def plot_activity(distrs, n_labels=10, level='column'):
 
 def _repr_similarity_grid(ax, activity_arr, cmap=plt.cm.Blues, 
                           normalize=False, labels=None, title=None,
+                          tick_fontsize=2,
                           fontsize=1.2):
     n_labels = len(labels)
     grid = torch.zeros(n_labels, n_labels)
@@ -125,7 +132,7 @@ def _repr_similarity_grid(ax, activity_arr, cmap=plt.cm.Blues,
            # ... and label them with the respective list entries
            xticklabels=labels, yticklabels=labels,
            title=title)
-    ax.tick_params(labelsize=fontsize)
+    ax.tick_params(labelsize=tick_fontsize)
 
     # Rotate the tick labels and set their alignment.
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
@@ -141,7 +148,7 @@ def _repr_similarity_grid(ax, activity_arr, cmap=plt.cm.Blues,
                     color="white" if grid[i, j] > thresh else "black")
 
 
-def plot_representation_similarity(distrs, n_labels=10, title=None, save=None, fontsize=1.4):
+def plot_representation_similarity(distrs, n_labels=10, title=None, save=None, fontsize=1.6):
     '''
     Plot grid showing representation similarity between distributions passed
     into distrs dict. 
