@@ -24,7 +24,7 @@ class MNISTBufferedDataset(datasets.MNIST):
         """
         if index == -1:
             # Noise
-            target = -1
+            target = np.random.randint(10)  # -1
             img = np.random.rand(28, 28)
         else:
             img, target = self.data[index].numpy(), int(self.targets[index])
@@ -62,9 +62,11 @@ class MNISTSequenceSampler(Sampler):
         self.label_indices = {}  # Digit -> Indices in dataset
         self.label_cursors = {}  # Digit -> Cursor across images for each digit
 
+        sequences = list(sequences)  # Avoid changing underlying sequence list
         if self.noise_buffer:
             for seq in sequences:
-                seq.append(-1)
+                if seq[-1] != -1:
+                    seq.append(-1)
         self.sequences = sequences
         self.n_sequences = len(self.sequences)
         self.seq_lengths = torch.tensor([len(subseq) for subseq in self.sequences])
@@ -75,7 +77,7 @@ class MNISTSequenceSampler(Sampler):
         self.sequence_cursor = torch.stack((first_batch_cursors, first_batch_cursors))  # Iterates over sequence items
         self._increment_next()
 
-        self.sequences_mat = pad_sequence(torch.tensor(self.sequences), batch_first=True, padding_value=-1)
+        self.sequences_mat = pad_sequence(torch.tensor(self.sequences), batch_first=True, padding_value=-99)
 
         # Get index for each digit (that appears in a passed sequence)
         for seq in sequences:

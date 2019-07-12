@@ -93,16 +93,21 @@ def plot_activity(distrs, n_labels=10, level='column'):
                 ax = axs[pi]
                 pi += 1
                 bsz, m, n = dist.size()
-                # no_columns = n == 1
+                no_columns = n == 1
                 col_act = dist.max(dim=2).values
-                if level == 'column':
+                if level == 'column' or no_columns:
                     act = col_act
                 elif level == 'cell':
                     col = col_act.view(bsz, m, 1)
                     act = torch.cat((dist, col), 2).view(bsz, m, n + 1)
                 mean_act = act.mean(dim=0).cpu()
-                ax.imshow(mean_act.t(), origin='bottom', extent=(0, m-1, 0, n+1))
-                ax.plot([0, m-1], [n, n], linewidth=0.4)
+                if no_columns:
+                    mean_act = activity_square(mean_act)
+                    side = mean_act.size(0)
+                    ax.imshow(mean_act, origin='bottom', extent=(0, side, 0, side))
+                else:
+                    ax.imshow(mean_act.t(), origin='bottom', extent=(0, m-1, 0, n+1))
+                    ax.plot([0, m-1], [n, n], linewidth=0.4)
                 ax.axis('off')
                 ax.set_title(key, fontsize=5)
     return fig
