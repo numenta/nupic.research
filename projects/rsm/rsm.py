@@ -55,8 +55,8 @@ class RSMLayer(torch.nn.Module):
                  bsz=64, dropout_p=0.0, decode_from_full_memory=False,
                  debug_log_names=None, mask_shifted_pi=False, do_inhibition=True,
                  boost_strat='rsm_inhibition', pred_gain=1.0, x_b_norm=False,
-                 boost_strength=1.0, mult_integration=False,
-                 debug=False, visual_debug=False, seq_length=8, use_bias=True,
+                 boost_strength=1.0, mult_integration=False, boost_strength_factor=1.0,
+                 debug=False, visual_debug=False, use_bias=True,
                  **kwargs):
         """
         RSM Layer as specified by Rawlinson et al 2019
@@ -80,7 +80,6 @@ class RSMLayer(torch.nn.Module):
         self.d_out = d_out
         self.dropout_p = dropout_p
 
-        self.seq_length = seq_length
         self.total_cells = m * n
         self.bsz = bsz
 
@@ -111,7 +110,7 @@ class RSMLayer(torch.nn.Module):
         self.kwinners_col = KWinners(self.m, self.k / self.m, 
                                      boost_strength=self.boost_strength,
                                      duty_cycle_period=5000,
-                                     boost_strength_factor=1.0)
+                                     boost_strength_factor=boost_strength_factor)
         self.linear_a = nn.Linear(d_in, m, bias=use_bias)  # Input weights (shared per group / proximal)
         if self.active_dendrites:
             self.linear_b = ActiveDendriteLayer(self.total_cells, self.total_cells, 
@@ -199,7 +198,7 @@ class RSMLayer(torch.nn.Module):
         # Cell-level mask: Make a bsz x total_cells binary mask of top 1 cell in each column
         if self.n == self.k_winner_cells:
             # Usually just in n=1 case, no need to choose winners
-            M_pi = torch.ones(bsz, self.total_cells)
+            M_pi = torch.ones(bsz, self.total_cells, device=sigma.device)
         else:
             mask = topk_mask(pi.view(bsz * self.m, self.n), self.k_winner_cells)
             M_pi = mask.view(bsz, self.total_cells).detach()

@@ -102,6 +102,7 @@ class RSMExperiment(object):
         self.boost_strength = config.get("boost_strength", 1.0)
         self.mult_integration = config.get("mult_integration", False)
         self.noise_buffer = config.get("noise_buffer", False)
+        self.boost_strength_factor = config.get("boost_strength_factor", 1.0)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -260,11 +261,11 @@ class RSMExperiment(object):
                                   do_inhibition=self.do_inhibition,
                                   boost_strat=self.boost_strat,
                                   boost_strength=self.boost_strength,
+                                  boost_strength_factor=self.boost_strength_factor,
                                   mult_integration=self.mult_integration,
                                   embed_dim=self.embed_dim,
                                   vocab_size=self.vocab_size,
                                   bsz=self.batch_size,
-                                  seq_length=self.seq_length,
                                   debug=self.debug)
             if self.jit_trace:
                 # Trace model (Can produce ~25% speed improvement)
