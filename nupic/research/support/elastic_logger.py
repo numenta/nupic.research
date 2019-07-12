@@ -23,8 +23,41 @@ import subprocess
 from datetime import datetime
 
 from elasticsearch import Elasticsearch, helpers
+from elasticsearch.client.xpack import SqlClient
 from elasticsearch.helpers import BulkIndexError
+from pandas import DataFrame
+from pandas.io.json.normalize import nested_to_record
 from ray.tune.logger import Logger
+
+
+def create_elastic_client(**kwargs):
+    """
+    Create and configure :class:`elasticsearch.Elasticsearch` client
+
+    The following environment variables are used to configure the client:
+
+        - **ELASTIC_CLOUD_ID**: The Cloud ID from ElasticCloud. Other host
+                                connection params will be ignored. ("cloud_id")
+        - **ELASTIC_HOSTS**: List of nodes we should connect to. ("hosts")
+        - **ELASTIC_AUTH**: http auth information ("http_auth")
+
+    :param kwargs: Used to override the environment variables or pass extra
+                   parameters to the :class:`elasticsearch.Elasticsearch`.
+    :type kwargs: dict
+    :return: Configured :class:`elasticsearch.Elasticsearch` client
+    :rtype: :class:`Elasticsearch`
+    """
+    hosts = os.environ.get("ELASTIC_HOST")
+    hosts = None if hosts is None else hosts.split(",")
+    elasticsearch_args = {
+        "cloud_id": os.environ.get("ELASTIC_CLOUD_ID"),
+        "hosts": hosts,
+        "http_auth": os.environ.get("ELASTIC_AUTH")
+    }
+
+    # Update elasticsearch client arguments from configuration if present
+    elasticsearch_args.update(kwargs)
+    return Elasticsearch(**elasticsearch_args)
 
 
 class ElasticsearchLogger(Logger):
@@ -53,15 +86,8 @@ class ElasticsearchLogger(Logger):
     """
 
     def _init(self):
-        elasticsearch_args = {
-            "cloud_id": os.environ.get("ELASTIC_CLOUD_ID"),
-            "hosts": [os.environ.get("ELASTIC_HOST")],
-            "http_auth": os.environ.get("ELASTIC_AUTH")
-        }
-
-        # Update elasticsearch client arguments from configuration if present
-        elasticsearch_args.update(self.config.get("elasticsearch_client", {}))
-        self.client = Elasticsearch(**elasticsearch_args)
+        elasticsearch_args = self.config.get("elasticsearch_client", {})
+        self.client = create_elastic_client(**elasticsearch_args)
 
         # Save git information
         self.git_remote = subprocess.check_output(
@@ -94,7 +120,6 @@ class ElasticsearchLogger(Logger):
 
     def on_result(self, result):
         """Given a result, appends it to the existing log."""
-
         log_entry = {
             "git": {
                 "remote": self.git_remote,
@@ -126,3 +151,77 @@ class ElasticsearchLogger(Logger):
                                      format(len(errors)), errors)
 
             self.buffer.clear()
+
+
+def elastic_dsl(client, dsl, index, **kwargs):
+    """
+    Sends DSL query to elasticsearch and returns the results as a
+    :class:`pandas.DataFrame`.
+
+    :param client: Configured elasticseach client. See :func:`create_elastic_client`
+    :type client: :class:`elasticseach.Elasticsearch`
+    :param dsl: Elasticsearch DSL query statement
+                See https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html  # noqa: E501
+    :type dsl: str
+    :param index: Index pattern. Usually the same as 'from' part of the SQL
+                  See https://www.elastic.co/guide/en/elasticsearch/reference/current/multi-index.html # noqa: E501
+    :type index: str
+
+    :param kwargs: Any additional keyword arguments will be passed to the initial
+                   :meth:`elasticsearch.Elasticsearch.search` call
+    :type kwargs: dict
+
+    :return: results as a :class:`pandas.DataFrame`.
+    :rtype: :class:`pandas.DataFrame`
+    """
+    response = helpers.scan(client=client, query=dsl, index=index, **kwargs)
+    data = []
+    for row in response:
+        # Normalize nested dicts in '_source' such as 'config' or 'git'
+        source = nested_to_record(row["_source"]) if "_source" in row else {}
+
+        # Squeeze scalar fields returned as arrays in the response by the search API
+        fields = row.get("fields", {})
+        fields = {k: v[0] if len(v) == 1 else v for k, v in fields.items()}
+
+        data.append({
+            "_index": row["_index"],
+            "_type": row["_type"],
+            **fields,
+            **source,
+        })
+    return DataFrame(data)
+
+
+def elastic_sql(client, sql, index, **kwargs):
+    """
+    Sends SQL query to elasticsearch and returns the results as a
+    :class:`pandas.DataFrame`.
+
+    :param client: Configured elasticseach client. See :func:`create_elastic_client`
+    :type client: :class:`elasticseach.Elasticsearch`
+    :param sql: Elasticsearch SQL query statement
+                See https://www.elastic.co/guide/en/elasticsearch/reference/current/xpack-sql.html  # noqa: E501
+    :type sql: str
+    :param index: Index pattern. Usually the same as 'from' part of the SQL
+                  See https://www.elastic.co/guide/en/elasticsearch/reference/current/multi-index.html
+    :type index: str
+    :param kwargs: Any additional keyword arguments will be passed to the initial
+                   :meth:`elasticsearch.Elasticsearch.search` call
+
+    :type kwargs: dict
+    :return: results as a :class:`pandas.DataFrame`.
+    :rtype: :class:`pandas.DataFrame`
+    """
+    sql_client = SqlClient(client)
+    # FIXME: SQL API does not support arrays. See https://github.com/elastic/elasticsearch/issues/33204  # noqa: E501
+    # For now we translate the SQL into elasticsearch DSL query and use the
+    # 'search' API to fetch the results
+    dsl = sql_client.translate({"query": sql})
+
+    # Ignore score
+    if "query" in dsl:
+        query = dsl["query"]
+        dsl["query"] = {"constant_score": {"filter": query}}
+
+    return elastic_dsl(client, dsl, index, **kwargs)
