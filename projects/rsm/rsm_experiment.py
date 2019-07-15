@@ -19,8 +19,10 @@ from util import (
     fig2img, 
     plot_confusion_matrix, 
     plot_activity, 
+    plot_activity_grid,
     plot_representation_similarity, 
-    AdamW
+    count_parameters,
+    print_epoch_values
 )
 from rsm_samplers import (
     MNISTBufferedDataset,
@@ -68,7 +70,6 @@ class RSMExperiment(object):
         # Data parameters
         self.input_size = config.get("input_size", (1, 28, 28))
         self.sequences = config.get("sequences", [[0, 1, 2, 3]])
-        self.randomize_sequences = config.get("randomize_sequences", False)
 
         self.learning_rate = config.get("learning_rate", 0.1)
         self.momentum = config.get("momentum", 0.9)
@@ -82,13 +83,13 @@ class RSMExperiment(object):
         self.eps = config.get("eps", 0.5)
         self.k_winner_cells = config.get("k_winner_cells", 1)
         self.dropout_p = config.get("dropout_p", 0.5)
+        self.flattened = self.n_cells_per_group == 1
 
         # Tweaks
         self.cell_winner_softmax = config.get("cell_winner_softmax", False)
         self.activation_fn = config.get("activation_fn", 'tanh')
         self.active_dendrites = config.get("active_dendrites", None)
         self.col_output_cells = config.get("col_output_cells", None)
-        self.clear_memory_each_subseq = config.get("clear_memory_each_subseq", False)
         self.static_digit = config.get("static_digit", False)
         self.use_mnist_pct = config.get("use_mnist_pct", 1.0)
         self.pred_l2_reg = config.get("pred_l2_reg", 0)
@@ -103,6 +104,7 @@ class RSMExperiment(object):
         self.mult_integration = config.get("mult_integration", False)
         self.noise_buffer = config.get("noise_buffer", False)
         self.boost_strength_factor = config.get("boost_strength_factor", 1.0)
+        self.fpartition = config.get("fpartition", None)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -144,10 +146,10 @@ class RSMExperiment(object):
             self.train_sampler = MNISTSequenceSampler(self.dataset, 
                                                       sequences=self.sequences,
                                                       batch_size=self.batch_size,
-                                                      randomize_sequences=self.randomize_sequences,
                                                       random_mnist_images=not self.static_digit,
                                                       noise_buffer=self.noise_buffer,
-                                                      use_mnist_pct=self.use_mnist_pct)
+                                                      use_mnist_pct=self.use_mnist_pct,
+                                                      max_batches=self.batches_in_epoch)
 
             if self.static_digit:
                 # For static digit paradigm, val & train samplers much match to ensure same digit
@@ -157,10 +159,10 @@ class RSMExperiment(object):
                 self.val_sampler = MNISTSequenceSampler(self.val_dataset, 
                                                         sequences=self.sequences,
                                                         batch_size=self.batch_size,
-                                                        randomize_sequences=self.randomize_sequences,
                                                         random_mnist_images=not self.static_digit,
                                                         noise_buffer=self.noise_buffer,
-                                                        use_mnist_pct=self.use_mnist_pct)
+                                                        use_mnist_pct=self.use_mnist_pct,
+                                                        max_batches=self.batches_in_epoch)
             self.train_loader = DataLoader(self.dataset,
                                            batch_sampler=self.train_sampler,
                                            collate_fn=pred_sequence_collate)
@@ -173,8 +175,8 @@ class RSMExperiment(object):
             from torchnlp.datasets import penn_treebank_dataset
             penn_treebank_dataset(self.data_dir + '/PTB', train=True)
             corpus = lang_util.Corpus(self.data_dir + '/PTB')
-            train_sampler = PTBSequenceSampler(corpus.train, batch_size=self.batch_size,
-                                               seq_length=self.seq_length)
+            train_sampler = PTBSequenceSampler(corpus.train, batch_size=self.batch_size, 
+                                               max_batches=self.batches_in_epoch)
 
             embedding = lang_util.BitwiseWordEmbedding()
 
@@ -183,7 +185,7 @@ class RSMExperiment(object):
                                            batch_sampler=train_sampler,
                                            collate_fn=collate_fn)
             val_sampler = PTBSequenceSampler(corpus.test, batch_size=self.batch_size,
-                                             seq_length=self.seq_length)
+                                             max_batches=self.batches_in_epoch)
             self.val_loader = DataLoader(corpus.test,
                                          batch_sampler=val_sampler,
                                          collate_fn=collate_fn)
@@ -203,14 +205,6 @@ class RSMExperiment(object):
                 self.pred_optimizer = torch.optim.Adam(self.predictor.parameters(),
                                                        lr=self.learning_rate,
                                                        weight_decay=self.pred_l2_reg)
-        elif self.optimizer_type == 'adamw':
-            self.optimizer = AdamW(self.model.parameters(),
-                                   lr=self.learning_rate)
-            if self.predictor:
-                self.pred_optimizer = AdamW(self.model.parameters(),
-                                            lr=self.learning_rate,
-                                            weight_decay=self.pred_l2_reg)
- 
         else:
             self.optimizer = torch.optim.SGD(self.model.parameters(),
                                              lr=self.learning_rate,
@@ -263,6 +257,7 @@ class RSMExperiment(object):
                                   boost_strength=self.boost_strength,
                                   boost_strength_factor=self.boost_strength_factor,
                                   mult_integration=self.mult_integration,
+                                  fpartition=self.fpartition,
                                   embed_dim=self.embed_dim,
                                   vocab_size=self.vocab_size,
                                   bsz=self.batch_size,
@@ -290,26 +285,30 @@ class RSMExperiment(object):
                                    nlayers=2)
 
         self.model.to(self.device)
+        self.model._buffers_to(self.device)
+        print(self.model.sigma.device, self.model.y.device)
+
+        print("Got model with %d trainable params" % count_parameters(self.model))
 
         self._get_loss_function()
         self._get_optimizer()
 
-    def _image_grid(self, image_batch, n_seqs=6, compare_with=None, compare_correct=None, limit_seqlen=50):
+    def _image_grid(self, image_batch, n_seqs=6, max_seqlen=50, compare_with=None, compare_correct=None, limit_seqlen=50):
         '''
         image_batch: n_batches x batch_size x image_dim
         '''
         side = 28
-        image_batch = image_batch[:, :n_seqs].reshape(-1, 1, side, side)
+        image_batch = image_batch[:max_seqlen, :n_seqs].reshape(-1, 1, side, side)
         if compare_with is not None:
             # Interleave comparison images with image_batch
-            compare_with = compare_with[:, :n_seqs].reshape(-1, 1, side, side)
+            compare_with = compare_with[:max_seqlen, :n_seqs].reshape(-1, 1, side, side)
             max_val = compare_with.max()
             if compare_correct is not None:
                 # Add 'incorrect label' to each image (masked by inverse of compare_correct)
                 # as 2x2 square 'dot' in upper left corner of falsely predicted targets
                 dot_size = 4
                 gap = 2
-                incorrect = ~compare_correct[:, :n_seqs].transpose(0, 1).flatten()
+                incorrect = ~compare_correct[:max_seqlen, :n_seqs].flatten()
                 compare_with[incorrect, :, gap:gap + dot_size, gap:gap + dot_size] = max_val
             batch = torch.empty((image_batch.shape[0] + compare_with.shape[0], image_batch.shape[1], side, side))
             batch[::2, :, :] = image_batch
@@ -390,7 +389,7 @@ class RSMExperiment(object):
         for _x_b, label, target in zip(x_bs, input_labels, pred_labels):
             _label = label.item()
             _label_next = target.item()
-            activity = _x_b.detach().view(self.m_groups, -1)
+            activity = _x_b.detach().view(self.m_groups, -1).squeeze()
             key = "%d-%d" % (_label, _label_next)
             if key not in self.activity_by_inputs:
                 self.activity_by_inputs[key] = []
@@ -398,7 +397,6 @@ class RSMExperiment(object):
 
     def _do_prediction(self, x_b, pred_targets, total_samples, correct_samples, 
                        total_pred_loss, train=False):
-        cm_fig = None
         class_predictions = correct_arr = None
         if self.predictor:
             bs, tc = x_b.size()
@@ -409,12 +407,13 @@ class RSMExperiment(object):
             total_samples += pred_targets.size(0)
             correct_arr = (class_predictions == pred_targets)
             correct_samples += correct_arr.sum().item()
-            total_pred_loss += pred_loss.item()
+            batch_loss = pred_loss.item()
+            total_pred_loss += batch_loss
             if train:
                 # Predictor backward + optimize
                 pred_loss.backward()
                 self.pred_optimizer.step()
-        return total_samples, correct_samples, class_predictions, correct_arr, total_pred_loss, cm_fig
+        return total_samples, correct_samples, class_predictions, correct_arr, batch_loss, total_pred_loss
 
     def _confusion_matrix(self, pred_targets, class_predictions):
         class_names = [str(x) for x in range(self.predictor_output_size)]
@@ -469,7 +468,7 @@ class RSMExperiment(object):
                 if loss is not None:
                     total_loss += loss.item()
 
-                total_samples, correct_samples, class_predictions, correct_arr, total_pred_loss, cm_fig = self._do_prediction(
+                total_samples, correct_samples, class_predictions, correct_arr, batch_loss, total_pred_loss = self._do_prediction(
                     x_b, pred_targets, total_samples, correct_samples, total_pred_loss)
 
                 hidden = self._repackage_hidden(hidden)
@@ -503,18 +502,21 @@ class RSMExperiment(object):
                                                         compare_correct=all_correct_arrs).cpu()
                 cm_fig = self._confusion_matrix(all_pred_targets, all_class_predictions)
                 ret['img_confusion'] = fig2img(cm_fig)
-                col_activity_grid = plot_activity(self.activity_by_inputs, 
+                if self.flattened:
+                    activity_grid = plot_activity_grid(self.activity_by_inputs, 
+                                                       n_labels=self.predictor_output_size)
+                else:
+                    activity_grid = plot_activity(self.activity_by_inputs, 
                                                   n_labels=self.predictor_output_size,
                                                   level='cell')
                 img_repr_sim = plot_representation_similarity(self.activity_by_inputs,
                                                               n_labels=self.predictor_output_size,
                                                               title=self.boost_strat)
                 ret['img_repr_sim'] = fig2img(img_repr_sim)
-                ret['img_col_activity'] = fig2img(col_activity_grid)
+                ret['img_col_activity'] = fig2img(activity_grid)
                 self.activity_by_inputs = {}
 
             ret['val_loss'] = val_loss = total_loss / (batch_idx + 1)
-            ret['val_ppl'] = lang_util.perpl(val_loss)
             if self.predictor:
                 test_pred_loss = total_pred_loss / (batch_idx + 1)
                 ret['val_pred_ppl'] = lang_util.perpl(test_pred_loss)
@@ -589,24 +591,23 @@ class RSMExperiment(object):
                 self._plot_gradient_flow()
 
             x_b = hidden[0]
-            total_samples, correct_samples, class_predictions, correct_arr, total_pred_loss, _ = self._do_prediction(
+            total_samples, correct_samples, class_predictions, correct_arr, batch_loss, total_pred_loss = self._do_prediction(
                 x_b, pred_targets, total_samples, correct_samples, total_pred_loss,
                 train=True)
 
             last_output = output
 
-            if batch_idx > self.batches_in_epoch:
-                print("Stopping after %d batches in epoch %d" % (self.batches_in_epoch, epoch))
-                break
+            # if batch_idx > self.batches_in_epoch:
+            #     print("Stopping after %d batches in epoch %d" % (self.batches_in_epoch, epoch))
+            #     break
 
             if self.batch_log_interval and batch_idx % self.batch_log_interval == 0:
                 print("Finished batch %d" % batch_idx)
                 if self.predictor:
                     acc = 100 * correct_samples / total_samples
-                    print("Partial train predictor accuracy: %.3f%%" % (acc))
-
-            if self.clear_memory_each_subseq:
-                hidden = self._init_hidden(self.batch_size)
+                    batch_acc = correct_arr.float().mean() * 100
+                    batch_ppl = lang_util.perpl(batch_loss)
+                    print("Partial train predictor accuracy - epoch: %.3f%%, batch acc: %.3f%%, batch ppl: %.1f" % (acc, batch_acc, batch_ppl))
 
         if self.eval_interval and (epoch == 0 or (epoch + 1) % self.eval_interval == 0):
             # Evaluate each x epochs
@@ -617,8 +618,7 @@ class RSMExperiment(object):
 
         ret["stop"] = 0
 
-        ret['train_loss'] = train_loss = total_loss / (batch_idx + 1)
-        ret['train_ppl'] = lang_util.perpl(train_loss)
+        ret['train_loss'] = total_loss / (batch_idx + 1)
         if self.predictor:
             train_pred_loss = total_pred_loss / (batch_idx + 1)
             ret['train_pred_ppl'] = lang_util.perpl(train_pred_loss)
@@ -627,7 +627,7 @@ class RSMExperiment(object):
         ret["epoch_time_train"] = train_time
         ret["epoch_time"] = time.time() - t1
         ret["learning_rate"] = self.learning_rate
-        print(epoch, ret)
+        print(epoch, print_epoch_values(ret))
         return ret
 
     def _post_epoch(self, epoch):

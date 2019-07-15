@@ -19,13 +19,16 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import unittest
-from functools import partial
 
 import torch
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from torchvision import transforms
 
-from rsm_samplers import MNISTSequenceSampler, PredictiveBatchSampler, pred_sequence_collate
+from rsm_samplers import (
+    MNISTSequenceSampler, 
+    MNISTBufferedDataset, 
+    pred_sequence_collate
+)
 
 
 class TestContext(object):
@@ -47,80 +50,78 @@ class StochasticMNISTTest(unittest.TestCase):
 
         self.BSZ = 2
         self.SEQ = [[0, 1, 2, 3], [0, 3, 2, 4]]
-        self.SL = 8
 
-        self.dataset = datasets.MNIST("~/nta/datasets", download=True,
-                                      transform=transforms.Compose([
-                                          transforms.ToTensor(),
-                                          transforms.Normalize((0.1307,), (0.3081,))
-                                      ]),)
+        self.dataset = MNISTBufferedDataset("~/nta/datasets", download=True,
+                                            transform=transforms.Compose([
+                                                transforms.ToTensor(),
+                                                transforms.Normalize((0.1307,), (0.3081,))
+                                            ]),)
 
-        random_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, randomize_sequences=False, random_mnist_images=True)
-        self.random_batch_sampler = PredictiveBatchSampler(random_sampler, batch_size=self.SL * self.BSZ)
-        fixed_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, randomize_sequences=False, random_mnist_images=False)
-        self.fixed_batch_sampler = PredictiveBatchSampler(fixed_sampler, batch_size=self.SL * self.BSZ)
+        self.random_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, 
+                                                   batch_size=self.BSZ, random_mnist_images=True,
+                                                   randomize_sequence_cursors=False)
+        self.fixed_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, 
+                                                  batch_size=self.BSZ, random_mnist_images=False,
+                                                  randomize_sequence_cursors=False)
 
-        self.collate_fn = partial(pred_sequence_collate, 
-                                  bsz=self.BSZ,
-                                  seq_length=self.SL,
-                                  return_inputs=True)
+        self.collate_fn = pred_sequence_collate
 
         self.random_digit_loader = DataLoader(self.dataset,
-                                              batch_sampler=self.random_batch_sampler,
+                                              batch_sampler=self.random_sampler,
                                               collate_fn=self.collate_fn)
 
         self.fixed_digit_loader = DataLoader(self.dataset,
-                                             batch_sampler=self.fixed_batch_sampler,
+                                             batch_sampler=self.fixed_sampler,
                                              collate_fn=self.collate_fn)
 
     def test_one(self):
-        # Each loop of both epoch (i) and batch (j) should begin at the start of SEQ
-        for i in range(2):
+        all_input_labels = []
+        all_target_labels = []
+        all_inputs = []
+
+        for i in range(1):
             for j, batch in enumerate(self.random_digit_loader):
                 inputs, targets, target_labels, input_labels = batch
 
-                expected_input_labels = torch.tensor([
-                    [0, 0],
-                    [1, 1],
-                    [2, 2],
-                    [3, 3],
-                    [0, 0],
-                    [3, 3],
-                    [2, 2],
-                    [4, 4],
-                ])
-                self.assertEqual((expected_input_labels == input_labels).sum(), self.BSZ * self.SL)
-                self.assertEqual(input_labels.size(), expected_input_labels.size())
+                all_inputs.append(inputs)
+                all_input_labels.append(input_labels)
+                all_target_labels.append(target_labels)
 
-                # Target labels should be next in sequence at each location
-                expected_target_labels = torch.tensor([
-                    [1, 1],
-                    [2, 2],
-                    [3, 3],
-                    [0, 0],
-                    [3, 3],
-                    [2, 2],
-                    [4, 4],
-                    [0, 0]
-                ])
-                self.assertEqual((expected_target_labels == target_labels).sum(), self.BSZ * self.SL)
-                self.assertEqual(target_labels.size(), expected_target_labels.size())
-
-                # Target and target labels have matching batch size and sequence length
+                # Target and target labels have matching batch size
                 self.assertEqual(targets.size(0), target_labels.size(0))
-                self.assertEqual(targets.size(1), target_labels.size(1))
 
-                # Input and input labels have matching batch size and sequence length
+                # Input and input labels have matching batch size
                 self.assertEqual(inputs.size(0), input_labels.size(0))
-                self.assertEqual(inputs.size(1), input_labels.size(1))
 
-                # Digit images with same label are different
-                zero_image_b0 = inputs[0][0]
-                zero_image_b1 = inputs[0][1]
-                self.assertTrue(zero_image_b0.sum() != zero_image_b1.sum())
+                self.assertEqual(inputs.size(0), self.BSZ)
 
-                if j > 2:
+                if len(all_input_labels) == 8:
                     break
+
+        all_input_labels = torch.stack(all_input_labels, dim=0)
+        all_target_labels = torch.stack(all_target_labels, dim=0)
+
+        # Each sequence in each batch should match one of the two original sequences
+        seq1col1 = all_input_labels[:4, 0]
+        seq1col2 = all_input_labels[:4, 1]
+        seq2col1 = all_input_labels[4:, 0]
+        seq2col2 = all_input_labels[4:, 1]
+        for seq in [seq1col1, seq1col2, seq2col1, seq2col2]:
+            self.assertTrue(list(seq) == self.SEQ[0] or list(seq) == self.SEQ[1])
+
+        # First 3 digit of target sequences match last 3 digits of actual sequences
+        seq1col1 = all_target_labels[:3, 0]
+        seq1col2 = all_target_labels[:3, 1]
+        seq2col1 = all_target_labels[4:-1, 0]
+        seq2col2 = all_target_labels[4:-1, 1]
+        for seq in [seq1col1, seq1col2, seq2col1, seq2col2]:
+            self.assertTrue(list(seq) == self.SEQ[0][1:] or list(seq) == self.SEQ[1][1:])
+
+        # Digit images with same label are different
+        if j == 0:
+            zero_image_b0 = all_inputs[0, 0]
+            zero_image_b1 = all_inputs[0, 1]
+            self.assertTrue(zero_image_b0.sum() != zero_image_b1.sum())
 
     def test_fixed_digit_sampling(self):
         batch = next(iter(self.fixed_digit_loader))
@@ -133,11 +134,12 @@ class StochasticMNISTTest(unittest.TestCase):
 
     def test_digit_balance(self):
 
-        random_seq_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, randomize_sequences=True, random_mnist_images=True)
-        random_seq_batch_sampler = PredictiveBatchSampler(random_seq_sampler, batch_size=self.SL * self.BSZ)
+        random_seq_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, 
+                                                  batch_size=self.BSZ,
+                                                  random_mnist_images=True)
 
         loader = DataLoader(self.dataset,
-                            batch_sampler=random_seq_batch_sampler,
+                            batch_sampler=random_seq_sampler,
                             collate_fn=self.collate_fn)
 
         all_inputs = []
@@ -145,7 +147,7 @@ class StochasticMNISTTest(unittest.TestCase):
             inputs, targets, target_labels, input_labels = batch
             all_inputs.append(input_labels)
 
-            if i > 100:
+            if i > 400:
                 break
 
         counts = torch.stack(all_inputs).flatten().bincount()
