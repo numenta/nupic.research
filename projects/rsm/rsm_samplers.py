@@ -50,14 +50,16 @@ class MNISTSequenceSampler(Sampler):
     """
 
     def __init__(self, data_source, sequences=None, batch_size=64, 
-                 randomize_sequences=False, random_mnist_images=True,
+                 random_mnist_images=True, randomize_sequence_cursors=True,
+                 max_batches=100,
                  use_mnist_pct=1.0, noise_buffer=False):
         super(MNISTSequenceSampler, self).__init__(data_source)
         self.data_source = data_source
-        self.randomize_sequences = randomize_sequences
         self.random_mnist_images = random_mnist_images
+        self.randomize_sequence_cursors = randomize_sequence_cursors
         self.use_mnist_pct = use_mnist_pct
         self.noise_buffer = noise_buffer
+        self.max_batches = max_batches
         self.bsz = batch_size
         self.label_indices = {}  # Digit -> Indices in dataset
         self.label_cursors = {}  # Digit -> Cursor across images for each digit
@@ -94,8 +96,11 @@ class MNISTSequenceSampler(Sampler):
         return torch.LongTensor(self.bsz).random_(0, self.n_sequences)
 
     def _init_sequence_cursors(self):
-        lengths = self.seq_lengths[self.sequence_id[0]]
-        cursors = (torch.FloatTensor(self.bsz).uniform_(0, 1) * lengths.float()).long()
+        if self.randomize_sequence_cursors:
+            lengths = self.seq_lengths[self.sequence_id[0]]
+            cursors = (torch.FloatTensor(self.bsz).uniform_(0, 1) * lengths.float()).long()
+        else:
+            cursors = torch.zeros(self.bsz).long()
         return cursors
 
     def _increment_next(self):
@@ -149,12 +154,12 @@ class MNISTSequenceSampler(Sampler):
             return indices[cursor].item()
 
     def __iter__(self):
-        while True:
+        for i in range(len(self)):
             yield self._get_next_batch()
         return
 
     def __len__(self):
-        return len(self.data_source)
+        return self.max_batches
 
 
 def pred_sequence_collate(batch):
@@ -174,46 +179,43 @@ class PTBSequenceSampler(Sampler):
     """
     """
 
-    def __init__(self, data_source, batch_size=64, seq_length=1):
-        super(PTBSequenceSampler, self).__init__(data_source)
-        self.bsz = batch_size
-        self.seq_length = seq_length
+    def __init__(self, data_source, batch_size=64, max_batches=1000000):
+        super(PTBSequenceSampler, self).__init__(None)
+        self.batch_size = batch_size
+        self.max_batches = max_batches
         self.data_source = data_source
         self.data_len = len(self.data_source)
         # Choose initial random offsets into PTB, one per item in batch
-        batch_offsets = (torch.rand(self.bsz) * (self.data_len - 1)).long()
-        # Increment 1 word ID each row/batch
-        inc = torch.arange(0, self.seq_length, dtype=torch.long).expand((self.bsz, self.seq_length)).t()
-        self.batch_idxs = batch_offsets.expand((self.seq_length, self.bsz)) + inc
+        self.batch_idxs = (torch.rand(self.batch_size) * (self.data_len - 1)).long()
 
     def __iter__(self):
-        # Yield a single batch of (seq_len x batch_size) words, each at a different offset into PTB
-        while True:
-            data = self.data_source[self.batch_idxs]
-            target = self.data_source[self.batch_idxs + 1]
-            self.batch_idxs += self.seq_length  # Move down to next sequence (maybe 1 row)
+        # Yield the next single batch of (batch_size) word IDs, each at a different offset into PTB
+        for i in range(len(self)):
+            # yield data, target
+            yield self.batch_idxs, self.batch_idxs + 1
+            self.batch_idxs += 1  # Next token row
             self.batch_idxs[self.batch_idxs > (self.data_len - 2)] = 0  # Wrap to start
-            yield data, target
         return
 
     def __len__(self):
-        return len(self.data_source) // self.bsz
+        return self.max_batches
 
 
 def vector_batch(word_ids, vector_dict):
     vectors = []
-    for word_id in word_ids.flatten():
+    for word_id in word_ids:
         vectors.append(vector_dict[word_id.item()])
-    return torch.stack(vectors).view(word_ids.size(0), word_ids.size(1), -1)
+    return torch.stack(vectors).view(word_ids.size(0), -1)
 
 
 def ptb_pred_sequence_collate(batch, vector_dict=None):
     """
-    Return minibatches, shape (seq_len, batch_size, embed dim)
+    Return minibatches, shape (batch_size, embed dim)
     """
     data, target = batch
+    pred_input = data
     data = vector_batch(data, vector_dict)
     pred_target = target
     target = vector_batch(target, vector_dict)
-    return (data, target, pred_target)
+    return (data, target, pred_target, pred_input)
 

@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import math
 
 import torch
 from torch import nn
@@ -56,7 +55,7 @@ class RSMLayer(torch.nn.Module):
                  debug_log_names=None, mask_shifted_pi=False, do_inhibition=True,
                  boost_strat='rsm_inhibition', pred_gain=1.0, x_b_norm=False,
                  boost_strength=1.0, mult_integration=False, boost_strength_factor=1.0,
-                 debug=False, visual_debug=False, use_bias=True,
+                 debug=False, visual_debug=False, use_bias=True, fpartition=None,
                  **kwargs):
         """
         RSM Layer as specified by Rawlinson et al 2019
@@ -100,6 +99,7 @@ class RSMLayer(torch.nn.Module):
         self.do_inhibition = do_inhibition
         self.boost_strength = boost_strength
         self.mult_integration = mult_integration
+        self.fpartition = fpartition
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -111,12 +111,8 @@ class RSMLayer(torch.nn.Module):
                                      boost_strength=self.boost_strength,
                                      duty_cycle_period=5000,
                                      boost_strength_factor=boost_strength_factor)
-        self.linear_a = nn.Linear(d_in, m, bias=use_bias)  # Input weights (shared per group / proximal)
-        if self.active_dendrites:
-            self.linear_b = ActiveDendriteLayer(self.total_cells, self.total_cells, 
-                                                n_dendrites=self.active_dendrites)
-        else:
-            self.linear_b = nn.Linear(self.total_cells, self.total_cells, bias=use_bias)  # Recurrent weights (per cell)
+
+        self._build_input_layers(use_bias=use_bias)
 
         decode_d_in = self.total_cells if self.decode_from_full_memory else m
         self.linear_d = nn.Linear(decode_d_in, d_out, bias=use_bias)  # Decoding through bottleneck
@@ -153,6 +149,28 @@ class RSMLayer(torch.nn.Module):
                             plt.title("%s (%s, rng: %.3f-%.3f, sum: %.3f)" % (name, size, tmin, tmax, tsum))
                             plt.show()
 
+    def _buffers_to(self, device):
+        self.sigma = self.sigma.to(device)
+        self.y = self.y.to(device)
+
+    def _partition_sizes(self):
+        pct_ff, pct_int, pct_rec = self.fpartition
+        m_ff = int(pct_ff * self.m)
+        m_rec = int(pct_rec * self.m)
+        m_int = self.m - m_ff - m_rec
+        return (m_ff, m_int, m_rec)
+
+    def _build_input_layers(self, use_bias=True):
+        if self.fpartition:
+            m_ff, m_int, m_rec = self._partition_sizes()
+            # Partition memory into fpartition % FF & remainder recurrent
+            self.linear_a = nn.Linear(self.d_in, m_ff + m_int, bias=use_bias)
+            self.linear_b = nn.Linear(self.total_cells, m_rec + m_int, bias=use_bias)  # Recurrent weights (per cell)    
+        else:
+            # Standard architecture, no partition
+            self.linear_a = nn.Linear(self.d_in, self.m, bias=use_bias)  # Input weights (shared per group / proximal)
+            self.linear_b = nn.Linear(self.total_cells, self.total_cells, bias=use_bias)  # Recurrent weights (per cell)
+
     def _post_epoch(self, epoch):
         self.kwinners_col.update_boost_strength()
 
@@ -180,15 +198,26 @@ class RSMLayer(torch.nn.Module):
         """
         Compute sigma (weighted sum for each cell j in group i (mxn))
         """
-        # Col activation from inputs repeated for each cell
-        z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
-        # Cell activation from recurrent input (dropped out)
-        z_b = self.linear_b(self.dropout(x_b)).view(bsz, self.total_cells)
-        self._debug_log({'z_a': z_a, 'z_b': z_b})
-        if self.mult_integration:
-            self.sigma = z_a * z_b
+        if self.fpartition:
+            m_ff, m_int, m_rec = self._partition_sizes()
+            sigma = torch.zeros_like(self.sigma)
+            # Integrate partitioned memory. 
+            # If m_int non-zero, these cells receive sum of FF & recurrent input
+            z_a = self.linear_a(x_a)  # bsz x (m_ff+m_int)
+            z_b = self.linear_b(self.dropout(x_b))  # bsz x (m_rec+m_int)
+            sigma[:, :m_ff + m_int] += z_a
+            sigma[:, -(m_rec + m_int):] += z_b
+            self.sigma = sigma
         else:
-            self.sigma = z_a + z_b
+            # Col activation from inputs repeated for each cell
+            z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
+            # Cell activation from recurrent input (dropped out)
+            z_b = self.linear_b(self.dropout(x_b)).view(bsz, self.total_cells)
+            self._debug_log({'z_a': z_a, 'z_b': z_b})
+            if self.mult_integration:
+                self.sigma = z_a * z_b
+            else:
+                self.sigma = z_a + z_b
         return self.sigma  # total_cells
 
     def _k_winners(self, sigma, pi, bsz):
@@ -262,6 +291,7 @@ class RSMLayer(torch.nn.Module):
         return (self.y, output)
 
     def _update_memory_and_inhibition(self, y, phi, psi, bsz):
+
         # Get updated psi (memory state), decay inactive
         psi = torch.max(psi * self.eps, y)
 

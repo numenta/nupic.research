@@ -3,8 +3,6 @@ from __future__ import print_function
 import os
 from io import open
 import math
-import torch.nn as nn
-import numpy as np
 
 import torch
 
@@ -33,6 +31,8 @@ class Corpus(object):
 
     def read_out(self, ids):
         out = []
+        if isinstance(ids, int):
+            ids = [ids]
         for id in ids:
             out.append(self.dictionary.idx2word[id])
         return " ".join(out)
@@ -51,14 +51,13 @@ class Corpus(object):
 
         # Tokenize file content
         with open(path, 'r', encoding="utf8") as f:
-            ids = torch.LongTensor(tokens)
+            ids = torch.zeros(tokens).long()
             token = 0
             for line in f:
                 words = line.split() + ['<eos>']
                 for word in words:
                     ids[token] = self.dictionary.word2idx[word]
                     token += 1
-
         return ids
 
 
