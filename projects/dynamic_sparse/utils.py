@@ -27,6 +27,7 @@ from torchvision import datasets, transforms
 
 import models
 import networks
+from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 
 
 class Dataset:
@@ -45,6 +46,8 @@ class Dataset:
             stats_mean=None,
             stats_std=None,
             augment_images=False,
+            test_noise=False,
+            noise_level=0.1,
         )
         defaults.update(config)
         self.__dict__.update(defaults)
@@ -96,6 +99,25 @@ class Dataset:
             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
         )
 
+        # noise dataset
+        if self.test_noise:
+            noise = self.noise_level
+            noise_transform = transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                    transforms.Normalize(self.stats_mean, self.stats_std),
+                    RandomNoise(
+                        noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2
+                    ),
+                ]
+            )
+            noise_set = getattr(datasets, self.dataset_name)(
+                root=self.data_dir, train=False, transform=noise_transform
+            )
+            self.noise_loader = DataLoader(
+                dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
+            )
+
 
 class Trainable(tune.Trainable):
     """ray.tune trainable generic class Adaptable to any pytorch module."""
@@ -110,7 +132,7 @@ class Trainable(tune.Trainable):
         self.model.setup()
 
     def _train(self):
-        log = self.model.run_epoch(self.dataset)
+        log = self.model.run_epoch(self.dataset, self._iteration)
         return log
 
     def _save(self, checkpoint_dir):
