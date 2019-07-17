@@ -295,7 +295,6 @@ class RSMExperiment(object):
                 eps=self.eps,
                 forget_mu=self.forget_mu,
                 activation_fn=self.activation_fn,
-                col_output_cells=self.col_output_cells,
                 dropout_p=self.dropout_p,
                 pred_gain=self.pred_gain,
                 decode_from_full_memory=self.decode_from_full_memory,
