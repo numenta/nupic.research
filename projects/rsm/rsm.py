@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn
 
-from active_dendrites import ActiveDendriteLayer
 from util import get_grad_printer, activity_square
 from nupic.torch.modules.k_winners import KWinners
 
@@ -55,6 +54,7 @@ class RSMLayer(torch.nn.Module):
                  debug_log_names=None, mask_shifted_pi=False, do_inhibition=True,
                  boost_strat='rsm_inhibition', pred_gain=1.0, x_b_norm=False,
                  boost_strength=1.0, mult_integration=False, boost_strength_factor=1.0,
+                 forget_mu=0.0,
                  debug=False, visual_debug=False, use_bias=True, fpartition=None,
                  **kwargs):
         """
@@ -69,7 +69,7 @@ class RSMLayer(torch.nn.Module):
 
         """
         super(RSMLayer, self).__init__()
-        self.k = k
+        self.k = int(k)
         self.k_winner_cells = k_winner_cells
         self.m = m
         self.n = n
@@ -77,7 +77,8 @@ class RSMLayer(torch.nn.Module):
         self.eps = eps
         self.d_in = d_in
         self.d_out = d_out
-        self.dropout_p = dropout_p
+        self.dropout_p = float(dropout_p)
+        self.forget_mu = float(forget_mu)
 
         self.total_cells = m * n
         self.bsz = bsz
@@ -100,6 +101,10 @@ class RSMLayer(torch.nn.Module):
         self.boost_strength = boost_strength
         self.mult_integration = mult_integration
         self.fpartition = fpartition
+        if isinstance(self.fpartition, float):
+            # Handle simple single-param FF-percentage only
+            # If fpartition is list, interpreted as [ff_pct, rec_pct]
+            self.fpartition = [self.fpartition, 0.0, 1.0 - self.fpartition]
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -109,7 +114,7 @@ class RSMLayer(torch.nn.Module):
 
         self.kwinners_col = KWinners(self.m, self.k / self.m, 
                                      boost_strength=self.boost_strength,
-                                     duty_cycle_period=5000,
+                                     duty_cycle_period=1000,
                                      boost_strength_factor=boost_strength_factor)
 
         self._build_input_layers(use_bias=use_bias)
@@ -154,7 +159,7 @@ class RSMLayer(torch.nn.Module):
         self.y = self.y.to(device)
 
     def _partition_sizes(self):
-        pct_ff, pct_int, pct_rec = self.fpartition
+        pct_ff, pct_rec = self.fpartition
         m_ff = int(pct_ff * self.m)
         m_rec = int(pct_rec * self.m)
         m_int = self.m - m_ff - m_rec
@@ -185,6 +190,15 @@ class RSMLayer(torch.nn.Module):
         ]:
             t.retain_grad()
             t.register_hook(get_grad_printer(label))
+
+    def _do_forgetting(self, phi, psi):
+        if self.forget_mu > 0:
+            keep_idxs = torch.rand(self.bsz) > self.forget_mu
+            mask = torch.zeros_like(phi)
+            mask[keep_idxs, :] = 1
+            phi = phi * mask
+            psi = psi * mask
+        return (phi, psi)
 
     def _group_max(self, activity):
         """
@@ -307,6 +321,9 @@ class RSMLayer(torch.nn.Module):
         bsz = x_a_batch.size(0)
 
         x_b, phi, psi = hidden
+
+        phi, psi = self._do_forgetting(phi, psi)
+
         self._debug_log({'x_b': x_b})
 
         self._debug_log({'x_a_batch': x_a_batch})
