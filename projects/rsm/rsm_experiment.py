@@ -79,11 +79,16 @@ class RSMExperiment(object):
         self.m_groups = config.get("m_groups", 200)
         self.n_cells_per_group = config.get("n_cells_per_group", 6)
         self.k_winners = config.get("k_winners", 25)
+        self.k_winners_pct = config.get("k_winners_pct", None)
+        if self.k_winners_pct is not None:
+            # Optionally define k-winners proportionally
+            self.k_winners = int(self.m_groups * self.k_winners_pct)
         self.gamma = config.get("gamma", 0.5)
         self.eps = config.get("eps", 0.5)
         self.k_winner_cells = config.get("k_winner_cells", 1)
         self.dropout_p = config.get("dropout_p", 0.5)
         self.flattened = self.n_cells_per_group == 1
+        self.forget_mu = config.get("forget_mu", 0.0)
 
         # Tweaks
         self.cell_winner_softmax = config.get("cell_winner_softmax", False)
@@ -244,6 +249,7 @@ class RSMExperiment(object):
                                   cell_winner_softmax=self.cell_winner_softmax,
                                   gamma=self.gamma,
                                   eps=self.eps,
+                                  forget_mu=self.forget_mu,
                                   activation_fn=self.activation_fn,
                                   active_dendrites=self.active_dendrites,
                                   col_output_cells=self.col_output_cells,
@@ -286,7 +292,6 @@ class RSMExperiment(object):
 
         self.model.to(self.device)
         self.model._buffers_to(self.device)
-        print(self.model.sigma.device, self.model.y.device)
 
         print("Got model with %d trainable params" % count_parameters(self.model))
 
@@ -597,10 +602,6 @@ class RSMExperiment(object):
 
             last_output = output
 
-            # if batch_idx > self.batches_in_epoch:
-            #     print("Stopping after %d batches in epoch %d" % (self.batches_in_epoch, epoch))
-            #     break
-
             if self.batch_log_interval and batch_idx % self.batch_log_interval == 0:
                 print("Finished batch %d" % batch_idx)
                 if self.predictor:
@@ -609,14 +610,16 @@ class RSMExperiment(object):
                     batch_ppl = lang_util.perpl(batch_loss)
                     print("Partial train predictor accuracy - epoch: %.3f%%, batch acc: %.3f%%, batch ppl: %.1f" % (acc, batch_acc, batch_ppl))
 
+        ret["stop"] = 0
+
         if self.eval_interval and (epoch == 0 or (epoch + 1) % self.eval_interval == 0):
             # Evaluate each x epochs
             ret.update(self._eval())
+            if self.dataset_kind == 'ptb' and epoch >= 7 and ret['val_pred_ppl'] > 250:
+                ret['stop'] = 1
 
         train_time = time.time() - t1
         self._post_epoch(epoch)
-
-        ret["stop"] = 0
 
         ret['train_loss'] = total_loss / (batch_idx + 1)
         if self.predictor:

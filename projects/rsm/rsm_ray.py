@@ -24,6 +24,7 @@ import argparse
 import os
 
 import ray
+import numpy as np
 import torch
 from ray import tune
 from ray.tune.logger import JsonLogger, CSVLogger
@@ -209,7 +210,7 @@ def parse_options():
 if __name__ == "__main__":
     # Load and parse command line option and experiment configurations
     options = parse_options()
-    configs = parse_config(options.config, options.experiments)
+    configs = parse_config(options.config, options.experiments, globals(), locals())
 
     # Use configuration file location as the project location.
     # Ray Tune default working directory is "~/ray_results"
