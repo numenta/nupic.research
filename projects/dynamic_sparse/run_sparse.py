@@ -23,49 +23,65 @@ import os
 
 import ray
 import ray.tune as tune
+import torch
 
-from utils import Trainable
+from loggers import DEFAULT_LOGGERS
+from utils import Trainable, download_dataset
+
+torch.manual_seed(32)  # run diverse samples
 
 # alternative initialization based on configuration
-config = dict(
-    network="resnet18",
-    # network params
-    # hidden_sizes=tune.grid_search([[300, 300, 300], [1000,1000,1000]]),
-    # hidden_sizes=[300,300,300],
-    # batch_norm=False,
-    # dropout=tune.grid_search([0, 0.3]),
-    # dropout=False,
-    # bias=False,
-    # init_weights=True,
-    # input_size=784,
+exp_config = dict(
+    # model related
+    device="cuda",
+    network="vgg19_bn",
     num_classes=10,
     model="DSNN",
-    debug_sparse=True,
+    # model=tune.grid_search(["SET", "DSNN", "DSNN_Flip", "DSNN_Correct"]),
+    # dataset related
     dataset_name="CIFAR10",
+    augment_images=True,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
     data_dir="~/nta/datasets",
-    device="cpu",
+    # optimizer related
     optim_alg="SGD",
-    batch_size_train=10,
-    batch_size_test=10,
+    momentum=0.9,
+    learning_rate=0.01,
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[250, 290],
+    lr_gamma=0.10,
+    debug_weights=True,
+    # sparse related
+    epsilon=tune.grid_search([50, 100, 200]),
+    start_sparse=1,
+    # end_sparse=-1, # search later
+    debug_sparse=True,
+    flip=False,  # search later, along with end sparse
+    weight_prune_perc=tune.grid_search([0, 0.1, 0.2, 0.3, 0.4]),
+    grad_prune_perc=tune.grid_search([0, 0.1, 0.2, 0.3, 0.4]),
 )
 
-# run
-ray.init()
-tune.run(
-    Trainable,
-    name="SET_local_test",
+tune_config = dict(
+    name="SET_DSNN_GS1",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
-    config=config,
+    config=exp_config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 10},
-    resources_per_trial={"cpu": 1, "gpu": 0},
+    stop={"training_iteration": 300},
+    resources_per_trial={"cpu": 1, "gpu": 1},
+    loggers=DEFAULT_LOGGERS,
+    verbose=1,
 )
 
-""""
-ongoing notes
+# TODO: automatically counts how many GPUs there are
 
-"""
+# override when running local for test
+if not torch.cuda.is_available():
+    exp_config["device"] = "cpu"
+    tune_config["resources_per_trial"] = {"cpu": 1}
+
+download_dataset(exp_config)
+ray.init()
+tune.run(Trainable, **tune_config)
