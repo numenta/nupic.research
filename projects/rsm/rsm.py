@@ -104,7 +104,7 @@ class RSMLayer(torch.nn.Module):
         if isinstance(self.fpartition, float):
             # Handle simple single-param FF-percentage only
             # If fpartition is list, interpreted as [ff_pct, rec_pct]
-            self.fpartition = [self.fpartition, 0.0, 1.0 - self.fpartition]
+            self.fpartition = [self.fpartition, 1.0 - self.fpartition]
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -192,7 +192,7 @@ class RSMLayer(torch.nn.Module):
             t.register_hook(get_grad_printer(label))
 
     def _do_forgetting(self, phi, psi):
-        if self.forget_mu > 0:
+        if self.training and self.forget_mu > 0:
             keep_idxs = torch.rand(self.bsz) > self.forget_mu
             mask = torch.zeros_like(phi)
             mask[keep_idxs, :] = 1

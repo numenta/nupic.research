@@ -64,6 +64,7 @@ class RSMExperiment(object):
         # Training / testing parameters
         self.batch_size = config.get("batch_size", 128)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
+        self.batches_in_first_epoch = config.get("batches_in_first_epoch", self.batches_in_epoch)
         self.eval_batches_in_epoch = config.get("eval_batches_in_epoch", self.batches_in_epoch)
         self.seq_length = config.get("seq_length", 35)
 
@@ -615,7 +616,7 @@ class RSMExperiment(object):
         if self.eval_interval and (epoch == 0 or (epoch + 1) % self.eval_interval == 0):
             # Evaluate each x epochs
             ret.update(self._eval())
-            if self.dataset_kind == 'ptb' and epoch >= 7 and ret['val_pred_ppl'] > 250:
+            if self.dataset_kind == 'ptb' and epoch >= 12 and ret['val_pred_ppl'] > 250:
                 ret['stop'] = 1
 
         train_time = time.time() - t1
