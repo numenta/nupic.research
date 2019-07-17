@@ -42,10 +42,14 @@ class BaseModel:
             debug_weights=False,
             start_sparse=None,
             end_sparse=None,
+            pruning_interval=1,
+            log_images=False,
+            flip=False,
+            weight_prune_perc=0,
+            grad_prune_perc=0,
+            test_noise=False,
         )
-        if config is None:
-            config = {}
-        defaults.update(config)
+        defaults.update(config or {})
         self.__dict__.update(defaults)
 
         # init remaining
@@ -73,18 +77,28 @@ class BaseModel:
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
 
-    def run_epoch(self, dataset):
+    def run_epoch(self, dataset, epoch):
+        self.current_epoch = epoch + 1
         self.log = {}
         self.network.train()
         self._run_one_pass(dataset.train_loader, train=True)
         self.network.eval()
         self._run_one_pass(dataset.test_loader, train=False)
-        if self.lr_scheduler:
-            self.lr_scheduler.step()
+        self._post_epoch_updates(dataset)
 
         return self.log
 
-    def _run_one_pass(self, loader, train=True):
+    def _post_epoch_updates(self, dataset=None):
+
+        # run one additional testing epoch for noise
+        if self.test_noise:
+            self._run_one_pass(dataset.noise_loader, train=False, noise=True)
+
+        # update learning rate
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
+
+    def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
         correct = 0
         for inputs, targets in loader:
@@ -113,8 +127,12 @@ class BaseModel:
             self.log["train_loss"] = loss
             self.log["train_acc"] = acc
         else:
-            self.log["val_loss"] = loss
-            self.log["val_acc"] = acc
+            if noise:
+                self.log["noise_loss"] = loss
+                self.log["noise_acc"] = acc
+            else:
+                self.log["val_loss"] = loss
+                self.log["val_acc"] = acc
 
         if train and self.debug_weights:
             self._log_weights()
@@ -165,7 +183,6 @@ class SparseModel(BaseModel):
         with torch.no_grad():
             # calculate sparsity masks
             self.masks = []
-            self.denseness = []
             self.num_params = []  # added for paper implementation
 
             # define sparse modules
@@ -181,10 +198,9 @@ class SparseModel(BaseModel):
                 mask = (torch.rand(shape) < on_perc).float().to(self.device)
                 m.weight.data *= mask
                 self.masks.append(mask)
-                self.denseness.append(on_perc)
                 self.num_params.append(torch.sum(mask).item())
 
-    def _run_one_pass(self, loader, train):
+    def _run_one_pass(self, loader, train, noise=False):
         """TODO: reimplement by calling super and passing a hook"""
         epoch_loss = 0
         epoch_correct = 0
@@ -217,8 +233,12 @@ class SparseModel(BaseModel):
             self.log["train_loss"] = loss
             self.log["train_acc"] = acc
         else:
-            self.log["val_loss"] = loss
-            self.log["val_acc"] = acc
+            if noise:
+                self.log["noise_loss"] = loss
+                self.log["noise_acc"] = acc
+            else:
+                self.log["val_loss"] = loss
+                self.log["val_acc"] = acc
 
         if train and self.debug_weights:
             self._log_weights()
@@ -237,13 +257,16 @@ class SparseModel(BaseModel):
                 self.log[log_name] = 1 - zero_count / size
 
                 # log image as well
-                if self.has_params(m) == "conv":
-                    ratio = 255 / np.prod(m.weight.shape[2:])
-                    heatmap = (torch.sum(m.weight, dim=[2, 3]).float() * ratio).int()
-                    self.log["img_" + log_name] = heatmap.tolist()
+                if self.log_images:
+                    if self.has_params(m) == "conv":
+                        ratio = 255 / np.prod(m.weight.shape[2:])
+                        heatmap = (
+                            torch.sum(m.weight, dim=[2, 3]).float() * ratio
+                        ).int()
+                        self.log["img_" + log_name] = heatmap.tolist()
 
 
-class SETFaster(SparseModel):
+class SET(SparseModel):
     """
     Implementation of SET with a more efficient approach of adding new
     weights (vectorized) The overhead in computation is 10x smaller compared to
@@ -251,13 +274,13 @@ class SETFaster(SparseModel):
     """
 
     def setup(self):
-        super(SETFaster, self).setup()
+        super(SET, self).setup()
 
         # initialize data structure keep track of added synapses
         self.added_synapses = [None for m in self.masks]
 
-    def _run_one_pass(self, loader, train):
-        super(SETFaster, self)._run_one_pass(loader, train)
+    def _run_one_pass(self, loader, train, noise=False):
+        super(SET, self)._run_one_pass(loader, train, noise)
         if train:
             self.reinitialize_weights()
 
@@ -303,13 +326,200 @@ class SETFaster(SparseModel):
                 m.weight.data *= prune_mask.float()
 
                 # keep track of added synapes
-                if self.debug_sparse and self.added_synapses[idx] is not None:
-                    total_added = torch.sum(self.added_synapses[idx]).item()
-                    surviving = torch.sum(self.added_synapses[idx] & prune_mask).item()
-                    if total_added:
-                        self.log["surviving_synapses_l" + str(idx)] = (
-                            surviving / total_added
-                        )
+                if self.debug_sparse:
+                    self.log["added_synapses_l" + str(idx)] = torch.sum(
+                        new_synapses
+                    ).item()
+                    if self.added_synapses[idx] is not None:
+                        total_added = torch.sum(self.added_synapses[idx]).item()
+                        surviving = torch.sum(
+                            self.added_synapses[idx] & prune_mask
+                        ).item()
+                        if total_added:
+                            self.log["surviving_synapses_l" + str(idx)] = (
+                                surviving / total_added
+                            )
+                self.added_synapses[idx] = new_synapses
+
+        # keep track of mask sizes when debugging
+        if self.debug_sparse:
+            for idx, m in enumerate(self.masks):
+                self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
+
+
+class DSNN(SparseModel):
+    """
+    Dynamically sparse neural networks.
+    Our improved version of SET
+    """
+
+    def setup(self):
+        super(DSNN, self).setup()
+        self.added_synapses = [None for m in self.masks]
+        self.last_gradients = [None for m in self.masks]
+
+        # initializae sign to 1 if to be flipped later
+        self.prune_grad_sign = -1
+        if self.flip:
+            self.prune_grad_sign = 1
+            self.flip_epoch = 30
+
+    def _post_epoch_updates(self, dataset=None):
+        super(DSNN, self)._post_epoch_updates(dataset)
+
+        # flip at a fixed interval
+        if self.flip:
+            if self.current_epoch == self.flip_epoch and self.prune_grad_sign == 1:
+                self.prune_grad_sign = -1
+
+        # update only when learning rate updates
+        # froze this for now
+        # if self.current_epoch in self.lr_milestones:
+        #     # decay pruning interval, inversely proportional with learning rate
+        #     self.pruning_interval = max(self.pruning_interval,
+        #         int((self.pruning_interval * (1/self.lr_gamma))/3))
+
+    def _run_one_pass(self, loader, train, noise=False):
+        """TODO: reimplement by calling super and passing a hook"""
+        epoch_loss = 0
+        epoch_correct = 0
+        for inputs, targets in loader:
+            # setup for training
+            inputs = inputs.to(self.device)
+            targets = targets.to(self.device)
+            self.optimizer.zero_grad()
+
+            # forward + backward + optimize
+            with torch.set_grad_enabled(train):
+                outputs = self.network(inputs)
+                _, preds = torch.max(outputs, 1)
+                epoch_correct += torch.sum(targets == preds).item()
+                loss = self.loss_func(outputs, targets)
+                if train:
+                    loss.backward()
+                    # zero the gradients for dead connections
+                    for idx, (mask, m) in enumerate(
+                        zip(self.masks, self.sparse_modules)
+                    ):
+                        m.weight.grad *= mask
+                        # save gradients before any operation
+                        # TODO: will need to integrate over several epochs later
+                        self.last_gradients[idx] = m.weight.grad
+
+                    self.optimizer.step()
+
+            # keep track of loss and accuracy
+            epoch_loss += loss.item() * inputs.size(0)
+
+        # store loss and acc at each pass
+        loss = epoch_loss / len(loader.dataset)
+        acc = epoch_correct / len(loader.dataset)
+        if train:
+            self.log["train_loss"] = loss
+            self.log["train_acc"] = acc
+        else:
+            if noise:
+                self.log["noise_loss"] = loss
+                self.log["noise_acc"] = acc
+            else:
+                self.log["val_loss"] = loss
+                self.log["val_acc"] = acc
+
+        # add monitoring of weights
+        if train and self.debug_weights:
+            self._log_weights()
+
+        # add monitoring of sparse levels
+        if train and self.debug_sparse:
+            self._log_sparse_levels()
+
+        # dynamically decide pruning interval
+        if train:
+            # no dynamic interval at this moment
+            # if self.current_epoch % self.pruning_interval == 0:
+            self.reinitialize_weights()
+
+    def prune(self, weight, grad, num_params, zeta=0.30, idx=0):
+        """
+        Calculate new weight based on SET approach weight vectorized version
+        aimed at keeping the mask with the similar level of sparsity.
+
+        Changes:
+        - higher zeta
+        - two masks: one based on weights, another based on gradients
+        """
+        with torch.no_grad():
+
+            # calculate weight mask
+            zeta = self.weight_prune_perc
+            weight_pos = weight[weight > 0]
+            pos_threshold, _ = torch.kthvalue(
+                weight_pos, max(int(zeta * len(weight_pos)), 1)
+            )
+            weight_neg = weight[weight < 0]
+            neg_threshold, _ = torch.kthvalue(
+                weight_neg, max(int((1 - zeta) * len(weight_neg)), 1)
+            )
+            weight_keep_mask = (weight >= pos_threshold) | (weight <= neg_threshold)
+            weight_keep_mask.to(self.device)
+            self.log["weight_keep_mask_l" + str(idx)] = torch.sum(
+                weight_keep_mask
+            ).item()
+
+            # calculate gradient mask
+            kappa = self.grad_prune_perc
+            grad = grad * self.prune_grad_sign * torch.sign(weight)
+            deltas = grad.view(-1)
+            grad_treshold, _ = torch.kthvalue(deltas, max(int(kappa * len(deltas)), 1))
+            grad_keep_mask = (grad >= grad_treshold).to(self.device)
+            # keep only those which are in the original weight matrix
+            grad_keep_mask = grad_keep_mask & (weight != 0)
+            self.log["grad_keep_mask_l" + str(idx)] = torch.sum(grad_keep_mask).item()
+
+            # combine both masks
+            keep_mask = weight_keep_mask & grad_keep_mask
+
+            # change mask to add new weight
+            num_add = num_params - torch.sum(keep_mask).item()
+            self.log["missing_weights_l" + str(idx)] = num_add
+            current_sparsity = torch.sum(weight == 0).item()
+            self.log["zero_weights_l" + str(idx)] = current_sparsity
+            p_add = num_add / max(current_sparsity, 1)  # avoid div by zero
+            probs = torch.rand(weight.shape).to(self.device) < p_add
+            new_synapses = probs & (weight == 0)
+            new_mask = keep_mask | new_synapses
+            self.log["added_synapses_l" + str(idx)] = torch.sum(new_synapses).item()
+
+        # track added connections
+        return new_mask, keep_mask, new_synapses
+
+    def reinitialize_weights(self):
+        """Reinitialize weights."""
+        for idx, (m, grad) in enumerate(zip(self.sparse_modules, self.last_gradients)):
+            new_mask, keep_mask, new_synapses = self.prune(
+                m.weight.clone().detach(), grad, self.num_params[idx], idx=idx
+            )
+            with torch.no_grad():
+                self.masks[idx] = new_mask.float()
+                m.weight.data *= keep_mask.float()
+
+                # keep track of added synapes
+                if self.debug_sparse:
+                    # count new synapses at this round
+                    # total_new = torch.sum(new_synapses).item()
+                    # total = np.prod(new_synapses.shape)
+                    # self.log["added_synapses_l" + str(idx)] = total_new
+                    # count how many synapses from last round have survived
+                    if self.added_synapses[idx] is not None:
+                        total_added = torch.sum(self.added_synapses[idx]).item()
+                        surviving = torch.sum(
+                            self.added_synapses[idx] & keep_mask
+                        ).item()
+                        if total_added:
+                            self.log["surviving_synapses_l" + str(idx)] = (
+                                surviving / total_added
+                            )
+                # keep track of new synapses to count surviving on next round
                 self.added_synapses[idx] = new_synapses
 
         # keep track of mask sizes when debugging
