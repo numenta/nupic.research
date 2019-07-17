@@ -31,3 +31,5 @@ tqdm
 torch
 torchvision
 nupic.torch
+python-dotenv
+elasticsearch
