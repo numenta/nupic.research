@@ -25,9 +25,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from rsm_samplers import (
-    MNISTSequenceSampler, 
-    MNISTBufferedDataset, 
-    pred_sequence_collate
+    MNISTBufferedDataset,
+    MNISTSequenceSampler,
+    pred_sequence_collate,
 )
 
 
@@ -42,7 +42,7 @@ class TestContext(object):
 class StochasticMNISTTest(unittest.TestCase):
     """
     Test that sampling classes produce correct batches of input and target images
-    according to the provided sequences. 
+    according to the provided sequences.
     """
 
     def setUp(self):
@@ -51,35 +51,45 @@ class StochasticMNISTTest(unittest.TestCase):
         self.BSZ = 2
         self.SEQ = [[0, 1, 2, 3], [0, 3, 2, 4]]
 
-        self.dataset = MNISTBufferedDataset("~/nta/datasets", download=True,
-                                            transform=transforms.Compose([
-                                                transforms.ToTensor(),
-                                                transforms.Normalize((0.1307,), (0.3081,))
-                                            ]),)
+        self.dataset = MNISTBufferedDataset(
+            "~/nta/datasets",
+            download=True,
+            transform=transforms.Compose(
+                [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+            ),
+        )
 
-        self.random_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, 
-                                                   batch_size=self.BSZ, random_mnist_images=True,
-                                                   randomize_sequence_cursors=False)
-        self.fixed_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, 
-                                                  batch_size=self.BSZ, random_mnist_images=False,
-                                                  randomize_sequence_cursors=False)
+        self.random_sampler = MNISTSequenceSampler(
+            self.dataset,
+            sequences=self.SEQ,
+            batch_size=self.BSZ,
+            random_mnist_images=True,
+            randomize_sequence_cursors=False,
+        )
+        self.fixed_sampler = MNISTSequenceSampler(
+            self.dataset,
+            sequences=self.SEQ,
+            batch_size=self.BSZ,
+            random_mnist_images=False,
+            randomize_sequence_cursors=False,
+        )
 
         self.collate_fn = pred_sequence_collate
 
-        self.random_digit_loader = DataLoader(self.dataset,
-                                              batch_sampler=self.random_sampler,
-                                              collate_fn=self.collate_fn)
+        self.random_digit_loader = DataLoader(
+            self.dataset, batch_sampler=self.random_sampler, collate_fn=self.collate_fn
+        )
 
-        self.fixed_digit_loader = DataLoader(self.dataset,
-                                             batch_sampler=self.fixed_sampler,
-                                             collate_fn=self.collate_fn)
+        self.fixed_digit_loader = DataLoader(
+            self.dataset, batch_sampler=self.fixed_sampler, collate_fn=self.collate_fn
+        )
 
     def test_one(self):
         all_input_labels = []
         all_target_labels = []
         all_inputs = []
 
-        for i in range(1):
+        for _i in range(1):
             for j, batch in enumerate(self.random_digit_loader):
                 inputs, targets, target_labels, input_labels = batch
 
@@ -98,8 +108,14 @@ class StochasticMNISTTest(unittest.TestCase):
                 if len(all_input_labels) == 8:
                     break
 
+        all_inputs = torch.stack(all_inputs, dim=0)
         all_input_labels = torch.stack(all_input_labels, dim=0)
         all_target_labels = torch.stack(all_target_labels, dim=0)
+
+        # Digit images with same label are different
+        zero_image_b0 = all_inputs[0, 0]
+        zero_image_b1 = all_inputs[0, 1]
+        self.assertTrue(zero_image_b0.sum() != zero_image_b1.sum())
 
         # Each sequence in each batch should match one of the two original sequences
         seq1col1 = all_input_labels[:4, 0]
@@ -115,13 +131,9 @@ class StochasticMNISTTest(unittest.TestCase):
         seq2col1 = all_target_labels[4:-1, 0]
         seq2col2 = all_target_labels[4:-1, 1]
         for seq in [seq1col1, seq1col2, seq2col1, seq2col2]:
-            self.assertTrue(list(seq) == self.SEQ[0][1:] or list(seq) == self.SEQ[1][1:])
-
-        # Digit images with same label are different
-        if j == 0:
-            zero_image_b0 = all_inputs[0, 0]
-            zero_image_b1 = all_inputs[0, 1]
-            self.assertTrue(zero_image_b0.sum() != zero_image_b1.sum())
+            self.assertTrue(
+                list(seq) == self.SEQ[0][1:] or list(seq) == self.SEQ[1][1:]
+            )
 
     def test_fixed_digit_sampling(self):
         batch = next(iter(self.fixed_digit_loader))
@@ -134,13 +146,16 @@ class StochasticMNISTTest(unittest.TestCase):
 
     def test_digit_balance(self):
 
-        random_seq_sampler = MNISTSequenceSampler(self.dataset, sequences=self.SEQ, 
-                                                  batch_size=self.BSZ,
-                                                  random_mnist_images=True)
+        random_seq_sampler = MNISTSequenceSampler(
+            self.dataset,
+            sequences=self.SEQ,
+            batch_size=self.BSZ,
+            random_mnist_images=True,
+        )
 
-        loader = DataLoader(self.dataset,
-                            batch_sampler=random_seq_sampler,
-                            collate_fn=self.collate_fn)
+        loader = DataLoader(
+            self.dataset, batch_sampler=random_seq_sampler, collate_fn=self.collate_fn
+        )
 
         all_inputs = []
         for i, batch in enumerate(loader):
@@ -153,7 +168,7 @@ class StochasticMNISTTest(unittest.TestCase):
         counts = torch.stack(all_inputs).flatten().bincount()
         n_zeros = counts[0].item()
         n_ones = counts[1].item()
-        # Frequency of 0s and 1s should approximately match statistics of sequences (2:1)
+        # Frequency of 0s and 1s should approximately match stats of sequences (2:1)
         self.assertAlmostEqual(n_zeros / n_ones, 2.0, delta=0.4)
 
 

@@ -1,16 +1,41 @@
-from PIL import Image
-import torch
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+
 import numpy as np
+import torch
+from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Sampler
 from torchvision import datasets
 
 
 class MNISTBufferedDataset(datasets.MNIST):
-
-    def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
-        super(MNISTBufferedDataset, self).__init__(root, train=train, transform=transform, 
-                                                   target_transform=target_transform, download=download)
+    def __init__(
+        self, root, train=True, transform=None, target_transform=None, download=False
+    ):
+        super(MNISTBufferedDataset, self).__init__(
+            root,
+            train=train,
+            transform=transform,
+            target_transform=target_transform,
+            download=download,
+        )
 
     def __getitem__(self, index):
         """
@@ -29,7 +54,7 @@ class MNISTBufferedDataset(datasets.MNIST):
         else:
             img, target = self.data[index].numpy(), int(self.targets[index])
 
-        img = Image.fromarray(img, mode='L')
+        img = Image.fromarray(img, mode="L")
 
         if self.transform is not None:
             img = self.transform(img)
@@ -45,14 +70,21 @@ class MNISTSequenceSampler(Sampler):
     Loop through one or more sequences of digits
     Draw each digit image (based on label specified by sequence) randomly
 
-    TODO: Having this work with a custom DataSet that draws random 
+    TODO: Having this work with a custom DataSet that draws random
     MNIST digits may be more appropriate
     """
 
-    def __init__(self, data_source, sequences=None, batch_size=64, 
-                 random_mnist_images=True, randomize_sequence_cursors=True,
-                 max_batches=100,
-                 use_mnist_pct=1.0, noise_buffer=False):
+    def __init__(
+        self,
+        data_source,
+        sequences=None,
+        batch_size=64,
+        random_mnist_images=True,
+        randomize_sequence_cursors=True,
+        max_batches=100,
+        use_mnist_pct=1.0,
+        noise_buffer=False,
+    ):
         super(MNISTSequenceSampler, self).__init__(data_source)
         self.data_source = data_source
         self.random_mnist_images = random_mnist_images
@@ -74,12 +106,18 @@ class MNISTSequenceSampler(Sampler):
         self.seq_lengths = torch.tensor([len(subseq) for subseq in self.sequences])
 
         # Each of these stores both current and next batch state (2 x batch_size)
-        self.sequence_id = torch.stack((self._init_sequence_ids(), self._init_sequence_ids()))  # Iterate over subsequences
+        self.sequence_id = torch.stack(
+            (self._init_sequence_ids(), self._init_sequence_ids())
+        )  # Iterate over subsequences
         first_batch_cursors = self._init_sequence_cursors()
-        self.sequence_cursor = torch.stack((first_batch_cursors, first_batch_cursors))  # Iterates over sequence items
+        self.sequence_cursor = torch.stack(
+            (first_batch_cursors, first_batch_cursors)
+        )  # Iterates over sequence items
         self._increment_next()
 
-        self.sequences_mat = pad_sequence(torch.tensor(self.sequences), batch_first=True, padding_value=-99)
+        self.sequences_mat = pad_sequence(
+            torch.tensor(self.sequences), batch_first=True, padding_value=-99
+        )
 
         # Get index for each digit (that appears in a passed sequence)
         for seq in sequences:
@@ -88,7 +126,7 @@ class MNISTSequenceSampler(Sampler):
                     mask = (data_source.targets == digit).nonzero().flatten()
                     idx = torch.randperm(mask.size(0))
                     if self.use_mnist_pct < 1.0:
-                        idx = idx[:int(self.use_mnist_pct * len(idx))]
+                        idx = idx[: int(self.use_mnist_pct * len(idx))]
                     self.label_indices[digit] = mask[idx]
                     self.label_cursors[digit] = 0
 
@@ -98,30 +136,39 @@ class MNISTSequenceSampler(Sampler):
     def _init_sequence_cursors(self):
         if self.randomize_sequence_cursors:
             lengths = self.seq_lengths[self.sequence_id[0]]
-            cursors = (torch.FloatTensor(self.bsz).uniform_(0, 1) * lengths.float()).long()
+            cursors = (
+                torch.FloatTensor(self.bsz).uniform_(0, 1) * lengths.float()
+            ).long()
         else:
             cursors = torch.zeros(self.bsz).long()
         return cursors
 
     def _increment_next(self):
-        # Increment cursors and select new random subsequences for those that have terminated
+        # Increment cursors and select new random subsequences for those that
+        # have terminated
         self.sequence_cursor[1] += 1
         roll_mask = self.sequence_cursor[1] >= self.seq_lengths[self.sequence_id[1]]
 
         if roll_mask.sum() > 0:
             # Roll items to 0 of randomly chosen next subsequence
-            self.sequence_id[1, roll_mask] = torch.LongTensor(1, roll_mask.sum()).random_(0, self.n_sequences)
+            self.sequence_id[1, roll_mask] = torch.LongTensor(
+                1, roll_mask.sum()
+            ).random_(0, self.n_sequences)
             self.sequence_cursor[1, roll_mask] = 0
 
     def _get_next_batch(self):
         """
         """
         # First row is current inputs
-        inp_labels_batch = self.sequences_mat[self.sequence_id[0], self.sequence_cursor[0]]
+        inp_labels_batch = self.sequences_mat[
+            self.sequence_id[0], self.sequence_cursor[0]
+        ]
         inp_idxs = [self._get_sample_image(digit.item()) for digit in inp_labels_batch]
 
         # Second row is next (predicted) inputs
-        tgt_labels_batch = self.sequences_mat[self.sequence_id[1], self.sequence_cursor[1]]
+        tgt_labels_batch = self.sequences_mat[
+            self.sequence_id[1], self.sequence_cursor[1]
+        ]
         tgt_idxs = [self._get_sample_image(digit.item()) for digit in tgt_labels_batch]
 
         # Roll next to current
@@ -130,7 +177,6 @@ class MNISTSequenceSampler(Sampler):
 
         self._increment_next()
 
-        # return (inp_images_batch, tgt_images_batch, tgt_labels_batch, inp_labels_batch)
         return inp_idxs + tgt_idxs
 
     def _get_sample_image(self, digit):
@@ -154,7 +200,7 @@ class MNISTSequenceSampler(Sampler):
             return indices[cursor].item()
 
     def __iter__(self):
-        for i in range(len(self)):
+        for _i in range(len(self)):
             yield self._get_next_batch()
         return
 
@@ -189,8 +235,9 @@ class PTBSequenceSampler(Sampler):
         self.batch_idxs = (torch.rand(self.batch_size) * (self.data_len - 1)).long()
 
     def __iter__(self):
-        # Yield the next single batch of (batch_size) word IDs, each at a different offset into PTB
-        for i in range(len(self)):
+        # Yield the next single batch of (batch_size) word IDs,
+        # each at a different offset into PTB
+        for _i in range(len(self)):
             # yield data, target
             yield self.batch_idxs, self.batch_idxs + 1
             self.batch_idxs += 1  # Next token row
@@ -218,4 +265,3 @@ def ptb_pred_sequence_collate(batch, vector_dict=None):
     pred_target = target
     target = vector_batch(target, vector_dict)
     return (data, target, pred_target, pred_input)
-
