@@ -117,7 +117,8 @@ def _get_value(progress, params, exp_name, exp_substring="", which="max"):
     columns = ["Experiment Name"]
 
     # add the columns names for main tags
-    tags = ["val_pred_acc", "val_loss", "val_pred_ppl", "train_pred_acc", "train_pred_ppl"]
+    tags = ["val_pred_acc", "val_loss", "val_pred_ppl",
+            "train_pred_acc", "train_pred_ppl"]
     for tag in tags:
         which = "min" if "ppl" in tag else "max"
         columns.append(tag)
