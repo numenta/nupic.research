@@ -21,7 +21,7 @@
 # ------------------------------------------------------------------------------
 from os import path
 
-from setuptools import setup
+from setuptools import setup, find_namespace_packages
 
 import nupic.research
 
@@ -52,7 +52,7 @@ setup(
     long_description=readme,
     long_description_content_type="text/markdown",
     version=nupic.research.__version__,
-    packages=["nupic"],
+    packages=find_namespace_packages(include=["nupic.*"]),
     install_requires=requirements,
     dependency_links=["git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch"],
     python_requires=">=3.6, <4",
