@@ -23,7 +23,7 @@ from torch import nn
 
 from nupic.torch.modules.k_winners import KWinners
 from nupic.torch.modules.sparse_weights import SparseWeights
-from util import activity_square, get_grad_printer
+from util import activity_square, count_parameters, get_grad_printer
 
 
 def topk_mask(x, k=2):
@@ -95,15 +95,30 @@ class RSMLayer(torch.nn.Module):
         visual_debug=False,
         use_bias=True,
         fpartition=None,
+        balance_part_winners=False,
         **kwargs,
     ):
         """
-        RSM Layer as specified by Rawlinson et al 2019
+        This class includes an attempted replication of the Recurrent Sparse Memory
+        architecture suggested by by
+        [Rawlinson et al 2019](https://arxiv.org/abs/1905.11589).
+
+        Parameters allow experimentation with a wide array of adjustments to this model,
+        both minor and major. Classes of models tested include:
+
+        * "Adjusted" model with k-winners and column boosting, 2 cell winners,
+            no inhibition
+        * "Flattened" model with 1 cell per column, 1000 cols, 25 winners
+            and multiplicative integration of FF & recurrent input
+        * "Flat Partitioned" model with 120 winners, and cells partitioned into three
+            functional types: ff only, recurrent only, and optionally a region that
+            integrates both.
 
         :param d_in: Dimension of input
-        :param m: Number of groups
-        :param n: Cells per group
-        :param k: # of groups to win in topk() (sparsity)
+        :param m: Number of groups/columns
+        :param n: Cells per group/column
+        :param k: # of groups/columns to win in topk() (sparsity)
+        :param k_winner_cells: # of winning cells per column
         :param gamma: Inhibition decay rate (0-1)
         :param eps: Integrated encoding decay rate (0-1)
 
@@ -121,6 +136,7 @@ class RSMLayer(torch.nn.Module):
         self.forget_mu = float(forget_mu)
 
         self.total_cells = m * n
+        self.flattened = self.total_cells == self.m
 
         # Tweaks
         self.activation_fn = activation_fn
@@ -131,12 +147,14 @@ class RSMLayer(torch.nn.Module):
         self.mask_shifted_pi = mask_shifted_pi
         self.do_inhibition = do_inhibition
         self.boost_strength = boost_strength
+        self.boost_strength_factor = boost_strength_factor
         self.mult_integration = mult_integration
         self.fpartition = fpartition
         if isinstance(self.fpartition, float):
             # Handle simple single-param FF-percentage only
             # If fpartition is list, interpreted as [ff_pct, rec_pct]
             self.fpartition = [self.fpartition, 1.0 - self.fpartition]
+        self.balance_part_winners = balance_part_winners
         self.weight_sparsity = weight_sparsity
 
         self.debug = debug
@@ -145,20 +163,14 @@ class RSMLayer(torch.nn.Module):
 
         self.dropout = nn.Dropout(p=self.dropout_p)
 
-        self.kwinners_col = KWinners(
-            self.m,
-            self.k / self.m,
-            boost_strength=self.boost_strength,
-            duty_cycle_period=1000,
-            boost_strength_factor=boost_strength_factor,
-        )
-
-        self._build_input_layers(use_bias=use_bias)
+        self._build_input_layers_and_kwinners(use_bias=use_bias)
 
         decode_d_in = self.total_cells if self.decode_from_full_memory else m
         self.linear_d = nn.Linear(
             decode_d_in, d_out, bias=use_bias
         )  # Decoding through bottleneck
+
+        print("Created model with %d trainable params" % count_parameters(self))
 
     def _debug_log(self, tensor_dict, truncate_len=400):
         if self.debug:
@@ -210,7 +222,17 @@ class RSMLayer(torch.nn.Module):
         m_int = self.m - m_ff - m_rec
         return (m_ff, m_int, m_rec)
 
-    def _build_input_layers(self, use_bias=True):
+    def _build_kwinner_mod(self, m, pct_on):
+        return KWinners(
+            m,
+            pct_on,
+            boost_strength=self.boost_strength,
+            duty_cycle_period=1000,
+            boost_strength_factor=self.boost_strength_factor,
+        )
+
+    def _build_input_layers_and_kwinners(self, use_bias=True):
+
         if self.fpartition:
             m_ff, m_int, m_rec = self._partition_sizes()
             # Partition memory into fpartition % FF & remainder recurrent
@@ -226,12 +248,30 @@ class RSMLayer(torch.nn.Module):
             self.linear_b = nn.Linear(
                 self.total_cells, self.total_cells, bias=use_bias
             )  # Recurrent weights (per cell)
+
+        pct_on = self.k / self.m
+        if self.fpartition and self.balance_part_winners:
+            # Create a kwinners module for each partition each with specified
+            # size but same pct on (balanced).
+            self.kwinners_ff = self.kwinners_rec = self.kwinners_int = None
+            if m_ff:
+                self.kwinners_ff = self._build_kwinner_mod(m_ff, pct_on)
+            if m_int:
+                self.kwinners_int = self._build_kwinner_mod(m_int, pct_on)
+            if m_rec:
+                self.kwinners_rec = self._build_kwinner_mod(m_rec, pct_on)
+        else:
+            # We need only a single kwinners to run on full memory
+            self.kwinners_col = self._build_kwinner_mod(self.m, pct_on)
         if self.weight_sparsity is not None:
             self.linear_a = SparseWeights(self.linear_a, self.weight_sparsity)
             self.linear_b = SparseWeights(self.linear_b, self.weight_sparsity)
 
     def _post_epoch(self, epoch):
-        self.kwinners_col.update_boost_strength()
+        # Update boost strength of any KWinners modules
+        for mod in self.modules:
+            if hasattr(mod, 'update_boost_strength'):
+                mod.update_boost_strength()
 
     def _register_hooks(self):
         """Utility function to call retain_grad and Pytorch's register_hook
@@ -271,6 +311,7 @@ class RSMLayer(torch.nn.Module):
             m_ff, m_int, m_rec = self._partition_sizes()
             sigma = torch.zeros_like(x_b)
             # Integrate partitioned memory.
+            # Pack as 1xm: [ ... m_ff ... ][ ... m_int ... ][ ... m_rec ... ]
             # If m_int non-zero, these cells receive sum of FF & recurrent input
             z_a = self.linear_a(x_a)  # bsz x (m_ff+m_int)
             z_b = self.linear_b(self.dropout(x_b))  # bsz x (m_rec+m_int)
@@ -292,11 +333,14 @@ class RSMLayer(torch.nn.Module):
         bsz = pi.size(0)
 
         # Group-wise max pooling
-        lambda_ = self._group_max(pi)
+        if not self.flattened:
+            lambda_ = self._group_max(pi)
+        else:
+            lambda_ = pi
 
         # Cell-level mask: Make a bsz x total_cells binary mask of top 1 cell / column
         if self.n == self.k_winner_cells:
-            # Usually just in n=1 case, no need to choose winners
+            # Usually just in flattened case, no need to choose winners
             m_pi = torch.ones(bsz, self.total_cells, device=sigma.device)
         else:
             mask = topk_mask(pi.view(bsz * self.m, self.n), self.k_winner_cells)
@@ -323,13 +367,27 @@ class RSMLayer(torch.nn.Module):
             del m_lambda
 
         elif self.boost_strat == "col_boosting":
-            # Experiment with HTM style boosted k-winner
-            winning_columns = (
-                self.kwinners_col(lambda_)
-                .view(bsz, self.m, 1)
-                .repeat(1, 1, self.n)
-                .view(bsz, self.total_cells)
-            )
+            # HTM style boosted k-winner
+            if self.balance_part_winners and self.fpartition:
+                m_ff, m_int, m_rec = self._partition_sizes()
+                winners = []
+                if self.kwinners_ff is not None:
+                    winners_ff = self.kwinners_ff(lambda_[:, :m_ff])
+                    winners.append(winners_ff)
+                if self.kwinners_int is not None:
+                    winners_int = self.kwinners_int(lambda_[:, m_ff:m_ff + m_int])
+                    winners.append(winners_int)
+                if self.kwinners_rec is not None:
+                    winners_rec = self.kwinners_rec(lambda_[:, -m_rec:])
+                    winners.append(winners_rec)
+                winning_columns = torch.cat(winners, 1)
+            else:
+                winning_columns = (
+                    self.kwinners_col(lambda_)
+                    .view(bsz, self.m, 1)
+                    .repeat(1, 1, self.n)
+                    .view(bsz, self.total_cells)
+                )
             self._debug_log({"winning_columns": winning_columns})
             premask_act = pi if self.mask_shifted_pi else sigma
             y_pre_act = m_pi * winning_columns * premask_act

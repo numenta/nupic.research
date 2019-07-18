@@ -39,7 +39,6 @@ from rsm_samplers import (
     ptb_pred_sequence_collate,
 )
 from util import (
-    count_parameters,
     fig2img,
     plot_activity,
     plot_activity_grid,
@@ -128,6 +127,7 @@ class RSMExperiment(object):
         self.noise_buffer = config.get("noise_buffer", False)
         self.boost_strength_factor = config.get("boost_strength_factor", 1.0)
         self.fpartition = config.get("fpartition", None)
+        self.balance_part_winners = config.get("balance_part_winners", False)
         self.weight_sparsity = config.get("weight_sparsity", None)
 
         # Predictor network
@@ -307,6 +307,7 @@ class RSMExperiment(object):
                 weight_sparsity=self.weight_sparsity,
                 mult_integration=self.mult_integration,
                 fpartition=self.fpartition,
+                balance_part_winners=self.balance_part_winners,
                 embed_dim=self.embed_dim,
                 vocab_size=self.vocab_size,
                 debug=self.debug,
@@ -338,8 +339,6 @@ class RSMExperiment(object):
             )
 
         self.model.to(self.device)
-
-        print("Got model with %d trainable params" % count_parameters(self.model))
 
         self._get_loss_function()
         self._get_optimizer()
@@ -747,7 +746,7 @@ class RSMExperiment(object):
         if self.eval_interval and (epoch == 0 or (epoch + 1) % self.eval_interval == 0):
             # Evaluate each x epochs
             ret.update(self._eval())
-            if self.dataset_kind == "ptb" and epoch >= 12 and ret["val_pred_ppl"] > 250:
+            if self.dataset_kind == "ptb" and epoch >= 12 and ret["val_pred_ppl"] > 280:
                 ret["stop"] = 1
 
         train_time = time.time() - t1
