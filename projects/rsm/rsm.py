@@ -270,7 +270,7 @@ class RSMLayer(torch.nn.Module):
     def _post_epoch(self, epoch):
         # Update boost strength of any KWinners modules
         for mod in self.modules():
-            if hasattr(mod, 'update_boost_strength'):
+            if hasattr(mod, "update_boost_strength"):
                 mod.update_boost_strength()
 
     def _register_hooks(self):

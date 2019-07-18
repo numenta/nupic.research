@@ -216,17 +216,18 @@ class RSMExperiment(object):
                 max_batches=self.batches_in_epoch,
             )
 
-            if self.embedding_kind == 'rsm_bitwise':
-                embedding = lang_util.BitwiseWordEmbedding()
-            elif self.embedding_kind == 'bpe':
+            if self.embedding_kind == "rsm_bitwise":
+                embedding = lang_util.BitwiseWordEmbedding().embedding_dict
+            elif self.embedding_kind == "bpe":
                 from torchnlp.word_to_vector import BPEmb
-                vectors = BPEmb(dim=self.embed_dim)
+                cache_dir = self.data_dir + "/torchnlp/.word_vectors_cache"
+                vectors = BPEmb(dim=self.embed_dim, cache=cache_dir)
                 embedding = {}
                 for word_id, word in enumerate(corpus.dictionary.idx2word):
                     embedding[word_id] = vectors[word]
 
             collate_fn = partial(
-                ptb_pred_sequence_collate, vector_dict=embedding.embedding_dict
+                ptb_pred_sequence_collate, vector_dict=embedding
             )
             self.train_loader = DataLoader(
                 corpus.train, batch_sampler=train_sampler, collate_fn=collate_fn
