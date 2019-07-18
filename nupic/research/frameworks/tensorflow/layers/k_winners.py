@@ -91,10 +91,11 @@ def compute_kwinners(x, k, duty_cycles, boost_strength):
     boosted = tf.reshape(boosted, [batch_size, -1])
     flat_x = tf.reshape(x, [batch_size, -1])
     top_k, indices = tf.math.top_k(input=boosted, k=k, sorted=False)
-    range = tf.expand_dims(tf.range(0, tf.shape(indices)[0]), 1)
-    range = tf.tile(range, [1, k])
-    full_indices = tf.concat([tf.expand_dims(range, -1),
-                              tf.expand_dims(indices, -1)], axis=2)
+    dim_range = tf.expand_dims(tf.range(0, tf.shape(indices)[0]), 1)
+    dim_range = tf.tile(dim_range, [1, k])
+    full_indices = tf.concat(
+        [tf.expand_dims(dim_range, -1), tf.expand_dims(indices, -1)], axis=2
+    )
     full_indices = tf.reshape(full_indices, [-1, 2])
 
     updates = tf.gather_nd(params=flat_x, indices=full_indices)
@@ -141,7 +142,7 @@ class KWinnersBase(keras.layers.Layer, metaclass=abc.ABCMeta):
         boost_strength,
         boost_strength_factor,
         duty_cycle_period,
-        **kwargs
+        **kwargs,
     ):
         super(KWinnersBase, self).__init__(**kwargs)
         self.percent_on = percent_on
@@ -244,7 +245,7 @@ class KWinners2d(KWinnersBase):
         boost_strength_factor=0.9,
         duty_cycle_period=1000,
         data_format="channel_first",
-        **kwargs
+        **kwargs,
     ):
         super(KWinners2d, self).__init__(
             percent_on=percent_on,
@@ -252,7 +253,7 @@ class KWinners2d(KWinnersBase):
             boost_strength=boost_strength,
             boost_strength_factor=boost_strength_factor,
             duty_cycle_period=duty_cycle_period,
-            **kwargs
+            **kwargs,
         )
         self.data_format = data_format
         if self.data_format == "channel_first":
@@ -288,9 +289,7 @@ class KWinners2d(KWinnersBase):
         self.scale_factor = np.prod(shape, dtype=np.float32)
 
     def get_config(self):
-        config = {
-            "data_format": self.data_format
-        }
+        config = {"data_format": self.data_format}
         config.update(super(KWinners2d, self).get_config())
         return config
 
@@ -312,11 +311,14 @@ class KWinners2d(KWinnersBase):
         return duty_cycles / period
 
     def call(self, inputs, training=None, **kwargs):
-        k = keras.backend.in_test_phase(self.k_inference, self.k,
-                                        training=training)
+        k = keras.backend.in_test_phase(self.k_inference, self.k, training=training)
 
-        x = compute_kwinners(x=inputs, k=k, duty_cycles=self.duty_cycles,
-                             boost_strength=self.boost_strength)
+        x = compute_kwinners(
+            x=inputs,
+            k=k,
+            duty_cycles=self.duty_cycles,
+            boost_strength=self.boost_strength,
+        )
 
         self.duty_cycles = keras.backend.in_train_phase(
             self.update_duty_cycle(x), self.duty_cycles, training=training
@@ -370,7 +372,8 @@ class KWinners(KWinnersBase):
             boost_strength=boost_strength,
             boost_strength_factor=boost_strength_factor,
             duty_cycle_period=duty_cycle_period,
-            **kwargs)
+            **kwargs,
+        )
 
     def build(self, input_shape):
         super(KWinners, self).build(input_shape=input_shape)
@@ -400,15 +403,16 @@ class KWinners(KWinnersBase):
         return ((self.duty_cycles * (period - batch_size)) + count) / period
 
     def call(self, inputs, training=None, **kwargs):
-        k = keras.backend.in_test_phase(x=self.k_inference,
-                                        alt=self.k,
-                                        training=training)
+        k = keras.backend.in_test_phase(
+            x=self.k_inference, alt=self.k, training=training
+        )
         kwinners = compute_kwinners(
-            x=inputs, k=k, duty_cycles=self.duty_cycles,
-            boost_strength=self.boost_strength)
+            x=inputs,
+            k=k,
+            duty_cycles=self.duty_cycles,
+            boost_strength=self.boost_strength,
+        )
         self.duty_cycles = keras.backend.in_train_phase(
-            x=self.update_duty_cycle(kwinners),
-            alt=self.duty_cycles,
-            training=training
+            x=self.update_duty_cycle(kwinners), alt=self.duty_cycles, training=training
         )
         return kwinners
