@@ -43,7 +43,7 @@ def show_predictions(config):
     exp = RSMExperiment(config=config)
     exp.model_setup(config)
 
-    exp.model_restore(config.get('checkpoint'))
+    exp.model_restore(config.get("checkpoint"))
 
     corpus = lang_util.Corpus(config.get("data_dir") + "/PTB")
     data = corpus.test.to(exp.device)
