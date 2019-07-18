@@ -28,34 +28,48 @@ import torch
 from loggers import DEFAULT_LOGGERS
 from utils import Trainable, download_dataset
 
-torch.manual_seed(32)  # run diverse samples
+torch.manual_seed(32)  # run diversse samples
 
 # alternative initialization based on configuration
 exp_config = dict(
-    network="vgg19_bn",
+    # model related
+    device="cuda",
+    # network=tune.grid_search(["vgg19_bn_kw", "vgg19_bn"]),
+    network="VGG19",
     num_classes=10,
     model=tune.grid_search(["BaseModel", "SparseModel", "SET", "DSNN"]),
-    # model="DSNN",
-    epsilon=60,
-    start_sparse=1,
-    momentum=0.9,
-    learning_rate=0.01,
-    lr_scheduler="MultiStepLR",
-    lr_milestones=[250, 290],
-    lr_gamma=0.10,
+    # model=tune.grid_search(["SET", "DSNN", "DSNN_Flip", "DSNN_Correct"]),
     dataset_name="CIFAR10",
     augment_images=True,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
     data_dir="~/nta/datasets",
-    device="cuda",
+    # optimizer related
     optim_alg="SGD",
+    momentum=0.9,
+    learning_rate=0.01,
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[250, 290],
+    lr_gamma=0.10,
     debug_weights=True,
+    # sparse related
+    epsilon=100,
+    start_sparse=1,
+    end_sparse=None,
     debug_sparse=True,
+    flip=False,
+    weight_prune_perc=0.3,
+    grad_prune_perc=0,
+    percent_on=0.3,
+    boost_strength=1.4,
+    boost_strength_factor=0.7,
+    test_noise=True,
+    noise_level=0.1,
+    kwinners=tune.grid_search([True, False]),  # moved to a parameter
 )
 
 tune_config = dict(
-    name="SET_DSNN_Test",
+    name="SET_DSNN_BoostingEval",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     config=exp_config,
