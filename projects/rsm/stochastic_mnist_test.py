@@ -90,7 +90,7 @@ class StochasticMNISTTest(unittest.TestCase):
         all_inputs = []
 
         for _i in range(1):
-            for j, batch in enumerate(self.random_digit_loader):
+            for _j, batch in enumerate(self.random_digit_loader):
                 inputs, targets, target_labels, input_labels = batch
 
                 all_inputs.append(inputs)
