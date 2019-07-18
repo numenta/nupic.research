@@ -129,6 +129,7 @@ class RSMExperiment(object):
         self.fpartition = config.get("fpartition", None)
         self.balance_part_winners = config.get("balance_part_winners", False)
         self.weight_sparsity = config.get("weight_sparsity", None)
+        self.embedding_kind = config.get("embedding_kind", "rsm_bitwise")
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -215,7 +216,14 @@ class RSMExperiment(object):
                 max_batches=self.batches_in_epoch,
             )
 
-            embedding = lang_util.BitwiseWordEmbedding()
+            if self.embedding_kind == 'rsm_bitwise':
+                embedding = lang_util.BitwiseWordEmbedding()
+            elif self.embedding_kind == 'bpe':
+                from torchnlp.word_to_vector import BPEmb
+                vectors = BPEmb(dim=self.embed_dim)
+                embedding = {}
+                for word_id, word in enumerate(corpus.dictionary.idx2word):
+                    embedding[word_id] = vectors[word]
 
             collate_fn = partial(
                 ptb_pred_sequence_collate, vector_dict=embedding.embedding_dict
