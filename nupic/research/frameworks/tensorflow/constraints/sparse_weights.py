@@ -29,14 +29,14 @@ class SparseWeights(keras.constraints.Constraint):
     Constrains the weights to a fixed sparsity rate where a fixed number of
     weights are always zeros.
 
-    :param sparsity:
+    :param percent_on:
       Percentage of weights that are allowed to be non-zero. Default 0.5
     :type sparsity: float
     """
 
-    def __init__(self, sparsity=0.5, name=None):
-        assert sparsity < 1.0
-        self.sparsity = sparsity
+    def __init__(self, percent_on=0.5, name=None):
+        assert 0.0 < percent_on < 1.0
+        self.percent_on = percent_on
         self.name = name or "sparse_mask"
         self._built = False
 
@@ -46,7 +46,7 @@ class SparseWeights(keras.constraints.Constraint):
         :param input_shape: Input shape including batch size
         """
         with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
-            non_zeros = int(round(input_shape[-1].value * self.sparsity))
+            non_zeros = int(round(input_shape[-1].value * self.percent_on))
 
             # Create random mask with k elements set to 1, all other elements set to 0
             values = tf.random_uniform(input_shape)
@@ -69,4 +69,4 @@ class SparseWeights(keras.constraints.Constraint):
         return w * self.mask
 
     def get_config(self):
-        return {"sparsity": self.sparsity, "name": self.name}
+        return {"percent_on": self.percent_on, "name": self.name}
