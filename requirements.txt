@@ -27,6 +27,7 @@ librosa
 scikit-image
 requests
 ray
+tensorflow
 tqdm
 torch
 torchvision
