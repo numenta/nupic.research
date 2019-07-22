@@ -23,6 +23,7 @@ import torch
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix
 from torch.nn.functional import cosine_similarity
 
@@ -319,7 +320,7 @@ def print_epoch_values(ret):
     return print_ret
 
 
-def _plot_grad_flow(self):
+def _plot_grad_flow(model):
     """
     Plots the gradients flowing through different layers in the net during
     training. Can be used for checking for possible gradient
@@ -331,7 +332,7 @@ def _plot_grad_flow(self):
     ave_grads = []
     max_grads = []
     layers = []
-    for n, p in self.model.named_parameters():
+    for n, p in model.named_parameters():
         if (p.requires_grad) and ("bias" not in n):
             layers.append(n)
             ave_grads.append(p.grad.abs().mean())
@@ -354,3 +355,38 @@ def _plot_grad_flow(self):
         ],
         ["max-gradient", "mean-gradient", "zero-gradient"],
     )
+
+
+def plot_cluster_weights(model):
+    # Switched to standard PCA
+    # To identify column formation we'll need to combine weights
+    # linear_a_int/linear_b_int since clusters may include cells
+    # across FF and predictive partitions
+    pca_3d = PCA(n_components=3)
+    w_a = model.linear_a.weight.data.cpu()
+    w_b = model.linear_b.weight.data.cpu()
+    fig, axs = plt.subplots(1, 2, dpi=200)
+
+    w_a_emb = pca_3d.fit_transform(w_a)
+    axs[0].scatter(w_a_emb[:, 0], w_a_emb[:, 1], c=w_a_emb[:, 2], s=1.5, alpha=0.6)
+    axs[0].set_title("FF input - %d cells" % w_a.shape[0])
+
+    if len(w_b):
+        w_b_emb = pca_3d.fit_transform(w_b)
+        axs[1].scatter(w_b_emb[:, 0], w_b_emb[:, 1], c=w_b_emb[:, 2], s=1.5, alpha=0.6)
+        axs[1].set_title("Rec input - %d cells" % w_b.shape[0])
+    return fig
+
+
+def print_aligned_sentences(s1, s2, labels=None):
+    widths = []
+    s1 = s1.split()
+    s2 = s2.split()
+    for w1, w2 in zip(s1, s2):
+        widths.append(max([len(w1), len(w2)]))
+    out1 = out2 = ""
+    for w1, w2, width in zip(s1, s2, widths):
+        out1 += w1.ljust(width + 1)
+        out2 += w2.ljust(width + 1)
+    print("%s: %s" % (labels[0] if labels else "s1", out1))
+    print("%s: %s" % (labels[1] if labels else "s2", out2))

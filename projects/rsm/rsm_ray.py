@@ -16,9 +16,6 @@
 #  along with this program.  If not, see http://www.gnu.org/licenses.
 #
 #  http://numenta.org/licenses/
-#
-# Original Code here:
-# https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 import argparse
 import os
@@ -177,30 +174,20 @@ def parse_options():
         "config file.",
     )
     optparser.add_argument(
-        "-r",
-        "--resume",
-        dest="resume",
-        help="resume from checkpoint if found"
+        "-r", "--resume", dest="resume", help="resume from checkpoint if found"
     )
     optparser.add_argument(
-        "-p",
-        "--predict",
-        dest="predict",
-        help="run prediction on trained model"
+        "-p", "--predict", dest="predict", help="run prediction on trained model"
     )
     optparser.add_argument(
         "-l",
         "--plot_gradients",
         dest="plot_gradients",
         help="Plot gradients for debugging",
-        default=False
+        default=False,
     )
     optparser.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        help="Verbosity",
-        default=0
+        "-v", "--verbose", dest="verbose", help="Verbosity", default=0
     )
 
     return optparser.parse_args()

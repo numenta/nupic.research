@@ -78,13 +78,11 @@ class RSMLayer(torch.nn.Module):
         activation_fn="tanh",
         embed_dim=0,
         vocab_size=0,
-        dropout_p=0.0,
         decode_from_full_memory=False,
         debug_log_names=None,
         mask_shifted_pi=False,
         do_inhibition=True,
         boost_strat="rsm_inhibition",
-        pred_gain=1.0,
         x_b_norm=False,
         boost_strength=1.0,
         mult_integration=False,
@@ -132,7 +130,6 @@ class RSMLayer(torch.nn.Module):
         self.eps = eps
         self.d_in = d_in
         self.d_out = d_out
-        self.dropout_p = float(dropout_p)
         self.forget_mu = float(forget_mu)
 
         self.total_cells = m * n
@@ -142,7 +139,6 @@ class RSMLayer(torch.nn.Module):
         self.activation_fn = activation_fn
         self.decode_from_full_memory = decode_from_full_memory
         self.boost_strat = boost_strat
-        self.pred_gain = pred_gain
         self.x_b_norm = x_b_norm
         self.mask_shifted_pi = mask_shifted_pi
         self.do_inhibition = do_inhibition
@@ -160,8 +156,6 @@ class RSMLayer(torch.nn.Module):
         self.debug = debug
         self.visual_debug = visual_debug
         self.debug_log_names = debug_log_names
-
-        self.dropout = nn.Dropout(p=self.dropout_p)
 
         self._build_input_layers_and_kwinners(use_bias=use_bias)
 
@@ -212,8 +206,9 @@ class RSMLayer(torch.nn.Module):
                             plt.show()
 
     def _zero_sparse_weights(self):
-        self.linear_a.rezero_weights()
-        self.linear_b.rezero_weights()
+        for mod in self.modules():
+            if isinstance(mod, SparseWeights):
+                mod.rezero_weights()
 
     def _partition_sizes(self):
         pct_ff, pct_rec = self.fpartition
@@ -236,10 +231,15 @@ class RSMLayer(torch.nn.Module):
         if self.fpartition:
             m_ff, m_int, m_rec = self._partition_sizes()
             # Partition memory into fpartition % FF & remainder recurrent
-            self.linear_a = nn.Linear(self.d_in, m_ff + m_int, bias=use_bias)
+            self.linear_a = nn.Linear(self.d_in, m_ff, bias=use_bias)
             self.linear_b = nn.Linear(
-                self.total_cells, m_rec + m_int, bias=use_bias
+                m_rec, m_rec, bias=use_bias
             )  # Recurrent weights (per cell)
+            if m_int:
+                # Add two additional layers for integrating ff & rec input
+                # NOTE: Testing int layer that gets only input from prior int (no ff)
+                self.linear_a_int = nn.Linear(self.d_in, m_int, bias=use_bias)
+                self.linear_b_int = nn.Linear(m_int, m_int, bias=use_bias)
         else:
             # Standard architecture, no partition
             self.linear_a = nn.Linear(
@@ -313,15 +313,22 @@ class RSMLayer(torch.nn.Module):
             # Integrate partitioned memory.
             # Pack as 1xm: [ ... m_ff ... ][ ... m_int ... ][ ... m_rec ... ]
             # If m_int non-zero, these cells receive sum of FF & recurrent input
-            z_a = self.linear_a(x_a)  # bsz x (m_ff+m_int)
-            z_b = self.linear_b(self.dropout(x_b))  # bsz x (m_rec+m_int)
-            sigma[:, : m_ff + m_int] += z_a
-            sigma[:, -(m_rec + m_int):] += z_b
+            z_a = self.linear_a(x_a)  # bsz x (m_ff)
+            if m_int:
+                z_b = self.linear_b(x_b[:, -m_rec:])  # bsz x m_rec
+                z_int_ff = self.linear_a_int(x_a)
+                # NOTE: Testing from only int/rec portion of mem (no ff)
+                z_int_rec = self.linear_b_int(x_b[:, m_ff: m_ff + m_int])
+                z_int = z_int_ff * z_int_rec if self.mult_integration else z_int_ff + z_int_rec
+                sigma = torch.cat((z_a, z_int, z_b), 1)  # bsz x m
+            else:
+                z_b = self.linear_b(x_b)  # bsz x m_rec
+                sigma = torch.cat((z_a, z_b), 1)  # bsz x m
         else:
             # Col activation from inputs repeated for each cell
             z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
             # Cell activation from recurrent input (dropped out)
-            z_b = self.linear_b(self.dropout(x_b))
+            z_b = self.linear_b(x_b)
             self._debug_log({"z_a": z_a, "z_b": z_b})
             if self.mult_integration:
                 sigma = z_a * z_b
@@ -375,7 +382,7 @@ class RSMLayer(torch.nn.Module):
                     winners_ff = self.kwinners_ff(lambda_[:, :m_ff])
                     winners.append(winners_ff)
                 if self.kwinners_int is not None:
-                    winners_int = self.kwinners_int(lambda_[:, m_ff:m_ff + m_int])
+                    winners_int = self.kwinners_int(lambda_[:, m_ff : m_ff + m_int])
                     winners.append(winners_int)
                 if self.kwinners_rec is not None:
                     winners_rec = self.kwinners_rec(lambda_[:, -m_rec:])
@@ -409,7 +416,6 @@ class RSMLayer(torch.nn.Module):
 
         y_pre_act = self._k_winners(sigma, pi)
 
-        # Mask-based sparsening
         activation = {"tanh": torch.tanh, "relu": nn.functional.relu}[
             self.activation_fn
         ]
@@ -457,9 +463,9 @@ class RSMLayer(torch.nn.Module):
         if self.x_b_norm:
             # Normalizing scalar (force sum(x_b) == 1)
             alpha = (psi.sum(dim=1) + 1e-9).unsqueeze(dim=1)
-            x_b = self.pred_gain * psi / alpha
+            x_b = psi / alpha
         else:
-            x_b = self.pred_gain * psi
+            x_b = psi
 
         hidden = (x_b, phi, psi)
         return (pred_output, hidden)

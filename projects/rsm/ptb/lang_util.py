@@ -16,9 +16,6 @@
 #  along with this program.  If not, see http://www.gnu.org/licenses.
 #
 #  http://numenta.org/licenses/
-#
-# Original Code here:
-# https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 from __future__ import print_function
 
