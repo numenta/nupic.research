@@ -29,7 +29,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from ptb import lang_util
-from ptb.ptb_lstm import LSTMModel
+from baseline_models import LSTMModel, RNNModel
 from rsm import RSMLayer, RSMPredictor
 from rsm_samplers import (
     MNISTBufferedDataset,
@@ -73,6 +73,7 @@ class RSMExperiment(object):
         self.eval_interval = config.get("eval_interval", 5)
         self.model_kind = config.get("model_kind", "rsm")
         self.debug = config.get("debug", False)
+        self.instrumentation = config.get("instrumentation", False)
         self.plot_gradients = config.get("plot_gradients", False)
         self.writer = None
 
@@ -296,6 +297,7 @@ class RSMExperiment(object):
         else:
             self.d_out = config.get("output_size", self.d_in)
         self.predictor = None
+        predictor_d_in = self.m_groups
         if self.model_kind == "rsm":
             self.model = RSMLayer(
                 d_in=self.d_in,
@@ -323,20 +325,13 @@ class RSMExperiment(object):
                 vocab_size=self.vocab_size,
                 debug=self.debug,
             )
+            predictor_d_in = self.m_groups * self.n_cells_per_group
             if self.jit_trace:
                 # Trace model (Can produce ~25% speed improvement)
                 inputs = torch.rand(self.seq_length, self.batch_size, self.d_in)
                 hidden = self._init_hidden(self.batch_size)
                 print(">> Running JIT trace...")
                 self.model = torch.jit.trace(self.model, (inputs, hidden))
-
-            if self.predictor_hidden_size:
-                self.predictor = RSMPredictor(
-                    d_in=self.m_groups * self.n_cells_per_group,
-                    d_out=self.predictor_output_size,
-                    hidden_size=self.predictor_hidden_size,
-                )
-                self.predictor.to(self.device)
 
         elif self.model_kind == "lstm":
             self.model = LSTMModel(
@@ -345,11 +340,28 @@ class RSMExperiment(object):
                 nhid=self.m_groups,
                 d_in=self.d_in,
                 d_out=self.d_out,
-                dropout=0.5,
-                nlayers=2,
+                nlayers=1
+            )
+
+        elif self.model_kind == "rnn":
+            self.model = RNNModel(
+                vocab_size=self.vocab_size,
+                embed_dim=self.embed_dim,
+                nhid=self.m_groups,
+                d_in=self.d_in,
+                d_out=self.d_out,
+                nlayers=1
             )
 
         self.model.to(self.device)
+
+        if self.predictor_hidden_size:
+            self.predictor = RSMPredictor(
+                d_in=predictor_d_in,
+                d_out=self.predictor_output_size,
+                hidden_size=self.predictor_hidden_size,
+            )
+            self.predictor.to(self.device)
 
         self._get_loss_function()
         self._get_optimizer()
@@ -423,15 +435,16 @@ class RSMExperiment(object):
 
     def _track_hists(self):
         ret = {}
-        for name, param in self.model.named_parameters():
-            if "weight" in name:
-                data = param.data.cpu()
-                if data.size(0):
-                    ret["hist_" + name] = data
-                    if self.debug:
-                        print(
-                            "%s: mean: %.3f std: %.3f" % (name, data.mean(), data.std())
-                        )
+        if self.instrumentation:
+            for name, param in self.model.named_parameters():
+                if "weight" in name:
+                    data = param.data.cpu()
+                    if data.size(0):
+                        ret["hist_" + name] = data
+                        if self.debug:
+                            print(
+                                "%s: mean: %.3f std: %.3f" % (name, data.mean(), data.std())
+                            )
         return ret
 
     def _init_hidden(self, batch_size):
@@ -447,7 +460,7 @@ class RSMExperiment(object):
                 (batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
             )
             return (x_b, phi, psi)
-        elif self.model_kind == "lstm":
+        elif self.model_kind in ["lstm", "rnn"]:
             return self.model.init_hidden(batch_size)
 
     def _store_activity_for_viz(self, x_bs, input_labels, pred_labels):
@@ -578,7 +591,7 @@ class RSMExperiment(object):
                 targets = targets.to(self.device)
                 pred_targets = pred_targets.to(self.device)
                 x_a_next, hidden = self.model(inputs, hidden)
-                x_b = hidden[0]
+                x_b = hidden[0] if isinstance(hidden, tuple) else hidden
 
                 # Loss
                 loss = self._compute_loss(
@@ -629,7 +642,7 @@ class RSMExperiment(object):
                     else torch.cat((all_cls_preds, class_predictions))
                 )
 
-                if self.dataset_kind == "mnist" and self.model_kind == "rsm":
+                if self.dataset_kind == "mnist" and self.model_kind == "rsm" and self.instrumentation:
                     # Summary of column activation by input & next input
                     self._store_activity_for_viz(x_b, input_labels, pred_targets)
 
@@ -638,7 +651,7 @@ class RSMExperiment(object):
                 last_output = x_a_next
 
             # After all eval batches, generate stats & figures
-            if self.dataset_kind == "mnist" and self.model_kind == "rsm":
+            if self.dataset_kind == "mnist" and self.model_kind == "rsm" and self.instrumentation:
                 if not self.predict_memory:
                     ret["img_preds"] = self._image_grid(
                         all_x_a_next,
@@ -760,7 +773,7 @@ class RSMExperiment(object):
             if self.plot_gradients:
                 self._plot_gradient_flow()
 
-            x_b = hidden[0]
+            x_b = hidden[0] if isinstance(hidden, tuple) else hidden
             total_samples, correct_samples, class_predictions, correct_arr, \
                 batch_loss, total_pred_loss = self._do_prediction(
                     x_b,
