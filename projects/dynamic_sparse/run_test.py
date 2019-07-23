@@ -29,18 +29,8 @@ from utils import Trainable
 # alternative initialization based on configuration
 config = dict(
     network="resnet18",
-    # network params
-    # hidden_sizes=tune.grid_search([[300, 300, 300], [1000,1000,1000]]),
-    # hidden_sizes=[300,300,300],
-    # batch_norm=False,
-    # dropout=tune.grid_search([0, 0.3]),
-    # dropout=False,
-    # bias=False,
-    # init_weights=True,
-    # input_size=784,
     num_classes=10,
     model="DSNN",
-    debug_sparse=True,
     dataset_name="CIFAR10",
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
@@ -49,6 +39,7 @@ config = dict(
     optim_alg="SGD",
     batch_size_train=10,
     batch_size_test=10,
+    debug_sparse=False,
 )
 
 # run
@@ -64,8 +55,3 @@ tune.run(
     stop={"training_iteration": 10},
     resources_per_trial={"cpu": 1, "gpu": 0},
 )
-
-""""
-ongoing notes
-
-"""
