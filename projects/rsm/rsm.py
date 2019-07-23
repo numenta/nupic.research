@@ -403,7 +403,7 @@ class RSMLayer(torch.nn.Module):
 
         return y_pre_act
 
-    def _inhibited_masking_and_prediction(self, sigma, phi):
+    def _inhibited_masking(self, sigma, phi):
         """
         Compute y_lambda
         """
@@ -421,14 +421,15 @@ class RSMLayer(torch.nn.Module):
         ]
         y = activation(y_pre_act)  # 1 x total_cells
 
+        return y
+
+    def _decode_prediction(self, y):
         # Decode prediction through group-wise max bottleneck
         decode_input = y if self.decode_from_full_memory else self._group_max(y)
         output = self.linear_d(decode_input)
-
-        return (y, output)
+        return output
 
     def _update_memory_and_inhibition(self, y, phi, psi):
-
         # Get updated psi (memory state), decay inactive
         psi = torch.max(psi * self.eps, y)
 
@@ -453,7 +454,9 @@ class RSMLayer(torch.nn.Module):
         sigma = self._fc_weighted_ave(x_a_batch, x_b)
         self._debug_log({"sigma": sigma})
 
-        y, pred_output = self._inhibited_masking_and_prediction(sigma, phi)
+        y = self._inhibited_masking(sigma, phi)
+
+        pred_output = self._decode_prediction(y)
         self._debug_log({"y": y, "pred_output": pred_output})
 
         phi, psi = self._update_memory_and_inhibition(y, phi, psi)

@@ -30,7 +30,7 @@ class LSTMModel(nn.Module):
         vocab_size=10000,
         embed_dim=200,
         nhid=650,
-        dropout=0.5,
+        dropout=0.0,
         nlayers=2,
         tie_weights=False,
     ):
@@ -38,20 +38,10 @@ class LSTMModel(nn.Module):
         self.drop = nn.Dropout(dropout)
 
         rnn_input_dim = d_in
-        self.encoder = None
-        if embed_dim:
-            self.encoder = nn.Embedding(d_in, embed_dim)
-            rnn_input_dim = embed_dim
 
+        self.encoder = None
         self.rnn = nn.LSTM(rnn_input_dim, nhid, nlayers, dropout=dropout)
         self.decoder = nn.Linear(nhid, d_out)
-
-        if tie_weights:
-            if nhid != embed_dim:
-                raise ValueError(
-                    "When using the tied flag, nhid must be equal to embed_dim"
-                )
-            self.decoder.weight = self.encoder.weight
 
         self.init_weights()
 
@@ -59,14 +49,14 @@ class LSTMModel(nn.Module):
         self.nlayers = nlayers
 
     def init_weights(self):
+        initrange = 0.1
         if self.encoder:
-            initrange = 0.1
             self.encoder.weight.data.uniform_(-initrange, initrange)
-            self.decoder.bias.data.zero_()
-            self.decoder.weight.data.uniform_(-initrange, initrange)
+        self.decoder.bias.data.zero_()
+        self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, x, hidden):
-        # Takes input x of shape (seq_len, batch, input_size)
+        # Takes input x of shape (batch, input_size)
         x = x.view(1, x.size(0), x.size(1))
         if self.encoder:
             emb = self.drop(self.encoder(x))
@@ -77,17 +67,83 @@ class LSTMModel(nn.Module):
         decoded = self.decoder(
             output.view(output.size(0) * output.size(1), output.size(2))
         )
-        return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden
+        return decoded.view(output.size(1), decoded.size(1)), hidden
 
     def init_hidden(self, bsz):
         weight = next(self.parameters())
         return (
-            weight.new_zeros(self.nlayers, bsz, self.nhid),
-            weight.new_zeros(self.nlayers, bsz, self.nhid),
+            weight.new_zeros(self.nlayers, bsz, self.nhid),  # h_0
+            weight.new_zeros(self.nlayers, bsz, self.nhid)  # c_0
         )
 
     def _track_weights(self):
         return {}
+
+    def _post_epoch(self, epoch):
+        pass
+
+    def _register_hooks(self):
+        pass
+
+
+class RNNModel(nn.Module):
+    """Container module with an encoder, a recurrent module, and a decoder."""
+
+    def __init__(
+        self,
+        d_in=1,
+        d_out=1,
+        vocab_size=10000,
+        embed_dim=200,
+        nhid=650,
+        dropout=0.0,
+        nlayers=2,
+        tie_weights=False,
+    ):
+        super(RNNModel, self).__init__()
+        self.drop = nn.Dropout(dropout)
+
+        rnn_input_dim = d_in
+
+        self.encoder = None
+        self.rnn = nn.RNN(rnn_input_dim, nhid, nlayers, dropout=dropout)
+        self.decoder = nn.Linear(nhid, d_out)
+
+        self.init_weights()
+
+        self.nhid = nhid
+        self.nlayers = nlayers
+
+    def init_weights(self):
+        initrange = 0.1
+        if self.encoder:
+            self.encoder.weight.data.uniform_(-initrange, initrange)
+        self.decoder.bias.data.zero_()
+        self.decoder.weight.data.uniform_(-initrange, initrange)
+
+    def forward(self, x, hidden):
+        # Takes input x of shape (batch, input_size)
+        x = x.view(1, x.size(0), x.size(1))
+        if self.encoder:
+            emb = self.drop(self.encoder(x))
+        else:
+            emb = x
+        output, hidden = self.rnn(emb, hidden)
+        output = self.drop(output)
+        decoded = self.decoder(
+            output.view(output.size(0) * output.size(1), output.size(2))
+        )
+        return decoded.view(output.size(1), decoded.size(1)), hidden
+
+    def init_hidden(self, bsz):
+        weight = next(self.parameters())
+        return weight.new_zeros(self.nlayers, bsz, self.nhid)
+
+    def _track_weights(self):
+        return {}
+
+    def _post_epoch(self, epoch):
+        pass
 
     def _register_hooks(self):
         pass
