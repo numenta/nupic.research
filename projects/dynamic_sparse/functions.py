@@ -29,7 +29,9 @@ class KWinners(nn.Module):
     TODO:
     - T should be per sample, not per iteration
 
-    Currently not being used
+    Not thoroughly tested, and currently not being used.
+    Changes required for the implementation to be similar to nupic.torch
+    Please test before using it.
     """
 
     def __init__(self, k_perc=0.1, use_absolute=False, use_boosting=False, beta=0.01):
