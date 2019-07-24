@@ -64,6 +64,134 @@ class RSMPredictor(torch.nn.Module):
         return x.view(-1, self.d_out)
 
 
+class RSMNet(torch.nn.Module):
+    def __init__(self, n_layers=1, **kwargs):
+        super(RSMNet, self).__init__()
+        self.n_layers = n_layers
+        self.total_cells = kwargs['m'] * kwargs['n']
+        eps_arr = kwargs['eps']
+        if isinstance(eps_arr, float):
+            eps_arr = [eps_arr for x in range(n_layers)]
+        for i in range(n_layers):
+            first_layer = i == 0
+            if not first_layer:
+                # Input to all layers above first is hidden state x_b from previous
+                hidden_dim = self.total_cells
+                kwargs['d_in'] = hidden_dim
+                # Output is of same dim as input (predictive autoencoder)
+                kwargs['d_out'] = kwargs['d_in']
+            kwargs['eps'] = eps_arr[i]
+            self.add_module("RSM_%d" % (i+1), RSMLayer(**kwargs))
+        print("Created RSMNet with %d layer(s)" % n_layers)
+
+    def forward(self, x_a_batch, hidden):
+        """
+        Each layer takes input (image batch from time sequence for first layer,
+        batch of hidden states from prior layer otherwise), and generates both:
+            - a prediction for the next input it will see
+            - a hidden state which is passed to the next layer
+
+        Arguments:
+            x_a_batch: (bsz, total_cells)
+            hidden: Tuple (x_b, phi, psi), each Tensor (n_layers, bsz, total_cells)
+
+        Returns:
+            output_by_layer: List of tensors (n_layers, bsz, dim (total_cells or d_in for first layer))
+            new_hidden: Tuple of tensors (n_layers, bsz, total_cells)
+        """
+        layer_input = x_a_batch
+        new_hidden_by_layer = []
+        output_by_layer = []
+
+        new_x_b = []
+        new_phi = []
+        new_psi = []
+
+        x_b, phi, psi = hidden
+
+        lid = 0
+        for (layer_name, layer), lay_phi, lay_psi in zip(self.named_children(), phi, psi):
+            last_layer = lid == len(phi) - 1
+            lay_x_b = x_b[lid]
+            lay_x_fb = x_b[lid+1] if not last_layer else None
+            pred_output, hidden = layer(layer_input, (lay_x_b, lay_x_fb, lay_phi, lay_psi))
+
+            new_x_b.append(hidden[0])
+            new_phi.append(hidden[1])
+            new_psi.append(hidden[2])
+
+            output_by_layer.append(pred_output)
+            layer_input = hidden[0]
+
+            lid += 1
+
+        new_hidden = (
+            torch.stack(new_x_b),
+            torch.stack(new_phi),
+            torch.stack(new_psi)
+        )
+
+        return (output_by_layer, new_hidden)
+
+    def _plot_tensors(self, tuples, detailed=False):
+        """
+        Plot tensors supporting values across multiple layers
+        """
+        n_tensors = len(tuples)
+        fig, axs = plt.subplots(self.n_layers, n_tensors, dpi=144)
+        for i, (label, val) in enumerate(tuples):
+            for l in range(self.n_layers):
+                layer_idx = self.n_layers - l - 1
+                ax = axs[layer_idx][i] if n_tensors > 1 else axs[layer_idx]
+                # Get layer's values (from either list or tensor)
+                # Outputs can't be stored in tensors since dimension heterogeneous
+                if isinstance(val, list):
+                    if val[l] is None:
+                        ax.set_visible(False)
+                        t = None
+                    else:
+                        t = val[l].detach()[0]
+                else:
+                    t = val.detach()[l, 0]
+                mod = list(self.children())[l]
+                if t is not None:
+                    size = t.numel()
+                    is_cell_level = t.numel() == mod.total_cells and mod.n > 1
+                    if is_cell_level:
+                        ax.imshow(
+                            t.view(mod.m, mod.n).t(),
+                            origin="bottom",
+                            extent=(0, mod.m - 1, 0, mod.n),
+                        )
+                    else:
+                        ax.imshow(activity_square(t))
+                    tmin = t.min()
+                    tmax = t.max()
+                    tsum = t.sum()
+                    title = "L%d %s" % (l+1, label)
+                    if detailed:
+                        title += " (%s, rng: %.3f-%.3f, sum: %.3f)" % (size, tmin, tmax, tsum)
+                    ax.set_title(title)
+        plt.show()
+
+    def _post_epoch(self, epoch):
+        for mod in self.children():
+            mod._post_epoch(epoch)
+
+    def init_hidden(self, batch_size):
+        param = next(self.parameters())
+        x_b = param.new_zeros(
+            (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
+        )
+        phi = param.new_zeros(
+            (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
+        )
+        psi = param.new_zeros(
+            (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
+        )
+        return (x_b, phi, psi)
+
+
 class RSMLayer(torch.nn.Module):
     def __init__(
         self,
@@ -89,6 +217,7 @@ class RSMLayer(torch.nn.Module):
         boost_strength_factor=1.0,
         forget_mu=0.0,
         weight_sparsity=None,
+        feedback=False,
         debug=False,
         visual_debug=False,
         use_bias=True,
@@ -152,6 +281,7 @@ class RSMLayer(torch.nn.Module):
             self.fpartition = [self.fpartition, 1.0 - self.fpartition]
         self.balance_part_winners = balance_part_winners
         self.weight_sparsity = weight_sparsity
+        self.feedback = feedback
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -160,11 +290,12 @@ class RSMLayer(torch.nn.Module):
         self._build_input_layers_and_kwinners(use_bias=use_bias)
 
         decode_d_in = self.total_cells if self.decode_from_full_memory else m
-        self.linear_d = nn.Linear(
-            decode_d_in, d_out, bias=use_bias
-        )  # Decoding through bottleneck
+        self.linear_d = nn.Linear(decode_d_in, d_out, bias=use_bias)  # Decoder
 
-        print("Created model with %d trainable params" % count_parameters(self))
+        print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
+
+    def __str__(self):
+        return "<RSMLayer m=%d n=%d k=%d d_in=%d eps=%.2f />" % (self.m, self.n, self.k, self.d_in, self.eps)
 
     def _debug_log(self, tensor_dict, truncate_len=400):
         if self.debug:
@@ -248,6 +379,9 @@ class RSMLayer(torch.nn.Module):
             self.linear_b = nn.Linear(
                 self.total_cells, self.total_cells, bias=use_bias
             )  # Recurrent weights (per cell)
+            if self.feedback:
+                self.linear_fb = nn.Linear(self.total_cells, self.total_cells,
+                                           bias=use_bias)
 
         pct_on = self.k / self.m
         if self.fpartition and self.balance_part_winners:
@@ -303,7 +437,7 @@ class RSMLayer(torch.nn.Module):
         """
         return activity.view(activity.size(0), self.m, self.n).max(dim=2).values
 
-    def _fc_weighted_ave(self, x_a, x_b):
+    def _fc_weighted_ave(self, x_a, x_b, x_fb):
         """
         Compute sigma (weighted sum for each cell j in group i (mxn))
         """
@@ -329,11 +463,21 @@ class RSMLayer(torch.nn.Module):
             z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
             # Cell activation from recurrent input (dropped out)
             z_b = self.linear_b(x_b)
+            if self.feedback and x_fb is not None:
+                z_fb = self.linear_fb(x_fb)
             self._debug_log({"z_a": z_a, "z_b": z_b})
-            if self.mult_integration:
-                sigma = z_a * z_b
+            if self.feedback and x_fb is not None:
+                self._debug_log({"z_fb": z_fb})
+                if self.mult_integration:
+                    sigma = z_a * z_b * z_fb
+                else:
+                    sigma = z_a + z_b + z_fb
             else:
-                sigma = z_a + z_b
+                if self.mult_integration:
+                    sigma = z_a * z_b
+                else:
+                    sigma = z_a + z_b
+
         return sigma  # total_cells
 
     def _k_winners(self, sigma, pi):
@@ -424,7 +568,7 @@ class RSMLayer(torch.nn.Module):
         return y
 
     def _decode_prediction(self, y):
-        # Decode prediction through group-wise max bottleneck
+        # Decode prediction (optionally through col-wise max bottleneck)
         decode_input = y if self.decode_from_full_memory else self._group_max(y)
         output = self.linear_d(decode_input)
         return output
@@ -442,16 +586,23 @@ class RSMLayer(torch.nn.Module):
         """
         :param x_a_batch: Input batch of batch_size items from
         generating process (batch_size, d_in)
+        :param hidden:
+            x_b: (normalized) memory state at same layer at t-1
+            x_fb: memory state at layer above at t-1
+            phi: inhibition state
+            psi: memory state at t-1
+
+        Note that RSMLayer takes a 4-tuple that includes the feedback state
+        from the layer above, x_fb, while the RSMNet takes only 3-tuple for
+        hidden state.
         """
-        x_b, phi, psi = hidden
+        x_b, x_fb, phi, psi = hidden
 
         phi, psi = self._do_forgetting(phi, psi)
 
-        self._debug_log({"x_b": x_b})
+        self._debug_log({"x_b": x_b, "x_a_batch": x_a_batch})
 
-        self._debug_log({"x_a_batch": x_a_batch})
-
-        sigma = self._fc_weighted_ave(x_a_batch, x_b)
+        sigma = self._fc_weighted_ave(x_a_batch, x_b, x_fb)
         self._debug_log({"sigma": sigma})
 
         y = self._inhibited_masking(sigma, phi)
