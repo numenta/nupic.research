@@ -26,6 +26,7 @@ from ray import tune
 from ray.tune.logger import CSVLogger, JsonLogger
 
 from nupic.research.frameworks.pytorch.tf_tune_utils import TFLoggerPlus
+from nupic.research.support.elastic_logger import ElasticsearchLogger
 from nupic.research.support.parse_config import parse_config
 from rsm_experiment import RSMExperiment
 
@@ -125,7 +126,7 @@ def run_experiment(config, trainable):
         sync_function=config.get("sync_function", None),
         resume=config.get("resume", False),
         reuse_actors=config.get("reuse_actors", False),
-        loggers=(JsonLogger, CSVLogger, TFLoggerPlus),
+        loggers=(JsonLogger, CSVLogger, TFLoggerPlus, ElasticsearchLogger),
         verbose=config.get("verbose", 0),
         resources_per_trial={
             # With lots of trials, optimal seems to be 0.5, or 2 trials per GPU
