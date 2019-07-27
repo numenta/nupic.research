@@ -1,4 +1,4 @@
-    #  Numenta Platform for Intelligent Computing (NuPIC)
+#  Numenta Platform for Intelligent Computing (NuPIC)
 #  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions apply:
@@ -73,9 +73,11 @@ class RSMExperiment(object):
         self.eval_interval = config.get("eval_interval", 5)
         self.model_kind = config.get("model_kind", "rsm")
         self.debug = config.get("debug", False)
+
+        # Instrumentation
         self.instrumentation = config.get("instrumentation", False)
         self.plot_gradients = config.get("plot_gradients", False)
-        self.writer = None
+        self.instr_charts = config.get("instr_charts", [])
 
         self.iterations = config.get("iterations", 200)
         self.dataset_kind = config.get("dataset", "mnist")
@@ -122,18 +124,23 @@ class RSMExperiment(object):
         self.mask_shifted_pi = config.get("mask_shifted_pi", False)
         self.do_inhibition = config.get("do_inhibition", True)
         self.boost_strength = config.get("boost_strength", 1.0)
+        self.boost_strength_factor = config.get("boost_strength_factor", 1.0)
         self.mult_integration = config.get("mult_integration", False)
         self.noise_buffer = config.get("noise_buffer", False)
-        self.boost_strength_factor = config.get("boost_strength_factor", 1.0)
         self.fpartition = config.get("fpartition", None)
         self.balance_part_winners = config.get("balance_part_winners", False)
         self.weight_sparsity = config.get("weight_sparsity", None)
         self.embedding_kind = config.get("embedding_kind", "rsm_bitwise")
         self.feedback = config.get("feedback", False)
+        self.input_bias = config.get("input_bias", False)
+        self.decode_bias = config.get("decode_bias", True)
+        self.loss_layers = config.get("loss_layers", "first")
+        self.tp_boosting = config.get("tp_boosting", False)  # Boosting temporal pooler (strat 3)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
         self.predictor_output_size = config.get("predictor_output_size", 10)
+        self.predict_layer = config.get("predict_layer", 0)
 
         # Baseline models
         self.n_layers = config.get("n_layers", 1)
@@ -150,6 +157,7 @@ class RSMExperiment(object):
         # Training state
         self.best_val_loss = None
         self.do_anneal_learning = False
+        self.last_train_output = None
 
         # Additional state for vis, etc
         self.activity_by_inputs = {}  # 'digit-digit' -> list of distribution arrays
@@ -321,6 +329,9 @@ class RSMExperiment(object):
                 fpartition=self.fpartition,
                 balance_part_winners=self.balance_part_winners,
                 feedback=self.feedback,
+                input_bias=self.input_bias,
+                decode_bias=self.decode_bias,
+                tp_boosting=self.tp_boosting,
                 embed_dim=self.embed_dim,
                 vocab_size=self.vocab_size,
                 debug=self.debug
@@ -342,7 +353,7 @@ class RSMExperiment(object):
                 d_out=self.d_out,
                 nlayers=self.n_layers
             )
-            predictor_d_in = self.m_groups
+            predictor_d_in = self.d_out
 
         elif self.model_kind == "rnn":
             self.model = RNNModel(
@@ -353,7 +364,7 @@ class RSMExperiment(object):
                 d_out=self.d_out,
                 nlayers=self.n_layers
             )
-            predictor_d_in = self.m_groups
+            predictor_d_in = self.d_out
 
         self.model.to(self.device)
 
@@ -435,7 +446,7 @@ class RSMExperiment(object):
             for param_group in self.optimizer.param_groups:
                 param_group["lr"] = self.learning_rate
 
-    def _track_hists(self):
+    def _store_instr_hists(self):
         ret = {}
         if self.instrumentation:
             for name, param in self.model.named_parameters():
@@ -465,26 +476,29 @@ class RSMExperiment(object):
                 self.activity_by_inputs[key] = []
             self.activity_by_inputs[key].append(activity)
 
-    def _reshape_hidden_for_predictor(self, hidden):
+    def _get_prediction_and_loss_inputs(self, hidden, output):
         x_b = None
         if self.model_kind == 'rsm':
             # hidden is (x_b, phi, psi)
             x_b = hidden[0]
+            predictor_input = x_b[self.predict_layer]
         elif self.model_kind == 'rnn':
             # hidden is [n_layers x bsz x nhid]
             x_b = hidden
+            # For RNN/LSTM, predict from model output
+            predictor_input = output
         elif self.model_kind == 'lstm':
             # hidden is (h [n_layers x bsz x nhid], c [n_layers x bsz x nhid])
-            x_b = hidden[0]
-        return x_b
+            x_b = hidden[0]  # Get hidden state h (do we want to predict from c?)
+            # For RNN/LSTM, predict from model output
+            predictor_input = output
+        return x_b, predictor_input
 
     def _do_prediction(
         self,
-        x_b,
+        input,
         pred_targets,
-        total_samples,
-        correct_samples,
-        total_pred_loss,
+        predictor_counts,
         train=False,
     ):
         """
@@ -494,34 +508,29 @@ class RSMExperiment(object):
         class_predictions = correct_arr = None
         if self.predictor:
             pred_targets = pred_targets.flatten()
-            predictor_outputs = self.predictor(x_b.detach()[-1])
+            predictor_outputs = self.predictor(input.detach())
             pred_loss = self.predictor_loss(predictor_outputs, pred_targets)
             _, class_predictions = torch.max(predictor_outputs, 1)
-            total_samples += pred_targets.size(0)
+            predictor_counts['total_samples'] += pred_targets.size(0)
             correct_arr = class_predictions == pred_targets
-            correct_samples += correct_arr.sum().item()
+            predictor_counts['correct_samples'] += correct_arr.sum().item()
             batch_loss = pred_loss.item()
-            total_pred_loss += batch_loss
+            predictor_counts['total_pred_loss'] += batch_loss
             if train:
                 # Predictor backward + optimize
                 pred_loss.backward()
                 self.pred_optimizer.step()
 
         return (
-            total_samples,
-            correct_samples,
+            predictor_counts,
             class_predictions,
             correct_arr,
-            batch_loss,
-            total_pred_loss,
+            batch_loss
         )
 
-    def _confusion_matrix(self, pred_targets, class_predictions):
-        class_names = [str(x) for x in range(self.predictor_output_size)]
-        cm_ax, cm_fig = plot_confusion_matrix(
-            pred_targets, class_predictions, class_names, title="Prediction Confusion"
-        )
-        return cm_fig
+    def _simple_present_loss(self, pred_imgs, target_imgs):
+        loss = self.loss(pred_imgs, target_imgs)
+        return loss
 
     def _compute_loss(self, last_pred_output, inputs_target, x_b_target):
         """
@@ -535,24 +544,89 @@ class RSMExperiment(object):
         """
         loss = None
         if last_pred_output is not None:
-            img_pred = last_pred_output[0]
-            l1_loss = self.loss(img_pred, inputs_target.detach())
+            if self.loss_layers in ['first', 'all']:
+                img_pred = last_pred_output[0]
+                l1_loss = self.loss(img_pred, inputs_target.detach())
+                if loss is None:
+                    loss = l1_loss
+                else:
+                    loss += l1_loss
 
-            loss = l1_loss
-
-            if self.n_layers > 1 and self.model_kind == 'rsm':
+            if self.n_layers > 1 and self.loss_layers in ['above_first', 'all']:
                 mem_preds = torch.stack(last_pred_output[1:])
                 ls_loss = self.loss(mem_preds, x_b_target[1:].detach())
-                loss += ls_loss
-
-            # else:
-            #     # Loss computed against column activity
-            #     n_deep_layers = len(last_pred_output) - 1
-            #     mem_preds = torch.stack(last_pred_output[1:]).view(
-            #         n_deep_layers, self.batch_size, self.m_groups, self.n_cells_per_group
-            #     ).max(dim=3).values
+                if loss is None:
+                    loss = ls_loss
+                else:
+                    loss += ls_loss
 
         return loss
+
+    def _agg_batch_metrics(self, metrics, **kwargs):
+        for metric_key, val in kwargs.items():
+            if val is not None:
+                if metric_key not in metrics:
+                    metrics[metric_key] = val
+                else:
+                    current = metrics[metric_key]
+                    metrics[metric_key] = torch.cat((current, val))
+        return metrics
+
+    def _generate_instr_charts(self, metrics):
+        ret = {}
+        if self.dataset_kind == "mnist" and self.model_kind == "rsm" and self.instrumentation:
+            if "img_preds" in self.instr_charts:
+                ret["img_preds"] = self._image_grid(
+                    metrics['x_a_next'],
+                    compare_with=metrics['targets'],
+                    compare_correct=metrics['correct_arr'],
+                ).cpu()
+            if "img_confusion" in self.instr_charts:
+                class_names = [str(x) for x in range(self.predictor_output_size)]
+                cm_ax, cm_fig = plot_confusion_matrix(
+                    metrics['pred_targets'], metrics['class_predictions'], class_names, title="Prediction Confusion"
+                )
+                ret["img_confusion"] = fig2img(cm_fig)
+            if "img_repr_sim" in self.instr_charts:
+                if self.flattened:
+                    activity_grid = plot_activity_grid(
+                        self.activity_by_inputs, n_labels=self.predictor_output_size
+                    )
+                else:
+                    activity_grid = plot_activity(
+                        self.activity_by_inputs,
+                        n_labels=self.predictor_output_size,
+                        level="cell",
+                    )
+                img_repr_sim = plot_representation_similarity(
+                    self.activity_by_inputs,
+                    n_labels=self.predictor_output_size,
+                    title=self.boost_strat,
+                )
+                ret["img_repr_sim"] = fig2img(img_repr_sim)
+            if "img_col_activity" in self.instr_charts:
+                ret["img_col_activity"] = fig2img(activity_grid)
+            self.activity_by_inputs = {}
+
+            # if self.dataset_kind == "ptb" and \
+            #         self.model_kind == "rsm" and epoch % 10 == 0:
+            #     print("Weight clusters...")
+            #     weight_clustered = plot_cluster_weights(self.model)  # Slow op
+            #     if weight_clustered:
+            #         ret["img_weight_cluster"] = fig2img(weight_clustered)
+
+        return ret
+
+    def _store_instr_scalars(self, metrics):
+        ret = {}
+        if self.n_layers > 1:
+            x_b_delta = metrics['x_b_delta']
+            # Shape: [n_layers, bsz, total_cells]
+            if x_b_delta is not None:
+                for lid, layer_x_b_delta in enumerate(x_b_delta):
+                    avg_x_b_delta = layer_x_b_delta.cpu().abs().mean().item()
+                    ret['L%d_avg_x_b_delta' % (lid + 1)] = avg_x_b_delta
+        return ret
 
     def _read_out_predictions(
         self,
@@ -572,7 +646,7 @@ class RSMExperiment(object):
                     labels=["Targ", "Pred"],
                 )
 
-    def _eval(self, epoch):
+    def eval_epoch(self, epoch):
         ret = {}
         print("Evaluating...")
         # Disable dropout
@@ -587,17 +661,19 @@ class RSMExperiment(object):
 
         with torch.no_grad():
             total_loss = 0.0
-            total_samples = 0.0
-            correct_samples = 0.0
-            total_pred_loss = 0.0
+            pcounts = {
+                'total_samples': 0.0,
+                'correct_samples': 0.0,
+                'total_pred_loss': 0.0
+            }
 
+            last_x_b = None
             hidden = self._init_hidden(self.batch_size)
 
-            all_x_a_next = all_targets = all_correct_arrs = all_pred_targets = None
-            all_cls_preds = None
             last_output = None
             read_out_tgt = []
             read_out_pred = []
+            metrics = {}
 
             for _b_idx, (inputs, targets, pred_targets, input_labels) in enumerate(
                 self.val_loader
@@ -607,20 +683,26 @@ class RSMExperiment(object):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
                 pred_targets = pred_targets.to(self.device)
+
+                if self.instrumentation and self.model_kind == "rsm":
+                    # Save prior hidden state for comparison
+                    last_x_b = hidden[0].detach()
+
                 x_a_next, hidden = self.model(inputs, hidden)
 
-                x_b = self._reshape_hidden_for_predictor(hidden)
+                x_b, pred_input = self._get_prediction_and_loss_inputs(hidden, x_a_next)
 
                 # Loss
+                # loss = self._simple_present_loss(x_a_next, targets)
                 loss = self._compute_loss(last_output, inputs, x_b)
                 if loss is not None:
                     total_loss += loss.item()
 
-                total_samples, correct_samples, class_predictions, correct_arr, \
-                    batch_loss, total_pred_loss = self._do_prediction(
-                        x_b, pred_targets, total_samples,
-                        correct_samples, total_pred_loss
+                pcounts, class_predictions, correct_arr, batch_loss = (
+                    self._do_prediction(
+                        pred_input, pred_targets, pcounts
                     )
+                )
 
                 self._read_out_predictions(
                     pred_targets, class_predictions, read_out_tgt, read_out_pred
@@ -629,85 +711,36 @@ class RSMExperiment(object):
                 hidden = self._repackage_hidden(hidden)
 
                 if self.instrumentation:
-                    # Save results for image grid & confusion matrix
-                    x_a_next.unsqueeze_(0)
-                    targets.unsqueeze_(0)
-                    correct_arr.unsqueeze_(0)
-                    all_x_a_next = (
-                        x_a_next
-                        if all_x_a_next is None
-                        else torch.cat((all_x_a_next, x_a_next))
-                    )
-                    all_targets = (
-                        targets
-                        if all_targets is None
-                        else torch.cat((all_targets, targets))
-                    )
-                    all_correct_arrs = (
-                        correct_arr
-                        if all_correct_arrs is None
-                        else torch.cat((all_correct_arrs, correct_arr))
-                    )
-                    all_pred_targets = (
-                        pred_targets
-                        if all_pred_targets is None
-                        else torch.cat((all_pred_targets, pred_targets))
-                    )
-                    all_cls_preds = (
-                        class_predictions
-                        if all_cls_preds is None
-                        else torch.cat((all_cls_preds, class_predictions))
-                    )
+                    metrics = self._agg_batch_metrics(metrics,
+                                                      x_a_next=x_a_next[0],
+                                                      targets=targets,
+                                                      correct_arr=correct_arr,
+                                                      pred_targets=pred_targets,
+                                                      class_predictions=class_predictions)
 
-                if self.dataset_kind == "mnist" and self.model_kind == "rsm" and self.instrumentation:
-                    # Summary of column activation by input & next input
-                    self._store_activity_for_viz(x_b, input_labels, pred_targets)
-
-                ret.update(self._track_hists())
+                    if self.dataset_kind == "mnist" and self.model_kind == "rsm":
+                        # Summary of column activation by input & next input
+                        self._store_activity_for_viz(x_b, input_labels, pred_targets)
 
                 last_output = x_a_next
 
-            # After all eval batches, generate stats & figures
-            if self.dataset_kind == "mnist" and self.model_kind == "rsm" and self.instrumentation:
-                if not self.predict_memory:
-                    ret["img_preds"] = self._image_grid(
-                        all_x_a_next,
-                        compare_with=all_targets,
-                        compare_correct=all_correct_arrs,
-                    ).cpu()
-                cm_fig = self._confusion_matrix(all_pred_targets, all_cls_preds)
-                ret["img_confusion"] = fig2img(cm_fig)
-                if self.flattened:
-                    activity_grid = plot_activity_grid(
-                        self.activity_by_inputs, n_labels=self.predictor_output_size
-                    )
-                else:
-                    activity_grid = plot_activity(
-                        self.activity_by_inputs,
-                        n_labels=self.predictor_output_size,
-                        level="cell",
-                    )
-                img_repr_sim = plot_representation_similarity(
-                    self.activity_by_inputs,
-                    n_labels=self.predictor_output_size,
-                    title=self.boost_strat,
-                )
-                ret["img_repr_sim"] = fig2img(img_repr_sim)
-                ret["img_col_activity"] = fig2img(activity_grid)
-                self.activity_by_inputs = {}
+            if self.instrumentation:
+                x_b_delta = None
+                if last_x_b is not None and self.model_kind == "rsm":
+                    # Save change in memory state (just last batch of epoch)
+                    x_b_delta = x_b - last_x_b
+                    metrics['x_b_delta'] = x_b_delta
 
-            # if self.dataset_kind == "ptb" and \
-            #         self.model_kind == "rsm" and epoch % 10 == 0:
-            #     print("Weight clusters...")
-            #     weight_clustered = plot_cluster_weights(self.model)  # Slow op
-            #     if weight_clustered:
-            #         ret["img_weight_cluster"] = fig2img(weight_clustered)
+                # After all eval batches, generate stats & figures
+                ret.update(self._generate_instr_charts(metrics))
+                ret.update(self._store_instr_scalars(metrics))
+                ret.update(self._store_instr_hists())
 
             ret["val_loss"] = val_loss = total_loss / (_b_idx + 1)
             if self.predictor:
-                test_pred_loss = total_pred_loss / (_b_idx + 1)
+                test_pred_loss = pcounts['total_pred_loss'] / (_b_idx + 1)
                 ret["val_pred_ppl"] = lang_util.perpl(test_pred_loss)
-                ret["val_pred_acc"] = 100 * correct_samples / total_samples
+                ret["val_pred_acc"] = 100 * pcounts['correct_samples'] / pcounts['total_samples']
 
             if not self.best_val_loss or val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
@@ -735,14 +768,18 @@ class RSMExperiment(object):
             self.predictor.train()
 
         # Performance metrics
-        total_loss = total_samples = correct_samples = total_pred_loss = 0.0
+        total_loss = 0.0
+        predictor_counts = {
+            'total_samples': 0.0,
+            'correct_samples': 0.0,
+            'total_pred_loss': 0.0
+        }
 
         bsz = self.batch_size
         if epoch == 0 and self.batch_size_first < self.batch_size:
             bsz = self.batch_size_first
 
         hidden = self._init_hidden(bsz)
-        last_output = None
 
         for batch_idx, (inputs, targets, pred_targets, _) in enumerate(
             self.train_loader
@@ -768,10 +805,11 @@ class RSMExperiment(object):
 
             output, hidden = self.model(inputs, hidden)
 
-            x_b = self._reshape_hidden_for_predictor(hidden)
+            x_b, pred_input = self._get_prediction_and_loss_inputs(hidden, output)
 
             # Loss
-            loss = self._compute_loss(last_output, inputs, x_b)
+            # loss = self._simple_present_loss(output, targets)
+            loss = self._compute_loss(self.last_train_output, inputs, x_b)
 
             if self.debug:
                 self.model._register_hooks()
@@ -788,25 +826,18 @@ class RSMExperiment(object):
                 else:
                     self.optimizer.step()
 
-            if self.plot_gradients:
-                self._plot_gradient_flow()
-
-            total_samples, correct_samples, class_predictions, correct_arr, \
-                batch_loss, total_pred_loss = self._do_prediction(
-                    x_b,
-                    pred_targets,
-                    total_samples,
-                    correct_samples,
-                    total_pred_loss,
-                    train=True,
+            predictor_counts, class_predictions, correct_arr, batch_loss = (
+                self._do_prediction(
+                    pred_input, pred_targets, predictor_counts, train=True
                 )
+            )
 
-            last_output = output
+            self.last_train_output = output
 
             if self.batch_log_interval and batch_idx % self.batch_log_interval == 0:
                 print("Finished batch %d" % batch_idx)
                 if self.predictor:
-                    acc = 100 * correct_samples / total_samples
+                    acc = 100 * predictor_counts['correct_samples'] / predictor_counts['total_samples']
                     batch_acc = correct_arr.float().mean() * 100
                     batch_ppl = lang_util.perpl(batch_loss)
                     print(
@@ -819,7 +850,7 @@ class RSMExperiment(object):
 
         if self.eval_interval and (epoch == 0 or (epoch + 1) % self.eval_interval == 0):
             # Evaluate each x epochs
-            ret.update(self._eval(epoch))
+            ret.update(self.eval_epoch(epoch))
             if self.dataset_kind == "ptb" and epoch >= 12 and ret["val_pred_ppl"] > 380:
                 ret["stop"] = 1
 
@@ -828,9 +859,9 @@ class RSMExperiment(object):
 
         ret["train_loss"] = total_loss / (batch_idx + 1)
         if self.predictor:
-            train_pred_loss = total_pred_loss / (batch_idx + 1)
+            train_pred_loss = predictor_counts['total_pred_loss'] / (batch_idx + 1)
             ret["train_pred_ppl"] = lang_util.perpl(train_pred_loss)
-            ret["train_pred_acc"] = 100 * correct_samples / total_samples
+            ret["train_pred_acc"] = 100 * predictor_counts['correct_samples'] / predictor_counts['total_samples']
 
         ret["epoch_time_train"] = train_time
         ret["epoch_time"] = time.time() - t1
@@ -897,8 +928,7 @@ class RSMExperiment(object):
         return self.model
 
     def model_cleanup(self):
-        if self.writer:
-            self.writer.close()
+        pass
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ from elasticsearch import Elasticsearch, helpers
 from elasticsearch.client.xpack import SqlClient
 from elasticsearch.helpers import BulkIndexError
 from pandas import DataFrame
-from pandas.io.json.normalize import nested_to_record
+from pandas.io.json import json_normalize
 from ray.tune.logger import Logger
 
 
@@ -178,7 +178,7 @@ def elastic_dsl(client, dsl, index, **kwargs):
     data = []
     for row in response:
         # Normalize nested dicts in '_source' such as 'config' or 'git'
-        source = nested_to_record(row["_source"]) if "_source" in row else {}
+        source = json_normalize(row)
 
         # Squeeze scalar fields returned as arrays in the response by the search API
         fields = row.get("fields", {})

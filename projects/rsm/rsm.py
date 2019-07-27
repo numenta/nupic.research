@@ -18,6 +18,7 @@
 #  http://numenta.org/licenses/
 
 import matplotlib.pyplot as plt
+import math
 import torch
 from torch import nn
 
@@ -36,6 +37,28 @@ def topk_mask(x, k=2):
     return res.scatter(-1, indices, 1)
 
 
+class PredictiveProximalLinear(nn.Linear):
+
+    def __init__(self, in_features, out_features, bias=True):
+        super(PredictiveProximalLinear, self).__init__(in_features, out_features, bias=bias)
+
+    def boost_predictive_grad(self, predictive_activity, output_activity):
+        """
+        Update gradients to encourage (proximal) connection between winning cells in this layer
+        and cells in layer below that were active at prior time step
+
+        Args:
+            - predictive_activity: (bsz, total_cells)
+            - output_activity: (bsz, m)
+        """
+        avg_predictive = predictive_activity.mean(0)
+        avg_output = output_activity.mean(0)
+        active_predictors = (avg_predictive > avg_predictive.mean()).float()
+        new_grad = active_predictors.repeat(self.weight.size(0), 1) * avg_output
+        scale = 0.01
+        self.weight.grad = new_grad * scale
+
+
 class RSMPredictor(torch.nn.Module):
     def __init__(self, d_in=28 * 28, d_out=10, hidden_size=20):
         """
@@ -52,6 +75,7 @@ class RSMPredictor(torch.nn.Module):
             nn.Linear(self.hidden_size, self.d_out),
             nn.LeakyReLU(),
         )
+        self._init_linear_weights()
 
     def forward(self, x):
         """
@@ -63,6 +87,14 @@ class RSMPredictor(torch.nn.Module):
         x = self.layers(x)
         return x.view(-1, self.d_out)
 
+    def _init_linear_weights(self):
+        for mod in self.modules():
+            if isinstance(mod, nn.Linear):
+                sd = 0.03
+                mod.weight.data.normal_(0.0, sd)
+                if mod.bias is not None:
+                    mod.bias.data.normal_(0.0, sd)
+
 
 class RSMNet(torch.nn.Module):
     def __init__(self, n_layers=1, **kwargs):
@@ -72,15 +104,16 @@ class RSMNet(torch.nn.Module):
         eps_arr = kwargs['eps']
         if isinstance(eps_arr, float):
             eps_arr = [eps_arr for x in range(n_layers)]
+        last_output_dim = None
         for i in range(n_layers):
             first_layer = i == 0
             if not first_layer:
                 # Input to all layers above first is hidden state x_b from previous
-                hidden_dim = self.total_cells
-                kwargs['d_in'] = hidden_dim
+                kwargs['d_in'] = last_output_dim
                 # Output is of same dim as input (predictive autoencoder)
                 kwargs['d_out'] = kwargs['d_in']
             kwargs['eps'] = eps_arr[i]
+            last_output_dim = kwargs['m'] * kwargs['n']
             self.add_module("RSM_%d" % (i+1), RSMLayer(**kwargs))
         print("Created RSMNet with %d layer(s)" % n_layers)
 
@@ -99,8 +132,6 @@ class RSMNet(torch.nn.Module):
             output_by_layer: List of tensors (n_layers, bsz, dim (total_cells or d_in for first layer))
             new_hidden: Tuple of tensors (n_layers, bsz, total_cells)
         """
-        layer_input = x_a_batch
-        new_hidden_by_layer = []
         output_by_layer = []
 
         new_x_b = []
@@ -108,20 +139,28 @@ class RSMNet(torch.nn.Module):
         new_psi = []
 
         x_b, phi, psi = hidden
+        layer_input = x_a_batch
 
         lid = 0
         for (layer_name, layer), lay_phi, lay_psi in zip(self.named_children(), phi, psi):
             last_layer = lid == len(phi) - 1
+            first_layer = lid == 0
             lay_x_b = x_b[lid]
-            lay_x_fb = x_b[lid+1] if not last_layer else None
-            pred_output, hidden = layer(layer_input, (lay_x_b, lay_x_fb, lay_phi, lay_psi))
+            lay_x_above = x_b[lid+1] if not last_layer else None
+            lay_x_below = x_b[lid-1] if not first_layer else None
+
+            hidden_in = (lay_x_b, lay_x_above, lay_x_below, lay_phi, lay_psi)
+
+            # TODO: Gradients not passing through to layers above?
+            pred_output, hidden = layer(layer_input, hidden_in)
+
+            layer_input = hidden[0]
 
             new_x_b.append(hidden[0])
             new_phi.append(hidden[1])
             new_psi.append(hidden[2])
 
             output_by_layer.append(pred_output)
-            layer_input = hidden[0]
 
             lid += 1
 
@@ -161,7 +200,7 @@ class RSMNet(torch.nn.Module):
                         ax.imshow(
                             t.view(mod.m, mod.n).t(),
                             origin="bottom",
-                            extent=(0, mod.m - 1, 0, mod.n),
+                            extent=(0, mod.m - 1, 0, mod.n + 1),
                         )
                     else:
                         ax.imshow(activity_square(t))
@@ -218,9 +257,11 @@ class RSMLayer(torch.nn.Module):
         forget_mu=0.0,
         weight_sparsity=None,
         feedback=False,
+        input_bias=False,
+        decode_bias=True,
+        tp_boosting=False,
         debug=False,
         visual_debug=False,
-        use_bias=True,
         fpartition=None,
         balance_part_winners=False,
         **kwargs,
@@ -282,15 +323,15 @@ class RSMLayer(torch.nn.Module):
         self.balance_part_winners = balance_part_winners
         self.weight_sparsity = weight_sparsity
         self.feedback = feedback
+        self.input_bias = input_bias
+        self.decode_bias = decode_bias
+        self.tp_boosting = tp_boosting
 
         self.debug = debug
         self.visual_debug = visual_debug
         self.debug_log_names = debug_log_names
 
-        self._build_input_layers_and_kwinners(use_bias=use_bias)
-
-        decode_d_in = self.total_cells if self.decode_from_full_memory else m
-        self.linear_d = nn.Linear(decode_d_in, d_out, bias=use_bias)  # Decoder
+        self._build_layers_and_kwinners()
 
         print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
 
@@ -336,6 +377,68 @@ class RSMLayer(torch.nn.Module):
                             )
                             plt.show()
 
+    def _build_layers_and_kwinners(self):
+        if self.fpartition:
+            m_ff, m_int, m_rec = self._partition_sizes()
+            # Partition memory into fpartition % FF & remainder recurrent
+            self.linear_a = nn.Linear(self.d_in, m_ff, bias=self.input_bias)
+            self.linear_b = nn.Linear(
+                m_rec, m_rec, bias=self.input_bias
+            )  # Recurrent weights (per cell)
+            if m_int:
+                # Add two additional layers for integrating ff & rec input
+                # NOTE: Testing int layer that gets only input from prior int (no ff)
+                self.linear_a_int = nn.Linear(self.d_in, m_int, bias=self.input_bias)
+                self.linear_b_int = nn.Linear(m_int, m_int, bias=self.input_bias)
+        else:
+            # Standard architecture, no partition
+            if self.tp_boosting:
+                self.linear_a = PredictiveProximalLinear(self.d_in, self.m,
+                                                         bias=self.input_bias)
+            else:
+                self.linear_a = nn.Linear(
+                    self.d_in, self.m, bias=self.input_bias
+                )  # Input weights (shared per group / proximal)
+            self.linear_b = nn.Linear(
+                self.total_cells, self.total_cells, bias=self.input_bias
+            )  # Recurrent weights (per cell)
+            if self.feedback:
+                # Linear layers for both recurrent input from above and below
+                self.linear_b_above = nn.Linear(self.total_cells, self.total_cells,
+                                                bias=self.input_bias)
+
+        pct_on = self.k / self.m
+        if self.fpartition and self.balance_part_winners:
+            # Create a kwinners module for each partition each with specified
+            # size but same pct on (balanced).
+            self.kwinners_ff = self.kwinners_rec = self.kwinners_int = None
+            if m_ff:
+                self.kwinners_ff = self._build_kwinner_mod(m_ff, pct_on)
+            if m_int:
+                self.kwinners_int = self._build_kwinner_mod(m_int, pct_on)
+            if m_rec:
+                self.kwinners_rec = self._build_kwinner_mod(m_rec, pct_on)
+        else:
+            # We need only a single kwinners to run on full memory
+            self.kwinners_col = self._build_kwinner_mod(self.m, pct_on)
+        if self.weight_sparsity is not None:
+            self.linear_a = SparseWeights(self.linear_a, self.weight_sparsity)
+            self.linear_b = SparseWeights(self.linear_b, self.weight_sparsity)
+
+        # Decode linear
+        decode_d_in = self.total_cells if self.decode_from_full_memory else self.m
+        self.linear_d = nn.Linear(decode_d_in, self.d_out, bias=self.decode_bias)
+
+        self._init_linear_weights()
+
+    def _init_linear_weights(self):
+        for mod in self.modules():
+            if isinstance(mod, nn.Linear):
+                sd = 0.03
+                mod.weight.data.normal_(0.0, sd)
+                if mod.bias is not None:
+                    mod.bias.data.normal_(0.0, sd)
+
     def _zero_sparse_weights(self):
         for mod in self.modules():
             if isinstance(mod, SparseWeights):
@@ -356,50 +459,6 @@ class RSMLayer(torch.nn.Module):
             duty_cycle_period=1000,
             boost_strength_factor=self.boost_strength_factor,
         )
-
-    def _build_input_layers_and_kwinners(self, use_bias=True):
-
-        if self.fpartition:
-            m_ff, m_int, m_rec = self._partition_sizes()
-            # Partition memory into fpartition % FF & remainder recurrent
-            self.linear_a = nn.Linear(self.d_in, m_ff, bias=use_bias)
-            self.linear_b = nn.Linear(
-                m_rec, m_rec, bias=use_bias
-            )  # Recurrent weights (per cell)
-            if m_int:
-                # Add two additional layers for integrating ff & rec input
-                # NOTE: Testing int layer that gets only input from prior int (no ff)
-                self.linear_a_int = nn.Linear(self.d_in, m_int, bias=use_bias)
-                self.linear_b_int = nn.Linear(m_int, m_int, bias=use_bias)
-        else:
-            # Standard architecture, no partition
-            self.linear_a = nn.Linear(
-                self.d_in, self.m, bias=use_bias
-            )  # Input weights (shared per group / proximal)
-            self.linear_b = nn.Linear(
-                self.total_cells, self.total_cells, bias=use_bias
-            )  # Recurrent weights (per cell)
-            if self.feedback:
-                self.linear_fb = nn.Linear(self.total_cells, self.total_cells,
-                                           bias=use_bias)
-
-        pct_on = self.k / self.m
-        if self.fpartition and self.balance_part_winners:
-            # Create a kwinners module for each partition each with specified
-            # size but same pct on (balanced).
-            self.kwinners_ff = self.kwinners_rec = self.kwinners_int = None
-            if m_ff:
-                self.kwinners_ff = self._build_kwinner_mod(m_ff, pct_on)
-            if m_int:
-                self.kwinners_int = self._build_kwinner_mod(m_int, pct_on)
-            if m_rec:
-                self.kwinners_rec = self._build_kwinner_mod(m_rec, pct_on)
-        else:
-            # We need only a single kwinners to run on full memory
-            self.kwinners_col = self._build_kwinner_mod(self.m, pct_on)
-        if self.weight_sparsity is not None:
-            self.linear_a = SparseWeights(self.linear_a, self.weight_sparsity)
-            self.linear_b = SparseWeights(self.linear_b, self.weight_sparsity)
 
     def _post_epoch(self, epoch):
         # Update boost strength of any KWinners modules
@@ -437,7 +496,7 @@ class RSMLayer(torch.nn.Module):
         """
         return activity.view(activity.size(0), self.m, self.n).max(dim=2).values
 
-    def _fc_weighted_ave(self, x_a, x_b, x_fb):
+    def _fc_weighted_ave(self, x_a, x_b, x_b_above=None):
         """
         Compute sigma (weighted sum for each cell j in group i (mxn))
         """
@@ -461,26 +520,25 @@ class RSMLayer(torch.nn.Module):
         else:
             # Col activation from inputs repeated for each cell
             z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
-            # Cell activation from recurrent input (dropped out)
+
+            # Cell activation from recurrent input
             z_b = self.linear_b(x_b)
-            if self.feedback and x_fb is not None:
-                z_fb = self.linear_fb(x_fb)
-            self._debug_log({"z_a": z_a, "z_b": z_b})
-            if self.feedback and x_fb is not None:
-                self._debug_log({"z_fb": z_fb})
-                if self.mult_integration:
-                    sigma = z_a * z_b * z_fb
-                else:
-                    sigma = z_a + z_b + z_fb
-            else:
-                if self.mult_integration:
-                    sigma = z_a * z_b
-                else:
-                    sigma = z_a + z_b
+            z_log = {"z_a": z_a, "z_b": z_b}
+            sigma = z_a * z_b if self.mult_integration else z_a + z_b
+            if self.feedback:
+                if x_b_above is not None:
+                    # Cell activation from recurrent input from layer above (apical)
+                    z_b_above = self.linear_b_above(x_b_above)
+                    z_log["z_b_above"] = z_b_above
+                    if self.mult_integration:
+                        sigma = sigma * z_b_above
+                    else:
+                        sigma = sigma + z_b_above
+        self._debug_log(z_log)
 
         return sigma  # total_cells
 
-    def _k_winners(self, sigma, pi):
+    def _k_winners(self, sigma, pi, x_b_below=None):
         bsz = pi.size(0)
 
         # Group-wise max pooling
@@ -531,23 +589,30 @@ class RSMLayer(torch.nn.Module):
                 if self.kwinners_rec is not None:
                     winners_rec = self.kwinners_rec(lambda_[:, -m_rec:])
                     winners.append(winners_rec)
-                winning_columns = torch.cat(winners, 1)
+                winning_col_exp = torch.cat(winners, 1)
             else:
-                winning_columns = (
-                    self.kwinners_col(lambda_)
-                    .view(bsz, self.m, 1)
-                    .repeat(1, 1, self.n)
+                winning_cols = self.kwinners_col(lambda_).view(bsz, self.m, 1)
+                winning_col_exp = (
+                    winning_cols.repeat(1, 1, self.n)
                     .view(bsz, self.total_cells)
                 )
-            self._debug_log({"winning_columns": winning_columns})
+
+                predictive_activity = None
+                if self.tp_boosting and x_b_below is not None:
+                    # Temporal pooling: boost proximal connections to cells that
+                    # were active in layer below at t-1.
+                    predictive_activity = x_b_below
+                    self.linear_a.boost_predictive_grad(predictive_activity, winning_cols)
+
+            self._debug_log({"winning_col_exp": winning_col_exp})
             premask_act = pi if self.mask_shifted_pi else sigma
-            y_pre_act = m_pi * winning_columns * premask_act
+            y_pre_act = m_pi * winning_col_exp * premask_act
 
         del m_pi
 
         return y_pre_act
 
-    def _inhibited_masking(self, sigma, phi):
+    def _inhibited_winners(self, sigma, phi, x_b_below=None):
         """
         Compute y_lambda
         """
@@ -558,7 +623,7 @@ class RSMLayer(torch.nn.Module):
 
         pi = pi.detach()  # Prevent gradients from flowing through inhibition/masking
 
-        y_pre_act = self._k_winners(sigma, pi)
+        y_pre_act = self._k_winners(sigma, pi, x_b_below)
 
         activation = {"tanh": torch.tanh, "relu": nn.functional.relu}[
             self.activation_fn
@@ -588,24 +653,26 @@ class RSMLayer(torch.nn.Module):
         generating process (batch_size, d_in)
         :param hidden:
             x_b: (normalized) memory state at same layer at t-1
-            x_fb: memory state at layer above at t-1
+            x_b_above: memory state at layer above at t-1
+            x_b_below: memory state at layer below at t-1
             phi: inhibition state
             psi: memory state at t-1
 
         Note that RSMLayer takes a 4-tuple that includes the feedback state
-        from the layer above, x_fb, while the RSMNet takes only 3-tuple for
+        from the layer above, x_c, while the RSMNet takes only 3-tuple for
         hidden state.
         """
-        x_b, x_fb, phi, psi = hidden
+        x_b, x_b_above, x_b_below, phi, psi = hidden
 
         phi, psi = self._do_forgetting(phi, psi)
 
         self._debug_log({"x_b": x_b, "x_a_batch": x_a_batch})
 
-        sigma = self._fc_weighted_ave(x_a_batch, x_b, x_fb)
+        sigma = self._fc_weighted_ave(x_a_batch, x_b,
+                                      x_b_above=x_b_above)
         self._debug_log({"sigma": sigma})
 
-        y = self._inhibited_masking(sigma, phi)
+        y = self._inhibited_winners(sigma, phi, x_b_below=x_b_below)
 
         pred_output = self._decode_prediction(y)
         self._debug_log({"y": y, "pred_output": pred_output})
