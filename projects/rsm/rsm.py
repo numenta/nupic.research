@@ -18,7 +18,6 @@
 #  http://numenta.org/licenses/
 
 import matplotlib.pyplot as plt
-import math
 import torch
 from torch import nn
 
@@ -37,26 +36,45 @@ def topk_mask(x, k=2):
     return res.scatter(-1, indices, 1)
 
 
+class PredictiveProximalLinearFunction(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, input, weight, bias, predictive_activity):
+        ctx.save_for_backward(input, weight, bias, predictive_activity)
+        output = input.mm(weight.t())
+        if bias is not None:
+            output += bias.unsqueeze(0).expand_as(output)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input, weight, bias, predictive_activity = ctx.saved_tensors
+        grad_input = grad_weight = grad_bias = None
+
+        if ctx.needs_input_grad[0]:
+            grad_input = grad_output.mm(weight)
+        if ctx.needs_input_grad[1]:
+            grad_weight = grad_output.t().mm(input)
+        if bias is not None and ctx.needs_input_grad[2]:
+            grad_bias = grad_output.sum(0).squeeze(0)
+
+        if predictive_activity is not None:
+            avg_predictive = predictive_activity.mean(0)
+            active_predictors = (avg_predictive > avg_predictive.mean()).float()
+            grad_weight *= active_predictors.repeat(grad_weight.size(0), 1)
+
+        return grad_input, grad_weight, grad_bias
+
+
 class PredictiveProximalLinear(nn.Linear):
+
+    __constants__ = ['bias']
 
     def __init__(self, in_features, out_features, bias=True):
         super(PredictiveProximalLinear, self).__init__(in_features, out_features, bias=bias)
 
-    def boost_predictive_grad(self, predictive_activity, output_activity):
-        """
-        Update gradients to encourage (proximal) connection between winning cells in this layer
-        and cells in layer below that were active at prior time step
-
-        Args:
-            - predictive_activity: (bsz, total_cells)
-            - output_activity: (bsz, m)
-        """
-        avg_predictive = predictive_activity.mean(0)
-        avg_output = output_activity.mean(0)
-        active_predictors = (avg_predictive > avg_predictive.mean()).float()
-        new_grad = active_predictors.repeat(self.weight.size(0), 1) * avg_output
-        scale = 0.01
-        self.weight.grad = new_grad * scale
+    def forward(self, input, predictive_activity=None):
+        return PredictiveProximalLinearFunction.apply(input, self.weight, self.bias, predictive_activity)
 
 
 class RSMPredictor(torch.nn.Module):
@@ -172,9 +190,9 @@ class RSMNet(torch.nn.Module):
 
         return (output_by_layer, new_hidden)
 
-    def _plot_tensors(self, tuples, detailed=False):
+    def _plot_tensors(self, tuples, detailed=False, return_fig=False):
         """
-        Plot tensors supporting values across multiple layers
+        Plot first item in batch across multiple layers
         """
         n_tensors = len(tuples)
         fig, axs = plt.subplots(self.n_layers, n_tensors, dpi=144)
@@ -211,7 +229,10 @@ class RSMNet(torch.nn.Module):
                     if detailed:
                         title += " (%s, rng: %.3f-%.3f, sum: %.3f)" % (size, tmin, tmax, tsum)
                     ax.set_title(title)
-        plt.show()
+        if return_fig:
+            return fig
+        else:
+            plt.show()
 
     def _post_epoch(self, epoch):
         for mod in self.children():
@@ -496,7 +517,7 @@ class RSMLayer(torch.nn.Module):
         """
         return activity.view(activity.size(0), self.m, self.n).max(dim=2).values
 
-    def _fc_weighted_ave(self, x_a, x_b, x_b_above=None):
+    def _fc_weighted_ave(self, x_a, x_b, x_b_above=None, x_b_below=None):
         """
         Compute sigma (weighted sum for each cell j in group i (mxn))
         """
@@ -519,7 +540,11 @@ class RSMLayer(torch.nn.Module):
                 sigma = torch.cat((z_a, z_b), 1)  # bsz x m
         else:
             # Col activation from inputs repeated for each cell
-            z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
+            if self.tp_boosting and x_b_below is not None:
+                predictive_activity = x_b_below
+                z_a = self.linear_a(x_a, predictive_activity).repeat_interleave(self.n, 1)
+            else:
+                z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
 
             # Cell activation from recurrent input
             z_b = self.linear_b(x_b)
@@ -538,7 +563,7 @@ class RSMLayer(torch.nn.Module):
 
         return sigma  # total_cells
 
-    def _k_winners(self, sigma, pi, x_b_below=None):
+    def _k_winners(self, sigma, pi):
         bsz = pi.size(0)
 
         # Group-wise max pooling
@@ -597,13 +622,6 @@ class RSMLayer(torch.nn.Module):
                     .view(bsz, self.total_cells)
                 )
 
-                predictive_activity = None
-                if self.tp_boosting and x_b_below is not None:
-                    # Temporal pooling: boost proximal connections to cells that
-                    # were active in layer below at t-1.
-                    predictive_activity = x_b_below
-                    self.linear_a.boost_predictive_grad(predictive_activity, winning_cols)
-
             self._debug_log({"winning_col_exp": winning_col_exp})
             premask_act = pi if self.mask_shifted_pi else sigma
             y_pre_act = m_pi * winning_col_exp * premask_act
@@ -612,7 +630,7 @@ class RSMLayer(torch.nn.Module):
 
         return y_pre_act
 
-    def _inhibited_winners(self, sigma, phi, x_b_below=None):
+    def _inhibited_winners(self, sigma, phi):
         """
         Compute y_lambda
         """
@@ -623,7 +641,7 @@ class RSMLayer(torch.nn.Module):
 
         pi = pi.detach()  # Prevent gradients from flowing through inhibition/masking
 
-        y_pre_act = self._k_winners(sigma, pi, x_b_below)
+        y_pre_act = self._k_winners(sigma, pi)
 
         activation = {"tanh": torch.tanh, "relu": nn.functional.relu}[
             self.activation_fn
@@ -669,10 +687,11 @@ class RSMLayer(torch.nn.Module):
         self._debug_log({"x_b": x_b, "x_a_batch": x_a_batch})
 
         sigma = self._fc_weighted_ave(x_a_batch, x_b,
-                                      x_b_above=x_b_above)
+                                      x_b_above=x_b_above,
+                                      x_b_below=x_b_below)
         self._debug_log({"sigma": sigma})
 
-        y = self._inhibited_winners(sigma, phi, x_b_below=x_b_below)
+        y = self._inhibited_winners(sigma, phi)
 
         pred_output = self._decode_prediction(y)
         self._debug_log({"y": y, "pred_output": pred_output})

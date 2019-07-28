@@ -134,8 +134,9 @@ class RSMExperiment(object):
         self.feedback = config.get("feedback", False)
         self.input_bias = config.get("input_bias", False)
         self.decode_bias = config.get("decode_bias", True)
-        self.loss_layers = config.get("loss_layers", "first")
         self.tp_boosting = config.get("tp_boosting", False)  # Boosting temporal pooler (strat 3)
+        self.loss_layers = config.get("loss_layers", "first")
+        self.int_loss_decay = config.get("int_loss_decay", 0.0)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -154,16 +155,18 @@ class RSMExperiment(object):
         self.learning_rate_gamma = config.get("learning_rate_gamma", 0.1)
         self.learning_rate_min = config.get("learning_rate_min", 0.0)
 
+        # Convenience
+        self.total_cells = self.m_groups * self.n_cells_per_group
+
         # Training state
         self.best_val_loss = None
         self.do_anneal_learning = False
         self.last_train_output = None
+        self.last_train_hidden = None
+        self.int_memory_buffer = torch.zeros(self.n_layers, self.batch_size, self.total_cells, requires_grad=False)
 
         # Additional state for vis, etc
         self.activity_by_inputs = {}  # 'digit-digit' -> list of distribution arrays
-
-        # Convenience
-        self.total_cells = self.m_groups * self.n_cells_per_group
 
     def _build_dataloader(self):
         # Extra element for sequential prediction labels
@@ -232,7 +235,6 @@ class RSMExperiment(object):
                 embedding = lang_util.BitwiseWordEmbedding().embedding_dict
             elif self.embedding_kind in ["bpe", "glove"]:
                 from torchnlp.word_to_vector import BPEmb, GloVe
-
                 cache_dir = self.data_dir + "/torchnlp/.word_vectors_cache"
                 if self.embedding_kind == "bpe":
                     vectors = BPEmb(dim=self.embed_dim, cache=cache_dir)
@@ -241,6 +243,13 @@ class RSMExperiment(object):
                 embedding = {}
                 for word_id, word in enumerate(corpus.dictionary.idx2word):
                     embedding[word_id] = vectors[word]
+            elif self.embedding_kind == "ptb_fasttext":
+                import fasttext
+                # Generated via notebooks/ptb_embeddings.ipynb
+                embedding = {}
+                ft_model = fasttext.load_model(self.data_dir + "/embeddings/ptb_fasttext.bin")
+                for word_id, word in enumerate(corpus.dictionary.idx2word):
+                    embedding[word_id] = torch.tensor(ft_model[word])
 
             collate_fn = partial(ptb_pred_sequence_collate, vector_dict=embedding)
             self.train_loader = DataLoader(
@@ -543,7 +552,9 @@ class RSMExperiment(object):
         activations or cells.
         """
         loss = None
+
         if last_pred_output is not None:
+
             if self.loss_layers in ['first', 'all']:
                 img_pred = last_pred_output[0]
                 l1_loss = self.loss(img_pred, inputs_target.detach())
@@ -553,12 +564,24 @@ class RSMExperiment(object):
                     loss += l1_loss
 
             if self.n_layers > 1 and self.loss_layers in ['above_first', 'all']:
+                memory = x_b_target.detach()
+                if self.int_loss_decay:
+                    # Integrated loss enabled, use buffer as target
+                    targets = self.int_memory_buffer[:-1]
+                else:
+                    targets = memory[1:]
+
                 mem_preds = torch.stack(last_pred_output[1:])
-                ls_loss = self.loss(mem_preds, x_b_target[1:].detach())
+                ls_loss = self.loss(mem_preds, targets)
                 if loss is None:
                     loss = ls_loss
                 else:
                     loss += ls_loss
+
+                if self.int_loss_decay:
+                    # Update memory buffers for each layer
+                    decayed_memory = self.int_memory_buffer * self.int_loss_decay
+                    self.int_memory_buffer = torch.max(decayed_memory, memory)
 
         return loss
 
@@ -574,39 +597,50 @@ class RSMExperiment(object):
 
     def _generate_instr_charts(self, metrics):
         ret = {}
-        if self.dataset_kind == "mnist" and self.model_kind == "rsm" and self.instrumentation:
-            if "img_preds" in self.instr_charts:
-                ret["img_preds"] = self._image_grid(
-                    metrics['x_a_next'],
-                    compare_with=metrics['targets'],
-                    compare_correct=metrics['correct_arr'],
-                ).cpu()
-            if "img_confusion" in self.instr_charts:
-                class_names = [str(x) for x in range(self.predictor_output_size)]
-                cm_ax, cm_fig = plot_confusion_matrix(
-                    metrics['pred_targets'], metrics['class_predictions'], class_names, title="Prediction Confusion"
-                )
-                ret["img_confusion"] = fig2img(cm_fig)
-            if "img_repr_sim" in self.instr_charts:
-                if self.flattened:
-                    activity_grid = plot_activity_grid(
-                        self.activity_by_inputs, n_labels=self.predictor_output_size
+        if self.model_kind == "rsm" and self.instrumentation:
+            if self.dataset_kind == "mnist":
+                if "img_preds" in self.instr_charts:
+                    ret["img_preds"] = self._image_grid(
+                        metrics['x_a_next'],
+                        compare_with=metrics['targets'],
+                        compare_correct=metrics['correct_arr'],
+                    ).cpu()
+                if "img_confusion" in self.instr_charts:
+                    class_names = [str(x) for x in range(self.predictor_output_size)]
+                    cm_ax, cm_fig = plot_confusion_matrix(
+                        metrics['pred_targets'], metrics['class_predictions'], class_names, title="Prediction Confusion"
                     )
-                else:
-                    activity_grid = plot_activity(
+                    ret["img_confusion"] = fig2img(cm_fig)
+                if "img_repr_sim" in self.instr_charts:
+                    img_repr_sim = plot_representation_similarity(
                         self.activity_by_inputs,
                         n_labels=self.predictor_output_size,
-                        level="cell",
+                        title=self.boost_strat,
                     )
-                img_repr_sim = plot_representation_similarity(
-                    self.activity_by_inputs,
-                    n_labels=self.predictor_output_size,
-                    title=self.boost_strat,
-                )
-                ret["img_repr_sim"] = fig2img(img_repr_sim)
-            if "img_col_activity" in self.instr_charts:
-                ret["img_col_activity"] = fig2img(activity_grid)
-            self.activity_by_inputs = {}
+                    ret["img_repr_sim"] = fig2img(img_repr_sim)
+                if "img_col_activity" in self.instr_charts:
+                    if self.flattened:
+                        activity_grid = plot_activity_grid(
+                            self.activity_by_inputs, n_labels=self.predictor_output_size
+                        )
+                    else:
+                        activity_grid = plot_activity(
+                            self.activity_by_inputs,
+                            n_labels=self.predictor_output_size,
+                            level="cell",
+                        )
+                    ret["img_col_activity"] = fig2img(activity_grid)
+                self.activity_by_inputs = {}
+
+            if "img_memory_snapshot" in self.instr_charts:
+                last_inp_layers = [None for x in range(self.n_layers)]
+                last_inp_layers[0] = metrics['last_input_snp']
+                fig = self.model._plot_tensors([
+                    ('last_out', metrics['last_output_snp']),
+                    ('inputs', last_inp_layers),
+                    ('x_b', metrics['last_hidden_snp'])
+                ], return_fig=True)
+                ret["img_memory_snapshot"] = fig2img(fig)
 
             # if self.dataset_kind == "ptb" and \
             #         self.model_kind == "rsm" and epoch % 10 == 0:
@@ -621,11 +655,13 @@ class RSMExperiment(object):
         ret = {}
         if self.n_layers > 1:
             x_b_delta = metrics['x_b_delta']
+            x_b = metrics['last_hidden_snp']
             # Shape: [n_layers, bsz, total_cells]
             if x_b_delta is not None:
-                for lid, layer_x_b_delta in enumerate(x_b_delta):
+                for lid, (layer_x_b_delta, layer_x_b) in enumerate(zip(x_b_delta, x_b)):
                     avg_x_b_delta = layer_x_b_delta.cpu().abs().mean().item()
                     ret['L%d_avg_x_b_delta' % (lid + 1)] = avg_x_b_delta
+                    ret['L%d_x_b_mean' % (lid+1)] = layer_x_b.cpu().abs().mean().item()
         return ret
 
     def _read_out_predictions(
@@ -726,10 +762,14 @@ class RSMExperiment(object):
 
             if self.instrumentation:
                 x_b_delta = None
-                if last_x_b is not None and self.model_kind == "rsm":
-                    # Save change in memory state (just last batch of epoch)
-                    x_b_delta = x_b - last_x_b
-                    metrics['x_b_delta'] = x_b_delta
+                # Save some snapshots from last batch of epoch
+                if self.model_kind == "rsm":
+                    if last_x_b is not None:
+                        x_b_delta = x_b - last_x_b
+                        metrics['x_b_delta'] = x_b_delta
+                    metrics['last_hidden_snp'] = x_b
+                    metrics['last_input_snp'] = inputs
+                    metrics['last_output_snp'] = last_output
 
                 # After all eval batches, generate stats & figures
                 ret.update(self._generate_instr_charts(metrics))
@@ -779,7 +819,13 @@ class RSMExperiment(object):
         if epoch == 0 and self.batch_size_first < self.batch_size:
             bsz = self.batch_size_first
 
-        hidden = self._init_hidden(bsz)
+        hidden = self.last_train_hidden
+        if hidden is not None and hidden[0].size(1) != bsz:
+            print("Batch size change, clear stored hidden and output state")
+            self.last_train_hidden = hidden = None
+            self.last_train_output = None
+        if hidden is None:
+            hidden = self._init_hidden(bsz)
 
         for batch_idx, (inputs, targets, pred_targets, _) in enumerate(
             self.train_loader
@@ -833,6 +879,7 @@ class RSMExperiment(object):
             )
 
             self.last_train_output = output
+            self.last_train_hidden = hidden
 
             if self.batch_log_interval and batch_idx % self.batch_log_interval == 0:
                 print("Finished batch %d" % batch_idx)
