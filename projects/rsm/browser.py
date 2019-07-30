@@ -33,7 +33,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from ray.tune.commands import flatten_dict
+from ray.tune.util import flatten_dict
 
 warnings.filterwarnings("ignore")
 

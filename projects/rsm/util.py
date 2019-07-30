@@ -320,7 +320,7 @@ def print_epoch_values(ret):
     return print_ret
 
 
-def _plot_grad_flow(model):
+def _plot_grad_flow(model, top=0.01):
     """
     Plots the gradients flowing through different layers in the net during
     training. Can be used for checking for possible gradient
@@ -334,31 +334,38 @@ def _plot_grad_flow(model):
     layers = []
     for n, p in model.named_parameters():
         if (p.requires_grad) and ("bias" not in n):
-            layers.append(n)
+            zg = False
             if p.grad is not None:
+                pmax = p.grad.abs().max()
                 ave_grads.append(p.grad.abs().mean())
-                max_grads.append(p.grad.abs().max())
+                max_grads.append(pmax)
+                zg = pmax == 0
             else:
                 ave_grads.append(0)
                 max_grads.append(0)
-
+                zg = True
+            if zg:
+                n += " *"
+            layers.append(n)
+    print("Gradients", max_grads)
     plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
     plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
     plt.hlines(0, 0, len(ave_grads) + 1, lw=2, color="k")
     plt.xticks(range(0, len(ave_grads), 1), layers, rotation="vertical")
     plt.xlim(left=0, right=len(ave_grads))
-    plt.ylim(bottom=-0.001, top=0.02)  # zoom in on the lower gradient regions
+    plt.ylim(bottom=-0.001, top=top)  # zoom in on the lower gradient regions
     plt.xlabel("Layers")
     plt.ylabel("average gradient")
-    plt.title("Gradient flow")
+    plt.title("Gradient flow (* indicates 0 grad)")
     plt.grid(True)
+    LABELS = ["max-gradient", "mean-gradient", "zero-gradient"]
     plt.legend(
         [
             Line2D([0], [0], color="c", lw=4),
             Line2D([0], [0], color="b", lw=4),
             Line2D([0], [0], color="k", lw=4),
         ],
-        ["max-gradient", "mean-gradient", "zero-gradient"],
+        LABELS
     )
 
 
