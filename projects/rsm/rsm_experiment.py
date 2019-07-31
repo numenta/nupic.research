@@ -85,17 +85,20 @@ class RSMExperiment(object):
 
         # Training / testing parameters
         self.batch_size = config.get("batch_size", 128)
+        self.eval_batch_size = config.get("eval_batch_size", self.batch_size)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
         self.batches_in_first_epoch = config.get("batches_in_first_epoch", self.batches_in_epoch)
         self.eval_batches_in_epoch = config.get(
             "eval_batches_in_epoch", self.batches_in_epoch
         )
         self.seq_length = config.get("seq_length", 35)
+        self.bptt_thru_epoch = config.get("bptt_thru_epoch", False)
+        self.pause_learning = config.get("pause_learning", False)
+        self.pause_after_epochs = config.get("pause_after_epochs", 0)
 
         # Data parameters
         self.input_size = config.get("input_size", (1, 28, 28))
         self.sequences = config.get("sequences", [[0, 1, 2, 3]])
-        self.bptt_thru_epoch = config.get("bptt_thru_epoch", False)
 
         self.learning_rate = config.get("learning_rate", 0.0005)
         self.pred_learning_rate = config.get("pred_learning_rate", self.learning_rate)
@@ -142,6 +145,7 @@ class RSMExperiment(object):
         self.loss_layers = config.get("loss_layers", "first")
         self.top_lateral_conn = config.get("top_lateral_conn", True)
         self.mem_gain = config.get("mem_gain", 1.0)
+        self.no_predictor = config.get("no_predictor", False)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -165,7 +169,7 @@ class RSMExperiment(object):
         # Training state
         self.best_val_loss = None
         self.do_anneal_learning = False
-        self.model_training = True
+        self.model_learning_paused = False
 
         self.train_hidden_buffer = []
         self.train_output_buffer = []
@@ -229,7 +233,7 @@ class RSMExperiment(object):
             from torchnlp.datasets import penn_treebank_dataset
 
             print("Maybe download PTB...")
-            penn_treebank_dataset(self.data_dir + "/PTB", train=True)
+            penn_treebank_dataset(self.data_dir + "/PTB", train=True, test=True)
             corpus = lang_util.Corpus(self.data_dir + "/PTB")
             train_sampler = PTBSequenceSampler(
                 corpus.train,
@@ -263,8 +267,9 @@ class RSMExperiment(object):
             )
             val_sampler = PTBSequenceSampler(
                 corpus.test,
-                batch_size=self.batch_size,
+                batch_size=self.eval_batch_size,
                 max_batches=self.eval_batches_in_epoch,
+                uniform_offsets=True
             )
             self.val_loader = DataLoader(
                 corpus.test, batch_sampler=val_sampler, collate_fn=collate_fn
@@ -501,17 +506,17 @@ class RSMExperiment(object):
         if self.model_kind == 'rsm':
             # hidden is (x_b, phi, psi)
             x_b = hidden[0]
-            predictor_input = x_b[self.predict_layer]
+            predictor_input = x_b[self.predict_layer].detach()
         elif self.model_kind == 'rnn':
             # hidden is [n_layers x bsz x nhid]
             x_b = hidden
             # For RNN/LSTM, predict from model output
-            predictor_input = output
+            predictor_input = output.detach()
         elif self.model_kind == 'lstm':
             # hidden is (h [n_layers x bsz x nhid], c [n_layers x bsz x nhid])
             x_b = hidden[0]  # Get hidden state h
             # For RNN/LSTM, predict from model output
-            predictor_input = output
+            predictor_input = output.detach()
         return x_b, predictor_input
 
     def _backward_and_optimize(self, loss):
@@ -629,12 +634,6 @@ class RSMExperiment(object):
         ret = {}
         if self.model_kind == "rsm" and self.instrumentation:
             if self.dataset_kind == "mnist":
-                if "img_preds" in self.instr_charts:
-                    ret["img_preds"] = self._image_grid(
-                        metrics['pred_images'],
-                        compare_with=metrics['targets'],
-                        compare_correct=metrics['correct_arr'],
-                    ).cpu()
                 if "img_confusion" in self.instr_charts:
                     class_names = [str(x) for x in range(self.predictor_output_size)]
                     cm_ax, cm_fig = plot_confusion_matrix(
@@ -661,6 +660,13 @@ class RSMExperiment(object):
                         )
                     ret["img_col_activity"] = fig2img(activity_grid)
                 self.activity_by_inputs = {}
+
+            if "img_preds" in self.instr_charts:
+                ret["img_preds"] = self._image_grid(
+                    metrics['pred_images'],
+                    compare_with=metrics['targets'],
+                    compare_correct=metrics['correct_arr'],
+                ).cpu()
 
             if "img_memory_snapshot" in self.instr_charts and self.n_layers > 1:
                 last_inp_layers = [None for x in range(self.n_layers)]
@@ -695,7 +701,7 @@ class RSMExperiment(object):
         read_out_pred,
         read_out_len=20,
     ):
-        if self.corpus and len(read_out_tgt) < read_out_len:
+        if self.predictor and self.corpus and len(read_out_tgt) < read_out_len:
             read_out_tgt.append(pred_targets[0])
             read_out_pred.append(class_predictions[0])
             if len(read_out_tgt) == read_out_len:
@@ -727,7 +733,7 @@ class RSMExperiment(object):
             }
 
             last_x_b = None
-            hidden = self._init_hidden(self.batch_size)
+            hidden = self._init_hidden(self.eval_batch_size)
 
             last_output = None
             read_out_tgt = []
@@ -811,6 +817,9 @@ class RSMExperiment(object):
                 # Val loss increased
                 if self.learning_rate_gamma:
                     self.do_anneal_learning = True  # Reduce LR during post_epoch
+                if self.pause_learning:
+                    print(">>> Pausing learning, validation loss rose to %.3f, best: %.3f" % (val_loss, self.best_val_loss))
+                    self.model_learning_paused = True
 
         return ret
 
@@ -884,9 +893,9 @@ class RSMExperiment(object):
             if not self.bptt_thru_epoch or batch_idx == len(self.train_loader) - 1:
                 # Compute loss only on last batch if BPTT, otherwise every batch
                 if self.bptt_thru_epoch:
-                    outputs = torch.cat(self.train_output_buffer)
+                    outputs = torch.cat(self.train_output_buffer[:-1])
                     loss_targets = (
-                        torch.cat(self.train_target_buffer),
+                        torch.cat(self.train_target_buffer[1:]),
                         torch.cat([h[0] for h in self.train_hidden_buffer])
                     )
                 else:
@@ -896,7 +905,7 @@ class RSMExperiment(object):
                 loss = self._compute_loss(outputs, loss_targets, train=True)
                 if loss is not None:
                     total_loss += loss.item()
-                    if self.model_training:
+                    if not self.model_learning_paused:                    
                         self._backward_and_optimize(loss)
 
                     if self.bptt_thru_epoch:
@@ -952,6 +961,9 @@ class RSMExperiment(object):
         The set of actions to do after each epoch of training: adjust learning
         rate, rezero sparse weights, and update boost strengths.
         """
+        if self.pause_after_epochs and epoch == self.pause_after_epochs:
+            print(">> Pausing model training after epoch %d" % epoch)
+            self.model_learning_paused = True
         self._adjust_learning_rate(epoch)
         self.model._post_epoch(epoch)
 

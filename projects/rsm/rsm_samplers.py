@@ -225,14 +225,18 @@ class PTBSequenceSampler(Sampler):
     """
     """
 
-    def __init__(self, data_source, batch_size=64, max_batches=1000000):
+    def __init__(self, data_source, batch_size=64, max_batches=1000000, uniform_offsets=False):
         super(PTBSequenceSampler, self).__init__(None)
         self.batch_size = batch_size
         self.max_batches = max_batches
         self.data_source = data_source
         self.data_len = len(self.data_source)
         # Choose initial random offsets into PTB, one per item in batch
-        self.batch_idxs = (torch.rand(self.batch_size) * (self.data_len - 1)).long()
+        if uniform_offsets:
+            # Useful for evaluation to guarantee even coverage
+            self.batch_idxs = (self.data_len / self.batch_size * torch.range(0, batch_size - 1)).long()
+        else:
+            self.batch_idxs = (torch.rand(self.batch_size) * (self.data_len - 1)).long()
 
     def __iter__(self):
         # Yield the next single batch of (batch_size) word IDs,
@@ -245,7 +249,7 @@ class PTBSequenceSampler(Sampler):
         return
 
     def __len__(self):
-        return self.max_batches
+        return self.max_batches if self.max_batches else self.data_len
 
 
 def vector_batch(word_ids, vector_dict):

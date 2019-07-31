@@ -148,6 +148,10 @@ class RSMNet(torch.nn.Module):
             param_by_layer = [param_by_layer for x in range(self.n_layers)]
         return param_by_layer
 
+    def _zero_sparse_weights(self):
+        for mod in self.children():
+            mod._zero_sparse_weights()
+
     def _register_hooks(self):
         if not self.hooks_registered:
             for mod in self.children():
