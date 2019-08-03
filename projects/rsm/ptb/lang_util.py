@@ -48,6 +48,9 @@ class Corpus(object):
         self.valid = self.tokenize(os.path.join(path, "ptb.valid.txt"))
         self.test = self.tokenize(os.path.join(path, "ptb.test.txt"))
 
+    def encode(self, words):
+        return [self.dictionary.word2idx[word] for word in words.split()]
+
     def read_out(self, ids):
         out = []
         if isinstance(ids, int):

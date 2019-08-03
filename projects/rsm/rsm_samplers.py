@@ -234,7 +234,7 @@ class PTBSequenceSampler(Sampler):
         # Choose initial random offsets into PTB, one per item in batch
         if uniform_offsets:
             # Useful for evaluation to guarantee even coverage
-            self.batch_idxs = (self.data_len / self.batch_size * torch.range(0, batch_size - 1)).long()
+            self.batch_idxs = (self.data_len / self.batch_size * torch.arange(0, batch_size)).long()
         else:
             self.batch_idxs = (torch.rand(self.batch_size) * (self.data_len - 1)).long()
 
