@@ -62,7 +62,6 @@ class RSMExperiment(object):
         self.data_dir = config.get("data_dir", "data")
         self.path = config.get("path", "results")
         self.model_filename = config.get("model_filename", "model.pth")
-        self.jit_trace = config.get("jit_trace", None)
         self.pred_model_filename = config.get("pred_model_filename", "pred_model.pth")
         self.graph_filename = config.get("graph_filename", "rsm.onnx")
         self.save_onnx_graph_at_checkpoint = config.get(
@@ -71,6 +70,7 @@ class RSMExperiment(object):
         self.exp_name = config.get("name", "exp")
         self.batch_log_interval = config.get("batch_log_interval", 0)
         self.eval_interval = config.get("eval_interval", 5)
+        self.eval_interval_schedule = config.get("eval_interval_schedule", None)
         self.model_kind = config.get("model_kind", "rsm")
         self.debug = config.get("debug", False)
         self.visual_debug = config.get("visual_debug", False)
@@ -91,7 +91,6 @@ class RSMExperiment(object):
         self.eval_batches_in_epoch = config.get(
             "eval_batches_in_epoch", self.batches_in_epoch
         )
-        self.seq_length = config.get("seq_length", 35)
         self.bptt_thru_epoch = config.get("bptt_thru_epoch", False)
         self.pause_learning = config.get("pause_learning", False)
         self.pause_after_epochs = config.get("pause_after_epochs", 0)
@@ -121,6 +120,7 @@ class RSMExperiment(object):
 
         # Tweaks
         self.activation_fn = config.get("activation_fn", "tanh")
+        self.decode_activation_fn = config.get("decode_activation_fn", None)
         self.static_digit = config.get("static_digit", False)
         self.use_mnist_pct = config.get("use_mnist_pct", 1.0)
         self.pred_l2_reg = config.get("pred_l2_reg", 0)
@@ -132,6 +132,7 @@ class RSMExperiment(object):
         self.do_inhibition = config.get("do_inhibition", True)
         self.boost_strength = config.get("boost_strength", 1.0)
         self.boost_strength_factor = config.get("boost_strength_factor", 1.0)
+        self.duty_cycle_period = config.get("duty_cycle_period", 1000)
         self.mult_integration = config.get("mult_integration", False)
         self.noise_buffer = config.get("noise_buffer", False)
         self.fpartition = config.get("fpartition", None)
@@ -145,12 +146,13 @@ class RSMExperiment(object):
         self.loss_layers = config.get("loss_layers", "first")
         self.top_lateral_conn = config.get("top_lateral_conn", True)
         self.mem_gain = config.get("mem_gain", 1.0)
-        self.no_predictor = config.get("no_predictor", False)
+        self.trainable_decay = config.get("trainable_decay", False)
+        self.decode_from_hys = config.get("decode_from_hys", False)
+
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
         self.predictor_output_size = config.get("predictor_output_size", 10)
-        self.predict_layer = config.get("predict_layer", 0)
 
         self.n_layers = config.get("n_layers", 1)
 
@@ -339,6 +341,7 @@ class RSMExperiment(object):
                 eps=self.eps,
                 forget_mu=self.forget_mu,
                 activation_fn=self.activation_fn,
+                decode_activation_fn=self.decode_activation_fn,
                 decode_from_full_memory=self.decode_from_full_memory,
                 x_b_norm=self.x_b_norm,
                 mask_shifted_pi=self.mask_shifted_pi,
@@ -346,6 +349,7 @@ class RSMExperiment(object):
                 boost_strat=self.boost_strat,
                 boost_strength=self.boost_strength,
                 boost_strength_factor=self.boost_strength_factor,
+                duty_cycle_period=self.duty_cycle_period,
                 weight_sparsity=self.weight_sparsity,
                 mult_integration=self.mult_integration,
                 fpartition=self.fpartition,
@@ -355,19 +359,15 @@ class RSMExperiment(object):
                 input_bias=self.input_bias,
                 decode_bias=self.decode_bias,
                 tp_boosting=self.tp_boosting,
+                trainable_decay=self.trainable_decay,
+                decode_from_hys=self.decode_from_hys,
                 mem_gain=self.mem_gain,
                 embed_dim=self.embed_dim,
                 vocab_size=self.vocab_size,
                 debug=self.debug,
                 visual_debug=self.visual_debug
             )
-            predictor_d_in = self.m_groups * self.n_cells_per_group
-            if self.jit_trace:
-                # Trace model (Can produce ~25% speed improvement)
-                inputs = torch.rand(self.seq_length, self.batch_size, self.d_in)
-                hidden = self._init_hidden(self.batch_size)
-                print(">> Running JIT trace...")
-                self.model = torch.jit.trace(self.model, (inputs, hidden))
+            predictor_d_in = self.n_layers * self.m_groups * self.n_cells_per_group
 
         elif self.model_kind == "lstm":
             self.model = LSTMModel(
@@ -504,9 +504,13 @@ class RSMExperiment(object):
     def _get_prediction_and_loss_inputs(self, hidden, output):
         x_b = None
         if self.model_kind == 'rsm':
-            # hidden is (x_b, phi, psi)
-            x_b = hidden[0]
-            predictor_input = x_b[self.predict_layer].detach()
+            # hidden is (x_b, x_b_hys, phi, psi)
+            # higher layers predict decaying version of lower layer x_b
+            x_b = hidden[1]
+            # TODO: Option to train separate predictors on each layer and interpolate
+            if self.predictor:
+                # Predict from concat of all layer hidden states
+                predictor_input = x_b.transpose(0, 1).contiguous().view(-1, self.predictor.d_in).detach()
         elif self.model_kind == 'rnn':
             # hidden is [n_layers x bsz x nhid]
             x_b = hidden
@@ -576,7 +580,7 @@ class RSMExperiment(object):
             correct_arr
         )
 
-    def _compute_loss(self, predicted_outputs, targets, train=False):
+    def _compute_loss(self, predicted_outputs, targets):
         """
         Compute loss across multiple layers (if applicable).
 
@@ -902,7 +906,7 @@ class RSMExperiment(object):
                     # train_output_buffer holds last and present outputs
                     outputs = self.train_output_buffer[0] if len(self.train_output_buffer) == 2 else None
                     loss_targets = (inputs, x_b)
-                loss = self._compute_loss(outputs, loss_targets, train=True)
+                loss = self._compute_loss(outputs, loss_targets)
                 if loss is not None:
                     total_loss += loss.item()
                     if not self.model_learning_paused:                    
@@ -965,6 +969,11 @@ class RSMExperiment(object):
             print(">> Pausing model training after epoch %d" % epoch)
             self.model_learning_paused = True
         self._adjust_learning_rate(epoch)
+        if self.eval_interval_schedule:
+            for step, new_interval in self.eval_interval_schedule:
+                if step == epoch:
+                    print(">> Changing eval interval to %d" % new_interval)
+                    self.eval_interval = new_interval
         self.model._post_epoch(epoch)
 
     def model_save(self, checkpoint_dir):

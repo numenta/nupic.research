@@ -19,6 +19,7 @@
 
 import matplotlib.pyplot as plt
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from nupic.torch.modules.k_winners import KWinners
@@ -124,6 +125,7 @@ class RSMNet(torch.nn.Module):
         eps_arr = self._parse_param_array(kwargs['eps'])
         k_winners_arr = self._parse_param_array(kwargs['k'])
         boost_strength_arr = self._parse_param_array(kwargs['boost_strength'])
+        duty_cycle_period_arr = self._parse_param_array(kwargs['duty_cycle_period'])
         last_output_dim = None
         for i in range(n_layers):
             first_layer = i == 0
@@ -138,6 +140,7 @@ class RSMNet(torch.nn.Module):
             kwargs['eps'] = eps_arr[i]
             kwargs['k'] = k_winners_arr[i]
             kwargs['boost_strength'] = boost_strength_arr[i]
+            kwargs['duty_cycle_period'] = duty_cycle_period_arr[i]
             last_output_dim = kwargs['m'] * kwargs['n']
             self.add_module("RSM_%d" % (i+1), RSMLayer(**kwargs))
         print("Created RSMNet with %d layer(s)" % n_layers)
@@ -167,7 +170,7 @@ class RSMNet(torch.nn.Module):
 
         Arguments:
             x_a_batch: (bsz, total_cells)
-            hidden: Tuple (x_b, phi, psi), each Tensor (n_layers, bsz, total_cells)
+            hidden: Tuple (x_b, x_b_hys, phi, psi), each Tensor (n_layers, bsz, total_cells)
 
         Returns:
             output_by_layer: List of tensors (n_layers, bsz, dim (total_cells or d_in for first layer))
@@ -176,29 +179,34 @@ class RSMNet(torch.nn.Module):
         output_by_layer = []
 
         new_x_b = []
+        new_x_b_hys = []
         new_phi = []
         new_psi = []
 
-        x_b, phi, psi = hidden
+        x_b, x_b_hys, phi, psi = hidden
         layer_input = x_a_batch
+
+        # If multi-layered, use non-decaying version
+        x_b_rec = x_b if self.n_layers > 1 else x_b_hys
 
         lid = 0
         for (layer_name, layer), lay_phi, lay_psi in zip(self.named_children(), phi, psi):
             last_layer = lid == len(phi) - 1
             first_layer = lid == 0
-            lay_x_b = x_b[lid]
-            lay_x_above = x_b[lid+1] if not last_layer else None
-            lay_x_below = x_b[lid-1] if not first_layer else None
+            lay_x_b = x_b_rec[lid]
+            lay_x_above = x_b_rec[lid+1] if not last_layer else None
+            lay_x_below = x_b_rec[lid-1] if not first_layer else None
 
             hidden_in = (lay_x_b, lay_x_above, lay_x_below, lay_phi, lay_psi)
 
             pred_output, hidden = layer(layer_input, hidden_in)
 
-            layer_input = hidden[0]
+            layer_input = hidden[1]
 
             new_x_b.append(hidden[0])
-            new_phi.append(hidden[1])
-            new_psi.append(hidden[2])
+            new_x_b_hys.append(hidden[1])
+            new_phi.append(hidden[2])
+            new_psi.append(hidden[3])
 
             output_by_layer.append(pred_output)
 
@@ -206,6 +214,7 @@ class RSMNet(torch.nn.Module):
 
         new_hidden = (
             torch.stack(new_x_b),
+            torch.stack(new_x_b_hys),
             torch.stack(new_phi),
             torch.stack(new_psi)
         )
@@ -266,16 +275,21 @@ class RSMNet(torch.nn.Module):
         x_b = param.new_zeros(
             (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
         )
+        x_b_hys = param.new_zeros(
+            (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
+        )
         phi = param.new_zeros(
             (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
         )
         psi = param.new_zeros(
             (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
         )
-        return (x_b, phi, psi)
+        return (x_b, x_b_hys, phi, psi)
 
 
 class RSMLayer(torch.nn.Module):
+    ACT_FNS = {"tanh": torch.tanh, "relu": F.relu, "sigmoid": torch.sigmoid}
+
     def __init__(
         self,
         d_in=28 * 28,
@@ -287,6 +301,7 @@ class RSMLayer(torch.nn.Module):
         gamma=0.5,
         eps=0.5,
         activation_fn="tanh",
+        decode_activation_fn=None,
         embed_dim=0,
         vocab_size=0,
         decode_from_full_memory=False,
@@ -296,6 +311,7 @@ class RSMLayer(torch.nn.Module):
         boost_strat="rsm_inhibition",
         x_b_norm=False,
         boost_strength=1.0,
+        duty_cycle_period=1000,
         mult_integration=False,
         boost_strength_factor=1.0,
         forget_mu=0.0,
@@ -310,6 +326,8 @@ class RSMLayer(torch.nn.Module):
         visual_debug=False,
         fpartition=None,
         balance_part_winners=False,
+        trainable_decay=False,
+        decode_from_hys=False,
         **kwargs,
     ):
         """
@@ -353,6 +371,7 @@ class RSMLayer(torch.nn.Module):
 
         # Tweaks
         self.activation_fn = activation_fn
+        self.decode_activation_fn = decode_activation_fn
         self.decode_from_full_memory = decode_from_full_memory
         self.boost_strat = boost_strat
         self.x_b_norm = x_b_norm
@@ -360,6 +379,7 @@ class RSMLayer(torch.nn.Module):
         self.do_inhibition = do_inhibition
         self.boost_strength = boost_strength
         self.boost_strength_factor = boost_strength_factor
+        self.duty_cycle_period = duty_cycle_period
         self.mult_integration = mult_integration
         self.fpartition = fpartition
         if isinstance(self.fpartition, float):
@@ -374,12 +394,18 @@ class RSMLayer(torch.nn.Module):
         self.tp_boosting = tp_boosting
         self.lateral_conn = lateral_conn
         self.mem_gain = mem_gain
+        self.trainable_decay = trainable_decay
+        self.decode_from_hys = decode_from_hys
 
         self.debug = debug
         self.visual_debug = visual_debug
         self.debug_log_names = debug_log_names
 
         self._build_layers_and_kwinners()
+
+        self.decay = nn.Parameter(self.eps * torch.ones(self.total_cells, dtype=torch.float32),
+                                  requires_grad=self.trainable_decay)
+        self.register_parameter("decay", self.decay)
 
         print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
 
@@ -508,7 +534,7 @@ class RSMLayer(torch.nn.Module):
             m,
             pct_on,
             boost_strength=self.boost_strength,
-            duty_cycle_period=1000,
+            duty_cycle_period=self.duty_cycle_period,
             boost_strength_factor=self.boost_strength_factor,
         )
 
@@ -681,27 +707,46 @@ class RSMLayer(torch.nn.Module):
 
         y_pre_act = self._k_winners(sigma, pi)
 
-        activation = {"tanh": torch.tanh, "relu": nn.functional.relu}[
-            self.activation_fn
-        ]
+        activation = RSMLayer.ACT_FNS[self.activation_fn]
         y = activation(y_pre_act)  # 1 x total_cells
 
         return y
 
-    def _decode_prediction(self, y):
-        # Decode prediction (optionally through col-wise max bottleneck)
-        decode_input = y if self.decode_from_full_memory else self._group_max(y)
-        output = self.linear_d(decode_input)
-        return output
-
     def _update_memory_and_inhibition(self, y, phi, psi):
+        """
+        Decay memory and inhibition tensors
+
+        If trainable_decay, the decay tensor can learn to decay different
+        cells in memory at different rates.
+        """
+
         # Get updated psi (memory state), decay inactive
-        psi = torch.max(psi * self.eps, y)
+        if self.trainable_decay:
+            decay_mult = torch.sigmoid(self.decay)
+            self._debug_log({"decay_mult": decay_mult})
+        else:
+            decay_mult = self.eps
+        psi = torch.max(psi * decay_mult, y)
 
         # Update phi for next step (decay inhibition cells)
         phi = torch.max(phi * self.gamma, y)
 
         return (phi, psi)
+
+    def _decode_prediction(self, y, x_b_hys):
+        # Decode prediction (optionally through col-wise max bottleneck)
+        if self.decode_from_hys:
+            decode_input = x_b_hys
+        else:
+            if self.decode_from_full_memory:
+                decode_input = self._group_max(y)
+            else:
+                decode_input = y
+        output = self.linear_d(decode_input)
+        if self.decode_activation_fn:
+            activation = RSMLayer.ACT_FNS[self.decode_activation_fn]
+            output = activation(output)
+        return output
 
     def forward(self, x_a_batch, hidden):
         """
@@ -731,9 +776,6 @@ class RSMLayer(torch.nn.Module):
 
         y = self._inhibited_winners(sigma, phi)
 
-        pred_output = self._decode_prediction(y)
-        self._debug_log({"y": y, "pred_output": pred_output})
-
         phi, psi = self._update_memory_and_inhibition(y, phi, psi)
         self._debug_log({"phi": phi, "psi": psi})
 
@@ -741,11 +783,18 @@ class RSMLayer(torch.nn.Module):
         if self.x_b_norm:
             # Normalizing scalar (force sum(x_b) == 1)
             alpha = (psi.sum(dim=1) + 1e-9).unsqueeze(dim=1)
-            x_b = psi / alpha
+            x_b = y / alpha
+            x_b_hys = psi / alpha
         else:
-            x_b = psi
+            x_b = y
+            x_b_hys = psi
 
-        hidden = (x_b, phi, psi)
+        pred_output = self._decode_prediction(y, x_b_hys)
+        self._debug_log({"y": y, "pred_output": pred_output})
+
+        self._debug_log({"x_b_hys": x_b_hys})
+
+        hidden = (x_b, x_b_hys, phi, psi)
         return (pred_output, hidden)
 
 
