@@ -1,0 +1,64 @@
+\documentclass{article}
+
+%_______________________________________
+%PREAMBLE
+
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+
+\begin{document}
+
+%_______________________________________
+%HEADER
+
+%_______________________________________
+%BODY
+\section{Dynamic Sparse CNN}
+A dynamic sparse convolutional layer takes a sparse input, $X^\ell$, and employs only a sparse subset of its filter when calculating the output $X^{\ell+1}$. A mask over the filter $F^{\ell+1}$ defines the subset of active connections (think of the masked filter as though shaped like swiss cheese). \\
+
+To calculate which connections remain active, algorithm \ref{alg:cnn} is used below. For this, we use the following notation
+\begin{itemize}
+	\item $B$ - the batch size
+	\item $N^{\ell}$, $M^{\ell}$, $C^{\ell}$ - height, width, and channel size of units $X^{\ell}$
+	\item $H^{\ell}$, $J^{\ell}$ - height and width of the the filter used to calculate $X^{\ell}$
+\end{itemize}
+
+Generally, we keep track of which units (i.e. connections) of the kernel saw activation in both their corresponding input and the summed output. For instance, the output $X^{\ell+1}_{n,m}$ and input $X^{\ell}_{n',m'}$ are said to wire together through the connection $F^{\ell+1}_{c, c', j, h}$ if 
+\begin{enumerate}
+	\item the output is a function of: input $\times$ connection 
+	\item the input and output satisfy some condition defined by $\text{Coactivation}(\text{input}, \text{output})$ (e.g. thresholding their absolute values)
+\end{enumerate}
+These coactivations deem which connections of $F^{\ell+1}$ get pruned - by, for example, keeping the $k$ strongest connections.
+
+\begin{algorithm}
+\caption{Sparse CNN Pruning}\label{alg:cnn}
+\begin{algorithmic}[1]
+\State $\mathcal{H}^{\ell+1} \gets \text{zeros}(C^{\ell+1}, \times C^{\ell} \times J^{\ell+1} \times H^{\ell+1})$ 
+\For{b in range(B)}
+	\For{c in range($C^{\ell+1}$)}
+		\For{n in range($N^{\ell+1}$)}
+			\For{m in range($M^{\ell+1}$)}
+				\State $\text{unit}_1 \gets X^{\ell+1}_{n,m,c}$
+					\State indices $\gets$ get\_input\_indices\_of\_filter(n,m)
+					\For{i, idx in enumerate(indices)}
+						\State $n', m', c' \gets idx$
+						\State $\text{unit}_2 \gets X^{\ell}_{n', m', c'}$
+						\If{Coactivation($\text{unit}_1$, $\text{unit}_2$)}
+							\State $\mathcal{H}^{\ell+1}(c, i) \gets \mathcal{H}^{\ell+1}(c, i) + 1$
+						\EndIf 
+					\EndFor
+			\EndFor
+		\EndFor
+	\EndFor
+\EndFor
+\State $F^{{\ell+1}'} \gets \text{Prune$(F^{\ell+1}; \mathcal{H}^{\ell+1})$}$
+
+\end{algorithmic}
+\end{algorithm}
+
+
+\end{document}
