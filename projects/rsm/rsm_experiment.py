@@ -92,8 +92,9 @@ class RSMExperiment(object):
             "eval_batches_in_epoch", self.batches_in_epoch
         )
         self.bptt_thru_epoch = config.get("bptt_thru_epoch", False)
-        self.pause_learning = config.get("pause_learning", False)
+        self.pause_after_upticks = config.get("pause_after_upticks", 0)
         self.pause_after_epochs = config.get("pause_after_epochs", 0)
+        self.pause_eval_interval = config.get("pause_eval_interval", 10)
 
         # Data parameters
         self.input_size = config.get("input_size", (1, 28, 28))
@@ -142,12 +143,12 @@ class RSMExperiment(object):
         self.feedback_conn = config.get("feedback_conn", False)
         self.input_bias = config.get("input_bias", False)
         self.decode_bias = config.get("decode_bias", True)
-        self.tp_boosting = config.get("tp_boosting", False)  # Boosting temporal pooler (strat 3)
         self.loss_layers = config.get("loss_layers", "first")
         self.top_lateral_conn = config.get("top_lateral_conn", True)
         self.mem_gain = config.get("mem_gain", 1.0)
         self.trainable_decay = config.get("trainable_decay", False)
-        self.decode_from_hys = config.get("decode_from_hys", False)
+        self.stoch_decay = config.get("stoch_decay", False)
+        self.unif_smoothing = config.get("unif_smoothing", 0.0)
 
 
         # Predictor network
@@ -165,13 +166,11 @@ class RSMExperiment(object):
         self.learning_rate_gamma = config.get("learning_rate_gamma", 0.1)
         self.learning_rate_min = config.get("learning_rate_min", 0.0)
 
-        # Convenience
-        self.total_cells = self.m_groups * self.n_cells_per_group
-
         # Training state
         self.best_val_loss = None
         self.do_anneal_learning = False
         self.model_learning_paused = False
+        self.n_upticks = 0
 
         self.train_hidden_buffer = []
         self.train_output_buffer = []
@@ -301,7 +300,8 @@ class RSMExperiment(object):
                 )
         else:
             self.optimizer = torch.optim.SGD(
-                self.model.parameters(), lr=self.learning_rate, momentum=self.momentum
+                self.model.parameters(), lr=self.learning_rate, momentum=self.momentum,
+                weight_decay=self.l2_reg
             )
             if self.predictor:
                 self.pred_optimizer = torch.optim.SGD(
@@ -358,16 +358,18 @@ class RSMExperiment(object):
                 top_lateral_conn=self.top_lateral_conn,
                 input_bias=self.input_bias,
                 decode_bias=self.decode_bias,
-                tp_boosting=self.tp_boosting,
                 trainable_decay=self.trainable_decay,
-                decode_from_hys=self.decode_from_hys,
+                stoch_decay=self.stoch_decay,
                 mem_gain=self.mem_gain,
                 embed_dim=self.embed_dim,
                 vocab_size=self.vocab_size,
                 debug=self.debug,
                 visual_debug=self.visual_debug
             )
-            predictor_d_in = self.n_layers * self.m_groups * self.n_cells_per_group
+            if self.n_layers > 1:
+                predictor_d_in = sum([m*n for m, n in zip(self.m_groups, self.n_cells_per_group)])
+            else:
+                predictor_d_in = self.m_groups * self.n_cells_per_group
 
         elif self.model_kind == "lstm":
             self.model = LSTMModel(
@@ -504,13 +506,13 @@ class RSMExperiment(object):
     def _get_prediction_and_loss_inputs(self, hidden, output):
         x_b = None
         if self.model_kind == 'rsm':
-            # hidden is (x_b, x_b_hys, phi, psi)
+            # hidden is (x_b, phi, psi)
             # higher layers predict decaying version of lower layer x_b
-            x_b = hidden[1]
+            x_b = hidden[0]
             # TODO: Option to train separate predictors on each layer and interpolate
             if self.predictor:
                 # Predict from concat of all layer hidden states
-                predictor_input = x_b.transpose(0, 1).contiguous().view(-1, self.predictor.d_in).detach()
+                predictor_input = torch.cat(x_b, dim=1).view(-1, self.predictor.d_in).detach()
         elif self.model_kind == 'rnn':
             # hidden is [n_layers x bsz x nhid]
             x_b = hidden
@@ -589,7 +591,9 @@ class RSMExperiment(object):
 
         Args:
             - predicted_outputs: list of len n_layers of (bsz, d_in or total_cells)
-            - targets: 2-tuple of (actual_input (bsz, d_in), x_b (bsz, total_cells)
+            - targets: 2-tuple
+                - list of actual_input (bsz, d_in) by layer
+                - list of x_b (bsz, total_cells)) by layer
             - x_b_target: (n_layers, bsz, total_cells)
 
         Note that batch size will differ if using a smaller first epoch batch size. 
@@ -612,15 +616,15 @@ class RSMExperiment(object):
                     loss += l1_loss
 
             if self.n_layers > 1 and self.loss_layers in ['above_first', 'all_layers']:
-                memory = targets[1].detach()
-                x_b_targets = memory[:-1]
-
-                mem_preds = torch.stack(predicted_outputs[1:])
-                ls_loss = self.loss(mem_preds, x_b_targets)
-                if loss is None:
-                    loss = ls_loss
-                else:
-                    loss += ls_loss
+                memory = self._repackage_hidden(targets[1])
+                for l in range(self.n_layers - 1):
+                    x_b_targets = memory[l]  # Target memory states up to 2nd to last layer
+                    mem_preds = predicted_outputs[l+1]  # Predictions from layer above
+                    ls_loss = self.loss(mem_preds, x_b_targets)
+                    if loss is None:
+                        loss = ls_loss
+                    else:
+                        loss += ls_loss
 
         return loss
 
@@ -821,9 +825,12 @@ class RSMExperiment(object):
                 # Val loss increased
                 if self.learning_rate_gamma:
                     self.do_anneal_learning = True  # Reduce LR during post_epoch
-                if self.pause_learning:
-                    print(">>> Pausing learning, validation loss rose to %.3f, best: %.3f" % (val_loss, self.best_val_loss))
-                    self.model_learning_paused = True
+                if self.pause_after_upticks and not self.model_learning_paused:
+                    self.n_upticks += 1
+                    if self.n_upticks >= self.pause_after_upticks:
+                        print(">>> Pausing learning after %d upticks, validation loss rose to %.3f, best: %.3f, setting eval interval to %d" % (self.n_upticks, val_loss, self.best_val_loss, self.pause_eval_interval))
+                        self.model_learning_paused = True
+                        self.eval_interval = self.pause_eval_interval
 
         return ret
 
