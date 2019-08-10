@@ -27,6 +27,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
+from layers import DSConv2d
+
 
 class BaseModel:
     """Base model, with training loops and logging functions."""
@@ -56,7 +58,6 @@ class BaseModel:
         defaults.update(config or {})
         self.__dict__.update(defaults)
 
-        # init remaining
         self.device = torch.device(self.device)
         self.network = network.to(self.device)
 
@@ -89,9 +90,10 @@ class BaseModel:
         self.current_epoch = epoch + 1
         self.log = {}
         self.network.train()
-        self._run_one_pass(dataset.train_loader, train=True)
-        self.network.eval()
-        self._run_one_pass(dataset.test_loader, train=False)
+        self.log['hello'] = 0
+        # self._run_one_pass(dataset.train_loader, train=True)
+        # self.network.eval()
+        # self._run_one_pass(dataset.test_loader, train=False)
         self._post_epoch_updates(dataset)
 
         return self.log
@@ -770,3 +772,19 @@ class DSNNMixedHeb(DSNNHeb):
 
         # track added connections
         return new_mask, keep_mask, add_mask
+
+
+class DSCNN(BaseModel):
+    """
+    Similar to other sparse models, but the focus here is on convolutional layers as
+    opposed to dense layers.
+    """
+
+    def _post_epoch_updates(self, dataset=None):
+
+        super()._post_epoch_updates(dataset)
+
+        for name, layer in self.network._modules.items():
+            if isinstance(layer, DSConv2d):
+                layer.progress_connections()
+                self.log['c' + layer] = layer.c #

@@ -25,6 +25,7 @@ import torch
 from torch import nn
 from torchvision import models
 
+from layers import DSConv2d
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 
@@ -500,3 +501,23 @@ def resnet18(config):
 
 def resnet50(config):
     return models.resnet50(num_classes=config["num_classes"])
+
+
+def vgg19_dscnn(config):
+
+    net = VGG19(config)
+    for name, layer in net._modules.items():
+        if isinstance(layer, torch.nn.Conv2d):
+            setattr(net, name, DSConv2d(
+                in_channels=layer.in_channels,
+                out_channels=layer.out_channels,
+                kernel_size=layer.kernel_size,
+                stride=layer.stride,
+                padding=layer.padding,
+                padding_mode=layer.padding_mode,
+                dilation=layer.dilation,
+                groups=layer.groups,
+                bias=(layer.bias is not None),
+            ))
+
+    return net
