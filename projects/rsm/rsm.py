@@ -119,14 +119,16 @@ class RSMNet(torch.nn.Module):
     def __init__(self, n_layers=1, **kwargs):
         super(RSMNet, self).__init__()
         self.n_layers = n_layers
-        self.total_cells = kwargs['m'] * kwargs['n']
         self.batch_counter = 0
         self.hooks_registered = False
         eps_arr = self._parse_param_array(kwargs['eps'])
         k_winners_arr = self._parse_param_array(kwargs['k'])
         boost_strength_arr = self._parse_param_array(kwargs['boost_strength'])
         duty_cycle_period_arr = self._parse_param_array(kwargs['duty_cycle_period'])
+        m_arr = self._parse_param_array(kwargs['m'])
+        n_arr = self._parse_param_array(kwargs['n'])
         last_output_dim = None
+        self.total_cells = []
         for i in range(n_layers):
             first_layer = i == 0
             top_layer = i == n_layers - 1
@@ -138,9 +140,12 @@ class RSMNet(torch.nn.Module):
             if top_layer:
                 kwargs['lateral_conn'] = kwargs['top_lateral_conn']
             kwargs['eps'] = eps_arr[i]
+            kwargs['m'] = m_arr[i]
+            kwargs['n'] = n_arr[i]
             kwargs['k'] = k_winners_arr[i]
             kwargs['boost_strength'] = boost_strength_arr[i]
             kwargs['duty_cycle_period'] = duty_cycle_period_arr[i]
+            self.total_cells.append(kwargs['m'] * kwargs['n'])
             last_output_dim = kwargs['m'] * kwargs['n']
             self.add_module("RSM_%d" % (i+1), RSMLayer(**kwargs))
         print("Created RSMNet with %d layer(s)" % n_layers)
@@ -169,7 +174,7 @@ class RSMNet(torch.nn.Module):
             - a hidden state which is passed to the next layer
 
         Arguments:
-            x_a_batch: (bsz, total_cells)
+            x_a_batch: (bsz, d_in)
             hidden: Tuple (x_b, x_b_hys, phi, psi), each Tensor (n_layers, bsz, total_cells)
 
         Returns:
@@ -179,45 +184,44 @@ class RSMNet(torch.nn.Module):
         output_by_layer = []
 
         new_x_b = []
-        new_x_b_hys = []
         new_phi = []
         new_psi = []
 
-        x_b, x_b_hys, phi, psi = hidden
+        x_b, phi, psi = hidden
         layer_input = x_a_batch
 
         # If multi-layered, use non-decaying version
-        x_b_rec = x_b if self.n_layers > 1 else x_b_hys
+        # x_b_rec = x_b if self.n_layers > 1 else x_b_hys
+        x_b_rec = x_b
 
         lid = 0
         for (layer_name, layer), lay_phi, lay_psi in zip(self.named_children(), phi, psi):
             last_layer = lid == len(phi) - 1
-            first_layer = lid == 0
+            lay_above = list(self.children())[lid + 1] if not last_layer else None
             lay_x_b = x_b_rec[lid]
             lay_x_above = x_b_rec[lid+1] if not last_layer else None
-            lay_x_below = x_b_rec[lid-1] if not first_layer else None
 
-            hidden_in = (lay_x_b, lay_x_above, lay_x_below, lay_phi, lay_psi)
+            if lay_x_above is not None:
+                psi_above = psi[lid + 1]
+                lay_x_above = torch.max(torch.sigmoid(lay_above.decay) * psi_above, lay_x_above)
+            if lay_x_b is not None:
+                lay_x_b = torch.max(torch.sigmoid(layer.decay) * lay_psi, lay_x_b)
+
+            hidden_in = (lay_x_b, lay_x_above, lay_phi, lay_psi)
 
             pred_output, hidden = layer(layer_input, hidden_in)
 
             layer_input = hidden[1]
 
             new_x_b.append(hidden[0])
-            new_x_b_hys.append(hidden[1])
-            new_phi.append(hidden[2])
-            new_psi.append(hidden[3])
+            new_phi.append(hidden[1])
+            new_psi.append(hidden[2])
 
             output_by_layer.append(pred_output)
 
             lid += 1
 
-        new_hidden = (
-            torch.stack(new_x_b),
-            torch.stack(new_x_b_hys),
-            torch.stack(new_phi),
-            torch.stack(new_psi)
-        )
+        new_hidden = (new_x_b, new_phi, new_psi)
 
         self.batch_counter += 1  # Is this stored elsewhere?
         return (output_by_layer, new_hidden)
@@ -272,19 +276,19 @@ class RSMNet(torch.nn.Module):
 
     def init_hidden(self, batch_size):
         param = next(self.parameters())
-        x_b = param.new_zeros(
-            (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
-        )
-        x_b_hys = param.new_zeros(
-            (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
-        )
-        phi = param.new_zeros(
-            (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
-        )
-        psi = param.new_zeros(
-            (self.n_layers, batch_size, self.total_cells), dtype=torch.float32, requires_grad=False
-        )
-        return (x_b, x_b_hys, phi, psi)
+        x_b = [param.new_zeros(
+            (batch_size, tc), 
+            dtype=torch.float32, requires_grad=False
+        ) for tc in self.total_cells]
+        phi = [param.new_zeros(
+            (batch_size, tc), 
+            dtype=torch.float32, requires_grad=False
+        ) for tc in self.total_cells]
+        psi = [param.new_zeros(
+            (batch_size, tc), 
+            dtype=torch.float32, requires_grad=False
+        ) for tc in self.total_cells]
+        return (x_b, phi, psi)
 
 
 class RSMLayer(torch.nn.Module):
@@ -320,14 +324,13 @@ class RSMLayer(torch.nn.Module):
         input_bias=False,
         decode_bias=True,
         lateral_conn=True,
-        tp_boosting=False,
         mem_gain=1.0,
         debug=False,
         visual_debug=False,
         fpartition=None,
         balance_part_winners=False,
         trainable_decay=False,
-        decode_from_hys=False,
+        stoch_decay=False,
         **kwargs,
     ):
         """
@@ -391,11 +394,10 @@ class RSMLayer(torch.nn.Module):
         self.feedback_conn = feedback_conn
         self.input_bias = input_bias
         self.decode_bias = decode_bias
-        self.tp_boosting = tp_boosting
         self.lateral_conn = lateral_conn
         self.mem_gain = mem_gain
         self.trainable_decay = trainable_decay
-        self.decode_from_hys = decode_from_hys
+        self.stoch_decay = stoch_decay
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -403,8 +405,12 @@ class RSMLayer(torch.nn.Module):
 
         self._build_layers_and_kwinners()
 
-        self.decay = nn.Parameter(self.eps * torch.ones(self.total_cells, dtype=torch.float32),
-                                  requires_grad=self.trainable_decay)
+        if self.stoch_decay:
+            # Fixed random decay rates, test with trainable_decay = False
+            decay_init = torch.ones(self.total_cells, dtype=torch.float32).uniform_(-3.0, 3.0)
+        else:
+            decay_init = self.eps * torch.ones(self.total_cells, dtype=torch.float32)
+        self.decay = nn.Parameter(decay_init, requires_grad=self.trainable_decay)
         self.register_parameter("decay", self.decay)
 
         print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
@@ -469,13 +475,9 @@ class RSMLayer(torch.nn.Module):
                 self.linear_b_int = nn.Linear(m_int, m_int, bias=self.input_bias)
         else:
             # Standard architecture, no partition
-            if self.tp_boosting:
-                self.linear_a = PredictiveProximalLinear(self.d_in, self.m,
-                                                         bias=self.input_bias)
-            else:
-                self.linear_a = nn.Linear(
-                    self.d_in, self.m, bias=self.input_bias
-                )  # Input weights (shared per group / proximal)
+            self.linear_a = nn.Linear(
+                self.d_in, self.m, bias=self.input_bias
+            )  # Input weights (shared per group / proximal)
             if self.lateral_conn:
                 self.linear_b = nn.Linear(
                     self.total_cells, self.total_cells, bias=self.input_bias
@@ -574,7 +576,7 @@ class RSMLayer(torch.nn.Module):
         """
         return activity.view(activity.size(0), self.m, self.n).max(dim=2).values
 
-    def _fc_weighted_ave(self, x_a, x_b, x_b_above=None, x_b_below=None):
+    def _fc_weighted_ave(self, x_a, x_b, x_b_above=None):
         """
         Compute sigma (weighted sum for each cell j in group i (mxn))
         """
@@ -599,11 +601,7 @@ class RSMLayer(torch.nn.Module):
                 sigma = torch.cat((z_a, z_b), 1)  # bsz x m
         else:
             # Col activation from inputs repeated for each cell
-            if self.tp_boosting and x_b_below is not None:
-                predictive_activity = x_b_below
-                z_a = self.linear_a(x_a, predictive_activity).repeat_interleave(self.n, 1)
-            else:
-                z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
+            z_a = self.linear_a(x_a).repeat_interleave(self.n, 1)
 
             sigma = z_a
             z_log = {"z_a": z_a}
@@ -712,7 +710,7 @@ class RSMLayer(torch.nn.Module):
 
         return y
 
-    def _update_memory_and_inhibition(self, y, phi, psi):
+    def _update_memory_and_inhibition(self, y, phi, psi, x_b=None):
         """
         Decay memory and inhibition tensors
 
@@ -721,27 +719,24 @@ class RSMLayer(torch.nn.Module):
         """
 
         # Get updated psi (memory state), decay inactive
-        if self.trainable_decay:
-            decay_mult = torch.sigmoid(self.decay)
-            self._debug_log({"decay_mult": decay_mult})
-        else:
-            decay_mult = self.eps
-        psi = torch.max(psi * decay_mult, y)
+        # if self.trainable_decay:
+        #     decay_mult = torch.sigmoid(self.decay)
+        #     self._debug_log({"decay_mult": decay_mult})
+        # else:
+        #     decay_mult = self.eps
+        # psi = torch.max(psi * decay_mult, y)
+        psi = x_b
 
         # Update phi for next step (decay inhibition cells)
         phi = torch.max(phi * self.gamma, y)
 
         return (phi, psi)
 
-    def _decode_prediction(self, y, x_b_hys):
-        # Decode prediction (optionally through col-wise max bottleneck)
-        if self.decode_from_hys:
-            decode_input = x_b_hys
+    def _decode_prediction(self, y, x_b):
+        if self.decode_from_full_memory:
+            decode_input = self._group_max(y)
         else:
-            if self.decode_from_full_memory:
-                decode_input = self._group_max(y)
-            else:
-                decode_input = y
+            decode_input = y
         output = self.linear_d(decode_input)
         if self.decode_activation_fn:
             activation = RSMLayer.ACT_FNS[self.decode_activation_fn]
@@ -755,7 +750,6 @@ class RSMLayer(torch.nn.Module):
         :param hidden:
             x_b: (normalized) memory state at same layer at t-1
             x_b_above: memory state at layer above at t-1
-            x_b_below: memory state at layer below at t-1
             phi: inhibition state
             psi: memory state at t-1
 
@@ -763,38 +757,33 @@ class RSMLayer(torch.nn.Module):
         from the layer above, x_c, while the RSMNet takes only 3-tuple for
         hidden state.
         """
-        x_b, x_b_above, x_b_below, phi, psi = hidden
+        x_b, x_b_above, phi, psi = hidden
 
         phi, psi = self._do_forgetting(phi, psi)
 
         self._debug_log({"x_b": x_b, "x_a_batch": x_a_batch})
 
         sigma = self._fc_weighted_ave(x_a_batch, x_b,
-                                      x_b_above=x_b_above,
-                                      x_b_below=x_b_below)
+                                      x_b_above=x_b_above)
         self._debug_log({"sigma": sigma})
 
         y = self._inhibited_winners(sigma, phi)
 
-        phi, psi = self._update_memory_and_inhibition(y, phi, psi)
+        phi, psi = self._update_memory_and_inhibition(y, phi, psi, x_b=x_b)
         self._debug_log({"phi": phi, "psi": psi})
 
         # Update recurrent input / output x_b
         if self.x_b_norm:
             # Normalizing scalar (force sum(x_b) == 1)
-            alpha = (psi.sum(dim=1) + 1e-9).unsqueeze(dim=1)
-            x_b = y / alpha
-            x_b_hys = psi / alpha
+            alpha_y = (y.sum(dim=1) + 1e-9).unsqueeze(dim=1)
+            x_b = y / alpha_y
         else:
             x_b = y
-            x_b_hys = psi
 
-        pred_output = self._decode_prediction(y, x_b_hys)
+        pred_output = self._decode_prediction(y, psi)
         self._debug_log({"y": y, "pred_output": pred_output})
 
-        self._debug_log({"x_b_hys": x_b_hys})
-
-        hidden = (x_b, x_b_hys, phi, psi)
+        hidden = (x_b, phi, psi)
         return (pred_output, hidden)
 
 
