@@ -34,11 +34,11 @@ def compare_models(
     This is done by feeding in num_samples random inputs and seeing whether
     the largest output difference is within epsilon.
 
-    :param model1:
-    :param model2:
-    :param input_shape:
-    :param epsilon:
-    :param num_samples:
+    :param model1: A torch.nn.Module
+    :param model2: A torch.nn.Module
+    :param input_shape: The expected shape of inputs, e.g. (28,28) for MNIST
+    :param epsilon: Tolerance
+    :param num_samples: Number of random samples to test
 
     :return: Boolean
     """
