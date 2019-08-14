@@ -57,6 +57,7 @@ from nupic.research.frameworks.pytorch.speech_commands_dataset import (
     PreprocessedSpeechDataset,
     SpeechCommandsDataset,
 )
+from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import Flatten, rezero_weights, update_boost_strength
 
 
@@ -157,6 +158,7 @@ class SparseSpeechExperiment(object):
                     input_size=input_size,
                     linear_n=linear_n[i],
                     dropout=dropout,
+                    use_batch_norm=use_batch_norm,
                     weight_sparsity=weight_sparsity,
                     percent_on=linear_percent_on[i],
                     k_inference_factor=k_inference_factor,
@@ -175,6 +177,13 @@ class SparseSpeechExperiment(object):
             model = resnet9(
                 num_classes=len(self.train_loader.dataset.classes), in_channels=1
             )
+
+        elif self.model_type == "gsc_sparse_cnn":
+            model = GSCSparseCNN()
+
+        elif self.model_type == "gsc_super_sparse_cnn":
+            model = GSCSuperSparseCNN()
+
         else:
             raise RuntimeError("Unknown model type")
 
@@ -273,8 +282,7 @@ class SparseSpeechExperiment(object):
         self.model.train()
         for batch_idx, (batch, target) in enumerate(self.train_loader):
             data = batch["input"]
-            if self.model_type in ["resnet9", "cnn"]:
-                data = torch.unsqueeze(data, 1)
+            data = torch.unsqueeze(data, 1)
             data, target = data.to(self.device), target.to(self.device)
             self.optimizer.zero_grad()
             output = self.model(data)
@@ -318,8 +326,7 @@ class SparseSpeechExperiment(object):
         with torch.no_grad():
             for batch, target in test_loader:
                 data = batch["input"]
-                if self.model_type in ["resnet9", "cnn"]:
-                    data = torch.unsqueeze(data, 1)
+                data = torch.unsqueeze(data, 1)
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 test_loss += F.nll_loss(output, target, reduction="sum").item()

@@ -226,6 +226,7 @@ def add_sparse_linear_layer(
     input_size,
     linear_n,
     dropout,
+    use_batch_norm,
     weight_sparsity,
     percent_on,
     k_inference_factor,
@@ -239,6 +240,7 @@ def add_sparse_linear_layer(
     :param input_size: Input size
     :param linear_n: Number of units
     :param dropout: dropout value
+    :param use_batch_norm: whether or not to use batch norm
     :param weight_sparsity: Pct of weights that are allowed to be non-zero
     :param percent_on: Pct of ON (non-zero) units
     :param k_inference_factor: During inference we increase percent_on by this factor
@@ -253,6 +255,9 @@ def add_sparse_linear_layer(
         )
     else:
         network.add_module("linear{}".format(suffix), linear)
+
+    if use_batch_norm:
+        network.add_module("linear_bn", nn.BatchNorm1d(linear_n, affine=False))
 
     if dropout > 0.0:
         network.add_module("linear{}_dropout".format(suffix), nn.Dropout(dropout))
