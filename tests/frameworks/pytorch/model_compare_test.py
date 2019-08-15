@@ -23,6 +23,7 @@ import unittest
 
 import torch
 import torch.nn
+
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.torch.modules import Flatten
 
@@ -33,6 +34,7 @@ def simple_linear_net():
         torch.nn.ReLU(),
         torch.nn.Linear(16, 2)
     )
+
 
 def simple_conv_net():
     return torch.nn.Sequential(
@@ -45,6 +47,7 @@ def simple_conv_net():
         torch.nn.Linear(16, 2)
     )
 
+
 class ModelCompareTest(unittest.TestCase):
 
     def test_identical(self):
@@ -56,8 +59,8 @@ class ModelCompareTest(unittest.TestCase):
         """Compare a network with itself except for one weight"""
         model1 = simple_linear_net()
         model2 = copy.deepcopy(model1)
-        model1._modules['0'].weight[0][0] = 1.0
-        model2._modules['0'].weight[0][0] = -1.0
+        model1._modules["0"].weight[0][0] = 1.0
+        model2._modules["0"].weight[0][0] = -1.0
         self.assertFalse(compare_models(model1, model2, (32,)))
 
     def test_different(self):
@@ -76,7 +79,6 @@ class ModelCompareTest(unittest.TestCase):
         model1 = simple_conv_net()
         model2 = simple_conv_net()
         self.assertFalse(compare_models(model1, model2, (1, 32, 32)))
-
 
 
 if __name__ == "__main__":
