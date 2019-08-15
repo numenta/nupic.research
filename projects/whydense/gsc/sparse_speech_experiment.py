@@ -31,16 +31,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from nupic.research.frameworks.pytorch.audio_transforms import (
-    AddBackgroundNoiseOnSTFT,
     AddNoise,
-    ChangeAmplitude,
-    ChangeSpeedAndPitchAudio,
     DeleteSTFT,
     FixAudioLength,
-    FixSTFTDimension,
-    StretchAudioOnSTFT,
-    TimeshiftAudioOnSTFT,
-    ToMelSpectrogram,
     ToMelSpectrogramFromSTFT,
     ToSTFT,
     ToTensor,
@@ -53,7 +46,6 @@ from nupic.research.frameworks.pytorch.model_utils import (
 )
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.research.frameworks.pytorch.speech_commands_dataset import (
-    BackgroundNoiseDataset,
     SpeechCommandsDataset,
 )
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
@@ -355,7 +347,7 @@ class SparseSpeechExperiment(object):
         """
         Test the model with different noise values and return test metrics.
         """
-        assert False
+        raise AssertionError()
         ret = {}
         test_data_dir = os.path.join(self.data_dir, "test")
         n_mels = 32
