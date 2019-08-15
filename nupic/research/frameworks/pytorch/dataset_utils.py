@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 import collections
 import itertools
+import os
 
 import numpy as np
 import torch
@@ -111,3 +112,55 @@ def split_dataset(dataset, groupby):
         zip(*(sorted(list(indices_by_group.items()), key=lambda x: x[0])))
     )
     return [Subset(dataset, indices=i) for i in indices]
+
+
+class PreprocessedDataset(Dataset):
+    def __init__(self, cachefilepath, basename, qualifiers):
+        """
+        A Pytorch Dataset class representing a pre-generated processed dataset stored in
+        an efficient compressed numpy format (.npz). The dataset is represented by
+        num_files copies, where each copy is a different variation of the full dataset.
+        For example, for training with data augmentation, each copy might have been
+        generated with a different random seed.  This class is useful if the
+        pre-processing time is a significant fraction of training time.
+
+        :param cachefilepath: String for the directory containing pre-processed data.
+
+        :param basename: Base file name from which to construct actual file names.
+        Actual file name will be "basename{}.npz".format(i) where i cycles through the
+        list of qualifiers.
+
+        :param qualifiers: List of qualifiers for each preprocessed files in this
+        dataset.
+        """
+        self.path = cachefilepath
+        self.basename = basename
+        self.num_cycle = itertools.cycle(qualifiers)
+        self.tensors = []
+        self.load_next()
+
+    def __getitem__(self, index):
+        return tuple(tensor[index] for tensor in self.tensors)
+
+    def __len__(self):
+        return len(self.tensors[0])
+
+    def load_next(self):
+        """
+        Call this to load the next copy into memory, such as at the end of an epoch.
+
+        :return: Name of the file that was actually loaded.
+        """
+        return self.load_qualifier(next(self.num_cycle))
+
+    def load_qualifier(self, qualifier):
+        """
+        Call this to load the a copy of a dataset with the specific qualifier into
+        memory.
+
+        :return: Name of the file that was actually loaded.
+        """
+        file_name = os.path.join(self.path,
+                                 self.basename+"{}.npz".format(qualifier))
+        self.tensors = list(np.load(file_name).values())
+        return file_name
