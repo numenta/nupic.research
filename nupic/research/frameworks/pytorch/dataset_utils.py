@@ -161,6 +161,6 @@ class PreprocessedDataset(Dataset):
         :return: Name of the file that was actually loaded.
         """
         file_name = os.path.join(self.path,
-                                 self.basename+"{}.npz".format(qualifier))
+                                 self.basename + "{}.npz".format(qualifier))
         self.tensors = list(np.load(file_name).values())
         return file_name
