@@ -28,35 +28,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.utils.data.sampler import WeightedRandomSampler
-from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.audio_transforms import (
-    AddBackgroundNoiseOnSTFT,
-    AddNoise,
-    ChangeAmplitude,
-    ChangeSpeedAndPitchAudio,
-    DeleteSTFT,
-    FixAudioLength,
-    FixSTFTDimension,
-    StretchAudioOnSTFT,
-    TimeshiftAudioOnSTFT,
-    ToMelSpectrogram,
-    ToMelSpectrogramFromSTFT,
-    ToSTFT,
-    ToTensor,
-)
+from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     add_sparse_cnn_layer,
     add_sparse_linear_layer,
     set_random_seed,
 )
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
-from nupic.research.frameworks.pytorch.speech_commands_dataset import (
-    BackgroundNoiseDataset,
-    PreprocessedSpeechDataset,
-    SpeechCommandsDataset,
-)
+from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import Flatten, rezero_weights, update_boost_strength
 
 
@@ -91,15 +71,16 @@ class SparseSpeechExperiment(object):
         set_random_seed(seed)
 
         # Get our directories correct
-        self.data_dir = os.path.join(config["data_dir"], "speech_commands")
-        self.use_preprocessed_dataset = False
+        self.data_dir = config["data_dir"]
 
         # Configure Model
         self.model_type = config["model_type"]
+        self.num_classes = 12
         self.log_interval = config["log_interval"]
         self.batches_in_epoch = config["batches_in_epoch"]
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
+        self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
         cnn_input_shape = config.get("cnn_input_shape", (1, 32, 32))
         linear_n = config["linear_n"]
         linear_percent_on = config["linear_percent_on"]
@@ -157,6 +138,7 @@ class SparseSpeechExperiment(object):
                     input_size=input_size,
                     linear_n=linear_n[i],
                     dropout=dropout,
+                    use_batch_norm=use_batch_norm,
                     weight_sparsity=weight_sparsity,
                     percent_on=linear_percent_on[i],
                     k_inference_factor=k_inference_factor,
@@ -167,14 +149,21 @@ class SparseSpeechExperiment(object):
 
             # Output layer
             model.add_module(
-                "output", nn.Linear(input_size, len(self.train_loader.dataset.classes))
+                "output", nn.Linear(input_size, self.num_classes)
             )
             model.add_module("softmax", nn.LogSoftmax(dim=1))
 
         elif self.model_type == "resnet9":
             model = resnet9(
-                num_classes=len(self.train_loader.dataset.classes), in_channels=1
+                num_classes=self.num_classes, in_channels=1
             )
+
+        elif self.model_type == "gsc_sparse_cnn":
+            model = GSCSparseCNN()
+
+        elif self.model_type == "gsc_super_sparse_cnn":
+            model = GSCSuperSparseCNN()
+
         else:
             raise RuntimeError("Unknown model type")
 
@@ -261,7 +250,6 @@ class SparseSpeechExperiment(object):
         self.logger.info("epoch: %s", epoch)
 
         t0 = time.time()
-        self.pre_epoch()
 
         self.logger.info(
             "Learning rate: %s",
@@ -271,10 +259,8 @@ class SparseSpeechExperiment(object):
         )
 
         self.model.train()
-        for batch_idx, (batch, target) in enumerate(self.train_loader):
-            data = batch["input"]
-            if self.model_type in ["resnet9", "cnn"]:
-                data = torch.unsqueeze(data, 1)
+        for batch_idx, (data, target) in enumerate(self.train_loader):
+            # data = torch.unsqueeze(data, 1)
             data, target = data.to(self.device), target.to(self.device)
             self.optimizer.zero_grad()
             output = self.model(data)
@@ -289,22 +275,15 @@ class SparseSpeechExperiment(object):
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def pre_epoch(self):
-        # Update dataset epoch when using pre-processed speech dataset
-        if self.use_preprocessed_dataset:
-            t2 = time.time()
-            self.train_loader.dataset.next_seed()
-            self.validation_loader.dataset.next_seed()
-            self.test_loader.dataset.next_seed()
-            self.bg_noise_loader.dataset.next_seed()
-            self.logger.debug(
-                "Dataset Load time = {0:.3f} secs, ".format(time.time() - t2)
-            )
-
     def post_epoch(self):
         self.model.apply(update_boost_strength)
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
+        t2 = time.time()
+        self.train_loader.dataset.load_next()
+        self.logger.debug(
+            "Dataset Load time = {0:.3f} secs, ".format(time.time() - t2)
+        )
 
     def test(self, test_loader=None):
         """Test the model using the given loader and return test metrics."""
@@ -316,10 +295,7 @@ class SparseSpeechExperiment(object):
         correct = 0
 
         with torch.no_grad():
-            for batch, target in test_loader:
-                data = batch["input"]
-                if self.model_type in ["resnet9", "cnn"]:
-                    data = torch.unsqueeze(data, 1)
+            for data, target in test_loader:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 test_loss += F.nll_loss(output, target, reduction="sum").item()
@@ -350,12 +326,6 @@ class SparseSpeechExperiment(object):
 
         return entropy
 
-    def run_background_noise_test(self):
-        """Runs background noise test."""
-        if self.bg_noise_loader is not None:
-            return self.test(self.bg_noise_loader)
-        return None
-
     def validate(self):
         """Run validation."""
         if self.validation_loader:
@@ -365,151 +335,41 @@ class SparseSpeechExperiment(object):
     def run_noise_tests(self):
         """
         Test the model with different noise values and return test metrics.
+        Loads pre-generated noise dataset with noise transforms included
         """
         ret = {}
-        test_data_dir = os.path.join(self.data_dir, "test")
-        n_mels = 32
-
-        # Test with noise
-        for noise in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]:
-            # Create noise dataset with noise transform
-            noise_transform = transforms.Compose(
-                [
-                    FixAudioLength(),
-                    AddNoise(noise),
-                    ToSTFT(),
-                    ToMelSpectrogramFromSTFT(n_mels=n_mels),
-                    DeleteSTFT(),
-                    ToTensor("mel_spectrogram", "input"),
-                ]
-            )
-
-            noise_dataset = SpeechCommandsDataset(
-                test_data_dir, noise_transform, silence_percentage=0
-            )
-
-            noise_loader = DataLoader(
-                noise_dataset,
-                batch_size=self.batch_size,
-                sampler=None,
-                shuffle=False,
-                pin_memory=self.use_cuda,
-            )
-
-            ret[noise] = self.test(noise_loader)
-
+        for noise in self.noise_values:
+            noise_qualifier = "{:02d}".format(int(100 * noise))
+            self.test_loader.dataset.load_qualifier(noise_qualifier)
+            ret[noise] = self.test(self.test_loader)
         return ret
 
     def load_datasets(self):
-        """The GSC dataset specifies specific files to be used as training,
-        test, and validation.  We assume the data has already been processed
-        according to those files into separate train, test, and valid
-        directories.
-
-        For our experiment we use a subset of the data (10 categories
-        out of 30), just like the Kaggle competition.
         """
-        n_mels = 32
+        GSC specifies specific files to be used as training, test, and validation.
 
-        # Check if using pre-processed data or raw data
-        self.use_preprocessed_dataset = PreprocessedSpeechDataset.is_valid(
-            self.data_dir
+        We assume the data has already been processed using the pre-processing scripts
+        here: https://github.com/numenta/nupic.torch/tree/master/examples/gsc
+        """
+        validation_dataset = PreprocessedDataset(
+            cachefilepath=self.data_dir,
+            basename="gsc_valid",
+            qualifiers=[""],
         )
-        if self.use_preprocessed_dataset:
-            train_dataset = PreprocessedSpeechDataset(self.data_dir, subset="train")
-            validation_dataset = PreprocessedSpeechDataset(
-                self.data_dir, subset="valid", silence_percentage=0
-            )
-            test_dataset = PreprocessedSpeechDataset(
-                self.data_dir, subset="test", silence_percentage=0
-            )
-            bg_noise_dataset = PreprocessedSpeechDataset(
-                self.data_dir, subset="noise", silence_percentage=0
-            )
-        else:
-            train_data_dir = os.path.join(self.data_dir, "train")
-            test_data_dir = os.path.join(self.data_dir, "test")
-            validation_data_dir = os.path.join(self.data_dir, "valid")
-            background_noise_dir = os.path.join(
-                self.data_dir, self.background_noise_dir
-            )
 
-            data_augmentation_transform = transforms.Compose(
-                [
-                    ChangeAmplitude(),
-                    ChangeSpeedAndPitchAudio(),
-                    FixAudioLength(),
-                    ToSTFT(),
-                    StretchAudioOnSTFT(),
-                    TimeshiftAudioOnSTFT(),
-                    FixSTFTDimension(),
-                ]
-            )
-
-            feature_transform = transforms.Compose(
-                [
-                    ToMelSpectrogramFromSTFT(n_mels=n_mels),
-                    DeleteSTFT(),
-                    ToTensor("mel_spectrogram", "input"),
-                ]
-            )
-
-            train_dataset = SpeechCommandsDataset(
-                train_data_dir,
-                transforms.Compose(
-                    [
-                        data_augmentation_transform,
-                        # Uncomment to allow adding BG noise during training
-                        # add_bg_noise,
-                        feature_transform,
-                    ]
-                ),
-            )
-
-            test_feature_transform = transforms.Compose(
-                [
-                    FixAudioLength(),
-                    ToMelSpectrogram(n_mels=n_mels),
-                    ToTensor("mel_spectrogram", "input"),
-                ]
-            )
-
-            validation_dataset = SpeechCommandsDataset(
-                validation_data_dir, test_feature_transform, silence_percentage=0
-            )
-
-            test_dataset = SpeechCommandsDataset(
-                test_data_dir, test_feature_transform, silence_percentage=0
-            )
-
-            bg_dataset = BackgroundNoiseDataset(
-                background_noise_dir, transforms.Compose([FixAudioLength(), ToSTFT()])
-            )
-
-            bg_noise_transform = transforms.Compose(
-                [
-                    FixAudioLength(),
-                    ToSTFT(),
-                    AddBackgroundNoiseOnSTFT(bg_dataset),
-                    ToMelSpectrogramFromSTFT(n_mels=n_mels),
-                    DeleteSTFT(),
-                    ToTensor("mel_spectrogram", "input"),
-                ]
-            )
-
-            bg_noise_dataset = SpeechCommandsDataset(
-                test_data_dir, bg_noise_transform, silence_percentage=0
-            )
-
-        weights = train_dataset.make_weights_for_balanced_classes()
-        sampler = WeightedRandomSampler(weights, len(weights))
-
-        # print("Number of training samples=",len(train_dataset))
-        # print("Number of validation samples=",len(validation_dataset))
-        # print("Number of test samples=",len(test_dataset))
+        test_dataset = PreprocessedDataset(
+            cachefilepath=self.data_dir,
+            basename="gsc_test_noise",
+            qualifiers=["{:02d}".format(int(100 * n)) for n in self.noise_values],
+        )
+        train_dataset = PreprocessedDataset(
+            cachefilepath=self.data_dir,
+            basename="gsc_train",
+            qualifiers=range(30),
+        )
 
         self.train_loader = DataLoader(
-            train_dataset, batch_size=self.batch_size, sampler=sampler
+            train_dataset, batch_size=self.batch_size, shuffle=True
         )
 
         self.validation_loader = DataLoader(
@@ -517,9 +377,5 @@ class SparseSpeechExperiment(object):
         )
 
         self.test_loader = DataLoader(
-            test_dataset, batch_size=self.batch_size, sampler=None, shuffle=False
-        )
-
-        self.bg_noise_loader = DataLoader(
-            bg_noise_dataset, batch_size=self.batch_size, sampler=None, shuffle=False
+            test_dataset, batch_size=self.batch_size, shuffle=False
         )
