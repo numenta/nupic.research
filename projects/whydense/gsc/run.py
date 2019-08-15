@@ -91,7 +91,9 @@ def run_noise_test(config):
         # Save noise results in checkpoint log dir
         noise_test = os.path.join(logdir, "noise.json")
         with open(noise_test, "w") as f:
-            json.dump(experiment.run_noise_tests(), f)
+            res = experiment.run_noise_tests()
+            json.dump(res, f)
+            print(res)
 
     # Upload results to S3
     sync_function = config.get("sync_function", None)
@@ -170,7 +172,10 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
         ray.init(num_cpus=num_cpus, num_gpus=num_gpus, local_mode=num_cpus == 1)
 
     # Run experiments
-    resources_per_trial = {"cpu": 1, "gpu": num_gpus / num_cpus}
+    gpu_percent = 0
+    if num_gpus > 0:
+        gpu_percent = configs.get("gpu_percentage", 0.5)
+    resources_per_trial = {"cpu": 1, "gpu": gpu_percent}
     print("resources_per_trial =", resources_per_trial)
     for exp in configs:
         print("experiment =", exp)
@@ -290,6 +295,8 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
     # Wait until all experiments complete
     ray.get(results)
     ray.shutdown()
+
+    print(results)
 
 
 if __name__ == "__main__":
