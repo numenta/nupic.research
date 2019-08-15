@@ -28,16 +28,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.audio_transforms import (
-    AddNoise,
-    DeleteSTFT,
-    FixAudioLength,
-    ToMelSpectrogramFromSTFT,
-    ToSTFT,
-    ToTensor,
-)
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     add_sparse_cnn_layer,
@@ -45,9 +36,6 @@ from nupic.research.frameworks.pytorch.model_utils import (
     set_random_seed,
 )
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
-from nupic.research.frameworks.pytorch.speech_commands_dataset import (
-    SpeechCommandsDataset,
-)
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import Flatten, rezero_weights, update_boost_strength
 
@@ -92,6 +80,7 @@ class SparseSpeechExperiment(object):
         self.batches_in_epoch = config["batches_in_epoch"]
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
+        self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
         cnn_input_shape = config.get("cnn_input_shape", (1, 32, 32))
         linear_n = config["linear_n"]
         linear_percent_on = config["linear_percent_on"]
@@ -346,68 +335,38 @@ class SparseSpeechExperiment(object):
     def run_noise_tests(self):
         """
         Test the model with different noise values and return test metrics.
+        Loads pre-generated noise dataset with noise transforms included
         """
-        raise AssertionError()
         ret = {}
-        test_data_dir = os.path.join(self.data_dir, "test")
-        n_mels = 32
-
-        # Test with noise
-        for noise in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]:
-            # Create noise dataset with noise transform
-            noise_transform = transforms.Compose(
-                [
-                    FixAudioLength(),
-                    AddNoise(noise),
-                    ToSTFT(),
-                    ToMelSpectrogramFromSTFT(n_mels=n_mels),
-                    DeleteSTFT(),
-                    ToTensor("mel_spectrogram", "input"),
-                ]
-            )
-
-            noise_dataset = SpeechCommandsDataset(
-                test_data_dir, noise_transform, silence_percentage=0
-            )
-
-            noise_loader = DataLoader(
-                noise_dataset,
-                batch_size=self.batch_size,
-                shuffle=False,
-                pin_memory=self.use_cuda,
-            )
-
-            ret[noise] = self.test(noise_loader)
-
+        for noise in self.noise_values:
+            noise_qualifier = "{:02d}".format(int(100 * noise))
+            self.test_loader.dataset.load_qualifier(noise_qualifier)
+            ret[noise] = self.test(self.test_loader)
         return ret
 
     def load_datasets(self):
         """
-        The GSC dataset specifies specific files to be used as training, test, and
-        validation.  We also assume the data has already been processed using the
-        pre-processing scripts here:
-        https://github.com/numenta/nupic.torch/tree/master/examples/gsc
+        GSC specifies specific files to be used as training, test, and validation.
+
+        We assume the data has already been processed using the pre-processing scripts
+        here: https://github.com/numenta/nupic.torch/tree/master/examples/gsc
         """
         validation_dataset = PreprocessedDataset(
             cachefilepath=self.data_dir,
             basename="gsc_valid",
-            qualifiers=range(1),
+            qualifiers=[""],
         )
 
         test_dataset = PreprocessedDataset(
             cachefilepath=self.data_dir,
             basename="gsc_test_noise",
-            qualifiers=["00"],
+            qualifiers=["{:02d}".format(int(100 * n)) for n in self.noise_values],
         )
         train_dataset = PreprocessedDataset(
             cachefilepath=self.data_dir,
             basename="gsc_train",
             qualifiers=range(30),
         )
-
-        # print("Number of training samples=",len(train_dataset))
-        # print("Number of validation samples=",len(validation_dataset))
-        # print("Number of test samples=",len(test_dataset))
 
         self.train_loader = DataLoader(
             train_dataset, batch_size=self.batch_size, shuffle=True
