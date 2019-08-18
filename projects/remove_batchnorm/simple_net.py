@@ -20,8 +20,7 @@
 
 from torch import nn
 
-from nupic.torch.modules import Flatten, KWinners, KWinners2d, SparseWeights
-
+from nupic.torch.modules import Flatten
 
 
 class SimpleCNN(nn.Sequential):
@@ -65,4 +64,3 @@ class SimpleCNN(nn.Sequential):
 
         # Classifier
         self.add_module("output", nn.Linear(linear_units, 12))
-

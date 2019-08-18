@@ -22,12 +22,15 @@ import pickle
 import random
 
 import numpy as np
-
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
-from torch import nn
 
+from nupic.torch.models.sparse_cnn import gsc_sparse_cnn, gsc_super_sparse_cnn
+
+from nupic.research.frameworks.pytorch.model_compare import compare_models
 from projects.remove_batchnorm.simple_net import SimpleCNN
+
 
 def train(model, num_samples=20):
     """
@@ -50,7 +53,7 @@ def train(model, num_samples=20):
 
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.2)
     model.train()
-    for batch_idx in range(10):
+    for _ in range(10):
         optimizer.zero_grad()
         output = model(x)
         loss = F.nll_loss(output, targets)
@@ -58,12 +61,12 @@ def train(model, num_samples=20):
         optimizer.step()
         print(loss.item())
 
+
 def inspect_model(model):
     model.eval()
+    print(model)
+
     with torch.no_grad():
-        print(model)
-        bnc = model._modules["cnn1_batchnorm"]
-        print(bnc)
         bnl = model._modules["linear_bn"]
         print(bnl)
         print("running_mean", bnl.running_mean)
@@ -73,17 +76,39 @@ def inspect_model(model):
         # From https://discuss.pytorch.org/t/affine-parameter-in-batchnorm/6005/2
         z = torch.zeros((1, 3))
         print("zeros", bnl(z))
-        print("zeros transformed", (z-bnl.running_mean)/(bnl.running_var + bnl.eps).sqrt())
+        print("zeros transformed",
+              (z - bnl.running_mean)/(bnl.running_var + bnl.eps).sqrt())
 
         o = torch.ones((1, 3))
         print("ones", bnl(o))
-        print("ones transformed", (o-bnl.running_mean)/(bnl.running_var + bnl.eps).sqrt())
+        print("ones transformed",
+              (o - bnl.running_mean)/(bnl.running_var + bnl.eps).sqrt())
+        print("---------------------\n\n")
+
+        linear = model._modules["linear"]
+        z = torch.zeros((1, linear.in_features))
+        o = torch.ones((1, linear.in_features))
+        lz = linear(z)
+        lo = linear(o)
+        print("linear(zeros)", lz)
+        print("bn(linear(zeros))", bnl(linear(z)))
+        print("linear(ones)", lo)
+        print("bn(linear(ones))", bnl(linear(o)))
+        t = (bnl.running_var + bnl.eps).sqrt()
+        linear.bias.data = (linear.bias - bnl.running_mean) / t
+        t = t.reshape((linear.out_features, 1))
+        linear.weight.data = linear.weight / t
+
+        print("linear(zeros) after rescaling", linear(z))
+        print("linear(ones) after rescaling", linear(o))
+
         print("---------------------\n\n")
 
         # With CNN
         cnn1 = model._modules["cnn1"]
-        z = torch.zeros((1, 1, 6, 6))
-        o = torch.ones((1, 1, 6, 6))
+        bnc = model._modules["cnn1_batchnorm"]
+        z = torch.zeros((1, cnn1.in_channels, 6, 6))
+        o = torch.ones((1, cnn1.in_channels, 6, 6))
         cz = cnn1(z)
         co = cnn1(o)
         print("cnn(zeros)", cz)
@@ -94,27 +119,87 @@ def inspect_model(model):
         print("cnn1.bias", cnn1.bias)
         t = (bnc.running_var + bnc.eps).sqrt()
         cnn1.bias.data = (cnn1.bias - bnc.running_mean) / t
-        t = t.reshape((2,1,1,1))
+        t = t.reshape((cnn1.out_channels, 1, 1, 1))
         cnn1.weight.data = cnn1.weight / t
         cz = cnn1(z)
         co = cnn1(o)
         print("cnn(zeros) after rescaling", cz)
         print("cnn(ones) after rescaling", co)
 
-    pass
+
+def fixup_conv(conv2d, bn_2d):
+    """
+    Given a conv2d and its associated batchNorm2D, change the weights of
+    the conv so that batch norm is no longer required.
+    """
+    t = (bn_2d.running_var + bn_2d.eps).sqrt()
+    conv2d.bias.data = (conv2d.bias - bn_2d.running_mean) / t
+    t = t.reshape((conv2d.out_channels, 1, 1, 1))
+    conv2d.weight.data = conv2d.weight / t
+
+
+def fixup_linear(linear, bn_linear):
+    """
+    Given a conv2d and its associated batchNorm2D, change the weights of
+    the conv so that batch norm is no longer required.
+    """
+    t = (bn_linear.running_var + bn_linear.eps).sqrt()
+    linear.bias.data = (linear.bias - bn_linear.running_mean) / t
+    t = t.reshape((linear.out_features, 1))
+    linear.weight.data = linear.weight / t
+
 
 def remove_batchnorm(model):
     """
+    Return a new model that is equivalent to model, but with batch norm layers removed.
+    Note: there are lots of restrictions to the structure of the model. We assume that
+    batchnorm is applied right after conv or linear layers, before relu, maxpool,
+    or kwinners.
+
     https://discuss.pytorch.org/t/replacing-convs-modules-with-custom-convs-then-notimplementederror/17736
     https://discuss.pytorch.org/t/how-to-replace-all-relu-activations-in-a-pretrained-network/31591/2
+
+    Deleting a layer:
+    https://spandan-madan.github.io/A-Collection-of-important-tasks-in-pytorch/
 
     :param model:
     :return:
     """
+    # Seems to be the best way to really ensure you're getting a copy
     modelr = pickle.loads(pickle.dumps(model))
 
-    bnc = modelr._modules["cnn1_batchnorm"]
-    pass
+    children = list(modelr.children())
+    names = list(modelr._modules.keys())
+    new_model = nn.Sequential()
+
+    modelr.eval()
+    with torch.no_grad():
+        last_module_with_weights = None
+        last_module_with_weights_type = None
+        for i, module in enumerate(children):
+            print(i, module)
+
+            if type(module) == nn.modules.conv.Conv2d:
+                last_module_with_weights = module
+                last_module_with_weights_type = type(module)
+                new_model.add_module(names[i], module)
+            elif type(module) == nn.modules.batchnorm.BatchNorm2d:
+                assert last_module_with_weights_type == nn.modules.conv.Conv2d
+                fixup_conv(last_module_with_weights, module)
+
+            elif type(module) == nn.modules.linear.Linear:
+                last_module_with_weights = module
+                last_module_with_weights_type = type(module)
+                new_model.add_module(names[i], module)
+            elif type(module) == nn.modules.batchnorm.BatchNorm1d:
+                assert last_module_with_weights_type == nn.modules.linear.Linear
+                fixup_linear(last_module_with_weights, module)
+
+            # Everything else gets added back as is
+            else:
+                new_model.add_module(names[i], module)
+
+    return new_model
 
 if __name__ == "__main__":
     seed = 42
@@ -123,5 +208,15 @@ if __name__ == "__main__":
     np.random.seed(seed)
     net = SimpleCNN()
     train(net)
-    inspect_model(net)
-    remove_batchnorm(net)
+    # inspect_model(net)
+
+    print(net)
+    net2 = remove_batchnorm(net)
+    print(net2)
+
+    print("comparison result=", compare_models(net, net2, (1, 32, 32)))
+    print("comparison result=", compare_models(net, SimpleCNN(), (1, 32, 32)))
+
+
+    # model = gsc_sparse_cnn()
+    # print(model)

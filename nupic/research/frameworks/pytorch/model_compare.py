@@ -44,9 +44,11 @@ def compare_models(
     """
     x = torch.randn((num_samples,) + input_shape)
 
+    model1.eval()
+    model2.eval()
     with torch.no_grad():
         y1 = model1(x)
         y2 = model2(x)
         diff = (y1 - y2).abs()
 
-    return diff.max() <= epsilon
+    return bool(diff.max() <= epsilon)
