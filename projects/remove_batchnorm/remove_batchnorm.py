@@ -33,20 +33,19 @@ from nupic.research.frameworks.pytorch.remove_batchnorm import remove_batchnorm
 from projects.remove_batchnorm.simple_net import SimpleCNN
 
 
+# Useful pages:
+#
+# https://discuss.pytorch.org/t/
+#           replacing-convs-modules-with-custom-convs-then-notimplementederror/17736
+# https://discuss.pytorch.org/t/
+#           how-to-replace-all-relu-activations-in-a-pretrained-network/31591/2
+#
+# Deleting a layer:
+# https://spandan-madan.github.io/A-Collection-of-important-tasks-in-pytorch/
+
 def train(model, num_samples=20):
     """
     Train the model on random inputs.
-
-    :param model: pytorch model to be trained
-
-    :param loader: data to train on
-    :param optimizer: Optimizer object used to train the model.
-
-    :param criterion: loss function to use
-
-    :param device:
-
-    :type device: :class:`torch.device`
     """
     # Create a random training set
     x = torch.randn((num_samples,) + (1, 32, 32))

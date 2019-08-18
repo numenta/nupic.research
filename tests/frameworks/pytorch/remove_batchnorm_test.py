@@ -32,31 +32,31 @@ from nupic.torch.modules import Flatten
 
 class SimpleCNN(nn.Sequential):
     """
-    Simple CNN model for testing batch norm removal. One CNN layer plus
-    one fully connected layer plus a linear output layer.
+    Simple CNN model for testing batch norm removal. One CNN layer plus one
+    fully connected layer plus a linear output layer.  The input shape will be
+    (1, 32, 32) and the net will have 12 output classes.
     """
 
     def __init__(self,
-                 cnn_out_channels=(2, 2),
+                 cnn_out_channels=2,
                  linear_units=3,
+                 sparse_weights=False,
                  ):
         super(SimpleCNN, self).__init__()
-        # input_shape = (1, 32, 32)
-        # First Sparse CNN layer
-        self.add_module("cnn1", nn.Conv2d(1, cnn_out_channels[0], 5))
-        self.add_module("cnn1_batchnorm", nn.BatchNorm2d(cnn_out_channels[0],
+        self.add_module("cnn1", nn.Conv2d(1, cnn_out_channels, 5))
+        self.add_module("cnn1_batchnorm", nn.BatchNorm2d(cnn_out_channels,
                                                          affine=False))
         self.add_module("cnn1_maxpool", nn.MaxPool2d(2))
         self.add_module("cnn1_relu", nn.ReLU())
 
-        self.add_module("flatten", Flatten())
 
-        # Sparse Linear layer
-        self.add_module("linear", nn.Linear(196 * cnn_out_channels[0], linear_units))
+        # Linear layer
+        self.add_module("flatten", Flatten())
+        self.add_module("linear", nn.Linear(196 * cnn_out_channels, linear_units))
         self.add_module("linear_bn", nn.BatchNorm1d(linear_units, affine=False))
         self.add_module("linear_relu", nn.ReLU())
 
-        # Classifier
+        # Classifier layer with 12 classes
         self.add_module("output", nn.Linear(linear_units, 12))
 
 
@@ -76,7 +76,6 @@ def train_randomly(model, num_samples=20):
         loss = F.nll_loss(output, targets)
         loss.backward()
         optimizer.step()
-        # print(loss.item())
 
 
 class RemoveBatchnormTest(unittest.TestCase):
@@ -84,6 +83,19 @@ class RemoveBatchnormTest(unittest.TestCase):
     def test_simple_cnn(self):
         """Compare a network with itself after batchnorm is removed."""
         model = SimpleCNN()
+        train_randomly(model)
+        model2 = remove_batchnorm(model)
+
+        self.assertLess(len(model2._modules.keys()), len(model._modules.keys()))
+        self.assertTrue(compare_models(model, model2, (1, 32, 32)))
+
+
+    def test_simple_cnn2(self):
+        """Compare another network with itself after batchnorm is removed."""
+        model = SimpleCNN(
+            cnn_out_channels=5,
+            linear_units=20,
+        )
         train_randomly(model)
         model2 = remove_batchnorm(model)
 
