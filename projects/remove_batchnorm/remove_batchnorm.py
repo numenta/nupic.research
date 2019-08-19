@@ -128,21 +128,29 @@ def inspect_model(model):
 
 
 if __name__ == "__main__":
-    seed = 42
+    seed = 44
     random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
-    net = SimpleCNN()
-    train(net)
+
+    # Simple networks
+    # net = SimpleCNN()
+    # train(net)
     # inspect_model(net)
 
-    print(net)
-    net2 = remove_batchnorm(net)
-    print(net2)
+    # print(net)
+    # net2 = remove_batchnorm(net)
+    # print(net2)
 
-    print("comparison result=", compare_models(net, net2, (1, 32, 32)))
-    print("comparison result=", compare_models(net, SimpleCNN(), (1, 32, 32)))
+    # print("comparison result=", compare_models(net, net2, (1, 32, 32)))
+    # print("comparison result=", compare_models(net, SimpleCNN(), (1, 32, 32)))
 
 
     # model = gsc_sparse_cnn()
     # print(model)
+
+    model = gsc_sparse_cnn(pretrained=True)
+    print(model)
+    model2 = remove_batchnorm(model)
+    print(model2)
+    print("comparison result=", compare_models(model, model2, (1, 32, 32)))
