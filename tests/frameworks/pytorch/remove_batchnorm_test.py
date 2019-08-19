@@ -18,7 +18,6 @@
 #  http://numenta.org/licenses/
 #
 
-import copy
 import unittest
 
 import torch
@@ -27,32 +26,45 @@ import torch.nn.functional as F
 
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.remove_batchnorm import remove_batchnorm
+from nupic.torch.models.sparse_cnn import gsc_sparse_cnn
 from nupic.torch.modules import Flatten
+from nupic.torch.modules.sparse_weights import (rezero_weights, SparseWeights,
+                                                SparseWeights2d)
 
 
 class SimpleCNN(nn.Sequential):
     """
     Simple CNN model for testing batch norm removal. One CNN layer plus one
     fully connected layer plus a linear output layer.  The input shape will be
-    (1, 32, 32) and the net will have 12 output classes.
+    (in_channels, 32, 32) and the net will have 12 output classes.
     """
 
     def __init__(self,
+                 in_channels=1,
                  cnn_out_channels=2,
                  linear_units=3,
                  sparse_weights=False,
                  ):
         super(SimpleCNN, self).__init__()
-        self.add_module("cnn1", nn.Conv2d(1, cnn_out_channels, 5))
+        if sparse_weights:
+            self.add_module("cnn1_sparse",
+                            SparseWeights2d(
+                                nn.Conv2d(in_channels, cnn_out_channels, 5), 0.5))
+        else:
+            self.add_module("cnn1", nn.Conv2d(in_channels, cnn_out_channels, 5))
         self.add_module("cnn1_batchnorm", nn.BatchNorm2d(cnn_out_channels,
                                                          affine=False))
         self.add_module("cnn1_maxpool", nn.MaxPool2d(2))
         self.add_module("cnn1_relu", nn.ReLU())
 
-
         # Linear layer
         self.add_module("flatten", Flatten())
-        self.add_module("linear", nn.Linear(196 * cnn_out_channels, linear_units))
+        if sparse_weights:
+            self.add_module("linear_sparse",
+                            SparseWeights(
+                                nn.Linear(196 * cnn_out_channels, linear_units), 0.5))
+        else:
+            self.add_module("linear", nn.Linear(196 * cnn_out_channels, linear_units))
         self.add_module("linear_bn", nn.BatchNorm1d(linear_units, affine=False))
         self.add_module("linear_relu", nn.ReLU())
 
@@ -60,12 +72,12 @@ class SimpleCNN(nn.Sequential):
         self.add_module("output", nn.Linear(linear_units, 12))
 
 
-def train_randomly(model, num_samples=20):
+def train_randomly(model, in_channels=1, num_samples=20):
     """
     Train the model on random inputs to ensure the batchnorm really learns something.
     """
     # Create a random training set
-    x = torch.randn((num_samples,) + (1, 32, 32))
+    x = torch.randn((num_samples,) + (in_channels, 32, 32))
     targets = torch.randint(0, 12, (num_samples,))
 
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.2)
@@ -89,14 +101,55 @@ class RemoveBatchnormTest(unittest.TestCase):
         self.assertLess(len(model2._modules.keys()), len(model._modules.keys()))
         self.assertTrue(compare_models(model, model2, (1, 32, 32)))
 
-
-    def test_simple_cnn2(self):
+    def test_cnn_more_out_channels(self):
         """Compare another network with itself after batchnorm is removed."""
         model = SimpleCNN(
-            cnn_out_channels=5,
+            cnn_out_channels=16,
             linear_units=20,
         )
         train_randomly(model)
+        model2 = remove_batchnorm(model)
+
+        self.assertLess(len(model2._modules.keys()), len(model._modules.keys()))
+        self.assertTrue(compare_models(model, model2, (1, 32, 32)))
+
+    def test_cnn_more_in_channels(self):
+        """
+        Compare a network with 3 in_channels with itself after batchnorm is removed.
+        """
+        model = SimpleCNN(
+            in_channels=3,
+            cnn_out_channels=4,
+            linear_units=5,
+        )
+        train_randomly(model, in_channels=3)
+        model2 = remove_batchnorm(model)
+
+        self.assertLess(len(model2._modules.keys()), len(model._modules.keys()))
+        self.assertTrue(compare_models(model, model2, (3, 32, 32)))
+
+    def test_cnn_sparse_weights(self):
+        """
+        Compare a network with 3 in_channels with itself after batchnorm is removed.
+        """
+        model = SimpleCNN(
+            in_channels=3,
+            cnn_out_channels=4,
+            linear_units=5,
+            sparse_weights=True,
+        )
+        train_randomly(model, in_channels=3)
+        model.apply(rezero_weights)
+        model2 = remove_batchnorm(model)
+
+        self.assertLess(len(model2._modules.keys()), len(model._modules.keys()))
+        self.assertTrue(compare_models(model, model2, (3, 32, 32)))
+
+    def test_gsc(self):
+        """
+        Compare the GSC network after batchnorm is removed.
+        """
+        model = gsc_sparse_cnn(pretrained=True)
         model2 = remove_batchnorm(model)
 
         self.assertLess(len(model2._modules.keys()), len(model._modules.keys()))

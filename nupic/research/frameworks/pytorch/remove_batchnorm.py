@@ -23,6 +23,8 @@ import pickle
 import torch
 import torch.nn as nn
 
+import nupic.torch
+
 
 def fold_batchnorm_conv(conv2d, bn_2d):
     """
@@ -49,6 +51,7 @@ def fold_batchnorm_linear(linear, bn_linear):
 def remove_batchnorm(model):
     """
     Return a new model that is equivalent to model, but with batch norm layers removed.
+
     Note: there are lots of restrictions to the structure of the model. We assume that
     batchnorm is applied right after conv or linear layers, before relu, maxpool,
     or kwinners.
@@ -80,21 +83,33 @@ def remove_batchnorm(model):
         last_module_with_weights_type = None
         for i, module in enumerate(children):
 
-            if type(module) == nn.modules.conv.Conv2d:
+            if ((type(module) == nn.modules.conv.Conv2d) or
+                (type(module) == nupic.torch.modules.sparse_weights.SparseWeights2d)):
                 last_module_with_weights = module
                 last_module_with_weights_type = type(module)
                 new_model.add_module(names[i], module)
             elif type(module) == nn.modules.batchnorm.BatchNorm2d:
-                assert last_module_with_weights_type == nn.modules.conv.Conv2d
-                fold_batchnorm_conv(last_module_with_weights, module)
+                if last_module_with_weights_type == nn.modules.conv.Conv2d:
+                    fold_batchnorm_conv(last_module_with_weights, module)
+                elif (last_module_with_weights_type ==
+                      nupic.torch.modules.sparse_weights.SparseWeights2d):
+                    fold_batchnorm_conv(last_module_with_weights.module, module)
+                    last_module_with_weights.rezero_weights()
 
-            elif type(module) == nn.modules.linear.Linear:
+            elif ((type(module) == nn.modules.linear.Linear) or
+                  (type(module) == nupic.torch.modules.sparse_weights.SparseWeights)):
                 last_module_with_weights = module
                 last_module_with_weights_type = type(module)
                 new_model.add_module(names[i], module)
             elif type(module) == nn.modules.batchnorm.BatchNorm1d:
-                assert last_module_with_weights_type == nn.modules.linear.Linear
-                fold_batchnorm_linear(last_module_with_weights, module)
+                if last_module_with_weights_type == nn.modules.linear.Linear:
+                    fold_batchnorm_linear(last_module_with_weights, module)
+                elif (last_module_with_weights_type ==
+                      nupic.torch.modules.sparse_weights.SparseWeights):
+                    fold_batchnorm_linear(last_module_with_weights.module, module)
+                    last_module_with_weights.rezero_weights()
+                else:
+                    raise AssertionError
 
             # Everything else gets added back as is
             else:
