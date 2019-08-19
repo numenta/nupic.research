@@ -83,6 +83,7 @@ def remove_batchnorm(model):
         last_module_with_weights_type = None
         for i, module in enumerate(children):
 
+            # If we have a conv layer, keep track of it and remove the next batchnorm
             if ((type(module) == nn.modules.conv.Conv2d)
                     or (type(module)
                         == nupic.torch.modules.sparse_weights.SparseWeights2d)):
@@ -97,6 +98,7 @@ def remove_batchnorm(model):
                     fold_batchnorm_conv(last_module_with_weights.module, module)
                     last_module_with_weights.rezero_weights()
 
+            # If we have a linear layer, keep track of it and remove the next batchnorm
             elif ((type(module) == nn.modules.linear.Linear)
                   or (type(module)
                       == nupic.torch.modules.sparse_weights.SparseWeights)):
