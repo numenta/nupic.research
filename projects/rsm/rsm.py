@@ -121,6 +121,8 @@ class RSMNet(torch.nn.Module):
         self.n_layers = n_layers
         self.batch_counter = 0
         self.hooks_registered = False
+        self.skip_context = kwargs['skip_context']
+        self.skip_context_val = kwargs['skip_context_val']
         eps_arr = self._parse_param_array(kwargs['eps'])
         k_winners_arr = self._parse_param_array(kwargs['k'])
         boost_strength_arr = self._parse_param_array(kwargs['boost_strength'])
@@ -132,13 +134,23 @@ class RSMNet(torch.nn.Module):
         for i in range(n_layers):
             first_layer = i == 0
             top_layer = i == n_layers - 1
-            if not first_layer:
+            if first_layer:
+                kwargs['skip_context'] = 0.0
+                kwargs['skip_context_val'] = False
+            else:
                 # Input to all layers above first is hidden state x_b from previous
-                kwargs['d_in'] = last_output_dim
+                if self.skip_context:
+                    # Keep default d_in for all layers (input dimension)
+                    pass
+                else:
+                    kwargs['d_in'] = last_output_dim
                 # Output is of same dim as input (predictive autoencoder)
                 kwargs['d_out'] = kwargs['d_in']
-            if top_layer:
-                kwargs['lateral_conn'] = kwargs['top_lateral_conn']
+            if not top_layer:
+                kwargs['d_above'] = m_arr[i+1] * n_arr[i+1]
+            if kwargs['lateral_conn']:
+                if top_layer:
+                    kwargs['lateral_conn'] = kwargs['top_lateral_conn']
             kwargs['eps'] = eps_arr[i]
             kwargs['m'] = m_arr[i]
             kwargs['n'] = n_arr[i]
@@ -148,6 +160,7 @@ class RSMNet(torch.nn.Module):
             self.total_cells.append(kwargs['m'] * kwargs['n'])
             last_output_dim = kwargs['m'] * kwargs['n']
             self.add_module("RSM_%d" % (i+1), RSMLayer(**kwargs))
+
         print("Created RSMNet with %d layer(s)" % n_layers)
 
     def _parse_param_array(self, param_val):
@@ -159,6 +172,14 @@ class RSMNet(torch.nn.Module):
     def _zero_sparse_weights(self):
         for mod in self.children():
             mod._zero_sparse_weights()
+
+    def _zero_kwinner_boost(self):
+        # Zero KWinner boost strengths since learning in RSM is pausing
+        for layer in self.children():
+            for mod in layer.children():
+                if isinstance(mod, KWinners):
+                    print("Zeroing boost strength for %s" % mod)
+                    mod.boost_strength = 0.0
 
     def _register_hooks(self):
         if not self.hooks_registered:
@@ -211,7 +232,20 @@ class RSMNet(torch.nn.Module):
 
             pred_output, hidden = layer(layer_input, hidden_in)
 
-            layer_input = hidden[1]
+            if self.skip_context:
+                # Prepare input for next layer (l>1)
+                if self.training or self.skip_context_val:
+                    # TODO: Confirm ok to skip at val time?
+                    keep_idxs = torch.rand(x_a_batch.size(0)) > self.skip_context
+                    mask = torch.zeros_like(x_a_batch)
+                    mask[keep_idxs, :] = 1
+                    layer_input = mask * x_a_batch + (1 - mask) * torch.zeros_like(x_a_batch).uniform_(-1.0, 1.0)
+                else:
+                    layer_input = x_a_batch
+            else:
+                # Higher layers predict lower layer's phi (TOOD: or should be x_b?)
+                # phi has hysteresis (if decay active), x_b is just winners
+                layer_input = hidden[1]  # phi
 
             new_x_b.append(hidden[0])
             new_phi.append(hidden[1])
@@ -225,50 +259,6 @@ class RSMNet(torch.nn.Module):
 
         self.batch_counter += 1  # Is this stored elsewhere?
         return (output_by_layer, new_hidden)
-
-    def _plot_tensors(self, tuples, detailed=False, return_fig=False):
-        """
-        Plot first item in batch across multiple layers
-        """
-        n_tensors = len(tuples)
-        fig, axs = plt.subplots(self.n_layers, n_tensors, dpi=144)
-        for i, (label, val) in enumerate(tuples):
-            for l in range(self.n_layers):
-                layer_idx = self.n_layers - l - 1
-                ax = axs[layer_idx][i] if n_tensors > 1 else axs[layer_idx]
-                # Get layer's values (from either list or tensor)
-                # Outputs can't be stored in tensors since dimension heterogeneous
-                if isinstance(val, list):
-                    if val[l] is None:
-                        ax.set_visible(False)
-                        t = None
-                    else:
-                        t = val[l].detach()[0]
-                else:
-                    t = val.detach()[l, 0]
-                mod = list(self.children())[l]
-                if t is not None:
-                    size = t.numel()
-                    is_cell_level = t.numel() == mod.total_cells and mod.n > 1
-                    if is_cell_level:
-                        ax.imshow(
-                            t.view(mod.m, mod.n).t(),
-                            origin="bottom",
-                            extent=(0, mod.m - 1, 0, mod.n + 1),
-                        )
-                    else:
-                        ax.imshow(activity_square(t))
-                    tmin = t.min()
-                    tmax = t.max()
-                    tsum = t.sum()
-                    title = "L%d %s" % (l+1, label)
-                    if detailed:
-                        title += " (%s, rng: %.3f-%.3f, sum: %.3f)" % (size, tmin, tmax, tsum)
-                    ax.set_title(title)
-        if return_fig:
-            return fig
-        else:
-            plt.show()
 
     def _post_epoch(self, epoch):
         for mod in self.children():
@@ -298,6 +288,7 @@ class RSMLayer(torch.nn.Module):
         self,
         d_in=28 * 28,
         d_out=28 * 28,
+        d_above=None,
         m=200,
         n=6,
         k=25,
@@ -310,7 +301,6 @@ class RSMLayer(torch.nn.Module):
         vocab_size=0,
         decode_from_full_memory=False,
         debug_log_names=None,
-        mask_shifted_pi=False,
         do_inhibition=True,
         boost_strat="rsm_inhibition",
         x_b_norm=False,
@@ -324,12 +314,15 @@ class RSMLayer(torch.nn.Module):
         input_bias=False,
         decode_bias=True,
         lateral_conn=True,
+        leaky_kwinners=0.0,
         mem_gain=1.0,
         debug=False,
         visual_debug=False,
         fpartition=None,
         balance_part_winners=False,
         trainable_decay=False,
+        skip_context=0.0,
+        skip_context_val=False,
         stoch_decay=False,
         **kwargs,
     ):
@@ -367,6 +360,7 @@ class RSMLayer(torch.nn.Module):
         self.eps = eps
         self.d_in = d_in
         self.d_out = d_out
+        self.d_above = d_above
         self.forget_mu = float(forget_mu)
 
         self.total_cells = m * n
@@ -378,7 +372,6 @@ class RSMLayer(torch.nn.Module):
         self.decode_from_full_memory = decode_from_full_memory
         self.boost_strat = boost_strat
         self.x_b_norm = x_b_norm
-        self.mask_shifted_pi = mask_shifted_pi
         self.do_inhibition = do_inhibition
         self.boost_strength = boost_strength
         self.boost_strength_factor = boost_strength_factor
@@ -398,6 +391,9 @@ class RSMLayer(torch.nn.Module):
         self.mem_gain = mem_gain
         self.trainable_decay = trainable_decay
         self.stoch_decay = stoch_decay
+        self.skip_context = skip_context
+        self.skip_context_val = skip_context_val
+        self.leaky_kwinners = leaky_kwinners
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -484,7 +480,7 @@ class RSMLayer(torch.nn.Module):
                 )  # Recurrent weights (per cell)
             if self.feedback_conn:
                 # Linear layers for both recurrent input from above and below
-                self.linear_b_above = nn.Linear(self.total_cells, self.total_cells,
+                self.linear_b_above = nn.Linear(self.d_above, self.total_cells,
                                                 bias=self.input_bias)
 
         pct_on = self.k / self.m
@@ -678,15 +674,20 @@ class RSMLayer(torch.nn.Module):
                     winners.append(winners_rec)
                 winning_col_exp = torch.cat(winners, 1)
             else:
-                winning_cols = self.kwinners_col(lambda_).view(bsz, self.m, 1)
+                # TODO: Is this a mask or does it contain values of lambda?
+                # TODO: Clean
+                winning_cols = (self.kwinners_col(lambda_).view(bsz, self.m, 1).abs() > 0).float()
                 winning_col_exp = (
                     winning_cols.repeat(1, 1, self.n)
                     .view(bsz, self.total_cells)
                 )
 
+            if self.leaky_kwinners:
+                winning_col_exp = torch.max(torch.ones_like(winning_col_exp) * self.leaky_kwinners, winning_col_exp)
+
             self._debug_log({"winning_col_exp": winning_col_exp})
-            premask_act = pi if self.mask_shifted_pi else sigma
-            y_pre_act = m_pi * winning_col_exp * premask_act
+            y_pre_act = m_pi * winning_col_exp * sigma
+
 
         del m_pi
 
@@ -732,11 +733,11 @@ class RSMLayer(torch.nn.Module):
 
         return (phi, psi)
 
-    def _decode_prediction(self, y, x_b):
+    def _decode_prediction(self, y):
         if self.decode_from_full_memory:
-            decode_input = self._group_max(y)
-        else:
             decode_input = y
+        else:
+            decode_input = self._group_max(y)
         output = self.linear_d(decode_input)
         if self.decode_activation_fn:
             activation = RSMLayer.ACT_FNS[self.decode_activation_fn]
@@ -780,7 +781,7 @@ class RSMLayer(torch.nn.Module):
         else:
             x_b = y
 
-        pred_output = self._decode_prediction(y, psi)
+        pred_output = self._decode_prediction(y)
         self._debug_log({"y": y, "pred_output": pred_output})
 
         hidden = (x_b, phi, psi)
