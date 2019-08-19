@@ -83,29 +83,31 @@ def remove_batchnorm(model):
         last_module_with_weights_type = None
         for i, module in enumerate(children):
 
-            if ((type(module) == nn.modules.conv.Conv2d) or
-                (type(module) == nupic.torch.modules.sparse_weights.SparseWeights2d)):
+            if ((type(module) == nn.modules.conv.Conv2d)
+                    or (type(module)
+                        == nupic.torch.modules.sparse_weights.SparseWeights2d)):
                 last_module_with_weights = module
                 last_module_with_weights_type = type(module)
                 new_model.add_module(names[i], module)
             elif type(module) == nn.modules.batchnorm.BatchNorm2d:
                 if last_module_with_weights_type == nn.modules.conv.Conv2d:
                     fold_batchnorm_conv(last_module_with_weights, module)
-                elif (last_module_with_weights_type ==
-                      nupic.torch.modules.sparse_weights.SparseWeights2d):
+                elif (last_module_with_weights_type
+                      == nupic.torch.modules.sparse_weights.SparseWeights2d):
                     fold_batchnorm_conv(last_module_with_weights.module, module)
                     last_module_with_weights.rezero_weights()
 
-            elif ((type(module) == nn.modules.linear.Linear) or
-                  (type(module) == nupic.torch.modules.sparse_weights.SparseWeights)):
+            elif ((type(module) == nn.modules.linear.Linear)
+                  or (type(module)
+                      == nupic.torch.modules.sparse_weights.SparseWeights)):
                 last_module_with_weights = module
                 last_module_with_weights_type = type(module)
                 new_model.add_module(names[i], module)
             elif type(module) == nn.modules.batchnorm.BatchNorm1d:
                 if last_module_with_weights_type == nn.modules.linear.Linear:
                     fold_batchnorm_linear(last_module_with_weights, module)
-                elif (last_module_with_weights_type ==
-                      nupic.torch.modules.sparse_weights.SparseWeights):
+                elif (last_module_with_weights_type
+                      == nupic.torch.modules.sparse_weights.SparseWeights):
                     fold_batchnorm_linear(last_module_with_weights.module, module)
                     last_module_with_weights.rezero_weights()
                 else:
@@ -116,4 +118,3 @@ def remove_batchnorm(model):
                 new_model.add_module(names[i], module)
 
     return new_model
-
