@@ -25,8 +25,9 @@ import torch
 from torch import nn
 from torchvision import models
 
-from layers import DSConv2d
+from layers import DSConv2d, RandDSConv2d, SparseConv2d
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
+from nupic.torch.models.sparse_cnn import MNISTSparseCNN
 
 
 class VGG19(nn.Module):
@@ -503,21 +504,85 @@ def resnet50(config):
     return models.resnet50(num_classes=config["num_classes"])
 
 
+def make_dscnn(net, config={}):
+
+    named_convs = [
+        (name, layer) for name, layer in net.named_modules()
+        if isinstance(layer, torch.nn.Conv2d)
+    ]
+    num_convs = len(named_convs)
+
+    def tolist(param):
+        if isinstance(param, list):
+            return param
+        else:
+            return [param] * num_convs
+
+    def get_conv_type(prune_method):
+        return \
+            RandDSConv2d \
+            if prune_method == 'random' else \
+            SparseConv2d \
+            if prune_method == 'static' else \
+            None \
+            if prune_method == 'none' else \
+            DSConv2d
+
+    # Get DSConv2d params from config.
+    prune_methods = tolist(config.get('prune_methods', 'dynamic'))
+    assert len(prune_methods) == num_convs, \
+        "Not enough prune_methods specified in config. Expected {}, got {}".format(
+            num_convs, prune_methods)
+    kwargs_s = [
+        {
+            arg: tolist(config.get(arg))[c_i] for arg in [
+                "hebbian_prune_frac",
+                "weight_prune_frac",
+                "sparsity",
+                "prune_dims"
+            ] if arg in config and
+            prune_methods[c_i] not in [None, SparseConv2d]
+        }
+        for c_i in range(num_convs)
+    ]
+
+    for prune_method, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
+
+        NewConv = get_conv_type(prune_method)
+        if NewConv is None:
+            continue
+
+        setattr(net, name, NewConv(
+            in_channels=conv.in_channels,
+            out_channels=conv.out_channels,
+            kernel_size=conv.kernel_size,
+            stride=conv.stride,
+            padding=conv.padding,
+            padding_mode=conv.padding_mode,
+            dilation=conv.dilation,
+            groups=conv.groups,
+            bias=(conv.bias is not None),
+            **kwargs,
+        ))
+
+    return net
+
+
 def vgg19_dscnn(config):
 
     net = VGG19(config)
-    for name, layer in net._modules.items():
-        if isinstance(layer, torch.nn.Conv2d):
-            setattr(net, name, DSConv2d(
-                in_channels=layer.in_channels,
-                out_channels=layer.out_channels,
-                kernel_size=layer.kernel_size,
-                stride=layer.stride,
-                padding=layer.padding,
-                padding_mode=layer.padding_mode,
-                dilation=layer.dilation,
-                groups=layer.groups,
-                bias=(layer.bias is not None),
-            ))
+    net = make_dscnn(net)
+    return net
 
+
+def mnist_sparse_cnn(config):
+
+    net = MNISTSparseCNN()
+    return net
+
+
+def mnist_sparse_dscnn(config):
+
+    net = MNISTSparseCNN()
+    net = make_dscnn(net, config)
     return net

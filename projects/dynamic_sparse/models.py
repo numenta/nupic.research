@@ -27,7 +27,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
-from layers import DSConv2d
+from layers import calc_sparsity, DSConv2d, SparseConv2d
 
 
 class BaseModel:
@@ -90,10 +90,9 @@ class BaseModel:
         self.current_epoch = epoch + 1
         self.log = {}
         self.network.train()
-        self.log['hello'] = 0
-        # self._run_one_pass(dataset.train_loader, train=True)
-        # self.network.eval()
-        # self._run_one_pass(dataset.test_loader, train=False)
+        self._run_one_pass(dataset.train_loader, train=True)
+        self.network.eval()
+        self._run_one_pass(dataset.test_loader, train=False)
         self._post_epoch_updates(dataset)
 
         return self.log
@@ -784,7 +783,19 @@ class DSCNN(BaseModel):
 
         super()._post_epoch_updates(dataset)
 
-        for name, layer in self.network._modules.items():
-            if isinstance(layer, DSConv2d):
-                layer.progress_connections()
-                self.log['c' + layer] = layer.c #
+        for name, module in self.network.named_modules():
+
+            if isinstance(module, DSConv2d):
+                module.progress_connections()
+                self.log['pruning_iterations_' + name] = module.pruning_iterations
+                self.log['kept_frac' + name] = module.kept_frac
+            if isinstance(module, (DSConv2d, SparseConv2d)):
+                self.log['sparsity_' + name] = calc_sparsity(module.weight)
+
+    def _log_weights(self):
+        """Log weights for all layers which have params."""
+        if "param_layers" not in self.__dict__:
+            self.param_layers = defaultdict(list)
+            for m, ltype in [(m, self.has_params(m)) for m in self.network.modules()]:
+                if ltype:
+                    self.param_layers[ltype].append(m)

@@ -127,8 +127,8 @@ class Trainable(tune.Trainable):
         tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
 
     def _setup(self, config):
-        network = getattr(networks, config["network"])(config=config)
-        self.model = getattr(models, config["model"])(network, config=config)
+        self.network = getattr(networks, config["network"])(config=config)
+        self.model = getattr(models, config["model"])(self.network, config=config)
         self.dataset = Dataset(config=config)
         self.model.setup()
 
