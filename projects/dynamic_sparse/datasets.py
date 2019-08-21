@@ -153,13 +153,12 @@ class PreprocessedSpeechDataset(Dataset):
 class PreprocessedSpeechDataLoader(VaryingDataLoader):
 
     def __init__(
-        self, root, subset, random_seed=0, classes=CLASSES,
-        silence_percentage=0.1, batch_sizes=1,
+        self, root, subset, random_seed=0, classes=CLASSES, batch_sizes=1,
         *args, **kwargs
     ):
 
         self.dataset = PreprocessedSpeechDataset(
-            root, subset, random_seed, classes, silence_percentage)
+            root, subset, random_seed, classes)
 
         super().__init__(self.dataset, batch_sizes, *args, *kwargs)
 
@@ -171,14 +170,13 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
 
 if __name__ == '__main__':
 
-    test_loading_processes = False
+    test_loading_processes = True
     root = '~/nta/datasets/gsc'
     root = os.path.expanduser(root)
     dataset_train = PreprocessedSpeechDataset(
         root,
         'train',
         classes=CLASSES,
-        silence_percentage=0.1
     )
 
     if test_loading_processes:
@@ -191,7 +189,6 @@ if __name__ == '__main__':
         root,
         'train',
         classes=CLASSES,
-        silence_percentage=0.1,
         batch_sizes=batch_sizes,
     )
     for i in range(3):
@@ -219,7 +216,6 @@ if __name__ == '__main__':
         root,
         'valid',
         classes=CLASSES,
-        silence_percentage=0.1
     )
 
     if test_loading_processes:
@@ -230,7 +226,6 @@ if __name__ == '__main__':
         root,
         'test_noise',
         classes=CLASSES,
-        silence_percentage=0.1
     )
 
     if test_loading_processes:
