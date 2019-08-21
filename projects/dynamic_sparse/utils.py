@@ -20,15 +20,16 @@
 # ----------------------------------------------------------------------
 
 import os
+from copy import deepcopy
 
 import ray
 from ray import tune
-from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 import models
 import networks
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
+from datasets import PreprocessedSpeechDataLoader, VaryingDataLoader
 
 
 class Dataset:
@@ -52,6 +53,42 @@ class Dataset:
         )
         defaults.update(config)
         self.__dict__.update(defaults)
+        self.data_dir = os.path.expanduser(self.data_dir)
+
+        if hasattr(datasets, self.dataset_name):
+            self.load_from_torch_vision()
+        elif 'PreprocessedGSC':
+            self.load_preprocessed_gsc()
+        else:
+            raise Exception("Dataset {}")
+
+    def load_preprocessed_gsc(self):
+
+        self.train_loader = PreprocessedSpeechDataLoader(
+            self.data_dir,
+            subset="train",
+            batch_sizes=self.batch_size_train,
+            shuffle=True
+        )
+
+        self.test_loader = PreprocessedSpeechDataLoader(
+            self.data_dir,
+            subset="valid",
+            silence_percentage=0,
+            batch_sizes=self.batch_size_test,
+        )
+
+        if self.test_noise:
+            self.noise_loader = PreprocessedSpeechDataLoader(
+                self.data_dir,
+                subset="test_noise",
+                silence_percentage=0,
+                batch_sizes=self.batch_size_test,
+            )
+        else:
+            self.noise_loader = None
+
+    def load_from_torch_vision(self):
 
         # expand ~
         self.data_dir = os.path.expanduser(self.data_dir)
@@ -88,16 +125,16 @@ class Dataset:
         train_set = getattr(datasets, self.dataset_name)(
             root=self.data_dir, train=True, transform=aug_transform
         )
-        self.train_loader = DataLoader(
-            dataset=train_set, batch_size=self.batch_size_train, shuffle=True
+        self.train_loader = VaryingDataLoader(
+            dataset=train_set, batch_sizes=self.batch_size_train, shuffle=True
         )
 
         # load test set
         test_set = getattr(datasets, self.dataset_name)(
             root=self.data_dir, train=False, transform=transform
         )
-        self.test_loader = DataLoader(
-            dataset=test_set, batch_size=self.batch_size_test, shuffle=False
+        self.test_loader = VaryingDataLoader(
+            dataset=test_set, batch_sizes=self.batch_size_test, shuffle=False
         )
 
         # noise dataset
@@ -115,8 +152,8 @@ class Dataset:
             noise_set = getattr(datasets, self.dataset_name)(
                 root=self.data_dir, train=False, transform=noise_transform
             )
-            self.noise_loader = DataLoader(
-                dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
+            self.noise_loader = VaryingDataLoader(
+                dataset=noise_set, batch_sizes=self.batch_size_test, shuffle=False
             )
 
 
@@ -149,13 +186,15 @@ def download_dataset(config):
     Required to avoid multiple simultaneous attempts to download same
     dataset
     """
-    getattr(datasets, config["dataset_name"])(
-        download=True, root=os.path.expanduser(config["data_dir"])
-    )
+    dataset_name = config["dataset_name"]
+    if hasattr(datasets, dataset_name):
+        getattr(datasets, config["dataset_name"])(
+            download=True, root=os.path.expanduser(config["data_dir"])
+        )
 
 
 def new_experiment(base_config, new_config):
-    modified_config = base_config.copy()
+    modified_config = deepcopy(base_config)
     modified_config.update(new_config)
     return modified_config
 

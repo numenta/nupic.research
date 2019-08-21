@@ -49,12 +49,17 @@ base_exp_config = dict(
     # ----- Dataset Related -----
     # dataset_name="CIFAR10",
     # input_size=(3, 32, 32),
-    dataset_name="MNIST",
-    input_size=(1, 28, 28),
-    num_classes=10,
+    # > MNIST
+    # dataset_name="MNIST",
+    # input_size=(1, 28, 28),
+    # data_dir="~/nta/datasets/gsc",
     # stats_mean=(0.4914, 0.4822, 0.4465),
     # stats_std=(0.2023, 0.1994, 0.2010),
-    data_dir="~/nta/datasets",
+    # > GSC
+    dataset_name="PreprocessedGSC",
+    data_dir="~/nta/datasets/gsc",
+    batch_size_train=(4, 16),
+    batch_size_test=1000,
 
     # ----- Network Related ------
     model="DSCNN",
@@ -86,10 +91,10 @@ base_exp_config = dict(
 )
 
 # ray configurations
-experiment_name = "dscnn-dynamic-by-weight-2019-08-19"
+experiment_name = "dscnn-dynamic-2019-08-20-center-mean"
 tune_config = dict(
     name=experiment_name,
-    num_samples=7,
+    num_samples=4,
     local_dir=os.path.expanduser(os.path.join("~/nta/results", experiment_name)),
     checkpoint_freq=0,
     checkpoint_at_end=False,
@@ -134,14 +139,15 @@ experiments = {
     #     prune_dims=[[], []],
     # ),
 
-    "dynamic-first-layer-80-sparse-by-weight": dict(
-        network="mnist_sparse_dscnn",
-        prune_methods=['dynamic', 'none'],
-        hebbian_prune_frac=0.0,
-        weight_prune_frac=0.90,
-        sparsity=0.80,
-        prune_dims=[[], []],
-    ),
+    # "dynamic-first-layer-80-sparse-by-weight": dict(
+    #     network="mnist_sparse_dscnn",
+    #     prune_methods=['dynamic', 'none'],
+    #     hebbian_prune_frac=0.0,
+    #     weight_prune_frac=0.90,
+    #     sparsity=0.80,
+    #     prune_dims=[[], []],
+    # ),
+
     "dynamic-second-layer-98-sparse-by-weight": dict(
         network="mnist_sparse_dscnn",
         prune_methods=['none', 'dynamic'],
