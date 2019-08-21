@@ -19,8 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import gc
-import pickle
 import os
 import itertools
 import random
@@ -50,23 +48,37 @@ class VaryingDataLoader(object):
         ]
         self.epoch = 0
 
+    @property
+    def data_loader(self):
+        return self.data_loaders[self.epoch]
+
     def __iter__(self):
 
         data = self.data_loaders[self.epoch]
         self.epoch = min(self.epoch + 1, len(self.data_loaders) - 1)
         return data.__iter__()
 
+    def __len__(self):
+        return len(self.data_loader)
+
     def __getattr__(self, name):
 
-        data_loader = self.data_loaders[self.epoch]
-        if hasattr(self, name):
-            return getattr(self, name)
-        elif hasattr(data_loader, name):
-            return getattr(data_loader, name)
-        else:
-            raise AttributeError(
-                "'{}' object has no attribute '{}'".format(
-                    self.__class__.__name__, name))
+        attrs = self.__dict__.keys()
+        if 'data_loaders' in attrs and 'epoch' in attrs:
+            if hasattr(self.data_loader, name):
+                return getattr(self.data_loader, name)
+
+        # Default
+        super().__getattribute__(name)
+
+    def __setattr__(self, name, value):
+
+        attrs = self.__dict__.keys()
+        if 'data_loaders' in attrs and 'epoch' in attrs:
+            if hasattr(self.data_loader, name):
+                self.data_loader.__setattr__(name, value)
+
+        super().__setattr__(name, value)
 
 
 class PreprocessedSpeechDataset(Dataset):
@@ -77,7 +89,7 @@ class PreprocessedSpeechDataset(Dataset):
     """
 
     def __init__(
-            self, root, subset, random_seed=0, classes=CLASSES, silence_percentage=0.1):
+            self, root, subset, random_seed=0, classes=CLASSES):
         """
         :param root: Dataset root directory
         :param subset: Which dataset subset to use ("train", "test", "valid", "noise")
@@ -88,13 +100,12 @@ class PreprocessedSpeechDataset(Dataset):
 
         self._root = root
         self._subset = subset
-        self._silence_percentage = silence_percentage
 
         self.data = None
 
         # Circular list of all seeds in this dataset
         random.seed(random_seed)
-        seeds = [re.search(r'gsc_' + subset + '(\d+)', e) for e in os.listdir(root)]
+        seeds = [re.search(r'gsc_' + subset + r'(\d+)', e) for e in os.listdir(root)]
         seeds = [int(e.group(1)) for e in seeds if e is not None]
         seeds = seeds if len(seeds) > 0 else [""]
         self._all_seeds = itertools.cycle(seeds if len(seeds) > 0 else "")
@@ -193,6 +204,16 @@ if __name__ == '__main__':
         for (batch, targets) in dataloader_2:
             assert batch.size()[0] == batch_sizes[min(i, len(batch_sizes) - 1)]
             break
+
+    dataloader_1.batch_size
+    len(dataloader_1)
+
+    try:
+        dataloader_1.batch_size = 1
+    except ValueError:
+        assert True
+    except Exception:
+        assert False, "Torch should not allow us to set the batch size."
 
     dataset_valid = PreprocessedSpeechDataset(
         root,
