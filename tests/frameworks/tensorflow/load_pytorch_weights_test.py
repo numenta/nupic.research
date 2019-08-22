@@ -21,11 +21,10 @@
 import numpy as np
 import tensorflow as tf
 import torch
-from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 from tensorflow.python.framework import test_util
 
 from nupic.research.frameworks.tensorflow.utils import load_pytorch_weights
-
+from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 
 SEED = 18
 
@@ -99,5 +98,5 @@ class LoadPytorchWeightsTest(tf.test.TestCase):
             self.assertAllClose(out_pt.detach().numpy(), out_tf)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     tf.test.main()
