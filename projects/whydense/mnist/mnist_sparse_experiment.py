@@ -134,6 +134,7 @@ class MNISTSparseExperiment(object):
                 input_size=input_size,
                 linear_n=linear_n[i],
                 dropout=dropout,
+                use_batch_norm=False,
                 weight_sparsity=weight_sparsity,
                 percent_on=linear_percent_on[i],
                 k_inference_factor=k_inference_factor,
