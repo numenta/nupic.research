@@ -22,10 +22,9 @@ This script is used to import GSC models pre-trained in pytorch into tensorflow
 """
 
 import torch.hub
-from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 
 from nupic.research.frameworks.tensorflow.utils import load_pytorch_weights
-
+from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 
 if __name__ == "__main__":
     print("Loading pre-trained gsc_sparse_cnn from pytorch hub")
