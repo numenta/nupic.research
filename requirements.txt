@@ -19,7 +19,7 @@
 #  http://numenta.org/licenses/
 #
 # ------------------------------------------------------------------------------
-numpy
+numpy==1.16.2
 matplotlib
 pandas
 tabulate
@@ -27,10 +27,10 @@ librosa
 scikit-image
 requests
 ray
-tensorflow
+nupic.tensorflow
 tqdm
-torch
-torchvision
+torchvision==0.3
+torch==1.1
 nupic.torch
 python-dotenv
 elasticsearch
