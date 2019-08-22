@@ -24,6 +24,7 @@ This script is used to import GSC models pre-trained in pytorch into tensorflow
 import numpy as np
 import tensorflow.keras.backend as K
 import torch.hub
+
 from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 
 
