@@ -789,6 +789,7 @@ class DSCNN(BaseModel):
         'prune_mask_sparsity',
         'keep_mask_sparsity',
         'weight_sparsity',
+        'last_coactivations',
     ]
 
     def _post_epoch_updates(self, dataset=None):
@@ -798,6 +799,9 @@ class DSCNN(BaseModel):
         for name, module in self.network.named_modules():
 
             if isinstance(module, DSConv2d):
+                # Log coactivation before pruning - otherwise they get reset.
+                self.log['hist_' + 'coactivations_' + name] = module.coactivations
+                # Prune. Then log some params.
                 module.progress_connections()
                 for attr in self.log_attrs:
                     value = getattr(module, attr) if hasattr(module, attr) else -2

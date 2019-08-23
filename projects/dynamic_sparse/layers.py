@@ -365,6 +365,8 @@ class DSConv2d(torch.nn.Conv2d):
 
         # Remove old hook to zero the gradients of pruned connections.
         self.prune_grads_hook.remove()
+        self.last_coactivations = self.coactivations.clone().detach()
+
         # Decide which connections to prune and which to regrow.
         with torch.no_grad():
 
