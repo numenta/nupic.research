@@ -539,7 +539,8 @@ def make_dscnn(net, config={}):
                 "hebbian_prune_frac",
                 "weight_prune_frac",
                 "sparsity",
-                "prune_dims"
+                "prune_dims",
+                "update_nsteps",
             ] if arg in config and
             prune_methods[c_i] not in [None, SparseConv2d]
         }

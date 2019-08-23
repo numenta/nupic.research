@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from collections.abc import Iterable
 from collections import defaultdict, deque
 
 import numpy as np
@@ -779,6 +780,14 @@ class DSCNN(BaseModel):
     opposed to dense layers.
     """
 
+    log_attrs = [
+        'pruning_iterations',
+        'kept_frac',
+        'prune_mask_sparsity',
+        'keep_mask_sparsity',
+        'weight_sparsity',
+    ]
+
     def _post_epoch_updates(self, dataset=None):
 
         super()._post_epoch_updates(dataset)
@@ -787,8 +796,12 @@ class DSCNN(BaseModel):
 
             if isinstance(module, DSConv2d):
                 module.progress_connections()
-                self.log['pruning_iterations_' + name] = module.pruning_iterations
-                self.log['kept_frac' + name] = module.kept_frac
+                for attr in self.log_attrs:
+                    value = getattr(module, attr) if hasattr(module, attr) else -2
+                    if isinstance(value, Iterable):
+                        attr = 'hist_' + attr
+                    self.log[attr + '_' + name] = value
+
             if isinstance(module, (DSConv2d, SparseConv2d)):
                 self.log['sparsity_' + name] = calc_sparsity(module.weight)
 
