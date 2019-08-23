@@ -28,7 +28,10 @@ import torch
 from loggers import DEFAULT_LOGGERS
 from utils import Trainable, download_dataset, new_experiment, run_experiment
 
-torch.manual_seed(32)
+from nupic.research.frameworks.pytorch.model_utils import set_random_seed
+
+# Set seed for `random`, `numpy`, and `pytorch`.
+set_random_seed(32)
 
 
 def serializer(obj):
@@ -59,11 +62,15 @@ base_exp_config = dict(
     dataset_name="PreprocessedGSC",
     data_dir="~/nta/datasets/gsc",
     batch_size_train=(4, 16),
-    batch_size_test=1000,
+    batch_size_test=(1000),
 
     # ----- Network Related ------
-    model="DSCNN",
-    network="mnist_sparse_dscnn",
+    # > DSCNN
+    # model="DSCNN",
+    # network="mnist_sparse_dscnn",
+    # > GSCSparseCNN
+    model="BaseModel",
+    network="gsc_sparse_cnn",
     # init_weights=True,
     # batch_norm=True,
     # dropout=False,
@@ -73,13 +80,24 @@ base_exp_config = dict(
     # boost_strength_factor=0.7,
 
     # ----- Optimizer Related ----
+    # optim_alg="SGD",
+    # momentum=0.9,
+    # learning_rate=0.01,
+    # weight_decay=1e-4,
+    # > GSCSparseCNN
     optim_alg="SGD",
-    momentum=0.9,
+    momentum=0.0,
     learning_rate=0.01,
-    weight_decay=1e-4,
+    weight_decay=1e-2,
+
+    # ----- LR Scheduler Related ----
+    lr_scheduler="StepLR",
+    lr_step_size=1,
+    lr_gamma=0.9,
 
     # ----- Dynamic-Sparse Related -----
-    #  todo ...
+    # * See DSCNN network for allowable params
+    # * Params set below in experiments.
 
     # ----- Additional Validation -----
     test_noise=False,
@@ -91,17 +109,17 @@ base_exp_config = dict(
 )
 
 # ray configurations
-experiment_name = "dscnn-dynamic-2019-08-20-center-mean"
+experiment_name = "gsc-sparse-cnn-pruning-comparisons-0-2019-08-22"
 tune_config = dict(
     name=experiment_name,
-    num_samples=4,
+    num_samples=1,
     local_dir=os.path.expanduser(os.path.join("~/nta/results", experiment_name)),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 15},
+    stop={"training_iteration": 30},
     resources_per_trial={
-        "cpu": os.cpu_count() / 2,
-        "gpu": torch.cuda.device_count() / 2,
+        "cpu": os.cpu_count() / 2.0,
+        "gpu": torch.cuda.device_count() / 2.0,
     },
     loggers=DEFAULT_LOGGERS,
     verbose=1,
@@ -110,199 +128,49 @@ tune_config = dict(
 
 # define experiments
 experiments = {
-    # "normal-baseline": dict(
-    #     network="mnist_sparse_dscnn",
+    # "gsc-baseline": dict(
+    #     model='DSCNN',
+    #     network='gsc_sparse_dscnn',
     #     prune_methods=['none', 'none'],
     # ),
-    # "static-first-layer-baseline-80-sparse": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['static', 'none'],
-    #     sparsity=0.80,
+    # "dynamic-hebbian-second-layer-99_9-sparse": dict(
+    #     model='DSCNN',
+    #     network='gsc_sparse_dscnn',
+    #     prune_methods=['none', 'dynamic'],
+    #     hebbian_prune_frac=0.9995,
+    #     magnitude_prune_frac=0.0,
+    #     sparsity=0.999,
+    #     prune_dims=tuple(),
     # ),
-    # "static-second-layer-baseline-98-sparse": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'static'],
-    #     sparsity=0.98,
+    # "dynamic-hebbian-second-layer-99-sparse": dict(
+    #     model='DSCNN',
+    #     network='gsc_sparse_dscnn',
+    #     prune_methods=['none', 'dynamic'],
+    #     hebbian_prune_frac=0.995,
+    #     magnitude_prune_frac=0.0,
+    #     sparsity=0.99,
+    #     prune_dims=tuple(),
     # ),
-    # "static-both-layers-baseline-80-98-sparse": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['static', 'static'],
-    #     sparsity=[0.80, 0.98],
-    # ),
-
-    # "random-baseline": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'random'],
-    #     hebbian_prune_frac=0.90,
-    #     weight_prune_frac=0.0,
-    #     sparsity=tune.grid_search([0.80, 0.90, 0.98]),
-    #     prune_dims=[[], []],
-    # ),
-
-    # "dynamic-first-layer-80-sparse-by-weight": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['dynamic', 'none'],
-    #     hebbian_prune_frac=0.0,
-    #     weight_prune_frac=0.90,
-    #     sparsity=0.80,
-    #     prune_dims=[[], []],
-    # ),
-
-    "dynamic-second-layer-98-sparse-by-weight": dict(
-        network="mnist_sparse_dscnn",
+    "dynamic-hebbian-second-layer-98-sparse": dict(
+        model='DSCNN',
+        network='gsc_sparse_dscnn',
         prune_methods=['none', 'dynamic'],
-        hebbian_prune_frac=0.0,
-        weight_prune_frac=0.99,
+        hebbian_prune_frac=0.99,
+        magnitude_prune_frac=0.0,
         sparsity=0.98,
-        prune_dims=[[], []],
+        update_nsteps=50, #tune.grid_search([1, 10, 25]),
+        prune_dims=tuple(),
     ),
-
-    # "dynamic-first-layer-80-sparse": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_method=['dynamic', 'none'],
-    #     hebbian_prune_frac=0.9,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.8,
-    #     prune_dims=[[], []],
+    # "static-second-layer-varying-sparsity": dict(
+    #     model='DSCNN',
+    #     network='gsc_sparse_dscnn',
+    #     prune_methods=['none', 'static'],
+    #     sparsity=tune.grid_search([0.98, 0.99, 0.999]),
     # ),
-
-    "dynamic-both-layers-80-98-sparse-by-weight": dict(
-        network="mnist_sparse_dscnn",
-        prune_method=['dynamic', 'dynamic'],
-        hebbian_prune_frac=0.0,
-        weight_prune_frac=[0.90, 0.99],
-        sparsity=[0.8, 0.98],
-        prune_dims=[[], []],
-    ),
-
-    # "dynamic-one-layer-0a": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.80,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.79,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-1a": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.90,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.89,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-2a": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_method=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.96,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.95,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-3a": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.99,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.98,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-4a-varying-sparsity": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.90,
-    #     weight_prune_frac=0.0,
-    #     sparsity=tune.grid_search([0.7, 0.8, 0.85, 0.88, 0.89]),
-    #     prune_dims=[[], []],
-    # ),
-
-    # "dynamic-one-layer-0b": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['dynamic', 'none'],
-    #     hebbian_prune_frac=0.5,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.4,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-1b": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['dynamic', 'none'],
-    #     hebbian_prune_frac=0.7,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.6,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-2b": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['dynamic', 'none'],
-    #     hebbian_prune_frac=0.8,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.6,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-3b": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_method=['dynamic', 'none'],
-    #     hebbian_prune_frac=0.9,
-    #     weight_prune_frac=0.0,
-    #     sparsity=0.8,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-4b-varying-sparsity": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.7,
-    #     weight_prune_frac=0.0,
-    #     sparsity=tune.grid_search([0.5, 0.60, 0.65, 0.68]),
-    #     prune_dims=[[], []],
-    # ),
-
-    # "dynamic-two-layer-0": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['dynamic', 'dynamic'],
-    #     hebbian_prune_frac=[0.80, 0.9],
-    #     weight_prune_frac=0.0,
-    #     sparsity=[0.75, 0.88],
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-1": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['dynamic', 'dynamic'],
-    #     hebbian_prune_frac=[0.85, 0.95],
-    #     weight_prune_frac=0.0,
-    #     sparsity=[0.8, 0.93],
-    #     prune_dims=[[], []],
-    # ),
-
-    # "dynamic-one-layer-weight-v-heb-1": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.9,
-    #     weight_prune_frac=tune.grid_search([0.5, 0.7, 0.9, 0.96]),
-    #     sparsity=0.8,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-weight-v-heb-2": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.96,
-    #     weight_prune_frac=tune.grid_search([0.5, 0.7, 0.9, 0.96]),
-    #     sparsity=0.9,
-    #     prune_dims=[[], []],
-    # ),
-    # "dynamic-one-layer-weight-v-heb-3": dict(
-    #     network="mnist_sparse_dscnn",
-    #     prune_methods=['none', 'dynamic'],
-    #     hebbian_prune_frac=0.99,
-    #     weight_prune_frac=tune.grid_search([0.5, 0.7, 0.9, 0.99]),
-    #     sparsity=0.98,
-    #     prune_dims=[[], []],
-    # ),
-
 }
 exp_configs = [
     (name, new_experiment(base_exp_config, c)) for name, c in experiments.items()
-]
+] if experiments else [(experiment_name, base_exp_config)]
 
 # Download dataset.
 download_dataset(base_exp_config)

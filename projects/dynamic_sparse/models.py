@@ -79,11 +79,14 @@ class BaseModel:
             )
 
         # add a learning rate scheduler
-        if self.lr_scheduler:
+        if self.lr_scheduler is True or self.lr_scheduler == 'MultiStepLR':
             self.lr_scheduler = schedulers.MultiStepLR(
                 self.optimizer, milestones=self.lr_milestones, gamma=self.lr_gamma
             )
-
+        elif self.lr_scheduler == 'StepLR':
+            self.lr_scheduler = schedulers.StepLR(
+                self.optimizer, self.lr_step_size, gamma=self.lr_gamma
+            )
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
 
