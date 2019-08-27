@@ -98,6 +98,7 @@ class RSMExperiment(object):
         self.pause_after_upticks = config.get("pause_after_upticks", 0)
         self.pause_after_epochs = config.get("pause_after_epochs", 0)
         self.pause_eval_interval = config.get("pause_eval_interval", 10)
+        self.pause_min_epoch = config.get("pause_min_epoch", 0)
 
         # Data parameters
         self.input_size = config.get("input_size", (1, 28, 28))
@@ -128,19 +129,21 @@ class RSMExperiment(object):
         self.activation_fn = config.get("activation_fn", "tanh")
         self.decode_activation_fn = config.get("decode_activation_fn", None)
         self.static_digit = config.get("static_digit", False)
+        self.randomize_sequence_cursors = config.get("randomize_sequence_cursors", True)
         self.use_mnist_pct = config.get("use_mnist_pct", 1.0)
         self.pred_l2_reg = config.get("pred_l2_reg", 0)
         self.l2_reg = config.get("l2_reg", 0)
+        self.dec_l2_reg = config.get("dec_l2_reg", 0)
         self.decode_from_full_memory = config.get("decode_from_full_memory", False)
         self.boost_strat = config.get("boost_strat", "rsm_inhibition")
         self.x_b_norm = config.get("x_b_norm", False)
         self.mask_shifted_pi = config.get("mask_shifted_pi", False)
-        self.do_inhibition = config.get("do_inhibition", True)
         self.boost_strength = config.get("boost_strength", 1.0)
         self.boost_strength_factor = config.get("boost_strength_factor", 1.0)
         self.duty_cycle_period = config.get("duty_cycle_period", 1000)
         self.mult_integration = config.get("mult_integration", False)
         self.noise_buffer = config.get("noise_buffer", False)
+        self.col_output_cells = config.get("col_output_cells", False)
         self.fpartition = config.get("fpartition", None)
         self.balance_part_winners = config.get("balance_part_winners", False)
         self.weight_sparsity = config.get("weight_sparsity", None)
@@ -151,14 +154,15 @@ class RSMExperiment(object):
         self.loss_layers = config.get("loss_layers", "first")
         self.top_lateral_conn = config.get("top_lateral_conn", True)
         self.lateral_conn = config.get("lateral_conn", True)
-        self.mem_gain = config.get("mem_gain", 1.0)
         self.trainable_decay = config.get("trainable_decay", False)
+        self.trainable_decay_rec = config.get("trainable_decay_rec", False)
+        self.additive_decay = config.get("additive_decay", False)
         self.stoch_decay = config.get("stoch_decay", False)
         self.unif_smoothing = config.get("unif_smoothing", 0.0)
-        self.skip_context = config.get("skip_context", 0) # Higher layers predict next input with skipped inputs
-        self.skip_context_val = config.get("skip_context_val", False)
         self.predict_from_input = config.get("predict_from_input", False)
-        self.leaky_kwinners = config.get("leaky_kwinners", 0.0)
+        self.stoch_k_sd = config.get("stoch_k_sd", False)
+        self.rec_active_dendrites = config.get("rec_active_dendrites", 0)
+        self.learn_forget = config.get("learn_forget", False)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -208,6 +212,7 @@ class RSMExperiment(object):
                 sequences=self.sequences,
                 batch_size=self.batch_size,
                 random_mnist_images=not self.static_digit,
+                randomize_sequence_cursors=self.randomize_sequence_cursors,
                 noise_buffer=self.noise_buffer,
                 use_mnist_pct=self.use_mnist_pct,
                 max_batches=self.batches_in_epoch,
@@ -223,6 +228,7 @@ class RSMExperiment(object):
                     sequences=self.sequences,
                     batch_size=self.batch_size,
                     random_mnist_images=not self.static_digit,
+                    randomize_sequence_cursors=self.randomize_sequence_cursors,
                     noise_buffer=self.noise_buffer,
                     use_mnist_pct=self.use_mnist_pct,
                     max_batches=self.eval_batches_in_epoch,
@@ -263,11 +269,11 @@ class RSMExperiment(object):
                 embedding = {}
                 for word_id, word in enumerate(corpus.dictionary.idx2word):
                     embedding[word_id] = vectors[word]
-            elif self.embedding_kind == "ptb_fasttext":
+            elif "ptb_fasttext" in self.embedding_kind:
                 import fasttext
                 # Generated via notebooks/ptb_embeddings.ipynb
                 embedding = {}
-                ft_model = fasttext.load_model(self.data_dir + "/embeddings/ptb_fasttext.bin")
+                ft_model = fasttext.load_model(self.data_dir + "/embeddings/%s.bin" % self.embedding_kind)
                 for word_id, word in enumerate(corpus.dictionary.idx2word):
                     embedding[word_id] = torch.tensor(ft_model[word])
 
@@ -355,9 +361,9 @@ class RSMExperiment(object):
                 activation_fn=self.activation_fn,
                 decode_activation_fn=self.decode_activation_fn,
                 decode_from_full_memory=self.decode_from_full_memory,
+                col_output_cells=self.col_output_cells,
                 x_b_norm=self.x_b_norm,
                 mask_shifted_pi=self.mask_shifted_pi,
-                do_inhibition=self.do_inhibition,
                 boost_strat=self.boost_strat,
                 boost_strength=self.boost_strength,
                 boost_strength_factor=self.boost_strength_factor,
@@ -372,13 +378,14 @@ class RSMExperiment(object):
                 input_bias=self.input_bias,
                 decode_bias=self.decode_bias,
                 trainable_decay=self.trainable_decay,
+                trainable_decay_rec=self.trainable_decay_rec,
+                additive_decay=self.additive_decay,
                 stoch_decay=self.stoch_decay,
-                mem_gain=self.mem_gain,
-                skip_context=self.skip_context,
-                skip_context_val=self.skip_context_val,
-                leaky_kwinners=self.leaky_kwinners,
                 embed_dim=self.embed_dim,
                 vocab_size=self.vocab_size,
+                stoch_k_sd=self.stoch_k_sd,
+                rec_active_dendrites=self.rec_active_dendrites,
+                learn_forget=self.learn_forget,
                 debug=self.debug,
                 visual_debug=self.visual_debug
             )
@@ -525,7 +532,7 @@ class RSMExperiment(object):
     def _get_prediction_and_loss_inputs(self, hidden, output, inputs=None):
         x_b = None
         if self.model_kind == 'rsm':
-            # hidden is (x_b, phi, psi)
+            # hidden is (x_b, phi, psi, hebb)
             # higher layers predict decaying version of lower layer x_b
             x_b = hidden[0]
             # TODO: Option to train separate predictors on each layer and interpolate
@@ -640,11 +647,7 @@ class RSMExperiment(object):
             if self.n_layers > 1 and self.loss_layers in ['above_first', 'all_layers']:
                 memory = self._repackage_hidden(targets[1])
                 for l in range(self.n_layers - 1):
-                    if self.skip_context:
-                        # Targets of higher layers are same inputs
-                        higher_targets = targets[0].detach()
-                    else:
-                        higher_targets = memory[l]  # Target memory states up to 2nd to last layer
+                    higher_targets = memory[l]  # Target memory states up to 2nd to last layer
                     outputs = predicted_outputs[l+1]  # Predictions from layer above
                     ls_loss = self.loss(outputs, higher_targets)
                     if loss is None:
@@ -656,6 +659,10 @@ class RSMExperiment(object):
                 for l in self.model.children():
                     # Add L2 reg term for recurrent weights only
                     loss += self.l2_reg * l.linear_b.weight.norm(2)
+            if self.dec_l2_reg:
+                for l in self.model.children():
+                    # Add L2 reg term for recurrent weights only
+                    loss += self.dec_l2_reg * l.linear_d.weight.norm(2)
 
         return loss
 
@@ -835,10 +842,11 @@ class RSMExperiment(object):
                 if self.learning_rate_gamma:
                     self.do_anneal_learning = True  # Reduce LR during post_epoch
                 if self.pause_after_upticks and not self.model_learning_paused:
-                    self.n_upticks += 1
-                    if self.n_upticks >= self.pause_after_upticks:
-                        print(">>> Pausing learning after %d upticks, validation loss rose to %.3f, best: %.3f" % (self.n_upticks, val_loss, self.best_val_loss))
-                        self._pause_learning(epoch)
+                    if not self.pause_min_epoch or (self.pause_min_epoch and epoch >= self.pause_min_epoch):
+                        self.n_upticks += 1
+                        if self.n_upticks >= self.pause_after_upticks:
+                            print(">>> Pausing learning after %d upticks, validation loss rose to %.3f, best: %.3f" % (self.n_upticks, val_loss, self.best_val_loss))
+                            self._pause_learning(epoch)
 
         return ret
 

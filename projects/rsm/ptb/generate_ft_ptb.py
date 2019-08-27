@@ -1,12 +1,21 @@
 from torchnlp.datasets import penn_treebank_dataset
 import fasttext
+import os
+
+PATH = "/home/ubuntu"
+# PATH = "/Users/jgordon"
 
 print("Maybe download ptb...")
-penn_treebank_dataset("/home/ubuntu/nta/datasets/PTB", train=True, test=True)
+penn_treebank_dataset(PATH + "/nta/datasets/PTB", train=True, test=True)
 
-PTB_TRAIN_PATH = "/home/ubuntu/nta/datasets/PTB/ptb.train.txt"
+PTB_TRAIN_PATH = PATH + "/nta/datasets/PTB/ptb.train.txt"
 
-model = fasttext.train_unsupervised(PTB_TRAIN_PATH, model='skipgram')
-filename = "/home/ubuntu/nta/datasets/embeddings/ptb_fasttext.bin"
+epoch = 15
+model = fasttext.train_unsupervised(PTB_TRAIN_PATH, model='skipgram', minCount=1, epoch=epoch)
+embed_dir = PATH + "/nta/datasets/embeddings"
+filename = PATH + "/nta/datasets/embeddings/ptb_fasttext_e%d.bin" % epoch
+if not os.path.exists(embed_dir):
+    os.makedirs(embed_dir)
+
 print("Saved %s" % filename)
 model.save_model(filename)

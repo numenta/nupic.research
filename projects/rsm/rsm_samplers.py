@@ -205,7 +205,7 @@ class MNISTSequenceSampler(Sampler):
         return
 
     def __len__(self):
-        return self.max_batches
+        return self.max_batches if self.max_batches else len(self.data_source)
 
 
 def pred_sequence_collate(batch):
@@ -256,7 +256,7 @@ def vector_batch(word_ids, vector_dict):
     vectors = []
     for word_id in word_ids:
         vectors.append(vector_dict[word_id.item()])
-    return torch.stack(vectors).view(word_ids.size(0), -1)
+    return torch.stack(vectors).view(word_ids.size(0), -1).detach()
 
 
 def ptb_pred_sequence_collate(batch, vector_dict=None):
