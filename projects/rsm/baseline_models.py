@@ -31,7 +31,7 @@ class LSTMModel(nn.Module):
         embed_dim=200,
         nhid=650,
         dropout=0.0,
-        nlayers=2,
+        nlayers=1,
         tie_weights=False,
     ):
         super(LSTMModel, self).__init__()

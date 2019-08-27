@@ -22,9 +22,11 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from nupic.torch.modules.k_winners import KWinners
+# from nupic.torch.modules.k_winners import KWinners
+from k_winners import KWinners
 from nupic.torch.modules.sparse_weights import SparseWeights
 from util import activity_square, count_parameters, get_grad_printer
+from active_dendrite import ActiveDendriteLayer
 
 
 def topk_mask(x, k=2):
@@ -35,47 +37,6 @@ def topk_mask(x, k=2):
     res = torch.zeros_like(x)
     topk, indices = x.topk(k, sorted=False)
     return res.scatter(-1, indices, 1)
-
-
-class PredictiveProximalLinearFunction(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, input, weight, bias, predictive_activity):
-        ctx.save_for_backward(input, weight, bias, predictive_activity)
-        output = input.mm(weight.t())
-        if bias is not None:
-            output += bias.unsqueeze(0).expand_as(output)
-        return output
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        input, weight, bias, predictive_activity = ctx.saved_tensors
-        grad_input = grad_weight = grad_bias = None
-
-        if ctx.needs_input_grad[0]:
-            grad_input = grad_output.mm(weight)
-        if ctx.needs_input_grad[1]:
-            grad_weight = grad_output.t().mm(input)
-        if bias is not None and ctx.needs_input_grad[2]:
-            grad_bias = grad_output.sum(0).squeeze(0)
-
-        if predictive_activity is not None:
-            avg_predictive = predictive_activity.mean(0)
-            active_predictors = (avg_predictive > avg_predictive.mean()).float()
-            grad_weight *= active_predictors.repeat(grad_weight.size(0), 1)
-
-        return grad_input, grad_weight, grad_bias
-
-
-class PredictiveProximalLinear(nn.Linear):
-
-    __constants__ = ['bias']
-
-    def __init__(self, in_features, out_features, bias=True):
-        super(PredictiveProximalLinear, self).__init__(in_features, out_features, bias=bias)
-
-    def forward(self, input, predictive_activity=None):
-        return PredictiveProximalLinearFunction.apply(input, self.weight, self.bias, predictive_activity)
 
 
 class RSMPredictor(torch.nn.Module):
@@ -121,8 +82,7 @@ class RSMNet(torch.nn.Module):
         self.n_layers = n_layers
         self.batch_counter = 0
         self.hooks_registered = False
-        self.skip_context = kwargs['skip_context']
-        self.skip_context_val = kwargs['skip_context_val']
+
         eps_arr = self._parse_param_array(kwargs['eps'])
         k_winners_arr = self._parse_param_array(kwargs['k'])
         boost_strength_arr = self._parse_param_array(kwargs['boost_strength'])
@@ -134,16 +94,8 @@ class RSMNet(torch.nn.Module):
         for i in range(n_layers):
             first_layer = i == 0
             top_layer = i == n_layers - 1
-            if first_layer:
-                kwargs['skip_context'] = 0.0
-                kwargs['skip_context_val'] = False
-            else:
-                # Input to all layers above first is hidden state x_b from previous
-                if self.skip_context:
-                    # Keep default d_in for all layers (input dimension)
-                    pass
-                else:
-                    kwargs['d_in'] = last_output_dim
+            if not first_layer:
+                kwargs['d_in'] = last_output_dim
                 # Output is of same dim as input (predictive autoencoder)
                 kwargs['d_out'] = kwargs['d_in']
             if not top_layer:
@@ -207,8 +159,9 @@ class RSMNet(torch.nn.Module):
         new_x_b = []
         new_phi = []
         new_psi = []
+        new_hebb = []
 
-        x_b, phi, psi = hidden
+        x_b, phi, psi, hebb = hidden
         layer_input = x_a_batch
 
         # If multi-layered, use non-decaying version
@@ -216,7 +169,7 @@ class RSMNet(torch.nn.Module):
         x_b_rec = x_b
 
         lid = 0
-        for (layer_name, layer), lay_phi, lay_psi in zip(self.named_children(), phi, psi):
+        for (layer_name, layer), lay_phi, lay_psi, lay_hebb in zip(self.named_children(), phi, psi, hebb):
             last_layer = lid == len(phi) - 1
             lay_above = list(self.children())[lid + 1] if not last_layer else None
             lay_x_b = x_b_rec[lid]
@@ -224,38 +177,28 @@ class RSMNet(torch.nn.Module):
 
             if lay_x_above is not None:
                 psi_above = psi[lid + 1]
-                lay_x_above = torch.max(torch.sigmoid(lay_above.decay) * psi_above, lay_x_above)
+                lay_x_above = lay_above._decay_memory(psi_above, lay_x_above, input=layer_input)
             if lay_x_b is not None:
-                lay_x_b = torch.max(torch.sigmoid(layer.decay) * lay_psi, lay_x_b)
+                lay_x_b = layer._decay_memory(lay_psi, lay_x_b, input=layer_input)
 
-            hidden_in = (lay_x_b, lay_x_above, lay_phi, lay_psi)
+            hidden_in = (lay_x_b, lay_x_above, lay_phi, lay_psi, lay_hebb)
 
             pred_output, hidden = layer(layer_input, hidden_in)
 
-            if self.skip_context:
-                # Prepare input for next layer (l>1)
-                if self.training or self.skip_context_val:
-                    # TODO: Confirm ok to skip at val time?
-                    keep_idxs = torch.rand(x_a_batch.size(0)) > self.skip_context
-                    mask = torch.zeros_like(x_a_batch)
-                    mask[keep_idxs, :] = 1
-                    layer_input = mask * x_a_batch + (1 - mask) * torch.zeros_like(x_a_batch).uniform_(-1.0, 1.0)
-                else:
-                    layer_input = x_a_batch
-            else:
-                # Higher layers predict lower layer's phi (TOOD: or should be x_b?)
-                # phi has hysteresis (if decay active), x_b is just winners
-                layer_input = hidden[1]  # phi
+            # Higher layers predict lower layer's phi (TOOD: or should be x_b?)
+            # phi has hysteresis (if decay active), x_b is just winners
+            layer_input = hidden[1]  # phi
 
             new_x_b.append(hidden[0])
             new_phi.append(hidden[1])
             new_psi.append(hidden[2])
+            new_hebb.append(hidden[3])
 
             output_by_layer.append(pred_output)
 
             lid += 1
 
-        new_hidden = (new_x_b, new_phi, new_psi)
+        new_hidden = (new_x_b, new_phi, new_psi, new_hebb)
 
         self.batch_counter += 1  # Is this stored elsewhere?
         return (output_by_layer, new_hidden)
@@ -278,7 +221,12 @@ class RSMNet(torch.nn.Module):
             (batch_size, tc), 
             dtype=torch.float32, requires_grad=False
         ) for tc in self.total_cells]
-        return (x_b, phi, psi)
+        # Hebbian plasticity (for differentiable decay)
+        hebb = [param.new_zeros(
+            (batch_size, tc), 
+            dtype=torch.float32, requires_grad=False
+        ) for tc in self.total_cells]        
+        return (x_b, phi, psi, hebb)
 
 
 class RSMLayer(torch.nn.Module):
@@ -301,7 +249,6 @@ class RSMLayer(torch.nn.Module):
         vocab_size=0,
         decode_from_full_memory=False,
         debug_log_names=None,
-        do_inhibition=True,
         boost_strat="rsm_inhibition",
         x_b_norm=False,
         boost_strength=1.0,
@@ -314,17 +261,19 @@ class RSMLayer(torch.nn.Module):
         input_bias=False,
         decode_bias=True,
         lateral_conn=True,
-        leaky_kwinners=0.0,
-        mem_gain=1.0,
+        col_output_cells=False,
         debug=False,
         visual_debug=False,
         fpartition=None,
         balance_part_winners=False,
         trainable_decay=False,
-        skip_context=0.0,
-        skip_context_val=False,
+        trainable_decay_rec=False,
+        additive_decay=False,
         stoch_decay=False,
-        **kwargs,
+        stoch_k_sd=0.0,
+        rec_active_dendrites=0,
+        learn_forget=False,
+        **kwargs
     ):
         """
         This class includes an attempted replication of the Recurrent Sparse Memory
@@ -372,7 +321,6 @@ class RSMLayer(torch.nn.Module):
         self.decode_from_full_memory = decode_from_full_memory
         self.boost_strat = boost_strat
         self.x_b_norm = x_b_norm
-        self.do_inhibition = do_inhibition
         self.boost_strength = boost_strength
         self.boost_strength_factor = boost_strength_factor
         self.duty_cycle_period = duty_cycle_period
@@ -388,20 +336,24 @@ class RSMLayer(torch.nn.Module):
         self.input_bias = input_bias
         self.decode_bias = decode_bias
         self.lateral_conn = lateral_conn
-        self.mem_gain = mem_gain
         self.trainable_decay = trainable_decay
+        self.trainable_decay_rec = trainable_decay_rec
+        self.additive_decay = additive_decay
         self.stoch_decay = stoch_decay
-        self.skip_context = skip_context
-        self.skip_context_val = skip_context_val
-        self.leaky_kwinners = leaky_kwinners
-
+        self.col_output_cells = col_output_cells
+        self.stoch_k_sd = stoch_k_sd
+        self.rec_active_dendrites = rec_active_dendrites
+        self.learn_forget = learn_forget
+        
         self.debug = debug
         self.visual_debug = visual_debug
         self.debug_log_names = debug_log_names
 
         self._build_layers_and_kwinners()
 
-        if self.stoch_decay:
+        if self.additive_decay:
+            decay_init = torch.ones(self.total_cells, dtype=torch.float32).uniform_(-3.0, 3.0)
+        elif self.stoch_decay:
             # Fixed random decay rates, test with trainable_decay = False
             decay_init = torch.ones(self.total_cells, dtype=torch.float32).uniform_(-3.0, 3.0)
         else:
@@ -457,6 +409,7 @@ class RSMLayer(torch.nn.Module):
                             plt.show()
 
     def _build_layers_and_kwinners(self):
+        self.sparse_mods = []        
         if self.fpartition:
             m_ff, m_int, m_rec = self._partition_sizes()
             # Partition memory into fpartition % FF & remainder recurrent
@@ -475,9 +428,18 @@ class RSMLayer(torch.nn.Module):
                 self.d_in, self.m, bias=self.input_bias
             )  # Input weights (shared per group / proximal)
             if self.lateral_conn:
-                self.linear_b = nn.Linear(
-                    self.total_cells, self.total_cells, bias=self.input_bias
-                )  # Recurrent weights (per cell)
+                d1 = d2 = self.total_cells
+                if self.col_output_cells:
+                    d1 += self.m  # One output per column
+                # Recurrent weights (per cell)
+                if self.rec_active_dendrites:
+                    sparsity = 0.3
+                    self.linear_b = ActiveDendriteLayer(d1, n_cells=d2, n_dendrites=self.rec_active_dendrites, sparsity=sparsity)
+                    if sparsity:
+                        self.sparse_mods.append(self.linear_b.linear_dend)
+                else:
+                    self.linear_b = nn.Linear(d1, d2, bias=self.input_bias)
+
             if self.feedback_conn:
                 # Linear layers for both recurrent input from above and below
                 self.linear_b_above = nn.Linear(self.d_above, self.total_cells,
@@ -500,10 +462,17 @@ class RSMLayer(torch.nn.Module):
         if self.weight_sparsity is not None:
             self.linear_a = SparseWeights(self.linear_a, self.weight_sparsity)
             self.linear_b = SparseWeights(self.linear_b, self.weight_sparsity)
+            self.sparse_mods.extend([self.linear_a, self.linear_b])
 
         # Decode linear
         decode_d_in = self.total_cells if self.decode_from_full_memory else self.m
         self.linear_d = nn.Linear(decode_d_in, self.d_out, bias=self.decode_bias)
+
+        if self.trainable_decay_rec:
+            self.linear_decay_rec = nn.Linear(self.total_cells, self.total_cells, bias=True)
+
+        if self.learn_forget:
+            self.linear_forget = nn.Linear(self.d_in, self.total_cells, bias=True)
 
         self._init_linear_weights()
 
@@ -516,7 +485,7 @@ class RSMLayer(torch.nn.Module):
                     mod.bias.data.normal_(0.0, sd)
 
     def _zero_sparse_weights(self):
-        for mod in self.modules():
+        for mod in self.sparse_mods:
             if isinstance(mod, SparseWeights):
                 mod.rezero_weights()
 
@@ -533,6 +502,8 @@ class RSMLayer(torch.nn.Module):
             pct_on,
             boost_strength=self.boost_strength,
             duty_cycle_period=self.duty_cycle_period,
+            k_inference_factor=1.0,  # New
+            stoch_sd=self.stoch_k_sd,
             boost_strength_factor=self.boost_strength_factor,
         )
 
@@ -554,6 +525,19 @@ class RSMLayer(torch.nn.Module):
             t.retain_grad()
             t.register_hook(get_grad_printer(label))
 
+    def _decay_memory(self, psi_last, x_b, input=None):
+        if self.trainable_decay_rec:
+            decay_param = self.linear_decay_rec(psi_last)
+        else:
+            decay_param = self.decay
+
+        decayed = torch.sigmoid(decay_param) * psi_last
+        if self.learn_forget and input is not None:
+            forget = torch.sigmoid(self.linear_forget(input))
+            decayed = decayed * forget
+        memory = torch.max(decayed, x_b)
+        return memory
+
     def _do_forgetting(self, phi, psi):
         bsz = phi.size(0)
         if self.training and self.forget_mu > 0:
@@ -570,7 +554,7 @@ class RSMLayer(torch.nn.Module):
 
         Returns max cell activity in each group
         """
-        return activity.view(activity.size(0), self.m, self.n).max(dim=2).values
+        return activity.view(-1, self.m, self.n).max(dim=2).values
 
     def _fc_weighted_ave(self, x_a, x_b, x_b_above=None):
         """
@@ -604,7 +588,10 @@ class RSMLayer(torch.nn.Module):
 
             # Cell activation from recurrent (lateral) input
             if self.lateral_conn:
-                z_b = self.mem_gain * self.linear_b(x_b)
+                z_b_in = x_b
+                if self.col_output_cells:
+                    z_b_in = torch.cat((z_b_in, self._group_max(x_b)), dim=1)
+                z_b = self.linear_b(z_b_in)
                 sigma = sigma * z_b if self.mult_integration else sigma + z_b
                 z_log["z_b"] = z_b
             # Activation from recurrent (feedback) input
@@ -656,8 +643,6 @@ class RSMLayer(torch.nn.Module):
 
             y_pre_act = m_pi * m_lambda * sigma
 
-            del m_lambda
-
         elif self.boost_strat == "col_boosting":
             # HTM style boosted k-winner
             if self.balance_part_winners and self.fpartition:
@@ -672,24 +657,22 @@ class RSMLayer(torch.nn.Module):
                 if self.kwinners_rec is not None:
                     winners_rec = self.kwinners_rec(lambda_[:, -m_rec:])
                     winners.append(winners_rec)
-                winning_col_exp = torch.cat(winners, 1)
+                m_lambda = (torch.cat(winners, 1).abs() > 0).float()
             else:
                 # TODO: Is this a mask or does it contain values of lambda?
                 # TODO: Clean
                 winning_cols = (self.kwinners_col(lambda_).view(bsz, self.m, 1).abs() > 0).float()
-                winning_col_exp = (
+                m_lambda = (
                     winning_cols.repeat(1, 1, self.n)
                     .view(bsz, self.total_cells)
                 )
 
-            if self.leaky_kwinners:
-                winning_col_exp = torch.max(torch.ones_like(winning_col_exp) * self.leaky_kwinners, winning_col_exp)
-
-            self._debug_log({"winning_col_exp": winning_col_exp})
-            y_pre_act = m_pi * winning_col_exp * sigma
+            self._debug_log({"m_lambda": m_lambda})
+            y_pre_act = m_pi * m_lambda * sigma
 
 
         del m_pi
+        del m_lambda
 
         return y_pre_act
 
@@ -698,7 +681,7 @@ class RSMLayer(torch.nn.Module):
         Compute y_lambda
         """
         # Apply inhibition to non-neg shifted sigma
-        inh = (1 - phi) if self.do_inhibition else 1
+        inh = (1 - phi) if self.boost_strat == "rsm_inhibition" else 1
         pi = inh * (sigma - sigma.min() + 1)
         self._debug_log({"pi": pi})
 
@@ -714,18 +697,9 @@ class RSMLayer(torch.nn.Module):
     def _update_memory_and_inhibition(self, y, phi, psi, x_b=None):
         """
         Decay memory and inhibition tensors
-
-        If trainable_decay, the decay tensor can learn to decay different
-        cells in memory at different rates.
         """
 
-        # Get updated psi (memory state), decay inactive
-        # if self.trainable_decay:
-        #     decay_mult = torch.sigmoid(self.decay)
-        #     self._debug_log({"decay_mult": decay_mult})
-        # else:
-        #     decay_mult = self.eps
-        # psi = torch.max(psi * decay_mult, y)
+        # Set psi to x_b, which includes decayed prior state (see RSMNet.forward)
         psi = x_b
 
         # Update phi for next step (decay inhibition cells)
@@ -758,7 +732,9 @@ class RSMLayer(torch.nn.Module):
         from the layer above, x_c, while the RSMNet takes only 3-tuple for
         hidden state.
         """
-        x_b, x_b_above, phi, psi = hidden
+        x_b, x_b_above, phi, psi, hebb = hidden
+
+        x_b_last = x_b.clone().detach()
 
         phi, psi = self._do_forgetting(phi, psi)
 
@@ -784,7 +760,7 @@ class RSMLayer(torch.nn.Module):
         pred_output = self._decode_prediction(y)
         self._debug_log({"y": y, "pred_output": pred_output})
 
-        hidden = (x_b, phi, psi)
+        hidden = (x_b, phi, psi, hebb)
         return (pred_output, hidden)
 
 
