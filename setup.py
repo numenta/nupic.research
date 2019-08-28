@@ -25,6 +25,7 @@ from setuptools import setup, find_namespace_packages
 
 import nupic.research
 
+
 ROOT = path.abspath(path.dirname(__file__))
 
 # Get requirements from file
@@ -54,7 +55,10 @@ setup(
     version=nupic.research.__version__,
     packages=find_namespace_packages(include=["nupic.*"]),
     install_requires=requirements,
-    dependency_links=["git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch"],
+    dependency_links=[
+        "git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch",
+        "git+https://github.com/numenta/nupic.tensorflow.git#egg=nupic.tensorflow",
+    ],
     python_requires=">=3.6, <4",
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -71,5 +75,6 @@ setup(
     },
     test_suite="tests",
     tests_require=["pytest>=4.4.0"],
-    extras_require={"dev": requirements_dev},
+    extras_require={
+        "dev": requirements_dev},
 )
