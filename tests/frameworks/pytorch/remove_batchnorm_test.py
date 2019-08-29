@@ -28,8 +28,11 @@ from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.remove_batchnorm import remove_batchnorm
 from nupic.torch.models.sparse_cnn import gsc_sparse_cnn
 from nupic.torch.modules import Flatten
-from nupic.torch.modules.sparse_weights import (rezero_weights, SparseWeights,
-                                                SparseWeights2d)
+from nupic.torch.modules.sparse_weights import (
+    SparseWeights,
+    SparseWeights2d,
+    rezero_weights,
+)
 
 
 class SimpleCNN(nn.Sequential):
