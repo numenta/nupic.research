@@ -21,6 +21,7 @@
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import click
 import numpy as np  # noqa F401
@@ -90,7 +91,9 @@ def run_noise_test(config):
         # Save noise results in checkpoint log dir
         noise_test = os.path.join(logdir, "noise.json")
         with open(noise_test, "w") as f:
-            json.dump(experiment.run_noise_tests(), f)
+            res = experiment.run_noise_tests()
+            json.dump(res, f)
+            print(res)
 
     # Upload results to S3
     sync_function = config.get("sync_function", None)
@@ -154,11 +157,6 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
     print("num_cpus =", num_cpus)
     print("redis_address =", redis_address)
 
-    # Use configuration file location as the project location.
-    project_dir = os.path.dirname(config.name)
-    project_dir = os.path.abspath(project_dir)
-    print("project_dir =", project_dir)
-
     # Load and parse experiment configurations
     configs = parse_config(config, experiments, globals_param=globals())
 
@@ -174,7 +172,10 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
         ray.init(num_cpus=num_cpus, num_gpus=num_gpus, local_mode=num_cpus == 1)
 
     # Run experiments
-    resources_per_trial = {"cpu": 1, "gpu": num_gpus / num_cpus}
+    gpu_percent = 0
+    if num_gpus > 0:
+        gpu_percent = configs.get("gpu_percentage", 0.5)
+    resources_per_trial = {"cpu": 1, "gpu": gpu_percent}
     print("resources_per_trial =", resources_per_trial)
     for exp in configs:
         print("experiment =", exp)
@@ -186,14 +187,13 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
         stop_criteria.update(config.get("stop", {}))
         print("stop_criteria =", stop_criteria)
 
-        # Make sure local directories are relative to the project location
-        path = config.get("path", None)
-        if path and not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+        # Make sure path and data_dir are relative to the project location,
+        # handling both ~/nta and ../results style paths.
+        path = config.get("path", ".")
+        config["path"] = str(Path(path).expanduser().resolve())
 
         data_dir = config.get("data_dir", "data")
-        if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
+        config["data_dir"] = str(Path(data_dir).expanduser().resolve())
 
         tune.run(
             SpeechExperimentTune,
@@ -261,11 +261,6 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
     print("num_cpus =", num_cpus)
     print("redis_address =", redis_address)
 
-    # Use configuration file location as the project location.
-    project_dir = os.path.dirname(config.name)
-    project_dir = os.path.abspath(project_dir)
-    print("project_dir =", project_dir)
-
     # Load and parse experiment configurations
     configs = parse_config(config, experiments, globals_param=globals())
 
@@ -286,14 +281,13 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
         config = configs[exp]
         config["name"] = exp
 
-        # Make sure local directories are relative to the project location
-        path = config.get("path", None)
-        if path and not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+        # Make sure path and data_dir are relative to the project location,
+        # handling both ~/nta and ../results style paths.
+        path = config.get("path", ".")
+        config["path"] = str(Path(path).expanduser().resolve())
 
         data_dir = config.get("data_dir", "data")
-        if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
+        config["data_dir"] = str(Path(data_dir).expanduser().resolve())
 
         # Run each experiment in parallel
         results.append(run_noise_test.remote(config))
@@ -301,6 +295,8 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
     # Wait until all experiments complete
     ray.get(results)
     ray.shutdown()
+
+    print(results)
 
 
 if __name__ == "__main__":
