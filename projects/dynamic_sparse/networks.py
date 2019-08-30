@@ -26,8 +26,8 @@ from torch import nn
 from torchvision import models
 
 from layers import DSConv2d, RandDSConv2d, SparseConv2d
-from nupic.torch.modules import Flatten, KWinners, KWinners2d
 from nupic.torch.models.sparse_cnn import MNISTSparseCNN
+from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 
 class VGG19(nn.Module):
@@ -504,7 +504,7 @@ def resnet50(config):
     return models.resnet50(num_classes=config["num_classes"])
 
 
-def make_dscnn(net, config={}):
+def make_dscnn(net, config):
 
     named_convs = [
         (name, layer) for name, layer in net.named_modules()
@@ -521,15 +521,15 @@ def make_dscnn(net, config={}):
     def get_conv_type(prune_method):
         return \
             RandDSConv2d \
-            if prune_method == 'random' else \
+            if prune_method == "random" else \
             SparseConv2d \
-            if prune_method == 'static' else \
+            if prune_method == "static" else \
             None \
-            if prune_method == 'none' else \
+            if prune_method == "none" else \
             DSConv2d
 
     # Get DSConv2d params from config.
-    prune_methods = tolist(config.get('prune_methods', 'dynamic'))
+    prune_methods = tolist(config.get("prune_methods", "dynamic"))
     assert len(prune_methods) == num_convs, \
         "Not enough prune_methods specified in config. Expected {}, got {}".format(
             num_convs, prune_methods)
@@ -541,19 +541,19 @@ def make_dscnn(net, config={}):
                 "sparsity",
                 "prune_dims",
                 "update_nsteps",
-            ] if arg in config and
-            prune_methods[c_i] not in [None, SparseConv2d]
+            ] if arg in config
+            and prune_methods[c_i] not in [None, SparseConv2d]
         }
         for c_i in range(num_convs)
     ]
 
     for prune_method, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
 
-        NewConv = get_conv_type(prune_method)
-        if NewConv is None:
+        conv_class = get_conv_type(prune_method)
+        if conv_class is None:
             continue
 
-        setattr(net, name, NewConv(
+        setattr(net, name, conv_class(
             in_channels=conv.in_channels,
             out_channels=conv.out_channels,
             kernel_size=conv.kernel_size,

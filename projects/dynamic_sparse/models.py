@@ -19,8 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections.abc import Iterable
 from collections import defaultdict, deque
+from collections.abc import Iterable
 
 import numpy as np
 import torch
@@ -28,7 +28,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
-from layers import calc_sparsity, DSConv2d, SparseConv2d
+from layers import DSConv2d, SparseConv2d, calc_sparsity
 
 
 class BaseModel:
@@ -79,11 +79,11 @@ class BaseModel:
             )
 
         # add a learning rate scheduler
-        if self.lr_scheduler is True or self.lr_scheduler == 'MultiStepLR':
+        if self.lr_scheduler is True or self.lr_scheduler == "MultiStepLR":
             self.lr_scheduler = schedulers.MultiStepLR(
                 self.optimizer, milestones=self.lr_milestones, gamma=self.lr_gamma
             )
-        elif self.lr_scheduler == 'StepLR':
+        elif self.lr_scheduler == "StepLR":
             self.lr_scheduler = schedulers.StepLR(
                 self.optimizer, self.lr_step_size, gamma=self.lr_gamma
             )
@@ -784,12 +784,12 @@ class DSCNN(BaseModel):
     """
 
     log_attrs = [
-        'pruning_iterations',
-        'kept_frac',
-        'prune_mask_sparsity',
-        'keep_mask_sparsity',
-        'weight_sparsity',
-        'last_coactivations',
+        "pruning_iterations",
+        "kept_frac",
+        "prune_mask_sparsity",
+        "keep_mask_sparsity",
+        "weight_sparsity",
+        "last_coactivations",
     ]
 
     def _post_epoch_updates(self, dataset=None):
@@ -800,17 +800,17 @@ class DSCNN(BaseModel):
 
             if isinstance(module, DSConv2d):
                 # Log coactivation before pruning - otherwise they get reset.
-                self.log['hist_' + 'coactivations_' + name] = module.coactivations
+                self.log["hist_" + "coactivations_" + name] = module.coactivations
                 # Prune. Then log some params.
                 module.progress_connections()
                 for attr in self.log_attrs:
                     value = getattr(module, attr) if hasattr(module, attr) else -2
                     if isinstance(value, Iterable):
-                        attr = 'hist_' + attr
-                    self.log[attr + '_' + name] = value
+                        attr = "hist_" + attr
+                    self.log[attr + "_" + name] = value
 
             if isinstance(module, (DSConv2d, SparseConv2d)):
-                self.log['sparsity_' + name] = calc_sparsity(module.weight)
+                self.log["sparsity_" + name] = calc_sparsity(module.weight)
 
     def _log_weights(self):
         """Log weights for all layers which have params."""

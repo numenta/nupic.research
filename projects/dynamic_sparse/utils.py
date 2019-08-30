@@ -28,8 +28,8 @@ from torchvision import datasets, transforms
 
 import models
 import networks
-from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from datasets import PreprocessedSpeechDataLoader, VaryingDataLoader
+from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 
 
 class Dataset:
@@ -57,7 +57,7 @@ class Dataset:
 
         if hasattr(datasets, self.dataset_name):
             self.load_from_torch_vision()
-        elif 'PreprocessedGSC':
+        elif "PreprocessedGSC":
             self.load_preprocessed_gsc()
         else:
             raise Exception("Dataset {}")

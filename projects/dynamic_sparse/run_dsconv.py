@@ -22,13 +22,11 @@
 import os
 
 import ray
-import ray.tune as tune
 import torch
 
 from loggers import DEFAULT_LOGGERS
-from utils import Trainable, download_dataset, new_experiment, run_experiment
-
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
+from utils import Trainable, download_dataset, new_experiment, run_experiment
 
 # Set seed for `random`, `numpy`, and `pytorch`.
 set_random_seed(32)
@@ -129,42 +127,42 @@ tune_config = dict(
 # define experiments
 experiments = {
     # "gsc-baseline": dict(
-    #     model='DSCNN',
-    #     network='gsc_sparse_dscnn',
-    #     prune_methods=['none', 'none'],
+    #     model="DSCNN",
+    #     network="gsc_sparse_dscnn",
+    #     prune_methods=["none", "none"],
     # ),
     # "dynamic-hebbian-second-layer-99_9-sparse": dict(
-    #     model='DSCNN',
-    #     network='gsc_sparse_dscnn',
-    #     prune_methods=['none', 'dynamic'],
+    #     model="DSCNN",
+    #     network="gsc_sparse_dscnn",
+    #     prune_methods=["none", "dynamic"],
     #     hebbian_prune_frac=0.9995,
     #     magnitude_prune_frac=0.0,
     #     sparsity=0.999,
     #     prune_dims=tuple(),
     # ),
     # "dynamic-hebbian-second-layer-99-sparse": dict(
-    #     model='DSCNN',
-    #     network='gsc_sparse_dscnn',
-    #     prune_methods=['none', 'dynamic'],
+    #     model="DSCNN",
+    #     network="gsc_sparse_dscnn",
+    #     prune_methods=["none", "dynamic"],
     #     hebbian_prune_frac=0.995,
     #     magnitude_prune_frac=0.0,
     #     sparsity=0.99,
     #     prune_dims=tuple(),
     # ),
     "dynamic-hebbian-second-layer-98-sparse": dict(
-        model='DSCNN',
-        network='gsc_sparse_dscnn',
-        prune_methods=['none', 'dynamic'],
+        model="DSCNN",
+        network="gsc_sparse_dscnn",
+        prune_methods=["none", "dynamic"],
         hebbian_prune_frac=0.99,
         magnitude_prune_frac=0.0,
         sparsity=0.98,
-        update_nsteps=50, #tune.grid_search([1, 10, 25]),
+        update_nsteps=50,
         prune_dims=tuple(),
     ),
     # "static-second-layer-varying-sparsity": dict(
-    #     model='DSCNN',
-    #     network='gsc_sparse_dscnn',
-    #     prune_methods=['none', 'static'],
+    #     model="DSCNN",
+    #     network="gsc_sparse_dscnn",
+    #     prune_methods=["none", "static"],
     #     sparsity=tune.grid_search([0.98, 0.99, 0.999]),
     # ),
 }

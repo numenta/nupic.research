@@ -19,16 +19,15 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import os
 import itertools
+import os
 import random
 import re
 from collections.abc import Iterable
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
-
+from torch.utils.data import DataLoader, Dataset
 
 CLASSES = (
     "unknown, silence, zero, one, two, three, four, five, six, seven,"
@@ -64,7 +63,7 @@ class VaryingDataLoader(object):
     def __getattr__(self, name):
 
         attrs = self.__dict__.keys()
-        if 'data_loaders' in attrs and 'epoch' in attrs:
+        if "data_loaders" in attrs and "epoch" in attrs:
             if hasattr(self.data_loader, name):
                 return getattr(self.data_loader, name)
 
@@ -74,7 +73,7 @@ class VaryingDataLoader(object):
     def __setattr__(self, name, value):
 
         attrs = self.__dict__.keys()
-        if 'data_loaders' in attrs and 'epoch' in attrs:
+        if "data_loaders" in attrs and "epoch" in attrs:
             if hasattr(self.data_loader, name):
                 self.data_loader.__setattr__(name, value)
 
@@ -85,7 +84,7 @@ class PreprocessedSpeechDataset(Dataset):
     """Google Speech Commands dataset preprocessed with with all transforms
     already applied.
 
-    Use the 'process_dataset.py' script to create preprocessed dataset
+    Use the "process_dataset.py" script to create preprocessed dataset
     """
 
     def __init__(
@@ -105,7 +104,7 @@ class PreprocessedSpeechDataset(Dataset):
 
         # Circular list of all seeds in this dataset
         random.seed(random_seed)
-        seeds = [re.search(r'gsc_' + subset + r'(\d+)', e) for e in os.listdir(root)]
+        seeds = [re.search(r"gsc_" + subset + r"(\d+)", e) for e in os.listdir(root)]
         seeds = [int(e.group(1)) for e in seeds if e is not None]
         seeds = seeds if len(seeds) > 0 else [""]
         self._all_seeds = itertools.cycle(seeds if len(seeds) > 0 else "")
@@ -136,10 +135,10 @@ class PreprocessedSpeechDataset(Dataset):
         """Load next seed from disk."""
 
         seed = str(next(self._all_seeds))
-        seed = '0' + seed \
-            if (len(seed) == 1) and self._subset == 'test_noise' else seed
+        seed = "0" + seed \
+            if (len(seed) == 1) and self._subset == "test_noise" else seed
 
-        data_path = os.path.join(self._root, 'gsc_' + self._subset + seed + '.npz')
+        data_path = os.path.join(self._root, "gsc_" + self._subset + seed + ".npz")
 
         x, y = np.load(data_path).values()
 
@@ -168,66 +167,65 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
         return iteration
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    test_loading_processes = True
-    root = '~/nta/datasets/gsc'
+    test_loading_processes = False
+    root = "~/nta/datasets/gsc"
     root = os.path.expanduser(root)
     dataset_train = PreprocessedSpeechDataset(
         root,
-        'train',
+        "train",
         classes=CLASSES,
     )
 
     if test_loading_processes:
-        for i in range(dataset_train.num_seeds + 1):
+        for _ in range(dataset_train.num_seeds + 1):
             dataset_train.next_seed()
 
-    batch_sizes = (1, 64)
+    batch_sizes = (4, 16)
 
     dataloader_1 = PreprocessedSpeechDataLoader(
         root,
-        'train',
+        "train",
         classes=CLASSES,
         batch_sizes=batch_sizes,
     )
     for i in range(3):
-        for (batch, targets) in dataloader_1:
+        for (batch, _) in dataloader_1:
             assert batch.size()[0] == batch_sizes[min(i, len(batch_sizes) - 1)]
             break
 
     dataloader_2 = VaryingDataLoader(dataset_train, batch_sizes=batch_sizes)
     for i in range(3):
-        for (batch, targets) in dataloader_2:
+        for (batch, _) in dataloader_2:
             assert batch.size()[0] == batch_sizes[min(i, len(batch_sizes) - 1)]
             break
 
     dataloader_1.batch_size
-    len(dataloader_1)
 
     try:
         dataloader_1.batch_size = 1
     except ValueError:
         assert True
     except Exception:
-        assert False, "Torch should not allow us to set the batch size."
+        raise ValueError("Torch should not allow us to set the batch size.")
 
     dataset_valid = PreprocessedSpeechDataset(
         root,
-        'valid',
+        "valid",
         classes=CLASSES,
     )
 
     if test_loading_processes:
-        for i in range(dataset_valid.num_seeds + 1):
+        for _ in range(dataset_valid.num_seeds + 1):
             dataset_valid.next_seed()
 
     dataset_test = PreprocessedSpeechDataset(
         root,
-        'test_noise',
+        "test_noise",
         classes=CLASSES,
     )
 
     if test_loading_processes:
-        for i in range(dataset_test.num_seeds + 1):
+        for _ in range(dataset_test.num_seeds + 1):
             dataset_test.next_seed()
