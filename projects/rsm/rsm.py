@@ -54,6 +54,7 @@ class RSMPredictor(torch.nn.Module):
             nn.LeakyReLU(),
             nn.Linear(self.hidden_size, self.d_out),
             nn.LeakyReLU(),
+            nn.Softmax(dim=1)
         )
         self._init_linear_weights()
 
@@ -177,9 +178,9 @@ class RSMNet(torch.nn.Module):
 
             if lay_x_above is not None:
                 psi_above = psi[lid + 1]
-                lay_x_above = lay_above._decay_memory(psi_above, lay_x_above, input=layer_input)
+                lay_x_above = lay_above._decay_memory(psi_above, lay_x_above)
             if lay_x_b is not None:
-                lay_x_b = layer._decay_memory(lay_psi, lay_x_b, input=layer_input)
+                lay_x_b = layer._decay_memory(lay_psi, lay_x_b)
 
             hidden_in = (lay_x_b, lay_x_above, lay_phi, lay_psi, lay_hebb)
 
@@ -268,11 +269,13 @@ class RSMLayer(torch.nn.Module):
         balance_part_winners=False,
         trainable_decay=False,
         trainable_decay_rec=False,
+        max_decay=1.0,
+        mem_floor=0.0,
         additive_decay=False,
         stoch_decay=False,
         stoch_k_sd=0.0,
+        ramping_memory=None,
         rec_active_dendrites=0,
-        learn_forget=False,
         **kwargs
     ):
         """
@@ -338,13 +341,15 @@ class RSMLayer(torch.nn.Module):
         self.lateral_conn = lateral_conn
         self.trainable_decay = trainable_decay
         self.trainable_decay_rec = trainable_decay_rec
+        self.max_decay = max_decay
         self.additive_decay = additive_decay
         self.stoch_decay = stoch_decay
         self.col_output_cells = col_output_cells
         self.stoch_k_sd = stoch_k_sd
         self.rec_active_dendrites = rec_active_dendrites
-        self.learn_forget = learn_forget
-        
+        self.mem_floor = mem_floor
+        self.ramping_memory = ramping_memory
+
         self.debug = debug
         self.visual_debug = visual_debug
         self.debug_log_names = debug_log_names
@@ -360,6 +365,12 @@ class RSMLayer(torch.nn.Module):
             decay_init = self.eps * torch.ones(self.total_cells, dtype=torch.float32)
         self.decay = nn.Parameter(decay_init, requires_grad=self.trainable_decay)
         self.register_parameter("decay", self.decay)
+        if self.ramping_memory:
+            self.ramp_speed = nn.Parameter(torch.ones(self.total_cells, dtype=torch.float32) * .01)
+            self.register_parameter("ramp_speed", self.ramp_speed)
+            self.ramp_left = nn.Parameter(torch.ones(self.total_cells, dtype=torch.float32) * -4.0)
+            self.register_parameter("ramp_left", self.ramp_left)
+            self.ramp_fn = nn.RELU6()
 
         print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
 
@@ -415,13 +426,13 @@ class RSMLayer(torch.nn.Module):
             # Partition memory into fpartition % FF & remainder recurrent
             self.linear_a = nn.Linear(self.d_in, m_ff, bias=self.input_bias)
             self.linear_b = nn.Linear(
-                m_ff + m_rec, m_rec, bias=self.input_bias
+                self.total_cells, m_rec, bias=self.input_bias
             )  # Recurrent weights (per cell)
             if m_int:
                 # Add two additional layers for integrating ff & rec input
                 # NOTE: Testing int layer that gets only input from prior int (no ff)
                 self.linear_a_int = nn.Linear(self.d_in, m_int, bias=self.input_bias)
-                self.linear_b_int = nn.Linear(m_int, m_int, bias=self.input_bias)
+                self.linear_b_int = nn.Linear(self.total_cells, m_int, bias=self.input_bias)
         else:
             # Standard architecture, no partition
             self.linear_a = nn.Linear(
@@ -471,9 +482,6 @@ class RSMLayer(torch.nn.Module):
         if self.trainable_decay_rec:
             self.linear_decay_rec = nn.Linear(self.total_cells, self.total_cells, bias=True)
 
-        if self.learn_forget:
-            self.linear_forget = nn.Linear(self.d_in, self.total_cells, bias=True)
-
         self._init_linear_weights()
 
     def _init_linear_weights(self):
@@ -502,7 +510,7 @@ class RSMLayer(torch.nn.Module):
             pct_on,
             boost_strength=self.boost_strength,
             duty_cycle_period=self.duty_cycle_period,
-            k_inference_factor=1.0,  # New
+            k_inference_factor=1.0, 
             stoch_sd=self.stoch_k_sd,
             boost_strength_factor=self.boost_strength_factor,
         )
@@ -525,17 +533,20 @@ class RSMLayer(torch.nn.Module):
             t.retain_grad()
             t.register_hook(get_grad_printer(label))
 
-    def _decay_memory(self, psi_last, x_b, input=None):
-        if self.trainable_decay_rec:
-            decay_param = self.linear_decay_rec(psi_last)
+    def _decay_memory(self, psi_last, x_b):
+        if self.ramping_memory:
+            nonzero = (psi_last.abs() > 0.0).long()
+            memory = memory + nonzero * self.ramp_speed
         else:
-            decay_param = self.decay
+            if self.trainable_decay_rec:
+                decay_param = self.linear_decay_rec(psi_last)
+            else:
+                decay_param = self.decay
 
-        decayed = torch.sigmoid(decay_param) * psi_last
-        if self.learn_forget and input is not None:
-            forget = torch.sigmoid(self.linear_forget(input))
-            decayed = decayed * forget
-        memory = torch.max(decayed, x_b)
+            updated = self.max_decay * torch.sigmoid(decay_param) * psi_last
+            if self.mem_floor:
+                updated[updated <= self.mem_floor] = 0.0
+            memory = torch.max(updated, x_b)
         return memory
 
     def _do_forgetting(self, phi, psi):
@@ -569,10 +580,10 @@ class RSMLayer(torch.nn.Module):
             z_a = self.linear_a(x_a)  # bsz x (m_ff)
             z_log = {"z_a": z_a}
             if m_int:
-                z_b = self.linear_b(x_b[:, -m_rec:])  # bsz x m_rec
+                z_b = self.linear_b(x_b)  # bsz x m_rec
                 z_int_ff = self.linear_a_int(x_a)
                 # NOTE: Testing from only int/rec portion of mem (no ff)
-                z_int_rec = self.linear_b_int(x_b[:, m_ff: m_ff + m_int])
+                z_int_rec = self.linear_b_int(x_b)
                 z_int = z_int_ff * z_int_rec if self.mult_integration else z_int_ff + z_int_rec
                 sigma = torch.cat((z_a, z_int, z_b), 1)  # bsz x m
             else:

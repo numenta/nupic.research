@@ -94,7 +94,6 @@ class RSMExperiment(object):
         self.eval_batches_in_epoch = config.get(
             "eval_batches_in_epoch", self.batches_in_epoch
         )
-        self.bptt_thru_epoch = config.get("bptt_thru_epoch", False)
         self.pause_after_upticks = config.get("pause_after_upticks", 0)
         self.pause_after_epochs = config.get("pause_after_epochs", 0)
         self.pause_eval_interval = config.get("pause_eval_interval", 10)
@@ -108,8 +107,7 @@ class RSMExperiment(object):
         self.pred_learning_rate = config.get("pred_learning_rate", self.learning_rate)
         self.momentum = config.get("momentum", 0.9)
         self.optimizer_type = config.get("optimizer", "adam")
-        self.pred_optimizer_type = config.get("pred_optimizer_type", self.optimizer_type)
-        self.pred_optimizer_type = config.get("pred_optimizer", "adam")
+        self.pred_optimizer_type = config.get("pred_optimizer", self.optimizer_type)
 
         # Model
         self.m_groups = config.get("m_groups", 200)
@@ -156,13 +154,18 @@ class RSMExperiment(object):
         self.lateral_conn = config.get("lateral_conn", True)
         self.trainable_decay = config.get("trainable_decay", False)
         self.trainable_decay_rec = config.get("trainable_decay_rec", False)
+        self.max_decay = config.get("max_decay", 1.0)
         self.additive_decay = config.get("additive_decay", False)
         self.stoch_decay = config.get("stoch_decay", False)
-        self.unif_smoothing = config.get("unif_smoothing", 0.0)
         self.predict_from_input = config.get("predict_from_input", False)
         self.stoch_k_sd = config.get("stoch_k_sd", False)
         self.rec_active_dendrites = config.get("rec_active_dendrites", 0)
-        self.learn_forget = config.get("learn_forget", False)
+        self.mem_floor = config.get("mem_floor", 0.0)
+
+        # Prediction smoothing
+        self.word_cache_decay = config.get("word_cache_decay", 0.0)
+        self.word_cache_pct = config.get("word_cache_pct", 0.0)
+        self.unif_smoothing = config.get("unif_smoothing", 0.0)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -187,7 +190,6 @@ class RSMExperiment(object):
 
         self.train_hidden_buffer = []
         self.train_output_buffer = []
-        self.train_target_buffer = []
 
         # Additional state for vis, etc
         self.activity_by_inputs = {}  # 'digit-digit' -> list of distribution arrays
@@ -297,14 +299,9 @@ class RSMExperiment(object):
         self.loss = getattr(torch.nn, self.loss_function)(reduction="mean")
         self.predictor_loss = None
         if self.predictor:
-            if self.unif_smoothing:
-                # Uniform mass label smoothing via CEL
-                smooth_dist = torch.ones(self.vocab_size, device=self.device, dtype=torch.float) / self.vocab_size
-                self.predictor_loss = SmoothedCrossEntropyLoss(smooth_dist=smooth_dist, smooth_eps=self.unif_smoothing)
-            else:
-                self.predictor_loss = torch.nn.CrossEntropyLoss()
+            self.predictor_loss = torch.nn.NLLLoss()
 
-    def _get_one_optimizer(self, type, params, lr, l2_reg):
+    def _get_one_optimizer(self, type, params, lr, l2_reg=0.0):
         if type == "adam":
             optimizer = torch.optim.Adam(
                 params,
@@ -323,11 +320,11 @@ class RSMExperiment(object):
         self.pred_optimizer = None
         self.optimizer = self._get_one_optimizer(self.optimizer_type, 
                                                  self.model.parameters(), 
-                                                 self.learning_rate, self.l2_reg)
+                                                 self.learning_rate)
         if self.predictor:
             self.pred_optimizer = self._get_one_optimizer(self.pred_optimizer_type, 
                                                      self.predictor.parameters(), 
-                                                     self.pred_learning_rate, self.pred_l2_reg)
+                                                     self.pred_learning_rate, l2_reg=self.pred_l2_reg)
 
     def model_setup(self, config):
         seed = config.get("seed", random.randint(0, 10000))
@@ -346,78 +343,56 @@ class RSMExperiment(object):
         self.d_out = config.get("output_size", self.d_in)
         self.predictor = None
         predictor_d_in = self.m_groups
-        if self.model_kind == "rsm":
-            self.model = RSMNet(
-                n_layers=self.n_layers,
-                d_in=self.d_in,
-                d_out=self.d_out,
-                m=self.m_groups,
-                n=self.n_cells_per_group,
-                k=self.k_winners,
-                k_winner_cells=self.k_winner_cells,
-                gamma=self.gamma,
-                eps=self.eps,
-                forget_mu=self.forget_mu,
-                activation_fn=self.activation_fn,
-                decode_activation_fn=self.decode_activation_fn,
-                decode_from_full_memory=self.decode_from_full_memory,
-                col_output_cells=self.col_output_cells,
-                x_b_norm=self.x_b_norm,
-                mask_shifted_pi=self.mask_shifted_pi,
-                boost_strat=self.boost_strat,
-                boost_strength=self.boost_strength,
-                boost_strength_factor=self.boost_strength_factor,
-                duty_cycle_period=self.duty_cycle_period,
-                weight_sparsity=self.weight_sparsity,
-                mult_integration=self.mult_integration,
-                fpartition=self.fpartition,
-                balance_part_winners=self.balance_part_winners,
-                feedback_conn=self.feedback_conn,
-                lateral_conn=self.lateral_conn,
-                top_lateral_conn=self.top_lateral_conn,
-                input_bias=self.input_bias,
-                decode_bias=self.decode_bias,
-                trainable_decay=self.trainable_decay,
-                trainable_decay_rec=self.trainable_decay_rec,
-                additive_decay=self.additive_decay,
-                stoch_decay=self.stoch_decay,
-                embed_dim=self.embed_dim,
-                vocab_size=self.vocab_size,
-                stoch_k_sd=self.stoch_k_sd,
-                rec_active_dendrites=self.rec_active_dendrites,
-                learn_forget=self.learn_forget,
-                debug=self.debug,
-                visual_debug=self.visual_debug
-            )
-            if self.predict_from_input:
-                predictor_d_in = self.d_in
+        self.model = RSMNet(
+            n_layers=self.n_layers,
+            d_in=self.d_in,
+            d_out=self.d_out,
+            m=self.m_groups,
+            n=self.n_cells_per_group,
+            k=self.k_winners,
+            k_winner_cells=self.k_winner_cells,
+            gamma=self.gamma,
+            eps=self.eps,
+            forget_mu=self.forget_mu,
+            activation_fn=self.activation_fn,
+            decode_activation_fn=self.decode_activation_fn,
+            decode_from_full_memory=self.decode_from_full_memory,
+            col_output_cells=self.col_output_cells,
+            x_b_norm=self.x_b_norm,
+            mask_shifted_pi=self.mask_shifted_pi,
+            boost_strat=self.boost_strat,
+            boost_strength=self.boost_strength,
+            boost_strength_factor=self.boost_strength_factor,
+            duty_cycle_period=self.duty_cycle_period,
+            weight_sparsity=self.weight_sparsity,
+            mult_integration=self.mult_integration,
+            fpartition=self.fpartition,
+            balance_part_winners=self.balance_part_winners,
+            feedback_conn=self.feedback_conn,
+            lateral_conn=self.lateral_conn,
+            top_lateral_conn=self.top_lateral_conn,
+            input_bias=self.input_bias,
+            decode_bias=self.decode_bias,
+            trainable_decay=self.trainable_decay,
+            trainable_decay_rec=self.trainable_decay_rec,
+            max_decay=self.max_decay,
+            additive_decay=self.additive_decay,
+            stoch_decay=self.stoch_decay,
+            embed_dim=self.embed_dim,
+            vocab_size=self.vocab_size,
+            stoch_k_sd=self.stoch_k_sd,
+            rec_active_dendrites=self.rec_active_dendrites,
+            mem_floor=self.mem_floor,
+            debug=self.debug,
+            visual_debug=self.visual_debug
+        )
+        if self.predict_from_input:
+            predictor_d_in = self.d_in
+        else:
+            if self.n_layers > 1:
+                predictor_d_in = sum([l.total_cells for l in self.model.children()])
             else:
-                if self.n_layers > 1:
-                    predictor_d_in = sum([l.total_cells for l in self.model.children()])
-                else:
-                    predictor_d_in = self.m_groups * self.n_cells_per_group
-
-        elif self.model_kind == "lstm":
-            self.model = LSTMModel(
-                vocab_size=self.vocab_size,
-                embed_dim=self.embed_dim,
-                nhid=self.m_groups,
-                d_in=self.d_in,
-                d_out=self.d_out,
-                nlayers=self.n_layers
-            )
-            predictor_d_in = self.d_out
-
-        elif self.model_kind == "rnn":
-            self.model = RNNModel(
-                vocab_size=self.vocab_size,
-                embed_dim=self.embed_dim,
-                nhid=self.m_groups,
-                d_in=self.d_in,
-                d_out=self.d_out,
-                nlayers=self.n_layers
-            )
-            predictor_d_in = self.d_out
+                predictor_d_in = self.m_groups * self.n_cells_per_group
 
         self.model.to(self.device)
 
@@ -425,12 +400,15 @@ class RSMExperiment(object):
             self.predictor = RSMPredictor(
                 d_in=predictor_d_in,
                 d_out=self.predictor_output_size,
-                hidden_size=self.predictor_hidden_size,
+                hidden_size=self.predictor_hidden_size
             )
             self.predictor.to(self.device)
 
         self._get_loss_function()
         self._get_optimizer()
+
+        if self.word_cache_decay:
+            self.word_cache = torch.zeros((self.eval_batch_size, self.vocab_size), device=self.device)        
 
     def _image_grid(
         self,
@@ -529,6 +507,14 @@ class RSMExperiment(object):
                 self.activity_by_inputs[key] = []
             self.activity_by_inputs[key].append(activity)
 
+    def _cache_inputs(self, input_labels):
+        """
+        Word cache for smoothing, currently only used for eval (on test)
+        """
+        self.word_cache.scatter_(1, input_labels.unsqueeze(1), 1.0)
+        # Decay
+        self.word_cache = self.word_cache * self.word_cache_decay
+
     def _get_prediction_and_loss_inputs(self, hidden, output, inputs=None):
         x_b = None
         if self.model_kind == 'rsm':
@@ -580,8 +566,28 @@ class RSMExperiment(object):
         class_predictions = correct_arr = None
         if self.predictor:
             pred_targets = pred_targets.flatten()
+
             predictor_outputs = self.predictor(input.detach())
-            pred_loss = self.predictor_loss(predictor_outputs, pred_targets)
+            predictions = torch.zeros_like(predictor_outputs)
+
+            predictor_mass_pct = 1.0
+            if self.word_cache_decay and not train and predictions.size(0) == self.word_cache.size(0):
+                # Word cache enabled (for eval)
+                mass_pct = self.word_cache_pct
+                predictor_mass_pct -= mass_pct
+                predictions += mass_pct * self.word_cache / self.word_cache.sum(dim=1, keepdim=True)
+
+            if self.unif_smoothing:
+                # Uniform smoothing enabled
+                mass_pct = self.unif_smoothing
+                predictor_mass_pct -= mass_pct
+                predictions += mass_pct * torch.ones_like(predictor_outputs) / self.vocab_size
+
+            predictions += predictor_mass_pct * predictor_outputs
+
+            prediction_log_probs = predictions.log()
+
+            pred_loss = self.predictor_loss(prediction_log_probs, pred_targets)  # NLLLoss
             _, class_predictions = torch.max(predictor_outputs, 1)
             pcounts['total_samples'] += pred_targets.size(0)
             correct_arr = class_predictions == pred_targets
@@ -657,12 +663,16 @@ class RSMExperiment(object):
 
             if self.l2_reg and self.lateral_conn:
                 for l in self.model.children():
-                    # Add L2 reg term for recurrent weights only
-                    loss += self.l2_reg * l.linear_b.weight.norm(2)
+                    # Add L2 reg term for recurrent weights
+                    loss += self.l2_reg * l.linear_b.weight.norm(2) ** 2
+                    if hasattr(l.linear_b, 'bias'):
+                        loss += self.l2_reg * l.linear_b.bias.norm(2) ** 2
             if self.dec_l2_reg:
                 for l in self.model.children():
-                    # Add L2 reg term for recurrent weights only
-                    loss += self.dec_l2_reg * l.linear_d.weight.norm(2)
+                    # Add L2 reg term for decode weights
+                    loss += self.dec_l2_reg * l.linear_d.weight.norm(2) ** 2
+                    if hasattr(l.linear_d, 'bias') and l.linear_d.bias is not None:
+                        loss += self.dec_l2_reg * l.linear_d.bias.norm(2) ** 2
 
         return loss
 
@@ -780,6 +790,9 @@ class RSMExperiment(object):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
                 pred_targets = pred_targets.to(self.device)
+                input_labels = input_labels.to(self.device)
+
+                self._cache_inputs(input_labels)
 
                 x_a_next, hidden = self.model(inputs, hidden)
 
@@ -889,7 +902,7 @@ class RSMExperiment(object):
         if hidden is None:
             hidden = self._init_hidden(self.batch_size)
 
-        for batch_idx, (inputs, targets, pred_targets, _) in enumerate(
+        for batch_idx, (inputs, targets, pred_targets, input_labels) in enumerate(
             self.train_loader
         ):
             # Inputs are of shape (batch, input_size)
@@ -900,10 +913,7 @@ class RSMExperiment(object):
                 targets = targets[:bsz]
                 pred_targets = pred_targets[:bsz]
 
-            if not (self.bptt_thru_epoch and batch_idx != 0):
-                # No BPTT - detach graph on each batch
-                # BPTT - detach graph on first batch
-                hidden = self._repackage_hidden(hidden)
+            hidden = self._repackage_hidden(hidden)
 
             self.optimizer.zero_grad()
             if self.pred_optimizer:
@@ -919,40 +929,21 @@ class RSMExperiment(object):
             x_b, pred_input = self._get_prediction_and_loss_inputs(hidden, output, inputs=inputs)
 
             self.train_output_buffer.append(output)
-            self.train_target_buffer.append(inputs)
             self.train_hidden_buffer.append(hidden)
 
             # Loss
-            if not self.bptt_thru_epoch or batch_idx == len(self.train_loader) - 1:
-                # Compute loss only on last batch if BPTT, otherwise every batch
-                if self.bptt_thru_epoch:
-                    outputs = torch.cat(self.train_output_buffer[:-1])
-                    loss_targets = (
-                        torch.cat(self.train_target_buffer[1:]),
-                        torch.cat([h[0] for h in self.train_hidden_buffer])
-                    )
-                else:
-                    # train_output_buffer holds last and present outputs
-                    outputs = self.train_output_buffer[0] if len(self.train_output_buffer) == 2 else None
-                    loss_targets = (inputs, x_b)
-                loss = self._compute_loss(outputs, loss_targets)
-                if loss is not None:
-                    total_loss += loss.item()
-                    if not self.model_learning_paused:                    
-                        self._backward_and_optimize(loss)
+            # train_output_buffer holds last and present outputs
+            outputs = self.train_output_buffer[0] if len(self.train_output_buffer) == 2 else None
+            loss_targets = (inputs, x_b)
+            loss = self._compute_loss(outputs, loss_targets)
+            if loss is not None:
+                total_loss += loss.item()
+                if not self.model_learning_paused:                    
+                    self._backward_and_optimize(loss)
 
-                    if self.bptt_thru_epoch:
-                        # Clear buffers
-                        self.train_output_buffer = []
-                        self.train_target_buffer = []
-                        # Truncate hidden buffer
-                        self.train_hidden_buffer = [hidden]
-
-            if not self.bptt_thru_epoch:
-                # Keep only latest batch states around
-                self.train_output_buffer = self.train_output_buffer[-1:]
-                self.train_target_buffer = self.train_target_buffer[-1:]
-                self.train_hidden_buffer = self.train_hidden_buffer[-1:]
+            # Keep only latest batch states around
+            self.train_output_buffer = self.train_output_buffer[-1:]
+            self.train_hidden_buffer = self.train_hidden_buffer[-1:]
 
             pcounts, class_predictions, correct_arr = (
                 self._do_prediction(
