@@ -30,6 +30,7 @@ import pickle
 from collections import OrderedDict
 from pathlib import Path
 
+import ray
 import torch
 import torch.nn.functional as F
 import torchvision.datasets as datasets
@@ -98,7 +99,7 @@ class StochasticExperiment(object):
     def train(self, loader):
         self.model.train()
 
-        for data, target in tqdm(loader, desc="Train", leave=False):
+        for data, target in loader:
             data, target = data.to(self.device), target.to(self.device)
             output = self.model(data)
             loss = self.loss_function(output, target)
@@ -116,7 +117,7 @@ class StochasticExperiment(object):
         loss = 0
         total_correct = 0
         with torch.no_grad():
-            for data, target in tqdm(loader, leave=False):
+            for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 # sum up batch loss
@@ -167,53 +168,32 @@ class StochasticExperiment(object):
         return result
 
 
-def run_mnist(folderpath, epochs, l0_strength, l2_strength):
+@ray.remote
+class MNISTExperiment(object):
+    def __init__(self, l0_strength, l2_strength):
+        batch_size = 100
+        transform = transforms.Compose([transforms.ToTensor()])
+        self.train_loader = torch.utils.data.DataLoader(
+            datasets.MNIST("./data", train=True, download=True,
+                           transform=transform),
+            batch_size=batch_size, shuffle=True, num_workers=4,
+            pin_memory=torch.cuda.is_available())
+        self.val_loader = torch.utils.data.DataLoader(
+            datasets.MNIST("./data", train=False, transform=transform),
+            batch_size=batch_size, num_workers=4,
+            pin_memory=torch.cuda.is_available())
+        num_classes = 10
+        input_size = (1, 28, 28)
 
-    batch_size = 100
-    transform = transforms.Compose([transforms.ToTensor()])
-    train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST("./data", train=True, download=True,
-                       transform=transform),
-        batch_size=batch_size, shuffle=True, num_workers=4,
-        pin_memory=torch.cuda.is_available())
-    val_loader = torch.utils.data.DataLoader(
-        datasets.MNIST("./data", train=False, transform=transform),
-        batch_size=batch_size, num_workers=4,
-        pin_memory=torch.cuda.is_available())
-    num_classes = 10
-    input_size = (1, 28, 28)
+        self.exp = StochasticExperiment(input_size, num_classes, l0_strength,
+                                        l2_strength)
 
-    exp = StochasticExperiment(input_size, num_classes, l0_strength,
-                               l2_strength)
-    print(exp.model)
-
-    outpath = folderpath / "config.pkl"
-    with open(outpath, "wb") as f:
-        print("Saving {}".format(outpath))
-        pickle.dump({"l0_strength": l0_strength, "l2_strength": l2_strength}, f)
-
-    nonzeros = exp.nonzero_counts()
-    results = exp.test(val_loader)
-    nonzeros = exp.nonzero_counts()
-    num_digits = len(str(int(epochs)))
-    outfilefmt = "res{:0" + str(num_digits) + "d}.pkl"
-    print("Initial epoch: {}".format(results))
-    outpath = folderpath / outfilefmt.format(0)
-    with open(outpath, "wb") as f:
-        print("Saving {}".format(outpath))
-        pickle.dump((results, nonzeros), f)
-
-    for epoch in range(1, epochs + 1):
-        exp.train(train_loader)
-        results = exp.test(val_loader)
-        nonzeros = exp.nonzero_counts()
-
-        print("Epoch {}: {}".format(epoch, results))
-
-        outpath = folderpath / outfilefmt.format(epoch)
-        with open(outpath, "wb") as f:
-            print("Saving {}".format(outpath))
-            pickle.dump((results, nonzeros), f)
+    def step(self, train=True):
+        if train:
+            self.exp.train(self.train_loader)
+        results = self.exp.test(self.val_loader)
+        nonzeros = self.exp.nonzero_counts()
+        return (results, nonzeros)
 
 
 if __name__ == "__main__":
@@ -222,6 +202,7 @@ if __name__ == "__main__":
     parser.add_argument("--l0", type=float, default=0.00002)
     parser.add_argument("--l2", type=float, default=0.0005)
     parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--redis-address", type=str, default=None)
 
     args = parser.parse_args()
 
@@ -230,4 +211,28 @@ if __name__ == "__main__":
 
     os.makedirs(folderpath, exist_ok=True)
 
-    run_mnist(folderpath, args.epochs, args.l0, args.l2)
+    ray.init(redis_address=args.redis_address)
+
+    print("Saving results to {}".format(folderpath))
+    outpath = folderpath / "config.pkl"
+    with open(outpath, "wb") as f:
+        pickle.dump({"l0_strength": args.l0,
+                     "l2_strength": args.l2}, f)
+
+    num_digits = len(str(int(args.epochs)))
+    outfilefmt = "res{:0" + str(num_digits) + "d}.pkl"
+
+    exp = MNISTExperiment.remote(args.l0, args.l2)
+    results, nonzeros = ray.get(exp.step.remote(train=False))
+    print("Initial epoch: {}".format(results))
+    outpath = folderpath / outfilefmt.format(0)
+    with open(outpath, "wb") as f:
+        pickle.dump((results, nonzeros), f)
+
+    for epoch in tqdm(range(1, args.epochs + 1), leave=False,
+                      desc="Running remotely", unit="epoch"):
+        results, nonzeros = ray.get(exp.step.remote())
+        print("Epoch {}: {}".format(epoch, results))
+        outpath = folderpath / outfilefmt.format(epoch)
+        with open(outpath, "wb") as f:
+            pickle.dump((results, nonzeros), f)
