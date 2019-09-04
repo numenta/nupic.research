@@ -23,35 +23,55 @@ import os
 
 import ray
 import ray.tune as tune
+import torch
 
-from utils import Trainable
+from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from dynamic_sparse.common.utils import Trainable, download_dataset
+
+torch.manual_seed(32)  # run diverse samples
 
 # alternative initialization based on configuration
-config = dict(
-    network="resnet18",
+exp_config = dict(
+    network="vgg19_bn",
     num_classes=10,
-    model="DSNN",
+    model=tune.grid_search(["BaseModel", "SparseModel", "SET", "DSNN"]),
+    # model="DSNN",
+    epsilon=60,
+    start_sparse=1,
+    momentum=0.9,
+    learning_rate=0.01,
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[250, 290],
+    lr_gamma=0.10,
     dataset_name="CIFAR10",
+    augment_images=True,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
     data_dir="~/nta/datasets",
-    device="cpu",
+    device="cuda",
     optim_alg="SGD",
-    batch_size_train=10,
-    batch_size_test=10,
-    debug_sparse=False,
+    debug_weights=True,
+    debug_sparse=True,
 )
 
-# run
-ray.init()
-tune.run(
-    Trainable,
-    name="SET_local_test",
+tune_config = dict(
+    name="SET_DSNN_Test",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
-    config=config,
+    config=exp_config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 10},
-    resources_per_trial={"cpu": 1, "gpu": 0},
+    stop={"training_iteration": 300},
+    resources_per_trial={"cpu": 1, "gpu": 1},
+    loggers=DEFAULT_LOGGERS,
+    verbose=1,
 )
+
+# override when running local for test
+if not torch.cuda.is_available():
+    exp_config["device"] = "cpu"
+    tune_config["resources_per_trial"] = {"cpu": 1}
+
+download_dataset(exp_config)
+ray.init()
+tune.run(Trainable, **tune_config)
