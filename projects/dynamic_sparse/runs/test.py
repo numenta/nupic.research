@@ -19,39 +19,28 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+# import sys
+# sys.path.append("..")
+
+# from models.base_models import BaseModel
+# from .. import models
+
+# from dynamic_sparse.models import *
+
+
 import os
+import sys
 
-import ray
-import ray.tune as tune
+sys.path.append("../../")
+# sys.path.append(os.path.expanduser("~/nta/nupic.research/projects/"))
 
-from utils import Trainable
+# import dynamic_sparse.models as models
+# import dynamic_sparse.networks as networks
+# from dynamic_sparse.common import *
 
-# alternative initialization based on configuration
-config = dict(
-    network="resnet18",
-    num_classes=10,
-    model="DSNN",
-    dataset_name="CIFAR10",
-    stats_mean=(0.4914, 0.4822, 0.4465),
-    stats_std=(0.2023, 0.1994, 0.2010),
-    data_dir="~/nta/datasets",
-    device="cpu",
-    optim_alg="SGD",
-    batch_size_train=10,
-    batch_size_test=10,
-    debug_sparse=False,
-)
+print("test")
+print(__file__.replace(".py", ""))
+print("Current File Name : ", os.path.basename(__file__))
+print("Current File Path : ", os.path.realpath(__file__))
 
-# run
-ray.init()
-tune.run(
-    Trainable,
-    name="SET_local_test",
-    num_samples=1,
-    local_dir=os.path.expanduser("~/nta/results"),
-    config=config,
-    checkpoint_freq=0,
-    checkpoint_at_end=False,
-    stop={"training_iteration": 10},
-    resources_per_trial={"cpu": 1, "gpu": 0},
-)
+# PYTHONPATH=~/nta/nupic.research/projects/ python mlp_heb.py
