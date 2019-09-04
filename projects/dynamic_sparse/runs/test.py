@@ -39,7 +39,7 @@ sys.path.append("../../")
 # from dynamic_sparse.common import *
 
 print("test")
-print(__file__)
+print(__file__.replace(".py", ""))
 print("Current File Name : ", os.path.basename(__file__))
 print("Current File Path : ", os.path.realpath(__file__))
 
