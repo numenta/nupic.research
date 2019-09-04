@@ -25,51 +25,40 @@ import ray
 import ray.tune as tune
 import torch
 
-from loggers import DEFAULT_LOGGERS
-from utils import Trainable, new_experiment, run_experiment
-
-torch.manual_seed(32)
-
+from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from dynamic_sparse.common.utils import Trainable, download_dataset
 
 # experiment configurations
-base_exp_config = dict(
+exp_config = dict(
     device="cuda",
     # dataset related
     dataset_name="CIFAR10",
-    input_size=3072,
+    input_size=(3, 32, 32),
     num_classes=10,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
     data_dir="~/nta/datasets",
+    augment_images=tune.grid_search([True, False]),
     # model related
-    model="DSNNMixedHeb",
-    network="MLPHeb",
-    init_weights=True,
-    batch_norm=True,
-    dropout=False,
-    kwinners=True,
-    percent_on=0.3,
-    boost_strength=1.4,
-    boost_strength_factor=0.7,
+    model=tune.grid_search(["DynamicRep", "SparseModel", "BaseModel"]),
+    # model="SparseModel",
+    network="Wide_ResNet",
+    dropout_rate=0,
+    depth=28,
+    widen_factor=2,
     # optimizer related
     optim_alg="SGD",
     momentum=0.9,
-    learning_rate=0.01,
-    weight_decay=1e-4,
+    learning_rate=0.1,
+    weight_decay=5e-4,
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[60, 120, 160],  # 2e-2, 4e-3, 8-e4
+    lr_gamma=0.20,
     # sparse related
-    epsilon=100,
+    on_perc=0.2,
+    zeta=0.2,
     start_sparse=1,
     end_sparse=None,
-    weight_prune_perc=0.45,
-    hebbian_prune_perc=0.45,
-    pruning_es=True,
-    pruning_es_patience=0,
-    pruning_es_window_size=5,
-    pruning_es_threshold=0.02,
-    pruning_interval=1,
-    # additional validation
-    test_noise=True,
-    noise_level=0.1,
     # debugging
     debug_weights=True,
     debug_sparse=True,
@@ -77,39 +66,23 @@ base_exp_config = dict(
 
 # ray configurations
 tune_config = dict(
-    name="hebbian-gs-test",
+    name="wideresnet-test",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 1000},  # 300 in cifar
-    resources_per_trial={"cpu": 1, "gpu": 0.33},
+    stop={"training_iteration": 200},  # 300 in cifar
+    resources_per_trial={"cpu": 1, "gpu": 1},
     loggers=DEFAULT_LOGGERS,
     verbose=1,
+    config=exp_config,
 )
 
-# define experiments
-experiments = {
-    "baselines": dict(
-        model=tune.grid_search(["BaseModel", "SparseModel", "DSNN"]),
-        weight_prune_perc=0.3,
-    ),  # 3
-    "mixed_hebbian_gs": dict(
-        weight_prune_perc=tune.grid_search([0.15, 0.30, 0.45, 0.60]),
-        hebbian_prune_perc=tune.grid_search([0.15, 0.30, 0.45, 0.60]),
-    ),  # 16
-    "epsilons": dict(epsilon=tune.grid_search([30, 200])),  # 2
-    "spaced_updates": dict(pruning_interval=tune.grid_search([2, 4, 8, 16, 32])),  # 5
-    "es_strategies": dict(pruning_es_patience=tune.grid_search([2, 1000])),  # 2
-}
-exp_configs = [
-    (name, new_experiment(base_exp_config, c)) for name, c in experiments.items()
-]
+# override when running local for test
+if not torch.cuda.is_available():
+    exp_config["device"] = "cpu"
+    tune_config["resources_per_trial"] = {"cpu": 1}
 
-# run all experiments in parallel
+download_dataset(exp_config)
 ray.init()
-results = [
-    run_experiment.remote(name, Trainable, c, tune_config) for name, c in exp_configs
-]
-ray.get(results)
-ray.shutdown()
+tune.run(Trainable, **tune_config)
