@@ -12,7 +12,7 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 # See the GNU Affero Public License for more details.
-#
+# summary
 # You should have received a copy of the GNU Affero Public License
 # along with this program.  If not, see http://www.gnu.org/licenses.
 #
@@ -346,13 +346,13 @@ class MLP(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
 
-class MLPHeb(nn.Module):
+class MLPHebDeprecated(nn.Module):
     """
     Simple 3 hidden layers + output MLPHeb, similar to one used in SET Paper.
     """
 
     def __init__(self, config=None):
-        super(MLPHeb, self).__init__()
+        super().__init__()
 
         defaults = dict(
             input_size=784,
