@@ -36,7 +36,7 @@ from nupic.research.frameworks.dynamic_sparse.common.dataloaders import (
     VaryingDataLoader,
 )
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-from nupic.research.frameworks.pytorch.model_utils import set_random_seedf
+from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 
 
 class Dataset:
