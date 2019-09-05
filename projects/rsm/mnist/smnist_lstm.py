@@ -27,20 +27,6 @@ PAGI9 = [[2, 4, 0, 7, 8, 1, 6, 1, 8], [2, 7, 4, 9, 5, 9, 3, 1, 0], [5, 7, 3, 4, 
     2, 9, 1, 9, 2, 8, 3, 2, 7], [1, 2, 6, 4, 8, 3, 5, 0, 3], [3, 8, 0, 5, 6, 4, 1, 3, 9], [4, 7, 5, 3, 7, 6, 7, 2, 4]]
 PLOT_INT = 100
 
-dataset = rsm_samplers.MNISTBufferedDataset(expanduser("~/nta/datasets"), download=True,
-                                            transform=transforms.Compose([
-                                                transforms.ToTensor(),
-                                                transforms.Normalize((0.1307,), (0.3081,))
-                                            ]),)
-
-sampler = rsm_samplers.MNISTSequenceSampler(dataset, sequences=PAGI9, 
-                                            batch_size=BSZ,
-                                            random_mnist_images=True)
-
-loader = DataLoader(dataset,
-             batch_sampler=sampler,
-             collate_fn=rsm_samplers.pred_sequence_collate)
-
 model = baseline_models.LSTMModel(
                 vocab_size=10,
                 nhid=200,
@@ -124,7 +110,7 @@ class BPTTTrainer():
         return (outputs, targets, states)
 
     def run(self, mbs=0, epochs=0):
-        write_path = expanduser("~/nta/results/SMNIST_LSTM/%d_mbs:%d_epochs:%d" % (int(time.time()), mbs, epochs))
+        write_path = expanduser("~/nta/results/SMNIST_LSTM/%d_mbs:%d_epochs:%d_k2:%d" % (int(time.time()), mbs, epochs, self.k2))
         if not os.path.exists(write_path):
             os.makedirs(write_path)
         self.writer = SummaryWriter(write_path)
@@ -219,7 +205,40 @@ if __name__ == "__main__":
         default=1000,
         help="# of epochs"
     )
+    optparser.add_argument(
+        "-k",
+        "--k2",
+        dest="k2",
+        type=int,
+        default=30,
+        help="k2"
+    )
+    optparser.add_argument(
+        "-n",
+        "--noise",
+        dest="noise",
+        action="store_true",
+        default=False,
+        help="Noise buffer between subsequences"
+    )    
     opts = optparser.parse_args()    
-    trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=30)
+
+    dataset = rsm_samplers.MNISTBufferedDataset(expanduser("~/nta/datasets"), download=True,
+                                                transform=transforms.Compose([
+                                                    transforms.ToTensor(),
+                                                    transforms.Normalize((0.1307,), (0.3081,))
+                                                ]),)
+
+    sampler = rsm_samplers.MNISTSequenceSampler(dataset, 
+                                                sequences=PAGI9, 
+                                                batch_size=BSZ,
+                                                noise_buffer=opts.noise,
+                                                random_mnist_images=True)
+
+    loader = DataLoader(dataset,
+                 batch_sampler=sampler,
+                 collate_fn=rsm_samplers.pred_sequence_collate)    
+
+    trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2)
     trainer.run(mbs=opts.mbs, epochs=opts.epochs)
 

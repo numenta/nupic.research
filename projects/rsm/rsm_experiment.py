@@ -161,6 +161,10 @@ class RSMExperiment(object):
         self.stoch_k_sd = config.get("stoch_k_sd", False)
         self.rec_active_dendrites = config.get("rec_active_dendrites", 0)
         self.mem_floor = config.get("mem_floor", 0.0)
+        self.ramping_memory = config.get("ramping_memory", False)
+        self.ramping_learn_vel = config.get("ramping_learn_vel", False)
+        self.ramping_fn = config.get("ramping_fn", "lognormal")
+        self.predictor_log_softmax = config.get("predictor_log_softmax", False)
 
         # Prediction smoothing
         self.word_cache_decay = config.get("word_cache_decay", 0.0)
@@ -383,6 +387,9 @@ class RSMExperiment(object):
             stoch_k_sd=self.stoch_k_sd,
             rec_active_dendrites=self.rec_active_dendrites,
             mem_floor=self.mem_floor,
+            ramping_memory=self.ramping_memory,
+            ramping_learn_vel=self.ramping_learn_vel,
+            ramping_fn=self.ramping_fn,
             debug=self.debug,
             visual_debug=self.visual_debug
         )
@@ -400,7 +407,8 @@ class RSMExperiment(object):
             self.predictor = RSMPredictor(
                 d_in=predictor_d_in,
                 d_out=self.predictor_output_size,
-                hidden_size=self.predictor_hidden_size
+                hidden_size=self.predictor_hidden_size,
+                log_softmax=self.predictor_log_softmax
             )
             self.predictor.to(self.device)
 
@@ -408,7 +416,7 @@ class RSMExperiment(object):
         self._get_optimizer()
 
         if self.word_cache_decay:
-            self.word_cache = torch.zeros((self.eval_batch_size, self.vocab_size), device=self.device)        
+            self.word_cache = torch.zeros((self.eval_batch_size, self.vocab_size), device=self.device, requires_grad=False)        
 
     def _image_grid(
         self,
@@ -481,7 +489,7 @@ class RSMExperiment(object):
         ret = {}
         if self.instrumentation:
             for name, param in self.model.named_parameters():
-                if "weight" in name or "decay" in name:
+                if "weight" in name or "decay" in name or "ramp" in name:
                     data = param.data.cpu()
                     if data.size(0):
                         ret["hist_" + name] = data
@@ -511,14 +519,15 @@ class RSMExperiment(object):
         """
         Word cache for smoothing, currently only used for eval (on test)
         """
-        self.word_cache.scatter_(1, input_labels.unsqueeze(1), 1.0)
-        # Decay
-        self.word_cache = self.word_cache * self.word_cache_decay
+        if self.word_cache_decay:
+            self.word_cache.scatter_(1, input_labels.unsqueeze(1), 1.0)
+            # Decay
+            self.word_cache = self.word_cache * self.word_cache_decay
 
     def _get_prediction_and_loss_inputs(self, hidden, output, inputs=None):
         x_b = None
         if self.model_kind == 'rsm':
-            # hidden is (x_b, phi, psi, hebb)
+            # hidden is (x_b, phi, psi)
             # higher layers predict decaying version of lower layer x_b
             x_b = hidden[0]
             # TODO: Option to train separate predictors on each layer and interpolate
@@ -585,7 +594,10 @@ class RSMExperiment(object):
 
             predictions += predictor_mass_pct * predictor_outputs
 
-            prediction_log_probs = predictions.log()
+            if not self.predictor_log_softmax:
+                prediction_log_probs = predictions.log()
+            else:
+                prediction_log_probs = predictions
 
             pred_loss = self.predictor_loss(prediction_log_probs, pred_targets)  # NLLLoss
             _, class_predictions = torch.max(predictor_outputs, 1)
