@@ -31,10 +31,12 @@ from torchvision import datasets, transforms
 
 import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
+from nupic.research.frameworks.dynamic_sparse.common.dataloaders import (
+    PreprocessedSpeechDataLoader,
+    VaryingDataLoader,
+)
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-from nupic.research.frameworks.pytorch.model_utils import set_random_seed
-
-from nupic.research.frameworks.dynamic_sparse.common.dataloaders import PreprocessedSpeechDataLoader, VaryingDataLoader
+from nupic.research.frameworks.pytorch.model_utils import set_random_seedf
 
 
 class Dataset:
