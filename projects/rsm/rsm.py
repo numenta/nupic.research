@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 from torch import nn
+import numpy as np
 
 # from nupic.torch.modules.k_winners import KWinners
 from k_winners import KWinners
@@ -40,7 +41,7 @@ def topk_mask(x, k=2):
 
 
 class RSMPredictor(torch.nn.Module):
-    def __init__(self, d_in=28 * 28, d_out=10, hidden_size=20):
+    def __init__(self, d_in=28 * 28, d_out=10, hidden_size=20, log_softmax=False):
         """
 
         """
@@ -54,7 +55,7 @@ class RSMPredictor(torch.nn.Module):
             nn.LeakyReLU(),
             nn.Linear(self.hidden_size, self.d_out),
             nn.LeakyReLU(),
-            nn.Softmax(dim=1)
+            nn.LogSoftmax(dim=1) if log_softmax else nn.Softmax(dim=1)
         )
         self._init_linear_weights()
 
@@ -87,7 +88,7 @@ class RSMNet(torch.nn.Module):
         eps_arr = self._parse_param_array(kwargs['eps'])
         k_winners_arr = self._parse_param_array(kwargs['k'])
         boost_strength_arr = self._parse_param_array(kwargs['boost_strength'])
-        duty_cycle_period_arr = self._parse_param_array(kwargs['duty_cycle_period'])
+        duty_cycle_period_arr = self._parse_param_array(kwargs.get('duty_cycle_period', 1000))
         m_arr = self._parse_param_array(kwargs['m'])
         n_arr = self._parse_param_array(kwargs['n'])
         last_output_dim = None
@@ -101,9 +102,9 @@ class RSMNet(torch.nn.Module):
                 kwargs['d_out'] = kwargs['d_in']
             if not top_layer:
                 kwargs['d_above'] = m_arr[i+1] * n_arr[i+1]
-            if kwargs['lateral_conn']:
+            if kwargs.get('lateral_conn', True):
                 if top_layer:
-                    kwargs['lateral_conn'] = kwargs['top_lateral_conn']
+                    kwargs['lateral_conn'] = kwargs.get('top_lateral_conn', False)
             kwargs['eps'] = eps_arr[i]
             kwargs['m'] = m_arr[i]
             kwargs['n'] = n_arr[i]
@@ -149,7 +150,8 @@ class RSMNet(torch.nn.Module):
 
         Arguments:
             x_a_batch: (bsz, d_in)
-            hidden: Tuple (x_b, x_b_hys, phi, psi), each Tensor (n_layers, bsz, total_cells)
+            hidden: Tuple (x_b, phi, psi), each Tensor (n_layers, bsz, total_cells)
+                - x_b is (possibly normalized) winners without hysteresis/decayed memory
 
         Returns:
             output_by_layer: List of tensors (n_layers, bsz, dim (total_cells or d_in for first layer))
@@ -160,46 +162,41 @@ class RSMNet(torch.nn.Module):
         new_x_b = []
         new_phi = []
         new_psi = []
-        new_hebb = []
 
-        x_b, phi, psi, hebb = hidden
+        x_b, phi, psi = hidden
         layer_input = x_a_batch
 
-        # If multi-layered, use non-decaying version
-        # x_b_rec = x_b if self.n_layers > 1 else x_b_hys
-        x_b_rec = x_b
-
         lid = 0
-        for (layer_name, layer), lay_phi, lay_psi, lay_hebb in zip(self.named_children(), phi, psi, hebb):
+        for (layer_name, layer), lay_phi, lay_psi in zip(self.named_children(), phi, psi):
             last_layer = lid == len(phi) - 1
             lay_above = list(self.children())[lid + 1] if not last_layer else None
-            lay_x_b = x_b_rec[lid]
-            lay_x_above = x_b_rec[lid+1] if not last_layer else None
+            lay_x_b = x_b[lid]
+            lay_x_above = x_b[lid+1] if not last_layer else None
 
+            # Update memory psi with prior step winners and apply decay as per config
             if lay_x_above is not None:
                 psi_above = psi[lid + 1]
                 lay_x_above = lay_above._decay_memory(psi_above, lay_x_above)
             if lay_x_b is not None:
                 lay_x_b = layer._decay_memory(lay_psi, lay_x_b)
 
-            hidden_in = (lay_x_b, lay_x_above, lay_phi, lay_psi, lay_hebb)
+            hidden_in = (lay_x_b, lay_x_above, lay_phi, lay_psi)
 
             pred_output, hidden = layer(layer_input, hidden_in)
 
-            # Higher layers predict lower layer's phi (TOOD: or should be x_b?)
+            # If layers > 1, higher layers predict lower layer's phi (TOOD: or should be x_b?)
             # phi has hysteresis (if decay active), x_b is just winners
             layer_input = hidden[1]  # phi
 
             new_x_b.append(hidden[0])
             new_phi.append(hidden[1])
             new_psi.append(hidden[2])
-            new_hebb.append(hidden[3])
 
             output_by_layer.append(pred_output)
 
             lid += 1
 
-        new_hidden = (new_x_b, new_phi, new_psi, new_hebb)
+        new_hidden = (new_x_b, new_phi, new_psi)
 
         self.batch_counter += 1  # Is this stored elsewhere?
         return (output_by_layer, new_hidden)
@@ -222,12 +219,7 @@ class RSMNet(torch.nn.Module):
             (batch_size, tc), 
             dtype=torch.float32, requires_grad=False
         ) for tc in self.total_cells]
-        # Hebbian plasticity (for differentiable decay)
-        hebb = [param.new_zeros(
-            (batch_size, tc), 
-            dtype=torch.float32, requires_grad=False
-        ) for tc in self.total_cells]        
-        return (x_b, phi, psi, hebb)
+        return (x_b, phi, psi)
 
 
 class RSMLayer(torch.nn.Module):
@@ -275,6 +267,8 @@ class RSMLayer(torch.nn.Module):
         stoch_decay=False,
         stoch_k_sd=0.0,
         ramping_memory=None,
+        ramping_learn_vel=False,
+        ramping_fn="lognormal",
         rec_active_dendrites=0,
         **kwargs
     ):
@@ -349,6 +343,8 @@ class RSMLayer(torch.nn.Module):
         self.rec_active_dendrites = rec_active_dendrites
         self.mem_floor = mem_floor
         self.ramping_memory = ramping_memory
+        self.ramping_learn_vel = ramping_learn_vel
+        self.ramping_fn = ramping_fn
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -366,11 +362,12 @@ class RSMLayer(torch.nn.Module):
         self.decay = nn.Parameter(decay_init, requires_grad=self.trainable_decay)
         self.register_parameter("decay", self.decay)
         if self.ramping_memory:
-            self.ramp_speed = nn.Parameter(torch.ones(self.total_cells, dtype=torch.float32) * .01)
-            self.register_parameter("ramp_speed", self.ramp_speed)
-            self.ramp_left = nn.Parameter(torch.ones(self.total_cells, dtype=torch.float32) * -4.0)
-            self.register_parameter("ramp_left", self.ramp_left)
-            self.ramp_fn = nn.RELU6()
+            # self.ramp_loc = nn.Parameter(torch.rand(self.total_cells, dtype=torch.float32))
+            # self.register_parameter("ramp_loc", self.ramp_loc)
+            self.ramp_shape = nn.Parameter(torch.rand(self.total_cells, dtype=torch.float32) * 4.0)
+            self.register_parameter("ramp_shape", self.ramp_shape)
+            self.ramp_vel = nn.Parameter(torch.ones(self.total_cells, dtype=torch.float32, requires_grad=self.ramping_learn_vel) * 0.0001)
+            self.register_parameter("ramp_vel", self.ramp_vel)
 
         print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
 
@@ -533,10 +530,23 @@ class RSMLayer(torch.nn.Module):
             t.retain_grad()
             t.register_hook(get_grad_printer(label))
 
+    def _ramp_memory_value(self, memory):
+        mu = 1.0 # self.ramp_loc
+        sigma = torch.clamp(self.ramp_shape, 0.01)
+        nearzero = 1e-7
+        x = memory * self.k + nearzero # Bring range of memory values toward [0, 1]
+        if self.ramping_fn == "lognormal":
+            y = (1./x) * 1/(sigma*np.sqrt(2*np.pi)) * torch.exp(-1 * (torch.log(x) - mu)**2 / (2*sigma**2))
+            y = y * (1.0 - (x <= nearzero).float()) # Memory value should be zero (regardless of ramp) once memory decreases to zero
+        elif self.ramping_fn == "normal":
+            y = torch.exp(-(((x-mu)/(2*np.pi*sigma))**2))
+            y = y * (1.0 - (x <= 0.0).float()) # Memory value should be zero (regardless of ramp) once memory decreases to zero
+        return y
+
     def _decay_memory(self, psi_last, x_b):
         if self.ramping_memory:
-            nonzero = (psi_last.abs() > 0.0).long()
-            memory = memory + nonzero * self.ramp_speed
+            memory = torch.clamp(psi_last - self.ramp_vel.abs(), 0.0, 1)
+            memory = torch.max(memory, x_b)
         else:
             if self.trainable_decay_rec:
                 decay_param = self.linear_decay_rec(psi_last)
@@ -670,8 +680,6 @@ class RSMLayer(torch.nn.Module):
                     winners.append(winners_rec)
                 m_lambda = (torch.cat(winners, 1).abs() > 0).float()
             else:
-                # TODO: Is this a mask or does it contain values of lambda?
-                # TODO: Clean
                 winning_cols = (self.kwinners_col(lambda_).view(bsz, self.m, 1).abs() > 0).float()
                 m_lambda = (
                     winning_cols.repeat(1, 1, self.n)
@@ -734,18 +742,20 @@ class RSMLayer(torch.nn.Module):
         :param x_a_batch: Input batch of batch_size items from
         generating process (batch_size, d_in)
         :param hidden:
-            x_b: (normalized) memory state at same layer at t-1
+            x_b: Memory at same layer at t-1 (possibly with decayed/hysteresis memory from prior time steps)
             x_b_above: memory state at layer above at t-1
-            phi: inhibition state
-            psi: memory state at t-1
+            phi: inhibition state (used only for boost_strat=='rsm_inhibition')
+            psi: memory state at t-1, inclusive of hysteresis / ramped values if applicable
 
         Note that RSMLayer takes a 4-tuple that includes the feedback state
         from the layer above, x_c, while the RSMNet takes only 3-tuple for
         hidden state.
         """
-        x_b, x_b_above, phi, psi, hebb = hidden
+        x_b, x_b_above, phi, psi = hidden
+        x_b_in = x_b.clone()
 
-        x_b_last = x_b.clone().detach()
+        if self.ramping_memory:
+            x_b = self._ramp_memory_value(x_b)
 
         phi, psi = self._do_forgetting(phi, psi)
 
@@ -757,8 +767,11 @@ class RSMLayer(torch.nn.Module):
 
         y = self._inhibited_winners(sigma, phi)
 
-        phi, psi = self._update_memory_and_inhibition(y, phi, psi, x_b=x_b)
+        phi, psi = self._update_memory_and_inhibition(y, phi, psi, x_b=x_b_in)
         self._debug_log({"phi": phi, "psi": psi})
+
+        pred_output = self._decode_prediction(y)
+        self._debug_log({"y": y, "pred_output": pred_output})
 
         # Update recurrent input / output x_b
         if self.x_b_norm:
@@ -768,10 +781,7 @@ class RSMLayer(torch.nn.Module):
         else:
             x_b = y
 
-        pred_output = self._decode_prediction(y)
-        self._debug_log({"y": y, "pred_output": pred_output})
-
-        hidden = (x_b, phi, psi, hebb)
+        hidden = (x_b, phi, psi)
         return (pred_output, hidden)
 
 
