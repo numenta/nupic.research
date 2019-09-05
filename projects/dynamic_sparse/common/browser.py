@@ -33,6 +33,7 @@ import glob
 import json
 import os
 import warnings
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -41,7 +42,7 @@ from ray.tune.commands import flatten_dict
 warnings.filterwarnings("ignore")
 
 
-def load(experiment_path):
+def load(experiment_path, metrics=None):
     """Load a single experiment into a dataframe"""
     experiment_path = os.path.abspath(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
@@ -51,7 +52,7 @@ def load(experiment_path):
     dataframes = []
     for exp_state, exp_name in experiment_states:
         progress, params = _read_experiment(exp_state, experiment_path)
-        dataframes.append(_get_value(progress, params, exp_name))
+        dataframes.append(_get_value(progress, params, exp_name, metrics))
 
     # concats all dataframes if there are any and return
     if not dataframes:
@@ -59,9 +60,9 @@ def load(experiment_path):
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
 
-def load_many(experiment_paths):
+def load_many(experiment_paths, metrics=None):
     """Load several experiments into a single dataframe"""
-    dataframes = [load(path) for path in experiment_paths]
+    dataframes = [load(path, metrics) for path in experiment_paths]
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
 
@@ -94,15 +95,16 @@ def _read_experiment(experiment_state, experiment_path):
     return progress, params
 
 
-def _get_value(progress, params, exp_name, exp_substring="", which="max"):
+def _get_value(progress, params, exp_name, performance_metrics=None, exp_substring=""):
     """
     For every experiment whose name matches exp_substring, scan the history
     and return the appropriate value associated with tag.
-    'which' can be one of the following:
-      last: returns the last value
-       min: returns the minimum value
-       max: returns the maximum value
-    median: returns the median value
+
+    Allow for custom performance metrics, such as ["test_accuracy", mean_accuracy"]
+    For performance metrics, will collect max and min (and the respective epoch)
+    along with median and last values
+
+    Can be modified to add more custom metrics based on available params
 
     Returns a pandas dataframe with two columns containing name and tag value
 
@@ -111,79 +113,55 @@ def _get_value(progress, params, exp_name, exp_substring="", which="max"):
     # Collect experiment names that match exp at all
     exps = [e for e in progress if exp_substring in e]
 
-    # empty histories always return None
-    columns = ["Experiment Name"]
+    # try to automatically determine what are the performance metrics, if not given
+    if performance_metrics is None:
+        performance_metrics = [m for m in progress[exps[0]].keys() if "acc" in m]
 
-    # add the columns names for main tags
-    tags = ["test_accuracy", "noise_accuracy", "mean_accuracy"]
-    for tag in tags:
-        columns.append(tag)
-        columns.append(tag + "_" + which)
-        if which in ["max", "min"]:
-            columns.append("epoch_" + str(tag))
-    columns.append("epochs")
-    columns.append("start_learning_rate")
-    columns.append("end_learning_rate")
-    columns.append("early_stop")
-    columns.append("experiment_file_name")
-    columns.extend(["trial_time", "mean_epoch_time"])
-    columns.extend(["trial_train_time", "mean_epoch_train_time"])
-
-    # add the remaining variables
-    columns.extend(params[exps[0]].keys())
-
-    all_values = []
+    # populate stats
+    stats = defaultdict(list)
     for e in exps:
-        # values for the experiment name
-        values = [e]
-        # values for the main tags
-        for tag in tags:
-            values.append(progress[e][tag].iloc[-1])
-            if which == "max":
-                values.append(progress[e][tag].max())
-                v = progress[e][tag].idxmax()
-                values.append(v)
-            elif which == "min":
-                values.append(progress[e][tag].min())
-                values.append(progress[e][tag].idxmin())
-            elif which == "median":
-                values.append(progress[e][tag].median())
-            elif which == "last":
-                values.append(progress[e][tag].iloc[-1])
-            else:
-                raise RuntimeError("Invalid value for which='{}'".format(which))
+        # add relevant progress metrics
+        stats["Experiment Name"].append(e)
+        for m in performance_metrics:
+            # max
+            stats[m + "_max"].append(progress[e][m].max())
+            stats[m + "_max_epoch"].append(progress[e][m].idxmax())
+            # min
+            stats[m + "_min"].append(progress[e][m].min())
+            stats[m + "_min_epoch"].append(progress[e][m].idxmin())
+            # others
+            stats[m + "_median"].append(progress[e][m].median())
+            stats[m + "_last"].append(progress[e][m].iloc[-1])
 
-        # add remaining main tags
-        values.append(progress[e]["training_iteration"].iloc[-1])
-        values.append(progress[e]["learning_rate"].iloc[0])
-        values.append(progress[e]["learning_rate"].iloc[-1])
-        # consider early stop if there is a signal and haven't reached last iteration
-        if (
-            params[e]["iterations"] != progress[e]["training_iteration"].iloc[-1]
-            and progress[e]["stop"].iloc[-1]
-        ):
-            values.append(1)
-        else:
-            values.append(0)
-        values.append(exp_name)
-        # store time in minutes
-        values.append(progress[e]["epoch_time"].sum() / 60)
-        values.append(progress[e]["epoch_time"].mean() / 60)
-        values.append(progress[e]["epoch_time_train"].sum() / 60)
-        values.append(progress[e]["epoch_time_train"].mean() / 60)
+        # remaining custom tags - specific
+        stats["epochs"].append(progress[e]["training_iteration"].iloc[-1])
+        stats["experiment_file_name"].append(exp_name)
+        stats["trial_time"].append(progress[e]["time_this_iter_s"].sum() / 60)
+        stats["mean_epoch_time"].append(progress[e]["time_this_iter_s"].mean() / 60)
 
-        # remaining values
-        for v in params[e].values():
+        # removed - couldn't find related in current dataset
+        # stats["start_learning_rate"].append(progress[e]["learning_rate"].iloc[0])
+        # stats["end_learning_rate"].append(progress[e]["learning_rate"].iloc[-1])
+        # stats["trial_train_time"].append(progress[e]["time_this_iter_s"].sum() / 60)
+        # stats["mean_epoch_train_time"].append(progress[e]["time_this_iter_s"].mean()/60)
+
+        # early stop
+        # if (
+        #     params[e]["iterations"] != progress[e]["training_iteration"].iloc[-1]
+        #     and progress[e]["stop"].iloc[-1]
+        # ):
+        #     stats["early_stop"].append(1)
+        # else:
+        #     stats["early_stop"].append(0)
+
+        # add all remaining params, for easy aggregations
+        for k, v in params[e].items():
             if isinstance(v, list):
-                values.append(np.mean(v))
+                stats[k].append(np.mean(v))
             else:
-                values.append(v)
+                stats[k].append(v)
 
-        all_values.append(values)
-
-    p = pd.DataFrame(all_values, columns=columns)
-
-    return p
+    return pd.DataFrame(stats)
 
 
 def _get_experiment_states(experiment_path, exit_on_fail=False):
