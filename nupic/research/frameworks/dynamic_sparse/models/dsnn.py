@@ -25,7 +25,11 @@ from collections.abc import Iterable
 import numpy as np
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.networks.layers import DSConv2d, SparseConv2d, calc_sparsity
+from nupic.research.frameworks.dynamic_sparse.networks.layers import (
+    DSConv2d,
+    SparseConv2d,
+    calc_sparsity,
+)
 
 from .main import BaseModel, SparseModel
 
