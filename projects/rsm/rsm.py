@@ -55,7 +55,7 @@ class RSMPredictor(torch.nn.Module):
             nn.LeakyReLU(),
             nn.Linear(self.hidden_size, self.d_out),
             nn.LeakyReLU(),
-            nn.LogSoftmax(dim=1) if log_softmax else nn.Softmax(dim=1)
+            nn.Softmax(dim=1)
         )
         self._init_linear_weights()
 
@@ -64,10 +64,19 @@ class RSMPredictor(torch.nn.Module):
         Receive input as hidden memory state from RSM, batch
         x^B is with shape (batch_size, total_cells)
 
-        Output is (batch_size, d_out)
+        Output is two tensors of shape (batch_size, d_out) being distribution and logits respectively.
         """
-        x = self.layers(x)
-        return x.view(-1, self.d_out)
+        x1 = None
+        x2 = x
+        for layer in self.layers:
+            x1 = x2
+            x2 = layer(x1)
+
+        # Return multiple outputs
+        # https://discuss.pytorch.org/t/a-model-with-multiple-outputs/10440
+        logits = x1.view(-1, self.d_out)
+        distribution = x2.view(-1, self.d_out)
+        return distribution, logits
 
     def _init_linear_weights(self):
         for mod in self.modules():
