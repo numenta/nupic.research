@@ -40,7 +40,7 @@ predictor = rsm.RSMPredictor(
             )
 
 class BPTTTrainer():
-    def __init__(self, model, loader, k1=1, k2=30, epoch_buffer=9, predictor=None, bsz=BSZ):
+    def __init__(self, model, loader, k1=1, k2=30, predictor=None, bsz=BSZ, mbs=100):
         self.k1 = k1
         self.k2 = k2
         self.model = model
@@ -52,14 +52,13 @@ class BPTTTrainer():
         self.bsz = bsz
         self.loss_module = torch.nn.MSELoss()
         self.retain_graph = self.k1 < self.k2
-        self.epoch_buffer = epoch_buffer
         self.epoch = 0
-        self.mbs = 0
+        self.mbs = mbs
+        self.total_mbs = 0
 
         # Predictor counts
         self.total_samples = 0
         self.correct_samples = 0
-        
         self.total_loss = 0.0
         
         if torch.cuda.is_available():
@@ -86,6 +85,7 @@ class BPTTTrainer():
             return tuple(self._repackage_hidden(v) for v in h)
         
     def predict(self, i, out, pred_tgts):
+        self.pred_optimizer.zero_grad()
         pred_out = self.predictor(out.detach())
         loss = self.predictor_loss(pred_out, pred_tgts)
         loss.backward()
@@ -94,11 +94,12 @@ class BPTTTrainer():
         correct_arr = class_predictions == pred_tgts
         self.total_samples += pred_tgts.size(0)
         self.correct_samples += correct_arr.sum().item()        
-        if (i+1) % PLOT_INT == 0:
+        interval = PLOT_INT if not self.mbs else self.mbs
+        if (i+1) % interval == 0:
             train_acc = 100.*self.correct_samples/self.total_samples
             print(i, "train acc: %.3f%%, loss: %.3f" % (train_acc, self.total_loss))
-            self.writer.add_scalar('train_acc', train_acc, self.mbs)
-            self.writer.add_scalar('train_loss', self.total_loss, self.mbs) 
+            self.writer.add_scalar('train_acc', train_acc, self.total_mbs)
+            self.writer.add_scalar('train_loss', self.total_loss, self.total_mbs) 
             self.total_samples = 0
             self.correct_samples = 0
             self.total_loss = 0.0
@@ -109,7 +110,7 @@ class BPTTTrainer():
         states = [(None, self.model.init_hidden(self.bsz))]
         return (outputs, targets, states)
 
-    def run(self, mbs=0, epochs=0):
+    def run(self, epochs=0):
         write_path = expanduser("~/nta/results/SMNIST_LSTM/%d_mbs:%d_epochs:%d_k2:%d" % (int(time.time()), mbs, epochs, self.k2))
         if not os.path.exists(write_path):
             os.makedirs(write_path)
@@ -117,15 +118,15 @@ class BPTTTrainer():
         if epochs:
             self.loader.batch_sampler.max_batches = mbs
             while self.epoch < epochs:
-                self.train(mbs)
+                self.train()
                 self.epoch += 1
         else:
             # Continuous just run up to mbs
             self.loader.batch_sampler.max_batches = 0
-            self.train(mbs)
+            self.train()
         self.writer.close()
 
-    def train(self, mbs=100):
+    def train(self):
         self.total_samples = 0
         self.correct_samples = 0
         self.total_loss = 0.0
@@ -157,7 +158,7 @@ class BPTTTrainer():
                 
             if (i+1)%self.k1 == 0:
                 self.optimizer.zero_grad()
-                self.pred_optimizer.zero_grad()
+                
                 # backprop last module (keep graph only if they ever overlap)
                 start = time.time()
                 for j in range(self.k2-1):
@@ -177,11 +178,11 @@ class BPTTTrainer():
                 # print("opt step, batch loss: %.3f" % batch_loss)
                 self.optimizer.step()
             self.total_loss += batch_loss
-            self.mbs += 1
+            self.total_mbs += 1
             
             self.predict(i, output, pred_tgts)
             
-            if i > mbs:
+            if i > self.mbs:
                 print("Done")
                 return
 
@@ -239,6 +240,6 @@ if __name__ == "__main__":
                  batch_sampler=sampler,
                  collate_fn=rsm_samplers.pred_sequence_collate)    
 
-    trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2)
-    trainer.run(mbs=opts.mbs, epochs=opts.epochs)
+    trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2, mbs=opts.mbs)
+    trainer.run(epochs=opts.epochs)
 
