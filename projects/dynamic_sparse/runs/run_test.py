@@ -21,7 +21,7 @@
 
 import os
 
-from dynamic_sparse.common.utils import run_ray
+from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # alternative initialization based on configuration
 exp_config = dict(
@@ -33,7 +33,7 @@ exp_config = dict(
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
     model="DSNN",
-    data_dir="~/nta/datasets",
+    data_dir="~/nta/data",
     on_perc=0.2,
     batch_size_train=10,
     batch_size_test=10,
