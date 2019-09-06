@@ -362,8 +362,8 @@ class RSMLayer(torch.nn.Module):
         self.decay = nn.Parameter(decay_init, requires_grad=self.trainable_decay)
         self.register_parameter("decay", self.decay)
         if self.ramping_memory:
-            # self.ramp_loc = nn.Parameter(torch.rand(self.total_cells, dtype=torch.float32))
-            # self.register_parameter("ramp_loc", self.ramp_loc)
+            self.ramp_loc = nn.Parameter(torch.rand(self.total_cells, dtype=torch.float32))
+            self.register_parameter("ramp_loc", self.ramp_loc)
             self.ramp_shape = nn.Parameter(torch.rand(self.total_cells, dtype=torch.float32) * 4.0)
             self.register_parameter("ramp_shape", self.ramp_shape)
             self.ramp_vel = nn.Parameter(torch.ones(self.total_cells, dtype=torch.float32, requires_grad=self.ramping_learn_vel) * 0.0001)
@@ -531,29 +531,32 @@ class RSMLayer(torch.nn.Module):
             t.register_hook(get_grad_printer(label))
 
     def _ramp_memory_value(self, memory):
-        mu = 1.0 # self.ramp_loc
-        sigma = torch.clamp(self.ramp_shape, 0.01)
+        mu = self.ramp_loc
+        sigma = self.ramp_shape
         nearzero = 1e-7
         x = memory * self.k + nearzero # Bring range of memory values toward [0, 1]
         if self.ramping_fn == "lognormal":
+            mu = 1.0
             y = (1./x) * 1/(sigma*np.sqrt(2*np.pi)) * torch.exp(-1 * (torch.log(x) - mu)**2 / (2*sigma**2))
             y = y * (1.0 - (x <= nearzero).float()) # Memory value should be zero (regardless of ramp) once memory decreases to zero
         elif self.ramping_fn == "normal":
             y = torch.exp(-(((x-mu)/(2*np.pi*sigma))**2))
-            y = y * (1.0 - (x <= 0.0).float()) # Memory value should be zero (regardless of ramp) once memory decreases to zero
+            # y = y * (1.0 - (x <= 0.0).float()) # Memory value should be zero (regardless of ramp) once memory decreases to zero
         return y
 
     def _decay_memory(self, psi_last, x_b):
         if self.ramping_memory:
-            memory = torch.clamp(psi_last - self.ramp_vel.abs(), 0.0, 1)
+            memory = psi_last - self.ramp_vel.abs()
             memory = torch.max(memory, x_b)
         else:
             if self.trainable_decay_rec:
-                decay_param = self.linear_decay_rec(psi_last)
+                decay_param = self.max_decay * torch.sigmoid(self.linear_decay_rec(psi_last))
+            elif self.trainable_decay:
+                decay_param = self.max_decay * torch.sigmoid(self.decay)
             else:
-                decay_param = self.decay
+                decay_param = self.eps
 
-            updated = self.max_decay * torch.sigmoid(decay_param) * psi_last
+            updated = decay_param * psi_last
             if self.mem_floor:
                 updated[updated <= self.mem_floor] = 0.0
             memory = torch.max(updated, x_b)
