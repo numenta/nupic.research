@@ -303,7 +303,11 @@ class RSMExperiment(object):
         self.loss = getattr(torch.nn, self.loss_function)(reduction="mean")
         self.predictor_loss = None
         if self.predictor:
-            self.predictor_loss = torch.nn.NLLLoss()
+            #self.predictor_loss = torch.nn.NLLLoss()
+            # https://pytorch.org/docs/stable/nn.html#crossentropyloss
+            # "This criterion combines nn.LogSoftmax() and nn.NLLLoss() in one single class."
+            # "The input is expected to contain raw, unnormalized scores for each class."
+            self.predictor_loss = torch.nn.CrossEntropyLoss()
 
     def _get_one_optimizer(self, type, params, lr, l2_reg=0.0):
         if type == "adam":
@@ -576,8 +580,8 @@ class RSMExperiment(object):
         if self.predictor:
             pred_targets = pred_targets.flatten()
 
-            predictor_outputs = self.predictor(input.detach())
-            predictions = torch.zeros_like(predictor_outputs)
+            predictor_dist, predictor_logits = self.predictor(input.detach())
+            predictions = torch.zeros_like(predictor_dist)
 
             predictor_mass_pct = 1.0
             if self.word_cache_decay and not train and predictions.size(0) == self.word_cache.size(0):
@@ -590,17 +594,17 @@ class RSMExperiment(object):
                 # Uniform smoothing enabled
                 mass_pct = self.unif_smoothing
                 predictor_mass_pct -= mass_pct
-                predictions += mass_pct * torch.ones_like(predictor_outputs) / self.vocab_size
+                predictions += mass_pct * torch.ones_like(predictor_dist) / self.vocab_size
 
-            predictions += predictor_mass_pct * predictor_outputs
+            predictions += predictor_mass_pct * predictor_dist
 
-            if not self.predictor_log_softmax:
-                prediction_log_probs = predictions.log()
-            else:
-                prediction_log_probs = predictions
+            # if not self.predictor_log_softmax:
+            #     prediction_log_probs = predictions.log()
+            # else:
+            #     prediction_log_probs = predictions
 
-            pred_loss = self.predictor_loss(prediction_log_probs, pred_targets)  # NLLLoss
-            _, class_predictions = torch.max(predictor_outputs, 1)
+            pred_loss = self.predictor_loss(predictor_logits, pred_targets)  # cross-entropy loss
+            _, class_predictions = torch.max(predictor_dist, 1)
             pcounts['total_samples'] += pred_targets.size(0)
             correct_arr = class_predictions == pred_targets
             pcounts['correct_samples'] += correct_arr.sum().item()
