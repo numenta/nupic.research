@@ -24,9 +24,14 @@ import os
 import ray
 import torch
 
-from loggers import DEFAULT_LOGGERS
+from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from nupic.research.frameworks.dynamic_sparse.common.utils import (
+    Trainable,
+    download_dataset,
+    new_experiment,
+    run_experiment,
+)
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
-from utils import Trainable, download_dataset, new_experiment, run_experiment
 
 # Set seed for `random`, `numpy`, and `pytorch`.
 set_random_seed(32)

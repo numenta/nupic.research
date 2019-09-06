@@ -29,12 +29,14 @@ from ray import tune
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-import dynamic_sparse.models as models
-import dynamic_sparse.networks as networks
+import nupic.research.frameworks.dynamic_sparse.models as models
+import nupic.research.frameworks.dynamic_sparse.networks as networks
+from nupic.research.frameworks.dynamic_sparse.common.dataloaders import (
+    PreprocessedSpeechDataLoader,
+    VaryingDataLoader,
+)
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
-
-from .dataloaders import PreprocessedSpeechDataLoader, VaryingDataLoader
 
 
 class Dataset:

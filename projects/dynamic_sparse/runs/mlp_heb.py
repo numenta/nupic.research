@@ -23,8 +23,8 @@ import os
 
 from ray import tune
 
-from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
-from dynamic_sparse.common.utils import run_ray
+from dynamic_sparse.common import DEFAULT_LOGGERS
+from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # experiment configurations
 base_exp_config = dict(
