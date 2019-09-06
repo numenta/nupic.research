@@ -303,7 +303,11 @@ class RSMExperiment(object):
         self.loss = getattr(torch.nn, self.loss_function)(reduction="mean")
         self.predictor_loss = None
         if self.predictor:
-            self.predictor_loss = torch.nn.NLLLoss()
+            #self.predictor_loss = torch.nn.NLLLoss()
+            # https://pytorch.org/docs/stable/nn.html#crossentropyloss
+            # "This criterion combines nn.LogSoftmax() and nn.NLLLoss() in one single class."
+            # "The input is expected to contain raw, unnormalized scores for each class."
+            self.predictor_loss = torch.nn.CrossEntropyLoss()
 
     def _get_one_optimizer(self, type, params, lr, l2_reg=0.0):
         if type == "adam":
@@ -576,8 +580,8 @@ class RSMExperiment(object):
         if self.predictor:
             pred_targets = pred_targets.flatten()
 
-            predictor_outputs = self.predictor(input.detach())
-            predictions = torch.zeros_like(predictor_outputs)
+            predictor_dist, predictor_logits = self.predictor(input.detach())
+            predictions = torch.zeros_like(predictor_dist)
 
             predictor_mass_pct = 1.0
             if self.word_cache_decay and not train and predictions.size(0) == self.word_cache.size(0):
@@ -590,22 +594,42 @@ class RSMExperiment(object):
                 # Uniform smoothing enabled
                 mass_pct = self.unif_smoothing
                 predictor_mass_pct -= mass_pct
-                predictions += mass_pct * torch.ones_like(predictor_outputs) / self.vocab_size
+                predictions += mass_pct * torch.ones_like(predictor_dist) / self.vocab_size
 
-            predictions += predictor_mass_pct * predictor_outputs
+            predictions += predictor_mass_pct * predictor_dist
 
-            if not self.predictor_log_softmax:
-                prediction_log_probs = predictions.log()
-            else:
-                prediction_log_probs = predictions
+            # No longer needed:
+            # if not self.predictor_log_softmax:
+            #     prediction_log_probs = predictions.log()
+            # else:
+            #     prediction_log_probs = predictions
 
-            pred_loss = self.predictor_loss(prediction_log_probs, pred_targets)  # NLLLoss
-            _, class_predictions = torch.max(predictor_outputs, 1)
+            # This loss is without inference-time model interpolation
+            pred_loss = self.predictor_loss(predictor_logits, pred_targets)  # cross-entropy loss
+
+            # This loss is for the interpolated model
+            predictor_dist_size = list(predictor_dist.size())
+            #print('shape dist: ', list(predictor_dist_size))
+            #print('shape tgts: ', list(pred_targets.size()))
+            # Alternate: torch.nn.functional.one_hot(x)
+            # labels_one_hot = torch.FloatTensor(predictor_dist_size)
+            # labels_one_hot = labels_one_hot.to(self.device)
+            # labels_one_hot.zero_()
+            # labels_one_hot.scatter_(1, pred_targets.unsqueeze(1), 1)
+            num_classes = predictor_dist_size[1]
+            labels_one_hot = torch.nn.functional.one_hot(pred_targets, num_classes=num_classes)
+            labels_one_hot = labels_one_hot.to(self.device).float()
+            #ll = (labels_one_hot * torch.log(predictor_dist)).sum(dim=[1]).mean()  This matches the training loss when other models are disabled
+            ll = (labels_one_hot * torch.log(predictor_dist)).sum(dim=[0,1])
+            interp_loss = -ll  # sum negative log likelihood
+
+            _, class_predictions = torch.max(predictor_dist, 1)
             pcounts['total_samples'] += pred_targets.size(0)
             correct_arr = class_predictions == pred_targets
             pcounts['correct_samples'] += correct_arr.sum().item()
             batch_loss = pred_loss.item()
             pcounts['total_pred_loss'] += batch_loss
+            pcounts['total_interp_loss'] += interp_loss.item()
             if train:
                 # Predictor backward + optimize
                 pred_loss.backward()
@@ -784,7 +808,8 @@ class RSMExperiment(object):
             pcounts = {
                 'total_samples': 0.0,
                 'correct_samples': 0.0,
-                'total_pred_loss': 0.0
+                'total_pred_loss': 0.0,
+                'total_interp_loss': 0.0
             }
 
             hidden = self._init_hidden(self.eval_batch_size)
@@ -856,9 +881,14 @@ class RSMExperiment(object):
 
             ret["val_loss"] = val_loss = total_loss / (_b_idx + 1)
             if self.predictor:
-                test_pred_loss = pcounts['total_pred_loss'] / (_b_idx + 1)
+                num_batches = (_b_idx + 1)
+                #num_samples = (num_batches * self.batch_size)  Why is this incorrect?
+                num_samples = pcounts['total_samples']
+                test_pred_loss = pcounts['total_pred_loss'] / num_batches
+                test_interp_loss = pcounts['total_interp_loss'] / num_samples
+                ret["val_interp_ppl"] = lang_util.perpl(test_interp_loss)
                 ret["val_pred_ppl"] = lang_util.perpl(test_pred_loss)
-                ret["val_pred_acc"] = 100 * pcounts['correct_samples'] / pcounts['total_samples']
+                ret["val_pred_acc"] = 100 * pcounts['correct_samples'] / num_samples
 
             if not self.best_val_loss or val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
@@ -902,7 +932,8 @@ class RSMExperiment(object):
         pcounts = {
             'total_samples': 0.0,
             'correct_samples': 0.0,
-            'total_pred_loss': 0.0
+            'total_pred_loss': 0.0,
+            'total_interp_loss': 0.0
         }
 
         bsz = self.batch_size
@@ -982,7 +1013,11 @@ class RSMExperiment(object):
 
         ret["train_loss"] = total_loss / (batch_idx + 1)
         if self.predictor:
-            train_pred_loss = pcounts['total_pred_loss'] / (batch_idx + 1)
+            num_batches = (batch_idx + 1)
+            num_samples = (num_batches * self.batch_size)
+            train_pred_loss = pcounts['total_pred_loss'] / num_batches
+            train_interp_loss = pcounts['total_interp_loss'] / num_samples
+            ret["train_interp_ppl"] = lang_util.perpl(train_interp_loss)
             ret["train_pred_ppl"] = lang_util.perpl(train_pred_loss)
             ret["train_pred_acc"] = 100 * pcounts['correct_samples'] / pcounts['total_samples']
 

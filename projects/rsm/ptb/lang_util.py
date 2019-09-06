@@ -106,5 +106,6 @@ class BitwiseWordEmbedding(object):
 
 
 def perpl(nll):
+    """Perplexity is exp(negative_log_likelihood). Clips very large values."""
     # Avoid overflow
     return math.exp(nll) if nll < 50 else 1000000
