@@ -304,6 +304,7 @@ class RSMExperiment(object):
         self.predictor_loss = None
         if self.predictor:
             self.predictor_loss = torch.nn.NLLLoss()
+            # self.predictor_loss = torch.nn.CrossEntropyLoss()
 
     def _get_one_optimizer(self, type, params, lr, l2_reg=0.0):
         if type == "adam":
