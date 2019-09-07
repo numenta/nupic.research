@@ -38,7 +38,7 @@ class MLP(nn.Module):
             hidden_sizes=[100, 100, 100],
             batch_norm=False,
             dropout=False,
-            use_kwinners=False,
+            # use_kwinners=False,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -60,16 +60,24 @@ class MLP(nn.Module):
         self.classifier = nn.Sequential(*layers)
 
     def _linear_block(self, a, b):
-        block = [nn.Linear(a, b), self.activation_func(b)]
+        """
+        Clarifications on batch norm position at the linear block:
+        - bn before relu at original paper
+        - bn after relu in recent work 
+        (see fchollet @ https://github.com/keras-team/keras/issues/1802)
+        - however, if applied after RELU or kWinners, breaks sparsity
+        """
+        block = [nn.Linear(a, b)]
         if self.batch_norm:
             block.append(nn.BatchNorm1d(b))
+        block.append(self.activation_func(b))
         if self.dropout:
             block.append(nn.Dropout(p=self.dropout))
         return block
 
     def _kwinners(self, num_units):
         return KWinners(
-            n=num_units, percent_on=0.3, boost_strength=1.4, boost_strength_factor=0.7
+            n=num_units, percent_on=0.25, boost_strength=1.4, boost_strength_factor=0.7
         )
 
     def forward(self, x):
@@ -87,7 +95,6 @@ class MLP(nn.Module):
             print(torch.mean(x).item())
 
         return x
-
 
 class MLPHeb(MLP):
     """Replace forward layer to add hebbian learning"""
