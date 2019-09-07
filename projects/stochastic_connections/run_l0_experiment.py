@@ -26,17 +26,17 @@ benchmark performance
 
 import argparse
 import os
-import pickle
+import time
+import uuid
 from collections import OrderedDict
-from pathlib import Path
 
 import ray
 import torch
 import torch.nn.functional as F
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+from ray import tune
 from torch import nn
-from tqdm import tqdm
 
 from nupic.torch.modules import Flatten
 from reparameterization_layers import (
@@ -45,8 +45,26 @@ from reparameterization_layers import (
 )
 
 
-class StochasticExperiment(object):
-    def __init__(self, input_size, num_classes, l0_strength, l2_strength):
+class StochasticMNISTExperiment(tune.Trainable):
+    def _setup(self, config):
+        l0_strength = config["l0_strength"]
+        l2_strength = config["l2_strength"]
+
+        data_path = os.path.expanduser("~/nta/datasets")
+        batch_size = 100
+        transform = transforms.Compose([transforms.ToTensor()])
+        self.train_loader = torch.utils.data.DataLoader(
+            datasets.MNIST(data_path, train=True, download=True,
+                           transform=transform),
+            batch_size=batch_size, shuffle=True, num_workers=4,
+            pin_memory=torch.cuda.is_available())
+        self.val_loader = torch.utils.data.DataLoader(
+            datasets.MNIST(data_path, train=False, transform=transform),
+            batch_size=batch_size, num_workers=4,
+            pin_memory=torch.cuda.is_available())
+        num_classes = 10
+        input_size = (1, 28, 28)
+
         conv_dims = (20, 50)
         fc_dims = 500
 
@@ -96,10 +114,9 @@ class StochasticExperiment(object):
         lr = 0.001
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr)
 
-    def train(self, loader):
+    def _train(self):
         self.model.train()
-
-        for data, target in loader:
+        for data, target in self.train_loader:
             data, target = data.to(self.device), target.to(self.device)
             output = self.model(data)
             loss = self.loss_function(output, target)
@@ -112,23 +129,31 @@ class StochasticExperiment(object):
                 layer = getattr(self.model, layername)
                 layer.constrain_parameters()
 
-    def test(self, loader):
         self.model.eval()
         loss = 0
         total_correct = 0
         with torch.no_grad():
-            for data, target in loader:
+            for data, target in self.val_loader:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
-                # sum up batch loss
                 loss += torch.sum(self.loss_function(output, target)).item()
                 # get the index of the max log-probability
                 pred = output.argmax(dim=1, keepdim=True)
                 total_correct += pred.eq(target.view_as(pred)).sum().item()
 
-        return {"accuracy": total_correct / len(loader.dataset),
-                "loss": loss / len(loader.dataset),
-                "total_correct": total_correct}
+        result = {
+            "mean_accuracy": total_correct / len(self.val_loader.dataset),
+            "mean_loss": loss / len(self.val_loader.dataset),
+            "total_correct": total_correct,
+        }
+        result.update(self.nonzero_counts())
+        return result
+
+    def _save(self, checkpoint_dir):
+        self.model.save(checkpoint_dir)
+
+    def _restore(self, checkpoint):
+        self.model.restore(checkpoint)
 
     def loss_function(self, output, target):
         return self.loglike(output, target) + self.regularization()
@@ -160,79 +185,38 @@ class StochasticExperiment(object):
                 num_inputs *= d
 
             result[layername] = {
-                "expected_nz_by_unit": e_nz_by_unit.detach().numpy(),
-                "inference_nz_by_unit": inf_nz_by_unit.detach().numpy(),
+                "expected_nz_by_unit": e_nz_by_unit.detach().tolist(),
+                "inference_nz_by_unit": inf_nz_by_unit.detach().tolist(),
                 "num_input_units": num_inputs,
             }
 
         return result
 
 
-@ray.remote
-class MNISTExperiment(object):
-    def __init__(self, l0_strength, l2_strength):
-        batch_size = 100
-        transform = transforms.Compose([transforms.ToTensor()])
-        self.train_loader = torch.utils.data.DataLoader(
-            datasets.MNIST("./data", train=True, download=True,
-                           transform=transform),
-            batch_size=batch_size, shuffle=True, num_workers=4,
-            pin_memory=torch.cuda.is_available())
-        self.val_loader = torch.utils.data.DataLoader(
-            datasets.MNIST("./data", train=False, transform=transform),
-            batch_size=batch_size, num_workers=4,
-            pin_memory=torch.cuda.is_available())
-        num_classes = 10
-        input_size = (1, 28, 28)
-
-        self.exp = StochasticExperiment(input_size, num_classes, l0_strength,
-                                        l2_strength)
-
-    def step(self, train=True):
-        if train:
-            self.exp.train(self.train_loader)
-        results = self.exp.test(self.val_loader)
-        nonzeros = self.exp.nonzero_counts()
-        return (results, nonzeros)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("foldername", type=str)
-    parser.add_argument("--l0", type=float, default=0.00002)
-    parser.add_argument("--l2", type=float, default=0.0005)
+    parser.add_argument("--l0", type=float, nargs="+", default=[1e-5, 2e-5, 4e-5])
+    parser.add_argument("--l2", type=float, nargs="+", default=[5e-4])
     parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--redis-address", type=str, default=None)
-
+    parser.add_argument("--samples", type=int, default=3)
+    parser.add_argument("--local", action="store_true")
     args = parser.parse_args()
 
-    cwd = Path(os.path.dirname(os.path.realpath(__file__)))
-    folderpath = cwd / args.foldername
+    if args.local:
+        ray.init()
+    else:
+        ray.init(redis_address="localhost:6379")
 
-    os.makedirs(folderpath, exist_ok=True)
+    exp_name = "L0-MNIST-{}-{}".format(time.strftime("%Y%m%d-%H%M%S"), uuid.uuid1())
+    print("Running experiment {}".format(exp_name))
+    analysis = tune.run(StochasticMNISTExperiment,
+                        name=exp_name,
+                        num_samples=args.samples,
+                        config={
+                            "l0_strength": tune.grid_search(args.l0),
+                            "l2_strength": tune.grid_search(args.l2),
+                        },
+                        stop={"training_iteration": 30})
 
-    ray.init(redis_address=args.redis_address)
-
-    print("Saving results to {}".format(folderpath))
-    outpath = folderpath / "config.pkl"
-    with open(outpath, "wb") as f:
-        pickle.dump({"l0_strength": args.l0,
-                     "l2_strength": args.l2}, f)
-
-    num_digits = len(str(int(args.epochs)))
-    outfilefmt = "res{:0" + str(num_digits) + "d}.pkl"
-
-    exp = MNISTExperiment.remote(args.l0, args.l2)
-    results, nonzeros = ray.get(exp.step.remote(train=False))
-    print("Initial epoch: {}".format(results))
-    outpath = folderpath / outfilefmt.format(0)
-    with open(outpath, "wb") as f:
-        pickle.dump((results, nonzeros), f)
-
-    for epoch in tqdm(range(1, args.epochs + 1), leave=False,
-                      desc="Running remotely", unit="epoch"):
-        results, nonzeros = ray.get(exp.step.remote())
-        print("Epoch {}: {}".format(epoch, results))
-        outpath = folderpath / outfilefmt.format(epoch)
-        with open(outpath, "wb") as f:
-            pickle.dump((results, nonzeros), f)
+    print(("To browse results, instantiate "
+           '`tune.Analysis("~/ray_results/{}")`').format(exp_name))
