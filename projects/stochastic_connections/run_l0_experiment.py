@@ -38,11 +38,11 @@ import torchvision.transforms as transforms
 from ray import tune
 from torch import nn
 
-from nupic.torch.modules import Flatten
-from reparameterization_layers import (
+from nupic.research.frameworks.stochastic_connections.reparameterization_layers import (
     StochasticConnectionsConv2d,
     StochasticConnectionsLinear,
 )
+from nupic.torch.modules import Flatten
 
 
 class StochasticMNISTExperiment(tune.Trainable):
@@ -216,7 +216,7 @@ if __name__ == "__main__":
                             "l0_strength": tune.grid_search(args.l0),
                             "l2_strength": tune.grid_search(args.l2),
                         },
-                        stop={"training_iteration": 30})
+                        stop={"training_iteration": args.epochs})
 
     print(("To browse results, instantiate "
            '`tune.Analysis("~/ray_results/{}")`').format(exp_name))
