@@ -38,7 +38,7 @@ class MLP(nn.Module):
             hidden_sizes=[100, 100, 100],
             batch_norm=False,
             dropout=False,
-            # use_kwinners=False,
+            use_kwinners=False,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)

@@ -262,7 +262,7 @@ class DSNNMixedHeb(DSNNHeb):
 
             # ----------- HEBBIAN PRUNING ----------------
             
-            if tau is not None:
+            if tau:
                 corr_active = corr[active_synapses]
                 # decide which weights to remove based on correlation
                 kth = int((1-tau) * total_active)
@@ -281,8 +281,7 @@ class DSNNMixedHeb(DSNNHeb):
 
             # ----------- WEIGHT PRUNING ----------------
                             
-            if zeta is not None:
-
+            if zeta:
                 # calculate the positive
                 weight_pos = weight[weight > 0]
                 pos_kth = int(zeta * len(weight_pos))
