@@ -324,9 +324,54 @@ class SET(SparseModel):
         # initialize data structure keep track of added synapses
         self.added_synapses = [None for m in self.masks]
 
-    def _post_epoch_updates(self):
-        super()._post_epoch_updates()
+        # add early stopping to SET
+        self.pruning_active = True
+        self.prune_cycles_completed = 0
+
+    def _post_epoch_updates(self, dataset):
+        super()._post_epoch_updates(dataset)
         self._reinitialize_weights()
+        # decide whether to stop pruning
+        if self.pruning_early_stop:
+            if self.current_epoch in self.lr_milestones:
+                self.prune_cycles_completed += 1
+                if self.prune_cycles_completed >= self.pruning_early_stop:
+                    self.pruning_active = False
+        # temporarily logging for debug purposes
+        self.log["pruning_early_stop"] = int(self.pruning_early_stop)
+
+    def _reinitialize_weights(self):
+        """Reinitialize weights."""
+        if self.pruning_active:
+            for idx, m in enumerate(self.sparse_modules):
+                layer_weights = m.weight.clone().detach()
+                new_mask, prune_mask, new_synapses = self.prune(
+                    layer_weights, self.num_params[idx]
+                )
+                with torch.no_grad():
+                    self.masks[idx] = new_mask.float()
+                    m.weight.data *= prune_mask.float()
+
+                    # keep track of added synapes
+                    if self.debug_sparse:
+                        self.log["added_synapses_l" + str(idx)] = torch.sum(
+                            new_synapses
+                        ).item()
+                        if self.added_synapses[idx] is not None:
+                            total_added = torch.sum(self.added_synapses[idx]).item()
+                            surviving = torch.sum(
+                                self.added_synapses[idx] & prune_mask
+                            ).item()
+                            if total_added:
+                                self.log["surviving_synapses_l" + str(idx)] = (
+                                    surviving / total_added
+                                )
+                    self.added_synapses[idx] = new_synapses
+
+        # keep track of mask sizes when debugging
+        if self.debug_sparse:
+            for idx, m in enumerate(self.masks):
+                self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
 
     def prune(self, weight, num_params, zeta=0.3):
         """
@@ -357,38 +402,6 @@ class SET(SparseModel):
 
         # track added connections
         return new_mask, prune_mask, new_synapses
-
-    def _reinitialize_weights(self):
-        """Reinitialize weights."""
-        for idx, m in enumerate(self.sparse_modules):
-            layer_weights = m.weight.clone().detach()
-            new_mask, prune_mask, new_synapses = self.prune(
-                layer_weights, self.num_params[idx]
-            )
-            with torch.no_grad():
-                self.masks[idx] = new_mask.float()
-                m.weight.data *= prune_mask.float()
-
-                # keep track of added synapes
-                if self.debug_sparse:
-                    self.log["added_synapses_l" + str(idx)] = torch.sum(
-                        new_synapses
-                    ).item()
-                    if self.added_synapses[idx] is not None:
-                        total_added = torch.sum(self.added_synapses[idx]).item()
-                        surviving = torch.sum(
-                            self.added_synapses[idx] & prune_mask
-                        ).item()
-                        if total_added:
-                            self.log["surviving_synapses_l" + str(idx)] = (
-                                surviving / total_added
-                            )
-                self.added_synapses[idx] = new_synapses
-
-        # keep track of mask sizes when debugging
-        if self.debug_sparse:
-            for idx, m in enumerate(self.masks):
-                self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
 
 
 class DSNN(SparseModel):
