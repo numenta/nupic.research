@@ -49,7 +49,7 @@ class HebbianPruningTest(unittest.TestCase):
                 [0.3897, 0.6865, 0.5072, 0.9749, 0.0597],
             ]
         )
-        # the inverse is what will be used
+        # the transpose is what will be used
         # ([
         #     [0.3201, 0.0401, 0.4954, 0.8101, 0.3897],
         #     [0.8318, 0.8620, 0.0092, 0.0922, 0.6865],
