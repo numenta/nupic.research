@@ -96,7 +96,7 @@ class HebbianPruningTest(unittest.TestCase):
 
         intersection = self.mag_hebb_intersection
         complement = set(self.nonzero_idxs).difference(intersection)
-        trues = keep_mask[expand(complement)] == True
+        trues = keep_mask[expand(complement)]
 
         self.assertFalse(
             keep_mask[intersection].item(),
@@ -107,14 +107,14 @@ class HebbianPruningTest(unittest.TestCase):
         )
 
         # test add mask
-        new_connections = add_mask[expand(self.zero_idxs)] == True
+        new_connections = add_mask[expand(self.zero_idxs)]
         self.assertEqual(
             torch.sum(new_connections).item(),
             1,
             "Add mask should have 1 previously non-active connections set to True",
         )
 
-        new_connections = add_mask[expand(self.nonzero_idxs)] == True
+        new_connections = add_mask[expand(self.nonzero_idxs)]
         self.assertEqual(
             torch.sum(new_connections).item(),
             0,
@@ -140,9 +140,9 @@ class HebbianPruningTest(unittest.TestCase):
         )
 
         # test keep mask
-        falses = keep_mask[expand(self.lowest_50_mag)] == False
+        falses = ~keep_mask[expand(self.lowest_50_mag)]
         highest_50 = set(self.nonzero_idxs).difference(self.lowest_50_mag)
-        trues = keep_mask[expand(highest_50)] == True
+        trues = keep_mask[expand(highest_50)]
 
         self.assertEqual(
             torch.sum(falses).item(), 6, "Lowest 50perc in magnitude should be False"
@@ -152,14 +152,14 @@ class HebbianPruningTest(unittest.TestCase):
         )
 
         # test add mask
-        new_connections = add_mask[expand(self.zero_idxs)] == True
+        new_connections = add_mask[expand(self.zero_idxs)]
         self.assertEqual(
             torch.sum(new_connections).item(),
             6,
             "Add mask should have 6 previously non-active connections set to True",
         )
 
-        new_connections = add_mask[expand(self.nonzero_idxs)] == True
+        new_connections = add_mask[expand(self.nonzero_idxs)]
         self.assertEqual(
             torch.sum(new_connections).item(),
             0,
@@ -185,9 +185,9 @@ class HebbianPruningTest(unittest.TestCase):
         )
 
         # test keep mask
-        falses = keep_mask[expand(self.lowest_25_hebb)] == False
+        falses = ~keep_mask[expand(self.lowest_25_hebb)]
         highest_75 = set(self.nonzero_idxs).difference(self.lowest_25_hebb)
-        trues = keep_mask[expand(highest_75)] == True
+        trues = keep_mask[expand(highest_75)]
 
         self.assertEqual(
             torch.sum(falses).item(), 3, "Lowest 25perc in correlations should be False"
@@ -197,14 +197,14 @@ class HebbianPruningTest(unittest.TestCase):
         )
 
         # test add mask
-        new_connections = add_mask[expand(self.zero_idxs)] == True
+        new_connections = add_mask[expand(self.zero_idxs)]
         self.assertEqual(
             torch.sum(new_connections).item(),
             3,
             "Add mask should have 3 previously non-active connections set to True",
         )
 
-        new_connections = add_mask[expand(self.nonzero_idxs)] == True
+        new_connections = add_mask[expand(self.nonzero_idxs)]
         self.assertEqual(
             torch.sum(new_connections).item(),
             0,
