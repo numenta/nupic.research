@@ -23,6 +23,7 @@ import sys
 import time
 from functools import partial, reduce
 
+import numpy as np
 import torch
 import torchvision.utils as vutils
 from torch.utils.data import DataLoader
@@ -64,8 +65,8 @@ class RSMExperiment(object):
     def __init__(self, config=None):
         self.data_dir = config.get("data_dir", "data")
         self.path = config.get("path", "results")
-        self.model_filename = config.get("model_filename", "model.pth")
-        self.pred_model_filename = config.get("pred_model_filename", "pred_model.pth")
+        self.model_filename = config.get("model_filename", "model.pt")
+        self.pred_model_filename = config.get("pred_model_filename", "pred_model.pt")
         self.graph_filename = config.get("graph_filename", "rsm.onnx")
         self.save_onnx_graph_at_checkpoint = config.get(
             "save_onnx_graph_at_checkpoint", False
@@ -102,6 +103,9 @@ class RSMExperiment(object):
         # Data parameters
         self.input_size = config.get("input_size", (1, 28, 28))
         self.sequences = config.get("sequences", [[0, 1, 2, 3]])
+        self.static_digit = config.get("static_digit", False)
+        self.randomize_sequence_cursors = config.get("randomize_sequence_cursors", True)
+        self.use_mnist_pct = config.get("use_mnist_pct", 1.0)
 
         self.learning_rate = config.get("learning_rate", 0.0005)
         self.pred_learning_rate = config.get("pred_learning_rate", self.learning_rate)
@@ -126,9 +130,6 @@ class RSMExperiment(object):
         # Tweaks
         self.activation_fn = config.get("activation_fn", "tanh")
         self.decode_activation_fn = config.get("decode_activation_fn", None)
-        self.static_digit = config.get("static_digit", False)
-        self.randomize_sequence_cursors = config.get("randomize_sequence_cursors", True)
-        self.use_mnist_pct = config.get("use_mnist_pct", 1.0)
         self.pred_l2_reg = config.get("pred_l2_reg", 0)
         self.l2_reg = config.get("l2_reg", 0)
         self.dec_l2_reg = config.get("dec_l2_reg", 0)
@@ -157,14 +158,13 @@ class RSMExperiment(object):
         self.max_decay = config.get("max_decay", 1.0)
         self.additive_decay = config.get("additive_decay", False)
         self.stoch_decay = config.get("stoch_decay", False)
-        self.predict_from_input = config.get("predict_from_input", False)
         self.stoch_k_sd = config.get("stoch_k_sd", False)
         self.rec_active_dendrites = config.get("rec_active_dendrites", 0)
         self.mem_floor = config.get("mem_floor", 0.0)
         self.ramping_memory = config.get("ramping_memory", False)
         self.ramping_learn_vel = config.get("ramping_learn_vel", False)
         self.ramping_fn = config.get("ramping_fn", "lognormal")
-        self.predictor_log_softmax = config.get("predictor_log_softmax", False)
+        self.flat_winners_sigma = config.get("flat_winners_sigma", False)
 
         # Prediction smoothing
         self.word_cache_decay = config.get("word_cache_decay", 0.0)
@@ -183,7 +183,7 @@ class RSMExperiment(object):
 
         self.loss_function = config.get("loss_function", "MSELoss")
         self.lr_step_schedule = config.get("lr_step_schedule", None)
-        self.learning_rate_gamma = config.get("learning_rate_gamma", 0.1)
+        self.learning_rate_gamma = config.get("learning_rate_gamma", 0.0)
         self.learning_rate_min = config.get("learning_rate_min", 0.0)
 
         # Training state
@@ -193,14 +193,12 @@ class RSMExperiment(object):
         self.n_upticks = 0
 
         self.train_hidden_buffer = []
-        self.train_output_buffer = []
 
         # Additional state for vis, etc
         self.activity_by_inputs = {}  # 'digit-digit' -> list of distribution arrays
 
     def _build_dataloader(self):
         # Extra element for sequential prediction labels
-
         self.val_loader = self.corpus = None
         if self.dataset_kind == "mnist":
             transform = transforms.Compose(
@@ -303,7 +301,6 @@ class RSMExperiment(object):
         self.loss = getattr(torch.nn, self.loss_function)(reduction="mean")
         self.predictor_loss = None
         if self.predictor:
-            #self.predictor_loss = torch.nn.NLLLoss()
             # https://pytorch.org/docs/stable/nn.html#crossentropyloss
             # "This criterion combines nn.LogSoftmax() and nn.NLLLoss() in one single class."
             # "The input is expected to contain raw, unnormalized scores for each class."
@@ -394,16 +391,14 @@ class RSMExperiment(object):
             ramping_memory=self.ramping_memory,
             ramping_learn_vel=self.ramping_learn_vel,
             ramping_fn=self.ramping_fn,
+            flat_winners_sigma=self.flat_winners_sigma,
             debug=self.debug,
             visual_debug=self.visual_debug
         )
-        if self.predict_from_input:
-            predictor_d_in = self.d_in
+        if self.n_layers > 1:
+            predictor_d_in = sum([l.total_cells for l in self.model.children()])
         else:
-            if self.n_layers > 1:
-                predictor_d_in = sum([l.total_cells for l in self.model.children()])
-            else:
-                predictor_d_in = self.m_groups * self.n_cells_per_group
+            predictor_d_in = self.m_groups * self.n_cells_per_group
 
         self.model.to(self.device)
 
@@ -411,8 +406,7 @@ class RSMExperiment(object):
             self.predictor = RSMPredictor(
                 d_in=predictor_d_in,
                 d_out=self.predictor_output_size,
-                hidden_size=self.predictor_hidden_size,
-                log_softmax=self.predictor_log_softmax
+                hidden_size=self.predictor_hidden_size
             )
             self.predictor.to(self.device)
 
@@ -421,55 +415,6 @@ class RSMExperiment(object):
 
         if self.word_cache_decay:
             self.word_cache = torch.zeros((self.eval_batch_size, self.vocab_size), device=self.device, requires_grad=False)        
-
-    def _image_grid(
-        self,
-        image_batch,
-        n_seqs=6,
-        max_seqlen=50,
-        compare_with=None,
-        compare_correct=None,
-        limit_seqlen=50,
-        side=28
-    ):
-        """
-        image_batch: n_batches x batch_size x image_dim
-        """
-        image_batch = image_batch[:max_seqlen, :n_seqs].reshape(-1, 1, side, side)
-        if compare_with is not None:
-            # Interleave comparison images with image_batch
-            compare_with = compare_with[:max_seqlen, :n_seqs].reshape(-1, 1, side, side)
-            max_val = compare_with.max()
-            if compare_correct is not None:
-                # Add 'incorrect label' to each image (masked by inverse of
-                # compare_correct) as 2x2 square 'dot' in upper left corner of falsely
-                # predicted targets
-                dsize = 4
-                gap = 2
-                incorrect = ~compare_correct[:max_seqlen, :n_seqs].flatten()
-                compare_with[
-                    incorrect, :, gap : gap + dsize, gap : gap + dsize
-                ] = max_val
-            batch = torch.empty(
-                (
-                    image_batch.shape[0] + compare_with.shape[0],
-                    image_batch.shape[1],
-                    side,
-                    side,
-                )
-            )
-            batch[::2, :, :] = image_batch
-            batch[1::2, :, :] = compare_with
-        else:
-            batch = image_batch
-        # make_grid returns 3 channels -- mean since grayscale
-        grid = vutils.make_grid(
-            batch[: 2 * limit_seqlen * n_seqs],
-            normalize=True,
-            nrow=n_seqs * 2,
-            padding=5,
-        ).mean(dim=0)
-        return grid
 
     def _repackage_hidden(self, h):
         """Wraps hidden states in new Tensors, to detach them from their history."""
@@ -489,35 +434,8 @@ class RSMExperiment(object):
             for param_group in self.optimizer.param_groups:
                 param_group["lr"] = self.learning_rate
 
-    def _store_instr_hists(self):
-        ret = {}
-        if self.instrumentation:
-            for name, param in self.model.named_parameters():
-                if "weight" in name or "decay" in name or "ramp" in name:
-                    data = param.data.cpu()
-                    if data.size(0):
-                        ret["hist_" + name] = data
-                        if self.debug:
-                            print(
-                                "%s: mean: %.3f std: %.3f" % (name, data.mean(), data.std())
-                            )
-        return ret
-
     def _init_hidden(self, batch_size):
         return self.model.init_hidden(batch_size)
-
-    def _store_activity_for_viz(self, x_bs, input_labels, pred_labels):
-        """
-        Aggregate activity for a supplied batch
-        """
-        for _x_b, label, target in zip(x_bs, input_labels, pred_labels):
-            _label = label.item()
-            _label_next = target.item()
-            activity = _x_b.detach().view(self.m_groups, -1).squeeze()
-            key = "%d-%d" % (_label, _label_next)
-            if key not in self.activity_by_inputs:
-                self.activity_by_inputs[key] = []
-            self.activity_by_inputs[key].append(activity)
 
     def _cache_inputs(self, input_labels):
         """
@@ -528,29 +446,14 @@ class RSMExperiment(object):
             # Decay
             self.word_cache = self.word_cache * self.word_cache_decay
 
-    def _get_prediction_and_loss_inputs(self, hidden, output, inputs=None):
-        x_b = None
-        if self.model_kind == 'rsm':
-            # hidden is (x_b, phi, psi)
-            # higher layers predict decaying version of lower layer x_b
-            x_b = hidden[0]
-            # TODO: Option to train separate predictors on each layer and interpolate
-            if self.predictor:
-                if self.predict_from_input:
-                    predictor_input = inputs
-                else:
-                    # Predict from concat of all layer hidden states
-                    predictor_input = torch.cat(x_b, dim=1).view(-1, self.predictor.d_in).detach()
-        elif self.model_kind == 'rnn':
-            # hidden is [n_layers x bsz x nhid]
-            x_b = hidden
-            # For RNN/LSTM, predict from model output
-            predictor_input = output.detach()
-        elif self.model_kind == 'lstm':
-            # hidden is (h [n_layers x bsz x nhid], c [n_layers x bsz x nhid])
-            x_b = hidden[0]  # Get hidden state h
-            # For RNN/LSTM, predict from model output
-            predictor_input = output.detach()
+    def _get_prediction_and_loss_inputs(self, hidden):
+        # hidden is (x_b, phi, psi)
+        # higher layers predict decaying version of lower layer x_b
+        x_b = hidden[0]
+        # TODO: Option to train separate predictors on each layer and interpolate
+        if self.predictor:
+            # Predict from concat of all layer hidden states
+            predictor_input = torch.cat(x_b, dim=1).view(-1, self.predictor.d_in).detach()
         return x_b, predictor_input
 
     def _backward_and_optimize(self, loss):
@@ -564,28 +467,17 @@ class RSMExperiment(object):
         else:
             self.optimizer.step()
 
-    def _do_prediction(
-        self,
-        input,
-        pred_targets,
-        pcounts,
-        train=False,
-        batch_idx=0
-    ):
-        """
-        Do prediction. If multiple layers decode from all cells in deepest
-        layer.
-        """
-        class_predictions = correct_arr = None
-        if self.predictor:
-            pred_targets = pred_targets.flatten()
+    def _interpolated_loss(self, predictor_dist, pred_targets, train=False):
+        predictor_dist_size = list(predictor_dist.size())        
+        num_classes = predictor_dist_size[1]
+        labels_one_hot = torch.nn.functional.one_hot(pred_targets, num_classes=num_classes)
+        labels_one_hot = labels_one_hot.to(self.device).float()
 
-            predictor_dist, predictor_logits = self.predictor(input.detach())
-            predictions = torch.zeros_like(predictor_dist)
-
-            predictor_mass_pct = 1.0
-            if self.word_cache_decay and not train and predictions.size(0) == self.word_cache.size(0):
-                # Word cache enabled (for eval)
+        predictions = torch.zeros_like(predictor_dist)
+        predictor_mass_pct = 1.0
+        if not train:
+            if self.word_cache_decay: # and predictions.size(0) == self.word_cache.size(0):
+                # Word cache enabled
                 mass_pct = self.word_cache_pct
                 predictor_mass_pct -= mass_pct
                 predictions += mass_pct * self.word_cache / self.word_cache.sum(dim=1, keepdim=True)
@@ -596,32 +488,34 @@ class RSMExperiment(object):
                 predictor_mass_pct -= mass_pct
                 predictions += mass_pct * torch.ones_like(predictor_dist) / self.vocab_size
 
-            predictions += predictor_mass_pct * predictor_dist
+        predictions += predictor_mass_pct * predictor_dist
+        ll = (labels_one_hot * torch.log(predictions)).sum(dim=[0,1])
+        interp_loss = -ll  # sum negative log likelihood
 
-            # No longer needed:
-            # if not self.predictor_log_softmax:
-            #     prediction_log_probs = predictions.log()
-            # else:
-            #     prediction_log_probs = predictions
+        return interp_loss.item()
+
+    def _do_prediction(
+        self,
+        input,
+        pred_targets,
+        pcounts,
+        train=False,
+        batch_idx=0
+    ):
+        """
+        Do prediction.
+        """
+        class_predictions = correct_arr = None
+        if self.predictor:
+            pred_targets = pred_targets.flatten()
+
+            predictor_dist, predictor_logits = self.predictor(input.detach())
 
             # This loss is without inference-time model interpolation
             pred_loss = self.predictor_loss(predictor_logits, pred_targets)  # cross-entropy loss
 
             # This loss is for the interpolated model
-            predictor_dist_size = list(predictor_dist.size())
-            #print('shape dist: ', list(predictor_dist_size))
-            #print('shape tgts: ', list(pred_targets.size()))
-            # Alternate: torch.nn.functional.one_hot(x)
-            # labels_one_hot = torch.FloatTensor(predictor_dist_size)
-            # labels_one_hot = labels_one_hot.to(self.device)
-            # labels_one_hot.zero_()
-            # labels_one_hot.scatter_(1, pred_targets.unsqueeze(1), 1)
-            num_classes = predictor_dist_size[1]
-            labels_one_hot = torch.nn.functional.one_hot(pred_targets, num_classes=num_classes)
-            labels_one_hot = labels_one_hot.to(self.device).float()
-            #ll = (labels_one_hot * torch.log(predictor_dist)).sum(dim=[1]).mean()  This matches the training loss when other models are disabled
-            ll = (labels_one_hot * torch.log(predictor_dist)).sum(dim=[0,1])
-            interp_loss = -ll  # sum negative log likelihood
+            interp_loss = self._interpolated_loss(predictor_dist, pred_targets, train=train)
 
             _, class_predictions = torch.max(predictor_dist, 1)
             pcounts['total_samples'] += pred_targets.size(0)
@@ -629,7 +523,7 @@ class RSMExperiment(object):
             pcounts['correct_samples'] += correct_arr.sum().item()
             batch_loss = pred_loss.item()
             pcounts['total_pred_loss'] += batch_loss
-            pcounts['total_interp_loss'] += interp_loss.item()
+            pcounts['total_interp_loss'] += interp_loss
             if train:
                 # Predictor backward + optimize
                 pred_loss.backward()
@@ -665,7 +559,6 @@ class RSMExperiment(object):
             - targets: 2-tuple
                 - list of actual_input (bsz, d_in) by layer
                 - list of x_b (bsz, total_cells)) by layer
-            - x_b_target: (n_layers, bsz, total_cells)
 
         Note that batch size will differ if using a smaller first epoch batch size. 
         In this case we crop target tensors to match predictions.
@@ -712,88 +605,10 @@ class RSMExperiment(object):
 
         return loss
 
-    def _agg_batch_metrics(self, metrics, **kwargs):
-        for metric_key, val in kwargs.items():
-            if val is not None:
-                if metric_key not in metrics:
-                    metrics[metric_key] = val
-                else:
-                    current = metrics[metric_key]
-                    metrics[metric_key] = torch.cat((current, val))
-        return metrics
-
-    def _generate_instr_charts(self, metrics):
-        ret = {}
-        if self.model_kind == "rsm" and self.instrumentation:
-            if self.dataset_kind == "mnist":
-                if "img_confusion" in self.instr_charts:
-                    class_names = [str(x) for x in range(self.predictor_output_size)]
-                    cm_ax, cm_fig = plot_confusion_matrix(
-                        metrics['pred_targets'], metrics['class_predictions'], class_names, title="Prediction Confusion"
-                    )
-                    ret["img_confusion"] = fig2img(cm_fig)
-                if "img_repr_sim" in self.instr_charts:
-                    img_repr_sim = plot_representation_similarity(
-                        self.activity_by_inputs,
-                        n_labels=self.predictor_output_size,
-                        title=self.boost_strat,
-                    )
-                    ret["img_repr_sim"] = fig2img(img_repr_sim)
-                if "img_col_activity" in self.instr_charts:
-                    if self.flattened:
-                        activity_grid = plot_activity_grid(
-                            self.activity_by_inputs, n_labels=self.predictor_output_size
-                        )
-                    else:
-                        activity_grid = plot_activity(
-                            self.activity_by_inputs,
-                            n_labels=self.predictor_output_size,
-                            level="cell",
-                        )
-                    ret["img_col_activity"] = fig2img(activity_grid)
-                self.activity_by_inputs = {}
-
-            if "img_preds" in self.instr_charts:
-                ret["img_preds"] = self._image_grid(
-                    metrics['pred_images'],
-                    compare_with=metrics['targets'],
-                    compare_correct=metrics['correct_arr'],
-                ).cpu()
-
-            if "img_memory_snapshot" in self.instr_charts and self.n_layers > 1:
-                last_inp_layers = [None for x in range(self.n_layers)]
-                last_inp_layers[0] = metrics['last_input_snp']
-                fig = plot_tensors(self.model, [
-                    ('last_out', metrics['last_output_snp']),
-                    ('inputs', last_inp_layers),
-                    ('x_b', metrics['last_hidden_snp'])
-                ], return_fig=True)
-                ret["img_memory_snapshot"] = fig2img(fig)
-
-        return ret
-
-    def _read_out_predictions(
-        self,
-        pred_targets,
-        class_predictions,
-        read_out_tgt,
-        read_out_pred,
-        read_out_len=20,
-    ):
-        if self.predictor and self.corpus and len(read_out_tgt) < read_out_len:
-            read_out_tgt.append(pred_targets[0])
-            read_out_pred.append(class_predictions[0])
-            if len(read_out_tgt) == read_out_len:
-                print_aligned_sentences(
-                    self.corpus.read_out(read_out_tgt),
-                    self.corpus.read_out(read_out_pred),
-                    labels=["Targ", "Pred"],
-                )
-
     def eval_epoch(self, epoch):
         ret = {}
         print("Evaluating...")
-        # Disable dropout
+
         self.model.eval()
         if self.predictor:
             self.predictor.eval()
@@ -802,6 +617,10 @@ class RSMExperiment(object):
             # Rezeroing happens before forward pass, so rezero after last
             # training forward.
             self.model._zero_sparse_weights()
+
+        if self.word_cache_decay:
+            # Clear cache
+            self.word_cache = self.word_cache * 0.0
 
         with torch.no_grad():
             total_loss = 0.0
@@ -814,7 +633,6 @@ class RSMExperiment(object):
 
             hidden = self._init_hidden(self.eval_batch_size)
 
-            last_output = None
             read_out_tgt = []
             read_out_pred = []
             metrics = {}
@@ -831,12 +649,12 @@ class RSMExperiment(object):
 
                 self._cache_inputs(input_labels)
 
-                x_a_next, hidden = self.model(inputs, hidden)
+                output, hidden = self.model(inputs, hidden)
 
-                x_b, pred_input = self._get_prediction_and_loss_inputs(hidden, x_a_next, inputs=inputs)
+                x_b, pred_input = self._get_prediction_and_loss_inputs(hidden)
 
                 # Loss
-                loss = self._compute_loss(last_output, (inputs, x_b))
+                loss = self._compute_loss(output, (targets, x_b))
                 if loss is not None:
                     total_loss += loss.item()
 
@@ -855,7 +673,7 @@ class RSMExperiment(object):
 
                 if self.instrumentation:
                     metrics = self._agg_batch_metrics(metrics,
-                                                      pred_images=x_a_next[0].unsqueeze(0),
+                                                      pred_images=output[0].unsqueeze(0),
                                                       targets=targets.unsqueeze(0),
                                                       correct_arr=correct_arr.unsqueeze(0),
                                                       pred_targets=pred_targets,
@@ -864,8 +682,6 @@ class RSMExperiment(object):
                     if self.dataset_kind == "mnist" and self.model_kind == "rsm":
                         # Summary of column activation by input & next input
                         self._store_activity_for_viz(x_b, input_labels, pred_targets)
-
-                last_output = x_a_next
 
             if self.instrumentation:
                 x_b_delta = None
@@ -879,10 +695,9 @@ class RSMExperiment(object):
                 ret.update(self._generate_instr_charts(metrics))
                 ret.update(self._store_instr_hists())
 
-            ret["val_loss"] = val_loss = total_loss / (_b_idx + 1)
+            num_batches = (_b_idx + 1)
+            ret["val_loss"] = val_loss = total_loss / num_batches
             if self.predictor:
-                num_batches = (_b_idx + 1)
-                #num_samples = (num_batches * self.batch_size)  Why is this incorrect?
                 num_samples = pcounts['total_samples']
                 test_pred_loss = pcounts['total_pred_loss'] / num_batches
                 test_interp_loss = pcounts['total_interp_loss'] / num_samples
@@ -949,7 +764,6 @@ class RSMExperiment(object):
             self.train_loader
         ):
             # Inputs are of shape (batch, input_size)
-
             if inputs.size(0) > bsz:
                 # Crop to smaller first epoch batch size
                 inputs = inputs[:bsz]
@@ -969,23 +783,19 @@ class RSMExperiment(object):
 
             output, hidden = self.model(inputs, hidden)
 
-            x_b, pred_input = self._get_prediction_and_loss_inputs(hidden, output, inputs=inputs)
+            x_b, pred_input = self._get_prediction_and_loss_inputs(hidden)
 
-            self.train_output_buffer.append(output)
             self.train_hidden_buffer.append(hidden)
 
             # Loss
-            # train_output_buffer holds last and present outputs
-            outputs = self.train_output_buffer[0] if len(self.train_output_buffer) == 2 else None
-            loss_targets = (inputs, x_b)
-            loss = self._compute_loss(outputs, loss_targets)
+            loss_targets = (targets, x_b)
+            loss = self._compute_loss(output, loss_targets)
             if loss is not None:
                 total_loss += loss.item()
                 if not self.model_learning_paused:                    
                     self._backward_and_optimize(loss)
 
             # Keep only latest batch states around
-            self.train_output_buffer = self.train_output_buffer[-1:]
             self.train_hidden_buffer = self.train_hidden_buffer[-1:]
 
             pcounts, class_predictions, correct_arr = (
@@ -1005,15 +815,13 @@ class RSMExperiment(object):
 
             # Evaluate each x epochs
             ret.update(self.eval_epoch(epoch))
-            # if self.dataset_kind == "ptb" and epoch >= 12 and ret["val_pred_ppl"] > 380:
-            #     ret["stop"] = 1
 
         train_time = time.time() - t1
         self._post_epoch(epoch)
 
-        ret["train_loss"] = total_loss / (batch_idx + 1)
+        num_batches = (batch_idx + 1)
+        ret["train_loss"] = total_loss / num_batches
         if self.predictor:
-            num_batches = (batch_idx + 1)
             num_samples = (num_batches * self.batch_size)
             train_pred_loss = pcounts['total_pred_loss'] / num_batches
             train_interp_loss = pcounts['total_interp_loss'] / num_samples
@@ -1095,6 +903,159 @@ class RSMExperiment(object):
     def model_cleanup(self):
         pass
 
+    def _agg_batch_metrics(self, metrics, **kwargs):
+        for metric_key, val in kwargs.items():
+            if val is not None:
+                if metric_key not in metrics:
+                    metrics[metric_key] = val
+                else:
+                    current = metrics[metric_key]
+                    metrics[metric_key] = torch.cat((current, val))
+        return metrics
+
+    def _generate_instr_charts(self, metrics):
+        ret = {}
+        if self.model_kind == "rsm" and self.instrumentation:
+            if self.dataset_kind == "mnist":
+                if "img_confusion" in self.instr_charts:
+                    class_names = [str(x) for x in range(self.predictor_output_size)]
+                    cm_ax, cm_fig = plot_confusion_matrix(
+                        metrics['pred_targets'], metrics['class_predictions'], class_names, title="Prediction Confusion"
+                    )
+                    ret["img_confusion"] = fig2img(cm_fig)
+                if "img_repr_sim" in self.instr_charts:
+                    img_repr_sim = plot_representation_similarity(
+                        self.activity_by_inputs,
+                        n_labels=self.predictor_output_size,
+                        title=self.boost_strat,
+                    )
+                    ret["img_repr_sim"] = fig2img(img_repr_sim)
+                if "img_col_activity" in self.instr_charts:
+                    if self.flattened:
+                        activity_grid = plot_activity_grid(
+                            self.activity_by_inputs, n_labels=self.predictor_output_size
+                        )
+                    else:
+                        activity_grid = plot_activity(
+                            self.activity_by_inputs,
+                            n_labels=self.predictor_output_size,
+                            level="cell",
+                        )
+                    ret["img_col_activity"] = fig2img(activity_grid)
+                self.activity_by_inputs = {}
+
+            if "img_preds" in self.instr_charts:
+                ret["img_preds"] = self._image_grid(
+                    metrics['pred_images'],
+                    compare_with=metrics['targets'],
+                    compare_correct=metrics['correct_arr'],
+                ).cpu()
+
+            if "img_memory_snapshot" in self.instr_charts and self.n_layers > 1:
+                last_inp_layers = [None for x in range(self.n_layers)]
+                last_inp_layers[0] = metrics['last_input_snp']
+                fig = plot_tensors(self.model, [
+                    ('last_out', metrics['last_output_snp']),
+                    ('inputs', last_inp_layers),
+                    ('x_b', metrics['last_hidden_snp'])
+                ], return_fig=True)
+                ret["img_memory_snapshot"] = fig2img(fig)
+
+        return ret
+
+    def _read_out_predictions(
+        self,
+        pred_targets,
+        class_predictions,
+        read_out_tgt,
+        read_out_pred,
+        read_out_len=20,
+    ):
+        if self.predictor and self.corpus and len(read_out_tgt) < read_out_len:
+            read_out_tgt.append(pred_targets[0])
+            read_out_pred.append(class_predictions[0])
+            if len(read_out_tgt) == read_out_len:
+                print_aligned_sentences(
+                    self.corpus.read_out(read_out_tgt),
+                    self.corpus.read_out(read_out_pred),
+                    labels=["Targ", "Pred"],
+                )
+
+    def _image_grid(
+        self,
+        image_batch,
+        n_seqs=6,
+        max_seqlen=50,
+        compare_with=None,
+        compare_correct=None,
+        limit_seqlen=50,
+        side=28
+    ):
+        """
+        image_batch: n_batches x batch_size x image_dim
+        """
+        image_batch = image_batch[:max_seqlen, :n_seqs].reshape(-1, 1, side, side)
+        if compare_with is not None:
+            # Interleave comparison images with image_batch
+            compare_with = compare_with[:max_seqlen, :n_seqs].reshape(-1, 1, side, side)
+            max_val = compare_with.max()
+            if compare_correct is not None:
+                # Add 'incorrect label' to each image (masked by inverse of
+                # compare_correct) as 2x2 square 'dot' in upper left corner of falsely
+                # predicted targets
+                dsize = 4
+                gap = 2
+                incorrect = ~compare_correct[:max_seqlen, :n_seqs].flatten()
+                compare_with[
+                    incorrect, :, gap : gap + dsize, gap : gap + dsize
+                ] = max_val
+            batch = torch.empty(
+                (
+                    image_batch.shape[0] + compare_with.shape[0],
+                    image_batch.shape[1],
+                    side,
+                    side,
+                )
+            )
+            batch[::2, :, :] = image_batch
+            batch[1::2, :, :] = compare_with
+        else:
+            batch = image_batch
+        # make_grid returns 3 channels -- mean since grayscale
+        grid = vutils.make_grid(
+            batch[: 2 * limit_seqlen * n_seqs],
+            normalize=True,
+            nrow=n_seqs * 2,
+            padding=5,
+        ).mean(dim=0)
+        return grid
+
+    def _store_instr_hists(self):
+        ret = {}
+        if self.instrumentation:
+            for name, param in self.model.named_parameters():
+                if "weight" in name or "decay" in name or "ramp" in name:
+                    data = param.data.cpu()
+                    if data.size(0):
+                        ret["hist_" + name] = data
+                        if self.debug:
+                            print(
+                                "%s: mean: %.3f std: %.3f" % (name, data.mean(), data.std())
+                            )
+        return ret
+
+    def _store_activity_for_viz(self, x_bs, input_labels, pred_labels):
+        """
+        Aggregate activity for a supplied batch
+        """
+        for _x_b, label, target in zip(x_bs, input_labels, pred_labels):
+            _label = label.item()
+            _label_next = target.item()
+            activity = _x_b.detach().view(self.m_groups, -1).squeeze()
+            key = "%d-%d" % (_label, _label_next)
+            if key not in self.activity_by_inputs:
+                self.activity_by_inputs[key] = []
+            self.activity_by_inputs[key].append(activity)
 
 if __name__ == "__main__":
     print("Using torch version", torch.__version__)

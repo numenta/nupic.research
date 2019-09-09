@@ -41,7 +41,7 @@ def topk_mask(x, k=2):
 
 
 class RSMPredictor(torch.nn.Module):
-    def __init__(self, d_in=28 * 28, d_out=10, hidden_size=20, log_softmax=False):
+    def __init__(self, d_in=28 * 28, d_out=10, hidden_size=20):
         """
 
         """
@@ -278,6 +278,7 @@ class RSMLayer(torch.nn.Module):
         ramping_memory=None,
         ramping_learn_vel=False,
         ramping_fn="lognormal",
+        flat_winners_sigma=False,
         rec_active_dendrites=0,
         **kwargs
     ):
@@ -354,6 +355,7 @@ class RSMLayer(torch.nn.Module):
         self.ramping_memory = ramping_memory
         self.ramping_learn_vel = ramping_learn_vel
         self.ramping_fn = ramping_fn
+        self.flat_winners_sigma = flat_winners_sigma
 
         self.debug = debug
         self.visual_debug = visual_debug

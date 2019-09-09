@@ -86,15 +86,15 @@ class BPTTTrainer():
         
     def predict(self, i, out, pred_tgts):
         self.pred_optimizer.zero_grad()
-        pred_out = self.predictor(out.detach())
-        loss = self.predictor_loss(pred_out, pred_tgts)
+        pred_distr, pred_logits = self.predictor(out.detach())
+        loss = self.predictor_loss(pred_logits, pred_tgts)
         loss.backward()
         self.pred_optimizer.step()
-        _, class_predictions = torch.max(pred_out, 1)
+        _, class_predictions = torch.max(pred_distr, 1)
         correct_arr = class_predictions == pred_tgts
         self.total_samples += pred_tgts.size(0)
         self.correct_samples += correct_arr.sum().item()        
-        interval = PLOT_INT if not self.mbs else self.mbs
+        interval = PLOT_INT if (not self.mbs or self.mbs > 10000) else self.mbs
         if (i+1) % interval == 0:
             train_acc = 100.*self.correct_samples/self.total_samples
             print(i, "train acc: %.3f%%, loss: %.3f" % (train_acc, self.total_loss))
@@ -110,13 +110,13 @@ class BPTTTrainer():
         states = [(None, self.model.init_hidden(self.bsz))]
         return (outputs, targets, states)
 
-    def run(self, epochs=0):
-        write_path = expanduser("~/nta/results/SMNIST_LSTM/%d_mbs:%d_epochs:%d_k2:%d" % (int(time.time()), mbs, epochs, self.k2))
+    def run(self, epochs=0, filename=None):
+        write_path = expanduser("~/nta/results/SMNIST_LSTM/%s" % filename)
         if not os.path.exists(write_path):
             os.makedirs(write_path)
         self.writer = SummaryWriter(write_path)
         if epochs:
-            self.loader.batch_sampler.max_batches = mbs
+            self.loader.batch_sampler.max_batches = self.mbs
             while self.epoch < epochs:
                 self.train()
                 self.epoch += 1
@@ -215,6 +215,14 @@ if __name__ == "__main__":
         help="k2"
     )
     optparser.add_argument(
+        "-f",
+        "--fixed",
+        dest="fixed",
+        action="store_true",
+        default=False,
+        help="Fixed MNIST digit"
+    )    
+    optparser.add_argument(
         "-n",
         "--noise",
         dest="noise",
@@ -234,12 +242,13 @@ if __name__ == "__main__":
                                                 sequences=PAGI9, 
                                                 batch_size=BSZ,
                                                 noise_buffer=opts.noise,
-                                                random_mnist_images=True)
+                                                random_mnist_images=not opts.fixed)
 
     loader = DataLoader(dataset,
                  batch_sampler=sampler,
                  collate_fn=rsm_samplers.pred_sequence_collate)    
 
     trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2, mbs=opts.mbs)
-    trainer.run(epochs=opts.epochs)
+    filename = "%d_mbs:%d_epochs:%d_k2:%d_fixed:%s_noise:%s" % (int(time.time()), opts.mbs, opts.epochs, opts.k2, opts.fixed, opts.noise)
+    trainer.run(epochs=opts.epochs, filename=filename)
 
