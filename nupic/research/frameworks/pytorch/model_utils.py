@@ -145,17 +145,22 @@ def evaluate_model(
     }
 
 
-def set_random_seed(seed):
-    """Set pytorch random seed.
+def set_random_seed(seed, deterministic_mode=True):
+    """
+    Set pytorch, python random, and numpy random seeds (these are all the seeds we
+    normally use).
 
-    See https://pytorch.org/docs/stable/notes/randomness.html
+    :param seed:  (int) seed value
+    :param deterministic_mode: (bool) If True, we'll get truly deterministic results,
+           but performance may be slower. See:
+           https://pytorch.org/docs/stable/notes/randomness.html
     """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-    if torch.backends.cudnn.is_available():
+    if torch.backends.cudnn.is_available() and deterministic_mode:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
