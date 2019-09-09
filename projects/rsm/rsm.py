@@ -210,7 +210,7 @@ class RSMNet(torch.nn.Module):
         self.batch_counter += 1  # Is this stored elsewhere?
         return (output_by_layer, new_hidden)
 
-    def _post_epoch(self, epoch):
+    def _post_train_epoch(self, epoch):
         for mod in self.children():
             mod._post_epoch(epoch)
 
