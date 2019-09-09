@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections import deque
 from collections.abc import Iterable
 
 import numpy as np
@@ -100,7 +99,7 @@ class DSNNHeb(SparseModel):
                     # keep track of new synapses to count surviving on next round
                     self.added_synapses[idx] = new_synapses
 
-            # logging 
+            # logging
             if self.debug_sparse:
                 for idx, (m, sr) in enumerate(zip(self.masks, survival_ratios)):
                     self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
@@ -167,9 +166,9 @@ class DSNNWeightedMag(DSNNHeb):
         with torch.no_grad():
             # init shared variables
             num_synapses = np.prod(weight.shape)
-            active_synapses = (weight != 0)
-            nonactive_synapses = (weight == 0)
-            total_active = torch.sum(active_synapses).item()
+            active_synapses = weight != 0
+            nonactive_synapses = weight == 0
+            # total_active = torch.sum(active_synapses).item()
             total_nonactive = torch.sum(nonactive_synapses).item()
             zeta = self.weight_prune_perc
             # transpose correlation to the weight matrix
@@ -178,7 +177,7 @@ class DSNNWeightedMag(DSNNHeb):
             weight *= corr
 
             # ----------- WEIGHT PRUNING ----------------
-                            
+
             if zeta is not None:
                 # calculate the positive
                 weight_pos = weight[weight > 0]
@@ -188,30 +187,32 @@ class DSNNWeightedMag(DSNNHeb):
                     pos_threshold = -1
                 else:
                     pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
-                
+
                 # calculate the negative
                 weight_neg = weight[weight < 0]
-                neg_kth = int((1-zeta) * len(weight_neg))
+                neg_kth = int((1 - zeta) * len(weight_neg))
                 # if zeta=1, neg_kth=0, prune all
                 if neg_kth == 0:
                     neg_threshold = torch.min(weight_neg).item() - 1
                 else:
                     neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
-                    
-                partial_weight_mask = (weight > pos_threshold) | (weight <= neg_threshold)
+
+                partial_weight_mask = (weight > pos_threshold) | (
+                    weight <= neg_threshold
+                )
                 weight_mask = partial_weight_mask & active_synapses
                 # move to device
                 weight_mask.to(self.device)
 
-            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------            
+            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------
             if zeta:
                 keep_mask = weight_mask
             else:
                 keep_mask = active_synapses.to(self.device)
 
-            # ----------- GROWTH ----------------      
+            # ----------- GROWTH ----------------
 
-            num_add = max(num_params - torch.sum(keep_mask).item(), 0)  
+            num_add = max(num_params - torch.sum(keep_mask).item(), 0)
             # probability of adding is 1 or lower
             p_add = num_add / max(total_nonactive, num_add)
             random_sample = torch.rand(weight.shape).to(self.device) < p_add
@@ -242,7 +243,6 @@ class DSNNWeightedMag(DSNNHeb):
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
-
     def prune_inverse(self, weight, num_params, corr, idx=0):
         """
         Grow by correlation
@@ -251,8 +251,8 @@ class DSNNMixedHeb(DSNNHeb):
         with torch.no_grad():
             # init shared variables
             num_synapses = np.prod(weight.shape)
-            active_synapses = (weight != 0)
-            nonactive_synapses = (weight == 0)
+            active_synapses = weight != 0
+            nonactive_synapses = weight == 0
             total_active = torch.sum(active_synapses).item()
             total_nonactive = torch.sum(nonactive_synapses).item()
             tau = self.hebbian_prune_perc
@@ -261,11 +261,11 @@ class DSNNMixedHeb(DSNNHeb):
             corr = corr.t()
 
             # ----------- HEBBIAN PRUNING ----------------
-            
+
             if tau:
                 corr_active = corr[active_synapses]
                 # decide which weights to remove based on correlation
-                kth = int((1-tau) * total_active)
+                kth = int((1 - tau) * total_active)
                 # if kth = 0, keep all the synapses
                 if kth == 0:
                     hebbian_keep_mask = torch.zeros(weight.shape).bool()
@@ -280,7 +280,7 @@ class DSNNMixedHeb(DSNNHeb):
                 hebbian_keep_mask = hebbian_keep_mask.to(self.device)
 
             # ----------- WEIGHT PRUNING ----------------
-                            
+
             if zeta:
                 # calculate the positive
                 weight_pos = weight[weight > 0]
@@ -294,10 +294,10 @@ class DSNNMixedHeb(DSNNHeb):
                         pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
                 else:
                     pos_threshold = 0
-                
+
                 # calculate the negative
                 weight_neg = weight[weight < 0]
-                neg_kth = int((1-zeta) * len(weight_neg))
+                neg_kth = int((1 - zeta) * len(weight_neg))
                 # if no negative weight, threshold -1 (select none)
                 if len(weight_neg) > 0:
                     # if zeta=1, neg_kth=0, prune all
@@ -307,14 +307,16 @@ class DSNNMixedHeb(DSNNHeb):
                         neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
                 else:
                     neg_threshold = -1
-                    
+
                 # consolidate
-                partial_weight_mask = (weight > pos_threshold) | (weight <= neg_threshold)
+                partial_weight_mask = (weight > pos_threshold) | (
+                    weight <= neg_threshold
+                )
                 weight_mask = partial_weight_mask & active_synapses
                 weight_mask = weight_mask.to(self.device)
 
-            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------            
-                
+            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------
+
             # join both masks
             if tau and zeta:
                 keep_mask = hebbian_keep_mask | weight_mask
@@ -325,13 +327,13 @@ class DSNNMixedHeb(DSNNHeb):
             else:
                 keep_mask = active_synapses.to(self.device)
 
-            # ----------- GROWTH ----------------      
+            # ----------- GROWTH ----------------
 
-            num_add = max(num_params - torch.sum(keep_mask).item(), 0)  
+            num_add = max(num_params - torch.sum(keep_mask).item(), 0)
             # added option to have hebbian grow or not
             if self.hebbian_grow:
                 # get threshold
-                kth = int(num_add) # should not be non-int
+                kth = int(num_add)  # should not be non-int
                 if kth > 0:
                     corr_nonactive = corr[nonactive_synapses]
                     add_threshold, _ = torch.kthvalue(corr_nonactive, kth)
@@ -380,8 +382,8 @@ class DSNNMixedHeb(DSNNHeb):
         with torch.no_grad():
             # init shared variables
             num_synapses = np.prod(weight.shape)
-            active_synapses = (weight != 0)
-            nonactive_synapses = (weight == 0)
+            active_synapses = weight != 0
+            nonactive_synapses = weight == 0
             total_active = torch.sum(active_synapses).item()
             total_nonactive = torch.sum(nonactive_synapses).item()
             tau = self.hebbian_prune_perc
@@ -390,7 +392,7 @@ class DSNNMixedHeb(DSNNHeb):
             corr = corr.t()
 
             # ----------- HEBBIAN PRUNING ----------------
-            
+
             if tau is not None:
                 corr_active = corr[active_synapses]
                 # decide which weights to remove based on correlation
@@ -410,7 +412,7 @@ class DSNNMixedHeb(DSNNHeb):
                 hebbian_keep_mask.to(self.device)
 
             # ----------- WEIGHT PRUNING ----------------
-                            
+
             if zeta is not None:
                 # calculate the positive
                 weight_pos = weight[weight > 0]
@@ -420,23 +422,25 @@ class DSNNMixedHeb(DSNNHeb):
                     pos_threshold = -1
                 else:
                     pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
-                
+
                 # calculate the negative
                 weight_neg = weight[weight < 0]
-                neg_kth = int((1-zeta) * len(weight_neg))
+                neg_kth = int((1 - zeta) * len(weight_neg))
                 # if zeta=1, neg_kth=0, prune all
                 if neg_kth == 0:
                     neg_threshold = torch.min(weight_neg).item() - 1
                 else:
                     neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
-                    
-                partial_weight_mask = (weight > pos_threshold) | (weight <= neg_threshold)
+
+                partial_weight_mask = (weight > pos_threshold) | (
+                    weight <= neg_threshold
+                )
                 weight_mask = partial_weight_mask & active_synapses
                 # move to device
                 weight_mask.to(self.device)
 
-            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------            
-                
+            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------
+
             # join both masks
             if tau and zeta:
                 keep_mask = hebbian_keep_mask | weight_mask
@@ -447,13 +451,13 @@ class DSNNMixedHeb(DSNNHeb):
             else:
                 keep_mask = active_synapses.to(self.device)
 
-            # ----------- GROWTH ----------------      
+            # ----------- GROWTH ----------------
 
-            num_add = max(num_params - torch.sum(keep_mask).item(), 0)  
+            num_add = max(num_params - torch.sum(keep_mask).item(), 0)
             # added option to have hebbian grow or not
             if self.hebbian_grow:
                 # get threshold
-                kth = int(total_nonactive - num_add) # should not be non-int
+                kth = int(total_nonactive - num_add)  # should not be non-int
                 corr_nonactive = corr[nonactive_synapses]
                 add_threshold, _ = torch.kthvalue(corr_nonactive, kth)
                 # calculate mask, only for currently nonactive

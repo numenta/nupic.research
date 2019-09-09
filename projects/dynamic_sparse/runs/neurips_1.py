@@ -24,7 +24,7 @@ import os
 from ray import tune
 
 from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
-from dynamic_sparse.common.utils import run_ray, run_ray_many
+from dynamic_sparse.common.utils import run_ray_many
 
 # experiment configurations
 base_exp_config = dict(
@@ -35,23 +35,23 @@ base_exp_config = dict(
     input_size=784,
     num_classes=10,
     # network related
-    network="MLP", # "MLPHeb",
+    network="MLP",  # "MLPHeb",
     hidden_sizes=[100, 100, 100],
     batch_norm=True,
     kwinners=False,
     # model related
-    model="SET", #"DSNNMixedHeb",
+    model="SET",  # "DSNNMixedHeb",
     on_perc=0.1,
     optim_alg="SGD",
     momentum=0.9,
-    weight_decay=1e-4,    
+    weight_decay=1e-4,
     learning_rate=0.1,
     lr_scheduler="MultiStepLR",
-    lr_milestones=[30,60,90],
+    lr_milestones=[30, 60, 90],
     lr_gamma=0.1,
     # sparse related
     hebbian_prune_perc=0.3,
-    pruning_early_stop=1, #tune.grid_search([None, 1, 2, 3]),
+    pruning_early_stop=1,  # tune.grid_search([None, 1, 2, 3]),
     hebbian_grow=False,
     # additional validation
     test_noise=False,
@@ -76,20 +76,16 @@ tune_config = dict(
 
 experiments = {
     "SET": dict(
-        network="MLP",
-        model="SET",
-        pruning_early_stop=tune.grid_search([0, 1, 2, 3]),
+        network="MLP", model="SET", pruning_early_stop=tune.grid_search([0, 1, 2, 3])
     ),
     "DSNN": dict(
         network="MLPHeb",
         model="DSNNMixedHeb",
         pruning_early_stop=tune.grid_search([0, 1, 2, 3]),
         hebbian_prune_perc=tune.grid_search([0.3, 0.5]),
-        hebbian_grow=False
-    )
+        hebbian_grow=False,
+    ),
 }
 
 
 run_ray_many(tune_config, base_exp_config, experiments)
-
-
