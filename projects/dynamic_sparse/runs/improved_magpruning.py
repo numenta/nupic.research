@@ -24,7 +24,7 @@ import os
 from ray import tune
 
 from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
-from dynamic_sparse.common.utils import run_ray, run_ray_many
+from dynamic_sparse.common.utils import run_ray
 
 # experiment configurations
 base_exp_config = dict(
@@ -44,10 +44,10 @@ base_exp_config = dict(
     on_perc=tune.grid_search([0.2, 0.1]),
     optim_alg="SGD",
     momentum=0.9,
-    weight_decay=1e-4,    
+    weight_decay=1e-4,
     learning_rate=0.1,
     lr_scheduler="MultiStepLR",
-    lr_milestones=[30,60,90],
+    lr_milestones=[30, 60, 90],
     lr_gamma=0.1,
     # sparse related
     hebbian_prune_perc=None,
@@ -62,7 +62,7 @@ base_exp_config = dict(
 )
 
 # ray configurations
-htune_config = dict(
+tune_config = dict(
     name=__file__.replace(".py", "") + "_eval1",
     num_samples=3,
     local_dir=os.path.expanduser("~/nta/results"),
@@ -75,5 +75,3 @@ htune_config = dict(
 )
 
 run_ray(tune_config, base_exp_config)
-
-

@@ -21,10 +21,8 @@
 
 import os
 
-from ray import tune
-
 from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
-from dynamic_sparse.common.utils import run_ray, run_ray_many
+from dynamic_sparse.common.utils import run_ray
 
 # experiment configurations
 base_exp_config = dict(
@@ -44,10 +42,10 @@ base_exp_config = dict(
     on_perc=0.1,
     optim_alg="SGD",
     momentum=0.9,
-    weight_decay=1e-4,    
+    weight_decay=1e-4,
     learning_rate=0.1,
     lr_scheduler="MultiStepLR",
-    lr_milestones=[30,60,90],
+    lr_milestones=[30, 60, 90],
     lr_gamma=0.1,
     # sparse related
     hebbian_prune_perc=0,
@@ -68,12 +66,10 @@ tune_config = dict(
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 30},
-    resources_per_trial={"cpu": 1, "gpu": .5},
+    resources_per_trial={"cpu": 1, "gpu": 0.5},
     loggers=DEFAULT_LOGGERS,
     verbose=1,
 )
 
 
 run_ray(tune_config, base_exp_config)
-
-

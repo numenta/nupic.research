@@ -206,6 +206,7 @@ class BaseModel:
 
         return results
 
+
 class SparseModel(BaseModel):
     """Sparsity implemented by:
 
@@ -309,6 +310,7 @@ class SparseModel(BaseModel):
                             torch.sum(m.weight, dim=[2, 3]).float() * ratio
                         ).int()
                         self.log["img_" + log_name] = heatmap.tolist()
+
 
 class SET(SparseModel):
     """
