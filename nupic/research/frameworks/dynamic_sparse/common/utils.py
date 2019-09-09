@@ -260,8 +260,6 @@ def init_ray():
         )
 
 
-
-
 def run_ray(tune_config, exp_config, fix_seed=False):
 
     # update config
@@ -355,7 +353,8 @@ def run_ray_many(tune_config, exp_config, experiments, fix_seed=False):
     # init ray
     ray.init()
     results = [
-        run_experiment.remote(name, Trainable, c, tune_config) for name, c in exp_configs
+        run_experiment.remote(name, Trainable, c, tune_config)
+        for name, c in exp_configs
     ]
     ray.get(results)
     ray.shutdown()
