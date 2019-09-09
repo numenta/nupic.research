@@ -63,7 +63,7 @@ class MLP(nn.Module):
         """
         Clarifications on batch norm position at the linear block:
         - bn before relu at original paper
-        - bn after relu in recent work 
+        - bn after relu in recent work
         (see fchollet @ https://github.com/keras-team/keras/issues/1802)
         - however, if applied after RELU or kWinners, breaks sparsity
         """
@@ -95,6 +95,7 @@ class MLP(nn.Module):
             print(torch.mean(x).item())
 
         return x
+
 
 class MLPHeb(MLP):
     """Replace forward layer to add hebbian learning"""
