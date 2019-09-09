@@ -684,7 +684,6 @@ class RSMExperiment(object):
                         self._store_activity_for_viz(x_b, input_labels, pred_targets)
 
             if self.instrumentation:
-                x_b_delta = None
                 # Save some snapshots from last batch of epoch
                 if self.model_kind == "rsm":
                     metrics['last_hidden_snp'] = x_b
@@ -810,6 +809,7 @@ class RSMExperiment(object):
                 break
 
         ret["stop"] = 0
+        self.model._post_train_epoch(epoch)  # Update kwinners duty cycles, etc
 
         if self.eval_interval and (epoch - 1) % self.eval_interval == 0:
 
@@ -848,7 +848,6 @@ class RSMExperiment(object):
                 if step == epoch:
                     print(">> Changing eval interval to %d" % new_interval)
                     self.eval_interval = new_interval
-        self.model._post_epoch(epoch)
 
     def model_save(self, checkpoint_dir):
         """Save the model in this directory.
