@@ -151,8 +151,8 @@ def set_random_seed(seed, deterministic_mode=True):
     normally use).
 
     :param seed:  (int) seed value
-    :param deterministic_mode: (bool) If True, we'll get truly deterministic results,
-           but performance may be slower. See:
+    :param deterministic_mode: (bool) If True, then even on a GPU we'll get more
+           deterministic results, though performance may be slower. See:
            https://pytorch.org/docs/stable/notes/randomness.html
     """
     random.seed(seed)
