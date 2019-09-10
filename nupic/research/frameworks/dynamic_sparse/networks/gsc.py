@@ -207,6 +207,35 @@ def make_dscnn(net, config=None):
         elif prune_method == "dynamic":
             return DSConv2d
 
+    def set_module(net, name, new_module):
+        """
+        Mimics "setattr" in purpose and argument types.
+        Sets module "name" of "net" to "new_module".
+        This is done recursively as "name" may be
+        of the form '0.subname-1.subname-2.3 ...'
+        where 0 and 3 indicate indices of a
+        torch.nn.Sequential.
+        """
+
+        subnames = name.split(".")
+        subname0, subnames_remaining = subnames[0], subnames[1:]
+
+        if subnames_remaining:
+
+            if subname0.isdigit():
+                subnet = net[int(subname0)]
+            else:
+                subnet = getattr(net, subname0)
+
+            set_module(subnet, ".".join(subnames_remaining), new_module)
+
+        else:
+
+            if subname0.isdigit():
+                net[int(subname0)] = new_module
+            else:
+                setattr(net, subname0, new_module)
+
     # Get DSConv2d params from config.
     prune_methods = tolist(config.get("prune_methods", "dynamic"))
     assert (
@@ -246,64 +275,25 @@ def make_dscnn(net, config=None):
         len((kwargs_s)) == len(named_convs) == len(prune_methods)
     ), "Sizes do not match"
 
-    # OLD VERSION
+    # Replace conv layers.
+    for prune_method, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
 
-    # for prune_meth, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
+        conv_type = get_conv_type(prune_method)
+        if conv_type is None:
+            continue
 
-    #     NewConv = get_conv_type(prune_meth)
-    #     if NewConv is None:
-    #         continue
-
-    #     setattr(net, name, NewConv(
-    #         in_channels=conv.in_channels,
-    #         out_channels=conv.out_channels,
-    #         kernel_size=conv.kernel_size,
-    #         stride=conv.stride,
-    #         padding=conv.padding,
-    #         padding_mode=conv.padding_mode,
-    #         dilation=conv.dilation,
-    #         groups=conv.groups,
-    #         bias=(conv.bias is not None),
-    #         **kwargs,
-    #     ))
-
-    # NEW VERSION
-
-    new_features = []
-    idx = 0  # iterate through args
-    # only start procedure if there at least one layer which needs to be pruned
-    if len(prune_methods):
-        # replace all conv layers if required
-        for layer in net.features:
-            if isinstance(layer, nn.Conv2d):
-                # only replace layer if one of the expected types
-                prune_method = prune_methods[idx]
-                if prune_method in ["static", "random", "dynamic"]:
-                    kwargs = kwargs_s[idx]
-                    conv_type = get_conv_type(prune_method)
-                    new_features.append(
-                        conv_type(
-                            in_channels=layer.in_channels,
-                            out_channels=layer.out_channels,
-                            kernel_size=layer.kernel_size,
-                            stride=layer.stride,
-                            padding=layer.padding,
-                            padding_mode=layer.padding_mode,
-                            dilation=layer.dilation,
-                            groups=layer.groups,
-                            bias=(layer.bias is not None),
-                            **kwargs,
-                        )
-                    )
-                # else, do nothing, append conv
-                else:
-                    new_features.append(layer)
-                idx += 1
-            else:
-                # do nothing, append regular layer
-                new_features.append(layer)
-
-    net.features = nn.Sequential(*new_features)
+        set_module(net, name, conv_type(
+            in_channels=conv.in_channels,
+            out_channels=conv.out_channels,
+            kernel_size=conv.kernel_size,
+            stride=conv.stride,
+            padding=conv.padding,
+            padding_mode=conv.padding_mode,
+            dilation=conv.dilation,
+            groups=conv.groups,
+            bias=(conv.bias is not None),
+            **kwargs,
+        ))
 
     return net
 
