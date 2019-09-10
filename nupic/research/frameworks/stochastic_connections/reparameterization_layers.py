@@ -39,7 +39,7 @@ LIMIT_B = 1.1
 EPSILON = 1e-6
 
 
-class StochasticConnectionsLinear(Module):
+class HardConcreteGatedLinear(Module):
     """
     Linear layer with stochastic connections, as in
     https://arxiv.org/abs/1712.01312
@@ -57,7 +57,7 @@ class StochasticConnectionsLinear(Module):
         :param temperature: Temperature of the concrete distribution
         :param l0_strength: Strength of the L0 penalty
         """
-        super(StochasticConnectionsLinear, self).__init__()
+        super(HardConcreteGatedLinear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.l0_strength = l0_strength
@@ -152,6 +152,18 @@ class StochasticConnectionsLinear(Module):
         return F.linear(x, self.sample_weight(),
                         (self.bias if self.use_bias else None))
 
+    def get_expected_nonzeros(self):
+        expected_gates = 1 - self.cdf_qz(0)
+        return expected_gates.sum(
+            dim=tuple(range(1, len(expected_gates.shape)))).detach()
+
+    def get_inference_nonzeros(self):
+        inference_gates = F.hardtanh(
+            torch.sigmoid(self.loga) * (LIMIT_B - LIMIT_A) + LIMIT_A,
+            min_val=0, max_val=1)
+        return (inference_gates > 0).sum(
+            dim=tuple(range(1, len(inference_gates.shape)))).detach()
+
     def __repr__(self):
         s = ("{name}({in_features} -> {out_features}, "
              "droprate_init={droprate_init}, l0_strength={l0_strength}, "
@@ -162,7 +174,7 @@ class StochasticConnectionsLinear(Module):
         return s.format(name=self.__class__.__name__, **self.__dict__)
 
 
-class StochasticConnectionsConv2d(Module):
+class HardConcreteGatedConv2d(Module):
     """
     Convolutional layer with stochastic connections, as in
     https://arxiv.org/abs/1712.01312
@@ -185,7 +197,7 @@ class StochasticConnectionsConv2d(Module):
         :param l2_strength: Strength of the L2 penalty
         :param l0_strength: Strength of the L0 penalty
         """
-        super(StochasticConnectionsConv2d, self).__init__()
+        super(HardConcreteGatedConv2d, self).__init__()
         if in_channels % groups != 0:
             raise ValueError("in_channels must be divisible by groups")
         if out_channels % groups != 0:
@@ -317,6 +329,18 @@ class StochasticConnectionsConv2d(Module):
                         (self.bias if self.use_bias else None),
                         self.stride, self.padding, self.dilation,
                         self.groups)
+
+    def get_expected_nonzeros(self):
+        expected_gates = 1 - self.cdf_qz(0)
+        return expected_gates.sum(
+            dim=tuple(range(1, len(expected_gates.shape)))).detach()
+
+    def get_inference_nonzeros(self):
+        inference_gates = F.hardtanh(
+            torch.sigmoid(self.loga) * (LIMIT_B - LIMIT_A) + LIMIT_A,
+            min_val=0, max_val=1)
+        return (inference_gates > 0).sum(
+            dim=tuple(range(1, len(inference_gates.shape)))).detach()
 
     def __repr__(self):
         s = ("{name}({in_channels}, {out_channels}, kernel_size={kernel_size}, "

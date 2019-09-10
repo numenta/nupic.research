@@ -32,15 +32,14 @@ from collections import OrderedDict
 
 import ray
 import torch
-import torch.nn.functional as F
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from ray import tune
 from torch import nn
 
 from nupic.research.frameworks.stochastic_connections.reparameterization_layers import (
-    StochasticConnectionsConv2d,
-    StochasticConnectionsLinear,
+    HardConcreteGatedConv2d,
+    HardConcreteGatedLinear,
 )
 from nupic.torch.modules import Flatten
 
@@ -68,7 +67,6 @@ class StochasticMNISTExperiment(tune.Trainable):
         conv_dims = (20, 50)
         fc_dims = 500
 
-        temperature = 2 / 3
         l0_strengths = (l0_strength, l0_strength, l0_strength, l0_strength)
 
         kernel_sidelength = 5
@@ -80,30 +78,35 @@ class StochasticMNISTExperiment(tune.Trainable):
         assert(feature_map_sidelength == int(feature_map_sidelength))
         feature_map_sidelength = int(feature_map_sidelength)
 
-        self.model = nn.Sequential(OrderedDict([
-            ("cnn1", StochasticConnectionsConv2d(
-                input_size[0], conv_dims[0], kernel_sidelength,
-                droprate_init=0.5, temperature=temperature,
-                l2_strength=l2_strength, l0_strength=l0_strengths[0])),
-            ("cnn1_relu", nn.ReLU()),
-            ("cnn1_maxpool", nn.MaxPool2d(maxpool_stride)),
-            ("cnn2", StochasticConnectionsConv2d(
-                conv_dims[0], conv_dims[1], kernel_sidelength,
-                droprate_init=0.5, temperature=temperature,
-                l2_strength=l2_strength, l0_strength=l0_strengths[1])),
-            ("cnn2_relu", nn.ReLU()),
-            ("cnn2_maxpool", nn.MaxPool2d(maxpool_stride)),
-            ("flatten", Flatten()),
-            ("fc1", StochasticConnectionsLinear(
-                (feature_map_sidelength**2) * conv_dims[1], fc_dims,
-                droprate_init=0.5, l2_strength=l2_strength,
-                l0_strength=l0_strengths[2], temperature=temperature)),
-            ("fc1_relu", nn.ReLU()),
-            ("fc2", StochasticConnectionsLinear(
-                fc_dims, num_classes, droprate_init=0.5,
-                l2_strength=l2_strength, l0_strength=l0_strengths[3],
-                temperature=temperature)),
-        ]))
+        model_type = config["model_type"]
+        if model_type == "HardConcrete":
+            temperature = 2 / 3
+            self.model = nn.Sequential(OrderedDict([
+                ("cnn1", HardConcreteGatedConv2d(
+                    input_size[0], conv_dims[0], kernel_sidelength,
+                    droprate_init=0.5, temperature=temperature,
+                    l2_strength=l2_strength, l0_strength=l0_strengths[0])),
+                ("cnn1_relu", nn.ReLU()),
+                ("cnn1_maxpool", nn.MaxPool2d(maxpool_stride)),
+                ("cnn2", HardConcreteGatedConv2d(
+                    conv_dims[0], conv_dims[1], kernel_sidelength,
+                    droprate_init=0.5, temperature=temperature,
+                    l2_strength=l2_strength, l0_strength=l0_strengths[1])),
+                ("cnn2_relu", nn.ReLU()),
+                ("cnn2_maxpool", nn.MaxPool2d(maxpool_stride)),
+                ("flatten", Flatten()),
+                ("fc1", HardConcreteGatedLinear(
+                    (feature_map_sidelength**2) * conv_dims[1], fc_dims,
+                    droprate_init=0.5, l2_strength=l2_strength,
+                    l0_strength=l0_strengths[2], temperature=temperature)),
+                ("fc1_relu", nn.ReLU()),
+                ("fc2", HardConcreteGatedLinear(
+                    fc_dims, num_classes, droprate_init=0.5,
+                    l2_strength=l2_strength, l0_strength=l0_strengths[3],
+                    temperature=temperature)),
+            ]))
+        else:
+            raise ValueError("Unrecognized model type: {}".format(model_type))
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(device)
@@ -170,23 +173,13 @@ class StochasticMNISTExperiment(tune.Trainable):
         for layername in ["cnn1", "cnn2", "fc1", "fc2"]:
             layer = getattr(self.model, layername)
 
-            # Measure two different types of nonzeros:
-            e_gates = 1 - layer.cdf_qz(0)
-            e_nz_by_unit = e_gates.sum(
-                dim=tuple(range(1, len(e_gates.shape))))
-            inf_gates = F.hardtanh(
-                torch.sigmoid(layer.loga) * (1.1 - -.1) + -.1,
-                min_val=0, max_val=1)
-            inf_nz_by_unit = (inf_gates > 0).sum(
-                dim=tuple(range(1, len(inf_gates.shape))))
-
             num_inputs = 1.
             for d in layer.weight.size()[1:]:
                 num_inputs *= d
 
             result[layername] = {
-                "expected_nz_by_unit": e_nz_by_unit.detach().tolist(),
-                "inference_nz_by_unit": inf_nz_by_unit.detach().tolist(),
+                "expected_nz_by_unit": layer.get_expected_nonzeros().tolist(),
+                "inference_nz_by_unit": layer.get_inference_nonzeros().tolist(),
                 "num_input_units": num_inputs,
             }
 
@@ -195,6 +188,8 @@ class StochasticMNISTExperiment(tune.Trainable):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, default="HardConcrete",
+                        choices=["HardConcrete"])
     parser.add_argument("--l0", type=float, nargs="+", default=[1e-5, 2e-5, 4e-5])
     parser.add_argument("--l2", type=float, nargs="+", default=[5e-4])
     parser.add_argument("--epochs", type=int, default=30)
@@ -215,6 +210,7 @@ if __name__ == "__main__":
                         config={
                             "l0_strength": tune.grid_search(args.l0),
                             "l2_strength": tune.grid_search(args.l2),
+                            "model_type": args.model,
                         },
                         stop={"training_iteration": args.epochs})
 
