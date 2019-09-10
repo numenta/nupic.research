@@ -214,21 +214,21 @@ def new_experiment(base_config, new_config):
     return modified_config
 
 
-# @ray.remote
-# def run_experiment(name, trainable, exp_config, tune_config):
+@ray.remote
+def run_experiment(name, trainable, exp_config, tune_config):
 
-#     # override when running local for test
-#     # if not torch.cuda.is_available():
-#     #     exp_config["device"] = "cpu"
-#     #     tune_config["resources_per_trial"] = {"cpu": 1}
+    # override when running local for test
+    # if not torch.cuda.is_available():
+    #     exp_config["device"] = "cpu"
+    #     tune_config["resources_per_trial"] = {"cpu": 1}
 
-#     # download dataset
-#     download_dataset(exp_config)
+    # download dataset
+    download_dataset(exp_config)
 
-#     # run
-#     tune_config["name"] = name
-#     tune_config["config"] = exp_config
-#     tune.run(Trainable, **tune_config)
+    # run
+    # tune_config["name"] = name
+    tune_config["config"] = exp_config
+    tune.run(Trainable, **tune_config)
 
 
 def init_ray():
@@ -304,3 +304,57 @@ def run_ray(tune_config, exp_config, fix_seed=False):
         set_random_seed(32)
 
     tune.run(Trainable, **tune_config)
+
+
+def run_ray_many(tune_config, exp_config, experiments, fix_seed=False):
+
+    # update config
+    tune_config["config"] = exp_config
+
+    # override when running local for test
+    if not torch.cuda.is_available():
+        tune_config["config"]["device"] = "cpu"
+        tune_config["resources_per_trial"] = {"cpu": 1}
+
+    # MC code to fix for an unknown bug
+    def serializer(obj):
+        if obj.is_cuda:
+            return obj.cpu().numpy()
+        else:
+            return obj.numpy()
+
+    def deserializer(serialized_obj):
+        return serialized_obj
+
+    for t in [
+        torch.FloatTensor,
+        torch.DoubleTensor,
+        torch.HalfTensor,
+        torch.ByteTensor,
+        torch.CharTensor,
+        torch.ShortTensor,
+        torch.IntTensor,
+        torch.LongTensor,
+        torch.Tensor,
+    ]:
+        ray.register_custom_serializer(
+            t, serializer=serializer, deserializer=deserializer
+        )
+
+    # fix seed
+    if fix_seed:
+        set_random_seed(32)
+
+    # multiple experiments
+    exp_configs = [
+        (name, new_experiment(exp_config, c)) for name, c in experiments.items()
+    ]
+
+    # init ray
+    ray.init()
+    results = [
+        run_experiment.remote(name, Trainable, c, tune_config)
+        for name, c in exp_configs
+    ]
+    ray.get(results)
+    ray.shutdown()
