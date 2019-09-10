@@ -70,5 +70,6 @@ if __name__ == "__main__":
     parser.add_argument("logdir", type=str,
                         help="Path to a single trial of a ray tune experiment")
     parser.add_argument("--outfilename", type=str, default="sparsity_log.pdf")
+    parser.add_argument("--expected", action="store_true")
     args = parser.parse_args()
-    save_plot(tune.Analysis(args.logdir), args.outfilename)
+    save_plot(tune.Analysis(args.logdir), args.outfilename, args.expected)
