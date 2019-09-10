@@ -37,6 +37,10 @@ import torchvision.transforms as transforms
 from ray import tune
 from torch import nn
 
+from nupic.research.frameworks.stochastic_connections.grad_log_prob_layers import (
+    BinaryGatedConv2d,
+    BinaryGatedLinear,
+)
 from nupic.research.frameworks.stochastic_connections.reparameterization_layers import (
     HardConcreteGatedConv2d,
     HardConcreteGatedLinear,
@@ -104,6 +108,30 @@ class StochasticMNISTExperiment(tune.Trainable):
                     fc_dims, num_classes, droprate_init=0.5,
                     l2_strength=l2_strength, l0_strength=l0_strengths[3],
                     temperature=temperature)),
+            ]))
+        elif model_type == "Binary":
+            self.model = nn.Sequential(OrderedDict([
+                ("cnn1", BinaryGatedConv2d(
+                    input_size[0], conv_dims[0], kernel_sidelength,
+                    droprate_init=0.5, l2_strength=l2_strength,
+                    l0_strength=l0_strengths[0])),
+                ("cnn1_relu", nn.ReLU()),
+                ("cnn1_maxpool", nn.MaxPool2d(maxpool_stride)),
+                ("cnn2", BinaryGatedConv2d(
+                    conv_dims[0], conv_dims[1], kernel_sidelength,
+                    droprate_init=0.5, l2_strength=l2_strength,
+                    l0_strength=l0_strengths[1])),
+                ("cnn2_relu", nn.ReLU()),
+                ("cnn2_maxpool", nn.MaxPool2d(maxpool_stride)),
+                ("flatten", Flatten()),
+                ("fc1", BinaryGatedLinear(
+                    (feature_map_sidelength**2) * conv_dims[1], fc_dims,
+                    droprate_init=0.5, l2_strength=l2_strength,
+                    l0_strength=l0_strengths[2])),
+                ("fc1_relu", nn.ReLU()),
+                ("fc2", BinaryGatedLinear(
+                    fc_dims, num_classes, droprate_init=0.5,
+                    l2_strength=l2_strength, l0_strength=l0_strengths[3])),
             ]))
         else:
             raise ValueError("Unrecognized model type: {}".format(model_type))
@@ -189,7 +217,7 @@ class StochasticMNISTExperiment(tune.Trainable):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default="HardConcrete",
-                        choices=["HardConcrete"])
+                        choices=["HardConcrete", "Binary"])
     parser.add_argument("--l0", type=float, nargs="+", default=[1e-5, 2e-5, 4e-5])
     parser.add_argument("--l2", type=float, nargs="+", default=[5e-4])
     parser.add_argument("--epochs", type=int, default=30)
