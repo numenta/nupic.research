@@ -93,5 +93,8 @@ if __name__ == "__main__":
                         help="Path to a ray tune experiment")
     parser.add_argument("--outfilename", type=str,
                         default="accuracy_sparsity_during_training.pdf")
+    parser.add_argument("--mean", action="store_true")
+    parser.add_argument("--expected", action="store_true")
     args = parser.parse_args()
-    save_plot(args.expdir, args.outfilename)
+    save_plot(args.expdir, args.outfilename, show_expected=args.expected,
+              mean=args.mean)
