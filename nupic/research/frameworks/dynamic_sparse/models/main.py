@@ -80,7 +80,7 @@ class BaseModel:
             )
 
         # add a learning rate scheduler
-        if self.lr_scheduler or self.lr_scheduler == "MultiStepLR":
+        if self.lr_scheduler == "MultiStepLR":
             self.lr_scheduler = schedulers.MultiStepLR(
                 self.optimizer, milestones=self.lr_milestones, gamma=self.lr_gamma
             )
