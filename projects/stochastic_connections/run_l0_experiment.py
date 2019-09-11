@@ -83,55 +83,60 @@ class StochasticMNISTExperiment(tune.Trainable):
         feature_map_sidelength = int(feature_map_sidelength)
 
         model_type = config["model_type"]
+        learn_weight = config["learn_weight"]
         if model_type == "HardConcrete":
             temperature = 2 / 3
             self.model = nn.Sequential(OrderedDict([
                 ("cnn1", HardConcreteGatedConv2d(
                     input_size[0], conv_dims[0], kernel_sidelength,
                     droprate_init=0.5, temperature=temperature,
-                    l2_strength=l2_strength, l0_strength=l0_strengths[0])),
+                    l2_strength=l2_strength, l0_strength=l0_strengths[0],
+                    learn_weight=learn_weight)),
                 ("cnn1_relu", nn.ReLU()),
                 ("cnn1_maxpool", nn.MaxPool2d(maxpool_stride)),
                 ("cnn2", HardConcreteGatedConv2d(
                     conv_dims[0], conv_dims[1], kernel_sidelength,
                     droprate_init=0.5, temperature=temperature,
-                    l2_strength=l2_strength, l0_strength=l0_strengths[1])),
+                    l2_strength=l2_strength, l0_strength=l0_strengths[1],
+                    learn_weight=learn_weight)),
                 ("cnn2_relu", nn.ReLU()),
                 ("cnn2_maxpool", nn.MaxPool2d(maxpool_stride)),
                 ("flatten", Flatten()),
                 ("fc1", HardConcreteGatedLinear(
                     (feature_map_sidelength**2) * conv_dims[1], fc_dims,
                     droprate_init=0.5, l2_strength=l2_strength,
-                    l0_strength=l0_strengths[2], temperature=temperature)),
+                    l0_strength=l0_strengths[2], temperature=temperature,
+                    learn_weight=learn_weight)),
                 ("fc1_relu", nn.ReLU()),
                 ("fc2", HardConcreteGatedLinear(
                     fc_dims, num_classes, droprate_init=0.5,
                     l2_strength=l2_strength, l0_strength=l0_strengths[3],
-                    temperature=temperature)),
+                    temperature=temperature, learn_weight=learn_weight)),
             ]))
         elif model_type == "Binary":
             self.model = nn.Sequential(OrderedDict([
                 ("cnn1", BinaryGatedConv2d(
                     input_size[0], conv_dims[0], kernel_sidelength,
                     droprate_init=0.5, l2_strength=l2_strength,
-                    l0_strength=l0_strengths[0])),
+                    l0_strength=l0_strengths[0], learn_weight=learn_weight)),
                 ("cnn1_relu", nn.ReLU()),
                 ("cnn1_maxpool", nn.MaxPool2d(maxpool_stride)),
                 ("cnn2", BinaryGatedConv2d(
                     conv_dims[0], conv_dims[1], kernel_sidelength,
                     droprate_init=0.5, l2_strength=l2_strength,
-                    l0_strength=l0_strengths[1])),
+                    l0_strength=l0_strengths[1], learn_weight=learn_weight)),
                 ("cnn2_relu", nn.ReLU()),
                 ("cnn2_maxpool", nn.MaxPool2d(maxpool_stride)),
                 ("flatten", Flatten()),
                 ("fc1", BinaryGatedLinear(
                     (feature_map_sidelength**2) * conv_dims[1], fc_dims,
                     droprate_init=0.5, l2_strength=l2_strength,
-                    l0_strength=l0_strengths[2])),
+                    l0_strength=l0_strengths[2], learn_weight=learn_weight)),
                 ("fc1_relu", nn.ReLU()),
                 ("fc2", BinaryGatedLinear(
                     fc_dims, num_classes, droprate_init=0.5,
-                    l2_strength=l2_strength, l0_strength=l0_strengths[3])),
+                    l2_strength=l2_strength, l0_strength=l0_strengths[3],
+                    learn_weight=learn_weight)),
             ]))
         else:
             raise ValueError("Unrecognized model type: {}".format(model_type))
@@ -222,13 +227,14 @@ if __name__ == "__main__":
     parser.add_argument("--l2", type=float, nargs="+", default=[5e-4])
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--samples", type=int, default=3)
-    parser.add_argument("--local", action="store_true")
+    parser.add_argument("--remote", action="store_true")
+    parser.add_argument("--fixedweight", action="store_true")
     args = parser.parse_args()
 
-    if args.local:
-        ray.init()
-    else:
+    if args.remote:
         ray.init(redis_address="localhost:6379")
+    else:
+        ray.init()
 
     exp_name = "L0-MNIST-{}-{}".format(time.strftime("%Y%m%d-%H%M%S"), uuid.uuid1())
     print("Running experiment {}".format(exp_name))
@@ -239,8 +245,14 @@ if __name__ == "__main__":
                             "l0_strength": tune.grid_search(args.l0),
                             "l2_strength": tune.grid_search(args.l2),
                             "model_type": args.model,
+                            "learn_weight": not args.fixedweight,
                         },
-                        stop={"training_iteration": args.epochs})
+                        stop={"training_iteration": args.epochs},
+                        resources_per_trial={
+                            "cpu": 1,
+                            "gpu": (1 if torch.cuda.is_available() else 0)
+                        },
+                        verbose=1)
 
     print(("To browse results, instantiate "
            '`tune.Analysis("~/ray_results/{}")`').format(exp_name))
