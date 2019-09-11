@@ -198,7 +198,6 @@ class RSMExperiment(object):
         self.activity_by_inputs = {}  # 'digit-digit' -> list of distribution arrays
 
     def _build_dataloader(self):
-        # Extra element for sequential prediction labels
         self.val_loader = self.corpus = None
         if self.dataset_kind == "mnist":
             transform = transforms.Compose(
@@ -281,6 +280,9 @@ class RSMExperiment(object):
                 for word_id, word in enumerate(corpus.dictionary.idx2word):
                     embedding[word_id] = torch.tensor(ft_model[word])
 
+            if self.embedding_kind:
+                print("Loaded embedding dict (%s) with %d entries" % (self.embedding_kind, len(embedding)))
+
             collate_fn = partial(ptb_pred_sequence_collate, vector_dict=embedding)
             self.train_loader = DataLoader(
                 corpus.train, batch_sampler=train_sampler, collate_fn=collate_fn
@@ -304,7 +306,7 @@ class RSMExperiment(object):
             # https://pytorch.org/docs/stable/nn.html#crossentropyloss
             # "This criterion combines nn.LogSoftmax() and nn.NLLLoss() in one single class."
             # "The input is expected to contain raw, unnormalized scores for each class."
-            self.predictor_loss = torch.nn.CrossEntropyLoss()
+            self.predictor_loss = torch.nn.CrossEntropyLoss(reduction='sum')
 
     def _get_one_optimizer(self, type, params, lr, l2_reg=0.0):
         if type == "adam":
@@ -331,7 +333,7 @@ class RSMExperiment(object):
                                                      self.predictor.parameters(), 
                                                      self.pred_learning_rate, l2_reg=self.pred_l2_reg)
 
-    def model_setup(self, config):
+    def model_setup(self, config, restore_path=None):
         seed = config.get("seed", random.randint(0, 10000))
         if torch.cuda.is_available():
             print("setup: Using cuda")
@@ -343,71 +345,77 @@ class RSMExperiment(object):
 
         self._build_dataloader()
 
-        # Build model and optimizer
-        self.d_in = reduce(lambda x, y: x * y, self.input_size)
-        self.d_out = config.get("output_size", self.d_in)
-        self.predictor = None
-        predictor_d_in = self.m_groups
-        self.model = RSMNet(
-            n_layers=self.n_layers,
-            d_in=self.d_in,
-            d_out=self.d_out,
-            m=self.m_groups,
-            n=self.n_cells_per_group,
-            k=self.k_winners,
-            k_winner_cells=self.k_winner_cells,
-            gamma=self.gamma,
-            eps=self.eps,
-            forget_mu=self.forget_mu,
-            activation_fn=self.activation_fn,
-            decode_activation_fn=self.decode_activation_fn,
-            decode_from_full_memory=self.decode_from_full_memory,
-            col_output_cells=self.col_output_cells,
-            x_b_norm=self.x_b_norm,
-            mask_shifted_pi=self.mask_shifted_pi,
-            boost_strat=self.boost_strat,
-            boost_strength=self.boost_strength,
-            boost_strength_factor=self.boost_strength_factor,
-            duty_cycle_period=self.duty_cycle_period,
-            weight_sparsity=self.weight_sparsity,
-            mult_integration=self.mult_integration,
-            fpartition=self.fpartition,
-            balance_part_winners=self.balance_part_winners,
-            feedback_conn=self.feedback_conn,
-            lateral_conn=self.lateral_conn,
-            top_lateral_conn=self.top_lateral_conn,
-            input_bias=self.input_bias,
-            decode_bias=self.decode_bias,
-            trainable_decay=self.trainable_decay,
-            trainable_decay_rec=self.trainable_decay_rec,
-            max_decay=self.max_decay,
-            additive_decay=self.additive_decay,
-            stoch_decay=self.stoch_decay,
-            embed_dim=self.embed_dim,
-            vocab_size=self.vocab_size,
-            stoch_k_sd=self.stoch_k_sd,
-            rec_active_dendrites=self.rec_active_dendrites,
-            mem_floor=self.mem_floor,
-            ramping_memory=self.ramping_memory,
-            ramping_learn_vel=self.ramping_learn_vel,
-            ramping_fn=self.ramping_fn,
-            flat_winners_sigma=self.flat_winners_sigma,
-            debug=self.debug,
-            visual_debug=self.visual_debug
-        )
-        if self.n_layers > 1:
-            predictor_d_in = sum([l.total_cells for l in self.model.children()])
+        if restore_path:
+            # Restore to self.model and self.predictor
+            self.model_restore(restore_path)
         else:
-            predictor_d_in = self.m_groups * self.n_cells_per_group
-
-        self.model.to(self.device)
-
-        if self.predictor_hidden_size:
-            self.predictor = RSMPredictor(
-                d_in=predictor_d_in,
-                d_out=self.predictor_output_size,
-                hidden_size=self.predictor_hidden_size
+            # Build model and optimizer
+            self.d_in = reduce(lambda x, y: x * y, self.input_size)
+            self.d_out = config.get("output_size", self.d_in)
+            self.predictor = None
+            predictor_d_in = self.m_groups
+            self.model = RSMNet(
+                n_layers=self.n_layers,
+                d_in=self.d_in,
+                d_out=self.d_out,
+                m=self.m_groups,
+                n=self.n_cells_per_group,
+                k=self.k_winners,
+                k_winner_cells=self.k_winner_cells,
+                gamma=self.gamma,
+                eps=self.eps,
+                forget_mu=self.forget_mu,
+                activation_fn=self.activation_fn,
+                decode_activation_fn=self.decode_activation_fn,
+                decode_from_full_memory=self.decode_from_full_memory,
+                col_output_cells=self.col_output_cells,
+                x_b_norm=self.x_b_norm,
+                mask_shifted_pi=self.mask_shifted_pi,
+                boost_strat=self.boost_strat,
+                boost_strength=self.boost_strength,
+                boost_strength_factor=self.boost_strength_factor,
+                duty_cycle_period=self.duty_cycle_period,
+                weight_sparsity=self.weight_sparsity,
+                mult_integration=self.mult_integration,
+                fpartition=self.fpartition,
+                balance_part_winners=self.balance_part_winners,
+                feedback_conn=self.feedback_conn,
+                lateral_conn=self.lateral_conn,
+                top_lateral_conn=self.top_lateral_conn,
+                input_bias=self.input_bias,
+                decode_bias=self.decode_bias,
+                trainable_decay=self.trainable_decay,
+                trainable_decay_rec=self.trainable_decay_rec,
+                max_decay=self.max_decay,
+                additive_decay=self.additive_decay,
+                stoch_decay=self.stoch_decay,
+                embed_dim=self.embed_dim,
+                vocab_size=self.vocab_size,
+                stoch_k_sd=self.stoch_k_sd,
+                rec_active_dendrites=self.rec_active_dendrites,
+                mem_floor=self.mem_floor,
+                ramping_memory=self.ramping_memory,
+                ramping_learn_vel=self.ramping_learn_vel,
+                ramping_fn=self.ramping_fn,
+                flat_winners_sigma=self.flat_winners_sigma,
+                debug=self.debug,
+                visual_debug=self.visual_debug
             )
+            if self.n_layers > 1:
+                predictor_d_in = sum([l.total_cells for l in self.model.children()])
+            else:
+                predictor_d_in = self.m_groups * self.n_cells_per_group
+
+            if self.predictor_hidden_size:
+                self.predictor = RSMPredictor(
+                    d_in=predictor_d_in,
+                    d_out=self.predictor_output_size,
+                    hidden_size=self.predictor_hidden_size
+                )
+
+        # Move to device
+        self.model.to(self.device)
+        if self.predictor:
             self.predictor.to(self.device)
 
         self._get_loss_function()
@@ -437,20 +445,22 @@ class RSMExperiment(object):
     def _init_hidden(self, batch_size):
         return self.model.init_hidden(batch_size)
 
-    def _cache_inputs(self, input_labels):
+    def _cache_inputs(self, input_labels, clear=False):
         """
         Word cache for smoothing, currently only used for eval (on test)
         """
         if self.word_cache_decay:
+            if clear:
+                # Clear cache
+                self.word_cache = self.word_cache * 0.0
+
             self.word_cache.scatter_(1, input_labels.unsqueeze(1), 1.0)
             # Decay
             self.word_cache = self.word_cache * self.word_cache_decay
 
     def _get_prediction_and_loss_inputs(self, hidden):
         # hidden is (x_b, phi, psi)
-        # higher layers predict decaying version of lower layer x_b
         x_b = hidden[0]
-        # TODO: Option to train separate predictors on each layer and interpolate
         if self.predictor:
             # Predict from concat of all layer hidden states
             predictor_input = torch.cat(x_b, dim=1).view(-1, self.predictor.d_in).detach()
@@ -521,8 +531,8 @@ class RSMExperiment(object):
             pcounts['total_samples'] += pred_targets.size(0)
             correct_arr = class_predictions == pred_targets
             pcounts['correct_samples'] += correct_arr.sum().item()
-            batch_loss = pred_loss.item()
-            pcounts['total_pred_loss'] += batch_loss
+            pred_loss_ = pred_loss.item()
+            pcounts['total_pred_loss'] += pred_loss_
             pcounts['total_interp_loss'] += interp_loss
             if train:
                 # Predictor backward + optimize
@@ -534,11 +544,11 @@ class RSMExperiment(object):
             if self.predictor:
                 acc = 100 * pcounts['correct_samples'] / pcounts['total_samples']
                 batch_acc = correct_arr.float().mean() * 100
-                batch_ppl = lang_util.perpl(batch_loss)
+                batch_ppl = lang_util.perpl(pred_loss_ / pred_targets.size(0))
                 print(
-                    "Partial train pred acc - epoch: %.3f%%, "
-                    "batch acc: %.3f%%, batch ppl: %.1f"
-                    % (acc, batch_acc, batch_ppl)
+                    "Partial pred acc - "
+                    "batch acc: %.3f%%, pred ppl: %.1f"
+                    % (batch_acc, batch_ppl)
                 )
 
         return (
@@ -618,10 +628,6 @@ class RSMExperiment(object):
             # training forward.
             self.model._zero_sparse_weights()
 
-        if self.word_cache_decay:
-            # Clear cache
-            self.word_cache = self.word_cache * 0.0
-
         with torch.no_grad():
             total_loss = 0.0
             pcounts = {
@@ -647,7 +653,7 @@ class RSMExperiment(object):
                 pred_targets = pred_targets.to(self.device)
                 input_labels = input_labels.to(self.device)
 
-                self._cache_inputs(input_labels)
+                self._cache_inputs(input_labels, clear=_b_idx==0)
 
                 output, hidden = self.model(inputs, hidden)
 
@@ -695,10 +701,10 @@ class RSMExperiment(object):
                 ret.update(self._store_instr_hists())
 
             num_batches = (_b_idx + 1)
+            num_samples = pcounts['total_samples']
             ret["val_loss"] = val_loss = total_loss / num_batches
             if self.predictor:
-                num_samples = pcounts['total_samples']
-                test_pred_loss = pcounts['total_pred_loss'] / num_batches
+                test_pred_loss = pcounts['total_pred_loss'] / num_samples
                 test_interp_loss = pcounts['total_interp_loss'] / num_samples
                 ret["val_interp_ppl"] = lang_util.perpl(test_interp_loss)
                 ret["val_pred_ppl"] = lang_util.perpl(test_pred_loss)
@@ -823,7 +829,7 @@ class RSMExperiment(object):
         ret["train_loss"] = total_loss / num_batches
         if self.predictor:
             num_samples = (num_batches * self.batch_size)
-            train_pred_loss = pcounts['total_pred_loss'] / num_batches
+            train_pred_loss = pcounts['total_pred_loss'] / num_samples
             train_interp_loss = pcounts['total_interp_loss'] / num_samples
             ret["train_interp_ppl"] = lang_util.perpl(train_interp_loss)
             ret["train_pred_ppl"] = lang_util.perpl(train_pred_loss)
@@ -856,6 +862,10 @@ class RSMExperiment(object):
 
         :return: str: The return value is expected to be the checkpoint path that
         can be later passed to `model_restore()`.
+
+        NOTE: Embedding is not saved with model, so results may vary if a different
+        embedding binary (even if re-generated with same config) is used with the 
+        restored model.
         """
         checkpoint_file = os.path.join(checkpoint_dir, self.model_filename)
         if checkpoint_file.endswith(".pt"):

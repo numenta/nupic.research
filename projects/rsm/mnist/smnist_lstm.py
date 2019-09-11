@@ -40,21 +40,23 @@ predictor = rsm.RSMPredictor(
             )
 
 class BPTTTrainer():
-    def __init__(self, model, loader, k1=1, k2=30, predictor=None, bsz=BSZ, mbs=100):
+    def __init__(self, model, loader, k1=1, k2=30, predictor=None, bsz=BSZ, mbs=100, use_optimizer=True, lr=1e-5):
         self.k1 = k1
         self.k2 = k2
+        self.lr = lr
         self.model = model
         self.loader = loader
         self.predictor = predictor
         self.predictor_loss = CrossEntropyLoss()
-        self.optimizer = torch.optim.Adam(params=self.model.parameters(), lr=1e-5)
-        self.pred_optimizer = torch.optim.Adam(params=self.predictor.parameters(), lr=1e-5)
+        self.optimizer = torch.optim.Adam(params=self.model.parameters(), lr=lr)
+        self.pred_optimizer = torch.optim.Adam(params=self.predictor.parameters(), lr=lr)
         self.bsz = bsz
         self.loss_module = torch.nn.MSELoss()
         self.retain_graph = self.k1 < self.k2
         self.epoch = 0
         self.mbs = mbs
         self.total_mbs = 0
+        self.use_optimizer = use_optimizer
 
         # Predictor counts
         self.total_samples = 0
@@ -176,7 +178,13 @@ class BPTTTrainer():
                     states[-j-2][1][0].backward(curr_h_grad, retain_graph=self.retain_graph)
                     # states[-j-2][1][1].backward(curr_c_grad, retain_graph=self.retain_graph)                    
                 # print("opt step, batch loss: %.3f" % batch_loss)
-                self.optimizer.step()
+                if self.use_optimizer:
+                    self.optimizer.step()
+                else:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.25)
+                    for p in self.model.parameters():
+                        p.data.add_(-self.lr, p.grad.data)
+
             self.total_loss += batch_loss
             self.total_mbs += 1
             
@@ -229,7 +237,15 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
         help="Noise buffer between subsequences"
-    )    
+    ) 
+    optparser.add_argument(
+        "-c",
+        "--clip",
+        dest="clip",
+        action="store_true",
+        default=False,
+        help="Gradient clipping"
+    )   
     opts = optparser.parse_args()    
 
     dataset = rsm_samplers.MNISTBufferedDataset(expanduser("~/nta/datasets"), download=True,
@@ -248,7 +264,7 @@ if __name__ == "__main__":
                  batch_sampler=sampler,
                  collate_fn=rsm_samplers.pred_sequence_collate)    
 
-    trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2, mbs=opts.mbs)
-    filename = "%d_mbs:%d_epochs:%d_k2:%d_fixed:%s_noise:%s" % (int(time.time()), opts.mbs, opts.epochs, opts.k2, opts.fixed, opts.noise)
+    trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2, mbs=opts.mbs, use_optimizer=not opts.clip)
+    filename = "%d_mbs:%d_epochs:%d_k2:%d_fixed:%s_noise:%s_clip:%s" % (int(time.time()), opts.mbs, opts.epochs, opts.k2, opts.fixed, opts.noise, opts.clip)
     trainer.run(epochs=opts.epochs, filename=filename)
 
