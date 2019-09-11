@@ -31,6 +31,8 @@ other value. This latter loss is estimated using dL/dz where z is the value of
 the gate. All of this simplifies to the ratio of P(z = 0) and P(z = 1).
 """
 
+import math
+
 import torch
 import torch.nn.functional as F
 from torch.nn import init
@@ -44,7 +46,8 @@ class BinaryGatedLinear(Module):
     Linear layer with stochastic binary gates
     """
     def __init__(self, in_features, out_features, l0_strength=1.,
-                 l2_strength=1., bias=True, droprate_init=0.5, **kwargs):
+                 l2_strength=1., learn_weight=True, bias=True, droprate_init=0.5,
+                 **kwargs):
         """
         :param in_features: Input dimensionality
         :param out_features: Output dimensionality
@@ -58,20 +61,25 @@ class BinaryGatedLinear(Module):
         self.out_features = out_features
         self.l0_strength = l0_strength
         self.l2_strength = l2_strength
-        self.weight = Parameter(torch.Tensor(out_features, in_features))
+        self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
+                            else torch.cuda.FloatTensor)
+        self.weight = self.floatTensor(out_features, in_features)
+        if learn_weight:
+            self.weight = Parameter(self.weight)
         self.logit_p1 = Parameter(torch.Tensor(out_features, in_features))
         self.droprate_init = droprate_init if droprate_init != 0. else 0.5
         self.use_bias = False
         if bias:
-            self.bias = Parameter(torch.Tensor(out_features))
+            self.bias = self.floatTensor(out_features)
+            if learn_weight:
+                self.bias = Parameter(self.bias)
             self.use_bias = True
-        self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
-                            else torch.cuda.FloatTensor)
         self.reset_parameters()
 
     def reset_parameters(self):
         init.kaiming_normal_(self.weight, mode="fan_out")
-        self.logit_p1.data.normal_(self.droprate_init, 1e-2)
+        self.logit_p1.data.normal_(math.log(1 - self.droprate_init)
+                                   - math.log(self.droprate_init), 1e-2)
         if self.use_bias:
             self.bias.data.fill_(0)
 
@@ -98,7 +106,7 @@ class BinaryGatedLinear(Module):
 
         def cc_to_p1(grad):
             ratio = p1 / (1 - p1)
-            p1.backward(grad * torch.where(mask, 1 / ratio, -ratio))
+            p1.backward(grad * torch.where(mask, 1 / ratio, ratio))
             return grad
 
         z = mask.float()
@@ -128,8 +136,8 @@ class BinaryGatedConv2d(Module):
     Convolutional layer with binary stochastic gates
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True, droprate_init=0.5,
-                 l2_strength=1., l0_strength=1., **kwargs):
+                 padding=0, dilation=1, groups=1, learn_weight=True, bias=True,
+                 droprate_init=0.5, l2_strength=1., l0_strength=1., **kwargs):
         """
         :param in_channels: Number of input channels
         :param out_channels: Number of output channels
@@ -162,23 +170,27 @@ class BinaryGatedConv2d(Module):
         self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
                             else torch.cuda.FloatTensor)
         self.use_bias = False
-        self.weight = Parameter(torch.Tensor(out_channels, in_channels // groups,
-                                             *self.kernel_size))
+        self.weight = self.floatTensor(out_channels, in_channels // groups,
+                                       *self.kernel_size)
+        if learn_weight:
+            self.weight = Parameter(self.weight)
         self.logit_p1 = Parameter(torch.Tensor(out_channels, in_channels // groups,
                                                *self.kernel_size))
         self.dim_z = out_channels
         self.input_shape = None
 
         if bias:
-            self.bias = Parameter(torch.Tensor(out_channels))
+            self.bias = self.floatTensor(out_channels)
+            if learn_weight:
+                self.bias = Parameter(self.bias)
             self.use_bias = True
 
         self.reset_parameters()
 
     def reset_parameters(self):
         init.kaiming_normal_(self.weight, mode="fan_in")
-
-        self.logit_p1.data.normal_(self.droprate_init, 1e-2)
+        self.logit_p1.data.normal_(math.log(1 - self.droprate_init)
+                                   - math.log(self.droprate_init), 1e-2)
 
         if self.use_bias:
             self.bias.data.fill_(0)
@@ -206,7 +218,7 @@ class BinaryGatedConv2d(Module):
 
         def cc_to_p1(grad):
             ratio = p1 / (1 - p1)
-            p1.backward(grad * torch.where(mask, 1 / ratio, -ratio))
+            p1.backward(grad * torch.where(mask, 1 / ratio, ratio))
             return grad
 
         z = mask.float()

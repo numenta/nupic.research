@@ -45,8 +45,8 @@ class HardConcreteGatedLinear(Module):
     https://arxiv.org/abs/1712.01312
     """
     def __init__(self, in_features, out_features, l0_strength=1.,
-                 l2_strength=1., bias=True, droprate_init=0.5,
-                 temperature=(2 / 3), **kwargs):
+                 l2_strength=1., bias=True, learn_weight=True,
+                 droprate_init=0.5, temperature=(2 / 3), **kwargs):
         """
         :param in_features: Input dimensionality
         :param out_features: Output dimensionality
@@ -62,16 +62,22 @@ class HardConcreteGatedLinear(Module):
         self.out_features = out_features
         self.l0_strength = l0_strength
         self.l2_strength = l2_strength
-        self.weight = Parameter(torch.Tensor(out_features, in_features))
+        self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
+                            else torch.cuda.FloatTensor)
+        self.weight = self.floatTensor(out_features, in_features)
+        if learn_weight:
+            self.weight = Parameter(self.weight)
         self.loga = Parameter(torch.Tensor(out_features, in_features))
         self.temperature = temperature
         self.droprate_init = droprate_init if droprate_init != 0. else 0.5
-        self.use_bias = False
+
         if bias:
-            self.bias = Parameter(torch.Tensor(out_features))
+            self.bias = self.floatTensor(out_features)
+            if learn_weight:
+                self.bias = Parameter(self.biars)
             self.use_bias = True
-        self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
-                            else torch.cuda.FloatTensor)
+        else:
+            self.use_bias = False
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -180,8 +186,9 @@ class HardConcreteGatedConv2d(Module):
     https://arxiv.org/abs/1712.01312
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True, droprate_init=0.5,
-                 temperature=(2 / 3), l2_strength=1., l0_strength=1., **kwargs):
+                 padding=0, dilation=1, groups=1, bias=True, learn_weight=True,
+                 droprate_init=0.5, temperature=(2 / 3), l2_strength=1.,
+                 l0_strength=1., **kwargs):
         """
         :param in_channels: Number of input channels
         :param out_channels: Number of output channels
@@ -217,15 +224,19 @@ class HardConcreteGatedConv2d(Module):
         self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
                             else torch.cuda.FloatTensor)
         self.use_bias = False
-        self.weight = Parameter(torch.Tensor(out_channels, in_channels // groups,
-                                             *self.kernel_size))
+        self.weight = self.floatTensor(out_channels, in_channels // groups,
+                                       *self.kernel_size)
+        if learn_weight:
+            self.weight = Parameter(self.weight)
         self.loga = Parameter(torch.Tensor(out_channels, in_channels // groups,
                                            *self.kernel_size))
         self.dim_z = out_channels
         self.input_shape = None
 
         if bias:
-            self.bias = Parameter(torch.Tensor(out_channels))
+            self.bias = self.floatTensor(out_channels)
+            if learn_weight:
+                self.bias = Parameter(self.bias)
             self.use_bias = True
 
         self.reset_parameters()
