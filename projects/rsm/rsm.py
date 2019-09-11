@@ -91,7 +91,6 @@ class RSMNet(torch.nn.Module):
     def __init__(self, n_layers=1, **kwargs):
         super(RSMNet, self).__init__()
         self.n_layers = n_layers
-        self.batch_counter = 0
         self.hooks_registered = False
 
         eps_arr = self._parse_param_array(kwargs['eps'])
@@ -207,7 +206,6 @@ class RSMNet(torch.nn.Module):
 
         new_hidden = (new_x_b, new_phi, new_psi)
 
-        self.batch_counter += 1  # Is this stored elsewhere?
         return (output_by_layer, new_hidden)
 
     def _post_train_epoch(self, epoch):
@@ -784,8 +782,8 @@ class RSMLayer(torch.nn.Module):
         phi, psi = self._update_memory_and_inhibition(y, phi, psi, x_b=x_b_in)
         self._debug_log({"phi": phi, "psi": psi})
 
-        pred_output = self._decode_prediction(y)
-        self._debug_log({"y": y, "pred_output": pred_output})
+        output = self._decode_prediction(y)
+        self._debug_log({"y": y, "output": output})
 
         # Update recurrent input / output x_b
         if self.x_b_norm:
@@ -796,7 +794,7 @@ class RSMLayer(torch.nn.Module):
             x_b = y
 
         hidden = (x_b, phi, psi)
-        return (pred_output, hidden)
+        return (output, hidden)
 
 
 if __name__ == "__main__":
