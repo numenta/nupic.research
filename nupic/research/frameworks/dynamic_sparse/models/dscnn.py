@@ -19,6 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import re
+
 from collections import defaultdict
 from collections.abc import Iterable
 
@@ -108,6 +110,7 @@ class DSCNN(BaseModel):
 
         for name, module in self.network.named_modules():
 
+            name = re.sub(r"squashed" + r"(\d+)", "", name)
             total_attr_d = defaultdict(lambda: 0)
             count_attr_d = defaultdict(lambda: 0)
             if isinstance(module, DSConv2d) and not isinstance(module, SparseConv2d):
