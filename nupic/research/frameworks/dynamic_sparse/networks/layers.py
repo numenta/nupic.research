@@ -270,6 +270,9 @@ class DSConv2d(torch.nn.Conv2d):
         # Set tensors to keep track of coactivations.
         self.register_buffer("coactivations", torch.zeros_like(self.weight))
 
+        # Register hook to update coactivations.
+        self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
+
         # Specify number of groups for the helper convolutional layer.
         # This is equal to the number of connections in the last three dimensions:
         #      new_groups = in_channels x kernel_size[0] x kernel_size[1]
@@ -893,14 +896,18 @@ class DSConv2d(torch.nn.Conv2d):
 
             # ----- END LOG BLOCK -----
 
+    @staticmethod
+    def forward_hook(module, input_tensor, output_tensor):
+        # Update connections strengths.
+        if isinstance(input_tensor, tuple):
+            input_tensor = input_tensor[0]
+        if module.training and module.learning_iterations % module.update_nsteps == 0:
+            module.update_coactivations(input_tensor, output_tensor)
+        if module.training:
+            module.learning_iterations += 1
+
     def __call__(self, input_tensor, *args, **kwargs):
         output_tensor = super().__call__(input_tensor, *args, **kwargs)
-
-        # Update connections strengths.
-        if self.training and self.learning_iterations % self.update_nsteps == 0:
-            self.update_coactivations(input_tensor, output_tensor)
-        if self.training:
-            self.learning_iterations += 1
         return output_tensor
 
 
