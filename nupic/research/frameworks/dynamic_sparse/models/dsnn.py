@@ -34,7 +34,7 @@ from .main import BaseModel, SparseModel
 
 
 class DSNNHeb(SparseModel):
-    """Improved results compared to regular SET"""
+    """Parent class for DSNNHeb models. Not to be instantiated"""
 
     def setup(self):
         super().setup()
@@ -48,19 +48,27 @@ class DSNNHeb(SparseModel):
             hebbian_prune_perc=None,
             weight_prune_perc=None,
             hebbian_grow=True,
+            hebbian_learning=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
 
         # initialize hebbian learning
-        self.network.hebbian_learning = True
+        self._init_coactivation_tracking()
         self.prune_cycles_completed = 0
+
+    def _init_coactivation_tracking(self):
+        """
+        Override method in children classes
+        Should only track coactivations if required by the algorithm
+        """
+        self.network.init_hebbian()
 
     def _post_epoch_updates(self, dataset=None):
         super()._post_epoch_updates(dataset)
         # zero out correlations (move to network)
         self._reinitialize_weights()
-        self.network.correlations = []
+        self.network.coactivations = []
         # decide whether to stop pruning
         if self.pruning_early_stop:
             if self.current_epoch in self.lr_milestones:
@@ -77,7 +85,7 @@ class DSNNHeb(SparseModel):
             survival_ratios = []
 
             for idx, (m, corr) in enumerate(
-                zip(self.sparse_modules, self.network.correlations)
+                zip(self.sparse_modules, self.network.coactivations)
             ):
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(), self.num_params[idx], corr, idx=idx
@@ -106,57 +114,135 @@ class DSNNHeb(SparseModel):
                     self.log["surviving_synapses_l" + str(idx)] = sr
                 self.log["surviving_synapses_avg"] = np.mean(survival_ratios)
 
-    def prune(self, weight, num_params, corr, idx=0):
-        """
-        Grow by correlation
-        Prune by correlation and magnitude
-        """
-        with torch.no_grad():
+    def _get_hebbian_mask(self, weight, corr, active_synapses):
 
-            # calculate weight mask
-            zeta = self.weight_prune_perc
-            weight_pos = weight[weight > 0]
-            pos_threshold, _ = torch.kthvalue(
-                weight_pos, max(int(zeta * len(weight_pos)), 1)
-            )
-            weight_neg = weight[weight < 0]
-            neg_threshold, _ = torch.kthvalue(
-                weight_neg, max(int((1 - zeta) * len(weight_neg)), 1)
-            )
-            weight_keep_mask = (weight >= pos_threshold) | (weight <= neg_threshold)
-            weight_keep_mask.to(self.device)
+        prune_perc = self.hebbian_prune_perc
+        num_synapses = np.prod(weight.shape)
+        total_active = torch.sum(active_synapses).item()
 
-            # no gradient mask, just a keep mask
-            keep_mask = weight_keep_mask
+        corr_active = corr[active_synapses]
+        # decide which weights to remove based on correlation
+        kth = int(prune_perc * total_active)
+        # if kth = 0, keep all the synapses
+        if kth == 0:
+            hebbian_mask = active_synapses
+        # else if kth greater than shape, remove all synapses
+        elif kth >= num_synapses:
+            hebbian_mask = torch.zeros(weight.shape)
+        # if no edge cases
+        else:
+            keep_threshold, _ = torch.kthvalue(corr_active, kth)
+            # keep mask are ones above threshold and currently active
+            hebbian_mask = (corr > keep_threshold) & active_synapses
+        # move to device
+        hebbian_mask.to(self.device)
 
-            # calculate number of parameters to add
-            num_add = num_params - torch.sum(keep_mask).item()
-            # transpose to fit the weights
-            corr = corr.t()
-            # remove the ones which will already be kept
-            corr *= (keep_mask == 0).float()
-            # get kth value, based on how many weights to add, and calculate mask
-            kth = int(np.prod(corr.shape) - num_add)
-            # contiguous()
-            corr_threshold, _ = torch.kthvalue(corr.contiguous().view(-1), kth)
-            add_mask = (corr > corr_threshold).to(self.device)
+        return hebbian_mask
 
-            new_mask = keep_mask | add_mask
+    def _get_inverse_hebbian_mask(self, weight, corr, active_synapses):
 
-            # logging
-            if self.debug_sparse:
-                self.log["weight_keep_mask_l" + str(idx)] = torch.sum(
-                    weight_keep_mask
-                ).item()
-                self.log["missing_weights_l" + str(idx)] = num_add
-                self.log["added_synapses_l" + str(idx)] = torch.sum(add_mask).item()
+        prune_perc = self.hebbian_prune_perc
+        num_synapses = np.prod(weight.shape)
+        total_active = torch.sum(active_synapses).item()
 
-        # track added connections
-        return new_mask, keep_mask, add_mask
+        corr_active = corr[active_synapses]
+        # decide which weights to remove based on correlation
+        kth = int((1 - prune_perc) * total_active)
+        # if kth = 0, keep all the synapses
+        if kth == 0:
+            hebbian_mask = torch.zeros(weight.shape).bool()
+        # else if kth greater than shape, remove all synapses
+        elif kth >= num_synapses:
+            hebbian_mask = active_synapses
+        # if no edge cases
+        else:
+            keep_threshold, _ = torch.kthvalue(corr_active, kth)
+            # keep mask are ones above threshold and currently active
+            hebbian_mask = (corr <= keep_threshold) & active_synapses
+        hebbian_mask = hebbian_mask.to(self.device)
+
+        return hebbian_mask
+
+    def _get_magnitude_mask(self, weight, active_synapses):
+
+        prune_perc = self.weight_prune_perc
+
+        # calculate the positive
+        weight_pos = weight[weight > 0]
+        pos_kth = int(prune_perc * len(weight_pos))
+        # if no positive weight, threshold can be 0 (select none)
+        if len(weight_pos) > 0:
+            # if prune_perc=0, pos_kth=0, prune nothing
+            if pos_kth == 0:
+                pos_threshold = -1
+            else:
+                pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
+        else:
+            pos_threshold = 0
+
+        # calculate the negative
+        weight_neg = weight[weight < 0]
+        neg_kth = int((1 - prune_perc) * len(weight_neg))
+        # if no negative weight, threshold -1 (select none)
+        if len(weight_neg) > 0:
+            # if prune_perc=1, neg_kth=0, prune all
+            if neg_kth == 0:
+                neg_threshold = torch.min(weight_neg).item() - 1
+            else:
+                neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
+        else:
+            neg_threshold = -1
+
+        # consolidate
+        partial_weight_mask = (weight > pos_threshold) | (weight <= neg_threshold)
+        weight_mask = partial_weight_mask & active_synapses
+        weight_mask = weight_mask.to(self.device)
+
+        return weight_mask
+
+    def _get_random_add_mask(self, nonactive_synapses, num_add):
+
+        total_nonactive = torch.sum(nonactive_synapses).item()
+        p_add = num_add / max(total_nonactive, num_add)
+        random_sample = torch.rand(nonactive_synapses.shape).to(self.device) < p_add
+        add_mask = random_sample & nonactive_synapses
+
+        return add_mask
+
+    def _get_hebbian_add_mask(self, corr, nonactive_synapses, num_add):
+
+        # get threshold
+        total_nonactive = torch.sum(nonactive_synapses).item()
+        kth = int(total_nonactive - num_add)  # should not be non-int
+        corr_nonactive = corr[nonactive_synapses]
+        add_threshold, _ = torch.kthvalue(corr_nonactive, kth)
+        # calculate mask, only for currently nonactive
+        add_mask = (corr > add_threshold) & nonactive_synapses
+
+        return add_mask
+
+    def _get_inverse_add_mask(self, corr, nonactive_synapses, num_add):
+
+        # get threshold
+        kth = int(num_add)  # should not be non-int
+        if kth > 0:
+            corr_nonactive = corr[nonactive_synapses]
+            add_threshold, _ = torch.kthvalue(corr_nonactive, kth)
+            # calculate mask, only for currently nonactive
+            add_mask = (corr <= add_threshold) & nonactive_synapses
+        # if there is nothing to add, return zeros
+        else:
+            add_mask = torch.zeros(nonactive_synapses.shape).bool()
+
+        return add_mask
 
 
 class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
+
+    def _init_coactivation_tracking(self):
+        if self.weight_prune_perc is not None:
+            self.network.init_hebbian()
 
     def prune(self, weight, num_params, corr, idx=0):
         """
@@ -168,55 +254,22 @@ class DSNNWeightedMag(DSNNHeb):
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
-            # total_active = torch.sum(active_synapses).item()
-            total_nonactive = torch.sum(nonactive_synapses).item()
-            zeta = self.weight_prune_perc
             # transpose correlation to the weight matrix
             corr = corr.t()
             # multiply correlation by weight, and then apply regular weight pruning
             weight *= corr
 
-            # ----------- WEIGHT PRUNING ----------------
+            # ----------- PRUNING ----------------
 
-            if zeta is not None:
-                # calculate the positive
-                weight_pos = weight[weight > 0]
-                pos_kth = int(zeta * len(weight_pos))
-                # if zeta=0, pos_kth=0, prune nothing
-                if pos_kth == 0:
-                    pos_threshold = -1
-                else:
-                    pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
-
-                # calculate the negative
-                weight_neg = weight[weight < 0]
-                neg_kth = int((1 - zeta) * len(weight_neg))
-                # if zeta=1, neg_kth=0, prune all
-                if neg_kth == 0:
-                    neg_threshold = torch.min(weight_neg).item() - 1
-                else:
-                    neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
-
-                partial_weight_mask = (weight > pos_threshold) | (
-                    weight <= neg_threshold
-                )
-                weight_mask = partial_weight_mask & active_synapses
-                # move to device
-                weight_mask.to(self.device)
-
-            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------
-            if zeta:
-                keep_mask = weight_mask
+            if self.weight_prune_perc is not None:
+                keep_mask = self._get_magnitude_mask(weight, corr, active_synapses)
             else:
                 keep_mask = active_synapses.to(self.device)
 
             # ----------- GROWTH ----------------
 
             num_add = max(num_params - torch.sum(keep_mask).item(), 0)
-            # probability of adding is 1 or lower
-            p_add = num_add / max(total_nonactive, num_add)
-            random_sample = torch.rand(weight.shape).to(self.device) < p_add
-            add_mask = random_sample & nonactive_synapses
+            add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
 
             # calculate the new mask
             new_mask = keep_mask | add_mask
@@ -230,11 +283,6 @@ class DSNNWeightedMag(DSNNHeb):
                     torch.sum(add_mask).item() / num_synapses
                 )
                 self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
-                # conditional logs
-                if zeta is not None:
-                    self.log["weight_mask_l" + str(idx)] = (
-                        torch.sum(weight_mask).item() / num_synapses
-                    )
 
         # track added connections
         return new_mask, keep_mask, add_mask
@@ -243,111 +291,46 @@ class DSNNWeightedMag(DSNNHeb):
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
-    def prune_inverse(self, weight, num_params, corr, idx=0):
-        """
-        Grow by correlation
-        Prune by magnitude
-        """
+    def _init_coactivation_tracking(self):
+        if self.hebbian_prune_perc is not None:
+            self.network.init_hebbian()
+
+    def prune(self, weight, num_params, corr, idx=0):
+        """Allows pruning by magnitude and hebbian"""
         with torch.no_grad():
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
-            total_active = torch.sum(active_synapses).item()
-            total_nonactive = torch.sum(nonactive_synapses).item()
-            tau = self.hebbian_prune_perc
-            zeta = self.weight_prune_perc
             # transpose correlation to the weight matrix
             corr = corr.t()
 
-            # ----------- HEBBIAN PRUNING ----------------
+            # ----------- PRUNE ----------------
 
-            if tau:
-                corr_active = corr[active_synapses]
-                # decide which weights to remove based on correlation
-                kth = int((1 - tau) * total_active)
-                # if kth = 0, keep all the synapses
-                if kth == 0:
-                    hebbian_keep_mask = torch.zeros(weight.shape).bool()
-                # else if kth greater than shape, remove all synapses
-                elif kth >= num_synapses:
-                    hebbian_keep_mask = active_synapses
-                # if no edge cases
-                else:
-                    keep_threshold, _ = torch.kthvalue(corr_active, kth)
-                    # keep mask are ones above threshold and currently active
-                    hebbian_keep_mask = (corr <= keep_threshold) & active_synapses
-                hebbian_keep_mask = hebbian_keep_mask.to(self.device)
+            if self.hebbian_prune_perc is not None:
+                hebbian_mask = self._get_hebbian_mask(weight, corr, active_synapses)
 
-            # ----------- WEIGHT PRUNING ----------------
-
-            if zeta:
-                # calculate the positive
-                weight_pos = weight[weight > 0]
-                pos_kth = int(zeta * len(weight_pos))
-                # if no positive weight, threshold can be 0 (select none)
-                if len(weight_pos) > 0:
-                    # if zeta=0, pos_kth=0, prune nothing
-                    if pos_kth == 0:
-                        pos_threshold = -1
-                    else:
-                        pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
-                else:
-                    pos_threshold = 0
-
-                # calculate the negative
-                weight_neg = weight[weight < 0]
-                neg_kth = int((1 - zeta) * len(weight_neg))
-                # if no negative weight, threshold -1 (select none)
-                if len(weight_neg) > 0:
-                    # if zeta=1, neg_kth=0, prune all
-                    if neg_kth == 0:
-                        neg_threshold = torch.min(weight_neg).item() - 1
-                    else:
-                        neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
-                else:
-                    neg_threshold = -1
-
-                # consolidate
-                partial_weight_mask = (weight > pos_threshold) | (
-                    weight <= neg_threshold
-                )
-                weight_mask = partial_weight_mask & active_synapses
-                weight_mask = weight_mask.to(self.device)
-
-            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------
+            if self.weight_prune_perc is not None:
+                magnitude_mask = self._get_magnitude_mask(weight, active_synapses)
 
             # join both masks
-            if tau and zeta:
-                keep_mask = hebbian_keep_mask | weight_mask
-            elif tau:
-                keep_mask = hebbian_keep_mask
-            elif zeta:
-                keep_mask = weight_mask
+            if self.hebbian_prune_perc and self.weight_prune_perc:
+                keep_mask = hebbian_mask | magnitude_mask
+            elif self.hebbian_prune_perc:
+                keep_mask = hebbian_mask
+            elif self.weight_prune_perc:
+                keep_mask = magnitude_mask
+            # if no pruning, just perpetuate same synapses
             else:
                 keep_mask = active_synapses.to(self.device)
 
             # ----------- GROWTH ----------------
 
             num_add = max(num_params - torch.sum(keep_mask).item(), 0)
-            # added option to have hebbian grow or not
             if self.hebbian_grow:
-                # get threshold
-                kth = int(num_add)  # should not be non-int
-                if kth > 0:
-                    corr_nonactive = corr[nonactive_synapses]
-                    add_threshold, _ = torch.kthvalue(corr_nonactive, kth)
-                    # calculate mask, only for currently nonactive
-                    add_mask = (corr <= add_threshold) & nonactive_synapses
-                # if there is nothing to add, return zeros
-                else:
-                    add_mask = torch.zeros(weight.shape).bool()
+                add_mask = self._get_hebbian_add_mask(corr, nonactive_synapses, num_add)
             else:
-                # probability of adding is 1 or lower
-                p_add = num_add / max(total_nonactive, num_add)
-                random_sample = torch.rand(weight.shape).to(self.device) < p_add
-                add_mask = random_sample & nonactive_synapses
-            add_mask = add_mask.to(self.device)
+                add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
 
             # calculate the new mask
             new_mask = keep_mask | add_mask
@@ -362,111 +345,56 @@ class DSNNMixedHeb(DSNNHeb):
                 )
                 self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
                 # conditional logs
-                if tau is not None:
-                    self.log["hebbian_keep_mask_l" + str(idx)] = (
-                        torch.sum(hebbian_keep_mask).item() / num_synapses
+                if self.hebbian_prune_perc is not None:
+                    self.log["hebbian_mask_l" + str(idx)] = (
+                        torch.sum(hebbian_mask).item() / num_synapses
                     )
-                if zeta is not None:
-                    self.log["weight_mask_l" + str(idx)] = (
-                        torch.sum(weight_mask).item() / num_synapses
+                if self.weight_prune_perc is not None:
+                    self.log["magnitude_mask_l" + str(idx)] = (
+                        torch.sum(magnitude_mask).item() / num_synapses
                     )
 
         # track added connections
         return new_mask, keep_mask, add_mask
 
-    def prune(self, weight, num_params, corr, idx=0):
-        """
-        Grow by correlation
-        Prune by magnitude
-        """
+    def prune_inverse(self, weight, num_params, corr, idx=0):
+        """Allows pruning by magnitude and hebbian"""
         with torch.no_grad():
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
-            total_active = torch.sum(active_synapses).item()
-            total_nonactive = torch.sum(nonactive_synapses).item()
-            tau = self.hebbian_prune_perc
-            zeta = self.weight_prune_perc
             # transpose correlation to the weight matrix
             corr = corr.t()
 
-            # ----------- HEBBIAN PRUNING ----------------
+            # ----------- PRUNE ----------------
 
-            if tau is not None:
-                corr_active = corr[active_synapses]
-                # decide which weights to remove based on correlation
-                kth = int(tau * total_active)
-                # if kth = 0, keep all the synapses
-                if kth == 0:
-                    hebbian_keep_mask = active_synapses
-                # else if kth greater than shape, remove all synapses
-                elif kth >= num_synapses:
-                    hebbian_keep_mask = torch.zeros(weight.shape)
-                # if no edge cases
-                else:
-                    keep_threshold, _ = torch.kthvalue(corr_active, kth)
-                    # keep mask are ones above threshold and currently active
-                    hebbian_keep_mask = (corr > keep_threshold) & active_synapses
-                # move to device
-                hebbian_keep_mask.to(self.device)
+            if self.hebbian_prune_perc is not None:
+                hebbian_mask = self._get_inverse_hebbian_mask(weight, active_synapses)
 
-            # ----------- WEIGHT PRUNING ----------------
-
-            if zeta is not None:
-                # calculate the positive
-                weight_pos = weight[weight > 0]
-                pos_kth = int(zeta * len(weight_pos))
-                # if zeta=0, pos_kth=0, prune nothing
-                if pos_kth == 0:
-                    pos_threshold = -1
-                else:
-                    pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
-
-                # calculate the negative
-                weight_neg = weight[weight < 0]
-                neg_kth = int((1 - zeta) * len(weight_neg))
-                # if zeta=1, neg_kth=0, prune all
-                if neg_kth == 0:
-                    neg_threshold = torch.min(weight_neg).item() - 1
-                else:
-                    neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
-
-                partial_weight_mask = (weight > pos_threshold) | (
-                    weight <= neg_threshold
-                )
-                weight_mask = partial_weight_mask & active_synapses
-                # move to device
-                weight_mask.to(self.device)
-
-            # ----------- COMBINE HEBBIAN AND WEIGHT ----------------
+            if self.weight_prune_perc is not None:
+                magnitude_mask = self._get_magnitude_mask(weight, corr, active_synapses)
 
             # join both masks
-            if tau and zeta:
-                keep_mask = hebbian_keep_mask | weight_mask
-            elif tau:
-                keep_mask = hebbian_keep_mask
-            elif zeta:
-                keep_mask = weight_mask
+            if self.hebbian_prune_perc and self.weight_prune_perc:
+                keep_mask = hebbian_mask | magnitude_mask
+            elif self.hebbian_prune_perc:
+                keep_mask = hebbian_mask
+            elif self.weight_prune_perc:
+                keep_mask = magnitude_mask
+            # if no pruning, just perpetuate same synapses
             else:
                 keep_mask = active_synapses.to(self.device)
 
             # ----------- GROWTH ----------------
 
             num_add = max(num_params - torch.sum(keep_mask).item(), 0)
-            # added option to have hebbian grow or not
             if self.hebbian_grow:
-                # get threshold
-                kth = int(total_nonactive - num_add)  # should not be non-int
-                corr_nonactive = corr[nonactive_synapses]
-                add_threshold, _ = torch.kthvalue(corr_nonactive, kth)
-                # calculate mask, only for currently nonactive
-                add_mask = (corr > add_threshold) & nonactive_synapses
+                add_mask = self._get_inverse_hebbian_add_mask(
+                    corr, nonactive_synapses, num_add
+                )
             else:
-                # probability of adding is 1 or lower
-                p_add = num_add / max(total_nonactive, num_add)
-                random_sample = torch.rand(weight.shape).to(self.device) < p_add
-                add_mask = random_sample & nonactive_synapses
+                add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
 
             # calculate the new mask
             new_mask = keep_mask | add_mask
@@ -481,13 +409,13 @@ class DSNNMixedHeb(DSNNHeb):
                 )
                 self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
                 # conditional logs
-                if tau is not None:
-                    self.log["hebbian_keep_mask_l" + str(idx)] = (
-                        torch.sum(hebbian_keep_mask).item() / num_synapses
+                if self.hebbian_prune_perc is not None:
+                    self.log["hebbian_mask_l" + str(idx)] = (
+                        torch.sum(hebbian_mask).item() / num_synapses
                     )
-                if zeta is not None:
-                    self.log["weight_mask_l" + str(idx)] = (
-                        torch.sum(weight_mask).item() / num_synapses
+                if self.weight_prune_perc is not None:
+                    self.log["magnitude_mask_l" + str(idx)] = (
+                        torch.sum(magnitude_mask).item() / num_synapses
                     )
 
         # track added connections
