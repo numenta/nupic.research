@@ -22,6 +22,7 @@ import random
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.framework import test_util
 from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.models import Model
 
@@ -54,6 +55,7 @@ class KWinnersTest(tf.test.TestCase):
         )
         self.duty_cycle = tf.constant(1.0 / 3.0, shape=(2, 7))
 
+    @test_util.run_all_in_graph_and_eager_modes
     def test_inference(self):
         """boost factor 0, k=3, batch size 2"""
         expected = np.zeros(self.x.shape)
@@ -107,6 +109,7 @@ class KWinners2dTest(tf.test.TestCase):
         x[1, 2, 1, 1] = 1.7
         self.x2 = tf.constant(x)
 
+    @test_util.run_all_in_graph_and_eager_modes
     def test_one(self):
         """Equal duty cycle, boost factor 0, k=4, batch size 1."""
         x = self.x
@@ -126,6 +129,7 @@ class KWinners2dTest(tf.test.TestCase):
             y = k_winners(x, training=True)
             self.assertAllClose(y, expected)
 
+    @test_util.run_all_in_graph_and_eager_modes
     def test_two(self):
         """Equal duty cycle, boost factor 0, k=3."""
         x = self.x
@@ -144,6 +148,7 @@ class KWinners2dTest(tf.test.TestCase):
             y = k_winners(x, training=True)
             self.assertAllClose(y, expected)
 
+    @test_util.run_all_in_graph_and_eager_modes
     def test_three(self):
         """Equal duty cycle, boost factor=0, k=4, batch size=2."""
         x = self.x2
@@ -167,6 +172,7 @@ class KWinners2dTest(tf.test.TestCase):
             y = k_winners(x, training=True)
             self.assertAllClose(y, expected)
 
+    @test_util.run_all_in_graph_and_eager_modes
     def test_four(self):
         """Equal duty cycle, boost factor=0, k=3, batch size=2."""
         x = self.x2
@@ -188,6 +194,7 @@ class KWinners2dTest(tf.test.TestCase):
             y = k_winners(x, training=True)
             self.assertAllClose(y, expected)
 
+    @test_util.run_all_in_graph_and_eager_modes
     def test_five(self):
         x = self.x2
         expected = np.zeros_like(x)
