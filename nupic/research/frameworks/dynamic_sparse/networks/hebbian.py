@@ -25,7 +25,7 @@ from torch import nn
 from nupic.torch.modules import KWinners
 
 
-class MLP(nn.Module):
+class MLPHeb(nn.Module):
     """Simple 3 hidden layers + output MLP"""
 
     def __init__(self, config=None):
@@ -93,25 +93,9 @@ class MLP(nn.Module):
         # need to flatten input before forward pass
         return self.classifier(x.view(-1, self.input_size))
 
-    def alternative_forward(self, x):
-        """Replace forward function by this to visualize activations"""
-        # need to flatten before forward pass
-        x = x.view(-1, self.input_size)
-        for layer in self.classifier:
-            # apply the transformation
-            x = layer(x)
-            # do something with the activation
-            print(torch.mean(x).item())
-
-        return x
-
-
-class MLPHeb(MLP):
-    """Replace forward layer to add hebbian learning"""
-
-    def __init__(self, config=None):
-        super().__init__(config)
-        self.correlations = []
+    def init_hebbian(self):
+        self.coactivations = []
+        self.forward = self.forward_with_coactivations
 
     def _has_activation(self, idx, layer):
         return (
@@ -120,7 +104,7 @@ class MLPHeb(MLP):
             or isinstance(layer, KWinners)
         )
 
-    def forward(self, x):
+    def forward_with_coactivations(self, x):
         """A faster and approximate way to track correlations"""
         x = x.view(-1, self.input_size)  # resiaze if needed, eg mnist
         prev_act = (x > 0).detach().float()
@@ -128,21 +112,20 @@ class MLPHeb(MLP):
         for idx_layer, layer in enumerate(self.classifier):
             # do the forward calculation normally
             x = layer(x)
-            if self.hebbian_learning:
-                n_samples = x.shape[0]
-                if self._has_activation(idx_layer, layer):
-                    with torch.no_grad():
-                        curr_act = (x > 0).detach().float()
-                        # add outer product to the correlations, per sample
-                        for s in range(n_samples):
-                            outer = torch.ger(prev_act[s], curr_act[s])
-                            if idx_activation + 1 > len(self.correlations):
-                                self.correlations.append(outer)
-                            else:
-                                self.correlations[idx_activation] += outer
-                        # reassigning to the next
-                        prev_act = curr_act
-                        # move to next activation
-                        idx_activation += 1
+            n_samples = x.shape[0]
+            if self._has_activation(idx_layer, layer):
+                with torch.no_grad():
+                    curr_act = (x > 0).detach().float()
+                    # add outer product to the coactivations, per sample
+                    for s in range(n_samples):
+                        outer = torch.ger(prev_act[s], curr_act[s])
+                        if idx_activation + 1 > len(self.coactivations):
+                            self.coactivations.append(outer)
+                        else:
+                            self.coactivations[idx_activation] += outer
+                    # reassigning to the next
+                    prev_act = curr_act
+                    # move to next activation
+                    idx_activation += 1
 
         return x

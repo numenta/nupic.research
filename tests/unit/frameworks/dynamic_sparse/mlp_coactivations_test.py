@@ -44,6 +44,7 @@ class CoactivationsTest(unittest.TestCase):
                 bias=False,
             )
         )
+        network.init_hebbian()
 
         # setting same initial weights
         weights = [
@@ -82,7 +83,7 @@ class CoactivationsTest(unittest.TestCase):
 
         # compare coactivations
         matches = 0
-        for ca_test, ca_network in zip(coactivations, network.correlations):
+        for ca_test, ca_network in zip(coactivations, network.coactivations):
             matches += int(torch.allclose(ca_test, ca_network))
 
         self.assertEqual(
@@ -115,7 +116,7 @@ class CoactivationsTest(unittest.TestCase):
 
         network(batch_inp)
         matches = 0
-        for ca_test, ca_network in zip(coactivations, network.correlations):
+        for ca_test, ca_network in zip(coactivations, network.coactivations):
             # print(ca_test)
             # print(ca_network)
             matches += int(torch.allclose(ca_test, ca_network))
