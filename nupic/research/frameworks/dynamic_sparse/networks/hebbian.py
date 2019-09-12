@@ -39,6 +39,8 @@ class MLP(nn.Module):
             batch_norm=False,
             dropout=False,
             use_kwinners=False,
+            hebbian_learning=False,
+            bias=True,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -50,13 +52,20 @@ class MLP(nn.Module):
         else:
             self.activation_func = lambda _: nn.ReLU()
 
+        layers = []
+        # add the first layer
+        layers.extend(self._linear_block(self.input_size, self.hidden_sizes[0]))
+        # all hidden layers
+        for i in range(1, len(self.hidden_sizes)):
+            layers.extend(
+                self._linear_block(self.hidden_sizes[i - 1], self.hidden_sizes[i])
+            )
+        # last layer
+        layers.append(
+            nn.Linear(self.hidden_sizes[-1], self.num_classes, bias=self.bias)
+        )
+
         # create the layers
-        layers = [
-            *self._linear_block(self.input_size, self.hidden_sizes[0]),
-            *self._linear_block(self.hidden_sizes[0], self.hidden_sizes[1]),
-            *self._linear_block(self.hidden_sizes[1], self.hidden_sizes[2]),
-            nn.Linear(self.hidden_sizes[2], self.num_classes),
-        ]
         self.classifier = nn.Sequential(*layers)
 
     def _linear_block(self, a, b):
@@ -67,7 +76,7 @@ class MLP(nn.Module):
         (see fchollet @ https://github.com/keras-team/keras/issues/1802)
         - however, if applied after RELU or kWinners, breaks sparsity
         """
-        block = [nn.Linear(a, b)]
+        block = [nn.Linear(a, b, bias=self.bias)]
         if self.batch_norm:
             block.append(nn.BatchNorm1d(b))
         block.append(self.activation_func(b))
