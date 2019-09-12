@@ -90,9 +90,19 @@ class WeightedMagPruningTest(unittest.TestCase):
 
     def test_pruning_partial(self):
 
+        network = MLPHeb(
+            config=dict(
+                input_size=3,
+                num_classes=2,
+                hidden_sizes=[4, 5],
+                use_kwinners=False,
+                hebbian_learning=True,
+                bias=False,
+            )
+        )
         model = DSNNWeightedMag(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=0.5),
+            network=network,
+            config=dict(on_perc=0.5, hebbian_prune_perc=0, weight_prune_perc=0.5),
         )
         model.setup()
         new_mask, keep_mask, add_mask = model.prune(
