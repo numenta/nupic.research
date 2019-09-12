@@ -99,8 +99,7 @@ class HebbianPruningTest(unittest.TestCase):
         trues = keep_mask[expand(complement)]
 
         self.assertFalse(
-            keep_mask[intersection].item(),
-            "Only item in intersection should be False",
+            keep_mask[intersection].item(), "Only item in intersection should be False"
         )
         self.assertEqual(
             torch.sum(trues).item(), 11, "All other items should be set to True"
@@ -319,4 +318,4 @@ class HebbianPruningTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)

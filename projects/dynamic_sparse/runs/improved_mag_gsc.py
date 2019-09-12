@@ -45,7 +45,7 @@ base_exp_config = dict(
     use_kwinners=True,
     # model related
     # model=tune.grid_search(["DSNNWeightedMag", "DSNNMixedHeb"]),
-    model="DSNNMixedHeb",
+    model="DSNNWeightedMag",
     # on_perc=tune.grid_search([0.1, 0.05, 0.04, 0.03]),
     on_perc=0.1,
     # sparse related
@@ -73,7 +73,7 @@ tune_config = dict(
     stop={"training_iteration": 100},
     resources_per_trial={"cpu": 1, "gpu": 0.5},
     loggers=DEFAULT_LOGGERS,
-    verbose=0,
+    verbose=1,
 )
 
 run_ray(tune_config, base_exp_config)

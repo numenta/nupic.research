@@ -181,25 +181,30 @@ class DSNNWeightedMag(DSNNHeb):
             if zeta is not None:
                 # calculate the positive
                 weight_pos = weight[weight > 0]
-                pos_kth = int(zeta * len(weight_pos))
-                # if zeta=0, pos_kth=0, prune nothing
-                if pos_kth == 0:
-                    pos_threshold = -1
+                if len(weight_pos):
+                    pos_kth = int(zeta * len(weight_pos))
+                    # if zeta=0, pos_kth=0, prune nothing
+                    if pos_kth == 0:
+                        pos_threshold = -1
+                    else:
+                        pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
                 else:
-                    pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
+                    pos_threshold = -1
 
                 # calculate the negative
                 weight_neg = weight[weight < 0]
-                neg_kth = int((1 - zeta) * len(weight_neg))
-                # if zeta=1, neg_kth=0, prune all
-                if neg_kth == 0:
-                    neg_threshold = torch.min(weight_neg).item() - 1
+                if len(weight_neg):
+                    neg_kth = int((1 - zeta) * len(weight_neg))
+                    # if zeta=1, neg_kth=0, prune all
+                    if neg_kth == 0:
+                        neg_threshold = torch.min(weight_neg).item() - 1
+                    else:
+                        neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
                 else:
-                    neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
+                    neg_threshold = 1
 
-                partial_weight_mask = (weight > pos_threshold) | (
-                    weight <= neg_threshold
-                )
+                partial_weight_mask = (weight > pos_threshold) | \
+                                      (weight <= neg_threshold)
                 weight_mask = partial_weight_mask & active_synapses
                 # move to device
                 weight_mask.to(self.device)
@@ -416,25 +421,30 @@ class DSNNMixedHeb(DSNNHeb):
             if zeta is not None:
                 # calculate the positive
                 weight_pos = weight[weight > 0]
-                pos_kth = int(zeta * len(weight_pos))
-                # if zeta=0, pos_kth=0, prune nothing
-                if pos_kth == 0:
-                    pos_threshold = -1
+                if len(weight_pos):
+                    pos_kth = int(zeta * len(weight_pos))
+                    # if zeta=0, pos_kth=0, prune nothing
+                    if pos_kth == 0:
+                        pos_threshold = -1
+                    else:
+                        pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
                 else:
-                    pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
+                    pos_threshold = -1
 
                 # calculate the negative
                 weight_neg = weight[weight < 0]
-                neg_kth = int((1 - zeta) * len(weight_neg))
-                # if zeta=1, neg_kth=0, prune all
-                if neg_kth == 0:
-                    neg_threshold = torch.min(weight_neg).item() - 1
+                if len(weight_neg):
+                    neg_kth = int((1 - zeta) * len(weight_neg))
+                    # if zeta=1, neg_kth=0, prune all
+                    if neg_kth == 0:
+                        neg_threshold = torch.min(weight_neg).item() - 1
+                    else:
+                        neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
                 else:
-                    neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
+                    neg_threshold = 1
 
-                partial_weight_mask = (weight > pos_threshold) | (
-                    weight <= neg_threshold
-                )
+                partial_weight_mask = (weight > pos_threshold) | \
+                                      (weight <= neg_threshold)
                 weight_mask = partial_weight_mask & active_synapses
                 # move to device
                 weight_mask.to(self.device)
