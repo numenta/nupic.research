@@ -264,13 +264,13 @@ class VGG19Heb(nn.Module):
                 m.bias.data.zero_()
 
 
-class MLP(nn.Module):
+class MLPDeprecated(nn.Module):
     """
     Simple 3 hidden layers + output MLP, similar to one used in SET Paper.
     """
 
     def __init__(self, config=None):
-        super(MLP, self).__init__()
+        super().__init__()
 
         defaults = dict(
             input_size=784,
