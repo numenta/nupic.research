@@ -34,7 +34,7 @@ from .main import BaseModel, SparseModel
 
 
 class DSNNHeb(SparseModel):
-    """Improved results compared to regular SET"""
+    """Parent class for DSNNHeb models. Not to be instantiated"""
 
     def setup(self):
         super().setup()
@@ -48,19 +48,27 @@ class DSNNHeb(SparseModel):
             hebbian_prune_perc=None,
             weight_prune_perc=None,
             hebbian_grow=True,
+            hebbian_learning=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
 
         # initialize hebbian learning
-        self.network.hebbian_learning = True
+        self._init_coactivation_tracking()
         self.prune_cycles_completed = 0
+
+    def _init_coactivation_tracking(self):
+        """ 
+        Override method in children classes
+        Should only track coactivations if required by the algorithm
+        """
+        self.network.init_hebbian()
 
     def _post_epoch_updates(self, dataset=None):
         super()._post_epoch_updates(dataset)
         # zero out correlations (move to network)
         self._reinitialize_weights()
-        self.network.correlations = []
+        self.network.coactivations = []
         # decide whether to stop pruning
         if self.pruning_early_stop:
             if self.current_epoch in self.lr_milestones:
@@ -77,7 +85,7 @@ class DSNNHeb(SparseModel):
             survival_ratios = []
 
             for idx, (m, corr) in enumerate(
-                zip(self.sparse_modules, self.network.correlations)
+                zip(self.sparse_modules, self.network.coactivations)
             ):
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(), self.num_params[idx], corr, idx=idx
@@ -232,6 +240,10 @@ class DSNNHeb(SparseModel):
 class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
+    def _init_coactivation_tracking(self):
+        if self.weight_prune_perc is not None:
+            self.network.init_hebbian()
+
     def prune(self, weight, num_params, corr, idx=0):
         """
         Grow by correlation
@@ -278,6 +290,10 @@ class DSNNWeightedMag(DSNNHeb):
 
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
+
+    def _init_coactivation_tracking(self):
+        if self.hebbian_prune_perc is not None:
+            self.network.init_hebbian()
 
     def prune(self, weight, num_params, corr, idx=0):
         """Allows pruning by magnitude and hebbian"""
