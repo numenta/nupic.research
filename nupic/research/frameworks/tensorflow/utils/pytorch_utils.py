@@ -22,7 +22,10 @@ This script is used to import GSC models pre-trained in pytorch into tensorflow
 """
 
 import numpy as np
+import tensorflow as tf
 import tensorflow.keras.backend as K
+
+TF_LOGGER = tf.get_logger()
 
 
 def _reflatten_linear_weight(x):
@@ -129,5 +132,7 @@ def load_pytorch_weights(model_tf, model_pt, weights_map=None):
             if transform is not None:
                 value = transform(value)
             batch_values.append((var, value))
+        else:
+            TF_LOGGER.warn("Unknown variable: %s", var.name)
 
     K.batch_set_value(batch_values)
