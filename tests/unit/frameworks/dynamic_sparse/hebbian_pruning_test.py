@@ -24,7 +24,10 @@ from itertools import product
 import torch
 
 # from nupic.research.frameworks.dynamic_sparse.common import *
-from nupic.research.frameworks.dynamic_sparse.models import DSNNMixedHeb
+from nupic.research.frameworks.dynamic_sparse.models import (
+    DSNNMixedHeb,
+    DSNNWeightedMag,
+)
 from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb
 
 
@@ -36,7 +39,7 @@ def expand(list_of_indices):
     return list(zip(*list_of_indices))
 
 
-class ImprovedMagPruningTest(unittest.TestCase):
+class WeightedMagPruningTest(unittest.TestCase):
     def setUp(self):
 
         # dummy coactivation matrix
@@ -67,14 +70,16 @@ class ImprovedMagPruningTest(unittest.TestCase):
                 [21, -11, 7, 0, 0],
                 [-14, 18, -6, 0, 0],
             ]
-        )
+        ).float()
 
-        # manually define which connections will be pruned
-        # select lowest 25% correlations
-        self.lowest_25_hebb = [(4, 0), (2, 1), (0, 1)]
-        # select lowest 50% of negatives and lowest 50% of positives
-        self.lowest_50_mag = [(2, 0), (2, 2), (4, 2), (0, 1), (3, 2), (4, 1)]
-        self.mag_hebb_intersection = (0, 1)
+        # weights
+        # [[ 6.0819,  0.0802, -5.9448,  0.0000,  0.0000],
+        # [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000],
+        # [-3.3820,  2.1125, -5.3704,  0.0000,  0.0000],
+        # [20.4414, -4.1558,  6.0158,  0.0000,  0.0000],
+        # [-1.3790,  7.1928, -5.6922,  0.0000,  0.0000]]
+
+        self.lowest_50_mag = [(2, 0), (3, 1), (4, 0), (0, 1), (2, 1), (3, 2)]
 
         # remaining support variables
         self.shape = self.weight.shape
@@ -83,34 +88,35 @@ class ImprovedMagPruningTest(unittest.TestCase):
         self.zero_idxs = [i for i in self.idxs if self.weight[i] == 0]
         self.num_params = torch.sum(self.weight != 0).item()
 
-    def test_partial_magnitude_and_hebbian(self):
+    def test_pruning_partial(self):
 
-        model = DSNNMixedHeb(
+        model = DSNNWeightedMag(
             network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=0.25, weight_prune_perc=0.50),
+            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=0.5),
         )
         model.setup()
         new_mask, keep_mask, add_mask = model.prune(
             self.weight, self.num_params, self.corr
         )
 
-        intersection = self.mag_hebb_intersection
-        complement = set(self.nonzero_idxs).difference(intersection)
-        trues = keep_mask[expand(complement)]
+        # test keep mask
+        falses = ~keep_mask[expand(self.lowest_50_mag)]
+        highest_50 = set(self.nonzero_idxs).difference(self.lowest_50_mag)
+        trues = keep_mask[expand(highest_50)]
 
-        self.assertFalse(
-            keep_mask[intersection].item(), "Only item in intersection should be False"
+        self.assertEqual(
+            torch.sum(falses).item(), 6, "Lowest 50perc in magnitude should be False"
         )
         self.assertEqual(
-            torch.sum(trues).item(), 11, "All other items should be set to True"
+            torch.sum(trues).item(), 6, "Highest 50perc in magnitude should be True"
         )
 
         # test add mask
         new_connections = add_mask[expand(self.zero_idxs)]
         self.assertEqual(
             torch.sum(new_connections).item(),
-            1,
-            "Add mask should have 1 previously non-active connections set to True",
+            6,
+            "Add mask should have 6 previously non-active connections set to True",
         )
 
         new_connections = add_mask[expand(self.nonzero_idxs)]
@@ -118,6 +124,72 @@ class ImprovedMagPruningTest(unittest.TestCase):
             torch.sum(new_connections).item(),
             0,
             "Add mask should not impact connections which were previously active",
+        )
+
+        # new mask needs to be a combination of both
+        dummy_new_mask = keep_mask | add_mask
+        self.assertTrue(
+            allclose_boolean(new_mask, dummy_new_mask),
+            "New mask should be an OR of keep_mask and add_mask",
+        )
+
+    def test_pruning_all(self):
+
+        model = DSNNWeightedMag(
+            network=MLPHeb(),
+            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=1),
+        )
+        model.setup()
+
+        new_mask, keep_mask, add_mask = model.prune(
+            self.weight, self.num_params, self.corr
+        )
+
+        # keep mask should not include any of previously existing connections
+        self.assertEqual(
+            torch.sum(keep_mask).item(),
+            0,
+            "When weight prune perc is 1, keep mask should be all 0s",
+        )
+
+        # conversely, the add mask need to have number of elements same as params
+        self.assertEqual(
+            torch.sum(add_mask).item(),
+            self.num_params,
+            "When weight prune perc is 1, add mask should replace all params",
+        )
+
+        # new mask needs to be a combination of both
+        dummy_new_mask = keep_mask | add_mask
+        self.assertTrue(
+            allclose_boolean(new_mask, dummy_new_mask),
+            "New mask should be an OR of keep_mask and add_mask",
+        )
+
+    def test_pruning_none(self):
+
+        model = DSNNWeightedMag(
+            network=MLPHeb(),
+            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=0),
+        )
+        model.setup()
+
+        new_mask, keep_mask, add_mask = model.prune(
+            self.weight, self.num_params, self.corr
+        )
+
+        # keep mask should not include any of previously existing connections
+        self.assertEqual(
+            torch.sum(keep_mask).item(),
+            self.num_params,
+            "When weight prune perc is 0, keep mask should be all 1s",
+        )
+
+        # conversely, the add mask need to have number of elements same as params
+        self.assertEqual(
+            torch.sum(add_mask).item(),
+            0,
+            "When weight prune perc is 0, add mask should be all 0s",
         )
 
         # new mask needs to be a combination of both
@@ -159,7 +231,7 @@ class HebbianPruningTest(unittest.TestCase):
                 [21, -11, 7, 0, 0],
                 [-14, 18, -6, 0, 0],
             ]
-        )
+        ).float()
 
         # manually define which connections will be pruned
         # select lowest 25% correlations
