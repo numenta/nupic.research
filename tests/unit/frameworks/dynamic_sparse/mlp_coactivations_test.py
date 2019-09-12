@@ -56,7 +56,7 @@ class CoactivationsTest(unittest.TestCase):
         for m in network.modules():
             if isinstance(m, nn.Linear):
                 # pytorch keeps weights tranposed
-                m.weight.data = next(weights_iter).T
+                m.weight.data = next(weights_iter).t()
 
         # ---------- Run one forward pass -----------
 
