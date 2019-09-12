@@ -58,7 +58,7 @@ class DSNNHeb(SparseModel):
         self.prune_cycles_completed = 0
 
     def _init_coactivation_tracking(self):
-        """ 
+        """
         Override method in children classes
         Should only track coactivations if required by the algorithm
         """
