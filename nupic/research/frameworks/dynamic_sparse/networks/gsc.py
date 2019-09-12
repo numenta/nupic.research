@@ -22,7 +22,7 @@
 import torch
 from torch import nn
 
-from nupic.torch.models.sparse_cnn import MNISTSparseCNN
+from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 from .layers import DSConv2d, RandDSConv2d, SparseConv2d
@@ -207,6 +207,35 @@ def make_dscnn(net, config=None):
         elif prune_method == "dynamic":
             return DSConv2d
 
+    def set_module(net, name, new_module):
+        """
+        Mimics "setattr" in purpose and argument types.
+        Sets module "name" of "net" to "new_module".
+        This is done recursively as "name" may be
+        of the form '0.subname-1.subname-2.3 ...'
+        where 0 and 3 indicate indices of a
+        torch.nn.Sequential.
+        """
+
+        subnames = name.split(".")
+        subname0, subnames_remaining = subnames[0], subnames[1:]
+
+        if subnames_remaining:
+
+            if subname0.isdigit():
+                subnet = net[int(subname0)]
+            else:
+                subnet = getattr(net, subname0)
+
+            set_module(subnet, ".".join(subnames_remaining), new_module)
+
+        else:
+
+            if subname0.isdigit():
+                net[int(subname0)] = new_module
+            else:
+                setattr(net, subname0, new_module)
+
     # Get DSConv2d params from config.
     prune_methods = tolist(config.get("prune_methods", "dynamic"))
     assert (
@@ -215,6 +244,7 @@ def make_dscnn(net, config=None):
         num_convs, prune_methods
     )
 
+    # Populate kwargs for new layers.
     possible_args = {
         "dynamic": [
             "hebbian_prune_frac",
@@ -246,64 +276,25 @@ def make_dscnn(net, config=None):
         len((kwargs_s)) == len(named_convs) == len(prune_methods)
     ), "Sizes do not match"
 
-    # OLD VERSION
+    # Replace conv layers.
+    for prune_method, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
 
-    # for prune_meth, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
+        conv_type = get_conv_type(prune_method)
+        if conv_type is None:
+            continue
 
-    #     NewConv = get_conv_type(prune_meth)
-    #     if NewConv is None:
-    #         continue
-
-    #     setattr(net, name, NewConv(
-    #         in_channels=conv.in_channels,
-    #         out_channels=conv.out_channels,
-    #         kernel_size=conv.kernel_size,
-    #         stride=conv.stride,
-    #         padding=conv.padding,
-    #         padding_mode=conv.padding_mode,
-    #         dilation=conv.dilation,
-    #         groups=conv.groups,
-    #         bias=(conv.bias is not None),
-    #         **kwargs,
-    #     ))
-
-    # NEW VERSION
-
-    new_features = []
-    idx = 0  # iterate through args
-    # only start procedure if there at least one layer which needs to be pruned
-    if len(prune_methods):
-        # replace all conv layers if required
-        for layer in net.features:
-            if isinstance(layer, nn.Conv2d):
-                # only replace layer if one of the expected types
-                prune_method = prune_methods[idx]
-                if prune_method in ["static", "random", "dynamic"]:
-                    kwargs = kwargs_s[idx]
-                    conv_type = get_conv_type(prune_method)
-                    new_features.append(
-                        conv_type(
-                            in_channels=layer.in_channels,
-                            out_channels=layer.out_channels,
-                            kernel_size=layer.kernel_size,
-                            stride=layer.stride,
-                            padding=layer.padding,
-                            padding_mode=layer.padding_mode,
-                            dilation=layer.dilation,
-                            groups=layer.groups,
-                            bias=(layer.bias is not None),
-                            **kwargs,
-                        )
-                    )
-                # else, do nothing, append conv
-                else:
-                    new_features.append(layer)
-                idx += 1
-            else:
-                # do nothing, append regular layer
-                new_features.append(layer)
-
-    net.features = nn.Sequential(*new_features)
+        set_module(net, name, conv_type(
+            in_channels=conv.in_channels,
+            out_channels=conv.out_channels,
+            kernel_size=conv.kernel_size,
+            stride=conv.stride,
+            padding=conv.padding,
+            padding_mode=conv.padding_mode,
+            dilation=conv.dilation,
+            groups=conv.groups,
+            bias=(conv.bias is not None),
+            **kwargs,
+        ))
 
     return net
 
@@ -324,5 +315,119 @@ def mnist_sparse_cnn(config):
 def mnist_sparse_dscnn(config):
 
     net = MNISTSparseCNN()
+    net = make_dscnn(net, config)
+    return net
+
+
+def gsc_sparse_cnn(config):
+
+    net = GSCSparseCNN()
+    return net
+
+
+def gsc_sparse_dscnn(config):
+
+    net = GSCSparseCNN()
+    net = make_dscnn(net, config)
+    return net
+
+
+class GSCSparseFullCNN(nn.Sequential):
+    """Sparse CNN model used to classify `Google Speech Commands` dataset as
+    described in `How Can We Be So Dense?`_ paper.
+
+    .. _`How Can We Be So Dense?`: https://arxiv.org/abs/1903.11257
+
+    :param cnn_out_channels: output channels for each CNN layer
+    :param cnn_percent_on: Percent of units allowed to remain on each convolution
+                           layer
+    :param linear_units: Number of units in the linear layer
+    :param linear_percent_on: Percent of units allowed to remain on the linear
+                              layer
+    :param linear_weight_sparsity: Percent of weights that are allowed to be
+                                   non-zero in the linear layer
+    :param k_inference_factor: During inference (training=False) we increase
+                               `percent_on` in all sparse layers by this factor
+    :param boost_strength: boost strength (0.0 implies no boosting)
+    :param boost_strength_factor: Boost strength factor to use [0..1]
+    :param duty_cycle_period: The period used to calculate duty cycles
+    """
+
+    def __init__(self,
+                 cnn_out_channels=(32, 64, 32),
+                 cnn_percent_on=(0.095, 0.125, 0.0925),
+                 linear_units=1600,
+                 linear_percent_on=0.1,
+                 linear_weight_sparsity=0.4,
+                 boost_strength=1.5,
+                 boost_strength_factor=0.9,
+                 k_inference_factor=1.5,
+                 duty_cycle_period=1000
+                 ):
+        super(GSCSparseFullCNN, self).__init__()
+        # input_shape = (1, 32, 32)
+        # First Sparse CNN layer
+        self.add_module("cnn1", nn.Conv2d(1, cnn_out_channels[0], 5))
+        self.add_module("cnn1_batchnorm", nn.BatchNorm2d(cnn_out_channels[0],
+                                                         affine=False))
+        self.add_module("cnn1_maxpool", nn.MaxPool2d(2))
+        self.add_module("cnn1_kwinner", KWinners2d(
+            channels=cnn_out_channels[0],
+            percent_on=cnn_percent_on[0],
+            k_inference_factor=k_inference_factor,
+            boost_strength=boost_strength,
+            boost_strength_factor=boost_strength_factor,
+            duty_cycle_period=duty_cycle_period))
+
+        # Second Sparse CNN layer
+        self.add_module("cnn2", nn.Conv2d(cnn_out_channels[0], cnn_out_channels[1], 5))
+        self.add_module("cnn2_batchnorm",
+                        nn.BatchNorm2d(cnn_out_channels[1], affine=False))
+        self.add_module("cnn2_maxpool", nn.MaxPool2d(2))
+        self.add_module("cnn2_kwinner", KWinners2d(
+            channels=cnn_out_channels[1],
+            percent_on=cnn_percent_on[1],
+            k_inference_factor=k_inference_factor,
+            boost_strength=boost_strength,
+            boost_strength_factor=boost_strength_factor,
+            duty_cycle_period=duty_cycle_period))
+
+        # # Third Sparse CNN layer
+        # self.add_module("cnn3",
+        #                 nn.Conv2d(cnn_out_channels[1], cnn_out_channels[2], 5))
+        # self.add_module("cnn3_batchnorm",
+        #                 nn.BatchNorm2d(cnn_out_channels[2], affine=False))
+        # # self.add_module("cnn3_maxpool", nn.MaxPool2d(2))
+        # self.add_module("cnn3_kwinner", KWinners2d(
+        #     channels=cnn_out_channels[2],
+        #     percent_on=cnn_percent_on[2],
+        #     k_inference_factor=k_inference_factor,
+        #     boost_strength=boost_strength,
+        #     boost_strength_factor=boost_strength_factor,
+        #     duty_cycle_period=duty_cycle_period))
+
+        self.add_module("flatten", Flatten())
+
+        # # Sparse Linear layer
+        # self.add_module("linear", SparseWeights(
+        #     nn.Linear(25 * cnn_out_channels[1], linear_units),
+        #     weight_sparsity=linear_weight_sparsity))
+        # self.add_module("linear_bn", nn.BatchNorm1d(linear_units, affine=False))
+        # self.add_module("linear_kwinner", KWinners(
+        #     n=linear_units,
+        #     percent_on=linear_percent_on,
+        #     k_inference_factor=k_inference_factor,
+        #     boost_strength=boost_strength,
+        #     boost_strength_factor=boost_strength_factor,
+        #     duty_cycle_period=duty_cycle_period))
+
+        # Classifier
+        self.add_module("output", nn.Linear(1600, 12))
+        self.add_module("softmax", nn.LogSoftmax(dim=1))
+
+
+def gsc_sparse_dscnn_fullyconv(config):
+
+    net = GSCSparseFullCNN()
     net = make_dscnn(net, config)
     return net
