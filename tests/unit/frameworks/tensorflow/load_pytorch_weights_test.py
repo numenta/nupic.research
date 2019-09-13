@@ -24,7 +24,7 @@ import torch
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.platform import test
 
-from nupic.research.frameworks.tensorflow.utils import load_pytorch_weights
+from nupic.research.frameworks.tensorflow.utils import load_gsc_weights_from_pytorch
 from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 
 
@@ -45,7 +45,7 @@ class LoadPytorchWeightsTest(keras_parameterized.TestCase):
         model_pt.eval()
 
         model_tf = GSCSparseCNN(pre_trained=False)
-        load_pytorch_weights(model_tf, model_pt)
+        load_gsc_weights_from_pytorch(model_tf, model_pt)
         model_tf.compile(optimizer="sgd",
                          loss="sparse_categorical_crossentropy",
                          metrics=["accuracy"])
@@ -69,7 +69,7 @@ class LoadPytorchWeightsTest(keras_parameterized.TestCase):
         model_pt.eval()
 
         model_tf = GSCSuperSparseCNN(pre_trained=False)
-        load_pytorch_weights(model_tf, model_pt)
+        load_gsc_weights_from_pytorch(model_tf, model_pt)
         model_tf.compile(optimizer="sgd",
                          loss="sparse_categorical_crossentropy",
                          metrics=["accuracy"])

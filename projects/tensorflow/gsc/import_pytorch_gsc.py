@@ -23,7 +23,7 @@ This script is used to import GSC models pre-trained in pytorch into tensorflow
 
 import torch.hub
 
-from nupic.research.frameworks.tensorflow.utils import load_pytorch_weights
+from nupic.research.frameworks.tensorflow.utils import load_gsc_weights_from_pytorch
 from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 
 if __name__ == "__main__":
@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     print("Converting gsc_sparse_cnn from pytorch to tensorflow")
     model_tf = GSCSparseCNN(data_format="channels_last")
-    load_pytorch_weights(model_tf, model_pt)
+    load_gsc_weights_from_pytorch(model_tf, model_pt)
     model_tf.compile(optimizer="sgd",
                      loss="sparse_categorical_crossentropy",
                      metrics=["accuracy"])
@@ -50,7 +50,7 @@ if __name__ == "__main__":
                               pretrained=True)
     print("Converting gsc_super_sparse_cnn from pytorch to tensorflow")
     model_tf = GSCSuperSparseCNN(data_format="channels_last")
-    load_pytorch_weights(model_tf, model_pt)
+    load_gsc_weights_from_pytorch(model_tf, model_pt)
     print("Saving pre-trained tensorflow version of gsc_super_sparse_cnn as "
           "gsc_super_sparse_cnn.h5")
     model_tf.save_weights("gsc_super_sparse_cnn.h5")
