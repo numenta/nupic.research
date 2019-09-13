@@ -433,28 +433,32 @@ def vgg19_dscnn(config):
 
 def mnist_sparse_cnn(config):
 
-    net = MNISTSparseCNN()
+    net_params = config.get('net_params', {})
+    net = MNISTSparseCNN(**net_params)
     return net
 
 
-def mnist_sparse_dscnn(config):
+def mnist_sparse_dscnn(config, squash=True):
 
-    net = MNISTSparseCNN()
+    net_params = config.get('net_params', {})
+    net = MNISTSparseCNN(**net_params)
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
-    net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+    net = squash_layers(net, DSConv2d, KWinners2d)
     return net
 
 
 def gsc_sparse_cnn(config):
 
-    net = GSCSparseCNN()
+    net_params = config.get('net_params', {})
+    net = GSCSparseCNN(net_params)
     return net
 
 
 def gsc_sparse_dscnn(config):
 
-    net = GSCSparseCNN()
+    net_params = config.get('net_params', {})
+    net = GSCSparseCNN(**net_params)
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
@@ -557,7 +561,8 @@ class GSCSparseFullCNN(nn.Sequential):
 
 def gsc_sparse_dscnn_fullyconv(config):
 
-    net = GSCSparseFullCNN()
+    net_params = config.get('net_params', {})
+    net = GSCSparseFullCNN(**net_params)
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
