@@ -113,6 +113,20 @@ def break_mask_ties(mask, num_remain=None, frac_remain=None):
 
 
 # ------------------
+# Base
+# ------------------
+
+class DynamicSparseBase(torch.nn.Module):
+
+    def _init_coactivations(self, weight):
+        # Init buffer to keep track of coactivations.
+        self.register_buffer("coactivations", torch.zeros_like(self.weight))
+
+    def reset_coactivations(self):
+        # Reset coactivations to zero.
+        self.coactivations[:] = 0
+
+# ------------------
 # Conv Layers
 # ------------------
 
@@ -186,7 +200,7 @@ class _NullConv(torch.nn.Conv2d):
         return mask
 
 
-class DSConv2d(torch.nn.Conv2d):
+class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
     def __init__(
         self,
@@ -224,6 +238,8 @@ class DSConv2d(torch.nn.Conv2d):
             in_channels, out_channels, kernel_size, stride, padding,
             dilation, groups, bias, padding_mode,
         )
+
+        self._init_coactivations(self.weight)
 
         if prune_dims is None:
             self.prune_dims = [0, 1]
@@ -266,9 +282,6 @@ class DSConv2d(torch.nn.Conv2d):
             self.weight_sparsity = calc_sparsity(self.weight)
         self.prune_grads_hook = self.weight.register_hook(
             lambda grad: grad * self.last_keep_mask.type(grad.dtype).to(grad.device))
-
-        # Set tensors to keep track of coactivations.
-        self.register_buffer("coactivations", torch.zeros_like(self.weight))
 
         # Register hook to update coactivations.
         self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
@@ -493,7 +506,6 @@ class DSConv2d(torch.nn.Conv2d):
             2. (unit_in  - mean_input ) > input_activity_threshold
             3. (unit_out - mean_output) > output_activity_threshold
         """
-
         with torch.no_grad():
 
             grouped_input = input_tensor.repeat((1, self.new_groups, 1, 1))
