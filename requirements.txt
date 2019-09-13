@@ -19,6 +19,8 @@
 #  http://numenta.org/licenses/
 #
 # ------------------------------------------------------------------------------
+nupic.torch
+nupic.tensorflow
 numpy
 matplotlib
 pandas
@@ -27,9 +29,7 @@ librosa
 scikit-image
 requests
 ray
-nupic.tensorflow
 tqdm
 torchvision
-nupic.torch
 python-dotenv
 elasticsearch
