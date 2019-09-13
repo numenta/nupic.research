@@ -33,9 +33,14 @@ Installation
 OK, enough caveats. Here are some installation instructions though mostly you are on your own. (Wait, was that another caveat?)
 
 Install using setup.py like any python project. Since the contents here change often, we highly recommend installing as follows:
-
+    
+    pip install -r requirements.txt
+    pip install -r requirements-dev.txt
     python setup.py develop
 
+When using anaconda virtual environment it is recommended to install `pytorch` from anaconda repository instead of pip:
+
+    conda install pytorch torchvision -c pytorch
 
 You can test your installation by running the test script from the repository root:
 
