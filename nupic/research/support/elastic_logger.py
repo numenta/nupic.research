@@ -47,7 +47,7 @@ def create_elastic_client(**kwargs):
     :return: Configured :class:`elasticsearch.Elasticsearch` client
     :rtype: :class:`Elasticsearch`
     """
-    hosts = os.environ.get("ELASTIC_HOST")
+    hosts = os.environ.get("ELASTIC_HOSTS")
     hosts = None if hosts is None else hosts.split(",")
     elasticsearch_args = {
         "cloud_id": os.environ.get("ELASTIC_CLOUD_ID"),
