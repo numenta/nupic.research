@@ -28,6 +28,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
+from nupic.torch.modules import update_boost_strength
 
 class BaseModel:
     """Base model, with training loops and logging functions."""
@@ -99,12 +100,12 @@ class BaseModel:
         self.log = {}
         self.network.train()
         self._run_one_pass(dataset.train_loader, train=True)
+        self._post_epoch_updates(dataset)
         self.network.eval()
         self._run_one_pass(dataset.test_loader, train=False)
         # run one additional testing epoch for noise
         if self.test_noise or test_noise_local:
             self._run_one_pass(dataset.noise_loader, train=False, noise=True)
-        self._post_epoch_updates(dataset)
 
         return self.log
 
@@ -112,6 +113,7 @@ class BaseModel:
         # update learning rate
         if self.lr_scheduler:
             self.lr_scheduler.step()
+        self.network.classifier.apply(update_boost_strength)
 
     def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
