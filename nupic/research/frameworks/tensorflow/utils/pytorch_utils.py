@@ -25,6 +25,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
+import nupic.torch.models
+
 TF_LOGGER = tf.get_logger()
 
 
@@ -109,16 +111,19 @@ _GSC_SPARSE_MAP = {
 }
 
 
-def load_pytorch_weights(model_tf, model_pt, weights_map=None):
+def load_gsc_weights_from_pytorch(model_tf, model_pt, weights_map=None):
     """
-    Update tensorflow model weights using pre-trained pytorch model
-    :param model_tf: Clean tensorflow model
+    Update tensorflow model weights using pre-trained GSC pytorch model
+    :param model_tf: Untrained GSC model (tensorflow).
     :type model_tf: :class:`nupic.tensorflow.models.GSCSparseCNN`
-    :param model_pt: Pre-trained pytorch model
+    :param model_pt: Pre-trained GSC model (pytorch).
     :type model_pt: :class:`nupic.torch.models.GSCSparseCNN`
     :param weights_map: Dictionay mapping tensorflow variables to pytorch state
     :type weights_map: dict
     """
+    if not isinstance(model_pt, nupic.torch.models.GSCSparseCNN):
+        raise NotImplementedError()
+
     if weights_map is None:
         weights_map = _GSC_SPARSE_MAP
     state_dict = model_pt.state_dict()
