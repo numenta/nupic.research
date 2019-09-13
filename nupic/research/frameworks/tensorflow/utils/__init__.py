@@ -18,4 +18,4 @@
 #  http://numenta.org/licenses/
 #
 
-from .pytorch_utils import load_pytorch_weights
+from .pytorch_utils import load_gsc_weights_from_pytorch
