@@ -24,7 +24,10 @@ from itertools import product
 import torch
 
 # from nupic.research.frameworks.dynamic_sparse.common import *
-from nupic.research.frameworks.dynamic_sparse.models import DSNNMixedHeb
+from nupic.research.frameworks.dynamic_sparse.models import (
+    DSNNMixedHeb,
+    DSNNWeightedMag,
+)
 from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb
 
 
@@ -34,6 +37,177 @@ def allclose_boolean(t1, t2):
 
 def expand(list_of_indices):
     return list(zip(*list_of_indices))
+
+
+class WeightedMagPruningTest(unittest.TestCase):
+    def setUp(self):
+
+        # dummy coactivation matrix
+        self.corr = torch.tensor(
+            [
+                [0.3201, 0.8318, 0.3382, 0.9734, 0.0985],
+                [0.0401, 0.8620, 0.0845, 0.3778, 0.3996],
+                [0.4954, 0.0092, 0.6713, 0.8594, 0.9487],
+                [0.8101, 0.0922, 0.2033, 0.7185, 0.4588],
+                [0.3897, 0.6865, 0.5072, 0.9749, 0.0597],
+            ]
+        )
+        # the transpose is what will be used
+        # ([
+        #     [0.3201, 0.0401, 0.4954, 0.8101, 0.3897],
+        #     [0.8318, 0.8620, 0.0092, 0.0922, 0.6865],
+        #     [0.3382, 0.0845, 0.6713, 0.2033, 0.5072],
+        #     [0.9734, 0.3778, 0.8594, 0.7185, 0.9749],
+        #     [0.0985, 0.3996, 0.9487, 0.4588, 0.0597]
+        # ])
+
+        # dummy weight matrix
+        self.weight = torch.tensor(
+            [
+                [19, 2, -12, 0, 0],
+                [0, 0, 0, 0, 0],
+                [-10, 25, -8, 0, 0],
+                [21, -11, 7, 0, 0],
+                [-14, 18, -6, 0, 0],
+            ]
+        ).float()
+
+        # weights
+        # [[ 6.0819,  0.0802, -5.9448,  0.0000,  0.0000],
+        # [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000],
+        # [-3.3820,  2.1125, -5.3704,  0.0000,  0.0000],
+        # [20.4414, -4.1558,  6.0158,  0.0000,  0.0000],
+        # [-1.3790,  7.1928, -5.6922,  0.0000,  0.0000]]
+
+        self.lowest_50_mag = [(2, 0), (3, 1), (4, 0), (0, 1), (2, 1), (3, 2)]
+
+        # remaining support variables
+        self.shape = self.weight.shape
+        self.idxs = list(product(*[range(s) for s in self.shape]))
+        self.nonzero_idxs = [i for i in self.idxs if self.weight[i] != 0]
+        self.zero_idxs = [i for i in self.idxs if self.weight[i] == 0]
+        self.num_params = torch.sum(self.weight != 0).item()
+
+    def test_pruning_partial(self):
+
+        network = MLPHeb(
+            config=dict(
+                input_size=3,
+                num_classes=2,
+                hidden_sizes=[4, 5],
+                use_kwinners=False,
+                hebbian_learning=True,
+                bias=False,
+            )
+        )
+        model = DSNNWeightedMag(
+            network=network,
+            config=dict(on_perc=0.5, hebbian_prune_perc=0, weight_prune_perc=0.5),
+        )
+        model.setup()
+        new_mask, keep_mask, add_mask = model.prune(
+            self.weight, self.num_params, self.corr
+        )
+
+        # test keep mask
+        falses = ~keep_mask[expand(self.lowest_50_mag)]
+        highest_50 = set(self.nonzero_idxs).difference(self.lowest_50_mag)
+        trues = keep_mask[expand(highest_50)]
+
+        self.assertEqual(
+            torch.sum(falses).item(), 6, "Lowest 50perc in magnitude should be False"
+        )
+        self.assertEqual(
+            torch.sum(trues).item(), 6, "Highest 50perc in magnitude should be True"
+        )
+
+        # test add mask
+        new_connections = add_mask[expand(self.zero_idxs)]
+        self.assertEqual(
+            torch.sum(new_connections).item(),
+            6,
+            "Add mask should have 6 previously non-active connections set to True",
+        )
+
+        new_connections = add_mask[expand(self.nonzero_idxs)]
+        self.assertEqual(
+            torch.sum(new_connections).item(),
+            0,
+            "Add mask should not impact connections which were previously active",
+        )
+
+        # new mask needs to be a combination of both
+        dummy_new_mask = keep_mask | add_mask
+        self.assertTrue(
+            allclose_boolean(new_mask, dummy_new_mask),
+            "New mask should be an OR of keep_mask and add_mask",
+        )
+
+    def test_pruning_all(self):
+
+        model = DSNNWeightedMag(
+            network=MLPHeb(),
+            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=1),
+        )
+        model.setup()
+
+        new_mask, keep_mask, add_mask = model.prune(
+            self.weight, self.num_params, self.corr
+        )
+
+        # keep mask should not include any of previously existing connections
+        self.assertEqual(
+            torch.sum(keep_mask).item(),
+            0,
+            "When weight prune perc is 1, keep mask should be all 0s",
+        )
+
+        # conversely, the add mask need to have number of elements same as params
+        self.assertEqual(
+            torch.sum(add_mask).item(),
+            self.num_params,
+            "When weight prune perc is 1, add mask should replace all params",
+        )
+
+        # new mask needs to be a combination of both
+        dummy_new_mask = keep_mask | add_mask
+        self.assertTrue(
+            allclose_boolean(new_mask, dummy_new_mask),
+            "New mask should be an OR of keep_mask and add_mask",
+        )
+
+    def test_pruning_none(self):
+
+        model = DSNNWeightedMag(
+            network=MLPHeb(),
+            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=0),
+        )
+        model.setup()
+
+        new_mask, keep_mask, add_mask = model.prune(
+            self.weight, self.num_params, self.corr
+        )
+
+        # keep mask should not include any of previously existing connections
+        self.assertEqual(
+            torch.sum(keep_mask).item(),
+            self.num_params,
+            "When weight prune perc is 0, keep mask should be all 1s",
+        )
+
+        # conversely, the add mask need to have number of elements same as params
+        self.assertEqual(
+            torch.sum(add_mask).item(),
+            0,
+            "When weight prune perc is 0, add mask should be all 0s",
+        )
+
+        # new mask needs to be a combination of both
+        dummy_new_mask = keep_mask | add_mask
+        self.assertTrue(
+            allclose_boolean(new_mask, dummy_new_mask),
+            "New mask should be an OR of keep_mask and add_mask",
+        )
 
 
 class HebbianPruningTest(unittest.TestCase):
@@ -67,7 +241,7 @@ class HebbianPruningTest(unittest.TestCase):
                 [21, -11, 7, 0, 0],
                 [-14, 18, -6, 0, 0],
             ]
-        )
+        ).float()
 
         # manually define which connections will be pruned
         # select lowest 25% correlations
@@ -99,8 +273,7 @@ class HebbianPruningTest(unittest.TestCase):
         trues = keep_mask[expand(complement)]
 
         self.assertFalse(
-            keep_mask[intersection].item(),
-            "Only item in intersection should be False",
+            keep_mask[intersection].item(), "Only item in intersection should be False"
         )
         self.assertEqual(
             torch.sum(trues).item(), 11, "All other items should be set to True"
@@ -319,4 +492,4 @@ class HebbianPruningTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)
