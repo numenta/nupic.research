@@ -30,6 +30,7 @@ import torch.optim.lr_scheduler as schedulers
 
 from nupic.torch.modules import update_boost_strength
 
+
 class BaseModel:
     """Base model, with training loops and logging functions."""
 
