@@ -43,7 +43,7 @@ class MLPHeb(nn.Module):
             dropout=False,
             bias=True,
         )
-        assert "use_kwinners" not in config, "use_kwinners is deprecated"
+        assert config is None or "use_kwinners" not in config, "use_kwinners is deprecated"
 
         defaults.update(config or {})
         self.__dict__.update(defaults)
