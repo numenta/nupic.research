@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from collections import defaultdict
+from itertools import product
 
 import numpy as np
 import torch
@@ -55,6 +56,7 @@ class BaseModel:
             weight_decay=1e-4,
             sparse_linear_only=False,
             epsilon=None,
+            sparsify_fixed=True,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -233,17 +235,40 @@ class SparseModel(BaseModel):
                 if self.has_params(m):
                     self.sparse_modules.append(m)
 
-            # initialize masks
             for m in self.sparse_modules:
                 shape = m.weight.shape
                 # two approaches of defining epsilon
                 if self.epsilon:
                     on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-                # create the masks
-                mask = (torch.rand(shape) < on_perc).float().to(self.device)
+                if self.sparsify_fixed:
+                    mask = self._sparsify_fixed(shape, on_perc)
+                else:
+                    mask = self._sparsify_stochastic(shape, on_perc)
                 m.weight.data *= mask
                 self.masks.append(mask)
                 self.num_params.append(torch.sum(mask).item())
+
+    def _sparsify_stochastic(self, shape, on_perc):
+        """Sthocastic in num of params approach of sparsifying a tensor"""
+        return (torch.rand(shape) < on_perc).float().to(self.device)
+
+    def _sparsify_fixed(self, shape, on_perc):
+        """
+        Deterministic in number of params approach of sparsifying a tensor
+        Sample N from all possible indices
+        """
+        all_idxs = np.array(list(product(*[range(s) for s in shape])))
+        num_add = int(on_perc * np.prod(shape))
+        sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
+        selected = all_idxs[sampled_idxs]
+
+        mask = torch.zeros(shape, dtype=torch.bool)
+        if len(selected.shape) > 1:
+            mask[list(zip(*selected))] = True
+        else:
+            mask[selected] = True
+
+        return mask.float().to(self.device)
 
     def _run_one_pass(self, loader, train, noise=False):
         """TODO: reimplement by calling super and passing a hook"""

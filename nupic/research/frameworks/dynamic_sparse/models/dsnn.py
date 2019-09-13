@@ -200,12 +200,32 @@ class DSNNHeb(SparseModel):
 
         return weight_mask
 
-    def _get_random_add_mask(self, nonactive_synapses, num_add):
-
+    def _get_random_add_mask_prob(self, nonactive_synapses, num_add):
+        """
+        Deprecated method of add random mask.
+        Faster, but adds stochasticity to number of added params - tricky to test
+        """
         total_nonactive = torch.sum(nonactive_synapses).item()
         p_add = num_add / max(total_nonactive, num_add)
         random_sample = torch.rand(nonactive_synapses.shape).to(self.device) < p_add
         add_mask = random_sample & nonactive_synapses
+
+        return add_mask
+
+    def _get_random_add_mask(self, nonactive_synapses, num_add):
+        """
+        Random mask that ensures the exact number of params is added
+        For computationally faster method, see _get_random_add_mask_prob
+        """
+        nonzero = torch.nonzero(nonactive_synapses, as_tuple=False)
+        sampled_idxs = np.random.choice(range(len(nonzero)), num_add, replace=False)
+        selected = nonzero[sampled_idxs]
+
+        add_mask = torch.zeros(nonactive_synapses.shape, dtype=torch.bool)
+        if len(selected.shape) > 1:
+            add_mask[list(zip(*selected))] = True
+        else:
+            add_mask[selected] = True
 
         return add_mask
 
@@ -262,7 +282,7 @@ class DSNNWeightedMag(DSNNHeb):
             # ----------- PRUNING ----------------
 
             if self.weight_prune_perc is not None:
-                keep_mask = self._get_magnitude_mask(weight, corr, active_synapses)
+                keep_mask = self._get_magnitude_mask(weight, active_synapses)
             else:
                 keep_mask = active_synapses.to(self.device)
 
