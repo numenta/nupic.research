@@ -63,16 +63,21 @@ class BinaryGatedLinear(Module):
         self.l2_strength = l2_strength
         self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
                             else torch.cuda.FloatTensor)
-        self.weight = self.floatTensor(out_features, in_features)
+        weight = torch.Tensor(out_features, in_features)
         if learn_weight:
-            self.weight = Parameter(self.weight)
+            self.weight = Parameter(weight)
+        else:
+            self.register_buffer("weight", weight)
+
         self.logit_p1 = Parameter(torch.Tensor(out_features, in_features))
         self.droprate_init = droprate_init if droprate_init != 0. else 0.5
         self.use_bias = False
         if bias:
-            self.bias = self.floatTensor(out_features)
+            b = torch.Tensor(out_features)
             if learn_weight:
-                self.bias = Parameter(self.bias)
+                self.bias = Parameter(b)
+            else:
+                self.register_buffer("bias", b)
             self.use_bias = True
         self.reset_parameters()
 
@@ -170,19 +175,23 @@ class BinaryGatedConv2d(Module):
         self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
                             else torch.cuda.FloatTensor)
         self.use_bias = False
-        self.weight = self.floatTensor(out_channels, in_channels // groups,
-                                       *self.kernel_size)
+        weight = torch.Tensor(out_channels, in_channels // groups,
+                              *self.kernel_size)
         if learn_weight:
-            self.weight = Parameter(self.weight)
+            self.weight = Parameter(weight)
+        else:
+            self.register_buffer("weight", weight)
         self.logit_p1 = Parameter(torch.Tensor(out_channels, in_channels // groups,
                                                *self.kernel_size))
         self.dim_z = out_channels
         self.input_shape = None
 
         if bias:
-            self.bias = self.floatTensor(out_channels)
+            b = torch.Tensor(out_channels)
             if learn_weight:
-                self.bias = Parameter(self.bias)
+                self.bias = Parameter(b)
+            else:
+                self.register_buffer("bias", b)
             self.use_bias = True
 
         self.reset_parameters()
