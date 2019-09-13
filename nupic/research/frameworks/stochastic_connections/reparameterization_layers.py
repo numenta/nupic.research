@@ -64,17 +64,21 @@ class HardConcreteGatedLinear(Module):
         self.l2_strength = l2_strength
         self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
                             else torch.cuda.FloatTensor)
-        self.weight = self.floatTensor(out_features, in_features)
+        weight = torch.Tensor(out_features, in_features)
         if learn_weight:
-            self.weight = Parameter(self.weight)
+            self.weight = Parameter(weight)
+        else:
+            self.register_buffer("weight", weight)
         self.loga = Parameter(torch.Tensor(out_features, in_features))
         self.temperature = temperature
         self.droprate_init = droprate_init if droprate_init != 0. else 0.5
 
         if bias:
-            self.bias = self.floatTensor(out_features)
+            bias = torch.Tensor(out_features)
             if learn_weight:
-                self.bias = Parameter(self.biars)
+                self.bias = Parameter(bias)
+            else:
+                self.register_buffer("bias", bias)
             self.use_bias = True
         else:
             self.use_bias = False
@@ -120,10 +124,19 @@ class HardConcreteGatedLinear(Module):
                    else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
         return -weight_l2_l0 - bias_l2
 
+    def count_inference_flops(self):
+        # For each unit, multiply with its n inputs then do n - 1 additions.
+        # To capture the -1, subtract it, but only in cases where there is at
+        # least one weight.
+        nz_by_unit = self.get_inference_nonzeros()
+        return (2 * torch.sum(nz_by_unit) - torch.sum(nz_by_unit > 0)).item()
+
     def count_expected_flops_and_l0(self):
         """
         Measures the expected floating point operations (FLOPs) and the expected
         L0 norm
+
+        Copied from the original L0 paper code
         """
         # dim_in multiplications and dim_in - 1 additions for each output unit
         # for the weights # + the bias addition for each unit
@@ -224,19 +237,23 @@ class HardConcreteGatedConv2d(Module):
         self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
                             else torch.cuda.FloatTensor)
         self.use_bias = False
-        self.weight = self.floatTensor(out_channels, in_channels // groups,
-                                       *self.kernel_size)
+        weight = torch.Tensor(out_channels, in_channels // groups,
+                              *self.kernel_size)
         if learn_weight:
-            self.weight = Parameter(self.weight)
+            self.weight = Parameter(weight)
+        else:
+            self.register_buffer("weight", weight)
         self.loga = Parameter(torch.Tensor(out_channels, in_channels // groups,
                                            *self.kernel_size))
         self.dim_z = out_channels
         self.input_shape = None
 
         if bias:
-            self.bias = self.floatTensor(out_channels)
+            bias = torch.Tensor(out_channels)
             if learn_weight:
-                self.bias = Parameter(self.bias)
+                self.bias = Parameter(bias)
+            else:
+                self.register_buffer("bias", bias)
             self.use_bias = True
 
         self.reset_parameters()
@@ -282,10 +299,29 @@ class HardConcreteGatedConv2d(Module):
                    else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
         return -weight_l2_l0 - bias_l2
 
+    def count_inference_flops(self):
+        # For each unit, multiply with n inputs then do n - 1 additions.
+        # Only subtract 1 in cases where is at least one weight.
+        nz_by_unit = self.get_inference_nonzeros()
+        flops_per_instance = 2 * torch.sum(nz_by_unit) - torch.sum(nz_by_unit > 0)
+
+        # for rows
+        instances = (
+            (self.input_shape[-2] - self.kernel_size[0]
+             + 2 * self.padding[0]) / self.stride[0]) + 1
+        # multiplying with cols
+        instances *= (
+            (self.input_shape[-1] - self.kernel_size[1] + 2 * self.padding[1])
+            / self.stride[1]) + 1
+
+        return (instances * flops_per_instance).item()
+
     def count_expected_flops_and_l0(self):
         """
         Measures the expected floating point operations (FLOPs) and the expected
         L0 norm
+
+        Copied from the original L0 paper code
         """
         ppos = torch.sum(1 - self.cdf_qz(0))
         # vector_length
