@@ -50,19 +50,13 @@ class MLPHeb(nn.Module):
         self.__dict__.update(defaults)
         self.device = torch.device(self.device)
 
-        layers = []
-        # add the first layer
-        layers.extend(self._linear_block(self.input_size, self.hidden_sizes[0],
-                                         self.percent_on_k_winner[0],
-                                         self.boost_strength[0],
-                                         self.boost_strength_factor[0]))
-        # all hidden layers
-        for i in range(1, len(self.hidden_sizes)):
+        # add the first layer and then the rest
+        layers = self._linear_block(self.input_size, self.hidden_sizes[0], 0)
+        for layer in range(1, len(self.hidden_sizes)):
             layers.extend(
-                self._linear_block(self.hidden_sizes[i - 1], self.hidden_sizes[i],
-                                   self.percent_on_k_winner[i],
-                                   self.boost_strength[i],
-                                   self.boost_strength_factor[i])
+                self._linear_block(self.hidden_sizes[layer - 1],
+                                   self.hidden_sizes[layer],
+                                   layer)
             )
         # last layer
         layers.append(
@@ -73,8 +67,7 @@ class MLPHeb(nn.Module):
         self.classifier = nn.Sequential(*layers)
         self.coactivations = []
 
-    def _linear_block(self, a, b, percent_on_k_winner=0.25, boost_strength=1.4,
-                      boost_strength_factor=0.7):
+    def _linear_block(self, a, b, layer):
         """
         Clarifications on batch norm position at the linear block:
         - bn before relu at original paper
@@ -85,11 +78,13 @@ class MLPHeb(nn.Module):
         block = [nn.Linear(a, b, bias=self.bias)]
         if self.batch_norm:
             block.append(nn.BatchNorm1d(b))
-        if percent_on_k_winner < 0.5:
-            block.append(KWinners(n=b, percent_on=percent_on_k_winner,
-                                  boost_strength=boost_strength,
-                                  boost_strength_factor=boost_strength_factor
-                                  ))
+        if self.percent_on_k_winner[layer] < 0.5:
+            block.append(
+                KWinners(n=b, percent_on=self.percent_on_k_winner[layer],
+                         boost_strength=self.boost_strength[layer],
+                         boost_strength_factor=self.boost_strength_factor[layer],
+                         k_inference_factor=1.0,
+                         ))
         else:
             block.append(nn.ReLU())
         if self.dropout:
