@@ -52,13 +52,11 @@ class BaseModel:
             weight_prune_perc=0,
             grad_prune_perc=0,
             test_noise=False,
-            percent_on=0.3,
-            boost_strength=1.4,
-            boost_strength_factor=0.7,
             weight_decay=1e-4,
             sparse_linear_only=False,
             epsilon=None,
             sparsify_fixed=True,
+            verbose=0,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -101,12 +99,14 @@ class BaseModel:
         self.log = {}
         self.network.train()
         self._run_one_pass(dataset.train_loader, train=True)
-        self._post_epoch_updates(dataset)
         self.network.eval()
         self._run_one_pass(dataset.test_loader, train=False)
         # run one additional testing epoch for noise
         if self.test_noise or test_noise_local:
             self._run_one_pass(dataset.noise_loader, train=False, noise=True)
+        self._post_epoch_updates(dataset)
+        if self.verbose > 0:
+            print(self.log)
 
         return self.log
 
@@ -144,6 +144,10 @@ class BaseModel:
         if train:
             self.log["train_loss"] = loss
             self.log["train_acc"] = acc
+            if self.lr_scheduler:
+                self.log["learning_rate"] = self.lr_scheduler.get_lr()[0]
+            else:
+                self.log["learning_rate"] = self.learning_rate
         else:
             if noise:
                 self.log["noise_loss"] = loss
