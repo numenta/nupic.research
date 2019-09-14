@@ -27,7 +27,7 @@ from torch import nn
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-from .layers import DSConv2d, RandDSConv2d, SparseConv2d
+from .layers import DSConv2d, RandDSConv2d, SparseConv2d, DynamicSparseBase
 from .main import VGG19
 
 # redefine Flatten
@@ -43,9 +43,28 @@ from .main import VGG19
 #     return Lambda(lambda x: x.view((x.size(0), -1)))
 
 
-# -------------------------------
-# Utils - network builders
-# -------------------------------
+# ----------------------------------------
+# Utils - network builders and inspectors
+# ----------------------------------------
+
+def get_dynamic_sparse_modules(net):
+    """
+    Inspects all children recursively to collect the
+    Dynamic-Sparse modules.
+    """
+    sparse_modules = []
+    for module in net.children():
+
+        subchildren = list(module.children())
+        if len(subchildren) > 0:
+            s = get_dynamic_sparse_modules(module)
+            sparse_modules.extend(s)
+
+        if isinstance(module, DynamicSparseBase):
+            sparse_modules.append(module)
+
+    return sparse_modules
+
 
 def swap_layers(sequential, layer_type_a, layer_type_b):
     """
@@ -321,8 +340,11 @@ class GSCHeb(nn.Module):
 
 # make a conv heb just by replacing the conv layers by special DSNN Conv layers
 def gsc_conv_heb(config):
-    # return make_dscnn(models.vgg19_bn(config), config)
-    return make_dscnn(GSCHeb(config), config)
+
+    net = make_dscnn(GSCHeb(config), config)
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
+    return net
 
 
 def gsc_conv_only_heb(config):
@@ -333,13 +355,13 @@ def gsc_conv_only_heb(config):
         return self.classifier(self.features(x))
 
     network.forward = forward
+    network.dynamic_sparse_modules = get_dynamic_sparse_modules(network)
 
     return network
 
 
 # function that makes the switch
 # why function inside other functions -> make it into a class?
-
 
 def make_dscnn(net, config=None):
     """
@@ -437,6 +459,9 @@ def vgg19_dscnn(config):
 
     net = VGG19(config)
     net = make_dscnn(net)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
 
 
@@ -454,6 +479,9 @@ def mnist_sparse_dscnn(config, squash=True):
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, KWinners2d)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
 
 
@@ -471,6 +499,9 @@ def gsc_sparse_dscnn(config):
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
 
 
@@ -575,4 +606,7 @@ def gsc_sparse_dscnn_fullyconv(config):
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
