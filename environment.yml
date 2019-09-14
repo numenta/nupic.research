@@ -1,0 +1,62 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: osx-64
+name: research
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+
+dependencies:
+  - python=3.7
+  - pip
+
+  # See requirements.txt
+  - pytorch
+  - torchvision
+  - numpy
+  - matplotlib
+  - pandas
+  - tabulate
+  - librosa
+  - scikit-image
+  - requests
+  - tqdm
+  - python-dotenv
+  - elasticsearch
+
+  # See requirements-dev.txt
+  - pytest-runner
+  - pytest
+  - black
+  - isort
+  - flake8
+  - flake8-black
+  - flake8-bugbear
+  - flake8-builtins
+  - flake8-comprehensions
+  - flake8-copyright
+  - flake8-mutable
+  - flake8-print
+  - pep8-naming
+  - flake8-quotes
+
+  - pip:
+      # Dependencies not available in conda
+      - ray
+
+      # See requirements-dev.txt
+      - docformatter
+      - flake8-breakpoint
+      - flake8-mypy
+      - flake8-isort
+      - flake8-fixme
+
+      # Install nupic.torch and  nupic.tensorflow libraries in develop mode
+      # Assume both libraries were cloned under ${HOME}/nta folder
+      - -e ${HOME}/nta/nupic.torch
+      - -e ${HOME}/nta/nupic.tensorflow
+
+      # Install nupic.research in develop mode
+      - -e .
+
