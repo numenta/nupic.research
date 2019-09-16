@@ -114,7 +114,7 @@ class BaseModel:
         # update learning rate
         if self.lr_scheduler:
             self.lr_scheduler.step()
-        self.network.classifier.apply(update_boost_strength)
+        self.network.apply(update_boost_strength)
 
     def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
