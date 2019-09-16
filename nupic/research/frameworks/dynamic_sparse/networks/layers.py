@@ -116,11 +116,27 @@ def break_mask_ties(mask, num_remain=None, frac_remain=None):
 # Base
 # ------------------
 
+def init_coactivation_tracking(m):
+    """
+    Function used to start tracking coactivations.
+    Call using :meth:`torch.nn.Module.apply` before training starts.
+    For example: ``m.apply(init_coactivation_tracking)``
+
+    :param m: torch.nn.Module
+    """
+    if isinstance(m, DynamicSparseBase):
+        m.init_coactivation_tracking()
+
+
 class DynamicSparseBase(torch.nn.Module):
 
     def _init_coactivations(self, weight):
         # Init buffer to keep track of coactivations.
+        self._track_coactivations = False
         self.register_buffer("coactivations", torch.zeros_like(self.weight))
+
+    def init_coactivation_tracking(self):
+        self._track_coactivations = True
 
     def reset_coactivations(self):
         # Reset coactivations to zero.
