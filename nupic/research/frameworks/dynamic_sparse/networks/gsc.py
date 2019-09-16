@@ -53,12 +53,7 @@ def get_dynamic_sparse_modules(net):
     Dynamic-Sparse modules.
     """
     sparse_modules = []
-    for module in net.children():
-
-        subchildren = list(module.children())
-        if len(subchildren) > 0:
-            s = get_dynamic_sparse_modules(module)
-            sparse_modules.extend(s)
+    for module in net.modules():
 
         if isinstance(module, DynamicSparseBase):
             sparse_modules.append(module)
