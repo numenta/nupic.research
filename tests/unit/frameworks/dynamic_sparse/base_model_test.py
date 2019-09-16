@@ -40,18 +40,18 @@ class BaseModelTest(unittest.TestCase):
         )
         model.setup()
 
-        self.assertEqual(model.network.classifier[1].percent_on, 0.2)
-        self.assertEqual(model.network.classifier[5].percent_on, 0.1)
-        self.assertEqual(model.network.classifier[1].boost_strength, 1.4)
-        self.assertEqual(model.network.classifier[5].boost_strength, 1.6)
-        self.assertEqual(model.network.classifier[1].boost_strength_factor, 0.7)
-        self.assertEqual(model.network.classifier[5].boost_strength_factor, 0.9)
+        self.assertEqual(model.network.classifier[1][1].percent_on, 0.2)
+        self.assertEqual(model.network.classifier[3][1].percent_on, 0.1)
+        self.assertEqual(model.network.classifier[1][1].boost_strength, 1.4)
+        self.assertEqual(model.network.classifier[3][1].boost_strength, 1.6)
+        self.assertEqual(model.network.classifier[1][1].boost_strength_factor, 0.7)
+        self.assertEqual(model.network.classifier[3][1].boost_strength_factor, 0.9)
 
         model._post_epoch_updates()
 
-        self.assertAlmostEqual(float(model.network.classifier[1].boost_strength),
+        self.assertAlmostEqual(float(model.network.classifier[1][1].boost_strength),
                                1.4 * 0.7, places=5)
-        self.assertAlmostEqual(float(model.network.classifier[5].boost_strength),
+        self.assertAlmostEqual(float(model.network.classifier[3][1].boost_strength),
                                1.6 * 0.9, places=5)
 
 

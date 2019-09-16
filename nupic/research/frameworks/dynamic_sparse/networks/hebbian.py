@@ -23,7 +23,82 @@ import torch
 from torch import nn
 
 from nupic.torch.modules import KWinners
+from .layers import DynamicSparseBase
 
+
+# ------------------------------------------------------------------------------------
+# DynamicSparse Linear Block 2019-09-13
+# ------------------------------------------------------------------------------------
+
+class DSLinearBlock(nn.Sequential, DynamicSparseBase):
+
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        bias,
+        batch_norm=None,
+        dropout=None,
+        activation_func=None,
+    ):
+
+        # Clarifications on batch norm position at the linear block:
+        # - bn before relu at original paper
+        # - bn after relu in recent work
+        # (see fchollet @ https://github.com/keras-team/keras/issues/1802)
+        # - however, if applied after RELU or kWinners, breaks sparsity
+        layers = [nn.Linear(in_features, out_features, bias=bias)]
+        if batch_norm:
+            layers.append(nn.BatchNorm1d(out_features))
+        if activation_func:
+            layers.append(activation_func)
+        if dropout:
+            layers.append(nn.Dropout(p=dropout))
+        super().__init__(*layers)
+
+        # Initialize dynamic sparse attributes.
+        self._init_coactivations(weight=self[0].weight)
+
+        # Initialize attr to decide whether to update coactivations during learning.
+        self._track_coactivations = False  # Off by default.
+
+    @property
+    def weight(self):
+        """
+        Return weight of linear layer - needed for introspective networks.
+        """
+        return self[0].weight
+
+    def init_hebbian(self):
+        self._track_coactivations = True
+
+    def forward(self, input_tensor):
+        output_tensor = super().forward(input_tensor)
+        if self._track_coactivations:
+            self.update_coactivations(input_tensor, output_tensor)
+        return output_tensor
+
+    def update_coactivations(self, x, y):
+        outer = 0
+        n_samples = x.shape[0]
+        with torch.no_grad():
+
+            # Get active units.
+            curr_act = (x > 0).detach().float()
+            prev_act = (y > 0).detach().float()
+
+            # Cumulate outer product over all samples.
+            # TODO: Vectorize this sum; for instance, using torch.einsum().
+            for s in range(n_samples):
+                outer += torch.ger(prev_act[s], curr_act[s])
+
+        # Update coactivations.
+        self.coactivations[:] += outer
+
+
+# ------------
+# MLP Network
+# ------------
 
 class MLPHeb(nn.Module):
     """Simple 3 hidden layers + output MLP"""
@@ -50,83 +125,72 @@ class MLPHeb(nn.Module):
         self.__dict__.update(defaults)
         self.device = torch.device(self.device)
 
-        # add the first layer and then the rest
-        layers = self._linear_block(self.input_size, self.hidden_sizes[0], 0)
-        for layer in range(1, len(self.hidden_sizes)):
-            layers.extend(
-                self._linear_block(self.hidden_sizes[layer - 1],
-                                   self.hidden_sizes[layer],
-                                   layer)
-            )
-        # last layer
+        # decide which actiovation function to use
+        self.activation_funcs = []
+        for layer, hidden_size in enumerate(self.hidden_sizes):
+            if self.percent_on_k_winner[layer] < 0.5:
+                self.activation_funcs.append(
+                    KWinners(n=hidden_size,
+                             percent_on=self.percent_on_k_winner[layer],
+                             boost_strength=self.boost_strength[layer],
+                             boost_strength_factor=self.boost_strength_factor[layer],
+                             k_inference_factor=1.0,
+                             )
+                )
+            else:
+                self.activation_funcs.append(
+                    nn.ReLU()
+                )
+
+        # Construct layers.
+        layers = []
+        kwargs = dict(
+            bias=self.bias,
+            batch_norm=self.batch_norm,
+            dropout=self.dropout,
+        )
+        # Flatten image.
+        layers = [nn.Flatten()]
+        # Add the first layer
         layers.append(
-            nn.Linear(self.hidden_sizes[-1], self.num_classes, bias=self.bias)
+            DSLinearBlock(
+                self.input_size,
+                self.hidden_sizes[0],
+                activation_func=self.activation_funcs[0],
+                **kwargs),
+        )
+        # Add hidden layers.
+        for i in range(1, len(self.hidden_sizes)):
+            layers.append(
+                DSLinearBlock(
+                    self.hidden_sizes[i - 1],
+                    self.hidden_sizes[i],
+                    activation_func=self.activation_funcs[i],
+                    **kwargs),
+            )
+        # Add last layer.
+        layers.append(
+            DSLinearBlock(self.hidden_sizes[-1], self.num_classes, bias=self.bias),
         )
 
-        # create the layers
+        # Create the classifier.
+        self.dynamic_sparse_modules = layers[1:]
         self.classifier = nn.Sequential(*layers)
-        self.coactivations = []
 
-    def _linear_block(self, a, b, layer):
-        """
-        Clarifications on batch norm position at the linear block:
-        - bn before relu at original paper
-        - bn after relu in recent work
-        (see fchollet @ https://github.com/keras-team/keras/issues/1802)
-        - however, if applied after RELU or kWinners, breaks sparsity
-        """
-        block = [nn.Linear(a, b, bias=self.bias)]
-        if self.batch_norm:
-            block.append(nn.BatchNorm1d(b))
-        if self.percent_on_k_winner[layer] < 0.5:
-            block.append(
-                KWinners(n=b, percent_on=self.percent_on_k_winner[layer],
-                         boost_strength=self.boost_strength[layer],
-                         boost_strength_factor=self.boost_strength_factor[layer],
-                         k_inference_factor=1.0,
-                         ))
+        # Initialize attr to decide whether to update coactivations during learning.
+        self._track_coactivations = False  # Off by default.
+
+    @property
+    def coactivations(self):
+        if self._track_coactivations:
+            return [m.coactivations.t() for m in self.dynamic_sparse_modules]
         else:
-            block.append(nn.ReLU())
-        if self.dropout:
-            block.append(nn.Dropout(p=self.dropout))
-        return block
+            return []
 
     def forward(self, x):
-        # need to flatten input before forward pass
-        return self.classifier(x.view(-1, self.input_size))
+        return self.classifier(x)
 
     def init_hebbian(self):
-        self.forward = self.forward_with_coactivations
-
-    def _has_activation(self, idx, layer):
-        return (
-            idx == len(self.classifier) - 1
-            or isinstance(layer, nn.ReLU)
-            or isinstance(layer, KWinners)
-        )
-
-    def forward_with_coactivations(self, x):
-        """A faster and approximate way to track correlations"""
-        x = x.view(-1, self.input_size)  # resiaze if needed, eg mnist
-        prev_act = (x > 0).detach().float()
-        idx_activation = 0
-        for idx_layer, layer in enumerate(self.classifier):
-            # do the forward calculation normally
-            x = layer(x)
-            n_samples = x.shape[0]
-            if self._has_activation(idx_layer, layer):
-                with torch.no_grad():
-                    curr_act = (x > 0).detach().float()
-                    # add outer product to the coactivations, per sample
-                    for s in range(n_samples):
-                        outer = torch.ger(prev_act[s], curr_act[s])
-                        if idx_activation + 1 > len(self.coactivations):
-                            self.coactivations.append(outer)
-                        else:
-                            self.coactivations[idx_activation] += outer
-                    # reassigning to the next
-                    prev_act = curr_act
-                    # move to next activation
-                    idx_activation += 1
-
-        return x
+        self._track_coactivations = True
+        for m in self.dynamic_sparse_modules:
+            m.init_hebbian()
