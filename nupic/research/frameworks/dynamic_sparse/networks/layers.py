@@ -823,7 +823,7 @@ class DSConv2d(torch.nn.Conv2d):
             self.last_keep_mask[:] = keep_mask
 
             # Reset coactivations...
-            self.coactivations.data[:] = torch.zeros_like(self.weight)
+            self.reset_coactivations()
             self.pruning_iterations += 1
 
             # ----- END LOG BLOCK -----
@@ -1028,11 +1028,11 @@ if __name__ == "__main__":
             prune_dims=[],
             magnitude_prune_frac=0.00,
             coactivation_test="variance",
+            update_nsteps=1,
         )
 
         input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
-        output_tensor = super(DSConv2d, conv).__call__(input_tensor)
-        conv.update_coactivations(input_tensor, output_tensor)
+        output_tensor = conv(input_tensor)
         mean_activations = (input_tensor.mean(), output_tensor.mean())
 
         B = output_tensor.shape[0]
@@ -1071,8 +1071,7 @@ if __name__ == "__main__":
         conv.progress_connections()
 
         input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
-        output_tensor = super(DSConv2d, conv).__call__(input_tensor)
-        conv.update_coactivations(input_tensor, output_tensor)
+        output_tensor = conv(input_tensor)
         alpha = conv.get_activity_threshold(input_tensor, output_tensor)
         mean_activations = (input_tensor.mean(), output_tensor.mean())
 
