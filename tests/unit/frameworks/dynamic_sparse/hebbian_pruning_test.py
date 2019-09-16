@@ -95,7 +95,6 @@ class WeightedMagPruningTest(unittest.TestCase):
                 input_size=3,
                 num_classes=2,
                 hidden_sizes=[4, 5],
-                use_kwinners=False,
                 hebbian_learning=True,
                 bias=False,
             )

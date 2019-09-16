@@ -28,6 +28,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
+from nupic.torch.modules import update_boost_strength
+
 
 class BaseModel:
     """Base model, with training loops and logging functions."""
@@ -50,13 +52,11 @@ class BaseModel:
             weight_prune_perc=0,
             grad_prune_perc=0,
             test_noise=False,
-            percent_on=0.3,
-            boost_strength=1.4,
-            boost_strength_factor=0.7,
             weight_decay=1e-4,
             sparse_linear_only=False,
             epsilon=None,
             sparsify_fixed=True,
+            verbose=0,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -105,6 +105,8 @@ class BaseModel:
         if self.test_noise or test_noise_local:
             self._run_one_pass(dataset.noise_loader, train=False, noise=True)
         self._post_epoch_updates(dataset)
+        if self.verbose > 0:
+            print(self.log)
 
         return self.log
 
@@ -112,6 +114,7 @@ class BaseModel:
         # update learning rate
         if self.lr_scheduler:
             self.lr_scheduler.step()
+        self.network.classifier.apply(update_boost_strength)
 
     def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
@@ -141,6 +144,10 @@ class BaseModel:
         if train:
             self.log["train_loss"] = loss
             self.log["train_acc"] = acc
+            if self.lr_scheduler:
+                self.log["learning_rate"] = self.lr_scheduler.get_lr()[0]
+            else:
+                self.log["learning_rate"] = self.learning_rate
         else:
             if noise:
                 self.log["noise_loss"] = loss
