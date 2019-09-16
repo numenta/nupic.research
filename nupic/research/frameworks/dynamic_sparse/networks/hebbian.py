@@ -24,7 +24,7 @@ from torch import nn
 
 from nupic.torch.modules import KWinners
 
-from .layers import DynamicSparseBase
+from .layers import DynamicSparseBase, init_coactivation_tracking
 
 # ------------------------------------------------------------------------------------
 # DynamicSparse Linear Block 2019-09-13
@@ -192,6 +192,4 @@ class MLPHeb(nn.Module):
         return self.classifier(x)
 
     def init_hebbian(self):
-        self._track_coactivations = True
-        for m in self.dynamic_sparse_modules:
-            m.init_hebbian()
+        self.apply(init_coactivation_tracking)

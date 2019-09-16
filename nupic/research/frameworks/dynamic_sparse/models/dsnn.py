@@ -28,6 +28,7 @@ from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     DSConv2d,
     SparseConv2d,
     calc_sparsity,
+    init_coactivation_tracking,
 )
 
 from .main import BaseModel, SparseModel
@@ -62,7 +63,7 @@ class DSNNHeb(SparseModel):
         Override method in children classes
         Should only track coactivations if required by the algorithm
         """
-        self.network.init_hebbian()
+        self.network.apply(init_coactivation_tracking)
 
     def _post_epoch_updates(self, dataset=None):
         super()._post_epoch_updates(dataset)
@@ -84,11 +85,10 @@ class DSNNHeb(SparseModel):
             # keep track of added synapes
             survival_ratios = []
 
-            for idx, (m, corr) in enumerate(
-                zip(self.sparse_modules, self.network.coactivations)
-            ):
+            for idx, m in enumerate(self.sparse_modules):
+                coacts = m.coactivations
                 new_mask, keep_mask, new_synapses = self.prune(
-                    m.weight.clone().detach(), self.num_params[idx], corr, idx=idx
+                    m.weight.clone().detach(), self.num_params[idx], coacts, idx=idx
                 )
                 with torch.no_grad():
                     self.masks[idx] = new_mask.float()
@@ -262,7 +262,7 @@ class DSNNWeightedMag(DSNNHeb):
 
     def _init_coactivation_tracking(self):
         if self.weight_prune_perc is not None:
-            self.network.init_hebbian()
+            self.network.apply(init_coactivation_tracking)
 
     def prune(self, weight, num_params, corr, idx=0):
         """
@@ -313,7 +313,7 @@ class DSNNMixedHeb(DSNNHeb):
 
     def _init_coactivation_tracking(self):
         if self.hebbian_prune_perc is not None:
-            self.network.init_hebbian()
+            self.network.apply(init_coactivation_tracking)
 
     def prune(self, weight, num_params, corr, idx=0):
         """Allows pruning by magnitude and hebbian"""
