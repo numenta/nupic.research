@@ -45,8 +45,6 @@ class BaseModel:
             lr_step_size=1,
             debug_sparse=False,
             debug_weights=False,
-            start_sparse=None,
-            end_sparse=None,
             pruning_interval=1,
             log_images=False,
             flip=False,
@@ -239,7 +237,7 @@ class SparseModel(BaseModel):
 
             # define sparse modules
             self.sparse_modules = []
-            for m in list(self.network.modules())[self.start_sparse : self.end_sparse]:
+            for m in list(self.network.modules()):
                 if isinstance(m, DynamicSparseBase):
                     # TODO: Could be more fitting to name this 'dynamic_sparse_modules'
                     self.sparse_modules.append(m)
