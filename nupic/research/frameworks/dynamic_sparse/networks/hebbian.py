@@ -23,12 +23,13 @@ import torch
 from torch import nn
 
 from nupic.torch.modules import KWinners
-from .layers import DynamicSparseBase
 
+from .layers import DynamicSparseBase
 
 # ------------------------------------------------------------------------------------
 # DynamicSparse Linear Block 2019-09-13
 # ------------------------------------------------------------------------------------
+
 
 class DSLinearBlock(nn.Sequential, DynamicSparseBase):
 

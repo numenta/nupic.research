@@ -27,7 +27,7 @@ from torch import nn
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-from .layers import DSConv2d, RandDSConv2d, SparseConv2d, DynamicSparseBase
+from .layers import DSConv2d, DynamicSparseBase, RandDSConv2d, SparseConv2d
 from .main import VGG19
 
 # redefine Flatten
@@ -163,7 +163,7 @@ def squash_layers(sequential, *types):
                 squashed.forward_hook_handle = forward_hook_handle
 
             # Append squashed sequence
-            name = 'squashed' + str(i0)
+            name = "squashed" + str(i0)
             new_seq.append((name, squashed))
 
             # Iterate i0.
@@ -467,14 +467,14 @@ def vgg19_dscnn(config):
 
 def mnist_sparse_cnn(config):
 
-    net_params = config.get('net_params', {})
+    net_params = config.get("net_params", {})
     net = MNISTSparseCNN(**net_params)
     return net
 
 
 def mnist_sparse_dscnn(config, squash=True):
 
-    net_params = config.get('net_params', {})
+    net_params = config.get("net_params", {})
     net = MNISTSparseCNN(**net_params)
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
@@ -487,14 +487,14 @@ def mnist_sparse_dscnn(config, squash=True):
 
 def gsc_sparse_cnn(config):
 
-    net_params = config.get('net_params', {})
+    net_params = config.get("net_params", {})
     net = GSCSparseCNN(net_params)
     return net
 
 
 def gsc_sparse_dscnn(config):
 
-    net_params = config.get('net_params', {})
+    net_params = config.get("net_params", {})
     net = GSCSparseCNN(**net_params)
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
@@ -601,7 +601,7 @@ class GSCSparseFullCNN(nn.Sequential):
 
 def gsc_sparse_dscnn_fullyconv(config):
 
-    net_params = config.get('net_params', {})
+    net_params = config.get("net_params", {})
     net = GSCSparseFullCNN(**net_params)
     net = make_dscnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
