@@ -60,18 +60,12 @@ class DSLinearBlock(nn.Sequential, DynamicSparseBase):
         # Initialize dynamic sparse attributes.
         self._init_coactivations(weight=self[0].weight)
 
-        # Initialize attr to decide whether to update coactivations during learning.
-        self._track_coactivations = False  # Off by default.
-
     @property
     def weight(self):
         """
         Return weight of linear layer - needed for introspective networks.
         """
         return self[0].weight
-
-    def init_hebbian(self):
-        self._track_coactivations = True
 
     def forward(self, input_tensor):
         output_tensor = super().forward(input_tensor)
@@ -192,4 +186,5 @@ class MLPHeb(nn.Module):
         return self.classifier(x)
 
     def init_hebbian(self):
+        self._track_coactivations = True
         self.apply(init_coactivation_tracking)
