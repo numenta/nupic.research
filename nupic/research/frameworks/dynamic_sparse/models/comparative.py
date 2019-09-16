@@ -21,6 +21,8 @@
 
 import torch
 
+from nupic.research.frameworks.dynamic_sparse.networks import DynamicSparseBase
+
 from .main import SparseModel
 
 
@@ -146,8 +148,8 @@ class DynamicRep(SparseModel):
         No need to keep track of full parameters, just the available ones
         """
         self.available_params = 0
-        for m in list(self.network.modules())[self.start_sparse : self.end_sparse]:
-            if self.has_params(m):
+        for m in list(self.network.modules()):
+            if isinstance(m, DynamicSparseBase):
                 self.available_params += torch.sum(m.weight != 0).item()
 
     def _initialize_prune_threshold(self):
@@ -156,8 +158,8 @@ class DynamicRep(SparseModel):
         total_params_count = 0
         # initialize h and total_params
         with torch.no_grad():
-            for m in list(self.network.modules())[self.start_sparse : self.end_sparse]:
-                if self.has_params(m):
+            for m in list(self.network.modules()):
+                if isinstance(m, DynamicSparseBase):
                     # count how many weights are not equal to 0
                     count_p = torch.sum(m.weight != 0).item()
                     # get topk for that level, and weight by num of values
