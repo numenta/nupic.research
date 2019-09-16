@@ -153,15 +153,15 @@ class CoactivationsTest(unittest.TestCase):
                 bias=False,
             )
         )
-        self.assertIsInstance(network.classifier[1], KWinners)
-        self.assertIsInstance(network.classifier[3], nn.ReLU)
-        self.assertIsInstance(network.classifier[5], KWinners)
-        self.assertEqual(network.classifier[1].percent_on, 0.2)
-        self.assertEqual(network.classifier[5].percent_on, 0.1)
-        self.assertEqual(network.classifier[1].boost_strength, 1.4)
-        self.assertEqual(network.classifier[5].boost_strength, 1.6)
-        self.assertEqual(network.classifier[1].boost_strength_factor, 0.7)
-        self.assertEqual(network.classifier[5].boost_strength_factor, 0.9)
+        self.assertIsInstance(network.classifier[1][1], KWinners)
+        self.assertIsInstance(network.classifier[2][1], nn.ReLU)
+        self.assertIsInstance(network.classifier[3][1], KWinners)
+        self.assertEqual(network.classifier[1][1].percent_on, 0.2)
+        self.assertEqual(network.classifier[3][1].percent_on, 0.1)
+        self.assertEqual(network.classifier[1][1].boost_strength, 1.4)
+        self.assertEqual(network.classifier[3][1].boost_strength, 1.6)
+        self.assertEqual(network.classifier[1][1].boost_strength_factor, 0.7)
+        self.assertEqual(network.classifier[3][1].boost_strength_factor, 0.9)
 
     def test_coactivation_during_forward_pass_k_winner(self):
         """Test just the k-winner portion of the coactivation logic."""
