@@ -36,29 +36,27 @@ class MLPHeb(nn.Module):
             input_size=784,
             num_classes=10,
             hidden_sizes=[100, 100, 100],
+            percent_on_k_winner=[1.0, 1.0, 1.0],
+            boost_strength=[1.4, 1.4, 1.4],
+            boost_strength_factor=[0.7, 0.7, 0.7],
             batch_norm=False,
             dropout=False,
-            use_kwinners=False,
-            hebbian_learning=False,
             bias=True,
         )
+        assert config is None or "use_kwinners" not in config, \
+            "use_kwinners is deprecated"
+
         defaults.update(config or {})
         self.__dict__.update(defaults)
         self.device = torch.device(self.device)
 
-        # decide which actiovation function to use
-        if self.use_kwinners:
-            self.activation_func = self._kwinners
-        else:
-            self.activation_func = lambda _: nn.ReLU()
-
-        layers = []
-        # add the first layer
-        layers.extend(self._linear_block(self.input_size, self.hidden_sizes[0]))
-        # all hidden layers
-        for i in range(1, len(self.hidden_sizes)):
+        # add the first layer and then the rest
+        layers = self._linear_block(self.input_size, self.hidden_sizes[0], 0)
+        for layer in range(1, len(self.hidden_sizes)):
             layers.extend(
-                self._linear_block(self.hidden_sizes[i - 1], self.hidden_sizes[i])
+                self._linear_block(self.hidden_sizes[layer - 1],
+                                   self.hidden_sizes[layer],
+                                   layer)
             )
         # last layer
         layers.append(
@@ -67,8 +65,9 @@ class MLPHeb(nn.Module):
 
         # create the layers
         self.classifier = nn.Sequential(*layers)
+        self.coactivations = []
 
-    def _linear_block(self, a, b):
+    def _linear_block(self, a, b, layer):
         """
         Clarifications on batch norm position at the linear block:
         - bn before relu at original paper
@@ -79,22 +78,24 @@ class MLPHeb(nn.Module):
         block = [nn.Linear(a, b, bias=self.bias)]
         if self.batch_norm:
             block.append(nn.BatchNorm1d(b))
-        block.append(self.activation_func(b))
+        if self.percent_on_k_winner[layer] < 0.5:
+            block.append(
+                KWinners(n=b, percent_on=self.percent_on_k_winner[layer],
+                         boost_strength=self.boost_strength[layer],
+                         boost_strength_factor=self.boost_strength_factor[layer],
+                         k_inference_factor=1.0,
+                         ))
+        else:
+            block.append(nn.ReLU())
         if self.dropout:
             block.append(nn.Dropout(p=self.dropout))
         return block
-
-    def _kwinners(self, num_units):
-        return KWinners(
-            n=num_units, percent_on=0.25, boost_strength=1.4, boost_strength_factor=0.7
-        )
 
     def forward(self, x):
         # need to flatten input before forward pass
         return self.classifier(x.view(-1, self.input_size))
 
     def init_hebbian(self):
-        self.coactivations = []
         self.forward = self.forward_with_coactivations
 
     def _has_activation(self, idx, layer):

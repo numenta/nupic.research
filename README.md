@@ -32,10 +32,15 @@ Installation
 
 OK, enough caveats. Here are some installation instructions though mostly you are on your own. (Wait, was that another caveat?)
 
-Install using setup.py like any python project. Since the contents here change often, we highly recommend installing as follows:
+When using anaconda virtual environment all you need to do is run the following command and conda will install everything for you. See [environment.yml](./environment.yml):
 
+    conda env create
+
+Otherwise you need can install using setup.py like any python project. Since the contents here change often, we highly recommend installing as follows:
+    
+    pip install -r requirements.txt
+    pip install -r requirements-dev.txt
     python setup.py develop
-
 
 You can test your installation by running the test script from the repository root:
 
