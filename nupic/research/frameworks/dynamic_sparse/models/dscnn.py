@@ -27,6 +27,7 @@ from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     DSConv2d,
     SparseConv2d,
     calc_sparsity,
+    init_coactivation_tracking,
 )
 
 from .main import BaseModel
@@ -102,6 +103,10 @@ class DSCNN(BaseModel):
         "c01_c11_grad_flow_diff",
         "c01_c11_grad_flow_diff_centered",
     ]
+
+    def setup(self):
+        super().setup()
+        self.network.apply(init_coactivation_tracking)
 
     def _post_epoch_updates(self, dataset=None):
 

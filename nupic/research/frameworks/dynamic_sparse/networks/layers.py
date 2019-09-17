@@ -861,10 +861,11 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         # Update connections strengths.
         if isinstance(input_tensor, tuple):
             input_tensor = input_tensor[0]
-        if module.training and module.learning_iterations % module.update_nsteps == 0:
-            module.update_coactivations(input_tensor, output_tensor)
         if module.training:
-            module.learning_iterations += 1
+            if module.learning_iterations % module.update_nsteps == 0 \
+               and module._track_coactivations:
+                module.update_coactivations(input_tensor, output_tensor)
+                module.learning_iterations += 1
 
     def __call__(self, input_tensor, *args, **kwargs):
         output_tensor = super().__call__(input_tensor, *args, **kwargs)
