@@ -26,7 +26,7 @@ from nupic.research.frameworks.dynamic_sparse.networks import DynamicSparseBase
 from .main import SparseModel
 
 
-class SET(SparseModel):
+class SETDepreciated(SparseModel):
     """
     Implementation of SET with a more efficient approach of adding new
     weights (vectorized) The overhead in computation is 10x smaller compared to
