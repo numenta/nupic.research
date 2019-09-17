@@ -51,7 +51,7 @@ class WeightedMagPruningTest(unittest.TestCase):
                 [0.8101, 0.0922, 0.2033, 0.7185, 0.4588],
                 [0.3897, 0.6865, 0.5072, 0.9749, 0.0597],
             ]
-        )
+        ).t()
         # the transpose is what will be used
         # ([
         #     [0.3201, 0.0401, 0.4954, 0.8101, 0.3897],
@@ -221,7 +221,7 @@ class HebbianPruningTest(unittest.TestCase):
                 [0.8101, 0.0922, 0.2033, 0.7185, 0.4588],
                 [0.3897, 0.6865, 0.5072, 0.9749, 0.0597],
             ]
-        )
+        ).t()
         # the transpose is what will be used
         # ([
         #     [0.3201, 0.0401, 0.4954, 0.8101, 0.3897],
