@@ -32,7 +32,7 @@ exp_config = dict(
     num_classes=10,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
-    model="DSNN",
+    model="SparseModel",
     data_dir="~/nta/data",
     on_perc=0.2,
     batch_size_train=10,
@@ -48,7 +48,7 @@ tune_config = dict(
     checkpoint_at_end=False,
     stop={"training_iteration": 10},
     resources_per_trial={"cpu": 1, "gpu": 1},
-    verbose=1,
+    verbose=2,
 )
 
 run_ray(tune_config, exp_config)

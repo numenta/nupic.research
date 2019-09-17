@@ -86,6 +86,7 @@ class ElasticsearchLogger(Logger):
     """
 
     def _init(self):
+
         elasticsearch_args = self.config.get("elasticsearch_client", {})
         self.client = create_elastic_client(**elasticsearch_args)
 

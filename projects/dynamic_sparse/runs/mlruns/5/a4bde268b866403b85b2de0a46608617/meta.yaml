@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/lsouza/nta/nupic.research/projects/dynamic_sparse/runs/mlruns/5/a4bde268b866403b85b2de0a46608617/artifacts
+end_time: 1568675283600
+entry_point_name: ''
+experiment_id: '5'
+lifecycle_stage: active
+name: ''
+run_id: a4bde268b866403b85b2de0a46608617
+run_uuid: a4bde268b866403b85b2de0a46608617
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1568675121117
+status: 3
+tags: []
+user_id: unknown
