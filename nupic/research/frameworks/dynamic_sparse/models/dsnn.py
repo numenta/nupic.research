@@ -323,7 +323,6 @@ class DSNNMixedHeb(DSNNHeb):
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
-
             # ----------- PRUNE ----------------
 
             if self.hebbian_prune_perc is not None:
@@ -385,7 +384,6 @@ class DSNNMixedHeb(DSNNHeb):
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
-
 
             # ----------- PRUNE ----------------
 
