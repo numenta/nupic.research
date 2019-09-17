@@ -273,8 +273,7 @@ class DSNNWeightedMag(DSNNHeb):
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
-            # transpose correlation to the weight matrix
-            corr = corr.t()
+
             # multiply correlation by weight, and then apply regular weight pruning
             weight *= corr
 
@@ -323,8 +322,7 @@ class DSNNMixedHeb(DSNNHeb):
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
-            # transpose correlation to the weight matrix
-            corr = corr.t()
+
 
             # ----------- PRUNE ----------------
 
@@ -387,8 +385,7 @@ class DSNNMixedHeb(DSNNHeb):
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
-            # transpose correlation to the weight matrix
-            corr = corr.t()
+
 
             # ----------- PRUNE ----------------
 
