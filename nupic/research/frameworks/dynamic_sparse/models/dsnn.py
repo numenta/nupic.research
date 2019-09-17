@@ -69,7 +69,8 @@ class DSNNHeb(SparseModel):
         super()._post_epoch_updates(dataset)
         # zero out correlations (move to network)
         self._reinitialize_weights()
-        self.network.coactivations = []
+        for m in self.sparse_modules:
+            m.reset_coactivations()
         # decide whether to stop pruning
         if self.pruning_early_stop:
             if self.current_epoch in self.lr_milestones:
