@@ -28,6 +28,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
+from nupic.research.frameworks.dynamic_sparse.networks import DynamicSparseBase
 from nupic.torch.modules import update_boost_strength
 
 
@@ -44,8 +45,6 @@ class BaseModel:
             lr_step_size=1,
             debug_sparse=False,
             debug_weights=False,
-            start_sparse=None,
-            end_sparse=None,
             pruning_interval=1,
             log_images=False,
             flip=False,
@@ -114,7 +113,7 @@ class BaseModel:
         # update learning rate
         if self.lr_scheduler:
             self.lr_scheduler.step()
-        self.network.classifier.apply(update_boost_strength)
+        self.network.apply(update_boost_strength)
 
     def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
@@ -238,8 +237,9 @@ class SparseModel(BaseModel):
 
             # define sparse modules
             self.sparse_modules = []
-            for m in list(self.network.modules())[self.start_sparse : self.end_sparse]:
-                if self.has_params(m):
+            for m in list(self.network.modules()):
+                if isinstance(m, DynamicSparseBase):
+                    # TODO: Could be more fitting to name this 'dynamic_sparse_modules'
                     self.sparse_modules.append(m)
 
             for m in self.sparse_modules:

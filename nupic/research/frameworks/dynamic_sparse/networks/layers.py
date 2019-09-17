@@ -113,6 +113,36 @@ def break_mask_ties(mask, num_remain=None, frac_remain=None):
 
 
 # ------------------
+# Base
+# ------------------
+
+def init_coactivation_tracking(m):
+    """
+    Function used to start tracking coactivations.
+    Call using :meth:`torch.nn.Module.apply` before training starts.
+    For example: ``m.apply(init_coactivation_tracking)``
+
+    :param m: torch.nn.Module
+    """
+    if isinstance(m, DynamicSparseBase):
+        m.init_coactivation_tracking()
+
+
+class DynamicSparseBase(torch.nn.Module):
+
+    def _init_coactivations(self, weight):
+        # Init buffer to keep track of coactivations.
+        self._track_coactivations = False
+        self.register_buffer("coactivations", torch.zeros_like(self.weight))
+
+    def init_coactivation_tracking(self):
+        self._track_coactivations = True
+
+    def reset_coactivations(self):
+        # Reset coactivations to zero.
+        self.coactivations[:] = 0
+
+# ------------------
 # Conv Layers
 # ------------------
 
@@ -186,7 +216,7 @@ class _NullConv(torch.nn.Conv2d):
         return mask
 
 
-class DSConv2d(torch.nn.Conv2d):
+class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
     def __init__(
         self,
@@ -224,6 +254,8 @@ class DSConv2d(torch.nn.Conv2d):
             in_channels, out_channels, kernel_size, stride, padding,
             dilation, groups, bias, padding_mode,
         )
+
+        self._init_coactivations(self.weight)
 
         if prune_dims is None:
             self.prune_dims = [0, 1]
@@ -267,8 +299,8 @@ class DSConv2d(torch.nn.Conv2d):
         self.prune_grads_hook = self.weight.register_hook(
             lambda grad: grad * self.last_keep_mask.type(grad.dtype).to(grad.device))
 
-        # Set tensors to keep track of coactivations.
-        self.register_buffer("coactivations", torch.zeros_like(self.weight))
+        # Register hook to update coactivations.
+        self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
 
         # Specify number of groups for the helper convolutional layer.
         # This is equal to the number of connections in the last three dimensions:
@@ -490,7 +522,6 @@ class DSConv2d(torch.nn.Conv2d):
             2. (unit_in  - mean_input ) > input_activity_threshold
             3. (unit_out - mean_output) > output_activity_threshold
         """
-
         with torch.no_grad():
 
             grouped_input = input_tensor.repeat((1, self.new_groups, 1, 1))
@@ -574,48 +605,6 @@ class DSConv2d(torch.nn.Conv2d):
 
             del h
 
-            # grouped_input = input_tensor.repeat((1, self.new_groups, 1, 1))
-            # grouped_input = self.grouped_conv(grouped_input).repeat(
-            #     (1, self.out_channels, 1, 1))
-
-            # mu_in = input_tensor.mean()
-            # mu_out = output_tensor.mean()
-
-            # self.input_means = np.append(self.input_means, mu_in.to("cpu").item())
-            # self.output_means = np.append(self.output_means, mu_out.to("cpu").item())
-
-            # del mu_in
-            # del mu_out
-
-            # s1 = grouped_input
-            # s2 = output_tensor[:, self.perm_indices, ...]
-
-            # mu_in = s1.mean(dim=0)
-            # mu_out = s2.mean(dim=0)
-
-            # std_in = s1.std(dim=0)
-            # std_out = s2.std(dim=0)
-
-            # corr = ((s1 - mu_in) * (s2 - mu_out)).mean(dim=0) / (std_in * std_out)
-            # corr[torch.where((std_in == 0) | (std_out == 0))] = 0
-            # corr = corr.abs()
-
-            # # Save space on device
-            # del s1
-            # del s2
-            # del grouped_input
-            # del mu_in
-            # del mu_out
-            # del std_in
-            # del std_out
-
-            # h = torch.sum(corr, (1, 2))
-            # h = h.type(self.coactivations.dtype)
-
-            # self.coactivations[self.connection_indxs] += h
-
-            # del h
-
     def progress_connections(self):
         """
         Prunes and add connections.
@@ -630,8 +619,8 @@ class DSConv2d(torch.nn.Conv2d):
         with torch.no_grad():
 
             # Get strengths of all connections.
-            strengths_hebbian = self.coactivations
             strengths_weight = self.weight.data.clone().detach().abs()
+            strengths_hebbian = self.coactivations * strengths_weight
 
             # Determine all combinations of prune dimensions
             all_dims = range(len(self.weight.shape))
@@ -847,32 +836,6 @@ class DSConv2d(torch.nn.Conv2d):
                 self.c00_frac = calc_onfrac(self.last_c00_mask)
                 self.c00_frac_rel = calc_onfrac(self.last_c00_mask[~last_keep_mask])
 
-                # if self.survival_rate is not None:
-
-                #     print('Pruned: |{}|'.format(prune_num))
-                #     print(' ' * 3, 'New -')
-                #     print(' ' * 6, self.c010_frac_rel,
-                #           int(c010_mask[~self.last_c01_mask].sum()),
-                #           ' / ',
-                #           int(self.last_c01_mask.sum()))
-                #     print(' ' * 3, 'All -')
-                #     print(' ' * 6, self.c10_frac_rel,
-                #           int(self.last_c10_mask[last_keep_mask].sum()),
-                #           ' / ',
-                #           int(last_keep_mask.sum()))
-                #     print('Surviving: |{} - {} = {}|'.format(
-                #         on_mask.sum(), prune_num, on_mask.sum() - prune_num))
-                #     print(' ' * 3, 'New -')
-                #     print(' ' * 6, self.c011_frac_rel,
-                #           int(c011_mask[self.last_c01_mask].sum()),
-                #           ' / ',
-                #           int(self.last_c01_mask.sum()))
-                #     print(' ' * 3, 'All -')
-                #     print(' ' * 6, self.c11_frac_rel,
-                #           int(self.last_c11_mask[last_keep_mask].sum()),
-                #           ' / ',
-                #           int(last_keep_mask.sum()))
-
                 # Reset grad stats...
                 self.running_c00_grad_flow = None
                 self.running_c01_grad_flow = None
@@ -888,19 +851,25 @@ class DSConv2d(torch.nn.Conv2d):
             self.last_keep_mask[:] = keep_mask
 
             # Reset coactivations...
-            self.coactivations.data[:] = torch.zeros_like(self.weight)
+            self.reset_coactivations()
             self.pruning_iterations += 1
+            self.learning_iterations = 0
 
             # ----- END LOG BLOCK -----
 
+    @staticmethod
+    def forward_hook(module, input_tensor, output_tensor):
+        # Update connections strengths.
+        if isinstance(input_tensor, tuple):
+            input_tensor = input_tensor[0]
+        if module.training:
+            if module.learning_iterations % module.update_nsteps == 0 \
+               and module._track_coactivations:
+                module.update_coactivations(input_tensor, output_tensor)
+            module.learning_iterations += 1
+
     def __call__(self, input_tensor, *args, **kwargs):
         output_tensor = super().__call__(input_tensor, *args, **kwargs)
-
-        # Update connections strengths.
-        if self.training and self.learning_iterations % self.update_nsteps == 0:
-            self.update_coactivations(input_tensor, output_tensor)
-        if self.training:
-            self.learning_iterations += 1
         return output_tensor
 
 
@@ -913,25 +882,6 @@ class RandDSConv2d(DSConv2d):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.coactivations.data[:] = torch.ones_like(self.weight)
-
-    # def progress_connections(self, *args, **kwargs):
-
-    #     if self.prune_grads_hook is not None:
-    #         self.prune_grads_hook.remove()
-
-    #     with torch.no_grad():
-
-    #         keep_mask = torch.rand(self.weight.shape) < self.nonzero_frac
-    #         self.weight[~keep_mask] = 0
-    #         self.prune_grads_hook = self.weight.register_hook(
-    #             lambda grad: grad * keep_mask.type(grad.dtype).to(grad.device))
-    #         self.pruning_iterations += 1
-
-    #         if self.last_keep_mask is not None:
-    #             kept = (self.last_keep_mask == keep_mask)
-    #             kept = kept[keep_mask == 1]
-    #             self.kept_frac = 1 - calc_sparsity(kept)
-    #         self.last_keep_mask = keep_mask
 
     def update_coactivations(self, input_tensor, output_tensor):
 
@@ -958,36 +908,6 @@ class SparseConv2d(DSConv2d):
 
     def update_coactivations(self, *args, **kwargs):
         pass
-
-# class SparseConv2d(SparseWeights2d):
-#     """
-#     Conv layer with static sparsity.
-#     """
-
-#     def __init__(self, sparsity, *args, **kwargs):
-
-#         conv = torch.nn.Conv2d(*args, **kwargs)
-#         super(SparseConv2d, self).__init__(conv, 1 - sparsity)
-#         self.weight = self.module.weight
-
-#         # Zero out random weights.
-#         with torch.no_grad():
-#             zero_idx = (self.zero_weights[0], self.zero_weights[1])
-#             self.weight.view(self.module.out_channels, -1)[zero_idx] = 0.0
-
-#         # Block gradient flow to pruned connections.
-#         self.prune_grads_hook = self.weight.register_hook(self.zero_gradients)
-
-#     def zero_gradients(self, grad):
-#         zero_idx = (self.zero_weights[0], self.zero_weights[1])
-#         grad.view(self.module.out_channels, -1)[zero_idx] = 0.0
-#         return grad
-
-#     def forward(self, x):
-#         return self.module.forward(x)
-
-#     def rezero_weights(self):
-#         pass
 
 
 if __name__ == "__main__":
@@ -1138,11 +1058,11 @@ if __name__ == "__main__":
             prune_dims=[],
             magnitude_prune_frac=0.00,
             coactivation_test="variance",
+            update_nsteps=1,
         )
 
         input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
-        output_tensor = super(DSConv2d, conv).__call__(input_tensor)
-        conv.update_coactivations(input_tensor, output_tensor)
+        output_tensor = conv(input_tensor)
         mean_activations = (input_tensor.mean(), output_tensor.mean())
 
         B = output_tensor.shape[0]
@@ -1181,8 +1101,7 @@ if __name__ == "__main__":
         conv.progress_connections()
 
         input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
-        output_tensor = super(DSConv2d, conv).__call__(input_tensor)
-        conv.update_coactivations(input_tensor, output_tensor)
+        output_tensor = conv(input_tensor)
         alpha = conv.get_activity_threshold(input_tensor, output_tensor)
         mean_activations = (input_tensor.mean(), output_tensor.mean())
 

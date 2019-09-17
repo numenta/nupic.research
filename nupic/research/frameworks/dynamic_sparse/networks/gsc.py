@@ -19,13 +19,15 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from collections import OrderedDict
+
 import torch
 from torch import nn
 
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-from .layers import DSConv2d, RandDSConv2d, SparseConv2d
+from .layers import DSConv2d, DynamicSparseBase, RandDSConv2d, SparseConv2d
 from .main import VGG19
 
 # redefine Flatten
@@ -40,6 +42,177 @@ from .main import VGG19
 # def Flatten():
 #     return Lambda(lambda x: x.view((x.size(0), -1)))
 
+
+# ----------------------------------------
+# Utils - network builders and inspectors
+# ----------------------------------------
+
+def get_dynamic_sparse_modules(net):
+    """
+    Inspects all children recursively to collect the
+    Dynamic-Sparse modules.
+    """
+    sparse_modules = []
+    for module in net.modules():
+
+        if isinstance(module, DynamicSparseBase):
+            sparse_modules.append(module)
+
+    return sparse_modules
+
+
+def swap_layers(sequential, layer_type_a, layer_type_b):
+    """
+    If 'layer_type_a' appears immediately before 'layer_type_2',
+    this function will swap their position in a new sequential.
+
+    :param sequential: torch.nn.Sequential
+    :param layer_type_a: type of first layer
+    :param layer_type_a: type of second layer
+    """
+
+    old_seq = dict(sequential.named_children())
+    names = list(old_seq.keys())
+    modules = list(old_seq.values())
+
+    # Make copy of sequence.
+    new_seq = list(old_seq.items())
+
+    # Edit copy in place.
+    layer_a = modules[0]
+    name_a = names[0]
+    for i, (name_b, layer_b) in enumerate(list(old_seq.items())[1:], 1):
+
+        if isinstance(layer_a, layer_type_a) and isinstance(layer_b, layer_type_b):
+            new_seq[i - 1] = (name_b, layer_b)
+            new_seq[i] = (name_a, layer_a)
+
+        layer_a = layer_b
+        name_a = name_b
+
+    # Turn sequence into nn.Sequential.
+    new_seq = OrderedDict(new_seq)
+    new_seq = torch.nn.Sequential(new_seq)
+    return new_seq
+
+
+def squash_layers(sequential, *types):
+    """
+    This function squashes layers matching the sequence of 'types'.
+    For instance, if 'types' is [Conv2d, BatchNorm, KWinners] and
+    "sequential" has layers [..., Conv2d, BatchNorm, KWinners, ...],
+    then a new "sequential" will be returns of the form
+    [..., SubSequence, ...] where SubSequence calls .
+
+    More importantly, SubSequence will use the same hook (if any)
+    as the original Conv2d, although with the output from KWinners
+    - at least in this example case.
+
+    :param sequential: torch.nn.Sequential
+    :param types: types of layers
+
+    :returns: a new torch.nn.Sequential
+    """
+    assert len(types) <= len(sequential), "More types than layers passed."
+    assert len(types) > 1, "Expected more than one type to squash."
+
+    named_children = dict(sequential.named_children())
+    names = list(named_children.keys())
+    modules = list(named_children.values())
+
+    i0 = 0
+    new_seq = []
+
+    while i0 < len(modules):
+
+        i1 = i0 + len(types)
+        if i1 > len(modules) + 1:
+            break
+
+        sublayers = modules[i0:i1]
+        subnames = names[i0:i1]
+        matches = [isinstance(layer, ltype) for layer, ltype in zip(sublayers, types)]
+        if all(matches):
+
+            # Save forward hook of base layer.
+            base_layer = modules[i0]
+            if hasattr(base_layer, "forward_hook"):
+                forward_hook = base_layer.forward_hook
+                if hasattr(base_layer, "forward_hook_handle"):
+                    base_layer.forward_hook_handle.remove()
+            else:
+                forward_hook = None
+
+            # Squash layers.
+            squashed = OrderedDict(zip(subnames, sublayers))
+            squashed = torch.nn.Sequential(squashed)
+            assert squashed[0] == base_layer
+
+            # Maintain same forward hook.
+            if forward_hook:
+                forward_hook_handle = squashed.register_forward_hook(
+                    lambda module, in_, out_:
+                    forward_hook(module[0], in_, out_)
+                )
+                squashed.forward_hook = forward_hook
+                squashed.forward_hook_handle = forward_hook_handle
+
+            # Append squashed sequence
+            name = "squashed" + str(i0)
+            new_seq.append((name, squashed))
+
+            # Iterate i0.
+            i0 = i1
+
+        else:
+
+            # Append layer as is.
+            name = names[i0]
+            module = modules[i0]
+            new_seq.append((name, module))
+
+            # Iterate i0.
+            i0 += 1
+
+    # Turn sequence into nn.Sequential.
+    new_seq = OrderedDict(new_seq)
+    new_seq = torch.nn.Sequential(new_seq)
+    return new_seq
+
+
+def set_module(net, name, new_module):
+    """
+    Mimics "setattr" in purpose and argument types.
+    Sets module "name" of "net" to "new_module".
+    This is done recursively as "name" may be
+    of the form '0.subname-1.subname-2.3 ...'
+    where 0 and 3 indicate indices of a
+    torch.nn.Sequential.
+    """
+
+    subnames = name.split(".")
+    subname0, subnames_remaining = subnames[0], subnames[1:]
+
+    if subnames_remaining:
+
+        if subname0.isdigit():
+            subnet = net[int(subname0)]
+        else:
+            subnet = getattr(net, subname0)
+
+        set_module(subnet, ".".join(subnames_remaining), new_module)
+
+    else:
+
+        if subname0.isdigit():
+            net[int(subname0)] = new_module
+        else:
+            setattr(net, subname0, new_module)
+
+
+# --------------
+# GSC Networks
+# --------------
 
 class GSCHeb(nn.Module):
     """LeNet like CNN used for GSC in how so dense paper."""
@@ -162,8 +335,11 @@ class GSCHeb(nn.Module):
 
 # make a conv heb just by replacing the conv layers by special DSNN Conv layers
 def gsc_conv_heb(config):
-    # return make_dscnn(models.vgg19_bn(config), config)
-    return make_dscnn(GSCHeb(config), config)
+
+    net = make_dscnn(GSCHeb(config), config)
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
+    return net
 
 
 def gsc_conv_only_heb(config):
@@ -174,6 +350,7 @@ def gsc_conv_only_heb(config):
         return self.classifier(self.features(x))
 
     network.forward = forward
+    network.dynamic_sparse_modules = get_dynamic_sparse_modules(network)
 
     return network
 
@@ -181,8 +358,11 @@ def gsc_conv_only_heb(config):
 # function that makes the switch
 # why function inside other functions -> make it into a class?
 
-
 def make_dscnn(net, config=None):
+    """
+    Edits net in place to replace Conv2d layers with those
+    specified in config.
+    """
 
     config = config or {}
 
@@ -206,35 +386,6 @@ def make_dscnn(net, config=None):
             return SparseConv2d
         elif prune_method == "dynamic":
             return DSConv2d
-
-    def set_module(net, name, new_module):
-        """
-        Mimics "setattr" in purpose and argument types.
-        Sets module "name" of "net" to "new_module".
-        This is done recursively as "name" may be
-        of the form '0.subname-1.subname-2.3 ...'
-        where 0 and 3 indicate indices of a
-        torch.nn.Sequential.
-        """
-
-        subnames = name.split(".")
-        subname0, subnames_remaining = subnames[0], subnames[1:]
-
-        if subnames_remaining:
-
-            if subname0.isdigit():
-                subnet = net[int(subname0)]
-            else:
-                subnet = getattr(net, subname0)
-
-            set_module(subnet, ".".join(subnames_remaining), new_module)
-
-        else:
-
-            if subname0.isdigit():
-                net[int(subname0)] = new_module
-            else:
-                setattr(net, subname0, new_module)
 
     # Get DSConv2d params from config.
     prune_methods = tolist(config.get("prune_methods", "dynamic"))
@@ -303,32 +454,49 @@ def vgg19_dscnn(config):
 
     net = VGG19(config)
     net = make_dscnn(net)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
 
 
 def mnist_sparse_cnn(config):
 
-    net = MNISTSparseCNN()
+    net_params = config.get("net_params", {})
+    net = MNISTSparseCNN(**net_params)
     return net
 
 
-def mnist_sparse_dscnn(config):
+def mnist_sparse_dscnn(config, squash=True):
 
-    net = MNISTSparseCNN()
+    net_params = config.get("net_params", {})
+    net = MNISTSparseCNN(**net_params)
     net = make_dscnn(net, config)
+    net = swap_layers(net, nn.MaxPool2d, KWinners2d)
+    net = squash_layers(net, DSConv2d, KWinners2d)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
 
 
 def gsc_sparse_cnn(config):
 
-    net = GSCSparseCNN()
+    net_params = config.get("net_params", {})
+    net = GSCSparseCNN(net_params)
     return net
 
 
 def gsc_sparse_dscnn(config):
 
-    net = GSCSparseCNN()
+    net_params = config.get("net_params", {})
+    net = GSCSparseCNN(**net_params)
     net = make_dscnn(net, config)
+    net = swap_layers(net, nn.MaxPool2d, KWinners2d)
+    net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
 
 
@@ -428,6 +596,12 @@ class GSCSparseFullCNN(nn.Sequential):
 
 def gsc_sparse_dscnn_fullyconv(config):
 
-    net = GSCSparseFullCNN()
+    net_params = config.get("net_params", {})
+    net = GSCSparseFullCNN(**net_params)
     net = make_dscnn(net, config)
+    net = swap_layers(net, nn.MaxPool2d, KWinners2d)
+    net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
