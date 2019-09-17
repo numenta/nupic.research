@@ -1,0 +1,4 @@
+artifact_location: file:///Users/lsouza/nta/nupic.research/projects/dynamic_sparse/runs/mlruns/5
+experiment_id: '5'
+lifecycle_stage: active
+name: test_mlflow5

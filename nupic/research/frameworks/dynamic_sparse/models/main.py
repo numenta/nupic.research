@@ -173,11 +173,23 @@ class BaseModel:
                 self.log[ltype + "_" + str(idx) + "_mean"] = torch.mean(m.weight).item()
                 self.log[ltype + "_" + str(idx) + "_std"] = torch.std(m.weight).item()
 
-    def save(self):
+    def save(self, checkpoint_dir):
         pass
 
-    def restore(self):
+    def restore(self, checkpoint_dir):
         pass
+    
+    # def _save(self, checkpoint_dir):
+    #     return self.model_save(checkpoint_dir)
+
+    # def _restore(self, checkpoint):
+    #     """Subclasses should override this to implement restore().
+
+    #     Args:
+    #         checkpoint (str | dict): Value as returned by `_save`.
+    #             If a string, then it is the checkpoint path.
+    #     """
+    #     self.model_restore(checkpoint)
 
     def train(self, dataset, num_epochs, test_noise=False):
         """
@@ -234,19 +246,17 @@ class SparseModel(BaseModel):
             for m in list(self.network.modules())[self.start_sparse : self.end_sparse]:
                 if self.has_params(m):
                     self.sparse_modules.append(m)
-
-            for m in self.sparse_modules:
-                shape = m.weight.shape
-                # two approaches of defining epsilon
-                if self.epsilon:
-                    on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-                if self.sparsify_fixed:
-                    mask = self._sparsify_fixed(shape, on_perc)
-                else:
-                    mask = self._sparsify_stochastic(shape, on_perc)
-                m.weight.data *= mask
-                self.masks.append(mask)
-                self.num_params.append(torch.sum(mask).item())
+                    shape = m.weight.shape
+                    # two approaches of defining epsilon
+                    if self.epsilon:
+                        on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
+                    if self.sparsify_fixed:
+                        mask = self._sparsify_fixed(shape, on_perc)
+                    else:
+                        mask = self._sparsify_stochastic(shape, on_perc)
+                    m.weight.data *= mask
+                    self.masks.append(mask)
+                    self.num_params.append(torch.sum(mask).item())
 
     def _sparsify_stochastic(self, shape, on_perc):
         """Sthocastic in num of params approach of sparsifying a tensor"""

@@ -21,11 +21,61 @@
 
 import torch
 from torch import nn
+from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-from nupic.torch.modules import KWinners
+class HebbianNetwork(nn.Module):
+    """Parent class with shared methods. Not to be instantiated"""
 
+    def __init__(self, config=None):
+        super().__init__()
 
-class MLPHeb(nn.Module):
+    def init_hebbian(self):
+        self.coactivations = []
+        self.forward = self.forward_with_coactivations        
+
+    def _has_activation(self, idx, layer):
+        return (
+            idx == len(self.classifier) - 1
+            or isinstance(layer, nn.ReLU)
+            or isinstance(layer, KWinners)
+        )
+
+    def forward(self, x):
+        if 'features' in self._modules:
+            x = self.features(x)
+        x = self.classifier(x)
+        return x
+
+    def forward_with_coactivations(self, x):
+        """A faster and approximate way to track correlations"""
+    
+        if 'features' in self._modules:
+            x = self.features(x)
+
+        prev_act = (x > 0).detach().float()
+        idx_activation = 0
+        for idx_layer, layer in enumerate(self.classifier):
+            # do the forward calculation normally
+            x = layer(x)
+            n_samples = x.shape[0]
+            if self._has_activation(idx_layer, layer):
+                with torch.no_grad():
+                    curr_act = (x > 0).detach().float()
+                    # add outer product to the coactivations, per sample
+                    for s in range(n_samples):
+                        outer = torch.ger(prev_act[s], curr_act[s])
+                        if idx_activation + 1 > len(self.coactivations):
+                            self.coactivations.append(outer)
+                        else:
+                            self.coactivations[idx_activation] += outer
+                    # reassigning to the next
+                    prev_act = curr_act
+                    # move to next activation
+                    idx_activation += 1
+
+        return x
+
+class MLPHeb(HebbianNetwork):
     """Simple 3 hidden layers + output MLP"""
 
     def __init__(self, config=None):
@@ -52,7 +102,7 @@ class MLPHeb(nn.Module):
         else:
             self.activation_func = lambda _: nn.ReLU()
 
-        layers = []
+        layers = [Flatten()]
         # add the first layer
         layers.extend(self._linear_block(self.input_size, self.hidden_sizes[0]))
         # all hidden layers
@@ -87,45 +137,80 @@ class MLPHeb(nn.Module):
     def _kwinners(self, num_units):
         return KWinners(
             n=num_units, percent_on=0.25, boost_strength=1.4, boost_strength_factor=0.7
+        )        
+
+class GSCHeb(HebbianNetwork):
+    """Simple 3 hidden layers + output MLP"""
+
+    def __init__(self, config=None):
+        super().__init__()
+
+        defaults = dict(
+            device='cpu',
+            input_size=1024,
+            num_classes=12,
+            boost_strength=1.5,
+            boost_strength_factor=0.9,
+            k_inference_factor=1.5,
+            duty_cycle_period=1000,
+            use_kwinners=True,
+            hidden_neurons_fc=1000,
         )
+        defaults.update(config or {})
+        self.__dict__.update(defaults)
+        self.device = torch.device(self.device)
 
-    def forward(self, x):
-        # need to flatten input before forward pass
-        return self.classifier(x.view(-1, self.input_size))
+        # hidden layers
+        conv_layers = [
+            *self._conv_block(1, 64, percent_on=0.095),  # 28x28 -> 14x14
+            *self._conv_block(64, 64, percent_on=0.125),  # 10x10 -> 5x5
+            Flatten(),
+        ]
 
-    def init_hebbian(self):
-        self.coactivations = []
-        self.forward = self.forward_with_coactivations
+        linear_layers = [
+            # *self._linear_block(1600, 1500, percent_on= 0.067),
+            *self._linear_block(1600, self.hidden_neurons_fc, percent_on=0.1),
+            nn.Linear(self.hidden_neurons_fc, self.num_classes),
+        ]
 
-    def _has_activation(self, idx, layer):
-        return (
-            idx == len(self.classifier) - 1
-            or isinstance(layer, nn.ReLU)
-            or isinstance(layer, KWinners)
-        )
+        self.features = nn.Sequential(*conv_layers)
+        self.classifier = nn.Sequential(*linear_layers)
 
-    def forward_with_coactivations(self, x):
-        """A faster and approximate way to track correlations"""
-        x = x.view(-1, self.input_size)  # resiaze if needed, eg mnist
-        prev_act = (x > 0).detach().float()
-        idx_activation = 0
-        for idx_layer, layer in enumerate(self.classifier):
-            # do the forward calculation normally
-            x = layer(x)
-            n_samples = x.shape[0]
-            if self._has_activation(idx_layer, layer):
-                with torch.no_grad():
-                    curr_act = (x > 0).detach().float()
-                    # add outer product to the coactivations, per sample
-                    for s in range(n_samples):
-                        outer = torch.ger(prev_act[s], curr_act[s])
-                        if idx_activation + 1 > len(self.coactivations):
-                            self.coactivations.append(outer)
-                        else:
-                            self.coactivations[idx_activation] += outer
-                    # reassigning to the next
-                    prev_act = curr_act
-                    # move to next activation
-                    idx_activation += 1
+    def _conv_block(self, fin, fout, percent_on=0.1):
+        block = [
+            nn.Conv2d(fin, fout, kernel_size=5, stride=1, padding=0),
+            nn.BatchNorm2d(fout, affine=False),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            self._activation_func(fout, percent_on),
+        ]
+        # if not self.use_kwinners:
+        #     block.append(nn.Dropout(p=0.5))
+        return block
 
-        return x
+    def _linear_block(self, fin, fout, percent_on=0.1):
+        block = [
+            nn.Linear(fin, fout),
+            nn.BatchNorm1d(fout, affine=False),
+            self._activation_func(fout, percent_on, twod=False),
+        ]
+        # if not self.use_kwinners:
+        #     block.append(nn.Dropout(p=0.5))
+        return block
+
+    def _activation_func(self, fout, percent_on, twod=True):
+        if self.use_kwinners:
+            if twod:
+                activation_func = KWinners2d
+            else:
+                activation_func = KWinners
+            return activation_func(
+                fout,
+                percent_on=percent_on,
+                boost_strength=self.boost_strength,
+                boost_strength_factor=self.boost_strength_factor,
+                k_inference_factor=self.k_inference_factor,
+                duty_cycle_period=self.duty_cycle_period,
+            )
+        else:
+            return nn.ReLU()
+

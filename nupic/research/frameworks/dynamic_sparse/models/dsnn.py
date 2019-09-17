@@ -57,6 +57,11 @@ class DSNNHeb(SparseModel):
         self._init_coactivation_tracking()
         self.prune_cycles_completed = 0
 
+        self.toprune_modules = []
+        for idx, m in enumerate(self.sparse_modules):
+            if self.has_params(m) == 'linear':
+                self.toprune_modules.append((idx, m))
+
     def _init_coactivation_tracking(self):
         """
         Override method in children classes
@@ -84,9 +89,7 @@ class DSNNHeb(SparseModel):
             # keep track of added synapes
             survival_ratios = []
 
-            for idx, (m, corr) in enumerate(
-                zip(self.sparse_modules, self.network.coactivations)
-            ):
+            for (idx, m), corr in zip(self.toprune_modules, self.network.coactivations):
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(), self.num_params[idx], corr, idx=idx
                 )
@@ -217,6 +220,7 @@ class DSNNHeb(SparseModel):
         Random mask that ensures the exact number of params is added
         For computationally faster method, see _get_random_add_mask_prob
         """
+        num_add = int(num_add)
         nonzero = torch.nonzero(nonactive_synapses, as_tuple=False)
         sampled_idxs = np.random.choice(range(len(nonzero)), num_add, replace=False)
         selected = nonzero[sampled_idxs]
@@ -227,7 +231,7 @@ class DSNNHeb(SparseModel):
         else:
             add_mask[selected] = True
 
-        return add_mask
+        return add_mask.to(self.device)
 
     def _get_hebbian_add_mask(self, corr, nonactive_synapses, num_add):
 
@@ -288,7 +292,7 @@ class DSNNWeightedMag(DSNNHeb):
 
             # ----------- GROWTH ----------------
 
-            num_add = max(num_params - torch.sum(keep_mask).item(), 0)
+            num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
             add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
 
             # calculate the new mask
@@ -312,8 +316,7 @@ class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
     def _init_coactivation_tracking(self):
-        if self.hebbian_prune_perc is not None:
-            self.network.init_hebbian()
+        self.network.init_hebbian()
 
     def prune(self, weight, num_params, corr, idx=0):
         """Allows pruning by magnitude and hebbian"""
