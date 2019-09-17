@@ -287,8 +287,10 @@ class DSNNWeightedMag(DSNNHeb):
 
             # ----------- GROWTH ----------------
 
-            num_add = max(num_params - torch.sum(keep_mask).item(), 0)
+            num_add = int(num_params - torch.sum(keep_mask).item())
+            num_add = max(num_add, 0)
             add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
+            add_mask = add_mask.to(keep_mask.device)
 
             # calculate the new mask
             new_mask = keep_mask | add_mask
@@ -345,13 +347,15 @@ class DSNNMixedHeb(DSNNHeb):
 
             # ----------- GROWTH ----------------
 
-            num_add = max(num_params - torch.sum(keep_mask).item(), 0)
+            num_add = int(num_params - torch.sum(keep_mask).item())
+            num_add = max(num_add, 0)
             if self.hebbian_grow:
                 add_mask = self._get_hebbian_add_mask(corr, nonactive_synapses, num_add)
             else:
                 add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
 
             # calculate the new mask
+            add_mask = add_mask.to(keep_mask.device)
             new_mask = keep_mask | add_mask
 
             # logging
@@ -407,7 +411,8 @@ class DSNNMixedHeb(DSNNHeb):
 
             # ----------- GROWTH ----------------
 
-            num_add = max(num_params - torch.sum(keep_mask).item(), 0)
+            num_add = int(num_params - torch.sum(keep_mask).item())
+            num_add = max(num_add, 0)
             if self.hebbian_grow:
                 add_mask = self._get_inverse_hebbian_add_mask(
                     corr, nonactive_synapses, num_add
@@ -416,6 +421,7 @@ class DSNNMixedHeb(DSNNHeb):
                 add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
 
             # calculate the new mask
+            add_mask.to(keep_mask.device)
             new_mask = keep_mask | add_mask
 
             # logging
