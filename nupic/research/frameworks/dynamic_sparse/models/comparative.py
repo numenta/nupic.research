@@ -51,8 +51,6 @@ class SET(SparseModel):
                 self.prune_cycles_completed += 1
                 if self.prune_cycles_completed >= self.pruning_early_stop:
                     self.pruning_active = False
-        # temporarily logging for debug purposes
-        self.log["pruning_early_stop"] = int(self.pruning_early_stop)
 
     def _reinitialize_weights(self):
         """Reinitialize weights."""
