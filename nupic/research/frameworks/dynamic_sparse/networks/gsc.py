@@ -19,200 +19,20 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections import OrderedDict
-
 import torch
 from torch import nn
 
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-from .layers import DSConv2d, DynamicSparseBase, RandDSConv2d, SparseConv2d
+from .layers import DSConv2d
 from .main import VGG19
-
-# redefine Flatten
-# class Lambda(nn.Module):
-#     def __init__(self, func:LambdaFunc):
-#         super().__init__()
-#         self.func = func
-
-#     def forward(self, x):
-#         return self.func(x)
-
-# def Flatten():
-#     return Lambda(lambda x: x.view((x.size(0), -1)))
-
-
-# ----------------------------------------
-# Utils - network builders and inspectors
-# ----------------------------------------
-
-def get_dynamic_sparse_modules(net):
-    """
-    Inspects all children recursively to collect the
-    Dynamic-Sparse modules.
-    """
-    sparse_modules = []
-    for module in net.modules():
-
-        if isinstance(module, DynamicSparseBase):
-            sparse_modules.append(module)
-
-    return sparse_modules
-
-
-def swap_layers(sequential, layer_type_a, layer_type_b):
-    """
-    If 'layer_type_a' appears immediately before 'layer_type_2',
-    this function will swap their position in a new sequential.
-
-    :param sequential: torch.nn.Sequential
-    :param layer_type_a: type of first layer
-    :param layer_type_a: type of second layer
-    """
-
-    old_seq = dict(sequential.named_children())
-    names = list(old_seq.keys())
-    modules = list(old_seq.values())
-
-    # Make copy of sequence.
-    new_seq = list(old_seq.items())
-
-    # Edit copy in place.
-    layer_a = modules[0]
-    name_a = names[0]
-    for i, (name_b, layer_b) in enumerate(list(old_seq.items())[1:], 1):
-
-        if isinstance(layer_a, layer_type_a) and isinstance(layer_b, layer_type_b):
-            new_seq[i - 1] = (name_b, layer_b)
-            new_seq[i] = (name_a, layer_a)
-
-        layer_a = layer_b
-        name_a = name_b
-
-    # Turn sequence into nn.Sequential.
-    new_seq = OrderedDict(new_seq)
-    new_seq = torch.nn.Sequential(new_seq)
-    return new_seq
-
-
-def squash_layers(sequential, *types):
-    """
-    This function squashes layers matching the sequence of 'types'.
-    For instance, if 'types' is [Conv2d, BatchNorm, KWinners] and
-    "sequential" has layers [..., Conv2d, BatchNorm, KWinners, ...],
-    then a new "sequential" will be returns of the form
-    [..., SubSequence, ...] where SubSequence calls .
-
-    More importantly, SubSequence will use the same hook (if any)
-    as the original Conv2d, although with the output from KWinners
-    - at least in this example case.
-
-    :param sequential: torch.nn.Sequential
-    :param types: types of layers
-
-    :returns: a new torch.nn.Sequential
-    """
-    assert len(types) <= len(sequential), "More types than layers passed."
-    assert len(types) > 1, "Expected more than one type to squash."
-
-    named_children = dict(sequential.named_children())
-    names = list(named_children.keys())
-    modules = list(named_children.values())
-
-    i0 = 0
-    new_seq = []
-
-    while i0 < len(modules):
-
-        i1 = i0 + len(types)
-        if i1 > len(modules) + 1:
-            break
-
-        sublayers = modules[i0:i1]
-        subnames = names[i0:i1]
-        matches = [isinstance(layer, ltype) for layer, ltype in zip(sublayers, types)]
-        if all(matches):
-
-            # Save forward hook of base layer.
-            base_layer = modules[i0]
-            if hasattr(base_layer, "forward_hook"):
-                forward_hook = base_layer.forward_hook
-                if hasattr(base_layer, "forward_hook_handle"):
-                    base_layer.forward_hook_handle.remove()
-            else:
-                forward_hook = None
-
-            # Squash layers.
-            squashed = OrderedDict(zip(subnames, sublayers))
-            squashed = torch.nn.Sequential(squashed)
-            assert squashed[0] == base_layer
-
-            # Maintain same forward hook.
-            if forward_hook:
-                forward_hook_handle = squashed.register_forward_hook(
-                    lambda module, in_, out_:
-                    forward_hook(module[0], in_, out_)
-                )
-                squashed.forward_hook = forward_hook
-                squashed.forward_hook_handle = forward_hook_handle
-
-            # Append squashed sequence
-            name = "squashed" + str(i0)
-            new_seq.append((name, squashed))
-
-            # Iterate i0.
-            i0 = i1
-
-        else:
-
-            # Append layer as is.
-            name = names[i0]
-            module = modules[i0]
-            new_seq.append((name, module))
-
-            # Iterate i0.
-            i0 += 1
-
-    # Turn sequence into nn.Sequential.
-    new_seq = OrderedDict(new_seq)
-    new_seq = torch.nn.Sequential(new_seq)
-    return new_seq
-
-
-def set_module(net, name, new_module):
-    """
-    Mimics "setattr" in purpose and argument types.
-    Sets module "name" of "net" to "new_module".
-    This is done recursively as "name" may be
-    of the form '0.subname-1.subname-2.3 ...'
-    where 0 and 3 indicate indices of a
-    torch.nn.Sequential.
-    """
-
-    subnames = name.split(".")
-    subname0, subnames_remaining = subnames[0], subnames[1:]
-
-    if subnames_remaining:
-
-        if subname0.isdigit():
-            subnet = net[int(subname0)]
-        else:
-            subnet = getattr(net, subname0)
-
-        set_module(subnet, ".".join(subnames_remaining), new_module)
-
-    else:
-
-        if subname0.isdigit():
-            net[int(subname0)] = new_module
-        else:
-            setattr(net, subname0, new_module)
-
+from .utils import get_dynamic_sparse_modules, make_dscnn, squash_layers, swap_layers
 
 # --------------
 # GSC Networks
 # --------------
+
 
 class GSCHeb(nn.Module):
     """LeNet like CNN used for GSC in how so dense paper."""
@@ -355,101 +175,6 @@ def gsc_conv_only_heb(config):
     return network
 
 
-# function that makes the switch
-# why function inside other functions -> make it into a class?
-
-def make_dscnn(net, config=None):
-    """
-    Edits net in place to replace Conv2d layers with those
-    specified in config.
-    """
-
-    config = config or {}
-
-    named_convs = [
-        (name, layer)
-        for name, layer in net.named_modules()
-        if isinstance(layer, torch.nn.Conv2d)
-    ]
-    num_convs = len(named_convs)
-
-    def tolist(param):
-        if isinstance(param, list):
-            return param
-        else:
-            return [param] * num_convs
-
-    def get_conv_type(prune_method):
-        if prune_method == "random":
-            return RandDSConv2d
-        elif prune_method == "static":
-            return SparseConv2d
-        elif prune_method == "dynamic":
-            return DSConv2d
-
-    # Get DSConv2d params from config.
-    prune_methods = tolist(config.get("prune_methods", "dynamic"))
-    assert (
-        len(prune_methods) == num_convs
-    ), "Not enough prune_methods specified in config. Expected {}, got {}".format(
-        num_convs, prune_methods
-    )
-
-    # Populate kwargs for new layers.
-    possible_args = {
-        "dynamic": [
-            "hebbian_prune_frac",
-            "weight_prune_frac",
-            "sparsity",
-            "prune_dims",
-            "update_nsteps",
-        ],
-        "random": [
-            "hebbian_prune_frac",
-            "weight_prune_frac",
-            "sparsity",
-            "prune_dims",
-            "update_nsteps",
-        ],
-        "static": ["sparsity"],
-        None: [],
-    }
-    kwargs_s = []
-    for c_i in range(num_convs):
-        layer_args = {}
-        prune_method = prune_methods[c_i]
-        for arg in possible_args[prune_method]:
-            if arg in config:
-                layer_args[arg] = tolist(config.get(arg))[c_i]
-        kwargs_s.append(layer_args)
-
-    assert (
-        len((kwargs_s)) == len(named_convs) == len(prune_methods)
-    ), "Sizes do not match"
-
-    # Replace conv layers.
-    for prune_method, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
-
-        conv_type = get_conv_type(prune_method)
-        if conv_type is None:
-            continue
-
-        set_module(net, name, conv_type(
-            in_channels=conv.in_channels,
-            out_channels=conv.out_channels,
-            kernel_size=conv.kernel_size,
-            stride=conv.stride,
-            padding=conv.padding,
-            padding_mode=conv.padding_mode,
-            dilation=conv.dilation,
-            groups=conv.groups,
-            bias=(conv.bias is not None),
-            **kwargs,
-        ))
-
-    return net
-
-
 def vgg19_dscnn(config):
 
     net = VGG19(config)
@@ -483,7 +208,7 @@ def mnist_sparse_dscnn(config, squash=True):
 def gsc_sparse_cnn(config):
 
     net_params = config.get("net_params", {})
-    net = GSCSparseCNN(net_params)
+    net = GSCSparseCNN(**net_params)
     return net
 
 
