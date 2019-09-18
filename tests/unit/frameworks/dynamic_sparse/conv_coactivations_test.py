@@ -83,31 +83,31 @@ def calc_coactivations(
     alpha
 ):
 
-    C_out = shape[0]
-    C_in = shape[1]
+    c_out = shape[0]
+    c_in = shape[1]
     kernel_size = (shape[2], shape[3])
 
-    B = output_tensor.shape[0]
-    N_out = output_tensor.shape[2]
-    M_out = output_tensor.shape[3]
+    b_out = output_tensor.shape[0]
+    n_out = output_tensor.shape[2]
+    m_out = output_tensor.shape[3]
 
     h = torch.zeros(shape)
-    for b in range(B):
-        for c_out in range(C_out):
-            for n_out in range(N_out):
-                for m_out in range(M_out):
-                    unit_1 = output_tensor[b, c_out, n_out, m_out]
+    for b_ in range(b_out):
+        for c_out_ in range(c_out):
+            for n_out_ in range(n_out):
+                for m_out_ in range(m_out):
+                    unit_1 = output_tensor[b_, c_out_, n_out_, m_out_]
                     indxs = get_indeces_of_input_and_filter(
-                        n_out, m_out, C_in, kernel_size, padding, stride)
+                        n_out_, m_out_, c_in, kernel_size, padding, stride)
 
                     for input_indx, filter_indx in indxs:
-                        c_in, n_in, m_in = input_indx
-                        c_fl, n_fl, m_fl = filter_indx
-                        unit_2 = input_tensor[b, c_in, n_in, m_in]
+                        c_in_, n_in_, m_in_ = input_indx
+                        c_fl_, n_fl_, m_fl_ = filter_indx
+                        unit_2 = input_tensor[b_, c_in_, n_in_, m_in_]
 
                         if coactivation(unit_2,
                                         unit_1, alpha, mean_activations):
-                            h[c_out, c_fl, n_fl, m_fl] += 1
+                            h[c_out_, c_fl_, n_fl_, m_fl_] += 1
     return h
 
 
@@ -155,10 +155,10 @@ class CoactivationsTest(unittest.TestCase):
         padding = conv.padding
         alpha = conv.get_activity_threshold(input_tensor, output_tensor)
 
-        H = calc_coactivations(
+        coacts = calc_coactivations(
             conv.weight.shape, padding, stride,
             input_tensor, output_tensor, mean_activations, alpha)
-        assert conv.coactivations.allclose(H, atol=0, rtol=0)
+        assert conv.coactivations.allclose(coacts, atol=0, rtol=0)
         conv.progress_connections()
 
         input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
@@ -166,10 +166,10 @@ class CoactivationsTest(unittest.TestCase):
         alpha = conv.get_activity_threshold(input_tensor, output_tensor)
         mean_activations = (input_tensor.mean(), output_tensor.mean())
 
-        H = calc_coactivations(
+        coacts = calc_coactivations(
             conv.weight.shape, padding, stride,
             input_tensor, output_tensor, mean_activations, alpha)
-        assert conv.coactivations.allclose(H, atol=0, rtol=0)
+        assert conv.coactivations.allclose(coacts, atol=0, rtol=0)
 
 
 if __name__ == "__main__":
