@@ -31,45 +31,14 @@ from .layers import DynamicSparseBase, init_coactivation_tracking
 # ------------------------------------------------------------------------------------
 
 
-class DSLinearBlock(nn.Sequential, DynamicSparseBase):
+class DSLinear(nn.Linear, DynamicSparseBase):
 
-    def __init__(
-        self,
-        in_features,
-        out_features,
-        bias,
-        batch_norm=None,
-        dropout=None,
-        activation_func=None,
-    ):
+    def __init__(self, in_features, out_features, bias=False):
 
-        # Clarifications on batch norm position at the linear block:
-        # - bn before relu at original paper
-        # - bn after relu in recent work
-        # (see fchollet @ https://github.com/keras-team/keras/issues/1802)
-        # - however, if applied after RELU or kWinners, breaks sparsity
-        layers = [nn.Linear(in_features, out_features, bias=bias)]
-        if batch_norm:
-            layers.append(nn.BatchNorm1d(out_features))
-        if activation_func:
-            layers.append(activation_func)
-        if dropout:
-            layers.append(nn.Dropout(p=dropout))
-        super().__init__(*layers)
+        super().__init__(in_features, out_features, bias=bias)
 
         # Initialize dynamic sparse attributes.
-        self._init_coactivations(weight=self[0].weight)
-
-    @property
-    def weight(self):
-        """
-        Return weight of linear layer - needed for introspective networks.
-        """
-        return self[0].weight
-
-    def forward(self, input_tensor):
-        output_tensor = super().forward(input_tensor)
-        return output_tensor
+        self._init_coactivations(weight=self.weight)
 
     def update_coactivations(self, x, y):
         outer = 0
@@ -87,6 +56,53 @@ class DSLinearBlock(nn.Sequential, DynamicSparseBase):
 
         # Update coactivations.
         self.coactivations[:] += outer
+
+
+class DSLinearBlock(nn.Sequential):
+
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        bias,
+        batch_norm=None,
+        dropout=None,
+        activation_func=None,
+    ):
+
+        # Clarifications on batch norm position at the linear block:
+        # - bn before relu at original paper
+        # - bn after relu in recent work
+        # (see fchollet @ https://github.com/keras-team/keras/issues/1802)
+        # - however, if applied after RELU or kWinners, breaks sparsity
+        layers = [DSLinear(in_features, out_features, bias=bias)]
+        if batch_norm:
+            layers.append(nn.BatchNorm1d(out_features))
+        if activation_func:
+            layers.append(activation_func)
+        if dropout:
+            layers.append(nn.Dropout(p=dropout))
+        super().__init__(*layers)
+
+        # Transfer forward hook.
+        dslayer = self[0]
+        forward_hook = dslayer.forward_hook
+        self.register_forward_hook(
+            lambda module, in_, out_:
+            forward_hook(dslayer, in_, out_)
+        )
+        dslayer.forward_hook_handle.remove()
+
+    @property
+    def weight(self):
+        """
+        Return weight of linear layer - needed for introspective networks.
+        """
+        return self[0].weight
+
+    def forward(self, input_tensor):
+        output_tensor = super().forward(input_tensor)
+        return output_tensor
 
 
 # ------------
@@ -167,7 +183,7 @@ class MLPHeb(nn.Module):
         )
 
         # Create the classifier.
-        self.dynamic_sparse_modules = layers[1:]
+        self.dynamic_sparse_modules = [l[0] for l in layers[1:]]
         self.classifier = nn.Sequential(*layers)
 
         # Initialize attr to decide whether to update coactivations during learning.
