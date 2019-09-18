@@ -27,7 +27,7 @@ from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 from .layers import DSConv2d
 from .main import VGG19
-from .utils import get_dynamic_sparse_modules, make_dscnn, squash_layers, swap_layers
+from .utils import get_dynamic_sparse_modules, make_dsnn, squash_layers, swap_layers
 
 # --------------
 # GSC Networks
@@ -156,14 +156,14 @@ class GSCHeb(nn.Module):
 # make a conv heb just by replacing the conv layers by special DSNN Conv layers
 def gsc_conv_heb(config):
 
-    net = make_dscnn(GSCHeb(config), config)
+    net = make_dsnn(GSCHeb(config), config)
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
     return net
 
 
 def gsc_conv_only_heb(config):
-    network = make_dscnn(GSCHeb(config), config)
+    network = make_dsnn(GSCHeb(config), config)
 
     # replace the forward function to not apply regular convolution
     def forward(self, x):
@@ -178,7 +178,7 @@ def gsc_conv_only_heb(config):
 def vgg19_dscnn(config):
 
     net = VGG19(config)
-    net = make_dscnn(net)
+    net = make_dsnn(net)
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
@@ -196,7 +196,7 @@ def mnist_sparse_dscnn(config, squash=True):
 
     net_params = config.get("net_params", {})
     net = MNISTSparseCNN(**net_params)
-    net = make_dscnn(net, config)
+    net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, KWinners2d)
 
@@ -216,7 +216,7 @@ def gsc_sparse_dscnn(config):
 
     net_params = config.get("net_params", {})
     net = GSCSparseCNN(**net_params)
-    net = make_dscnn(net, config)
+    net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
 
@@ -323,7 +323,7 @@ def gsc_sparse_dscnn_fullyconv(config):
 
     net_params = config.get("net_params", {})
     net = GSCSparseFullCNN(**net_params)
-    net = make_dscnn(net, config)
+    net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
 
