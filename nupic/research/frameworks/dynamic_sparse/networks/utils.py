@@ -65,7 +65,7 @@ def swap_layers(sequential, layer_type_a, layer_type_b):
     return new_seq
 
 
-def squash_layers(sequential, *types, transfer_foward_hook=True):
+def squash_layers(sequential, *types, transfer_forward_hook=True):
     """
     This function squashes layers matching the sequence of 'types'.
     For instance, if 'types' is [Conv2d, BatchNorm, KWinners] and
@@ -92,21 +92,26 @@ def squash_layers(sequential, *types, transfer_foward_hook=True):
 
     i0 = 0
     new_seq = []
-
     while i0 < len(modules):
-
         i1 = i0 + len(types)
-        if i1 > len(modules) + 1:
-            break
+        if i1 <= len(modules) + 1:
 
-        sublayers = modules[i0:i1]
-        subnames = names[i0:i1]
-        matches = [isinstance(layer, ltype) for layer, ltype in zip(sublayers, types)]
+            sublayers = modules[i0:i1]
+            subnames = names[i0:i1]
+            matches = [
+                isinstance(layer, ltype) for layer, ltype in zip(sublayers, types)
+            ]
+
+        else:
+            matches = [False]
+
         if all(matches):
 
-            # Save forward hook of base layer.
+            # Get base dynamic sparse layers.
             base_layer = modules[i0]
-            if transfer_foward_hook and hasattr(base_layer, "forward_hook"):
+
+            # Save forward hook of base layer.
+            if transfer_forward_hook and hasattr(base_layer, "forward_hook"):
                 forward_hook = base_layer.forward_hook
                 if hasattr(base_layer, "forward_hook_handle"):
                     base_layer.forward_hook_handle.remove()
