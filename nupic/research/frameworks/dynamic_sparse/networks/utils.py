@@ -23,7 +23,9 @@ from collections import OrderedDict
 
 import torch
 
-from .layers import DSConv2d, DynamicSparseBase, RandDSConv2d, SparseConv2d
+from nupic.torch.modules import KWinners, KWinners2d, SparseWeights
+
+from .layers import DSConv2d, DSLinear, DynamicSparseBase, RandDSConv2d, SparseConv2d
 
 # -------------------------------------------------
 # General Utils - network mutators
@@ -203,7 +205,7 @@ def get_dynamic_sparse_modules(net):
     return sparse_modules
 
 
-def make_dscnn(net, config=None):
+def make_dsnn(net, config=None):
     """
     Edits net in place to replace Conv2d layers with those
     specified in config.
@@ -211,12 +213,12 @@ def make_dscnn(net, config=None):
 
     config = config or {}
 
-    named_convs = [
+    named_layers = [
         (name, layer)
         for name, layer in net.named_modules()
-        if isinstance(layer, torch.nn.Conv2d)
+        if isinstance(layer, torch.nn.Conv2d) or isinstance(layer, torch.nn.Linear)
     ]
-    num_convs = len(named_convs)
+    num_convs = len(named_layers)
 
     def tolist(param):
         if isinstance(param, list):
@@ -224,16 +226,18 @@ def make_dscnn(net, config=None):
         else:
             return [param] * num_convs
 
-    def get_conv_type(prune_method):
+    def get_layer_type(prune_method):
         if prune_method == "random":
             return RandDSConv2d
         elif prune_method == "static":
             return SparseConv2d
-        elif prune_method == "dynamic":
+        elif prune_method == "dynamic-conv":
             return DSConv2d
+        elif prune_method == "dynamic-linear":
+            return DSLinear
 
     # Get DSConv2d params from config.
-    prune_methods = tolist(config.get("prune_methods", "dynamic"))
+    prune_methods = tolist(config.get("prune_methods", None))
     assert (
         len(prune_methods) == num_convs
     ), "Not enough prune_methods specified in config. Expected {}, got {}".format(
@@ -242,13 +246,14 @@ def make_dscnn(net, config=None):
 
     # Populate kwargs for new layers.
     possible_args = {
-        "dynamic": [
+        "dynamic-conv": [
             "hebbian_prune_frac",
             "weight_prune_frac",
             "sparsity",
             "prune_dims",
             "update_nsteps",
         ],
+        "dynamic-linear": [],
         "random": [
             "hebbian_prune_frac",
             "weight_prune_frac",
@@ -269,27 +274,36 @@ def make_dscnn(net, config=None):
         kwargs_s.append(layer_args)
 
     assert (
-        len((kwargs_s)) == len(named_convs) == len(prune_methods)
+        len((kwargs_s)) == len(named_layers) == len(prune_methods)
     ), "Sizes do not match"
 
     # Replace conv layers.
-    for prune_method, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
+    for method, kwargs, (name, layer) in zip(prune_methods, kwargs_s, named_layers):
 
-        conv_type = get_conv_type(prune_method)
-        if conv_type is None:
+        layer_type = get_layer_type(method)
+        if layer_type is None:
             continue
 
-        set_module(net, name, conv_type(
-            in_channels=conv.in_channels,
-            out_channels=conv.out_channels,
-            kernel_size=conv.kernel_size,
-            stride=conv.stride,
-            padding=conv.padding,
-            padding_mode=conv.padding_mode,
-            dilation=conv.dilation,
-            groups=conv.groups,
-            bias=(conv.bias is not None),
-            **kwargs,
-        ))
+        if isinstance(layer, torch.nn.Conv2d):
+            set_module(net, name, layer_type(
+                in_channels=layer.in_channels,
+                out_channels=layer.out_channels,
+                kernel_size=layer.kernel_size,
+                stride=layer.stride,
+                padding=layer.padding,
+                padding_mode=layer.padding_mode,
+                dilation=layer.dilation,
+                groups=layer.groups,
+                bias=(layer.bias is not None),
+                **kwargs,
+            ))
+
+        elif isinstance(layer, torch.nn.Linear):
+            set_module(net, name, layer_type(
+                in_features=layer.in_features,
+                out_features=layer.out_features,
+                bias=(layer.bias is not None),
+                **kwargs,
+            ))
 
     return net
