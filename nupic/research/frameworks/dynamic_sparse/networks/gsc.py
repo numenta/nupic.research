@@ -34,7 +34,7 @@ from .utils import get_dynamic_sparse_modules, make_dsnn, squash_layers, swap_la
 # --------------
 
 
-class GSCHeb(nn.Module):
+class GSCHebDepreciated(nn.Module):
     """LeNet like CNN used for GSC in how so dense paper."""
 
     def __init__(self, config=None):
@@ -154,16 +154,16 @@ class GSCHeb(nn.Module):
 
 
 # make a conv heb just by replacing the conv layers by special DSNN Conv layers
-def gsc_conv_heb(config):
+def gsc_conv_heb_depreciated(config):
 
-    net = make_dsnn(GSCHeb(config), config)
+    net = make_dsnn(GSCHebDepreciated(config), config)
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
     return net
 
 
-def gsc_conv_only_heb(config):
-    network = make_dsnn(GSCHeb(config), config)
+def gsc_conv_only_heb_depreciated(config):
+    network = make_dsnn(GSCHebDepreciated(config), config)
 
     # replace the forward function to not apply regular convolution
     def forward(self, x):
