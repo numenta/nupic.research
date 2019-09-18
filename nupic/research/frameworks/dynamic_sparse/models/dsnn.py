@@ -49,7 +49,6 @@ class DSNNHeb(SparseModel):
             hebbian_prune_perc=None,
             weight_prune_perc=None,
             hebbian_grow=True,
-            hebbian_learning=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
