@@ -175,7 +175,7 @@ def gsc_conv_only_heb_depreciated(config):
     return network
 
 
-def vgg19_dscnn(config):
+def vgg19_dsnn(config):
 
     net = VGG19(config)
     net = make_dsnn(net)
@@ -192,7 +192,7 @@ def mnist_sparse_cnn(config):
     return net
 
 
-def mnist_sparse_dscnn(config, squash=True):
+def mnist_sparse_dsnn(config, squash=True):
 
     net_params = config.get("net_params", {})
     net = MNISTSparseCNN(**net_params)
@@ -215,7 +215,7 @@ def gsc_sparse_cnn(config):
     return net
 
 
-def gsc_sparse_dscnn(config):
+def gsc_sparse_dsnn(config):
 
     net_params = config.get("net_params", {})
     net = GSCSparseCNN(**net_params)
@@ -325,7 +325,7 @@ class GSCSparseFullCNN(nn.Sequential):
         self.add_module("softmax", nn.LogSoftmax(dim=1))
 
 
-def gsc_sparse_dscnn_fullyconv(config):
+def gsc_sparse_dsnn_fullyconv(config):
 
     net_params = config.get("net_params", {})
     net = GSCSparseFullCNN(**net_params)
