@@ -72,8 +72,9 @@ def squash_layers(sequential, *types, transfer_forward_hook=True):
     This function squashes layers matching the sequence of 'types'.
     For instance, if 'types' is [Conv2d, BatchNorm, KWinners] and
     "sequential" has layers [..., Conv2d, BatchNorm, KWinners, ...],
-    then a new "sequential" will be returns of the form
-    [..., SubSequence, ...] where SubSequence calls .
+    then a new "sequential" will be returned of the form
+    [..., SubSequence, ...] where SubSequence contains the 'types'
+    specified.
 
     More importantly, if 'transfer_foward_hook=True'
     the SubSequence will use the same hook (if any)
