@@ -53,25 +53,25 @@ class NetworkConstructionTests(unittest.TestCase):
             if isinstance(l, (DSLinear, DSConv2d)):
                 dynamic_layers.append(l)
 
-        assert len(dynamic_layers) == 2
-        assert isinstance(dynamic_layers[0], DSConv2d)
-        assert isinstance(dynamic_layers[1], DSLinear)
+        self.assertTrue(len(dynamic_layers) == 2)
+        self.assertTrue(isinstance(dynamic_layers[0], DSConv2d))
+        self.assertTrue(isinstance(dynamic_layers[1], DSLinear))
 
-        assert len(net) == 14
+        self.assertTrue(len(net) == 14)
 
         # Swap activation with max pool
         net = swap_layers(net, nn.MaxPool2d, KWinners2d)
-        assert len(net) == 14
+        self.assertTrue(len(net) == 14)
 
         # Squash dynamic conv layer with its activation.
         net = squash_layers(
             net, DSConv2d, nn.BatchNorm2d, KWinners2d, transfer_forward_hook=True)
-        assert len(net) == 12
+        self.assertTrue(len(net) == 12)
 
         # Squash linear conv layer with its activation.
         net = squash_layers(
             net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True)
-        assert len(net) == 10
+        self.assertTrue(len(net) == 10)
 
         # Exercise forward pass.
         net.apply(init_coactivation_tracking)
@@ -81,8 +81,8 @@ class NetworkConstructionTests(unittest.TestCase):
         # Ensure coactivations have been updated.
         conv_coacts = net[4][0].coactivations
         lin_coacts = net[7][0].module.coactivations
-        assert not conv_coacts.allclose(torch.zeros_like(conv_coacts))
-        assert not lin_coacts.allclose(torch.zeros_like(lin_coacts))
+        self.assertTrue(not conv_coacts.allclose(torch.zeros_like(conv_coacts)))
+        self.assertTrue(not lin_coacts.allclose(torch.zeros_like(lin_coacts)))
 
 
 if __name__ == "__main__":
