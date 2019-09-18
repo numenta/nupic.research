@@ -23,7 +23,7 @@ import torch
 from torch import nn
 
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
-from nupic.torch.modules import Flatten, KWinners, KWinners2d
+from nupic.torch.modules import Flatten, KWinners, KWinners2d, SparseWeights
 
 from .layers import DSConv2d
 from .main import VGG19
@@ -199,6 +199,9 @@ def mnist_sparse_dscnn(config, squash=True):
     net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, KWinners2d)
+    net = squash_layers(
+        net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True
+    )
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
@@ -219,6 +222,9 @@ def gsc_sparse_dscnn(config):
     net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+    net = squash_layers(
+        net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True
+    )
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
@@ -326,6 +332,9 @@ def gsc_sparse_dscnn_fullyconv(config):
     net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+    net = squash_layers(
+        net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True
+    )
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
