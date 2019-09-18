@@ -69,8 +69,6 @@ class DSLinearBlock(nn.Sequential, DynamicSparseBase):
 
     def forward(self, input_tensor):
         output_tensor = super().forward(input_tensor)
-        if self._track_coactivations:
-            self.update_coactivations(input_tensor, output_tensor)
         return output_tensor
 
     def update_coactivations(self, x, y):
