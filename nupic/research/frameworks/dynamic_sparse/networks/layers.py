@@ -130,10 +130,26 @@ def init_coactivation_tracking(m):
 
 class DynamicSparseBase(torch.nn.Module):
 
-    def _init_coactivations(self, weight):
+    def _init_coactivations(self, weight, update_nsteps=1):
+        """
+        This method
+            1. registers a buffer the shape of weight to track coactivations
+            2. adds a forward hook to the module to update the coactivations
+               every 'update_nsteps'.
+        """
+
         # Init buffer to keep track of coactivations.
         self._track_coactivations = False
         self.register_buffer("coactivations", torch.zeros_like(self.weight))
+
+        # Init helper attrs to keep track of when to update coactivations.
+        self.learning_iterations = 0
+        self.update_nsteps = update_nsteps
+
+        # Register hook to update coactivations.
+        assert hasattr(self, "update_coactivations"), \
+            "DynamicSparse modules must define a coactivation function."
+        self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
 
     def init_coactivation_tracking(self):
         self._track_coactivations = True
@@ -141,6 +157,21 @@ class DynamicSparseBase(torch.nn.Module):
     def reset_coactivations(self):
         # Reset coactivations to zero.
         self.coactivations[:] = 0
+
+    @staticmethod
+    def forward_hook(module, input_tensor, output_tensor):
+        if not module._track_coactivations:
+            return
+
+        # Update connections strengths.
+        if isinstance(input_tensor, tuple):
+            # TODO: This assumption of taking the first element may not
+            #       work for all module.
+            input_tensor = input_tensor[0]
+        if module.training:
+            if module.learning_iterations % module.update_nsteps == 0:
+                module.update_coactivations(input_tensor, output_tensor)
+            module.learning_iterations += 1
 
 # ------------------
 # Conv Layers
@@ -255,7 +286,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             dilation, groups, bias, padding_mode,
         )
 
-        self._init_coactivations(self.weight)
+        self._init_coactivations(self.weight, update_nsteps=update_nsteps)
 
         if prune_dims is None:
             self.prune_dims = [0, 1]
@@ -272,7 +303,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         #   k1_weight - the number of connections to keep by magnitude pruning
         #   k1_hebbian - the number of connections to keep by hebbian pruning
         #   k2 - the number of connections to keep non-zero
-        self.update_nsteps = update_nsteps
         self.num_connections = np.prod([
             d for i, d in enumerate(self.weight.shape) if i not in self.prune_dims
         ])
@@ -298,9 +328,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             self.weight_sparsity = calc_sparsity(self.weight)
         self.prune_grads_hook = self.weight.register_hook(
             lambda grad: grad * self.last_keep_mask.type(grad.dtype).to(grad.device))
-
-        # Register hook to update coactivations.
-        self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
 
         # Specify number of groups for the helper convolutional layer.
         # This is equal to the number of connections in the last three dimensions:
@@ -857,17 +884,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
             # ----- END LOG BLOCK -----
 
-    @staticmethod
-    def forward_hook(module, input_tensor, output_tensor):
-        # Update connections strengths.
-        if isinstance(input_tensor, tuple):
-            input_tensor = input_tensor[0]
-        if module.training:
-            if module.learning_iterations % module.update_nsteps == 0 \
-               and module._track_coactivations:
-                module.update_coactivations(input_tensor, output_tensor)
-            module.learning_iterations += 1
-
     def __call__(self, input_tensor, *args, **kwargs):
         output_tensor = super().__call__(input_tensor, *args, **kwargs)
         return output_tensor
@@ -898,16 +914,20 @@ class RandDSConv2d(DSConv2d):
         self.coactivations.data[:] = torch.ones_like(self.weight)
 
 
-class SparseConv2d(DSConv2d):
+class SparseConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
-    def _init_logging_params(self):
-        pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_coactivations(self.weight)
 
-    def progress_connections(self, *args, **kwargs):
-        pass
+    # def _init_logging_params(self):
+    #     pass
 
-    def update_coactivations(self, *args, **kwargs):
-        pass
+    # def progress_connections(self, *args, **kwargs):
+    #     pass
+
+    # def update_coactivations(self, *args, **kwargs):
+    #     pass
 
 
 if __name__ == "__main__":
@@ -1060,6 +1080,7 @@ if __name__ == "__main__":
             coactivation_test="variance",
             update_nsteps=1,
         )
+        conv.init_coactivation_tracking()
 
         input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
         output_tensor = conv(input_tensor)
