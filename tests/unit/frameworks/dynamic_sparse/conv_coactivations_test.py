@@ -97,7 +97,7 @@ def calc_coactivations(
             for n_out_ in range(n_out):
                 for m_out_ in range(m_out):
                     unit_1 = output_tensor[b_, c_out_, n_out_, m_out_]
-                    indxs = get_indeces_of_input_and_filter(
+                    indxs = get_indices_of_input_and_filter(
                         n_out_, m_out_, c_in, kernel_size, padding, stride)
 
                     for input_indx, filter_indx in indxs:
