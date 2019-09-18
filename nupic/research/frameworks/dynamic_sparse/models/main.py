@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from collections import defaultdict
+from collections.abc import Iterable
 from itertools import product
 
 import numpy as np
@@ -225,35 +226,50 @@ class SparseModel(BaseModel):
     def setup(self):
         super(SparseModel, self).setup()
 
+        # calculate sparsity masks
+        self.masks = []
+        self.num_params = []  # added for paper implementation
+
+        # define sparse modules
+        self.sparse_modules = []
+        for m in list(self.network.modules()):
+            if isinstance(m, DynamicSparseBase):
+                # TODO: Could be more fitting to name this 'dynamic_sparse_modules'
+                self.sparse_modules.append(m)
+
         # added option to define sparsity by on_perc
         if "on_perc" in self.__dict__:
+            self._make_attr_iterable("on_perc")
             on_perc = self.on_perc
             self.epsilon = None
 
         with torch.no_grad():
-            # calculate sparsity masks
-            self.masks = []
-            self.num_params = []  # added for paper implementation
 
-            # define sparse modules
-            self.sparse_modules = []
-            for m in list(self.network.modules()):
-                if isinstance(m, DynamicSparseBase):
-                    # TODO: Could be more fitting to name this 'dynamic_sparse_modules'
-                    self.sparse_modules.append(m)
-
-            for m in self.sparse_modules:
+            for idx, m in enumerate(self.sparse_modules):
                 shape = m.weight.shape
                 # two approaches of defining epsilon
                 if self.epsilon:
                     on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
                 if self.sparsify_fixed:
-                    mask = self._sparsify_fixed(shape, on_perc)
+                    mask = self._sparsify_fixed(shape, on_perc[idx])
                 else:
-                    mask = self._sparsify_stochastic(shape, on_perc)
+                    mask = self._sparsify_stochastic(shape, on_perc[idx])
                 m.weight.data *= mask
                 self.masks.append(mask)
                 self.num_params.append(torch.sum(mask).item())
+
+    def _make_attr_iterable(self, attr):
+        """
+        This function (called in setup), ensures that a pre-existing attr
+        in an iterable (list) of length equal to self.sparse_modules.
+        """
+        value = getattr(self, attr)
+        if isinstance(value, Iterable):
+            assert len(value) != len(self.sparse_modules), \
+                "Expected {} to be of same length as sparse modules."
+        else:
+            value = [value] * len(self.sparse_modules)
+            setattr(self, attr, value)
 
     def _sparsify_stochastic(self, shape, on_perc):
         """Sthocastic in num of params approach of sparsifying a tensor"""
