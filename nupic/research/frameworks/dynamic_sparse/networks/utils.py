@@ -65,7 +65,7 @@ def swap_layers(sequential, layer_type_a, layer_type_b):
     return new_seq
 
 
-def squash_layers(sequential, *types):
+def squash_layers(sequential, *types, transfer_foward_hook=True):
     """
     This function squashes layers matching the sequence of 'types'.
     For instance, if 'types' is [Conv2d, BatchNorm, KWinners] and
@@ -73,7 +73,8 @@ def squash_layers(sequential, *types):
     then a new "sequential" will be returns of the form
     [..., SubSequence, ...] where SubSequence calls .
 
-    More importantly, SubSequence will use the same hook (if any)
+    More importantly, if 'transfer_foward_hook=True'
+    the SubSequence will use the same hook (if any)
     as the original Conv2d, although with the output from KWinners
     - at least in this example case.
 
@@ -105,7 +106,7 @@ def squash_layers(sequential, *types):
 
             # Save forward hook of base layer.
             base_layer = modules[i0]
-            if hasattr(base_layer, "forward_hook"):
+            if transfer_foward_hook and hasattr(base_layer, "forward_hook"):
                 forward_hook = base_layer.forward_hook
                 if hasattr(base_layer, "forward_hook_handle"):
                     base_layer.forward_hook_handle.remove()
