@@ -25,6 +25,8 @@ import torch
 
 from .layers import DSConv2d, DSLinear, DynamicSparseBase, RandDSConv2d, SparseConv2d
 
+from nupic.torch.modules import SparseWeights
+
 # -------------------------------------------------
 # General Utils - network mutators
 # -------------------------------------------------
@@ -107,8 +109,13 @@ def squash_layers(sequential, *types, transfer_forward_hook=True):
 
         if all(matches):
 
+            # TODO: Fix implementation so that 'SparseWeights' modules don't need
+            #       special treatment. Note that in these cases, it's assumed
+            #       that 'SparseWeights().module' contains the forward hook of interest.
+
             # Get base dynamic sparse layers.
-            base_layer = modules[i0]
+            is_sparse_weight = isinstance(modules[i0], SparseWeights)
+            base_layer = modules[i0] if not is_sparse_weight else modules[i0].module
 
             # Save forward hook of base layer.
             if transfer_forward_hook and hasattr(base_layer, "forward_hook"):
@@ -121,13 +128,19 @@ def squash_layers(sequential, *types, transfer_forward_hook=True):
             # Squash layers.
             squashed = OrderedDict(zip(subnames, sublayers))
             squashed = torch.nn.Sequential(squashed)
-            assert squashed[0] == base_layer
+
+            if not is_sparse_weight:
+                assert squashed[0] == base_layer
+            else:
+                assert squashed[0].module == base_layer
 
             # Maintain same forward hook.
             if forward_hook:
                 forward_hook_handle = squashed.register_forward_hook(
                     lambda module, in_, out_:
-                    forward_hook(module[0], in_, out_)
+                    forward_hook(
+                        module[0] if not is_sparse_weight else module[0].module,
+                        in_, out_)
                 )
                 squashed.forward_hook = forward_hook
                 squashed.forward_hook_handle = forward_hook_handle

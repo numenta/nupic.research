@@ -70,21 +70,8 @@ class NetworkConstructionTests(unittest.TestCase):
 
         # Squash linear conv layer with its activation.
         net = squash_layers(
-            net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=False)
+            net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True)
         assert len(net) == 10
-
-        # Manually switch over the linear layer forward hook.
-        # This is slightly trickier than the conv.
-        dsblock = net[7]
-        swlayer = dsblock[0]  # SparseWeights layer
-        swlayer.module.forward_hook_handle.remove()
-        forward_hook = swlayer.module.forward_hook
-        forward_hook_handle = dsblock.register_forward_hook(
-            lambda module, in_, out_:
-            forward_hook(module[0].module, in_, out_)
-        )
-        dsblock.forward_hook = forward_hook
-        dsblock.forward_hook_handle = forward_hook_handle
 
         # Exercise forward pass.
         net.apply(init_coactivation_tracking)
