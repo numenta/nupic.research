@@ -24,38 +24,11 @@ from torch import nn
 
 from nupic.torch.modules import KWinners
 
-from .layers import DynamicSparseBase, init_coactivation_tracking
+from .layers import DSLinear, init_coactivation_tracking
 
 # ------------------------------------------------------------------------------------
 # DynamicSparse Linear Block 2019-09-13
 # ------------------------------------------------------------------------------------
-
-
-class DSLinear(nn.Linear, DynamicSparseBase):
-
-    def __init__(self, in_features, out_features, bias=False):
-
-        super().__init__(in_features, out_features, bias=bias)
-
-        # Initialize dynamic sparse attributes.
-        self._init_coactivations(weight=self.weight)
-
-    def update_coactivations(self, x, y):
-        outer = 0
-        n_samples = x.shape[0]
-        with torch.no_grad():
-
-            # Get active units.
-            curr_act = (x > 0).detach().float()
-            prev_act = (y > 0).detach().float()
-
-            # Cumulate outer product over all samples.
-            # TODO: Vectorize this sum; for instance, using torch.einsum().
-            for s in range(n_samples):
-                outer += torch.ger(prev_act[s], curr_act[s])
-
-        # Update coactivations.
-        self.coactivations[:] += outer
 
 
 class DSLinearBlock(nn.Sequential):
