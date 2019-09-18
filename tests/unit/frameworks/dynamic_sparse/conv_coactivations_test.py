@@ -44,7 +44,7 @@ def coactivation(t1, t2, alpha, mean_activations):
     return s
 
 
-def get_indeces_of_input_and_filter(
+def get_indices_of_input_and_filter(
         n, m, in_channels, kernel_size, padding, stride):
     """
     Assumes dilation=1 and grouping=1
@@ -120,7 +120,7 @@ class CoactivationsTest(unittest.TestCase):
     def setUp(self):
         pass
 
-    def test_via_brute_force_comparision(self):
+    def test_via_brute_force_comparison(self):
 
         batch_size = 2
         in_channels = 4
