@@ -23,9 +23,9 @@ from collections import OrderedDict
 
 import torch
 
-from .layers import DSConv2d, DSLinear, DynamicSparseBase, RandDSConv2d, SparseConv2d
-
 from nupic.torch.modules import SparseWeights
+
+from .layers import DSConv2d, DSLinear, DynamicSparseBase, RandDSConv2d, SparseConv2d
 
 # -------------------------------------------------
 # General Utils - network mutators
