@@ -23,8 +23,6 @@ from collections import OrderedDict
 
 import torch
 
-from nupic.torch.modules import KWinners, KWinners2d, SparseWeights
-
 from .layers import DSConv2d, DSLinear, DynamicSparseBase, RandDSConv2d, SparseConv2d
 
 # -------------------------------------------------
