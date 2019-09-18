@@ -39,6 +39,14 @@ class DSNNHeb(SparseModel):
 
     def setup(self):
         super().setup()
+
+        # Set some attributes to be a list corresponding to self.sparse_modules.
+        for attr in [
+            "hebbian_prune_perc",
+            "weight_prune_perc",
+        ]:
+            self._make_attr_iterable(attr)
+
         self.added_synapses = [None for m in self.masks]
         self.last_gradients = [None for m in self.masks]
 
@@ -112,9 +120,8 @@ class DSNNHeb(SparseModel):
                     self.log["surviving_synapses_l" + str(idx)] = sr
                 self.log["surviving_synapses_avg"] = np.mean(survival_ratios)
 
-    def _get_hebbian_mask(self, weight, corr, active_synapses):
+    def _get_hebbian_mask(self, weight, corr, active_synapses, prune_perc):
 
-        prune_perc = self.hebbian_prune_perc
         num_synapses = np.prod(weight.shape)
         total_active = torch.sum(active_synapses).item()
 
@@ -137,9 +144,8 @@ class DSNNHeb(SparseModel):
 
         return hebbian_mask
 
-    def _get_inverse_hebbian_mask(self, weight, corr, active_synapses):
+    def _get_inverse_hebbian_mask(self, weight, corr, active_synapses, prune_perc):
 
-        prune_perc = self.hebbian_prune_perc
         num_synapses = np.prod(weight.shape)
         total_active = torch.sum(active_synapses).item()
 
@@ -161,9 +167,7 @@ class DSNNHeb(SparseModel):
 
         return hebbian_mask
 
-    def _get_magnitude_mask(self, weight, active_synapses):
-
-        prune_perc = self.weight_prune_perc
+    def _get_magnitude_mask(self, weight, active_synapses, prune_perc):
 
         # calculate the positive
         weight_pos = weight[weight > 0]
@@ -259,8 +263,9 @@ class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
     def _init_coactivation_tracking(self):
-        if self.weight_prune_perc is not None:
-            self.network.apply(init_coactivation_tracking)
+        for m, weight_prune_frac in zip(self.sparse_modules, self.weight_prune_perc):
+            if weight_prune_frac is not None:
+                m.apply(init_coactivation_tracking)
 
     def prune(self, weight, num_params, corr, idx=0):
         """
@@ -277,9 +282,11 @@ class DSNNWeightedMag(DSNNHeb):
             weight *= corr
 
             # ----------- PRUNING ----------------
+            weight_prune_perc = self.weight_prune_perc[idx]
 
-            if self.weight_prune_perc is not None:
-                keep_mask = self._get_magnitude_mask(weight, active_synapses)
+            if weight_prune_perc is not None:
+                keep_mask = self._get_magnitude_mask(
+                    weight, active_synapses, weight_prune_perc)
             else:
                 keep_mask = active_synapses.to(self.device)
 
@@ -311,8 +318,9 @@ class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
     def _init_coactivation_tracking(self):
-        if self.hebbian_prune_perc is not None:
-            self.network.apply(init_coactivation_tracking)
+        for m, heb_prune_frac in zip(self.sparse_modules, self.hebbian_prune_perc):
+            if heb_prune_frac is not None:
+                m.apply(init_coactivation_tracking)
 
     def prune(self, weight, num_params, corr, idx=0):
         """Allows pruning by magnitude and hebbian"""
@@ -323,19 +331,23 @@ class DSNNMixedHeb(DSNNHeb):
             nonactive_synapses = weight == 0
 
             # ----------- PRUNE ----------------
+            hebbian_prune_perc = self.hebbian_prune_perc[idx]
+            weight_prune_perc = self.weight_prune_perc[idx]
 
-            if self.hebbian_prune_perc is not None:
-                hebbian_mask = self._get_hebbian_mask(weight, corr, active_synapses)
+            if hebbian_prune_perc is not None:
+                hebbian_mask = self._get_hebbian_mask(
+                    weight, corr, active_synapses, hebbian_prune_perc)
 
-            if self.weight_prune_perc is not None:
-                magnitude_mask = self._get_magnitude_mask(weight, active_synapses)
+            if weight_prune_perc is not None:
+                magnitude_mask = self._get_magnitude_mask(
+                    weight, active_synapses, weight_prune_perc)
 
             # join both masks
-            if self.hebbian_prune_perc and self.weight_prune_perc:
+            if hebbian_prune_perc and weight_prune_perc:
                 keep_mask = hebbian_mask | magnitude_mask
-            elif self.hebbian_prune_perc:
+            elif hebbian_prune_perc:
                 keep_mask = hebbian_mask
-            elif self.weight_prune_perc:
+            elif weight_prune_perc:
                 keep_mask = magnitude_mask
             # if no pruning, just perpetuate same synapses
             else:
@@ -364,11 +376,11 @@ class DSNNMixedHeb(DSNNHeb):
                 )
                 self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
                 # conditional logs
-                if self.hebbian_prune_perc is not None:
+                if hebbian_prune_perc is not None:
                     self.log["hebbian_mask_l" + str(idx)] = (
                         torch.sum(hebbian_mask).item() / num_synapses
                     )
-                if self.weight_prune_perc is not None:
+                if weight_prune_perc is not None:
                     self.log["magnitude_mask_l" + str(idx)] = (
                         torch.sum(magnitude_mask).item() / num_synapses
                     )
@@ -386,18 +398,23 @@ class DSNNMixedHeb(DSNNHeb):
 
             # ----------- PRUNE ----------------
 
-            if self.hebbian_prune_perc is not None:
-                hebbian_mask = self._get_inverse_hebbian_mask(weight, active_synapses)
+            hebbian_prune_perc = self.hebbian_prune_perc[idx]
+            weight_prune_perc = self.weight_prune_perc[idx]
 
-            if self.weight_prune_perc is not None:
-                magnitude_mask = self._get_magnitude_mask(weight, corr, active_synapses)
+            if hebbian_prune_perc is not None:
+                hebbian_mask = self._get_inverse_hebbian_mask(
+                    weight, active_synapses, hebbian_prune_perc)
+
+            if weight_prune_perc is not None:
+                magnitude_mask = self._get_magnitude_mask(
+                    weight, corr, active_synapses, weight_prune_perc)
 
             # join both masks
-            if self.hebbian_prune_perc and self.weight_prune_perc:
+            if hebbian_prune_perc and weight_prune_perc:
                 keep_mask = hebbian_mask | magnitude_mask
-            elif self.hebbian_prune_perc:
+            elif hebbian_prune_perc:
                 keep_mask = hebbian_mask
-            elif self.weight_prune_perc:
+            elif weight_prune_perc:
                 keep_mask = magnitude_mask
             # if no pruning, just perpetuate same synapses
             else:
@@ -428,11 +445,11 @@ class DSNNMixedHeb(DSNNHeb):
                 )
                 self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
                 # conditional logs
-                if self.hebbian_prune_perc is not None:
+                if hebbian_prune_perc is not None:
                     self.log["hebbian_mask_l" + str(idx)] = (
                         torch.sum(hebbian_mask).item() / num_synapses
                     )
-                if self.weight_prune_perc is not None:
+                if weight_prune_perc is not None:
                     self.log["magnitude_mask_l" + str(idx)] = (
                         torch.sum(magnitude_mask).item() / num_synapses
                     )
