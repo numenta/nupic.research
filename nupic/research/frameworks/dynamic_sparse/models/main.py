@@ -265,8 +265,10 @@ class SparseModel(BaseModel):
         """
         value = getattr(self, attr)
         if isinstance(value, Iterable):
-            assert len(value) != len(self.sparse_modules), \
-                "Expected {} to be of same length as sparse modules."
+            assert len(value) == len(self.sparse_modules), """
+                Expected '{}' to be of same length as sparse modules ({}).
+                Got {} of type {}.
+                """.format(attr, len(self.sparse_modules), value, type(value))
         else:
             value = [value] * len(self.sparse_modules)
             setattr(self, attr, value)
