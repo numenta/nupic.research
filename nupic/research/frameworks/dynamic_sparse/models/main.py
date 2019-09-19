@@ -249,7 +249,9 @@ class SparseModel(BaseModel):
                 # two approaches of defining epsilon
                 if self.epsilon:
                     on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-                if self.sparsify_fixed:
+                if on_perc[idx] >= 1:
+                    mask = torch.ones(shape).float().to(self.device)
+                elif self.sparsify_fixed:
                     mask = self._sparsify_fixed(shape, on_perc[idx])
                 else:
                     mask = self._sparsify_stochastic(shape, on_perc[idx])
