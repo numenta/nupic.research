@@ -99,9 +99,15 @@ class SparseModelTest(unittest.TestCase):
 
         sparse_modules1 = SparseModel.get_sparse_modules(self.network1)
         self.assertTrue(len(sparse_modules1) == 4)
+        ds_modules_1 = SparseModel.get_dynamic_sparse_modules(self.network1)
+        self.assertTrue(len(ds_modules_1) == 4)
+        self.assertTrue(set(ds_modules_1) <= set(sparse_modules1))
 
         sparse_modules2 = SparseModel.get_sparse_modules(self.network2)
         self.assertTrue(len(sparse_modules2) == 4)
+        ds_modules_2 = SparseModel.get_dynamic_sparse_modules(self.network2)
+        self.assertTrue(len(ds_modules_2) == 0)
+        self.assertTrue(set(ds_modules_2) <= set(sparse_modules2))
 
 
 if __name__ == "__main__":
