@@ -31,9 +31,11 @@ from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
-    add_sparse_cnn_layer,
-    add_sparse_linear_layer,
     set_random_seed,
+)
+from nupic.research.frameworks.pytorch.models.le_sparse_net import (
+    add_sparse_cnn_layer,
+    add_sparse_linear_layer
 )
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
@@ -111,7 +113,7 @@ class SparseSpeechExperiment(object):
                         in_channels=in_channels,
                         out_channels=cnn_out_channels[i],
                         use_batch_norm=use_batch_norm,
-                        weight_sparsity=cnn_weight_sparsity,
+                        weight_sparsity=cnn_weight_sparsity[i],
                         percent_on=cnn_percent_on[i],
                         k_inference_factor=k_inference_factor,
                         boost_strength=boost_strength,
