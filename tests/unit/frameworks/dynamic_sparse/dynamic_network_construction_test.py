@@ -28,7 +28,10 @@ from nupic.research.frameworks.dynamic_sparse.networks import (
     DSLinear,
     GSCSparseCNN,
     init_coactivation_tracking,
+)
+from nupic.research.frameworks.dynamic_sparse.networks.utils import (
     make_dsnn,
+    replace_sparse_weights,
     squash_layers,
     swap_layers,
 )
@@ -46,6 +49,11 @@ class NetworkConstructionTests(unittest.TestCase):
         )
 
         net = GSCSparseCNN()
+
+        # Replace SparseWeights with the dense counterparts.
+        net = replace_sparse_weights(net)
+
+        # Replace dense modules with dynamic counterparts.
         make_dsnn(net, config)
 
         dynamic_layers = []
@@ -70,7 +78,7 @@ class NetworkConstructionTests(unittest.TestCase):
 
         # Squash linear conv layer with its activation.
         net = squash_layers(
-            net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True)
+            net, DSLinear, nn.BatchNorm1d, KWinners, transfer_forward_hook=True)
         self.assertTrue(len(net) == 10)
 
         # Exercise forward pass.
@@ -80,7 +88,7 @@ class NetworkConstructionTests(unittest.TestCase):
 
         # Ensure coactivations have been updated.
         conv_coacts = net[4][0].coactivations
-        lin_coacts = net[7][0].module.coactivations
+        lin_coacts = net[7][0].coactivations
         self.assertTrue(not conv_coacts.allclose(torch.zeros_like(conv_coacts)))
         self.assertTrue(not lin_coacts.allclose(torch.zeros_like(lin_coacts)))
 
