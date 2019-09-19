@@ -92,6 +92,12 @@ class DSNNHeb(SparseModel):
             survival_ratios = []
 
             for idx, m in enumerate(self.sparse_modules):
+
+                # Check if module is dynamic.
+                if not isinstance(m, DynamicSparseBase):
+                    continue
+
+                # Update masks.
                 coacts = m.coactivations
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(), self.num_params[idx], coacts, idx=idx
