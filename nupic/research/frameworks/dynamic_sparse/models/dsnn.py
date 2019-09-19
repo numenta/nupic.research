@@ -327,6 +327,9 @@ class DSNNWeightedMag(DSNNHeb):
                 self.log["add_mask_l" + str(idx)] = (
                     torch.sum(add_mask).item() / num_synapses
                 )
+                self.log["new_mask_l" + str(idx)] = (
+                    torch.sum(new_mask).item() / num_synapses
+                )
                 self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
 
         # track added connections
@@ -393,6 +396,9 @@ class DSNNMixedHeb(DSNNHeb):
                 )
                 self.log["add_mask_l" + str(idx)] = (
                     torch.sum(add_mask).item() / num_synapses
+                )
+                self.log["new_mask_l" + str(idx)] = (
+                    torch.sum(new_mask).item() / num_synapses
                 )
                 self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
                 # conditional logs
