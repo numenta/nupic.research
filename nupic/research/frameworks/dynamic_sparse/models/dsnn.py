@@ -46,7 +46,7 @@ class DSNNHeb(SparseModel):
             "hebbian_prune_perc",
             "weight_prune_perc",
         ]:
-            self._make_attr_iterable(attr)
+            self._make_attr_iterable(attr, counterpart=self.dynamic_sparse_modules)
 
         self.added_synapses = [None for m in self.masks]
         self.last_gradients = [None for m in self.masks]

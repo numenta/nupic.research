@@ -305,19 +305,25 @@ class SparseModel(BaseModel):
 
         return sparse_modules
 
-    def _make_attr_iterable(self, attr):
+    def _make_attr_iterable(self, attr, counterpart=None):
         """
         This function (called in setup), ensures that a pre-existing attr
         in an iterable (list) of length equal to self.sparse_modules.
+
+        :param attr: str - name of attribute to make into iterable
+        :param counterpart: Iterable with defined length - determines how many times
+                            to repeat the value of 'attr'. Defaults to
+                            self.sparse_modules.
         """
+        counterpart = counterpart or self.sparse_modules
         value = getattr(self, attr)
         if isinstance(value, Iterable):
-            assert len(value) == len(self.sparse_modules), """
+            assert len(value) == len(counterpart), """
                 Expected '{}' to be of same length as sparse modules ({}).
                 Got {} of type {}.
-                """.format(attr, len(self.sparse_modules), value, type(value))
+                """.format(attr, len(counterpart), value, type(value))
         else:
-            value = [value] * len(self.sparse_modules)
+            value = [value] * len(counterpart)
             setattr(self, attr, value)
 
     def _sparsify_stochastic(self, shape, on_perc):
