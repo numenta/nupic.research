@@ -23,13 +23,56 @@ from collections import OrderedDict
 
 import torch
 
-from nupic.torch.modules import SparseWeights
+from nupic.torch.modules import SparseWeights, SparseWeights2d
 
 from .layers import DSConv2d, DSLinear, DynamicSparseBase, RandDSConv2d, SparseConv2d
 
 # -------------------------------------------------
 # General Utils - network mutators
 # -------------------------------------------------
+
+
+def replace_sparse_weights(sequence):
+
+    new_seq = OrderedDict()
+    for name, m in sequence.named_children():
+
+        # Case 1: Linear
+        if isinstance(m, SparseWeights):
+
+            linear = m.module
+            new_module = torch.nn.Linear(
+                in_features=linear.in_features,
+                out_features=linear.out_features,
+                bias=(linear.bias is not None),
+            )
+
+        # Case 2: Conv2d
+        elif isinstance(m, SparseWeights2d):
+
+            conv = m.module
+            new_module = torch.nn.Conv2d(
+                in_channels=conv.in_channels,
+                out_channels=conv.out_channels,
+                kernel_size=conv.kernel_size,
+                stride=conv.stride,
+                padding=conv.padding,
+                padding_mode=conv.padding_mode,
+                dilation=conv.dilation,
+                groups=conv.groups,
+                bias=(conv.bias is not None),
+            )
+
+        # Case 3: Default, add back-in as is.
+        else:
+            new_module = m
+
+        # Add new_module.
+        new_seq[name] = new_module
+
+    # Return new sequential.
+    new_seq = torch.nn.Sequential(new_seq)
+    return new_seq
 
 
 def swap_layers(sequential, layer_type_a, layer_type_b):
