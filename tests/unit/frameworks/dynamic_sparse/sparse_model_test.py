@@ -23,7 +23,7 @@ import unittest
 import torch
 
 from nupic.research.frameworks.dynamic_sparse.models import SparseModel
-from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb
+from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb, gsc_sparse_dsnn
 
 
 def has_params(layer):
@@ -35,15 +35,15 @@ def count_params(network):
     for layer in network.modules():
         if has_params(layer):
             nonzeros = torch.nonzero(layer.weight.data)
-            print(len(nonzeros))
             total_params += len(nonzeros)
 
     return total_params
 
 
 class SparseModelTest(unittest.TestCase):
-    def test_initialize_sparsify_fixed(self):
-        network = MLPHeb(
+
+    def setUp(self):
+        self.network1 = MLPHeb(
             config=dict(
                 input_size=300,
                 num_classes=10,
@@ -52,6 +52,12 @@ class SparseModelTest(unittest.TestCase):
                 batch_norm=False,
             )
         )
+
+        self.network2 = gsc_sparse_dsnn({})
+
+    def test_initialize_sparsify_fixed(self):
+
+        network = self.network1
 
         params_before = count_params(network)
 
@@ -62,8 +68,6 @@ class SparseModelTest(unittest.TestCase):
         model.setup()
         params_after = count_params(network)
 
-        print("\nparams: ", params_before, params_after)
-
         self.assertEqual(
             int(params_before * on_perc),
             params_after,
@@ -71,15 +75,7 @@ class SparseModelTest(unittest.TestCase):
         )
 
     def test_initialize_sparsify_stochastic(self):
-        network = MLPHeb(
-            config=dict(
-                input_size=300,
-                num_classes=10,
-                hidden_sizes=[100, 100, 100],
-                bias=False,
-                batch_norm=False,
-            )
-        )
+        network = self.network1
 
         params_before = count_params(network)
 
@@ -98,6 +94,14 @@ class SparseModelTest(unittest.TestCase):
             delta=threshold,
             msg="Number of params should be approximate to total params * on perc",
         )
+
+    def test_sparse_modules_count(self):
+
+        sparse_modules1 = SparseModel.get_sparse_modules(self.network1)
+        self.assertTrue(len(sparse_modules1) == 4)
+
+        sparse_modules2 = SparseModel.get_sparse_modules(self.network2)
+        self.assertTrue(len(sparse_modules2) == 4)
 
 
 if __name__ == "__main__":
