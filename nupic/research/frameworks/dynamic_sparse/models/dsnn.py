@@ -26,6 +26,7 @@ import torch
 
 from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     DSConv2d,
+    DynamicSparseBase,
     SparseConv2d,
     calc_sparsity,
     init_coactivation_tracking,

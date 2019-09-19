@@ -23,7 +23,7 @@ import torch
 from torch import nn
 
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
-from nupic.torch.modules import Flatten, KWinners, KWinners2d, SparseWeights
+from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 from .layers import DSConv2d, DSLinear
 from .main import VGG19
@@ -43,8 +43,28 @@ from .utils import (
 class GSCHebDepreciated(nn.Module):
     """LeNet like CNN used for GSC in how so dense paper."""
 
+    # NOTE: See `gsc_sparse_dsnn` for general method to construct
+    #       dynamic-gsc network. For instance, one may use
+    # ```
+    # config = dict(
+    #       prune_methods=[None, "dynamic-conv", "dynamic-linear", None]
+    # )
+    # net = gsc_sparse_dsnn(config)
+    # ```
+    #
+    # This will yield a network with a dense-conv (implied by the None), then a
+    # dynamic-conv, then a dynamic-linear and then a dense-linear
+    # (also implied by the None). As well, all the other intermediate layers
+    # expected from the GSC network will be included between them.
+    #
+    # This `GSCHeb` network would also work just fine; however, it would need some
+    # adjustments to mimic the `GSCHeb` implementation first - that is, it would
+    # need to use modules inherited from `DynamicSparseBase` which helps track
+    # coactivations.
+    #
+
     def __init__(self, config=None):
-        super(GSCHeb, self).__init__()
+        super(GSCHebDepreciated, self).__init__()
 
         defaults = dict(
             input_size=1024,
