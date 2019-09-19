@@ -26,6 +26,7 @@ import torch
 
 from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     DSConv2d,
+    DynamicSparseBase,
     SparseConv2d,
     calc_sparsity,
     init_coactivation_tracking,
@@ -91,29 +92,44 @@ class DSNNHeb(SparseModel):
             # keep track of added synapes
             survival_ratios = []
 
-            for idx, m in enumerate(self.dynamic_sparse_modules):
+            s_idx = 0  # mask index (+1 per sparse module)
+            ds_idx = 0  # pruning index (+1 per dynamic-sparse module)
+            for m in enumerate(self.dynamic_sparse_modules):
 
-                # Update masks.
+                # Case 1: Not Dynamic
+                if not isinstance(m, DynamicSparseBase):
+                    # Iterate for just a sparse module.
+                    # Don't update the masks - keep sparsity as is.
+                    s_idx += 1
+                    continue
+
+                # Case 2: Dynamic.
+                # Update masks - make the sparsity dynamic.
                 coacts = m.coactivations
                 new_mask, keep_mask, new_synapses = self.prune(
-                    m.weight.clone().detach(), self.num_params[idx], coacts, idx=idx
+                    m.weight.clone().detach(),
+                    self.num_params[s_idx], coacts, idx=ds_idx
                 )
                 with torch.no_grad():
-                    self.masks[idx] = new_mask.float()
-                    m.weight.data *= self.masks[idx]
+                    self.masks[s_idx] = new_mask.float()
+                    m.weight.data *= self.masks[s_idx]
 
                     # count how many synapses from last round have survived
-                    if self.added_synapses[idx] is not None:
-                        total_added = torch.sum(self.added_synapses[idx]).item()
+                    if self.added_synapses[s_idx] is not None:
+                        total_added = torch.sum(self.added_synapses[s_idx]).item()
                         surviving = torch.sum(
-                            self.added_synapses[idx] & keep_mask
+                            self.added_synapses[s_idx] & keep_mask
                         ).item()
                         if total_added:
                             survival_ratio = surviving / total_added
                             survival_ratios.append(survival_ratio)
 
                     # keep track of new synapses to count surviving on next round
-                    self.added_synapses[idx] = new_synapses
+                    self.added_synapses[s_idx] = new_synapses
+
+                # Iterate as dynamic-sparse and sparse module (it's technically both)
+                s_idx += 1
+                ds_idx += 1
 
             # logging
             if self.debug_sparse:
