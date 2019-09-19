@@ -26,7 +26,6 @@ import torch
 
 from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     DSConv2d,
-    DynamicSparseBase,
     SparseConv2d,
     calc_sparsity,
     init_coactivation_tracking,
@@ -41,7 +40,7 @@ class DSNNHeb(SparseModel):
     def setup(self):
         super().setup()
 
-        # Set some attributes to be a list corresponding to self.sparse_modules.
+        # Set some attributes to be a list corresponding to self.dynamic_sparse_modules.
         for attr in [
             "hebbian_prune_perc",
             "weight_prune_perc",
@@ -77,7 +76,7 @@ class DSNNHeb(SparseModel):
         super()._post_epoch_updates(dataset)
         # zero out correlations (move to network)
         self._reinitialize_weights()
-        for m in self.sparse_modules:
+        for m in self.dynamic_sparse_modules:
             m.reset_coactivations()
         # decide whether to stop pruning
         if self.pruning_early_stop:
@@ -92,11 +91,7 @@ class DSNNHeb(SparseModel):
             # keep track of added synapes
             survival_ratios = []
 
-            for idx, m in enumerate(self.sparse_modules):
-
-                # Check if module is dynamic.
-                if not isinstance(m, DynamicSparseBase):
-                    continue
+            for idx, m in enumerate(self.dynamic_sparse_modules):
 
                 # Update masks.
                 coacts = m.coactivations
@@ -270,7 +265,8 @@ class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
     def _init_coactivation_tracking(self):
-        for m, weight_prune_frac in zip(self.sparse_modules, self.weight_prune_perc):
+        modules_and_percs = zip(self.dynamic_sparse_modules, self.weight_prune_perc)
+        for m, weight_prune_frac in modules_and_percs:
             if weight_prune_frac is not None:
                 m.apply(init_coactivation_tracking)
 
@@ -325,7 +321,8 @@ class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
     def _init_coactivation_tracking(self):
-        for m, heb_prune_frac in zip(self.sparse_modules, self.hebbian_prune_perc):
+        modules_and_percs = zip(self.dynamic_sparse_modules, self.hebbian_prune_perc)
+        for m, heb_prune_frac in modules_and_percs:
             if heb_prune_frac is not None:
                 m.apply(init_coactivation_tracking)
 
