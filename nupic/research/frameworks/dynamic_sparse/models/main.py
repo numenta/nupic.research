@@ -29,6 +29,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
+from nupic.research.frameworks.dynamic_sparse.networks import DSConv2d, DSLinear
 from nupic.torch.modules import update_boost_strength
 
 
@@ -231,6 +232,9 @@ class SparseModel(BaseModel):
 
         # define sparse modules
         self.sparse_modules = self.get_sparse_modules(self.network)
+        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules(self.network)
+
+        assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
 
         # added option to define sparsity by on_perc
         if "on_perc" in self.__dict__:
@@ -269,6 +273,28 @@ class SparseModel(BaseModel):
 
             # Check if Conv or Linear.
             if isinstance(m, (nn.Linear, nn.Conv2d)):
+                sparse_modules.append(m)
+
+            # Check if recursion needed.
+            elif len(list(m.children())) > 0:
+                sparse_modules.extend(
+                    cls.get_sparse_modules(m)
+                )
+
+        return sparse_modules
+
+    @classmethod
+    def get_dynamic_sparse_modules(cls, net):
+        """
+        This function recursively finds which modules are intended to
+        be dynamically sparse.
+        """
+
+        sparse_modules = []
+        for m in net.children():
+
+            # Check if Conv or Linear.
+            if isinstance(m, (DSLinear, DSConv2d)):
                 sparse_modules.append(m)
 
             # Check if recursion needed.
