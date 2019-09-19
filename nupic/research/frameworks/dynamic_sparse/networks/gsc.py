@@ -25,9 +25,15 @@ from torch import nn
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
 from nupic.torch.modules import Flatten, KWinners, KWinners2d, SparseWeights
 
-from .layers import DSConv2d
+from .layers import DSConv2d, DSLinear
 from .main import VGG19
-from .utils import get_dynamic_sparse_modules, make_dsnn, squash_layers, swap_layers
+from .utils import (
+    get_dynamic_sparse_modules,
+    make_dsnn,
+    replace_sparse_weights,
+    squash_layers,
+    swap_layers,
+)
 
 # --------------
 # GSC Networks
@@ -196,12 +202,11 @@ def mnist_sparse_dsnn(config, squash=True):
 
     net_params = config.get("net_params", {})
     net = MNISTSparseCNN(**net_params)
+    net = replace_sparse_weights(net)
     net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, KWinners2d)
-    net = squash_layers(
-        net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True
-    )
+    net = squash_layers(net, DSLinear, nn.BatchNorm1d, KWinners)
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
@@ -219,12 +224,11 @@ def gsc_sparse_dsnn(config):
 
     net_params = config.get("net_params", {})
     net = GSCSparseCNN(**net_params)
+    net = replace_sparse_weights(net)
     net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
-    net = squash_layers(
-        net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True
-    )
+    net = squash_layers(net, DSLinear, nn.BatchNorm1d, KWinners)
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
@@ -332,9 +336,6 @@ def gsc_sparse_dsnn_fullyconv(config):
     net = make_dsnn(net, config)
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
-    net = squash_layers(
-        net, SparseWeights, nn.BatchNorm1d, KWinners, transfer_forward_hook=True
-    )
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
