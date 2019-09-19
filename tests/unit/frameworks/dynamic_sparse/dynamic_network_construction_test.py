@@ -35,7 +35,7 @@ from nupic.research.frameworks.dynamic_sparse.networks.utils import (
     squash_layers,
     swap_layers,
 )
-from nupic.torch.modules import KWinners, KWinners2d, SparseWeights
+from nupic.torch.modules import KWinners, KWinners2d
 
 
 class NetworkConstructionTests(unittest.TestCase):
