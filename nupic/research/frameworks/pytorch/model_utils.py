@@ -27,7 +27,6 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-
 logging.basicConfig(level=logging.ERROR)
 
 
@@ -161,5 +160,3 @@ def set_random_seed(seed, deterministic_mode=True):
     if torch.backends.cudnn.is_available() and deterministic_mode:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-
-
