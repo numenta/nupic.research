@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from collections import defaultdict
+from collections.abc import Iterable
 from itertools import product
 
 import numpy as np
@@ -28,7 +29,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
-from nupic.research.frameworks.dynamic_sparse.networks import DynamicSparseBase
+from nupic.research.frameworks.dynamic_sparse.networks import DSConv2d, DSLinear
 from nupic.torch.modules import update_boost_strength
 
 
@@ -225,35 +226,107 @@ class SparseModel(BaseModel):
     def setup(self):
         super(SparseModel, self).setup()
 
+        # calculate sparsity masks
+        self.masks = []
+        self.num_params = []  # added for paper implementation
+
+        # define sparse modules
+        self.sparse_modules = self.get_sparse_modules(self.network)
+        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules(self.network)
+
+        assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
+
         # added option to define sparsity by on_perc
         if "on_perc" in self.__dict__:
+            self._make_attr_iterable("on_perc")
             on_perc = self.on_perc
             self.epsilon = None
 
         with torch.no_grad():
-            # calculate sparsity masks
-            self.masks = []
-            self.num_params = []  # added for paper implementation
 
-            # define sparse modules
-            self.sparse_modules = []
-            for m in list(self.network.modules()):
-                if isinstance(m, DynamicSparseBase):
-                    # TODO: Could be more fitting to name this 'dynamic_sparse_modules'
-                    self.sparse_modules.append(m)
-
-            for m in self.sparse_modules:
+            for idx, m in enumerate(self.sparse_modules):
                 shape = m.weight.shape
                 # two approaches of defining epsilon
                 if self.epsilon:
                     on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-                if self.sparsify_fixed:
-                    mask = self._sparsify_fixed(shape, on_perc)
+                if on_perc[idx] >= 1:
+                    mask = torch.ones(shape).float().to(self.device)
+                elif self.sparsify_fixed:
+                    mask = self._sparsify_fixed(shape, on_perc[idx])
                 else:
-                    mask = self._sparsify_stochastic(shape, on_perc)
+                    mask = self._sparsify_stochastic(shape, on_perc[idx])
                 m.weight.data *= mask
                 self.masks.append(mask)
                 self.num_params.append(torch.sum(mask).item())
+
+    @classmethod
+    def get_sparse_modules(cls, net):
+        """
+        This function recursively finds which modules to make sparse
+        and which to remain dense. The encapsulated logic crucially
+        assumes that no conv or linear layers have sub-children that need
+        sparsifying.
+
+        Note: For instance DSConv2d layers have Conv2d children)
+        """
+
+        sparse_modules = []
+        for m in net.children():
+
+            # Check if Conv or Linear.
+            if isinstance(m, (nn.Linear, nn.Conv2d)):
+                sparse_modules.append(m)
+
+            # Check if recursion needed.
+            elif len(list(m.children())) > 0:
+                sparse_modules.extend(
+                    cls.get_sparse_modules(m)
+                )
+
+        return sparse_modules
+
+    @classmethod
+    def get_dynamic_sparse_modules(cls, net):
+        """
+        This function recursively finds which modules are intended to
+        be dynamically sparse.
+        """
+
+        sparse_modules = []
+        for m in net.children():
+
+            # Check if Conv or Linear.
+            if isinstance(m, (DSLinear, DSConv2d)):
+                sparse_modules.append(m)
+
+            # Check if recursion needed.
+            elif len(list(m.children())) > 0:
+                sparse_modules.extend(
+                    cls.get_sparse_modules(m)
+                )
+
+        return sparse_modules
+
+    def _make_attr_iterable(self, attr, counterpart=None):
+        """
+        This function (called in setup), ensures that a pre-existing attr
+        in an iterable (list) of length equal to self.sparse_modules.
+
+        :param attr: str - name of attribute to make into iterable
+        :param counterpart: Iterable with defined length - determines how many times
+                            to repeat the value of 'attr'. Defaults to
+                            self.sparse_modules.
+        """
+        counterpart = counterpart or self.sparse_modules
+        value = getattr(self, attr)
+        if isinstance(value, Iterable):
+            assert len(value) == len(counterpart), """
+                Expected '{}' to be of same length as sparse modules ({}).
+                Got {} of type {}.
+                """.format(attr, len(counterpart), value, type(value))
+        else:
+            value = [value] * len(counterpart)
+            setattr(self, attr, value)
 
     def _sparsify_stochastic(self, shape, on_perc):
         """Sthocastic in num of params approach of sparsifying a tensor"""

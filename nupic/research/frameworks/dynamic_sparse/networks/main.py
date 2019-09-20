@@ -119,9 +119,9 @@ class VGG19(nn.Module):
                 m.bias.data.zero_()
 
 
-class VGG19Heb(nn.Module):
+class VGG19HebDepreciated(nn.Module):
     def __init__(self, config=None):
-        super(VGG19Heb, self).__init__()
+        super(VGG19HebDepreciated, self).__init__()
 
         defaults = dict(
             device="gpu",
