@@ -24,14 +24,14 @@ from torch import nn
 
 from nupic.torch.modules import KWinners
 
-from .layers import DynamicSparseBase, init_coactivation_tracking
+from .layers import DSLinear, init_coactivation_tracking
 
 # ------------------------------------------------------------------------------------
 # DynamicSparse Linear Block 2019-09-13
 # ------------------------------------------------------------------------------------
 
 
-class DSLinearBlock(nn.Sequential, DynamicSparseBase):
+class DSLinearBlock(nn.Sequential):
 
     def __init__(
         self,
@@ -48,7 +48,7 @@ class DSLinearBlock(nn.Sequential, DynamicSparseBase):
         # - bn after relu in recent work
         # (see fchollet @ https://github.com/keras-team/keras/issues/1802)
         # - however, if applied after RELU or kWinners, breaks sparsity
-        layers = [nn.Linear(in_features, out_features, bias=bias)]
+        layers = [DSLinear(in_features, out_features, bias=bias)]
         if batch_norm:
             layers.append(nn.BatchNorm1d(out_features))
         if activation_func:
@@ -57,8 +57,14 @@ class DSLinearBlock(nn.Sequential, DynamicSparseBase):
             layers.append(nn.Dropout(p=dropout))
         super().__init__(*layers)
 
-        # Initialize dynamic sparse attributes.
-        self._init_coactivations(weight=self[0].weight)
+        # Transfer forward hook.
+        dslayer = self[0]
+        forward_hook = dslayer.forward_hook
+        self.register_forward_hook(
+            lambda module, in_, out_:
+            forward_hook(dslayer, in_, out_)
+        )
+        dslayer.forward_hook_handle.remove()
 
     @property
     def weight(self):
@@ -69,26 +75,7 @@ class DSLinearBlock(nn.Sequential, DynamicSparseBase):
 
     def forward(self, input_tensor):
         output_tensor = super().forward(input_tensor)
-        if self._track_coactivations:
-            self.update_coactivations(input_tensor, output_tensor)
         return output_tensor
-
-    def update_coactivations(self, x, y):
-        outer = 0
-        n_samples = x.shape[0]
-        with torch.no_grad():
-
-            # Get active units.
-            curr_act = (x > 0).detach().float()
-            prev_act = (y > 0).detach().float()
-
-            # Cumulate outer product over all samples.
-            # TODO: Vectorize this sum; for instance, using torch.einsum().
-            for s in range(n_samples):
-                outer += torch.ger(prev_act[s], curr_act[s])
-
-        # Update coactivations.
-        self.coactivations[:] += outer
 
 
 # ------------
@@ -169,7 +156,7 @@ class MLPHeb(nn.Module):
         )
 
         # Create the classifier.
-        self.dynamic_sparse_modules = layers[1:]
+        self.dynamic_sparse_modules = [l[0] for l in layers[1:]]
         self.classifier = nn.Sequential(*layers)
 
         # Initialize attr to decide whether to update coactivations during learning.

@@ -130,10 +130,26 @@ def init_coactivation_tracking(m):
 
 class DynamicSparseBase(torch.nn.Module):
 
-    def _init_coactivations(self, weight):
+    def _init_coactivations(self, weight, update_nsteps=1):
+        """
+        This method
+            1. registers a buffer the shape of weight to track coactivations
+            2. adds a forward hook to the module to update the coactivations
+               every 'update_nsteps'.
+        """
+
         # Init buffer to keep track of coactivations.
         self._track_coactivations = False
         self.register_buffer("coactivations", torch.zeros_like(self.weight))
+
+        # Init helper attrs to keep track of when to update coactivations.
+        self.learning_iterations = 0
+        self.update_nsteps = update_nsteps
+
+        # Register hook to update coactivations.
+        assert hasattr(self, "update_coactivations"), \
+            "DynamicSparse modules must define a coactivation function."
+        self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
 
     def init_coactivation_tracking(self):
         self._track_coactivations = True
@@ -141,6 +157,52 @@ class DynamicSparseBase(torch.nn.Module):
     def reset_coactivations(self):
         # Reset coactivations to zero.
         self.coactivations[:] = 0
+
+    @staticmethod
+    def forward_hook(module, input_tensor, output_tensor):
+        if not module._track_coactivations:
+            return
+
+        # Update connections strengths.
+        if isinstance(input_tensor, tuple):
+            # TODO: This assumption of taking the first element may not
+            #       work for all module.
+            input_tensor = input_tensor[0]
+        if module.training:
+            if module.learning_iterations % module.update_nsteps == 0:
+                module.update_coactivations(input_tensor, output_tensor)
+            module.learning_iterations += 1
+
+
+# ------------------
+# Linear Layers
+# ------------------
+
+class DSLinear(torch.nn.Linear, DynamicSparseBase):
+
+    def __init__(self, in_features, out_features, bias=False):
+
+        super().__init__(in_features, out_features, bias=bias)
+
+        # Initialize dynamic sparse attributes.
+        self._init_coactivations(weight=self.weight)
+
+    def update_coactivations(self, x, y):
+        outer = 0
+        n_samples = x.shape[0]
+        with torch.no_grad():
+
+            # Get active units.
+            curr_act = (x > 0).detach().float()
+            prev_act = (y > 0).detach().float()
+
+            # Cumulate outer product over all samples.
+            # TODO: Vectorize this sum; for instance, using torch.einsum().
+            for s in range(n_samples):
+                outer += torch.ger(prev_act[s], curr_act[s])
+
+        # Update coactivations.
+        self.coactivations[:] += outer
 
 # ------------------
 # Conv Layers
@@ -255,7 +317,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             dilation, groups, bias, padding_mode,
         )
 
-        self._init_coactivations(self.weight)
+        self._init_coactivations(self.weight, update_nsteps=update_nsteps)
 
         if prune_dims is None:
             self.prune_dims = [0, 1]
@@ -272,7 +334,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         #   k1_weight - the number of connections to keep by magnitude pruning
         #   k1_hebbian - the number of connections to keep by hebbian pruning
         #   k2 - the number of connections to keep non-zero
-        self.update_nsteps = update_nsteps
         self.num_connections = np.prod([
             d for i, d in enumerate(self.weight.shape) if i not in self.prune_dims
         ])
@@ -298,9 +359,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             self.weight_sparsity = calc_sparsity(self.weight)
         self.prune_grads_hook = self.weight.register_hook(
             lambda grad: grad * self.last_keep_mask.type(grad.dtype).to(grad.device))
-
-        # Register hook to update coactivations.
-        self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
 
         # Specify number of groups for the helper convolutional layer.
         # This is equal to the number of connections in the last three dimensions:
@@ -857,17 +915,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
             # ----- END LOG BLOCK -----
 
-    @staticmethod
-    def forward_hook(module, input_tensor, output_tensor):
-        # Update connections strengths.
-        if isinstance(input_tensor, tuple):
-            input_tensor = input_tensor[0]
-        if module.training:
-            if module.learning_iterations % module.update_nsteps == 0 \
-               and module._track_coactivations:
-                module.update_coactivations(input_tensor, output_tensor)
-            module.learning_iterations += 1
-
     def __call__(self, input_tensor, *args, **kwargs):
         output_tensor = super().__call__(input_tensor, *args, **kwargs)
         return output_tensor
@@ -898,214 +945,21 @@ class RandDSConv2d(DSConv2d):
         self.coactivations.data[:] = torch.ones_like(self.weight)
 
 
-class SparseConv2d(DSConv2d):
+class SparseConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
-    def _init_logging_params(self):
-        pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_coactivations(self.weight)
 
-    def progress_connections(self, *args, **kwargs):
-        pass
+    # def _init_logging_params(self):
+    #     pass
 
-    def update_coactivations(self, *args, **kwargs):
-        pass
+    # def progress_connections(self, *args, **kwargs):
+    #     pass
+
+    # def update_coactivations(self, *args, **kwargs):
+    #     pass
 
 
 if __name__ == "__main__":
-
-    # --------------------------------
-    # Exercise basic functionalities.
-    # --------------------------------
-    import torch.optim as optim
-
-    torch.manual_seed(42)
-
-    if True:
-
-        conv1 = _NullConv(3, 3, 4)
-        conv2 = DSConv2d(8, 8, 4,
-                         prune_dims=[0, 1],
-                         hebbian_prune_frac=0.99,
-                         sparsity=0.98)
-        conv3 = RandDSConv2d(8, 8, 4)
-
-        assert torch.tensor([calc_sparsity(conv2.weight)]).allclose(
-            torch.Tensor([1 - conv2.nonzero_frac]), rtol=0, atol=0.1), \
-            "Sparsity {}".format(conv2.calc_sparsity())
-
-        torch.autograd.set_detect_anomaly(True)
-        optimizer = optim.SGD(conv2.parameters(), lr=0.001, momentum=0.9)
-        input_tensor = torch.randn(2, 8, 10, 10)
-        output_tensor = super(DSConv2d, conv2).__call__(input_tensor)
-        conv2.update_coactivations(input_tensor, output_tensor)
-        assert calc_sparsity(conv2.coactivations) != 1
-
-        conv2.progress_connections()
-
-        w2 = conv2.weight.clone().detach()
-
-        output_tensor.mean().backward()
-        optimizer.step()
-
-        grad_sparsity = torch.tensor([calc_sparsity(conv2.weight.grad)])
-        assert grad_sparsity.allclose(
-            torch.Tensor([1 - conv2.nonzero_frac]), rtol=0, atol=0.1), \
-            "Sparsity = {} , Expected = {}".format(
-                grad_sparsity, 1 - conv2.nonzero_frac)
-
-        conv2.update_coactivations(input_tensor, output_tensor)
-        assert calc_sparsity(conv2.coactivations) != 1
-
-        output_tensor = super(DSConv2d, conv3).__call__(input_tensor)
-        conv3.update_coactivations(input_tensor, output_tensor)
-        conv3.progress_connections()
-
-        # conv4 = SparseConv2d(0.7, 3, 3, 4)
-        # optimizer = optim.SGD(conv4.parameters(), lr=0.001, momentum=0.9)
-
-        # input_tensor = torch.randn(4, 3, 10, 10)
-        # output_tensor = conv4(input_tensor)
-
-        # grad = output_tensor.mean().backward()
-        # optimizer.step()
-
-        # input_tensor = torch.randn(4, 3, 10, 10)
-        # output_tensor = conv4(input_tensor)
-
-        # grad = output_tensor.mean().backward()
-        # optimizer.step()
-
-        # sparsity = calc_sparsity(conv4.weight)
-        # assert np.isclose(sparsity, 0.7, rtol=0, atol=0.01), \
-        #     "Expected sparsity {}, observed {}".format(0.7, sparsity)
-
-    # ---------------------------------------------
-    # Validate behavior against brute force method.
-    # ---------------------------------------------
-
-    subtract_mean_activations = True
-
-    def coactivation(t1, t2, alpha, mean_activations):
-        """
-        :param t1: input unit
-        :param t1: output unit
-        :param alpha: activity threshold
-        :param mean_activations: average activations of input and output
-        """
-        a1, a2 = alpha if hasattr(alpha, "__iter__") else (alpha, alpha)
-
-        if subtract_mean_activations:
-            t1, t2 = (t1 - mean_activations[0], t2 - mean_activations[1])
-
-        s = torch.abs(t1).gt(a1) * torch.abs(t2).gt(a2)
-        return s
-
-    def get_indeces_of_input_and_filter(
-            n, m, in_channels, kernel_size, padding, stride):
-        """
-        Assumes dilation=1 and grouping=1
-        """
-
-        k1, k2 = kernel_size
-        p1, p2 = padding
-        s1, s2 = stride
-
-        i1, i2 = (0, 0)
-
-        i1 -= p1
-        i2 -= p2
-
-        i1 += n * s1
-        i2 += m * s2
-
-        indxs = []
-        for c_in in range(in_channels):
-            for n_k1 in range(k1):
-                for m_k2 in range(k2):
-                    filter_indx = (c_in, n_k1, m_k2)
-                    input_indx = (c_in, i1 + n_k1, i2 + m_k2)
-                    indxs.append((input_indx, filter_indx))
-
-        return indxs
-
-    if True:
-
-        conv = DSConv2d(32, 32, 5, prune_dims=[])
-        input_tensor = torch.randn(2, 32, 10, 10)
-        output_tensor = super(DSConv2d, conv).__call__(input_tensor)
-        conv.update_coactivations(input_tensor, output_tensor)
-        conv.progress_connections()
-        conv.update_coactivations(input_tensor, output_tensor)
-        conv.progress_connections()
-
-    if True:
-
-        batch_size = 2
-        in_channels = 4
-        out_channels = 4
-        kernel_size = (2, 2)
-        stride = (1, 1)
-        padding = 0
-        conv = DSConv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=1,
-            groups=1,
-            sparsity=0.98,
-            hebbian_prune_frac=0.99,
-            prune_dims=[],
-            magnitude_prune_frac=0.00,
-            coactivation_test="variance",
-            update_nsteps=1,
-        )
-
-        input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
-        output_tensor = conv(input_tensor)
-        mean_activations = (input_tensor.mean(), output_tensor.mean())
-
-        B = output_tensor.shape[0]
-        N_out = output_tensor.shape[2]
-        M_out = output_tensor.shape[3]
-        C_in = conv.weight.shape[1]
-        C_out = conv.weight.shape[0]
-        kernel_size = conv.kernel_size
-        stride = conv.stride
-        padding = conv.padding
-        alpha = conv.get_activity_threshold(input_tensor, output_tensor)
-
-        def calc_coactivations(input_tensor, output_tensor, mean_activations, alpha):
-            h = torch.zeros_like(conv.weight)
-            for b in range(B):
-                for c_out in range(C_out):
-                    for n_out in range(N_out):
-                        for m_out in range(M_out):
-                            unit_1 = output_tensor[b, c_out, n_out, m_out]
-                            indxs = get_indeces_of_input_and_filter(
-                                n_out, m_out, in_channels, kernel_size, padding, stride)
-
-                            for input_indx, filter_indx in indxs:
-                                c_in, n_in, m_in = input_indx
-                                c_fl, n_fl, m_fl = filter_indx
-                                unit_2 = input_tensor[b, c_in, n_in, m_in]
-
-                                if coactivation(unit_2,
-                                                unit_1, alpha, mean_activations):
-                                    h[c_out, c_fl, n_fl, m_fl] += 1
-            return h
-
-        H = calc_coactivations(input_tensor, output_tensor, mean_activations, alpha)
-        H_copy = H.clone().detach()
-        assert conv.coactivations.allclose(H, atol=0, rtol=0)
-        conv.progress_connections()
-
-        input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
-        output_tensor = conv(input_tensor)
-        alpha = conv.get_activity_threshold(input_tensor, output_tensor)
-        mean_activations = (input_tensor.mean(), output_tensor.mean())
-
-        H = calc_coactivations(input_tensor, output_tensor, mean_activations, alpha)
-        assert conv.coactivations.allclose(H, atol=0, rtol=0)
-
-        print("DONE.")
+    pass
