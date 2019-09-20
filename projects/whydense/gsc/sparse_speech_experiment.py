@@ -30,12 +30,11 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
-from nupic.research.frameworks.pytorch.model_utils import (
-    set_random_seed,
-)
+from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.research.frameworks.pytorch.models.le_sparse_net import (
+    LeSparseNet,
     add_sparse_cnn_layer,
-    add_sparse_linear_layer
+    add_sparse_linear_layer,
 )
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
@@ -141,7 +140,7 @@ class SparseSpeechExperiment(object):
                     linear_n=linear_n[i],
                     dropout=dropout,
                     use_batch_norm=use_batch_norm,
-                    weight_sparsity=weight_sparsity,
+                    weight_sparsity=weight_sparsity[i],
                     percent_on=linear_percent_on[i],
                     k_inference_factor=k_inference_factor,
                     boost_strength=boost_strength,
@@ -154,6 +153,21 @@ class SparseSpeechExperiment(object):
                 "output", nn.Linear(input_size, self.num_classes)
             )
             model.add_module("softmax", nn.LogSoftmax(dim=1))
+
+        elif self.model_type == "le_sparse":
+            model = LeSparseNet(
+                cnn_out_channels=cnn_out_channels,
+                cnn_activity_percent_on=cnn_percent_on,
+                cnn_weight_percent_on=cnn_weight_sparsity,
+                linear_n=linear_n,
+                linear_activity_percent_on=linear_percent_on,
+                linear_weight_percent_on=weight_sparsity,
+                boost_strength=boost_strength,
+                boost_strength_factor=boost_strength_factor,
+                use_batch_norm=use_batch_norm,
+                dropout=dropout,
+                num_classes=self.num_classes,
+            )
 
         elif self.model_type == "resnet9":
             model = resnet9(
