@@ -39,7 +39,7 @@ from nupic.research.frameworks.pytorch.model_utils import (
 )
 from nupic.research.frameworks.pytorch.models.le_sparse_net import (
     add_sparse_cnn_layer,
-    add_sparse_linear_layer
+    add_sparse_linear_layer,
 )
 from nupic.torch.modules import Flatten, rezero_weights, update_boost_strength
 
