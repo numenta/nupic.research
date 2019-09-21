@@ -95,6 +95,14 @@ def run_noise_test(config):
             json.dump(res, f)
             print(res)
 
+        # Compute total noise score
+        total_correct = 0
+        for k, v in res.items():
+            print(k, v, v["total_correct"])
+            total_correct += v["total_correct"]
+        print("Total across all noise values",total_correct)
+
+
     # Upload results to S3
     sync_function = config.get("sync_function", None)
     if sync_function is not None:
@@ -167,7 +175,6 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
     # Initialize ray cluster
     if redis_address is not None:
         ray.init(redis_address=redis_address, include_webui=True)
-        num_cpus = 1
     else:
         ray.init(num_cpus=num_cpus, num_gpus=num_gpus, local_mode=num_cpus == 1)
 
