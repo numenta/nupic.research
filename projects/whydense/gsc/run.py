@@ -100,8 +100,7 @@ def run_noise_test(config):
         for k, v in res.items():
             print(k, v, v["total_correct"])
             total_correct += v["total_correct"]
-        print("Total across all noise values",total_correct)
-
+        print("Total across all noise values", total_correct)
 
     # Upload results to S3
     sync_function = config.get("sync_function", None)
