@@ -1,5 +1,24 @@
 # Speech Commands Data Set v0.01
 
+This is a dataset of one-second .wav audio files, each containing a single spoken
+English word. 
+
+## Usage
+
+Download dataset, and select the 10 categories corresponding to the spoken 
+digits:
+
+```
+download_speech_commands.sh
+```
+
+
+Below is the original 
+
+
+###################################################
+
+
 This is a set of one-second .wav audio files, each containing a single spoken
 English word. These words are from a small set of commands, and are spoken by a
 variety of different speakers. The audio files are organized into folders based
