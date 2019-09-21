@@ -214,3 +214,41 @@ class GSCHeb(HebbianNetwork):
         else:
             return nn.ReLU()
 
+
+class GSCHebSmall(GSCHeb):
+    """Simple 3 hidden layers + output MLP"""
+
+    def __init__(self, config=None):
+        super().__init__()
+
+        defaults = dict(
+            device='cpu',
+            input_size=1024,
+            num_classes=12,
+            boost_strength=1.5,
+            boost_strength_factor=0.9,
+            k_inference_factor=1.5,
+            duty_cycle_period=1000,
+            use_kwinners=True,
+            hidden_neurons_fc=207,
+        )
+        defaults.update(config or {})
+        self.__dict__.update(defaults)
+        self.device = torch.device(self.device)
+
+        # hidden layers
+        conv_layers = [
+            *self._conv_block(1, 12, percent_on=0.095),  # 28x28 -> 14x14
+            *self._conv_block(12, 12, percent_on=0.125),  # 10x10 -> 5x5
+            Flatten(),
+        ]
+
+        linear_layers = [
+            # *self._linear_block(1600, 1500, percent_on= 0.067),
+            *self._linear_block(300, self.hidden_neurons_fc, percent_on=0.1),
+            nn.Linear(self.hidden_neurons_fc, self.num_classes),
+        ]
+
+        self.features = nn.Sequential(*conv_layers)
+        self.classifier = nn.Sequential(*linear_layers)
+
