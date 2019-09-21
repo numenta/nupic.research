@@ -274,6 +274,7 @@ class SparseSpeechExperiment(object):
             else self.lr_scheduler.get_lr(),
         )
 
+        self.pre_epoch()
         self.model.train()
         for batch_idx, (data, target) in enumerate(self.train_loader):
             # data = torch.unsqueeze(data, 1)
@@ -286,20 +287,18 @@ class SparseSpeechExperiment(object):
 
             if batch_idx >= self.batches_in_epoch:
                 break
-
         self.post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
 
     def post_epoch(self):
-        self.model.apply(update_boost_strength)
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         t2 = time.time()
         self.train_loader.dataset.load_next()
-        self.logger.debug(
-            "Dataset Load time = {0:.3f} secs, ".format(time.time() - t2)
-        )
+
+    def pre_epoch(self):
+        self.model.apply(update_boost_strength)
 
     def test(self, test_loader=None):
         """Test the model using the given loader and return test metrics."""
