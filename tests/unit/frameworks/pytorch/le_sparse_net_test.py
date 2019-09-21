@@ -49,7 +49,7 @@ class LeSparseNetTest(unittest.TestCase):
             linear_weight_percent_on=(1.0, 0.4),
         )
         self.assertGreater(len(model), 2)
-        for key, val in model.named_modules():
+        for key, _ in model.named_modules():
             self.assertFalse("cnn" in key)
 
         # Run some input through it and ensure it doesn't crash
@@ -65,7 +65,7 @@ class LeSparseNetTest(unittest.TestCase):
             linear_n=(),
         )
         self.assertGreater(len(model), 2)
-        for key, val in model.named_modules():
+        for key, _ in model.named_modules():
             self.assertFalse("linear" in key)
 
         # Run some input through it and ensure it doesn't crash
