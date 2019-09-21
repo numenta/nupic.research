@@ -33,11 +33,13 @@ from nupic.research.frameworks.pytorch.dataset_utils import (
 )
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.model_utils import (
-    add_sparse_cnn_layer,
-    add_sparse_linear_layer,
     evaluate_model,
     set_random_seed,
     train_model,
+)
+from nupic.research.frameworks.pytorch.models.le_sparse_net import (
+    add_sparse_cnn_layer,
+    add_sparse_linear_layer,
 )
 from nupic.torch.modules import Flatten, rezero_weights, update_boost_strength
 
