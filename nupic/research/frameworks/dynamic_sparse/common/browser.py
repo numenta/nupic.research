@@ -110,7 +110,7 @@ def _read_experiment(experiment_state, experiment_path):
     return progress, params
 
 
-def _get_value(progress, params, exp_name, performance_metrics=None, exp_substring=""):
+def _get_value(progress, params, exp_name, performance_metrics=None, full_metrics=None, exp_substring=""):
     """
     For every experiment whose name matches exp_substring, scan the history
     and return the appropriate value associated with tag.
@@ -132,6 +132,9 @@ def _get_value(progress, params, exp_name, performance_metrics=None, exp_substri
     if performance_metrics is None:
         performance_metrics = [m for m in progress[exps[0]].keys() if "acc" in m]
 
+    if full_metrics is None:
+        full_metrics = ['val_acc']
+
     # populate stats
     stats = defaultdict(list)
     for e in exps:
@@ -147,6 +150,10 @@ def _get_value(progress, params, exp_name, performance_metrics=None, exp_substri
             # others
             stats[m + "_median"].append(progress[e][m].median())
             stats[m + "_last"].append(progress[e][m].iloc[-1])
+
+        # add all data for one metric - required to plot
+        for m in full_metrics:
+            stats[m + '_all'].append(progress[e][m])
 
         # remaining custom tags - specific
         stats["epochs"].append(progress[e]["training_iteration"].iloc[-1])

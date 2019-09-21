@@ -39,7 +39,9 @@ base_exp_config = dict(
     batch_size_train=(4, 16),
     batch_size_test=1000,
     # network related
-    network="GSCHeb",
+    # test 2 networks - create a new one equivalent
+    # need to load into notebook and found out size
+    network=tune.grid_search(["GSCHeb", "GSCHebSmall"]),
     optim_alg="SGD",
     momentum=0, # 0.9,
     learning_rate=0.01, # 0.1,
@@ -50,29 +52,30 @@ base_exp_config = dict(
     use_kwinners=True,
     # sparse_linear_only=True, # False
     # model related
-    model=tune.grid_search(["DSNNWeightedMag", "DSNNMixedHeb"]),
-    on_perc=0.04,
+    model="BaseModel",
+    # on_perc=0.04,
     # sparse related
+    on_perc=1,
     hebbian_prune_perc=None,
     hebbian_grow=False,
-    weight_prune_perc=tune.grid_search(list(np.arange(0, 1.001, 0.05))),
-    pruning_early_stop=2,
+    # weight_prune_perc=tune.grid_search(list(np.arange(0, 1.001, 0.05))),
+    # pruning_early_stop=2,
     # additional validation
     test_noise=False,
     # debugging
     debug_weights=True,
-    debug_sparse=True,
+    # debug_sparse=False,
 )
 
 # ray configurations
 tune_config = dict(
-    name=__file__.replace(".py", "") + "_searchperc2",
-    num_samples=5,
+    name=__file__.replace(".py", "") + "_test2",
+    num_samples=10,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 100},
-    resources_per_trial={"cpu": 1, "gpu": .20},
+    resources_per_trial={"cpu": 1, "gpu": .25},
     loggers=DEFAULT_LOGGERS,
     verbose=0,
 )
