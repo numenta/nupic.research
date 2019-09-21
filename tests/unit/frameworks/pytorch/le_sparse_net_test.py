@@ -48,8 +48,8 @@ class LeSparseNetTest(unittest.TestCase):
             linear_activity_percent_on=(0.1, 1.0),
             linear_weight_percent_on=(1.0, 0.4),
         )
-        self.assertGreater(len(model._modules), 2)
-        for key in model._modules.keys():
+        self.assertGreater(len(model), 2)
+        for key, val in model.named_modules():
             self.assertFalse("cnn" in key)
 
         # Run some input through it and ensure it doesn't crash
@@ -64,8 +64,8 @@ class LeSparseNetTest(unittest.TestCase):
             cnn_out_channels=(8, ),
             linear_n=(),
         )
-        self.assertGreater(len(model._modules), 2)
-        for key in model._modules.keys():
+        self.assertGreater(len(model), 2)
+        for key, val in model.named_modules():
             self.assertFalse("linear" in key)
 
         # Run some input through it and ensure it doesn't crash
@@ -84,7 +84,7 @@ class LeSparseNetTest(unittest.TestCase):
             linear_activity_percent_on=(0.1, 1.0),
             linear_weight_percent_on=(1.0, 0.4),
         )
-        self.assertGreater(len(model._modules), 2)
+        self.assertGreater(len(model), 2)
 
         # Run some input through it and ensure it doesn't crash
         x = torch.randn((2,) + (1, 32, 32))
