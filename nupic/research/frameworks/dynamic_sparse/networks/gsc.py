@@ -26,7 +26,6 @@ from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 from .layers import DSConv2d, DSLinear
-from .main import VGG19
 from .utils import (
     get_dynamic_sparse_modules,
     make_dsnn,
