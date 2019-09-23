@@ -25,7 +25,6 @@ from collections.abc import Iterable
 
 from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     DSConv2d,
-    SparseConv2d,
     calc_sparsity,
     init_coactivation_tracking,
 )
@@ -117,7 +116,7 @@ class DSCNN(BaseModel):
             name = re.sub(r"squashed" + r"(\d+)", "", name)
             total_attr_d = defaultdict(lambda: 0)
             count_attr_d = defaultdict(lambda: 0)
-            if isinstance(module, DSConv2d) and not isinstance(module, SparseConv2d):
+            if isinstance(module, DSConv2d):
                 # Prune. Then log some params.
                 module.progress_connections()
                 print("progressing")
@@ -140,7 +139,7 @@ class DSCNN(BaseModel):
             #     count = count_attr_d[attr]
             #     self.log[attr + "_" + "total_mean"] = total / count
 
-            if isinstance(module, (DSConv2d, SparseConv2d)):
+            if isinstance(module, DSConv2d):
                 self.log["sparsity_" + name] = calc_sparsity(module.weight)
 
     def _log_weights(self):
