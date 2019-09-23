@@ -159,7 +159,7 @@ class CoactivationsTest(unittest.TestCase):
             conv.weight.shape, padding, stride,
             input_tensor, output_tensor, mean_activations, alpha)
         self.assertTrue(conv.coactivations.allclose(coacts, atol=0, rtol=0))
-        conv.progress_connections()
+        conv.reset_coactivations()
 
         input_tensor = torch.randn(batch_size, in_channels, *kernel_size)
         output_tensor = conv(input_tensor)
