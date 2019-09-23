@@ -245,6 +245,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         sparsity=0.80,
         prune_dims=None,
         update_nsteps=100,
+        half_precision=False,
         coactivation_test="correlation_proxy",
         threshold_multiplier=1,
     ):
@@ -260,6 +261,10 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
                            over all i, j combinations
         :param update_nsteps: period of training steps to wait before calculating the
                               coactivations needed for Hebbian pruning.
+        :param half_precision: whether to operate in half precision when calculating
+                               calculating the coactivation - this only works when the
+                               device is "cuda" and is mainly for memory saving during
+                               training
         """
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding,
@@ -267,6 +272,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         )
 
         self._init_coactivations(self.weight, update_nsteps=update_nsteps)
+        self.half_precision = half_precision
 
         if prune_dims is None:
             self.prune_dims = [0, 1]
@@ -500,16 +506,16 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         """
 
         # Construct weight.
+        dtype = torch.float16 if self.half_precision else torch.float32
         weight = torch.zeros(
             1, *self.weight.shape[1:],
-            dtype=torch.float32
+            dtype=dtype
         )
 
         # Set weights to zero except those specified.
         weight[0, c, j, h] = 1
 
-        # TODO: The 'to' here may not be needed.
-        return weight.to("cuda" if torch.cuda.device_count() > 0 else "cpu")
+        return weight
 
     def get_activity_threshold(self, input_tensor, output_tensor):
         """
@@ -531,6 +537,11 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         """
         with torch.no_grad():
 
+            # Switch to half-floating precision if needed.
+            if self.half_precision:
+                input_tensor = input_tensor.half()
+
+            # Prep input to compute the coactivations.
             grouped_input = input_tensor.repeat((1, self.new_groups, 1, 1))
             grouped_input = self.grouped_conv(grouped_input).repeat(
                 (1, self.out_channels, 1, 1))
