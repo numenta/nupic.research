@@ -201,16 +201,6 @@ def gsc_conv_only_heb_depreciated(config):
     return network
 
 
-def vgg19_dsnn(config):
-
-    net = VGG19(config)
-    net = make_dsnn(net)
-
-    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
-
-    return net
-
-
 def mnist_sparse_cnn(config):
 
     net_params = config.get("net_params", {})
