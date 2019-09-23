@@ -23,6 +23,7 @@ import os
 from collections.abc import Iterable
 from copy import deepcopy
 
+import numpy as np
 import ray
 import torch  # to remove later
 from ray import tune
@@ -112,8 +113,12 @@ class Dataset:
             tempset = getattr(datasets, self.dataset_name)(
                 root=self.data_dir, train=True, transform=transforms.ToTensor()
             )
-            self.stats_mean = (tempset.data.float().mean().item() / 255,)
-            self.stats_std = (tempset.data.float().std().item() / 255,)
+            if isinstance(tempset, np.ndarray):
+                self.stats_mean = (tempset.data.mean() / 255,)
+                self.stats_std = (tempset.data.std() / 255,)
+            else:
+                self.stats_mean = (tempset.data.float().mean().item() / 255,)
+                self.stats_std = (tempset.data.float().std().item() / 255,)
             del tempset
 
         # set up transformations
