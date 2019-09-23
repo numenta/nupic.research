@@ -245,7 +245,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         sparsity=0.80,
         prune_dims=None,
         update_nsteps=100,
-        coactivation_test="variance",
+        coactivation_test="correlation_proxy",
         threshold_multiplier=1,
     ):
         """
