@@ -221,62 +221,6 @@ class _NullConv(torch.nn.Conv2d):
         # Do nothing and don't initialize the weights.
         pass
 
-    def where(self, condition):
-        """
-        Similar to torch.where, but the result is packed into tuples and its
-        shape is transposed via zip.
-        Per the last statement, here's an example:
-            zip((0, 1, 2), (0, 1, 2)) -> ((0, 0), (1, 1), (2, 2))
-
-        :param condition: some condition in the form of a mask
-        """
-        idx = [tuple(i_.to("cpu").numpy()) for i_ in torch.where(condition)]
-        idx = tuple(zip(*idx))
-        return idx
-
-    def break_ties(self, mask, num_remain=None, frac_remain=None):
-        """
-        Break ties in a mask - whether between zeros or ones.
-        This function ensures exactly a num_remain number of
-        non-zeros will be present in the output mask
-
-        :param mask: mask of zeros and ones (or equivalents) - overwritten in place
-        :param num_remain: number of desired non-zeros
-        """
-
-        assert num_remain is not None or frac_remain is not None
-
-        if num_remain is None:
-            num_remain = int(frac_remain * np.prod(mask.shape))
-
-        idx_ones = self.where(mask == 1)
-        num_ones = len(idx_ones)
-        if num_ones > 0:
-            idx_ones = tuple(
-                idx_ones[i1_]
-                for i1_ in np.random.choice(
-                    range(num_ones), min(num_remain, num_ones), replace=False)
-            )
-
-        if num_ones < num_remain:
-            num_fill = num_remain - num_ones
-            idx_zeros = self.where(mask == 0)
-            num_zeros = len(idx_zeros)
-            idx_remain = idx_ones + tuple(
-                idx_zeros[i0_]
-                for i0_ in np.random.choice(
-                    range(num_zeros), min(num_fill, num_zeros), replace=False)
-            )
-
-        else:
-            idx_remain = idx_ones
-
-        idx_remain = tuple(zip(*idx_remain))
-        mask[...] = 0
-        mask[idx_remain] = 1
-
-        return mask
-
 
 class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
