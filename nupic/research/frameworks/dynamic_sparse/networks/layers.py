@@ -454,46 +454,5 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         return output_tensor
 
 
-class RandDSConv2d(DSConv2d):
-    """
-    Module like DSConv2d, but the dynamics of pruning and adding weights are entirely
-    random.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.coactivations.data[:] = torch.ones_like(self.weight)
-
-    def calc_coactivations(self, input_tensor, output_tensor):
-
-        with torch.no_grad():
-
-            mu_in = input_tensor.mean()
-            mu_out = output_tensor.mean()
-
-            self.input_means = np.append(self.input_means, mu_in.to("cpu").item())
-            self.output_means = np.append(self.output_means, mu_out.to("cpu").item())
-
-    def progress_connections(self, *args, **kwargs):
-        super().progress_connections(*args, **kwargs)
-        self.coactivations.data[:] = torch.ones_like(self.weight)
-
-
-class SparseConv2d(torch.nn.Conv2d, DynamicSparseBase):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._init_coactivations(self.weight)
-
-    # def _init_logging_params(self):
-    #     pass
-
-    # def progress_connections(self, *args, **kwargs):
-    #     pass
-
-    # def calc_coactivations(self, *args, **kwargs):
-    #     pass
-
-
 if __name__ == "__main__":
     pass
