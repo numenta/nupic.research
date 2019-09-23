@@ -274,11 +274,7 @@ def make_dsnn(net, config=None):
             return [param] * num_convs
 
     def get_layer_type(prune_method):
-        if prune_method == "random":
-            return RandDSConv2d
-        elif prune_method == "static":
-            return SparseConv2d
-        elif prune_method == "dynamic-conv":
+        if prune_method == "dynamic-conv":
             return DSConv2d
         elif prune_method == "dynamic-linear":
             return DSLinear
@@ -294,21 +290,12 @@ def make_dsnn(net, config=None):
     # Populate kwargs for new layers.
     possible_args = {
         "dynamic-conv": [
-            "hebbian_prune_frac",
-            "weight_prune_frac",
-            "sparsity",
-            "prune_dims",
             "update_nsteps",
+            "half_precision",
+            "coactivation_test",
+            "threshold_multiplier",
         ],
         "dynamic-linear": [],
-        "random": [
-            "hebbian_prune_frac",
-            "weight_prune_frac",
-            "sparsity",
-            "prune_dims",
-            "update_nsteps",
-        ],
-        "static": ["sparsity"],
         None: [],
     }
     kwargs_s = []
