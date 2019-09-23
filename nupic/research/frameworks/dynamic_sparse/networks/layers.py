@@ -147,7 +147,7 @@ class DynamicSparseBase(torch.nn.Module):
         self.update_nsteps = update_nsteps
 
         # Register hook to update coactivations.
-        assert hasattr(self, "update_coactivations"), \
+        assert hasattr(self, "calc_coactivations"), \
             "DynamicSparse modules must define a coactivation function."
         self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
 
@@ -157,6 +157,11 @@ class DynamicSparseBase(torch.nn.Module):
     def reset_coactivations(self):
         # Reset coactivations to zero.
         self.coactivations[:] = 0
+
+    def _update_coactivations(self, input_tensor, output_tensor):
+
+        new_coacts = self.calc_coactivations(input_tensor, output_tensor)
+        self.coactivations[:] += new_coacts
 
     @staticmethod
     def forward_hook(module, input_tensor, output_tensor):
@@ -170,7 +175,7 @@ class DynamicSparseBase(torch.nn.Module):
             input_tensor = input_tensor[0]
         if module.training:
             if module.learning_iterations % module.update_nsteps == 0:
-                module.update_coactivations(input_tensor, output_tensor)
+                module._update_coactivations(input_tensor, output_tensor)
             module.learning_iterations += 1
 
 
@@ -187,7 +192,7 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
         # Initialize dynamic sparse attributes.
         self._init_coactivations(weight=self.weight)
 
-    def update_coactivations(self, x, y):
+    def calc_coactivations(self, x, y):
         outer = 0
         n_samples = x.shape[0]
         with torch.no_grad():
@@ -201,8 +206,8 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
             for s in range(n_samples):
                 outer += torch.ger(prev_act[s], curr_act[s])
 
-        # Update coactivations.
-        self.coactivations[:] += outer
+        # Return coactivations.
+        return outer
 
 # ------------------
 # Conv Layers
@@ -515,7 +520,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             output_tensor.std()
         )
 
-    def update_coactivations(self, input_tensor, output_tensor):
+    def calc_coactivations(self, input_tensor, output_tensor):
         """
         This function updates self.coactivations.
         The computation is highly vectorized and unfortunately quite opaque.
@@ -603,9 +608,12 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
                 del corr_proxy
 
-            self.coactivations[self.connection_indxs] += h
+            new_coacts = torch.zeros_like(self.coactivations)
+            new_coacts[self.connection_indxs] = h
 
             del h
+
+            return new_coacts
 
     def progress_connections(self):
         """
@@ -874,7 +882,7 @@ class RandDSConv2d(DSConv2d):
         super().__init__(*args, **kwargs)
         self.coactivations.data[:] = torch.ones_like(self.weight)
 
-    def update_coactivations(self, input_tensor, output_tensor):
+    def calc_coactivations(self, input_tensor, output_tensor):
 
         with torch.no_grad():
 
@@ -901,7 +909,7 @@ class SparseConv2d(torch.nn.Conv2d, DynamicSparseBase):
     # def progress_connections(self, *args, **kwargs):
     #     pass
 
-    # def update_coactivations(self, *args, **kwargs):
+    # def calc_coactivations(self, *args, **kwargs):
     #     pass
 
 
