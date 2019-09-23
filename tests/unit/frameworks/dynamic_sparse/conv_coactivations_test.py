@@ -137,10 +137,6 @@ class CoactivationsTest(unittest.TestCase):
             padding=padding,
             dilation=1,
             groups=1,
-            sparsity=0.98,
-            hebbian_prune_frac=0.99,
-            prune_dims=[],
-            magnitude_prune_frac=0.00,
             coactivation_test="variance",
             update_nsteps=1,
         )
