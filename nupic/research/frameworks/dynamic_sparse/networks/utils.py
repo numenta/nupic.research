@@ -25,7 +25,7 @@ import torch
 
 from nupic.torch.modules import SparseWeights, SparseWeights2d
 
-from .layers import DSConv2d, DSLinear, DynamicSparseBase, RandDSConv2d, SparseConv2d
+from .layers import DSConv2d, DSLinear, DynamicSparseBase
 
 # -------------------------------------------------
 # General Utils - network mutators
