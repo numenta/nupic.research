@@ -240,10 +240,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         groups=1,
         bias=True,
         padding_mode="zeros",
-        hebbian_prune_frac=0.15,
-        magnitude_prune_frac=0.00,
-        sparsity=0.80,
-        prune_dims=None,
         update_nsteps=100,
         half_precision=False,
         coactivation_test="correlation_proxy",
@@ -253,12 +249,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         The primary params are the same for a regular Conv2d layer.
         Otherwise, they're described below.
 
-        :param hebbian_prune_frac: fraction of weights to keep by Hebbian based ranking
-        :param magnitude_prune_frac: fraction of weights to keep by magn. based ranking
-        :param sparsity: fraction of weights to maintain as zero
-        :param prune_dims: take [0, 1] as an example, then pruning will occur
-                           separately for each self.weight[i, j, :, :]
-                           over all i, j combinations
         :param update_nsteps: period of training steps to wait before calculating the
                               coactivations needed for Hebbian pruning.
         :param half_precision: whether to operate in half precision when calculating
