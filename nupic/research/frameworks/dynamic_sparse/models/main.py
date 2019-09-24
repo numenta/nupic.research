@@ -77,6 +77,8 @@ class BaseModel:
             epsilon=None,
             sparsify_fixed=True,
             verbose=0,
+            train_batches_per_epoch=np.inf,  # default - don't limit the batches
+            test_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -114,6 +116,10 @@ class BaseModel:
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
 
+        # init batch info per epic.
+        self._make_attr_schedulable("train_batches_per_epoch")
+        self._make_attr_schedulable("test_batches_per_epoch")
+
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
         self.log = {}
@@ -130,16 +136,40 @@ class BaseModel:
 
         return self.log
 
+    def _make_attr_schedulable(self, attr):
+
+        value = getattr(self, attr)
+        if isinstance(value, NumScheduler):
+            return
+
+        if not isinstance(value, Iterable):
+            value = [value]
+        setattr(self, attr, NumScheduler(value))
+
     def _post_epoch_updates(self, dataset=None):
         # update learning rate
         if self.lr_scheduler:
             self.lr_scheduler.step()
         self.network.apply(update_boost_strength)
 
+        # iterate num_schedulers
+        for val in self.__dict__.values():
+            if isinstance(val, NumScheduler):
+                val.step()
+
     def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
         correct = 0
-        for inputs, targets in loader:
+        for idx, (inputs, targets) in enumerate(loader):
+
+            # Limit number of batches per epoch if desired.
+            if train:
+                if idx >= self.train_batches_per_epoch.get_value():
+                    break
+            else:
+                if idx >= self.test_batches_per_epoch.get_value():
+                    break
+
             # setup for training
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
