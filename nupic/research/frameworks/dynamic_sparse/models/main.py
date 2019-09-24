@@ -33,6 +33,26 @@ from nupic.research.frameworks.dynamic_sparse.networks import DSConv2d, DSLinear
 from nupic.torch.modules import update_boost_strength
 
 
+class NumScheduler(object):
+    """
+    Class like an lr_scheduler, but for any number of concern.
+    In it's simplest form, this will just grab an element from
+    a list of 'values' depending on the epic, but further development
+    could allow the logic could be made more complex.
+    """
+
+    def __init__(self, values):
+        self._values = values
+        self._epoch = 0
+
+    def step(self):
+        self._epoch += 1
+
+    def get_value(self):
+        idx = min(self._epoch, len(self._values) - 1)
+        return self._values[idx]
+
+
 class BaseModel:
     """Base model, with training loops and logging functions."""
 
