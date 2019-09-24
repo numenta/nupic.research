@@ -29,7 +29,11 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
-from nupic.research.frameworks.dynamic_sparse.networks import DSConv2d, DSLinear
+from nupic.research.frameworks.dynamic_sparse.networks import (
+    DSConv2d,
+    DSLinear,
+    DynamicSparseBase
+)
 from nupic.torch.modules import update_boost_strength
 
 
@@ -352,9 +356,11 @@ class SparseModel(BaseModel):
             # Check if recursion needed.
             elif len(list(m.children())) > 0:
                 sparse_modules.extend(
-                    cls.get_sparse_modules(m)
+                    cls.get_dynamic_sparse_modules(m)
                 )
 
+        # Sanity check, then return.
+        assert all([isinstance(m, DynamicSparseBase) for m in sparse_modules])
         return sparse_modules
 
     def _make_attr_iterable(self, attr, counterpart=None):
