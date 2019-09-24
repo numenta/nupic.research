@@ -113,7 +113,7 @@ class Dataset:
             tempset = getattr(datasets, self.dataset_name)(
                 root=self.data_dir, train=True, transform=transforms.ToTensor()
             )
-            if isinstance(tempset, np.ndarray):
+            if isinstance(tempset.data, np.ndarray):
                 self.stats_mean = (tempset.data.mean() / 255,)
                 self.stats_std = (tempset.data.std() / 255,)
             else:
