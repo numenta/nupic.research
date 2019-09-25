@@ -27,7 +27,6 @@ import torch
 from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from nupic.research.frameworks.dynamic_sparse.common.utils import (
     Trainable,
-    download_dataset,
     new_experiment,
     run_experiment,
 )
@@ -129,12 +128,6 @@ exp_configs = (
     if experiments
     else [(experiment_name, base_exp_config)]
 )
-
-# from nupic.research.frameworks.dynamic_sparse.networks import vgg19_dsnn
-# config = exp_configs[0]
-# vgg19_dsnn(config)
-# Download dataset.
-# download_dataset(base_exp_config)
 
 # Register serializers.
 ray.init()

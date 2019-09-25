@@ -377,7 +377,7 @@ class SparseModel(BaseModel):
         value = getattr(self, attr)
         if isinstance(value, Iterable):
             assert len(value) == len(counterpart), """
-                Expected '{}' to be of same length as sparse modules ({}).
+                Expected "{}" to be of same length as sparse modules ({}).
                 Got {} of type {}.
                 """.format(attr, len(counterpart), value, type(value))
         else:

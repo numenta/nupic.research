@@ -29,7 +29,6 @@ from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 from .layers import DSConv2d, DSLinear
 from .utils import (
-    get_dynamic_sparse_modules,
     make_dsnn,
     replace_sparse_weights,
     squash_layers,
@@ -530,8 +529,5 @@ def vgg19_dsnn(config):
 
     if config.get("init_weights"):
         VGG19.initialize_weights(net.classifier)
-
-    # Sanity check.
-    # assert 
 
     return net
