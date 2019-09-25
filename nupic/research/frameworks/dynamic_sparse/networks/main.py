@@ -28,12 +28,7 @@ from torchvision import models
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 from .layers import DSConv2d, DSLinear
-from .utils import (
-    make_dsnn,
-    replace_sparse_weights,
-    squash_layers,
-    swap_layers,
-)
+from .utils import make_dsnn, replace_sparse_weights, squash_layers, swap_layers
 
 
 class VGG19(nn.Module):
