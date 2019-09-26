@@ -68,7 +68,7 @@ class VaryingDataLoader(object):
                 return getattr(self.data_loader, name)
 
         # Default
-        super().__getattribute__(name)
+        return super().__getattribute__(name)
 
     def __setattr__(self, name, value):
 

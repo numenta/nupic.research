@@ -23,57 +23,78 @@ import torch
 from torch import nn
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-class HebbianNetwork(nn.Module):
-    """Parent class with shared methods. Not to be instantiated"""
+from .layers import DSLinear, init_coactivation_tracking
 
-    def __init__(self, config=None):
-        super().__init__()
+# ------------------------------------------------------------------------------------
+# DynamicSparse Linear Block 2019-09-13
+# ------------------------------------------------------------------------------------
 
-    def init_hebbian(self):
-        self.coactivations = []
-        self.forward = self.forward_with_coactivations        
+class DSLinearBlock(nn.Sequential):
 
-    def _has_activation(self, idx, layer):
-        return (
-            idx == len(self.classifier) - 1
-            or isinstance(layer, nn.ReLU)
-            or isinstance(layer, KWinners)
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        bias,
+        batch_norm=None,
+        dropout=None,
+        activation_func=None,
+    ):
+
+        # Clarifications on batch norm position at the linear block:
+        # - bn before relu at original paper
+        # - bn after relu in recent work
+        # (see fchollet @ https://github.com/keras-team/keras/issues/1802)
+        # - however, if applied after RELU or kWinners, breaks sparsity
+        layers = [DSLinear(in_features, out_features, bias=bias)]
+        if batch_norm:
+            layers.append(nn.BatchNorm1d(out_features))
+        if activation_func:
+            layers.append(activation_func)
+        if dropout:
+            layers.append(nn.Dropout(p=dropout))
+        super().__init__(*layers)
+
+        # Transfer forward hook.
+        dslayer = self[0]
+        forward_hook = dslayer.forward_hook
+        self.register_forward_hook(
+            lambda module, in_, out_:
+            forward_hook(dslayer, in_, out_)
         )
+        dslayer.forward_hook_handle.remove()
+
+    @property
+    def weight(self):
+        """
+        Return weight of linear layer - needed for introspective networks.
+        """
+        return self[0].weight
+
+    def forward(self, input_tensor):
+        output_tensor = super().forward(input_tensor)
+        return output_tensor
+
+# ------------
+# MLP Network
+# ------------
+
+class HebbianNetwork(nn.Module):
+
+    @property
+    def coactivations(self):
+        if self._track_coactivations:
+            return [m.coactivations.t() for m in self.dynamic_sparse_modules]
+        else:
+            return []
 
     def forward(self, x):
-        if 'features' in self._modules:
-            x = self.features(x)
-        x = self.classifier(x)
-        return x
+        return self.classifier(x)
 
-    def forward_with_coactivations(self, x):
-        """A faster and approximate way to track correlations"""
-    
-        if 'features' in self._modules:
-            x = self.features(x)
+    def init_hebbian(self):
+        self._track_coactivations = True
+        self.apply(init_coactivation_tracking)
 
-        prev_act = (x > 0).detach().float()
-        idx_activation = 0
-        for idx_layer, layer in enumerate(self.classifier):
-            # do the forward calculation normally
-            x = layer(x)
-            n_samples = x.shape[0]
-            if self._has_activation(idx_layer, layer):
-                with torch.no_grad():
-                    curr_act = (x > 0).detach().float()
-                    # add outer product to the coactivations, per sample
-                    for s in range(n_samples):
-                        outer = torch.ger(prev_act[s], curr_act[s])
-                        if idx_activation + 1 > len(self.coactivations):
-                            self.coactivations.append(outer)
-                        else:
-                            self.coactivations[idx_activation] += outer
-                    # reassigning to the next
-                    prev_act = curr_act
-                    # move to next activation
-                    idx_activation += 1
-
-        return x
 
 class MLPHeb(HebbianNetwork):
     """Simple 3 hidden layers + output MLP"""
@@ -86,58 +107,75 @@ class MLPHeb(HebbianNetwork):
             input_size=784,
             num_classes=10,
             hidden_sizes=[100, 100, 100],
+            percent_on_k_winner=[1.0, 1.0, 1.0],
+            boost_strength=[1.4, 1.4, 1.4],
+            boost_strength_factor=[0.7, 0.7, 0.7],
             batch_norm=False,
             dropout=False,
-            use_kwinners=False,
-            hebbian_learning=False,
             bias=True,
         )
+        assert config is None or "use_kwinners" not in config, \
+            "use_kwinners is deprecated"
+
         defaults.update(config or {})
         self.__dict__.update(defaults)
         self.device = torch.device(self.device)
 
         # decide which actiovation function to use
-        if self.use_kwinners:
-            self.activation_func = self._kwinners
-        else:
-            self.activation_func = lambda _: nn.ReLU()
+        self.activation_funcs = []
+        for layer, hidden_size in enumerate(self.hidden_sizes):
+            if self.percent_on_k_winner[layer] < 0.5:
+                self.activation_funcs.append(
+                    KWinners(n=hidden_size,
+                             percent_on=self.percent_on_k_winner[layer],
+                             boost_strength=self.boost_strength[layer],
+                             boost_strength_factor=self.boost_strength_factor[layer],
+                             k_inference_factor=1.0,
+                             )
+                )
+            else:
+                self.activation_funcs.append(
+                    nn.ReLU()
+                )
 
-        layers = [Flatten()]
-        # add the first layer
-        layers.extend(self._linear_block(self.input_size, self.hidden_sizes[0]))
-        # all hidden layers
-        for i in range(1, len(self.hidden_sizes)):
-            layers.extend(
-                self._linear_block(self.hidden_sizes[i - 1], self.hidden_sizes[i])
-            )
-        # last layer
+        # Construct layers.
+        layers = []
+        kwargs = dict(
+            bias=self.bias,
+            batch_norm=self.batch_norm,
+            dropout=self.dropout,
+        )
+        # Flatten image.
+        layers = [nn.Flatten()]
+        # Add the first layer
         layers.append(
-            nn.Linear(self.hidden_sizes[-1], self.num_classes, bias=self.bias)
+            DSLinearBlock(
+                self.input_size,
+                self.hidden_sizes[0],
+                activation_func=self.activation_funcs[0],
+                **kwargs),
+        )
+        # Add hidden layers.
+        for i in range(1, len(self.hidden_sizes)):
+            layers.append(
+                DSLinearBlock(
+                    self.hidden_sizes[i - 1],
+                    self.hidden_sizes[i],
+                    activation_func=self.activation_funcs[i],
+                    **kwargs),
+            )
+        # Add last layer.
+        layers.append(
+            DSLinearBlock(self.hidden_sizes[-1], self.num_classes, bias=self.bias),
         )
 
-        # create the layers
+        # Create the classifier.
+        self.dynamic_sparse_modules = [l[0] for l in layers[1:]]
         self.classifier = nn.Sequential(*layers)
 
-    def _linear_block(self, a, b):
-        """
-        Clarifications on batch norm position at the linear block:
-        - bn before relu at original paper
-        - bn after relu in recent work
-        (see fchollet @ https://github.com/keras-team/keras/issues/1802)
-        - however, if applied after RELU or kWinners, breaks sparsity
-        """
-        block = [nn.Linear(a, b, bias=self.bias)]
-        if self.batch_norm:
-            block.append(nn.BatchNorm1d(b))
-        block.append(self.activation_func(b))
-        if self.dropout:
-            block.append(nn.Dropout(p=self.dropout))
-        return block
+        # Initialize attr to decide whether to update coactivations during learning.
+        self._track_coactivations = False  # Off by default.
 
-    def _kwinners(self, num_units):
-        return KWinners(
-            n=num_units, percent_on=0.25, boost_strength=1.4, boost_strength_factor=0.7
-        )        
 
 class GSCHeb(HebbianNetwork):
     """Simple 3 hidden layers + output MLP"""
@@ -149,106 +187,63 @@ class GSCHeb(HebbianNetwork):
             device='cpu',
             input_size=1024,
             num_classes=12,
-            boost_strength=1.5,
-            boost_strength_factor=0.9,
-            k_inference_factor=1.5,
+            boost_strength=[1.5, 1.5, 1.5],
+            boost_strength_factor=[0.9, 0.9, 0.9],
             duty_cycle_period=1000,
+            k_inference_factor=1.5,
             use_kwinners=True,
+            percent_on=[0.095, 0.125, 0.1],
+            hidden_neurons_conv=[64,64],
             hidden_neurons_fc=1000,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
         self.device = torch.device(self.device)
 
-        # hidden layers
+        # decide which actiovation function to use
+        self.activation_funcs = []
+        hidden_sizes = [*self.hidden_neurons_conv, hidden_neurons_fc]
+        for layer, hidden_size in enumerate(hidden_sizes):
+            if self.percent_on_k_winner[layer] < 0.5:
+                self.activation_funcs.append(
+                    KWinners(n=hidden_size,
+                             percent_on=self.percent_on_k_winner[layer],
+                             boost_strength=self.boost_strength[layer],
+                             boost_strength_factor=self.boost_strength_factor[layer],
+                             k_inference_factor=1.0,
+                             )
+                )
+            else:
+                self.activation_funcs.append(
+                    nn.ReLU()
+                )
+
+        # linear layers
         conv_layers = [
-            *self._conv_block(1, 64, percent_on=0.095),  # 28x28 -> 14x14
-            *self._conv_block(64, 64, percent_on=0.125),  # 10x10 -> 5x5
+            # 28x28 -> 14x14
+            *self._conv_block(1, hidden_neurons_conv[0], self.activation_funcs[0]),  
+            # 10x10 -> 5x5
+            *self._conv_block(hidden_neurons_conv[0], hidden_neurons_conv[1], self.activation_funcs[1]),  
             Flatten(),
         ]
-
-        linear_layers = [
-            # *self._linear_block(1600, 1500, percent_on= 0.067),
-            *self._linear_block(1600, self.hidden_neurons_fc, percent_on=0.1),
-            nn.Linear(self.hidden_neurons_fc, self.num_classes),
+       linear_layers = [
+            DSLinearBlock(hidden_neurons_conv[1] * 25, hidden_neurons_fc, activation_func=self.activation_funcs[2]),
+            DSLinearBlock(hidden_neurons_fc, 12),
         ]
 
         self.features = nn.Sequential(*conv_layers)
         self.classifier = nn.Sequential(*linear_layers)
 
-    def _conv_block(self, fin, fout, percent_on=0.1):
+    def _conv_block(self, fin, fout, activation_func):
         block = [
             nn.Conv2d(fin, fout, kernel_size=5, stride=1, padding=0),
             nn.BatchNorm2d(fout, affine=False),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            self._activation_func(fout, percent_on),
+            activation_func
         ]
-        # if not self.use_kwinners:
-        #     block.append(nn.Dropout(p=0.5))
         return block
 
-    def _linear_block(self, fin, fout, percent_on=0.1):
-        block = [
-            nn.Linear(fin, fout),
-            nn.BatchNorm1d(fout, affine=False),
-            self._activation_func(fout, percent_on, twod=False),
-        ]
-        # if not self.use_kwinners:
-        #     block.append(nn.Dropout(p=0.5))
-        return block
-
-    def _activation_func(self, fout, percent_on, twod=True):
-        if self.use_kwinners:
-            if twod:
-                activation_func = KWinners2d
-            else:
-                activation_func = KWinners
-            return activation_func(
-                fout,
-                percent_on=percent_on,
-                boost_strength=self.boost_strength,
-                boost_strength_factor=self.boost_strength_factor,
-                k_inference_factor=self.k_inference_factor,
-                duty_cycle_period=self.duty_cycle_period,
-            )
-        else:
-            return nn.ReLU()
-
-
-class GSCHebSmall(GSCHeb):
-    """Simple 3 hidden layers + output MLP"""
-
-    def __init__(self, config=None):
-        super().__init__()
-
-        defaults = dict(
-            device='cpu',
-            input_size=1024,
-            num_classes=12,
-            boost_strength=1.5,
-            boost_strength_factor=0.9,
-            k_inference_factor=1.5,
-            duty_cycle_period=1000,
-            use_kwinners=True,
-            hidden_neurons_fc=207,
-        )
-        defaults.update(config or {})
-        self.__dict__.update(defaults)
-        self.device = torch.device(self.device)
-
-        # hidden layers
-        conv_layers = [
-            *self._conv_block(1, 12, percent_on=0.095),  # 28x28 -> 14x14
-            *self._conv_block(12, 12, percent_on=0.125),  # 10x10 -> 5x5
-            Flatten(),
-        ]
-
-        linear_layers = [
-            # *self._linear_block(1600, 1500, percent_on= 0.067),
-            *self._linear_block(300, self.hidden_neurons_fc, percent_on=0.1),
-            nn.Linear(self.hidden_neurons_fc, self.num_classes),
-        ]
-
-        self.features = nn.Sequential(*conv_layers)
-        self.classifier = nn.Sequential(*linear_layers)
-
+def gsc_heb_small(config):
+    config['hidden_neurons_conv'] = [12,12]
+    config['hidden_neurons_fc'] = 207
+    return GSCHeb(config)
