@@ -168,6 +168,7 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
 
 if __name__ == "__main__":
 
+    # TODO: Move this code to tests
     test_loading_processes = False
     root = "~/nta/datasets/gsc"
     root = os.path.expanduser(root)
