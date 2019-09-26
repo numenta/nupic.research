@@ -21,16 +21,17 @@
 
 import torch
 from torch import nn
-from nupic.torch.modules import Flatten, KWinners, KWinners2d
+
+from nupic.torch.modules import Flatten, KWinners
 
 from .layers import DSLinear, init_coactivation_tracking
 
 # ------------------------------------------------------------------------------------
-# DynamicSparse Linear Block 2019-09-13
+# DynamicSparse Linear Block
 # ------------------------------------------------------------------------------------
 
-class DSLinearBlock(nn.Sequential):
 
+class DSLinearBlock(nn.Sequential):
     def __init__(
         self,
         in_features,
@@ -59,8 +60,7 @@ class DSLinearBlock(nn.Sequential):
         dslayer = self[0]
         forward_hook = dslayer.forward_hook
         self.register_forward_hook(
-            lambda module, in_, out_:
-            forward_hook(dslayer, in_, out_)
+            lambda module, in_, out_: forward_hook(dslayer, in_, out_)
         )
         dslayer.forward_hook_handle.remove()
 
@@ -75,12 +75,13 @@ class DSLinearBlock(nn.Sequential):
         output_tensor = super().forward(input_tensor)
         return output_tensor
 
+
 # ------------
 # MLP Network
 # ------------
 
-class HebbianNetwork(nn.Module):
 
+class HebbianNetwork(nn.Module):
     @property
     def coactivations(self):
         if self._track_coactivations:
@@ -114,8 +115,9 @@ class MLPHeb(HebbianNetwork):
             dropout=False,
             bias=True,
         )
-        assert config is None or "use_kwinners" not in config, \
-            "use_kwinners is deprecated"
+        assert (
+            config is None or "use_kwinners" not in config
+        ), "use_kwinners is deprecated"
 
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -126,25 +128,20 @@ class MLPHeb(HebbianNetwork):
         for layer, hidden_size in enumerate(self.hidden_sizes):
             if self.percent_on_k_winner[layer] < 0.5:
                 self.activation_funcs.append(
-                    KWinners(n=hidden_size,
-                             percent_on=self.percent_on_k_winner[layer],
-                             boost_strength=self.boost_strength[layer],
-                             boost_strength_factor=self.boost_strength_factor[layer],
-                             k_inference_factor=1.0,
-                             )
+                    KWinners(
+                        n=hidden_size,
+                        percent_on=self.percent_on_k_winner[layer],
+                        boost_strength=self.boost_strength[layer],
+                        boost_strength_factor=self.boost_strength_factor[layer],
+                        k_inference_factor=1.0,
+                    )
                 )
             else:
-                self.activation_funcs.append(
-                    nn.ReLU()
-                )
+                self.activation_funcs.append(nn.ReLU())
 
         # Construct layers.
         layers = []
-        kwargs = dict(
-            bias=self.bias,
-            batch_norm=self.batch_norm,
-            dropout=self.dropout,
-        )
+        kwargs = dict(bias=self.bias, batch_norm=self.batch_norm, dropout=self.dropout)
         # Flatten image.
         layers = [nn.Flatten()]
         # Add the first layer
@@ -153,7 +150,8 @@ class MLPHeb(HebbianNetwork):
                 self.input_size,
                 self.hidden_sizes[0],
                 activation_func=self.activation_funcs[0],
-                **kwargs),
+                **kwargs,
+            )
         )
         # Add hidden layers.
         for i in range(1, len(self.hidden_sizes)):
@@ -162,11 +160,12 @@ class MLPHeb(HebbianNetwork):
                     self.hidden_sizes[i - 1],
                     self.hidden_sizes[i],
                     activation_func=self.activation_funcs[i],
-                    **kwargs),
+                    **kwargs,
+                )
             )
         # Add last layer.
         layers.append(
-            DSLinearBlock(self.hidden_sizes[-1], self.num_classes, bias=self.bias),
+            DSLinearBlock(self.hidden_sizes[-1], self.num_classes, bias=self.bias)
         )
 
         # Create the classifier.
@@ -184,7 +183,7 @@ class GSCHeb(HebbianNetwork):
         super().__init__()
 
         defaults = dict(
-            device='cpu',
+            device="cpu",
             input_size=1024,
             num_classes=12,
             boost_strength=[1.5, 1.5, 1.5],
@@ -193,7 +192,7 @@ class GSCHeb(HebbianNetwork):
             k_inference_factor=1.5,
             use_kwinners=True,
             percent_on=[0.095, 0.125, 0.1],
-            hidden_neurons_conv=[64,64],
+            hidden_neurons_conv=[64, 64],
             hidden_neurons_fc=1000,
         )
         defaults.update(config or {})
@@ -202,33 +201,40 @@ class GSCHeb(HebbianNetwork):
 
         # decide which actiovation function to use
         self.activation_funcs = []
-        hidden_sizes = [*self.hidden_neurons_conv, hidden_neurons_fc]
+        hidden_sizes = [*self.hidden_neurons_conv, self.hidden_neurons_fc]
         for layer, hidden_size in enumerate(hidden_sizes):
             if self.percent_on_k_winner[layer] < 0.5:
                 self.activation_funcs.append(
-                    KWinners(n=hidden_size,
-                             percent_on=self.percent_on_k_winner[layer],
-                             boost_strength=self.boost_strength[layer],
-                             boost_strength_factor=self.boost_strength_factor[layer],
-                             k_inference_factor=1.0,
-                             )
+                    KWinners(
+                        n=hidden_size,
+                        percent_on=self.percent_on_k_winner[layer],
+                        boost_strength=self.boost_strength[layer],
+                        boost_strength_factor=self.boost_strength_factor[layer],
+                        k_inference_factor=1.0,
+                    )
                 )
             else:
-                self.activation_funcs.append(
-                    nn.ReLU()
-                )
+                self.activation_funcs.append(nn.ReLU())
 
         # linear layers
         conv_layers = [
             # 28x28 -> 14x14
-            *self._conv_block(1, hidden_neurons_conv[0], self.activation_funcs[0]),  
+            *self._conv_block(1, self.hidden_neurons_conv[0], self.activation_funcs[0]),
             # 10x10 -> 5x5
-            *self._conv_block(hidden_neurons_conv[0], hidden_neurons_conv[1], self.activation_funcs[1]),  
+            *self._conv_block(
+                self.hidden_neurons_conv[0],
+                self.hidden_neurons_conv[1],
+                self.activation_funcs[1],
+            ),
             Flatten(),
         ]
-       linear_layers = [
-            DSLinearBlock(hidden_neurons_conv[1] * 25, hidden_neurons_fc, activation_func=self.activation_funcs[2]),
-            DSLinearBlock(hidden_neurons_fc, 12),
+        linear_layers = [
+            DSLinearBlock(
+                self.hidden_neurons_conv[1] * 25,
+                self.hidden_neurons_fc,
+                activation_func=self.activation_funcs[2],
+            ),
+            DSLinearBlock(self.hidden_neurons_fc, 12),
         ]
 
         self.features = nn.Sequential(*conv_layers)
@@ -239,11 +245,12 @@ class GSCHeb(HebbianNetwork):
             nn.Conv2d(fin, fout, kernel_size=5, stride=1, padding=0),
             nn.BatchNorm2d(fout, affine=False),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            activation_func
+            activation_func,
         ]
         return block
 
+
 def gsc_heb_small(config):
-    config['hidden_neurons_conv'] = [12,12]
-    config['hidden_neurons_fc'] = 207
+    config["hidden_neurons_conv"] = [12, 12]
+    config["hidden_neurons_fc"] = 207
     return GSCHeb(config)

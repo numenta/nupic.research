@@ -29,12 +29,12 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
+from nupic.research.frameworks.common.utils import NumScheduler
 from nupic.research.frameworks.dynamic_sparse.networks import (
     DSConv2d,
     DSLinear,
     DynamicSparseBase,
 )
-from nupic.research.frameworks.common.utils import NumScheduler
 from nupic.torch.modules import update_boost_strength
 
 
@@ -220,7 +220,7 @@ class BaseModel:
 
     def restore(self, checkpoint_dir):
         pass
-    
+
     # def _save(self, checkpoint_dir):
     #     return self.model_save(checkpoint_dir)
 
@@ -290,25 +290,25 @@ class SparseModel(BaseModel):
             self.epsilon = None
 
         with torch.no_grad():
-
-        # TODO: restore the implementation of start_sparse and end_sparse
-        # TODO: restore the implementation of sparse_linear_only
-        for idx, m in enumerate(self.sparse_modules):
-            shape = m.weight.shape
-            # two approaches of defining epsilon
-            if self.epsilon:
-                on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-            # TODO: remove non-sparse layers from the array. Impact other functions, such as logging and debugging
-            # sparse modules should include only the layers which are actually sparse
-            if on_perc[idx] >= 1:
-                mask = torch.ones(shape).float().to(self.device)
-            elif self.sparsify_fixed:
-                mask = self._sparsify_fixed(shape, on_perc[idx])
-            else:
-                mask = self._sparsify_stochastic(shape, on_perc[idx])
-            m.weight.data *= mask
-            self.masks.append(mask)
-            self.num_params.append(torch.sum(mask).item())
+            # TODO: restore the implementation of start_sparse and end_sparse
+            # TODO: restore the implementation of sparse_linear_only
+            for idx, m in enumerate(self.sparse_modules):
+                shape = m.weight.shape
+                # two approaches of defining epsilon
+                if self.epsilon:
+                    on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
+                # TODO: remove non-sparse layers from the array.
+                # Impact other functions, such as logging and debugging
+                # Should include only the layers which are actually sparse
+                if on_perc[idx] >= 1:
+                    mask = torch.ones(shape).float().to(self.device)
+                elif self.sparsify_fixed:
+                    mask = self._sparsify_fixed(shape, on_perc[idx])
+                else:
+                    mask = self._sparsify_stochastic(shape, on_perc[idx])
+                m.weight.data *= mask
+                self.masks.append(mask)
+                self.num_params.append(torch.sum(mask).item())
 
     @classmethod
     def get_sparse_modules(cls, net):
@@ -320,7 +320,6 @@ class SparseModel(BaseModel):
 
         Note: For instance DSConv2d layers have Conv2d children)
         """
-
         sparse_modules = []
         for m in net.children():
 
