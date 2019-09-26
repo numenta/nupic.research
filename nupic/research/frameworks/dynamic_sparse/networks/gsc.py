@@ -25,27 +25,45 @@ from torch import nn
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, MNISTSparseCNN
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-from .layers import DSConv2d, RandDSConv2d, SparseConv2d
-from .main import VGG19
+from .layers import DSConv2d, DSLinear
+from .utils import (
+    get_dynamic_sparse_modules,
+    make_dsnn,
+    replace_sparse_weights,
+    squash_layers,
+    swap_layers,
+)
 
-# redefine Flatten
-# class Lambda(nn.Module):
-#     def __init__(self, func:LambdaFunc):
-#         super().__init__()
-#         self.func = func
-
-#     def forward(self, x):
-#         return self.func(x)
-
-# def Flatten():
-#     return Lambda(lambda x: x.view((x.size(0), -1)))
+# --------------
+# GSC Networks
+# --------------
 
 
-class GSCHeb(nn.Module):
+class GSCHebDepreciated(nn.Module):
     """LeNet like CNN used for GSC in how so dense paper."""
 
+    # NOTE: See `gsc_sparse_dsnn` for general method to construct
+    #       dynamic-gsc network. For instance, one may use
+    # ```
+    # config = dict(
+    #       prune_methods=[None, "dynamic-conv", "dynamic-linear", None]
+    # )
+    # net = gsc_sparse_dsnn(config)
+    # ```
+    #
+    # This will yield a network with a dense-conv (implied by the None), then a
+    # dynamic-conv, then a dynamic-linear and then a dense-linear
+    # (also implied by the None). As well, all the other intermediate layers
+    # expected from the GSC network will be included between them.
+    #
+    # This `GSCHeb` network would also work just fine; however, it would need some
+    # adjustments to mimic the `GSCHeb` implementation first - that is, it would
+    # need to use modules inherited from `DynamicSparseBase` which helps track
+    # coactivations.
+    #
+
     def __init__(self, config=None):
-        super(GSCHeb, self).__init__()
+        super(GSCHebDepreciated, self).__init__()
 
         defaults = dict(
             input_size=1024,
@@ -161,174 +179,68 @@ class GSCHeb(nn.Module):
 
 
 # make a conv heb just by replacing the conv layers by special DSNN Conv layers
-def gsc_conv_heb(config):
-    # return make_dscnn(models.vgg19_bn(config), config)
-    return make_dscnn(GSCHeb(config), config)
+def gsc_conv_heb_depreciated(config):
+
+    net = make_dsnn(GSCHebDepreciated(config), config)
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
+    return net
 
 
-def gsc_conv_only_heb(config):
-    network = make_dscnn(GSCHeb(config), config)
+def gsc_conv_only_heb_depreciated(config):
+    network = make_dsnn(GSCHebDepreciated(config), config)
 
     # replace the forward function to not apply regular convolution
     def forward(self, x):
         return self.classifier(self.features(x))
 
     network.forward = forward
+    network.dynamic_sparse_modules = get_dynamic_sparse_modules(network)
 
     return network
 
 
-# function that makes the switch
-# why function inside other functions -> make it into a class?
-
-
-def make_dscnn(net, config=None):
-
-    config = config or {}
-
-    named_convs = [
-        (name, layer)
-        for name, layer in net.named_modules()
-        if isinstance(layer, torch.nn.Conv2d)
-    ]
-    num_convs = len(named_convs)
-
-    def tolist(param):
-        if isinstance(param, list):
-            return param
-        else:
-            return [param] * num_convs
-
-    def get_conv_type(prune_method):
-        if prune_method == "random":
-            return RandDSConv2d
-        elif prune_method == "static":
-            return SparseConv2d
-        elif prune_method == "dynamic":
-            return DSConv2d
-
-    def set_module(net, name, new_module):
-        """
-        Mimics "setattr" in purpose and argument types.
-        Sets module "name" of "net" to "new_module".
-        This is done recursively as "name" may be
-        of the form '0.subname-1.subname-2.3 ...'
-        where 0 and 3 indicate indices of a
-        torch.nn.Sequential.
-        """
-
-        subnames = name.split(".")
-        subname0, subnames_remaining = subnames[0], subnames[1:]
-
-        if subnames_remaining:
-
-            if subname0.isdigit():
-                subnet = net[int(subname0)]
-            else:
-                subnet = getattr(net, subname0)
-
-            set_module(subnet, ".".join(subnames_remaining), new_module)
-
-        else:
-
-            if subname0.isdigit():
-                net[int(subname0)] = new_module
-            else:
-                setattr(net, subname0, new_module)
-
-    # Get DSConv2d params from config.
-    prune_methods = tolist(config.get("prune_methods", "dynamic"))
-    assert (
-        len(prune_methods) == num_convs
-    ), "Not enough prune_methods specified in config. Expected {}, got {}".format(
-        num_convs, prune_methods
-    )
-
-    # Populate kwargs for new layers.
-    possible_args = {
-        "dynamic": [
-            "hebbian_prune_frac",
-            "weight_prune_frac",
-            "sparsity",
-            "prune_dims",
-            "update_nsteps",
-        ],
-        "random": [
-            "hebbian_prune_frac",
-            "weight_prune_frac",
-            "sparsity",
-            "prune_dims",
-            "update_nsteps",
-        ],
-        "static": ["sparsity"],
-        None: [],
-    }
-    kwargs_s = []
-    for c_i in range(num_convs):
-        layer_args = {}
-        prune_method = prune_methods[c_i]
-        for arg in possible_args[prune_method]:
-            if arg in config:
-                layer_args[arg] = tolist(config.get(arg))[c_i]
-        kwargs_s.append(layer_args)
-
-    assert (
-        len((kwargs_s)) == len(named_convs) == len(prune_methods)
-    ), "Sizes do not match"
-
-    # Replace conv layers.
-    for prune_method, kwargs, (name, conv) in zip(prune_methods, kwargs_s, named_convs):
-
-        conv_type = get_conv_type(prune_method)
-        if conv_type is None:
-            continue
-
-        set_module(net, name, conv_type(
-            in_channels=conv.in_channels,
-            out_channels=conv.out_channels,
-            kernel_size=conv.kernel_size,
-            stride=conv.stride,
-            padding=conv.padding,
-            padding_mode=conv.padding_mode,
-            dilation=conv.dilation,
-            groups=conv.groups,
-            bias=(conv.bias is not None),
-            **kwargs,
-        ))
-
-    return net
-
-
-def vgg19_dscnn(config):
-
-    net = VGG19(config)
-    net = make_dscnn(net)
-    return net
-
-
 def mnist_sparse_cnn(config):
 
-    net = MNISTSparseCNN()
+    net_params = config.get("net_params", {})
+    net = MNISTSparseCNN(**net_params)
     return net
 
 
-def mnist_sparse_dscnn(config):
+def mnist_sparse_dsnn(config, squash=True):
 
-    net = MNISTSparseCNN()
-    net = make_dscnn(net, config)
+    net_params = config.get("net_params", {})
+    net = MNISTSparseCNN(**net_params)
+    net = replace_sparse_weights(net)
+    net = make_dsnn(net, config)
+    net = swap_layers(net, nn.MaxPool2d, KWinners2d)
+    net = squash_layers(net, DSConv2d, KWinners2d)
+    net = squash_layers(net, DSLinear, nn.BatchNorm1d, KWinners)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
 
 
 def gsc_sparse_cnn(config):
 
-    net = GSCSparseCNN()
+    net_params = config.get("net_params", {})
+    net = GSCSparseCNN(**net_params)
     return net
 
 
-def gsc_sparse_dscnn(config):
+def gsc_sparse_dsnn(config):
 
-    net = GSCSparseCNN()
-    net = make_dscnn(net, config)
+    net_params = config.get("net_params", {})
+    net = GSCSparseCNN(**net_params)
+    net = replace_sparse_weights(net)
+    net = make_dsnn(net, config)
+    net = swap_layers(net, nn.MaxPool2d, KWinners2d)
+    net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+    net = squash_layers(net, DSLinear, nn.BatchNorm1d, KWinners)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net
 
 
@@ -426,8 +338,14 @@ class GSCSparseFullCNN(nn.Sequential):
         self.add_module("softmax", nn.LogSoftmax(dim=1))
 
 
-def gsc_sparse_dscnn_fullyconv(config):
+def gsc_sparse_dsnn_fullyconv(config):
 
-    net = GSCSparseFullCNN()
-    net = make_dscnn(net, config)
+    net_params = config.get("net_params", {})
+    net = GSCSparseFullCNN(**net_params)
+    net = make_dsnn(net, config)
+    net = swap_layers(net, nn.MaxPool2d, KWinners2d)
+    net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
     return net

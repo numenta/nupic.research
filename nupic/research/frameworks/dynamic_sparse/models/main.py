@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from collections import defaultdict
+from collections.abc import Iterable
 from itertools import product
 
 import numpy as np
@@ -27,6 +28,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
+
+from nupic.research.frameworks.dynamic_sparse.networks import (
+    DSConv2d,
+    DSLinear,
+    DynamicSparseBase,
+)
+from nupic.research.frameworks.common.utils import NumScheduler
+from nupic.torch.modules import update_boost_strength
 
 
 class BaseModel:
@@ -42,21 +51,19 @@ class BaseModel:
             lr_step_size=1,
             debug_sparse=False,
             debug_weights=False,
-            start_sparse=None,
-            end_sparse=None,
             pruning_interval=1,
             log_images=False,
             flip=False,
             weight_prune_perc=0,
             grad_prune_perc=0,
             test_noise=False,
-            percent_on=0.3,
-            boost_strength=1.4,
-            boost_strength_factor=0.7,
             weight_decay=1e-4,
             sparse_linear_only=False,
             epsilon=None,
             sparsify_fixed=True,
+            verbose=0,
+            train_batches_per_epoch=np.inf,  # default - don't limit the batches
+            test_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -94,6 +101,10 @@ class BaseModel:
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
 
+        # init batch info per epic.
+        self._make_attr_schedulable("train_batches_per_epoch")
+        self._make_attr_schedulable("test_batches_per_epoch")
+
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
         self.log = {}
@@ -105,18 +116,45 @@ class BaseModel:
         if self.test_noise or test_noise_local:
             self._run_one_pass(dataset.noise_loader, train=False, noise=True)
         self._post_epoch_updates(dataset)
+        if self.verbose > 0:
+            print(self.log)
 
         return self.log
+
+    def _make_attr_schedulable(self, attr):
+
+        value = getattr(self, attr)
+        if isinstance(value, NumScheduler):
+            return
+
+        if not isinstance(value, Iterable):
+            value = [value]
+        setattr(self, attr, NumScheduler(value))
 
     def _post_epoch_updates(self, dataset=None):
         # update learning rate
         if self.lr_scheduler:
             self.lr_scheduler.step()
+        self.network.apply(update_boost_strength)
+
+        # iterate num_schedulers
+        for val in self.__dict__.values():
+            if isinstance(val, NumScheduler):
+                val.step()
 
     def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
         correct = 0
-        for inputs, targets in loader:
+        for idx, (inputs, targets) in enumerate(loader):
+
+            # Limit number of batches per epoch if desired.
+            if train:
+                if idx >= self.train_batches_per_epoch.get_value():
+                    break
+            else:
+                if idx >= self.test_batches_per_epoch.get_value():
+                    break
+
             # setup for training
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
@@ -141,6 +179,10 @@ class BaseModel:
         if train:
             self.log["train_loss"] = loss
             self.log["train_acc"] = acc
+            if self.lr_scheduler:
+                self.log["learning_rate"] = self.lr_scheduler.get_lr()[0]
+            else:
+                self.log["learning_rate"] = self.learning_rate
         else:
             if noise:
                 self.log["noise_loss"] = loss
@@ -231,32 +273,113 @@ class SparseModel(BaseModel):
     def setup(self):
         super(SparseModel, self).setup()
 
+        # calculate sparsity masks
+        self.masks = []
+        self.num_params = []  # added for paper implementation
+
+        # define sparse modules
+        self.sparse_modules = self.get_sparse_modules(self.network)
+        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules(self.network)
+
+        assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
+
         # added option to define sparsity by on_perc
         if "on_perc" in self.__dict__:
+            self._make_attr_iterable("on_perc")
             on_perc = self.on_perc
             self.epsilon = None
 
         with torch.no_grad():
-            # calculate sparsity masks
-            self.masks = []
-            self.num_params = []  # added for paper implementation
 
-            # define sparse modules
-            self.sparse_modules = []
-            for m in list(self.network.modules())[self.start_sparse : self.end_sparse]:
-                if self.has_params(m):
-                    self.sparse_modules.append(m)
-                    shape = m.weight.shape
-                    # two approaches of defining epsilon
-                    if self.epsilon:
-                        on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-                    if self.sparsify_fixed:
-                        mask = self._sparsify_fixed(shape, on_perc)
-                    else:
-                        mask = self._sparsify_stochastic(shape, on_perc)
-                    m.weight.data *= mask
-                    self.masks.append(mask)
-                    self.num_params.append(torch.sum(mask).item())
+        # TODO: restore the implementation of start_sparse and end_sparse
+        # TODO: restore the implementation of sparse_linear_only
+        for idx, m in enumerate(self.sparse_modules):
+            shape = m.weight.shape
+            # two approaches of defining epsilon
+            if self.epsilon:
+                on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
+            # TODO: remove non-sparse layers from the array. Impact other functions, such as logging and debugging
+            # sparse modules should include only the layers which are actually sparse
+            if on_perc[idx] >= 1:
+                mask = torch.ones(shape).float().to(self.device)
+            elif self.sparsify_fixed:
+                mask = self._sparsify_fixed(shape, on_perc[idx])
+            else:
+                mask = self._sparsify_stochastic(shape, on_perc[idx])
+            m.weight.data *= mask
+            self.masks.append(mask)
+            self.num_params.append(torch.sum(mask).item())
+
+    @classmethod
+    def get_sparse_modules(cls, net):
+        """
+        This function recursively finds which modules to make sparse
+        and which to remain dense. The encapsulated logic crucially
+        assumes that no conv or linear layers have sub-children that need
+        sparsifying.
+
+        Note: For instance DSConv2d layers have Conv2d children)
+        """
+
+        sparse_modules = []
+        for m in net.children():
+
+            # Check if Conv or Linear.
+            # TODO: use a common function, such as has_params
+            if isinstance(m, (nn.Linear, nn.Conv2d)):
+                sparse_modules.append(m)
+
+            # Check if recursion needed.
+            elif len(list(m.children())) > 0:
+                sparse_modules.extend(
+                    cls.get_sparse_modules(m)
+                )
+
+        return sparse_modules
+
+    @classmethod
+    def get_dynamic_sparse_modules(cls, net):
+        """
+        This function recursively finds which modules are intended to
+        be dynamically sparse.
+        """
+        sparse_modules = []
+        for m in net.children():
+
+            # Check if Conv or Linear.
+            if isinstance(m, (DSLinear, DSConv2d)):
+                sparse_modules.append(m)
+
+            # Check if recursion needed.
+            elif len(list(m.children())) > 0:
+                sparse_modules.extend(
+                    cls.get_dynamic_sparse_modules(m)
+                )
+
+        # Sanity check, then return.
+        assert all([isinstance(m, DynamicSparseBase) for m in sparse_modules])
+        return sparse_modules
+
+    def _make_attr_iterable(self, attr, counterpart=None):
+        """
+        This function (called in setup), ensures that a pre-existing attr
+        in an iterable (list) of length equal to self.sparse_modules.
+
+        :param attr: str - name of attribute to make into iterable
+        :param counterpart: Iterable with defined length - determines how many times
+                            to repeat the value of 'attr'. Defaults to
+                            self.sparse_modules.
+        """
+        counterpart = counterpart or self.sparse_modules
+        value = getattr(self, attr)
+        if isinstance(value, Iterable):
+            assert len(value) == len(counterpart), """
+                Expected "{}" to be of same length as sparse modules ({}).
+                Got {} of type {}.
+                """.format(attr, len(counterpart), value, type(value))
+        else:
+            value = [value] * len(counterpart)
+            setattr(self, attr, value)
 
     def _sparsify_stochastic(self, shape, on_perc):
         """Sthocastic in num of params approach of sparsifying a tensor"""

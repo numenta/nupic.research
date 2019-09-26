@@ -27,6 +27,9 @@ from torchvision import models
 
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
+from .layers import DSConv2d, DSLinear
+from .utils import make_dsnn, replace_sparse_weights, squash_layers, swap_layers
+
 
 class VGG19(nn.Module):
     def __init__(self, config=None):
@@ -34,14 +37,11 @@ class VGG19(nn.Module):
 
         defaults = dict(
             device="gpu",
-            input_size=784,
             num_classes=10,
-            hidden_sizes=[4000, 1000, 4000],
-            batch_norm=False,
-            dropout=0.3,
-            bias=False,
             init_weights=True,
-            kwinners=False,
+            kwinners=True,
+            boost_strength=1.5,
+            boost_strength_factor=0.85,
             percent_on=0.3,
         )
         defaults.update(config or {})
@@ -80,7 +80,7 @@ class VGG19(nn.Module):
         self.classifier = nn.Sequential(*layers)
 
         if self.init_weights:
-            self._initialize_weights()
+            self.initialize_weights(self.classifier)
 
     def _kwinners(self, fout):
         return KWinners2d(
@@ -103,8 +103,14 @@ class VGG19(nn.Module):
     def forward(self, x):
         return self.classifier(x)
 
-    def _initialize_weights(self):
-        for m in self.classifier.modules():
+    @classmethod
+    def initialize_weights(cls, net):
+        """
+        Initializes weights for any network where the initialization-scheme
+        follows that of the VGG-19 network in the "How can we be so Dense"
+        paper.
+        """
+        for m in net.children():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2.0 / n))
@@ -119,9 +125,9 @@ class VGG19(nn.Module):
                 m.bias.data.zero_()
 
 
-class VGG19Heb(nn.Module):
+class VGG19HebDepreciated(nn.Module):
     def __init__(self, config=None):
-        super(VGG19Heb, self).__init__()
+        super(VGG19HebDepreciated, self).__init__()
 
         defaults = dict(
             device="gpu",
@@ -500,3 +506,23 @@ def resnet18(config):
 
 def resnet50(config):
     return models.resnet50(num_classes=config["num_classes"])
+
+
+def vgg19_dsnn(config):
+
+    net = VGG19(config=config)
+    net = replace_sparse_weights(net)
+    net = make_dsnn(net, config)
+    net.classifier = swap_layers(
+        net.classifier, nn.MaxPool2d, KWinners2d)
+    net.classifier = squash_layers(
+        net.classifier, DSConv2d, nn.BatchNorm2d, KWinners2d)
+    net.classifier = squash_layers(
+        net.classifier, DSConv2d, nn.BatchNorm2d, KWinners2d, nn.AvgPool2d)
+    net.classifier = squash_layers(
+        net.classifier, DSLinear, nn.BatchNorm1d, KWinners)
+
+    if config.get("init_weights"):
+        VGG19.initialize_weights(net.classifier)
+
+    return net
