@@ -1,4 +1,0 @@
-artifact_location: file:///Users/lsouza/nta/nupic.research/projects/dynamic_sparse/runs/mlruns/4
-experiment_id: '4'
-lifecycle_stage: active
-name: test_mlflow4
