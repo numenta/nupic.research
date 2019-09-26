@@ -36,7 +36,7 @@ class DSLinearBlock(nn.Sequential):
         self,
         in_features,
         out_features,
-        bias,
+        bias=True,
         batch_norm=None,
         dropout=None,
         activation_func=None,
@@ -111,7 +111,7 @@ class MLPHeb(HebbianNetwork):
             percent_on_k_winner=[1.0, 1.0, 1.0],
             boost_strength=[1.4, 1.4, 1.4],
             boost_strength_factor=[0.7, 0.7, 0.7],
-            batch_norm=False,
+            batch_norm=True,
             dropout=False,
             bias=True,
         )
@@ -191,13 +191,15 @@ class GSCHeb(HebbianNetwork):
             duty_cycle_period=1000,
             k_inference_factor=1.5,
             use_kwinners=True,
-            percent_on=[0.095, 0.125, 0.1],
+            percent_on_k_winner=[0.095, 0.125, 0.1],
             hidden_neurons_conv=[64, 64],
             hidden_neurons_fc=1000,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
         self.device = torch.device(self.device)
+
+        kwargs = dict(bias=self.bias, batch_norm=self.batch_norm, dropout=self.dropout)
 
         # decide which actiovation function to use
         self.activation_funcs = []
@@ -233,6 +235,7 @@ class GSCHeb(HebbianNetwork):
                 self.hidden_neurons_conv[1] * 25,
                 self.hidden_neurons_fc,
                 activation_func=self.activation_funcs[2],
+                **kwargs
             ),
             DSLinearBlock(self.hidden_neurons_fc, 12),
         ]
