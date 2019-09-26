@@ -29,8 +29,32 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
-from nupic.research.frameworks.dynamic_sparse.networks import DSConv2d, DSLinear
+from nupic.research.frameworks.dynamic_sparse.networks import (
+    DSConv2d,
+    DSLinear,
+    DynamicSparseBase,
+)
 from nupic.torch.modules import update_boost_strength
+
+
+class NumScheduler(object):
+    """
+    Class like an lr_scheduler, but for any number of concern.
+    In it's simplest form, this will just grab an element from
+    a list of 'values' depending on the epic, but further development
+    could allow the logic could be made more complex.
+    """
+
+    def __init__(self, values):
+        self._values = values
+        self._epoch = 0
+
+    def step(self):
+        self._epoch += 1
+
+    def get_value(self):
+        idx = min(self._epoch, len(self._values) - 1)
+        return self._values[idx]
 
 
 class BaseModel:
@@ -57,6 +81,8 @@ class BaseModel:
             epsilon=None,
             sparsify_fixed=True,
             verbose=0,
+            train_batches_per_epoch=np.inf,  # default - don't limit the batches
+            test_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -94,6 +120,10 @@ class BaseModel:
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
 
+        # init batch info per epic.
+        self._make_attr_schedulable("train_batches_per_epoch")
+        self._make_attr_schedulable("test_batches_per_epoch")
+
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
         self.log = {}
@@ -110,16 +140,40 @@ class BaseModel:
 
         return self.log
 
+    def _make_attr_schedulable(self, attr):
+
+        value = getattr(self, attr)
+        if isinstance(value, NumScheduler):
+            return
+
+        if not isinstance(value, Iterable):
+            value = [value]
+        setattr(self, attr, NumScheduler(value))
+
     def _post_epoch_updates(self, dataset=None):
         # update learning rate
         if self.lr_scheduler:
             self.lr_scheduler.step()
         self.network.apply(update_boost_strength)
 
+        # iterate num_schedulers
+        for val in self.__dict__.values():
+            if isinstance(val, NumScheduler):
+                val.step()
+
     def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
         correct = 0
-        for inputs, targets in loader:
+        for idx, (inputs, targets) in enumerate(loader):
+
+            # Limit number of batches per epoch if desired.
+            if train:
+                if idx >= self.train_batches_per_epoch.get_value():
+                    break
+            else:
+                if idx >= self.test_batches_per_epoch.get_value():
+                    break
+
             # setup for training
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
@@ -302,9 +356,11 @@ class SparseModel(BaseModel):
             # Check if recursion needed.
             elif len(list(m.children())) > 0:
                 sparse_modules.extend(
-                    cls.get_sparse_modules(m)
+                    cls.get_dynamic_sparse_modules(m)
                 )
 
+        # Sanity check, then return.
+        assert all([isinstance(m, DynamicSparseBase) for m in sparse_modules])
         return sparse_modules
 
     def _make_attr_iterable(self, attr, counterpart=None):
@@ -321,7 +377,7 @@ class SparseModel(BaseModel):
         value = getattr(self, attr)
         if isinstance(value, Iterable):
             assert len(value) == len(counterpart), """
-                Expected '{}' to be of same length as sparse modules ({}).
+                Expected "{}" to be of same length as sparse modules ({}).
                 Got {} of type {}.
                 """.format(attr, len(counterpart), value, type(value))
         else:

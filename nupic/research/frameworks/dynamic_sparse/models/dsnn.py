@@ -27,7 +27,6 @@ import torch
 from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     DSConv2d,
     DynamicSparseBase,
-    SparseConv2d,
     calc_sparsity,
     init_coactivation_tracking,
 )
@@ -538,7 +537,7 @@ class DSNNConvHeb(DSNNMixedHeb):
                     attr = "hist_" + attr
                 self.log[attr + "_" + str(idx)] = value
 
-            if isinstance(module, (DSConv2d, SparseConv2d)):
+            if isinstance(module, DSConv2d):
                 self.log["sparsity_" + str(idx)] = calc_sparsity(module.weight)
 
 
@@ -596,5 +595,5 @@ class DSNNConvOnlyHeb(BaseModel):
                     attr = "hist_" + attr
                 self.log[attr + "_" + str(idx)] = value
 
-            if isinstance(module, (DSConv2d, SparseConv2d)):
+            if isinstance(module, DSConv2d):
                 self.log["sparsity_" + str(idx)] = calc_sparsity(module.weight)
