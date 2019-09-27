@@ -39,28 +39,6 @@ from nupic.research.frameworks.dynamic_sparse.common.dataloaders import (
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 
-# -------------------------------------------------
-# General Utils - helper classes
-# -------------------------------------------------
-
-class NumScheduler(object):
-    """
-    Class like an lr_scheduler, but for any number of concern.
-    In it's simplest form, this will just grab an element from
-    a list of 'values' depending on the epic, but further development
-    could allow the logic could be made more complex.
-    """
-
-    def __init__(self, values):
-        self._values = values
-        self._epoch = 0
-
-    def step(self):
-        self._epoch += 1
-
-    def get_value(self):
-        idx = min(self._epoch, len(self._values) - 1)
-        return self._values[idx]
 
 class Dataset:
     """Loads a dataset.
