@@ -22,7 +22,7 @@
 import torch
 from torch import nn
 
-from nupic.torch.modules import Flatten, KWinners
+from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 from .layers import DSLinear, init_coactivation_tracking
 
@@ -90,12 +90,9 @@ class HebbianNetwork(nn.Module):
             return []
 
     def forward(self, x):
-        print('before features ', x.shape)
         if 'features' in self._modules:
             x = self.features(x)
-        print('after features ', x.shape)
         x = self.classifier(x)
-        print('after classifier ', x.shape)
         return x
 
     def init_hebbian(self):
@@ -120,6 +117,7 @@ class MLPHeb(HebbianNetwork):
             batch_norm=True,
             dropout=False,
             bias=True,
+            k_inference_factor=1.0,
         )
         assert (
             config is None or "use_kwinners" not in config
@@ -135,11 +133,11 @@ class MLPHeb(HebbianNetwork):
             if self.percent_on_k_winner[layer] < 0.5:
                 self.activation_funcs.append(
                     KWinners(
-                        n=hidden_size,
+                        hidden_size,
                         percent_on=self.percent_on_k_winner[layer],
                         boost_strength=self.boost_strength[layer],
                         boost_strength_factor=self.boost_strength_factor[layer],
-                        k_inference_factor=1.0,
+                        k_inference_factor=self.k_inference_factor,
                     )
                 )
             else:
@@ -209,14 +207,13 @@ class GSCHeb(HebbianNetwork):
 
         kwargs = dict(bias=self.bias, batch_norm=self.batch_norm, dropout=self.dropout)
 
-        # decide which actiovation function to use
+        # decide which actiovation function to use for conv
         self.activation_funcs = []
-        hidden_sizes = [*self.hidden_neurons_conv, self.hidden_neurons_fc]
-        for layer, hidden_size in enumerate(hidden_sizes):
+        for layer, hidden_size in enumerate(self.hidden_neurons_conv):
             if self.percent_on_k_winner[layer] < 0.5:
                 self.activation_funcs.append(
-                    KWinners(
-                        n=hidden_size,
+                    KWinners2d(
+                        hidden_size,
                         percent_on=self.percent_on_k_winner[layer],
                         boost_strength=self.boost_strength[layer],
                         boost_strength_factor=self.boost_strength_factor[layer],
@@ -225,6 +222,18 @@ class GSCHeb(HebbianNetwork):
                 )
             else:
                 self.activation_funcs.append(nn.ReLU())
+
+        # decide which activvation to use for linear
+        if self.percent_on_k_winner[-1] < 0.5:
+            linear_activation = KWinners(
+                self.hidden_neurons_fc,
+                percent_on=self.percent_on_k_winner[-1],
+                boost_strength=self.boost_strength[-1],
+                boost_strength_factor=self.boost_strength_factor[-1],
+                k_inference_factor=self.k_inference_factor,
+            )
+        else:
+            linear_activation = nn.ReLU()
 
         # linear layers
         conv_layers = [
@@ -246,7 +255,7 @@ class GSCHeb(HebbianNetwork):
             DSLinearBlock(
                 self.hidden_neurons_conv[1] * 25,
                 self.hidden_neurons_fc,
-                activation_func=self.activation_funcs[2],
+                activation_func=linear_activation,
                 **kwargs
             ),
             DSLinearBlock(self.hidden_neurons_fc, self.num_classes),
