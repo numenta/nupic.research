@@ -39,7 +39,6 @@ base_exp_config = dict(
     train_batches_per_epoch=5121,   
     # batch_size_train=(4, 16),
     batch_size_train=16,
-    test_batches_per_epoch=50, # total of 1000 samples, similar to HSD
     batch_size_test=20, # required to fit the GPU
     # ----- network related ----
     network="GSCHeb",
@@ -75,12 +74,12 @@ base_exp_config = dict(
 # ray configurations
 tune_config = dict(
     name=__file__.replace(".py", "") + "_test1",
-    num_samples=5,
+    num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 25},
-    resources_per_trial={"cpu": 1, "gpu": .20},
+    resources_per_trial={"cpu": 1, "gpu": .25},
     loggers=DEFAULT_LOGGERS,
     verbose=0,
 )
