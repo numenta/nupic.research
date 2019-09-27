@@ -37,10 +37,7 @@ class SETDepreciated(SparseModel):
         super().setup()
 
         # add specific defaults
-        new_defaults = dict(
-            pruning_active=True,
-            pruning_early_stop=None,
-        )
+        new_defaults = dict(pruning_active=True, pruning_early_stop=None)
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
 

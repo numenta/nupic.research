@@ -36,8 +36,7 @@ CLASSES = (
 
 
 class VaryingDataLoader(object):
-
-    def __init__(self, dataset, batch_sizes=(1, ), *args, **kwargs):
+    def __init__(self, dataset, batch_sizes=(1,), *args, **kwargs):
 
         if not isinstance(batch_sizes, Iterable):
             batch_sizes = tuple([batch_sizes])
@@ -87,8 +86,7 @@ class PreprocessedSpeechDataset(Dataset):
     Use the "process_dataset.py" script to create preprocessed dataset
     """
 
-    def __init__(
-            self, root, subset, random_seed=0, classes=CLASSES):
+    def __init__(self, root, subset, random_seed=0, classes=CLASSES):
         """
         :param root: Dataset root directory
         :param subset: Which dataset subset to use ("train", "test", "valid", "noise")
@@ -134,8 +132,7 @@ class PreprocessedSpeechDataset(Dataset):
     def next_seed(self):
         """Load next seed from disk."""
         seed = str(next(self._all_seeds))
-        seed = "0" + seed \
-            if (len(seed) == 1) and self._subset == "test_noise" else seed
+        seed = "0" + seed if (len(seed) == 1) and self._subset == "test_noise" else seed
 
         data_path = os.path.join(self._root, "gsc_" + self._subset + seed + ".npz")
 
@@ -149,14 +146,18 @@ class PreprocessedSpeechDataset(Dataset):
 
 
 class PreprocessedSpeechDataLoader(VaryingDataLoader):
-
     def __init__(
-        self, root, subset, random_seed=0, classes=CLASSES, batch_sizes=1,
-        *args, **kwargs
+        self,
+        root,
+        subset,
+        random_seed=0,
+        classes=CLASSES,
+        batch_sizes=1,
+        *args,
+        **kwargs,
     ):
 
-        self.dataset = PreprocessedSpeechDataset(
-            root, subset, random_seed, classes)
+        self.dataset = PreprocessedSpeechDataset(root, subset, random_seed, classes)
 
         super().__init__(self.dataset, batch_sizes, *args, *kwargs)
 
@@ -168,14 +169,11 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
 
 if __name__ == "__main__":
 
+    # TODO: Move this code to tests
     test_loading_processes = False
     root = "~/nta/datasets/gsc"
     root = os.path.expanduser(root)
-    dataset_train = PreprocessedSpeechDataset(
-        root,
-        "train",
-        classes=CLASSES,
-    )
+    dataset_train = PreprocessedSpeechDataset(root, "train", classes=CLASSES)
 
     if test_loading_processes:
         for _ in range(dataset_train.num_seeds + 1):
@@ -184,10 +182,7 @@ if __name__ == "__main__":
     batch_sizes = (4, 16)
 
     dataloader_1 = PreprocessedSpeechDataLoader(
-        root,
-        "train",
-        classes=CLASSES,
-        batch_sizes=batch_sizes,
+        root, "train", classes=CLASSES, batch_sizes=batch_sizes
     )
     for i in range(3):
         for (batch, _) in dataloader_1:
@@ -209,21 +204,13 @@ if __name__ == "__main__":
     except Exception:
         raise ValueError("Torch should not allow us to set the batch size.")
 
-    dataset_valid = PreprocessedSpeechDataset(
-        root,
-        "valid",
-        classes=CLASSES,
-    )
+    dataset_valid = PreprocessedSpeechDataset(root, "valid", classes=CLASSES)
 
     if test_loading_processes:
         for _ in range(dataset_valid.num_seeds + 1):
             dataset_valid.next_seed()
 
-    dataset_test = PreprocessedSpeechDataset(
-        root,
-        "test_noise",
-        classes=CLASSES,
-    )
+    dataset_test = PreprocessedSpeechDataset(root, "test_noise", classes=CLASSES)
 
     if test_loading_processes:
         for _ in range(dataset_test.num_seeds + 1):
