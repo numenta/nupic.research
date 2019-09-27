@@ -90,7 +90,13 @@ class HebbianNetwork(nn.Module):
             return []
 
     def forward(self, x):
-        return self.classifier(x)
+        print('before features ', x.shape)
+        if 'features' in self._modules:
+            x = self.features(x)
+        print('after features ', x.shape)
+        x = self.classifier(x)
+        print('after classifier ', x.shape)
+        return x
 
     def init_hebbian(self):
         self._track_coactivations = True
@@ -190,10 +196,12 @@ class GSCHeb(HebbianNetwork):
             boost_strength_factor=[0.9, 0.9, 0.9],
             duty_cycle_period=1000,
             k_inference_factor=1.5,
-            use_kwinners=True,
             percent_on_k_winner=[0.095, 0.125, 0.1],
             hidden_neurons_conv=[64, 64],
             hidden_neurons_fc=1000,
+            batch_norm=True,
+            dropout=False,
+            bias=True,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -212,7 +220,7 @@ class GSCHeb(HebbianNetwork):
                         percent_on=self.percent_on_k_winner[layer],
                         boost_strength=self.boost_strength[layer],
                         boost_strength_factor=self.boost_strength_factor[layer],
-                        k_inference_factor=1.0,
+                        k_inference_factor=self.k_inference_factor,
                     )
                 )
             else:
@@ -221,12 +229,16 @@ class GSCHeb(HebbianNetwork):
         # linear layers
         conv_layers = [
             # 28x28 -> 14x14
-            *self._conv_block(1, self.hidden_neurons_conv[0], self.activation_funcs[0]),
+            *self._conv_block(
+                1, 
+                self.hidden_neurons_conv[0], 
+                self.activation_funcs[0]
+            ),
             # 10x10 -> 5x5
             *self._conv_block(
                 self.hidden_neurons_conv[0],
                 self.hidden_neurons_conv[1],
-                self.activation_funcs[1],
+                self.activation_funcs[1]
             ),
             Flatten(),
         ]
@@ -237,7 +249,7 @@ class GSCHeb(HebbianNetwork):
                 activation_func=self.activation_funcs[2],
                 **kwargs
             ),
-            DSLinearBlock(self.hidden_neurons_fc, 12),
+            DSLinearBlock(self.hidden_neurons_fc, self.num_classes),
         ]
 
         self.features = nn.Sequential(*conv_layers)

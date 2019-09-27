@@ -29,11 +29,11 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
-from nupic.research.frameworks.common.utils import NumScheduler
 from nupic.research.frameworks.dynamic_sparse.networks import (
     DSConv2d,
     DSLinear,
     DynamicSparseBase,
+    NumScheduler
 )
 from nupic.torch.modules import update_boost_strength
 
