@@ -265,44 +265,55 @@ class GSCSparseFullCNN(nn.Sequential):
     :param duty_cycle_period: The period used to calculate duty cycles
     """
 
-    def __init__(self,
-                 cnn_out_channels=(32, 64, 32),
-                 cnn_percent_on=(0.095, 0.125, 0.0925),
-                 linear_units=1600,
-                 linear_percent_on=0.1,
-                 linear_weight_sparsity=0.4,
-                 boost_strength=1.5,
-                 boost_strength_factor=0.9,
-                 k_inference_factor=1.5,
-                 duty_cycle_period=1000
-                 ):
+    def __init__(
+        self,
+        cnn_out_channels=(32, 64, 32),
+        cnn_percent_on=(0.095, 0.125, 0.0925),
+        linear_units=1600,
+        linear_percent_on=0.1,
+        linear_weight_sparsity=0.4,
+        boost_strength=1.5,
+        boost_strength_factor=0.9,
+        k_inference_factor=1.5,
+        duty_cycle_period=1000,
+    ):
         super(GSCSparseFullCNN, self).__init__()
         # input_shape = (1, 32, 32)
         # First Sparse CNN layer
         self.add_module("cnn1", nn.Conv2d(1, cnn_out_channels[0], 5))
-        self.add_module("cnn1_batchnorm", nn.BatchNorm2d(cnn_out_channels[0],
-                                                         affine=False))
+        self.add_module(
+            "cnn1_batchnorm", nn.BatchNorm2d(cnn_out_channels[0], affine=False)
+        )
         self.add_module("cnn1_maxpool", nn.MaxPool2d(2))
-        self.add_module("cnn1_kwinner", KWinners2d(
-            channels=cnn_out_channels[0],
-            percent_on=cnn_percent_on[0],
-            k_inference_factor=k_inference_factor,
-            boost_strength=boost_strength,
-            boost_strength_factor=boost_strength_factor,
-            duty_cycle_period=duty_cycle_period))
+        self.add_module(
+            "cnn1_kwinner",
+            KWinners2d(
+                channels=cnn_out_channels[0],
+                percent_on=cnn_percent_on[0],
+                k_inference_factor=k_inference_factor,
+                boost_strength=boost_strength,
+                boost_strength_factor=boost_strength_factor,
+                duty_cycle_period=duty_cycle_period,
+            ),
+        )
 
         # Second Sparse CNN layer
         self.add_module("cnn2", nn.Conv2d(cnn_out_channels[0], cnn_out_channels[1], 5))
-        self.add_module("cnn2_batchnorm",
-                        nn.BatchNorm2d(cnn_out_channels[1], affine=False))
+        self.add_module(
+            "cnn2_batchnorm", nn.BatchNorm2d(cnn_out_channels[1], affine=False)
+        )
         self.add_module("cnn2_maxpool", nn.MaxPool2d(2))
-        self.add_module("cnn2_kwinner", KWinners2d(
-            channels=cnn_out_channels[1],
-            percent_on=cnn_percent_on[1],
-            k_inference_factor=k_inference_factor,
-            boost_strength=boost_strength,
-            boost_strength_factor=boost_strength_factor,
-            duty_cycle_period=duty_cycle_period))
+        self.add_module(
+            "cnn2_kwinner",
+            KWinners2d(
+                channels=cnn_out_channels[1],
+                percent_on=cnn_percent_on[1],
+                k_inference_factor=k_inference_factor,
+                boost_strength=boost_strength,
+                boost_strength_factor=boost_strength_factor,
+                duty_cycle_period=duty_cycle_period,
+            ),
+        )
 
         # # Third Sparse CNN layer
         # self.add_module("cnn3",

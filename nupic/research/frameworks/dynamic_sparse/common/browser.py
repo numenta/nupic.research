@@ -29,6 +29,7 @@ Converted to a module
 
 from __future__ import absolute_import, division, print_function
 
+import copy
 import glob
 import json
 import os
@@ -37,7 +38,6 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-import copy
 
 warnings.filterwarnings("ignore")
 
@@ -56,6 +56,7 @@ def flatten_dict(dt, delimiter="/"):
         for k in remove:
             del dt[k]
     return dt
+
 
 def load(experiment_path, metrics=None):
     """Load a single experiment into a dataframe"""
@@ -110,7 +111,14 @@ def _read_experiment(experiment_state, experiment_path):
     return progress, params
 
 
-def _get_value(progress, params, exp_name, performance_metrics=None, full_metrics=None, exp_substring=""):
+def _get_value(
+    progress,
+    params,
+    exp_name,
+    performance_metrics=None,
+    full_metrics=None,
+    exp_substring="",
+):
     """
     For every experiment whose name matches exp_substring, scan the history
     and return the appropriate value associated with tag.
@@ -133,7 +141,7 @@ def _get_value(progress, params, exp_name, performance_metrics=None, full_metric
         performance_metrics = [m for m in progress[exps[0]].keys() if "acc" in m]
 
     if full_metrics is None:
-        full_metrics = ['val_acc']
+        full_metrics = ["val_acc"]
 
     # populate stats
     stats = defaultdict(list)
@@ -153,7 +161,7 @@ def _get_value(progress, params, exp_name, performance_metrics=None, full_metric
 
         # add all data for one metric - required to plot
         for m in full_metrics:
-            stats[m + '_all'].append(progress[e][m])
+            stats[m + "_all"].append(progress[e][m])
 
         # remaining custom tags - specific
         stats["epochs"].append(progress[e]["training_iteration"].iloc[-1])

@@ -21,14 +21,14 @@
 
 
 import os
-import numpy as np
+
 from ray import tune
 
 from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
-# define a small convolutional network 
-# in line with the 
+# define a small convolutional network
+# in line with the
 
 # experiment configurations
 base_exp_config = dict(
@@ -36,10 +36,10 @@ base_exp_config = dict(
     # ----- dataset related ----
     dataset_name="PreprocessedGSC",
     data_dir=os.path.expanduser("~/nta/datasets/gsc"),
-    train_batches_per_epoch=5121,   
+    train_batches_per_epoch=5121,
     # batch_size_train=(4, 16),
     batch_size_train=16,
-    batch_size_test=20, # required to fit the GPU
+    batch_size_test=20,  # required to fit the GPU
     # ----- network related ----
     network="GSCHeb",
     percent_on_k_winner=[0.095, 0.125, 0.067],
@@ -47,23 +47,25 @@ base_exp_config = dict(
     boost_strength=[1.5, 1.5, 1.5],
     boost_strength_factor=[0.9, 0.9, 0.9],
     hidden_neurons_conv=[64, 64],
-    hidden_neurons_fc=1500,    
+    hidden_neurons_fc=1500,
     bias=True,
     dropout=False,
     batch_norm=True,
     # ----- model related ----
-    model=tune.grid_search(["BaseModel", "SparseModel", "DSNNWeightedMag", "DSNNMixedHeb"]),
+    model=tune.grid_search(
+        ["BaseModel", "SparseModel", "DSNNWeightedMag", "DSNNMixedHeb"]
+    ),
     optim_alg="SGD",
-    momentum=0, 
+    momentum=0,
     learning_rate=0.01,
-    weight_decay= 0.01,
+    weight_decay=0.01,
     lr_scheduler="StepLR",
     lr_gamma=0.9,
-    on_perc=[1 , 1, 0.1, 1],
+    on_perc=[1, 1, 0.1, 1],
     hebbian_prune_perc=None,
     hebbian_grow=False,
     weight_prune_perc=0.3,
-    pruning_early_stop=None, # 2
+    pruning_early_stop=None,  # 2
     # additional validation
     test_noise=True,
     # debugging
@@ -79,10 +81,9 @@ tune_config = dict(
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 25},
-    resources_per_trial={"cpu": 1, "gpu": .25},
+    resources_per_trial={"cpu": 1, "gpu": 0.25},
     loggers=DEFAULT_LOGGERS,
     verbose=0,
 )
 
 run_ray(tune_config, base_exp_config)
-

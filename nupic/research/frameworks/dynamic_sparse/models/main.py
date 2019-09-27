@@ -33,7 +33,7 @@ from nupic.research.frameworks.dynamic_sparse.networks import (
     DSConv2d,
     DSLinear,
     DynamicSparseBase,
-    NumScheduler
+    NumScheduler,
 )
 from nupic.torch.modules import update_boost_strength
 
@@ -289,7 +289,7 @@ class SparseModel(BaseModel):
             on_perc = self.on_perc
             self.epsilon = None
 
-        # change the way pruning masks are created 
+        # change the way pruning masks are created
 
         with torch.no_grad():
             # TODO: restore the implementation of start_sparse and end_sparse
@@ -332,9 +332,7 @@ class SparseModel(BaseModel):
 
             # Check if recursion needed.
             elif len(list(m.children())) > 0:
-                sparse_modules.extend(
-                    cls.get_sparse_modules(m)
-                )
+                sparse_modules.extend(cls.get_sparse_modules(m))
 
         return sparse_modules
 
@@ -353,9 +351,7 @@ class SparseModel(BaseModel):
 
             # Check if recursion needed.
             elif len(list(m.children())) > 0:
-                sparse_modules.extend(
-                    cls.get_dynamic_sparse_modules(m)
-                )
+                sparse_modules.extend(cls.get_dynamic_sparse_modules(m))
 
         # Sanity check, then return.
         assert all([isinstance(m, DynamicSparseBase) for m in sparse_modules])
@@ -374,10 +370,14 @@ class SparseModel(BaseModel):
         counterpart = counterpart or self.sparse_modules
         value = getattr(self, attr)
         if isinstance(value, Iterable):
-            assert len(value) == len(counterpart), """
+            assert len(value) == len(
+                counterpart
+            ), """
                 Expected "{}" to be of same length as sparse modules ({}).
                 Got {} of type {}.
-                """.format(attr, len(counterpart), value, type(value))
+                """.format(
+                attr, len(counterpart), value, type(value)
+            )
         else:
             value = [value] * len(counterpart)
             setattr(self, attr, value)
@@ -393,38 +393,38 @@ class SparseModel(BaseModel):
         mask = torch.zeros(shape, dtype=torch.bool)
         # loop over outputs
         for dim in range(output_size):
-            # select a subsample of the indexes in the output unit    
+            # select a subsample of the indexes in the output unit
             all_idxs = np.array(list(product(*[range(s) for s in shape[1:]])))
-            sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
+            sampled_idxs = np.random.choice(
+                range(len(all_idxs)), num_add, replace=False
+            )
             selected = all_idxs[sampled_idxs]
             if len(selected) > 0:
                 # change from long to wide format
                 selected_wide = list(zip(*selected))
                 # append the output dimension to wide format
-                selected_wide.insert(0, tuple([dim]*len(selected_wide[0])))
+                selected_wide.insert(0, tuple([dim] * len(selected_wide[0])))
                 # apply the mask
                 mask[selected_wide] = True
         return mask.float().to(self.device)
 
+    # def _sparsify_fixed(self, shape, on_perc):
+    #     """
+    #     Deterministic in number of params approach of sparsifying a tensor
+    #     Sample N from all possible indices
+    #     """
+    #     all_idxs = np.array(list(product(*[range(s) for s in shape])))
+    #     num_add = int(on_perc * np.prod(shape))
+    #     sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
+    #     selected = all_idxs[sampled_idxs]
 
-    def _sparsify_fixed(self, shape, on_perc):
-        """
-        Deterministic in number of params approach of sparsifying a tensor
-        Sample N from all possible indices
-        """
-        all_idxs = np.array(list(product(*[range(s) for s in shape])))
-        num_add = int(on_perc * np.prod(shape))
-        sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
-        selected = all_idxs[sampled_idxs]
+    #     mask = torch.zeros(shape, dtype=torch.bool)
+    #     if len(selected.shape) > 1:
+    #         mask[list(zip(*selected))] = True
+    #     else:
+    #         mask[selected] = True
 
-        mask = torch.zeros(shape, dtype=torch.bool)
-        if len(selected.shape) > 1:
-            mask[list(zip(*selected))] = True
-        else:
-            mask[selected] = True
-
-        return mask.float().to(self.device)
-
+    #     return mask.float().to(self.device)
 
     def _sparsify_stochastic(self, shape, on_perc):
         """Sthocastic in num of params approach of sparsifying a tensor"""

@@ -31,6 +31,7 @@ from .layers import DSConv2d, DSLinear, DynamicSparseBase
 # General Utils - helper classes
 # -------------------------------------------------
 
+
 class NumScheduler(object):
     """
     Class like an lr_scheduler, but for any number of concern.
@@ -50,9 +51,11 @@ class NumScheduler(object):
         idx = min(self._epoch, len(self._values) - 1)
         return self._values[idx]
 
+
 # -------------------------------------------------
 # General Utils - network mutators
 # -------------------------------------------------
+
 
 def replace_sparse_weights(sequence):
 
@@ -195,10 +198,7 @@ def squash_layers(sequential, *types, transfer_forward_hook=True):
             # Maintain same forward hook.
             if forward_hook:
                 forward_hook_handle = squashed.register_forward_hook(
-                    lambda module, in_, out_:
-                    forward_hook(
-                        module[0],
-                        in_, out_)
+                    lambda module, in_, out_: forward_hook(module[0], in_, out_)
                 )
                 squashed.forward_hook = forward_hook
                 squashed.forward_hook_handle = forward_hook_handle
@@ -259,6 +259,7 @@ def set_module(net, name, new_module):
 # ------------------------------------------------------------
 # Dynamic Utils - dynamic-network builders and introspectors.
 # ------------------------------------------------------------
+
 
 def get_dynamic_sparse_modules(net):
     """
@@ -341,25 +342,33 @@ def make_dsnn(net, config=None):
             continue
 
         if isinstance(layer, torch.nn.Conv2d):
-            set_module(net, name, layer_type(
-                in_channels=layer.in_channels,
-                out_channels=layer.out_channels,
-                kernel_size=layer.kernel_size,
-                stride=layer.stride,
-                padding=layer.padding,
-                padding_mode=layer.padding_mode,
-                dilation=layer.dilation,
-                groups=layer.groups,
-                bias=(layer.bias is not None),
-                **kwargs,
-            ))
+            set_module(
+                net,
+                name,
+                layer_type(
+                    in_channels=layer.in_channels,
+                    out_channels=layer.out_channels,
+                    kernel_size=layer.kernel_size,
+                    stride=layer.stride,
+                    padding=layer.padding,
+                    padding_mode=layer.padding_mode,
+                    dilation=layer.dilation,
+                    groups=layer.groups,
+                    bias=(layer.bias is not None),
+                    **kwargs,
+                ),
+            )
 
         elif isinstance(layer, torch.nn.Linear):
-            set_module(net, name, layer_type(
-                in_features=layer.in_features,
-                out_features=layer.out_features,
-                bias=(layer.bias is not None),
-                **kwargs,
-            ))
+            set_module(
+                net,
+                name,
+                layer_type(
+                    in_features=layer.in_features,
+                    out_features=layer.out_features,
+                    bias=(layer.bias is not None),
+                    **kwargs,
+                ),
+            )
 
     return net

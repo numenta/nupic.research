@@ -90,7 +90,7 @@ class HebbianNetwork(nn.Module):
             return []
 
     def forward(self, x):
-        if 'features' in self._modules:
+        if "features" in self._modules:
             x = self.features(x)
         x = self.classifier(x)
         return x
@@ -238,16 +238,12 @@ class GSCHeb(HebbianNetwork):
         # linear layers
         conv_layers = [
             # 28x28 -> 14x14
-            *self._conv_block(
-                1, 
-                self.hidden_neurons_conv[0], 
-                self.activation_funcs[0]
-            ),
+            *self._conv_block(1, self.hidden_neurons_conv[0], self.activation_funcs[0]),
             # 10x10 -> 5x5
             *self._conv_block(
                 self.hidden_neurons_conv[0],
                 self.hidden_neurons_conv[1],
-                self.activation_funcs[1]
+                self.activation_funcs[1],
             ),
             Flatten(),
         ]
@@ -256,7 +252,7 @@ class GSCHeb(HebbianNetwork):
                 self.hidden_neurons_conv[1] * 25,
                 self.hidden_neurons_fc,
                 activation_func=linear_activation,
-                **kwargs
+                **kwargs,
             ),
             DSLinearBlock(self.hidden_neurons_fc, self.num_classes),
         ]
