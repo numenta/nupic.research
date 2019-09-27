@@ -289,6 +289,8 @@ class SparseModel(BaseModel):
             on_perc = self.on_perc
             self.epsilon = None
 
+        # change the way pruning masks are created 
+
         with torch.no_grad():
             # TODO: restore the implementation of start_sparse and end_sparse
             # TODO: restore the implementation of sparse_linear_only
@@ -303,7 +305,7 @@ class SparseModel(BaseModel):
                 if on_perc[idx] >= 1:
                     mask = torch.ones(shape).float().to(self.device)
                 elif self.sparsify_fixed:
-                    mask = self._sparsify_fixed(shape, on_perc[idx])
+                    mask = self._sparsify_fixed_per_output(shape, on_perc[idx])
                 else:
                     mask = self._sparsify_stochastic(shape, on_perc[idx])
                 m.weight.data *= mask
@@ -379,6 +381,50 @@ class SparseModel(BaseModel):
         else:
             value = [value] * len(counterpart)
             setattr(self, attr, value)
+
+    def _sparsify_fixed_per_output(self, shape, on_perc):
+        """
+        Similar implementation to how so dense
+        Works in any number of dimension, considering the 1st one is the output
+        """
+        output_size = shape[0]
+        input_size = np.prod(shape[1:])
+        num_add = int(on_perc * input_size)
+        mask = torch.zeros(shape, dtype=torch.bool)
+        # loop over outputs
+        for dim in range(output_size):
+            # select a subsample of the indexes in the output unit    
+            all_idxs = np.array(list(product(*[range(s) for s in shape[1:]])))
+            sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
+            selected = all_idxs[sampled_idxs]
+            if len(selected) > 0:
+                # change from long to wide format
+                selected_wide = list(zip(*selected))
+                # append the output dimension to wide format
+                selected_wide.insert(0, tuple([dim]*len(selected_wide[0])))
+                # apply the mask
+                mask[selected_wide] = True
+        return mask.float().to(self.device)
+
+
+    def _sparsify_fixed(self, shape, on_perc):
+        """
+        Deterministic in number of params approach of sparsifying a tensor
+        Sample N from all possible indices
+        """
+        all_idxs = np.array(list(product(*[range(s) for s in shape])))
+        num_add = int(on_perc * np.prod(shape))
+        sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
+        selected = all_idxs[sampled_idxs]
+
+        mask = torch.zeros(shape, dtype=torch.bool)
+        if len(selected.shape) > 1:
+            mask[list(zip(*selected))] = True
+        else:
+            mask[selected] = True
+
+        return mask.float().to(self.device)
+
 
     def _sparsify_stochastic(self, shape, on_perc):
         """Sthocastic in num of params approach of sparsifying a tensor"""
