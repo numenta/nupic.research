@@ -20,14 +20,13 @@
 # ----------------------------------------------------------------------
 
 import os
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
-import mlflow
-from mlflow.tracking import MlflowClient
-from ray import tune
-from ray.tune.logger import MLFLowLogger, DEFAULT_LOGGERS
-from nupic.research.support.elastic_logger import ElasticsearchLogger
 
 from dotenv import load_dotenv
+from ray.tune.logger import DEFAULT_LOGGERS
+
+from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
+from nupic.research.support.elastic_logger import ElasticsearchLogger
+
 load_dotenv()
 
 # alternative initialization based on configuration
@@ -43,14 +42,14 @@ exp_config = dict(
     batch_size_train=10,
     batch_size_test=10,
     debug_sparse=True,
-    name='test2'
+    name="test2",
 )
 
-exp_config['elasticsearch_index'] = __file__.replace(".py", "") + "_eval"
+exp_config["elasticsearch_index"] = __file__.replace(".py", "") + "_eval"
 
 # run
 tune_config = dict(
-    name='test',
+    name="test",
     num_samples=3,
     local_dir=os.path.expanduser("~/nta/results"),
     # checkpoint_freq=0,
@@ -58,7 +57,7 @@ tune_config = dict(
     stop={"training_iteration": 1},
     resources_per_trial={"cpu": 1, "gpu": 1},
     verbose=2,
-    loggers=DEFAULT_LOGGERS + (ElasticsearchLogger, ),
+    loggers=DEFAULT_LOGGERS + (ElasticsearchLogger,),
 )
 
 run_ray(tune_config, exp_config)

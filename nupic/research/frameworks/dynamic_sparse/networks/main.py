@@ -513,14 +513,12 @@ def vgg19_dsnn(config):
     net = VGG19(config=config)
     net = replace_sparse_weights(net)
     net = make_dsnn(net, config)
-    net.classifier = swap_layers(
-        net.classifier, nn.MaxPool2d, KWinners2d)
+    net.classifier = swap_layers(net.classifier, nn.MaxPool2d, KWinners2d)
+    net.classifier = squash_layers(net.classifier, DSConv2d, nn.BatchNorm2d, KWinners2d)
     net.classifier = squash_layers(
-        net.classifier, DSConv2d, nn.BatchNorm2d, KWinners2d)
-    net.classifier = squash_layers(
-        net.classifier, DSConv2d, nn.BatchNorm2d, KWinners2d, nn.AvgPool2d)
-    net.classifier = squash_layers(
-        net.classifier, DSLinear, nn.BatchNorm1d, KWinners)
+        net.classifier, DSConv2d, nn.BatchNorm2d, KWinners2d, nn.AvgPool2d
+    )
+    net.classifier = squash_layers(net.classifier, DSLinear, nn.BatchNorm1d, KWinners)
 
     if config.get("init_weights"):
         VGG19.initialize_weights(net.classifier)

@@ -20,11 +20,11 @@
 # ----------------------------------------------------------------------
 
 import os
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
-import mlflow
+
 from mlflow.tracking import MlflowClient
-from ray import tune
-from ray.tune.logger import MLFLowLogger, DEFAULT_LOGGERS
+from ray.tune.logger import DEFAULT_LOGGERS, MLFLowLogger
+
+from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # alternative initialization based on configuration
 exp_config = dict(
@@ -54,7 +54,7 @@ tune_config = dict(
     stop={"training_iteration": 5},
     resources_per_trial={"cpu": 1, "gpu": 1},
     verbose=2,
-    loggers=DEFAULT_LOGGERS + (MLFLowLogger, ),
+    loggers=DEFAULT_LOGGERS + (MLFLowLogger,),
 )
 
 run_ray(tune_config, exp_config)

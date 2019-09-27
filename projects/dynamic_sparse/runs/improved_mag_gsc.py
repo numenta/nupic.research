@@ -21,14 +21,15 @@
 
 
 import os
+
 import numpy as np
 from ray import tune
 
 from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
-# define a small convolutional network 
-# in line with the 
+# define a small convolutional network
+# in line with the
 
 # experiment configurations
 base_exp_config = dict(
@@ -41,12 +42,12 @@ base_exp_config = dict(
     # network related
     network="GSCHeb",
     optim_alg="SGD",
-    momentum=0, # 0.9,
-    learning_rate=0.01, # 0.1,
-    weight_decay= 0.01, # 1e-4,
+    momentum=0,  # 0.9,
+    learning_rate=0.01,  # 0.1,
+    weight_decay=0.01,  # 1e-4,
     lr_scheduler="MultiStepLR",
     lr_milestones=[30, 60, 90],
-    lr_gamma=0.9, # 0.1,
+    lr_gamma=0.9,  # 0.1,
     use_kwinners=True,
     # sparse_linear_only=True, # False
     # model related
@@ -72,10 +73,9 @@ tune_config = dict(
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 100},
-    resources_per_trial={"cpu": 1, "gpu": .20},
+    resources_per_trial={"cpu": 1, "gpu": 0.20},
     loggers=DEFAULT_LOGGERS,
     verbose=0,
 )
 
 run_ray(tune_config, base_exp_config)
-
