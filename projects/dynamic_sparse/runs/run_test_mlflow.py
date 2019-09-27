@@ -21,9 +21,9 @@
 
 import os
 
-from mlflow.tracking import MlflowClient
 from ray.tune.logger import DEFAULT_LOGGERS, MLFLowLogger
 
+from mlflow.tracking import MlflowClient
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # alternative initialization based on configuration
