@@ -114,7 +114,7 @@ class MLPHeb(HebbianNetwork):
             percent_on_k_winner=[1.0, 1.0, 1.0],
             boost_strength=[1.4, 1.4, 1.4],
             boost_strength_factor=[0.7, 0.7, 0.7],
-            batch_norm=True,
+            batch_norm=False,
             dropout=False,
             bias=True,
             k_inference_factor=1.0,
