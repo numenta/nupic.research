@@ -726,7 +726,7 @@ class RSMExperiment(object):
         return ret
 
     def _pause_learning(self, epoch):
-        print("Setting eval interval to %d" % self.pause_eval_interval)
+        print("Pausing learning... Setting eval interval to %d" % self.pause_eval_interval)
         self.model_learning_paused = True
         self.eval_interval = self.pause_eval_interval
         self.model._zero_kwinner_boost()
