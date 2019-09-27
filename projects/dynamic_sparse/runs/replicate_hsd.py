@@ -79,7 +79,7 @@ tune_config = dict(
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 25},
-    resources_per_trial={"cpu": 1, "gpu": 1},
+    resources_per_trial={"cpu": 1, "gpu": .25},
     loggers=DEFAULT_LOGGERS,
     verbose=0,
 )
