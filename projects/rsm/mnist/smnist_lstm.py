@@ -40,7 +40,10 @@ predictor = rsm.RSMPredictor(
             )
 
 class BPTTTrainer():
-    def __init__(self, model, loader, k1=1, k2=30, predictor=None, bsz=BSZ, mbs=100, use_optimizer=True, lr=1e-5):
+    def __init__(self, model, loader, k1=1, k2=30, predictor=None, 
+                 bsz=BSZ, mbs=100, 
+                 use_optimizer=True, lr=1e-5,
+                 link_cell_state=False):
         self.k1 = k1
         self.k2 = k2
         self.lr = lr
@@ -53,6 +56,7 @@ class BPTTTrainer():
         self.bsz = bsz
         self.loss_module = torch.nn.MSELoss()
         self.retain_graph = self.k1 < self.k2
+        self.link_cell_state = link_cell_state
         self.epoch = 0
         self.mbs = mbs
         self.total_mbs = 0
@@ -124,7 +128,7 @@ class BPTTTrainer():
                 self.epoch += 1
         else:
             # Continuous just run up to mbs
-            self.loader.batch_sampler.max_batches = 0
+            self.loader.batch_sampler.max_batches = self.mbs
             self.train()
         self.writer.close()
 
@@ -174,9 +178,10 @@ class BPTTTrainer():
                     if states[-j-2][0] is None:
                         break
                     curr_h_grad = states[-j-1][0][0].grad
-                    # curr_c_grad = states[-j-1][0][1].grad                    
+                    curr_c_grad = states[-j-1][0][1].grad                    
                     states[-j-2][1][0].backward(curr_h_grad, retain_graph=self.retain_graph)
-                    # states[-j-2][1][1].backward(curr_c_grad, retain_graph=self.retain_graph)                    
+                    if self.link_cell_state:
+                        states[-j-2][1][1].backward(curr_c_grad, retain_graph=self.retain_graph)                    
                 # print("opt step, batch loss: %.3f" % batch_loss)
                 if self.use_optimizer:
                     self.optimizer.step()
@@ -246,6 +251,22 @@ if __name__ == "__main__":
         default=False,
         help="Gradient clipping"
     )   
+    optparser.add_argument(
+        "-l",
+        "--lr",
+        dest="lr",
+        type=float,
+        default=1e-5,
+        help="Learning rate"
+    )
+    optparser.add_argument(
+        "-s",
+        "--cs",
+        dest="cs",
+        action="store_true",
+        default=False,
+        help="Reconnect cell state"
+    )
     opts = optparser.parse_args()    
 
     dataset = rsm_samplers.MNISTBufferedDataset(expanduser("~/nta/datasets"), download=True,
@@ -264,7 +285,7 @@ if __name__ == "__main__":
                  batch_sampler=sampler,
                  collate_fn=rsm_samplers.pred_sequence_collate)    
 
-    trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2, mbs=opts.mbs, use_optimizer=not opts.clip)
-    filename = "%d_mbs:%d_epochs:%d_k2:%d_fixed:%s_noise:%s_clip:%s" % (int(time.time()), opts.mbs, opts.epochs, opts.k2, opts.fixed, opts.noise, opts.clip)
+    trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2, mbs=opts.mbs, use_optimizer=not opts.clip, lr=opts.lr, link_cell_state=opts.cs)
+    filename = "%d_mbs-%d_epochs-%d_k2-%d_fixed-%s_noise-%s_clip-%s_cs-%s_lr-%s" % (int(time.time()), opts.mbs, opts.epochs, opts.k2, opts.fixed, opts.noise, opts.clip, opts.cs, opts.lr)
     trainer.run(epochs=opts.epochs, filename=filename)
 

@@ -22,6 +22,7 @@ import os
 
 import ray
 import torch
+import numpy as np
 from ray import tune
 from ray.tune.logger import CSVLogger, JsonLogger
 
