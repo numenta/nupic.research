@@ -18,9 +18,9 @@
 #  http://numenta.org/licenses/
 #
 import numpy as np
-from nupic.torch.modules import KWinners2d
 
 from nupic.research.frameworks.pytorch.functions import k_winners2d_local
+from nupic.torch.modules import KWinners2d
 
 
 class KWinners2dLocal(KWinners2d):
