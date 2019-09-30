@@ -273,10 +273,6 @@ class RSMLayer(torch.nn.Module):
         additive_decay=False,
         stoch_decay=False,
         stoch_k_sd=0.0,
-        ramping_memory=None,
-        ramping_learn_vel=False,
-        ramping_fn="lognormal",
-        flat_winners_sigma=False,
         rec_active_dendrites=0,
         **kwargs
     ):
@@ -350,10 +346,6 @@ class RSMLayer(torch.nn.Module):
         self.stoch_k_sd = stoch_k_sd
         self.rec_active_dendrites = rec_active_dendrites
         self.mem_floor = mem_floor
-        self.ramping_memory = ramping_memory
-        self.ramping_learn_vel = ramping_learn_vel
-        self.ramping_fn = ramping_fn
-        self.flat_winners_sigma = flat_winners_sigma
 
         self.debug = debug
         self.visual_debug = visual_debug
@@ -370,13 +362,9 @@ class RSMLayer(torch.nn.Module):
             decay_init = self.eps * torch.ones(self.total_cells, dtype=torch.float32)
         self.decay = nn.Parameter(decay_init, requires_grad=self.trainable_decay)
         self.register_parameter("decay", self.decay)
-        if self.ramping_memory:
-            self.ramp_loc = nn.Parameter(torch.rand(self.total_cells, dtype=torch.float32))
-            self.register_parameter("ramp_loc", self.ramp_loc)
-            self.ramp_shape = nn.Parameter(torch.rand(self.total_cells, dtype=torch.float32) * 4.0)
-            self.register_parameter("ramp_shape", self.ramp_shape)
-            self.ramp_vel = nn.Parameter(torch.ones(self.total_cells, dtype=torch.float32, requires_grad=self.ramping_learn_vel) * 0.0001)
-            self.register_parameter("ramp_vel", self.ramp_vel)
+        self.learning_iterations = 0
+        self.duty_cycle = torch.zeros(self.total_cells)
+        self.register_buffer("duty_cycle", self.duty_cycle)
 
         print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
 
@@ -539,36 +527,19 @@ class RSMLayer(torch.nn.Module):
             t.retain_grad()
             t.register_hook(get_grad_printer(label))
 
-    def _ramp_memory_value(self, memory):
-        mu = self.ramp_loc
-        sigma = self.ramp_shape
-        nearzero = 1e-7
-        x = memory * self.k + nearzero # Bring range of memory values toward [0, 1]
-        if self.ramping_fn == "lognormal":
-            mu = 1.0
-            y = (1./x) * 1/(sigma*np.sqrt(2*np.pi)) * torch.exp(-1 * (torch.log(x) - mu)**2 / (2*sigma**2))
-            y = y * (1.0 - (x <= nearzero).float()) # Memory value should be zero (regardless of ramp) once memory decreases to zero
-        elif self.ramping_fn == "normal":
-            y = torch.exp(-(((x-mu)/(2*np.pi*sigma))**2))
-            # y = y * (1.0 - (x <= 0.0).float()) # Memory value should be zero (regardless of ramp) once memory decreases to zero
-        return y
 
     def _decay_memory(self, psi_last, x_b):
-        if self.ramping_memory:
-            memory = psi_last - self.ramp_vel.abs()
-            memory = torch.max(memory, x_b)
+        if self.trainable_decay_rec:
+            decay_param = self.max_decay * torch.sigmoid(self.linear_decay_rec(psi_last))
+        elif self.trainable_decay:
+            decay_param = self.max_decay * torch.sigmoid(self.decay)
         else:
-            if self.trainable_decay_rec:
-                decay_param = self.max_decay * torch.sigmoid(self.linear_decay_rec(psi_last))
-            elif self.trainable_decay:
-                decay_param = self.max_decay * torch.sigmoid(self.decay)
-            else:
-                decay_param = self.eps
+            decay_param = self.eps
 
-            updated = decay_param * psi_last
-            if self.mem_floor:
-                updated[updated <= self.mem_floor] = 0.0
-            memory = torch.max(updated, x_b)
+        updated = decay_param * psi_last
+        if self.mem_floor:
+            updated[updated <= self.mem_floor] = 0.0
+        memory = torch.max(updated, x_b)
         return memory
 
     def _do_forgetting(self, phi, psi):
@@ -641,6 +612,17 @@ class RSMLayer(torch.nn.Module):
 
         return sigma  # total_cells
 
+    def _update_duty_cycle(winners):
+        '''
+        For tracking layer entropy (across both inhibition/boosting approaches)
+        '''
+        batch_size = winners.shape[0]
+        self.learning_iterations += batch_size
+        period = min(1000, self.learning_iterations)
+        self.duty_cycle.mul_(period - batch_size)
+        self.duty_cycle.add_(winners.gt(0).sum(dim=0, dtype=torch.float))
+        self.duty_cycle.div_(period)
+
     def _k_winners(self, sigma, pi):
         bsz = pi.size(0)
 
@@ -671,6 +653,7 @@ class RSMLayer(torch.nn.Module):
                 .view(bsz, self.total_cells)
                 .detach()
             )
+            col_winners = m_lambda
 
             self._debug_log({"m_pi": m_pi, "m_lambda": m_lambda})
 
@@ -697,8 +680,10 @@ class RSMLayer(torch.nn.Module):
                     winning_cols.repeat(1, 1, self.n)
                     .view(bsz, self.total_cells)
                 )
+                col_winners = winning_cols
 
             self._debug_log({"m_lambda": m_lambda})
+            self._update_duty_cycle(col_winners)
             y_pre_act = m_pi * m_lambda * sigma
 
 
@@ -765,9 +750,6 @@ class RSMLayer(torch.nn.Module):
         """
         x_b, x_b_above, phi, psi = hidden
         x_b_in = x_b.clone()
-
-        if self.ramping_memory:
-            x_b = self._ramp_memory_value(x_b)
 
         phi, psi = self._do_forgetting(phi, psi)
 

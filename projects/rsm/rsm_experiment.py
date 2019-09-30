@@ -32,6 +32,7 @@ from torchvision import transforms
 from ptb import lang_util
 from baseline_models import LSTMModel, RNNModel
 from nupic.torch.modules.k_winners import KWinners
+from nupic.torch.duty_cycle_metrics import binary_entropy
 from rsm import RSMNet, RSMPredictor
 from rsm_samplers import (
     MNISTBufferedDataset,
@@ -161,10 +162,6 @@ class RSMExperiment(object):
         self.stoch_k_sd = config.get("stoch_k_sd", False)
         self.rec_active_dendrites = config.get("rec_active_dendrites", 0)
         self.mem_floor = config.get("mem_floor", 0.0)
-        self.ramping_memory = config.get("ramping_memory", False)
-        self.ramping_learn_vel = config.get("ramping_learn_vel", False)
-        self.ramping_fn = config.get("ramping_fn", "lognormal")
-        self.flat_winners_sigma = config.get("flat_winners_sigma", False)
 
         # Prediction smoothing
         self.word_cache_decay = config.get("word_cache_decay", 0.0)
@@ -394,10 +391,6 @@ class RSMExperiment(object):
                 stoch_k_sd=self.stoch_k_sd,
                 rec_active_dendrites=self.rec_active_dendrites,
                 mem_floor=self.mem_floor,
-                ramping_memory=self.ramping_memory,
-                ramping_learn_vel=self.ramping_learn_vel,
-                ramping_fn=self.ramping_fn,
-                flat_winners_sigma=self.flat_winners_sigma,
                 debug=self.debug,
                 visual_debug=self.visual_debug
             )
@@ -691,14 +684,15 @@ class RSMExperiment(object):
 
             if self.instrumentation:
                 # Save some snapshots from last batch of epoch
-                if self.model_kind == "rsm":
-                    metrics['last_hidden_snp'] = x_b
-                    metrics['last_input_snp'] = inputs
-                    metrics['last_output_snp'] = last_output
+                # if self.model_kind == "rsm":
+                #     metrics['last_hidden_snp'] = x_b
+                #     metrics['last_input_snp'] = inputs
+                #     metrics['last_output_snp'] = last_output
 
                 # After all eval batches, generate stats & figures
                 ret.update(self._generate_instr_charts(metrics))
                 ret.update(self._store_instr_hists())
+                _, ret['layer_entropy'] = binary_entropy(self.model.RSM_1.duty_cycle)
 
             num_batches = (_b_idx + 1)
             num_samples = pcounts['total_samples']
