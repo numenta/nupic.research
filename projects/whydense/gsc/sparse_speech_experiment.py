@@ -80,8 +80,10 @@ class SparseSpeechExperiment(object):
         self.load_datasets()
 
         if self.model_type == "le_sparse":
+            print("linear_n", config["linear_n"], config["seed"])
+            print()
             model = LeSparseNet(
-                input_shape=config.get("cnn_input_shape", (1, 32, 32)),
+                input_shape=config.get("input_shape", (1, 32, 32)),
                 cnn_out_channels=config["cnn_out_channels"],
                 cnn_activity_percent_on=config["cnn_percent_on"],
                 cnn_weight_percent_on=config["cnn_weight_sparsity"],
@@ -95,7 +97,6 @@ class SparseSpeechExperiment(object):
                 num_classes=self.num_classes,
                 k_inference_factor=config["k_inference_factor"],
             )
-            print(model)
 
         elif self.model_type == "resnet9":
             model = resnet9(

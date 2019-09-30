@@ -69,13 +69,12 @@ def add_sparse_cnn_layer(
     else:
         network.add_module("cnn{}_cnn".format(suffix), cnn)
 
+    if percent_on >= 1.0 or percent_on <= 0:
+        network.add_module("cnn{}_relu".format(suffix), nn.ReLU())
+
     if use_batch_norm:
         bn = nn.BatchNorm2d(out_channels, affine=False)
         network.add_module("cnn{}_bn".format(suffix), bn)
-
-    # Max pool
-    maxpool = nn.MaxPool2d(kernel_size=2)
-    network.add_module("cnn{}_maxpool".format(suffix), maxpool)
 
     if 0 < percent_on < 1.0:
         kwinner = KWinners2d(
@@ -86,8 +85,10 @@ def add_sparse_cnn_layer(
             boost_strength_factor=boost_strength_factor,
         )
         network.add_module("cnn{}_kwinner".format(suffix), kwinner)
-    else:
-        network.add_module("cnn{}_relu".format(suffix), nn.ReLU())
+
+    # Max pool
+    maxpool = nn.MaxPool2d(kernel_size=2)
+    network.add_module("cnn{}_maxpool".format(suffix), maxpool)
 
 
 def add_sparse_linear_layer(
@@ -126,12 +127,12 @@ def add_sparse_linear_layer(
     else:
         network.add_module("linear{}_linear".format(suffix), linear)
 
+    if percent_on >= 1.0 or percent_on <= 0:
+        network.add_module("linear{}_relu".format(suffix), nn.ReLU())
+
     if use_batch_norm:
         network.add_module("linear{}_bn".format(suffix),
                            nn.BatchNorm1d(linear_n, affine=False))
-
-    if dropout > 0.0:
-        network.add_module("linear{}_dropout".format(suffix), nn.Dropout(dropout))
 
     if 0 < percent_on < 1.0:
         network.add_module(
@@ -145,8 +146,9 @@ def add_sparse_linear_layer(
             ),
         )
 
-    else:
-        network.add_module("linear{}_relu".format(suffix), nn.ReLU())
+    if dropout > 0.0:
+        network.add_module("linear{}_dropout".format(suffix), nn.Dropout(dropout))
+
 
 
 class LeSparseNet(nn.Sequential):
