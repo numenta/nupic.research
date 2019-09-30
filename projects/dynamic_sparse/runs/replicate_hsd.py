@@ -22,7 +22,6 @@
 
 import os
 
-import numpy as np
 from ray import tune
 
 from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
@@ -34,32 +33,41 @@ from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 # experiment configurations
 base_exp_config = dict(
     device="cuda",
-    # dataset related
+    # ----- dataset related ----
     dataset_name="PreprocessedGSC",
     data_dir=os.path.expanduser("~/nta/datasets/gsc"),
-    batch_size_train=(4, 16),
-    batch_size_test=1000,
-    # network related
+    train_batches_per_epoch=5121,
+    # batch_size_train=(4, 16),
+    batch_size_train=16,
+    batch_size_test=20,  # required to fit the GPU
+    # ----- network related ----
     network="GSCHeb",
+    percent_on_k_winner=[0.095, 0.125, 0.067],
+    k_inference_factor=1.5,
+    boost_strength=[1.5, 1.5, 1.5],
+    boost_strength_factor=[0.9, 0.9, 0.9],
+    hidden_neurons_conv=[64, 64],
+    hidden_neurons_fc=1500,
+    bias=True,
+    dropout=False,
+    batch_norm=True,
+    # ----- model related ----
+    model=tune.grid_search(
+        ["BaseModel", "SparseModel", "DSNNWeightedMag", "DSNNMixedHeb"]
+    ),
     optim_alg="SGD",
-    momentum=0,  # 0.9,
-    learning_rate=0.01,  # 0.1,
-    weight_decay=0.01,  # 1e-4,
-    lr_scheduler="MultiStepLR",
-    lr_milestones=[30, 60, 90],
-    lr_gamma=0.9,  # 0.1,
-    use_kwinners=True,
-    # sparse_linear_only=True, # False
-    # model related
-    model=tune.grid_search(["DSNNWeightedMag", "DSNNMixedHeb"]),
-    on_perc=0.04,
-    # sparse related
+    momentum=0,
+    learning_rate=0.01,
+    weight_decay=0.01,
+    lr_scheduler="StepLR",
+    lr_gamma=0.9,
+    on_perc=[1, 1, 0.1, 1],
     hebbian_prune_perc=None,
     hebbian_grow=False,
-    weight_prune_perc=tune.grid_search(list(np.arange(0, 1.001, 0.05))),
-    pruning_early_stop=2,
+    weight_prune_perc=0.3,
+    pruning_early_stop=None,  # 2
     # additional validation
-    test_noise=False,
+    test_noise=True,
     # debugging
     debug_weights=True,
     debug_sparse=True,
@@ -67,13 +75,13 @@ base_exp_config = dict(
 
 # ray configurations
 tune_config = dict(
-    name=__file__.replace(".py", "") + "_searchperc2",
-    num_samples=5,
+    name=__file__.replace(".py", "") + "_test1",
+    num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 100},
-    resources_per_trial={"cpu": 1, "gpu": 0.20},
+    stop={"training_iteration": 25},
+    resources_per_trial={"cpu": 1, "gpu": 0.25},
     loggers=DEFAULT_LOGGERS,
     verbose=0,
 )

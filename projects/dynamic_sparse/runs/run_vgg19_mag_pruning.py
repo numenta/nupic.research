@@ -80,7 +80,6 @@ base_exp_config = dict(
     # ----- Dynamic-Sparse Related -----
     # * See models for allowable params
     # * Values entered below in experiments.
-
     # ----- Debugging -----
     debug_weights=True,
     debug_sparse=True,
@@ -120,7 +119,7 @@ experiments = {
         hebbian_prune_perc=None,
         hebbian_grow=False,
         weight_prune_perc=0.3,
-    )
+    ),
 }
 
 exp_configs = (
