@@ -286,16 +286,24 @@ class SparseModel(BaseModel):
 
         # define all modules (those that are sparsifiable)
         self.all_modules = self.get_all_modules(self.network)
+        self.all_modules = self.all_modules[self.start_sparse: self.end_sparse]
+        if self.sparse_linear_only:
+            self.all_modules = list(filter(
+                lambda m: isinstance(m, nn.Linear),
+                self.all_modules
+            ))
 
         # added option to define sparsity by on_perc
         if "on_perc" in self.__dict__:
-            all_modules = self.all_modules[self.start_sparse: self.end_sparse]
-            self._make_attr_iterable("on_perc", all_modules)
-            on_perc = self.on_perc
+            self._make_attr_iterable("on_perc", self.all_modules)
             self.epsilon = None
-        assert len(self.on_perc) == len(all_modules), """
-        `on_perc` should have been made into an iterable to coincide with `all_modules`
-        """
+
+            self.on_perc_sparse = [p for p in self.on_perc if p is not None]
+
+            assert len(self.on_perc) == len(self.all_modules), """
+            `on_perc` should have been made into an iterable to coincide with
+                `all_modules` = {}
+            """.format([m.__class__.__name__ for m in self.all_modules])
 
         # define sparse modules according to `on_perc`
         self.sparse_modules = self.get_sparse_modules()
@@ -305,7 +313,15 @@ class SparseModel(BaseModel):
 
         assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
 
+        # quick sanity check
+        if "on_perc" in self.__dict__:
+            assert len(self.on_perc_sparse) == len(self.sparse_modules), """
+            `on_perc_sparse` should have been made into an iterable to coincide with
+                `sparse_modules` = {}
+            """.format([m.__class__.__name__ for m in self.sparse_modules])
+
         with torch.no_grad():
+            on_perc = self.on_perc_sparse
             for idx, m in enumerate(self.sparse_modules):
                 shape = m.weight.shape
                 # two approaches of defining epsilon
@@ -350,12 +366,8 @@ class SparseModel(BaseModel):
         This function gets the modules of `all_modules` which have an
         `on_perc` that is not None.
         """
-        all_modules = self.all_modules[self.start_sparse: self.end_sparse]
         sparse_modules = []
-        for m, on_perc in zip(all_modules, self.on_perc):
-
-            if self.sparse_linear_only and not isinstance(m, nn.Linear):
-                continue
+        for m, on_perc in zip(self.all_modules, self.on_perc):
 
             if on_perc is not None:
                 sparse_modules.append(m)
@@ -391,10 +403,10 @@ class SparseModel(BaseModel):
             assert len(value) == len(
                 counterpart
             ), """
-                Expected "{}" to be of same length as sparse modules ({}).
+                Expected "{}" to be of same length as counterpart ({}).
                 Got {} of type {}.
                 """.format(
-                attr, len(counterpart), value, type(value)
+                attr, counterpart, value, type(value)
             )
         else:
             value = [value] * len(counterpart)
