@@ -278,8 +278,8 @@ class SparseModel(BaseModel):
         self.num_params = []  # added for paper implementation
 
         # define sparse modules
-        self.sparse_modules = self.get_sparse_modules(self.network)
-        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules(self.network)
+        self.sparse_modules = self.get_sparse_modules()
+        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules()
 
         assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
 
@@ -315,7 +315,7 @@ class SparseModel(BaseModel):
     def is_sparsifiable(self, module):
         return isinstance(module, (nn.Linear, nn.Conv2d))
 
-    def get_sparse_modules(self, net):
+    def get_sparse_modules(self):
         """
         This function recursively finds which modules to make sparse
         and which to remain dense. The encapsulated logic crucially
@@ -325,7 +325,7 @@ class SparseModel(BaseModel):
         Note: For instance DSConv2d layers have Conv2d children)
         """
         sparse_modules = []
-        for m in net.children():
+        for m in self.children():
 
             # Check if Conv or Linear.
             if self.is_sparsifiable(m):
@@ -337,13 +337,13 @@ class SparseModel(BaseModel):
 
         return sparse_modules
 
-    def get_dynamic_sparse_modules(self, net):
+    def get_dynamic_sparse_modules(self):
         """
         This function recursively finds which modules are intended to
         be dynamically sparse.
         """
         sparse_modules = []
-        for m in net.children():
+        for m in self.children():
 
             # Check if Conv or Linear.
             if isinstance(m, (DSLinear, DSConv2d)):
