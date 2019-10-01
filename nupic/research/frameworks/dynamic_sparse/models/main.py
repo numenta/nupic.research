@@ -273,6 +273,15 @@ class SparseModel(BaseModel):
     def setup(self):
         super(SparseModel, self).setup()
 
+        # add specific defaults
+        new_defaults = dict(
+            start_sparse=0,
+            end_sparse=-1,
+            sparse_linear_only=False,
+        )
+        new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
+        self.__dict__.update(new_defaults)
+
         # calculate sparsity masks
         self.masks = []
         self.num_params = []  # added for paper implementation
@@ -282,10 +291,11 @@ class SparseModel(BaseModel):
 
         # added option to define sparsity by on_perc
         if "on_perc" in self.__dict__:
-            self._make_attr_iterable("on_perc", self.all_modules)
+            all_modules = self.all_modules[self.start_sparse: self.end_sparse]
+            self._make_attr_iterable("on_perc", all_modules)
             on_perc = self.on_perc
             self.epsilon = None
-        assert len(self.on_perc) == len(self.all_modules), """
+        assert len(self.on_perc) == len(all_modules), """
         `on_perc` should have been made into an iterable to coincide with `all_modules`
         """
 
@@ -298,16 +308,11 @@ class SparseModel(BaseModel):
         assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
 
         with torch.no_grad():
-            # TODO: restore the implementation of start_sparse and end_sparse
-            # TODO: restore the implementation of sparse_linear_only
             for idx, m in enumerate(self.sparse_modules):
                 shape = m.weight.shape
                 # two approaches of defining epsilon
                 if self.epsilon:
                     on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-                # TODO: remove non-sparse layers from the array.
-                # Impact other functions, such as logging and debugging
-                # Should include only the layers which are actually sparse
                 if on_perc[idx] >= 1:
                     mask = torch.ones(shape).float().to(self.device)
                 elif self.sparsify_fixed:
@@ -347,8 +352,12 @@ class SparseModel(BaseModel):
         This function gets the modules of `all_modules` which have an
         `on_perc` that is not None.
         """
+        all_modules = self.all_modules[self.start_sparse: self.end_sparse]
         sparse_modules = []
-        for m, on_perc in self.all_modules, self.on_perc:
+        for m, on_perc in all_modules, self.on_perc:
+
+            if self.sparse_linear_only and not isinstance(m, nn.Linear):
+                continue
 
             if on_perc is not None:
                 sparse_modules.append(m)
