@@ -30,8 +30,6 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
 from nupic.research.frameworks.dynamic_sparse.networks import (
-    DSConv2d,
-    DSLinear,
     DynamicSparseBase,
     NumScheduler,
 )
