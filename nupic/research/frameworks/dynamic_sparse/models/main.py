@@ -313,6 +313,10 @@ class SparseModel(BaseModel):
                 self.num_params.append(torch.sum(mask).item())
 
     @classmethod
+    def is_sparsifiable(cls, module):
+        return isinstance(module, (nn.Linear, nn.Conv2d))
+
+    @classmethod
     def get_sparse_modules(cls, net):
         """
         This function recursively finds which modules to make sparse
@@ -326,8 +330,7 @@ class SparseModel(BaseModel):
         for m in net.children():
 
             # Check if Conv or Linear.
-            # TODO: use a common function, such as has_params
-            if isinstance(m, (nn.Linear, nn.Conv2d)):
+            if cls.is_sparsifiable(m):
                 sparse_modules.append(m)
 
             # Check if recursion needed.
