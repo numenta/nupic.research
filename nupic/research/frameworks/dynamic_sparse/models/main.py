@@ -300,10 +300,10 @@ class SparseModel(BaseModel):
         """
 
         # define sparse modules according to `on_perc`
-        self.sparse_modules = self.get_sparse_modules(self.network)
+        self.sparse_modules = self.get_sparse_modules()
 
         # define the subset of sparse_modules that are dynamic
-        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules(self.network)
+        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules()
 
         assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
 
@@ -326,7 +326,7 @@ class SparseModel(BaseModel):
     def is_sparsifiable(self, module):
         return isinstance(module, (nn.Linear, nn.Conv2d))
 
-    def get_all_modules(self):
+    def get_all_modules(self, network):
         """
         This function recursively finds which modules are "sparsifiable".
         The encapsulated logic crucially assumes that no conv or linear
@@ -335,7 +335,7 @@ class SparseModel(BaseModel):
         Note: For instance DSConv2d layers have Conv2d children.
         """
         all_modules = []
-        for m in self.children():
+        for m in network.children():
 
             # Check if Conv or Linear.
             if self.is_sparsifiable(m):
@@ -354,7 +354,7 @@ class SparseModel(BaseModel):
         """
         all_modules = self.all_modules[self.start_sparse: self.end_sparse]
         sparse_modules = []
-        for m, on_perc in all_modules, self.on_perc:
+        for m, on_perc in zip(all_modules, self.on_perc):
 
             if self.sparse_linear_only and not isinstance(m, nn.Linear):
                 continue
@@ -370,7 +370,7 @@ class SparseModel(BaseModel):
         sub-classed from `DynamicSparseBase`
         """
         dynamic_sparse_modules = []
-        for m in self.sparse_modules():
+        for m in self.sparse_modules:
 
             # Check if Conv or Linear.
             if isinstance(m, (DynamicSparseBase)):
