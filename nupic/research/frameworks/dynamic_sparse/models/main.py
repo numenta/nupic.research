@@ -312,12 +312,10 @@ class SparseModel(BaseModel):
                 self.masks.append(mask)
                 self.num_params.append(torch.sum(mask).item())
 
-    @classmethod
-    def is_sparsifiable(cls, module):
+    def is_sparsifiable(self, module):
         return isinstance(module, (nn.Linear, nn.Conv2d))
 
-    @classmethod
-    def get_sparse_modules(cls, net):
+    def get_sparse_modules(self, net):
         """
         This function recursively finds which modules to make sparse
         and which to remain dense. The encapsulated logic crucially
@@ -330,17 +328,16 @@ class SparseModel(BaseModel):
         for m in net.children():
 
             # Check if Conv or Linear.
-            if cls.is_sparsifiable(m):
+            if self.is_sparsifiable(m):
                 sparse_modules.append(m)
 
             # Check if recursion needed.
             elif len(list(m.children())) > 0:
-                sparse_modules.extend(cls.get_sparse_modules(m))
+                sparse_modules.extend(self.get_sparse_modules(m))
 
         return sparse_modules
 
-    @classmethod
-    def get_dynamic_sparse_modules(cls, net):
+    def get_dynamic_sparse_modules(self, net):
         """
         This function recursively finds which modules are intended to
         be dynamically sparse.
@@ -354,7 +351,7 @@ class SparseModel(BaseModel):
 
             # Check if recursion needed.
             elif len(list(m.children())) > 0:
-                sparse_modules.extend(cls.get_dynamic_sparse_modules(m))
+                sparse_modules.extend(self.get_dynamic_sparse_modules(m))
 
         # Sanity check, then return.
         assert all([isinstance(m, DynamicSparseBase) for m in sparse_modules])
