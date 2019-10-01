@@ -275,8 +275,8 @@ class SparseModel(BaseModel):
 
         # add specific defaults
         new_defaults = dict(
-            start_sparse=0,
-            end_sparse=-1,
+            start_sparse=None,
+            end_sparse=None,
             sparse_linear_only=False,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
