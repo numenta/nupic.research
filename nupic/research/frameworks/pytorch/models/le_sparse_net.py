@@ -150,7 +150,6 @@ def add_sparse_linear_layer(
         network.add_module("linear{}_dropout".format(suffix), nn.Dropout(dropout))
 
 
-
 class LeSparseNet(nn.Sequential):
     """
     A generic LeNet style sparse CNN network as described in `How Can We Be So Dense?`_
