@@ -89,7 +89,8 @@ def break_mask_ties(mask, num_remain=None, frac_remain=None):
         idx_ones = tuple(
             idx_ones[i1_]
             for i1_ in np.random.choice(
-                range(num_ones), min(num_remain, num_ones), replace=False)
+                range(num_ones), min(num_remain, num_ones), replace=False
+            )
         )
 
     if num_ones < num_remain:
@@ -99,7 +100,8 @@ def break_mask_ties(mask, num_remain=None, frac_remain=None):
         idx_remain = idx_ones + tuple(
             idx_zeros[i0_]
             for i0_ in np.random.choice(
-                range(num_zeros), min(num_fill, num_zeros), replace=False)
+                range(num_zeros), min(num_fill, num_zeros), replace=False
+            )
         )
 
     else:
@@ -116,6 +118,7 @@ def break_mask_ties(mask, num_remain=None, frac_remain=None):
 # Base
 # ------------------
 
+
 def init_coactivation_tracking(m):
     """
     Function used to start tracking coactivations.
@@ -129,7 +132,6 @@ def init_coactivation_tracking(m):
 
 
 class DynamicSparseBase(torch.nn.Module):
-
     def _init_coactivations(self, weight, update_nsteps=1):
         """
         This method
@@ -147,8 +149,9 @@ class DynamicSparseBase(torch.nn.Module):
         self.update_nsteps = update_nsteps
 
         # Register hook to update coactivations.
-        assert hasattr(self, "calc_coactivations"), \
-            "DynamicSparse modules must define a coactivation function."
+        assert hasattr(
+            self, "calc_coactivations"
+        ), "DynamicSparse modules must define a coactivation function."
         self.forward_hook_handle = self.register_forward_hook(self.forward_hook)
 
     def init_coactivation_tracking(self):
@@ -183,8 +186,8 @@ class DynamicSparseBase(torch.nn.Module):
 # Linear Layers
 # ------------------
 
-class DSLinear(torch.nn.Linear, DynamicSparseBase):
 
+class DSLinear(torch.nn.Linear, DynamicSparseBase):
     def __init__(self, in_features, out_features, bias=False):
 
         super().__init__(in_features, out_features, bias=bias)
@@ -209,6 +212,7 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
         # Return coactivations.
         return outer
 
+
 # ------------------
 # Conv Layers
 # ------------------
@@ -228,7 +232,6 @@ class _NullConv(torch.nn.Conv2d):
 
 
 class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
-
     def __init__(
         self,
         in_channels,
@@ -257,8 +260,15 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
                                training
         """
         super().__init__(
-            in_channels, out_channels, kernel_size, stride, padding,
-            dilation, groups, bias, padding_mode,
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            groups,
+            bias,
+            padding_mode,
         )
 
         self._init_coactivations(self.weight, update_nsteps=update_nsteps)
@@ -279,9 +289,9 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
         # Compute indices that loop over all connections in the last three dimensions.
         # This will be used to help initialize the helper convolution.
-        self.filter_indxs = list(itertools.product(*[
-            range(d) for d in self.weight.shape[1:]
-        ]))
+        self.filter_indxs = list(
+            itertools.product(*[range(d) for d in self.weight.shape[1:]])
+        )
 
         # Compute indices that loop over all connections, including the out_channels.
         # This will be used to unpack the point-wise comparisons of the coactivations.
@@ -296,9 +306,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         # This will be used to unpack the point-wise comparisons of the coactivations.
         self.perm_indices = []
         for c_i in range(self.out_channels):
-            self.perm_indices.extend(
-                [c_i] * self.new_groups
-            )
+            self.perm_indices.extend([c_i] * self.new_groups)
 
         # Create helper conv layer to aid in coactivation calculations.
         self.grouped_conv = _NullConv(
@@ -315,14 +323,12 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
         # Populate the weight matrix with stacked tensors having only one non-zero unit.
         single_unit_weights = [
-            self._get_single_unit_weights(
-                c, j, h,
-            )
-            for c, j, h in self.filter_indxs
+            self._get_single_unit_weights(c, j, h) for c, j, h in self.filter_indxs
         ]
         stacked_weights = torch.cat(single_unit_weights, dim=0)
         self.grouped_conv.weight = torch.nn.Parameter(
-            stacked_weights, requires_grad=False)
+            stacked_weights, requires_grad=False
+        )
 
     def _get_single_unit_weights(self, c, j, h):
         """
@@ -333,10 +339,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
 
         # Construct weight.
         dtype = torch.float16 if self.half_precision else torch.float32
-        weight = torch.zeros(
-            1, *self.weight.shape[1:],
-            dtype=dtype
-        )
+        weight = torch.zeros(1, *self.weight.shape[1:], dtype=dtype)
 
         # Set weights to zero except those specified.
         weight[0, c, j, h] = 1
@@ -347,10 +350,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         """
         Returns tuple of input and output activity thresholds.
         """
-        return (
-            input_tensor.std(),
-            output_tensor.std()
-        )
+        return (input_tensor.std(), output_tensor.std())
 
     def calc_coactivations(self, input_tensor, output_tensor):
         """
@@ -370,7 +370,8 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             # Prep input to compute the coactivations.
             grouped_input = input_tensor.repeat((1, self.new_groups, 1, 1))
             grouped_input = self.grouped_conv(grouped_input).repeat(
-                (1, self.out_channels, 1, 1))
+                (1, self.out_channels, 1, 1)
+            )
 
             mu_in = input_tensor.mean()
             mu_out = output_tensor.mean()
@@ -394,7 +395,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
                 del a2
                 del grouped_input
 
-                h = torch.sum(s2.mul(s1), (0, 2, 3,))
+                h = torch.sum(s2.mul(s1), (0, 2, 3))
 
                 del s1
                 del s2

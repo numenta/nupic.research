@@ -21,34 +21,42 @@
 
 import os
 
+from ray.tune.logger import DEFAULT_LOGGERS, MLFLowLogger
+
+from mlflow.tracking import MlflowClient
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # alternative initialization based on configuration
 exp_config = dict(
     device="cuda",
-    network="resnet18",
-    dataset_name="CIFAR10",
-    input_size=(3, 32, 32),
+    network="MLPHeb",
+    dataset_name="MNIST",
+    input_size=784,
     num_classes=10,
-    stats_mean=(0.4914, 0.4822, 0.4465),
-    stats_std=(0.2023, 0.1994, 0.2010),
     model="SparseModel",
     data_dir="~/nta/data",
     on_perc=0.2,
     batch_size_train=10,
     batch_size_test=10,
+    debug_sparse=True,
 )
+
+client = MlflowClient()
+exp_config["mlflow_experiment_id"] = client.create_experiment("test_mlflow5")
 
 # run
 tune_config = dict(
     name=__file__,
-    num_samples=1,
+    num_samples=3,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 10},
+    stop={"training_iteration": 5},
     resources_per_trial={"cpu": 1, "gpu": 1},
     verbose=2,
+    loggers=DEFAULT_LOGGERS + (MLFLowLogger,),
 )
 
 run_ray(tune_config, exp_config)
+
+# df = mlflow.search_runs([experiment_id])

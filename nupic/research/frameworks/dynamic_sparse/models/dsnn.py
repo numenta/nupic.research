@@ -41,10 +41,7 @@ class DSNNHeb(SparseModel):
         super().setup()
 
         # Set some attributes to be a list corresponding to self.dynamic_sparse_modules.
-        for attr in [
-            "hebbian_prune_perc",
-            "weight_prune_perc",
-        ]:
+        for attr in ["hebbian_prune_perc", "weight_prune_perc"]:
             self._make_attr_iterable(attr, counterpart=self.dynamic_sparse_modules)
 
         self.added_synapses = [None for m in self.masks]
@@ -95,6 +92,7 @@ class DSNNHeb(SparseModel):
             ds_idx = 0  # pruning index (+1 per dynamic-sparse module)
             for m in enumerate(self.dynamic_sparse_modules):
 
+                # TODO: if is in dynamic_sparse_modules, why is this check required?
                 # Case 1: Not Dynamic
                 if not isinstance(m, DynamicSparseBase):
                     # Iterate for just a sparse module.
@@ -107,7 +105,9 @@ class DSNNHeb(SparseModel):
                 coacts = m.coactivations
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(),
-                    self.num_params[s_idx], coacts, idx=ds_idx
+                    self.num_params[s_idx],
+                    coacts,
+                    idx=ds_idx,
                 )
                 with torch.no_grad():
                     self.masks[s_idx] = new_mask.float()
@@ -236,6 +236,7 @@ class DSNNHeb(SparseModel):
         Random mask that ensures the exact number of params is added
         For computationally faster method, see _get_random_add_mask_prob
         """
+        num_add = int(num_add)
         nonzero = torch.nonzero(nonactive_synapses, as_tuple=False)
         sampled_idxs = np.random.choice(range(len(nonzero)), num_add, replace=False)
         selected = nonzero[sampled_idxs]
@@ -246,7 +247,7 @@ class DSNNHeb(SparseModel):
         else:
             add_mask[selected] = True
 
-        return add_mask
+        return add_mask.to(self.device)
 
     def _get_hebbian_add_mask(self, corr, nonactive_synapses, num_add):
 
@@ -304,14 +305,14 @@ class DSNNWeightedMag(DSNNHeb):
 
             if weight_prune_perc is not None:
                 keep_mask = self._get_magnitude_mask(
-                    weight, active_synapses, weight_prune_perc)
+                    weight, active_synapses, weight_prune_perc
+                )
             else:
                 keep_mask = active_synapses.to(self.device)
 
             # ----------- GROWTH ----------------
 
-            num_add = int(num_params - torch.sum(keep_mask).item())
-            num_add = max(num_add, 0)
+            num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
             add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
             add_mask = add_mask.to(keep_mask.device)
 
@@ -358,11 +359,13 @@ class DSNNMixedHeb(DSNNHeb):
 
             if hebbian_prune_perc is not None:
                 hebbian_mask = self._get_hebbian_mask(
-                    weight, corr, active_synapses, hebbian_prune_perc)
+                    weight, corr, active_synapses, hebbian_prune_perc
+                )
 
             if weight_prune_perc is not None:
                 magnitude_mask = self._get_magnitude_mask(
-                    weight, active_synapses, weight_prune_perc)
+                    weight, active_synapses, weight_prune_perc
+                )
 
             # join both masks
             if hebbian_prune_perc and weight_prune_perc:
@@ -428,11 +431,13 @@ class DSNNMixedHeb(DSNNHeb):
 
             if hebbian_prune_perc is not None:
                 hebbian_mask = self._get_inverse_hebbian_mask(
-                    weight, active_synapses, hebbian_prune_perc)
+                    weight, active_synapses, hebbian_prune_perc
+                )
 
             if weight_prune_perc is not None:
                 magnitude_mask = self._get_magnitude_mask(
-                    weight, corr, active_synapses, weight_prune_perc)
+                    weight, corr, active_synapses, weight_prune_perc
+                )
 
             # join both masks
             if hebbian_prune_perc and weight_prune_perc:
