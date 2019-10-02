@@ -33,4 +33,4 @@ tqdm
 torchvision
 python-dotenv
 elasticsearch
-seaborn
+seaborn>=0.9.0
