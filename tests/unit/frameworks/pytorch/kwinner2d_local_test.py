@@ -115,6 +115,8 @@ class KWinner2dLocalTest(unittest.TestCase):
         )
 
         kw.train(mode=True)
+
+        # Expectation due to boosting after the second training step
         expected = torch.zeros_like(x)
         expected[0, [2, 3], 0, 0] = x[0, [2, 3], 0, 0]
         expected[0, [1, 3], 0, 1] = x[0, [1, 3], 0, 1]
@@ -130,6 +132,7 @@ class KWinner2dLocalTest(unittest.TestCase):
         result = kw(x)
         self.assertTrue(result.eq(expected).all())
 
+        # Expectation due to boosting after the fourth training step
         expected_boosted = expected.clone()
         expected_boosted[0, [0, 1], 1, 1] = 0
         expected_boosted[0, [0, 2], 1, 1] = x[0, [0, 2], 1, 1]
