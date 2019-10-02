@@ -25,14 +25,21 @@ from nupic.torch.modules import KWinners2d
 
 class KWinners2dLocal(KWinners2d):
     """
-    A K-winner module where the k-winners are chosen locally across all the channels
+    A K-winner 2d module where the k-winners are chosen locally across all the
+    channels
     """
+
+    def __init__(self, channels, percent_on=0.1, k_inference_factor=1.5,
+                 boost_strength=1.0, boost_strength_factor=0.9,
+                 duty_cycle_period=1000):
+        super().__init__(channels, percent_on, k_inference_factor, boost_strength,
+                         boost_strength_factor, duty_cycle_period)
+        self.k = int(round(self.channels * self.percent_on))
+        self.k_inference = int(round(self.channels * self.percent_on_inference))
 
     def forward(self, x):
         if self.n == 0:
             self.n = np.prod(x.shape[1:])
-            self.k = int(round(self.channels * self.percent_on))
-            self.k_inference = int(round(self.channels * self.percent_on_inference))
 
         if self.training:
             x = k_winners2d_local(x, self.duty_cycle, self.k, self.boost_strength)
