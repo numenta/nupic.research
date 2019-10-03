@@ -31,8 +31,6 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
 from nupic.research.frameworks.dynamic_sparse.networks import (
-    DSConv2d,
-    DSLinear,
     DynamicSparseBase,
     NumScheduler,
 )
@@ -275,35 +273,62 @@ class SparseModel(BaseModel):
     def setup(self):
         super(SparseModel, self).setup()
 
+        # add specific defaults
+        new_defaults = dict(
+            start_sparse=None,
+            end_sparse=None,
+            sparse_linear_only=False,
+        )
+        new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
+        self.__dict__.update(new_defaults)
+
         # calculate sparsity masks
         self.masks = []
         self.num_params = []  # added for paper implementation
 
-        # define sparse modules
-        self.sparse_modules = self.get_sparse_modules(self.network)
-        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules(self.network)
-
-        assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
+        # define all modules (those that are sparsifiable)
+        self.all_modules = self.get_all_modules(self.network)
+        self.all_modules = self.all_modules[self.start_sparse: self.end_sparse]
+        if self.sparse_linear_only:
+            self.all_modules = list(filter(
+                lambda m: isinstance(m, nn.Linear),
+                self.all_modules
+            ))
 
         # added option to define sparsity by on_perc
         if "on_perc" in self.__dict__:
-            self._make_attr_iterable("on_perc")
-            on_perc = self.on_perc
+            self._make_attr_iterable("on_perc", self.all_modules)
             self.epsilon = None
 
-        # change the way pruning masks are created
+            self.on_perc_sparse = [p for p in self.on_perc if p is not None]
+
+            assert len(self.on_perc) == len(self.all_modules), """
+            `on_perc` should have been made into an iterable to coincide with
+                `all_modules` = {}
+            """.format([m.__class__.__name__ for m in self.all_modules])
+
+        # define sparse modules according to `on_perc`
+        self.sparse_modules = self.get_sparse_modules()
+
+        # define the subset of sparse_modules that are dynamic
+        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules()
+
+        assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
+
+        # quick sanity check
+        if "on_perc" in self.__dict__:
+            assert len(self.on_perc_sparse) == len(self.sparse_modules), """
+            `on_perc_sparse` should have been made into an iterable to coincide with
+                `sparse_modules` = {}
+            """.format([m.__class__.__name__ for m in self.sparse_modules])
 
         with torch.no_grad():
-            # TODO: restore the implementation of start_sparse and end_sparse
-            # TODO: restore the implementation of sparse_linear_only
+            on_perc = self.on_perc_sparse
             for idx, m in enumerate(self.sparse_modules):
                 shape = m.weight.shape
                 # two approaches of defining epsilon
                 if self.epsilon:
                     on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-                # TODO: remove non-sparse layers from the array.
-                # Impact other functions, such as logging and debugging
-                # Should include only the layers which are actually sparse
                 if on_perc[idx] >= 1:
                     mask = torch.ones(shape).float().to(self.device)
                 elif self.sparsify_fixed:
@@ -314,52 +339,58 @@ class SparseModel(BaseModel):
                 self.masks.append(mask)
                 self.num_params.append(torch.sum(mask).item())
 
-    @classmethod
-    def get_sparse_modules(cls, net):
-        """
-        This function recursively finds which modules to make sparse
-        and which to remain dense. The encapsulated logic crucially
-        assumes that no conv or linear layers have sub-children that need
-        sparsifying.
+    def is_sparsifiable(self, module):
+        return isinstance(module, (nn.Linear, nn.Conv2d))
 
-        Note: For instance DSConv2d layers have Conv2d children)
+    def get_all_modules(self, network):
         """
-        sparse_modules = []
-        for m in net.children():
+        This function recursively finds which modules are "sparsifiable".
+        The encapsulated logic crucially assumes that no conv or linear
+        layers have sub-children that need sparsifying.
+
+        Note: For instance DSConv2d layers have Conv2d children.
+        """
+        all_modules = []
+        for m in network.children():
 
             # Check if Conv or Linear.
-            # TODO: use a common function, such as has_params
-            if isinstance(m, (nn.Linear, nn.Conv2d)):
-                sparse_modules.append(m)
+            if self.is_sparsifiable(m):
+                all_modules.append(m)
 
             # Check if recursion needed.
             elif len(list(m.children())) > 0:
-                sparse_modules.extend(cls.get_sparse_modules(m))
+                all_modules.extend(self.get_all_modules(m))
 
-        return sparse_modules
+        return all_modules
 
-    @classmethod
-    def get_dynamic_sparse_modules(cls, net):
+    def get_sparse_modules(self):
         """
-        This function recursively finds which modules are intended to
-        be dynamically sparse.
+        This function gets the modules of `all_modules` which have an
+        `on_perc` that is not None.
         """
         sparse_modules = []
-        for m in net.children():
+        for m, on_perc in zip(self.all_modules, self.on_perc):
 
-            # Check if Conv or Linear.
-            if isinstance(m, (DSLinear, DSConv2d)):
+            if on_perc is not None:
                 sparse_modules.append(m)
 
-            # Check if recursion needed.
-            elif len(list(m.children())) > 0:
-                sparse_modules.extend(cls.get_dynamic_sparse_modules(m))
-
-        # Sanity check, then return.
-        assert all([isinstance(m, DynamicSparseBase) for m in sparse_modules])
         return sparse_modules
 
-    def _make_attr_iterable(self, attr, counterpart=None):
+    def get_dynamic_sparse_modules(self):
+        """
+        This function gets the modules of `sparse_modules` which are
+        sub-classed from `DynamicSparseBase`
+        """
+        dynamic_sparse_modules = []
+        for m in self.sparse_modules:
+
+            # Check if Conv or Linear.
+            if isinstance(m, (DynamicSparseBase)):
+                dynamic_sparse_modules.append(m)
+
+        return dynamic_sparse_modules
+
+    def _make_attr_iterable(self, attr, counterpart):
         """
         This function (called in setup), ensures that a pre-existing attr
         in an iterable (list) of length equal to self.sparse_modules.
@@ -369,16 +400,15 @@ class SparseModel(BaseModel):
                             to repeat the value of 'attr'. Defaults to
                             self.sparse_modules.
         """
-        counterpart = counterpart or self.sparse_modules
         value = getattr(self, attr)
         if isinstance(value, Iterable):
             assert len(value) == len(
                 counterpart
             ), """
-                Expected "{}" to be of same length as sparse modules ({}).
+                Expected "{}" to be of same length as counterpart ({}).
                 Got {} of type {}.
                 """.format(
-                attr, len(counterpart), value, type(value)
+                attr, counterpart, value, type(value)
             )
         else:
             value = [value] * len(counterpart)
