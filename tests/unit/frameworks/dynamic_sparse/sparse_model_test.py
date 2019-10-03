@@ -96,15 +96,31 @@ class SparseModelTest(unittest.TestCase):
 
     def test_sparse_modules_count(self):
 
-        sparse_modules1 = SparseModel.get_sparse_modules(self.network1)
+        network = self.network1
+        on_perc = 0.1
+
+        model = SparseModel(
+            network=network, config=dict(sparsify_fixed=False, on_perc=on_perc)
+        )
+        model.setup()
+
+        sparse_modules1 = model.sparse_modules
         self.assertTrue(len(sparse_modules1) == 4)
-        ds_modules_1 = SparseModel.get_dynamic_sparse_modules(self.network1)
+        ds_modules_1 = model.dynamic_sparse_modules
         self.assertTrue(len(ds_modules_1) == 4)
         self.assertTrue(set(ds_modules_1) <= set(sparse_modules1))
 
-        sparse_modules2 = SparseModel.get_sparse_modules(self.network2)
+        network = self.network2
+        on_perc = 0.1
+
+        model = SparseModel(
+            network=network, config=dict(sparsify_fixed=False, on_perc=on_perc)
+        )
+        model.setup()
+
+        sparse_modules2 = model.sparse_modules
         self.assertTrue(len(sparse_modules2) == 4)
-        ds_modules_2 = SparseModel.get_dynamic_sparse_modules(self.network2)
+        ds_modules_2 = model.dynamic_sparse_modules
         self.assertTrue(len(ds_modules_2) == 0)
         self.assertTrue(set(ds_modules_2) <= set(sparse_modules2))
 

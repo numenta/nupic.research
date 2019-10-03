@@ -90,9 +90,8 @@ class DSNNHeb(SparseModel):
 
             s_idx = 0  # mask index (+1 per sparse module)
             ds_idx = 0  # pruning index (+1 per dynamic-sparse module)
-            for m in enumerate(self.dynamic_sparse_modules):
+            for m in enumerate(self.sparse_modules):
 
-                # TODO: if is in dynamic_sparse_modules, why is this check required?
                 # Case 1: Not Dynamic
                 if not isinstance(m, DynamicSparseBase):
                     # Iterate for just a sparse module.

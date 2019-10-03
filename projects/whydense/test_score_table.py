@@ -23,6 +23,7 @@ import json
 import os
 import re
 from itertools import groupby
+from pathlib import Path
 
 import click
 import numpy as np
@@ -67,15 +68,25 @@ def main(config, experiments, tablefmt):
     # Load and parse experiment configurations
     configs = parse_config(config, experiments, globals_param=globals())
 
-    # Select tags ignoring seed
+    # Select tags ignoring seed value
     def key_func(x):
-        re.split("[,_]", re.sub(",|\\d+_|seed=\\d+", "", x["experiment_tag"]))
+        s = re.split("[,_]", re.sub(",|\\d+_|seed=\\d+", "", x["experiment_tag"]))
+        if len(s[0]) == 0:
+            return ["_"]
 
     for exp in configs:
         config = configs[exp]
 
+        # Make sure path and data_dir are relative to the project location,
+        # handling both ~/nta and ../results style paths.
+        path = config.get("path", ".")
+        config["path"] = str(Path(path).expanduser().resolve())
+
+        data_dir = config.get("data_dir", "data")
+        config["data_dir"] = str(Path(data_dir).expanduser().resolve())
+
         # Load experiment data
-        experiment_path = os.path.join(project_dir, config["path"], exp)
+        experiment_path = os.path.join(config["path"], exp)
         experiment_state = load_ray_tune_experiment(
             experiment_path=experiment_path, load_results=True
         )
