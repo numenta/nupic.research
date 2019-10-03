@@ -150,7 +150,7 @@ class DynamicSparseBase(torch.nn.Module):
         # Init defaults and override only when params are specified in the config.
         config = config or {}
         defaults = dict(
-            moving_average_alpha=1.0,           # See `_update_coactivations`
+            moving_average_alpha=None,           # See `_update_coactivations`
             update_func=None,  # See `_update_coactivations`
         )
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
