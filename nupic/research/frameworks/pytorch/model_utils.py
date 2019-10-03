@@ -160,3 +160,16 @@ def set_random_seed(seed, deterministic_mode=True):
     if torch.backends.cudnn.is_available() and deterministic_mode:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
+
+def count_nonzero_params(model):
+    """
+    Count the total number of non-zero weights in the model, including bias weights.
+    """
+    total_nonzero_params = 0
+    total_params = 0
+    for param in model.parameters():
+        total_nonzero_params += param.data.nonzero().size(0)
+        total_params += param.data.numel()
+
+    return total_params, total_nonzero_params
