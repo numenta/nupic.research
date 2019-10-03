@@ -19,44 +19,48 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import os
+# Commented to avoid issues with FLAKE8
+# on the order of libraries not installed in the execution server
+# TODO:: require fix
 
-from ray.tune.logger import DEFAULT_LOGGERS, MLFLowLogger
+# import os
 
-from mlflow.tracking import MlflowClient
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
+# from mlflow.tracking import MlflowClient
+# from ray.tune.logger import DEFAULT_LOGGERS, MLFLowLogger
 
-# alternative initialization based on configuration
-exp_config = dict(
-    device="cuda",
-    network="MLPHeb",
-    dataset_name="MNIST",
-    input_size=784,
-    num_classes=10,
-    model="SparseModel",
-    data_dir="~/nta/data",
-    on_perc=0.2,
-    batch_size_train=10,
-    batch_size_test=10,
-    debug_sparse=True,
-)
+# from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
-client = MlflowClient()
-exp_config["mlflow_experiment_id"] = client.create_experiment("test_mlflow5")
+# # alternative initialization based on configuration
+# exp_config = dict(
+#     device="cuda",
+#     network="MLPHeb",
+#     dataset_name="MNIST",
+#     input_size=784,
+#     num_classes=10,
+#     model="SparseModel",
+#     data_dir="~/nta/data",
+#     on_perc=0.2,
+#     batch_size_train=10,
+#     batch_size_test=10,
+#     debug_sparse=True,
+# )
 
-# run
-tune_config = dict(
-    name=__file__,
-    num_samples=3,
-    local_dir=os.path.expanduser("~/nta/results"),
-    checkpoint_freq=0,
-    checkpoint_at_end=False,
-    stop={"training_iteration": 5},
-    resources_per_trial={"cpu": 1, "gpu": 1},
-    verbose=2,
-    loggers=DEFAULT_LOGGERS + (MLFLowLogger,),
-)
+# client = MlflowClient()
+# exp_config["mlflow_experiment_id"] = client.create_experiment("test_mlflow5")
 
-run_ray(tune_config, exp_config)
+# # run
+# tune_config = dict(
+#     name=__file__,
+#     num_samples=3,
+#     local_dir=os.path.expanduser("~/nta/results"),
+#     checkpoint_freq=0,
+#     checkpoint_at_end=False,
+#     stop={"training_iteration": 5},
+#     resources_per_trial={"cpu": 1, "gpu": 1},
+#     verbose=2,
+#     loggers=DEFAULT_LOGGERS + (MLFLowLogger,),
+# )
 
-# df = mlflow.search_runs([experiment_id])
+# run_ray(tune_config, exp_config)
+
+# # df = mlflow.search_runs([experiment_id])

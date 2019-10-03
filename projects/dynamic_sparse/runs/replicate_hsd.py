@@ -75,8 +75,8 @@ base_exp_config = dict(
 
 # ray configurations
 tune_config = dict(
-    name=__file__.replace(".py", "") + "_test1",
-    num_samples=1,
+    name=__file__.replace(".py", "") + "_debug6_8x",
+    num_samples=10,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
