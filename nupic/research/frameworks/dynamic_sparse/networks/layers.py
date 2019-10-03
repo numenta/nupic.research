@@ -201,17 +201,16 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
         with torch.no_grad():
 
             # Get active units.
-            curr_act = (x > 0).detach().float()
-            prev_act = (y > 0).detach().float()
+            prev_act = (x > 0).detach().float()
+            curr_act = (y > 0).detach().float()
 
             # Cumulate outer product over all samples.
             # TODO: Vectorize this sum; for instance, using torch.einsum().
             for s in range(n_samples):
-                outer += torch.ger(prev_act[s], curr_act[s])
+                outer += torch.ger(curr_act[s], prev_act[s])
 
         # Return coactivations.
         return outer
-
 
 # ------------------
 # Conv Layers
