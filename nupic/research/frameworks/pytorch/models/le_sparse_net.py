@@ -41,6 +41,7 @@ def add_sparse_cnn_layer(
     k_inference_factor,
     boost_strength,
     boost_strength_factor,
+    activation_fct_before_max_pool,
 ):
     """Add sparse cnn layer to network.
 
@@ -55,6 +56,8 @@ def add_sparse_cnn_layer(
     :param boost_strength: boost strength (0.0 implies no boosting)
     :param boost_strength_factor:
         boost strength is multiplied by this factor after each epoch
+    :param activation_fct_before_max_pool:
+        If true ReLU/K-winners will be placed before the max_pool step
     """
     cnn = nn.Conv2d(
         in_channels=in_channels,
@@ -69,14 +72,17 @@ def add_sparse_cnn_layer(
     else:
         network.add_module("cnn{}_cnn".format(suffix), cnn)
 
-    if percent_on >= 1.0 or percent_on <= 0:
-        network.add_module("cnn{}_relu".format(suffix), nn.ReLU())
-
     if use_batch_norm:
         bn = nn.BatchNorm2d(out_channels, affine=False)
         network.add_module("cnn{}_bn".format(suffix), bn)
 
-    if 0 < percent_on < 1.0:
+    if not activation_fct_before_max_pool:
+        maxpool = nn.MaxPool2d(kernel_size=2)
+        network.add_module("cnn{}_maxpool".format(suffix), maxpool)
+
+    if percent_on >= 1.0 or percent_on <= 0:
+        network.add_module("cnn{}_relu".format(suffix), nn.ReLU())
+    else:
         kwinner = KWinners2d(
             channels=out_channels,
             percent_on=percent_on,
@@ -86,9 +92,9 @@ def add_sparse_cnn_layer(
         )
         network.add_module("cnn{}_kwinner".format(suffix), kwinner)
 
-    # Max pool
-    maxpool = nn.MaxPool2d(kernel_size=2)
-    network.add_module("cnn{}_maxpool".format(suffix), maxpool)
+    if activation_fct_before_max_pool:
+        maxpool = nn.MaxPool2d(kernel_size=2)
+        network.add_module("cnn{}_maxpool".format(suffix), maxpool)
 
 
 def add_sparse_linear_layer(
@@ -118,6 +124,8 @@ def add_sparse_linear_layer(
     :param boost_strength: boost strength (0.0 implies no boosting)
     :param boost_strength_factor:
         boost strength is multiplied by this factor after each epoch
+    :param activation_function_before_max_pool:
+        If true ReLU/K-winners will be placed before the max_pool step
     """
     linear = nn.Linear(input_size, linear_n)
     if 0 < weight_sparsity < 1.0:
@@ -191,6 +199,7 @@ class LeSparseNet(nn.Sequential):
                  k_inference_factor=1.5,
                  use_batch_norm=True,
                  dropout=False,
+                 activation_fct_before_max_pool=False,
                  ):
         super(LeSparseNet, self).__init__()
 
@@ -210,6 +219,7 @@ class LeSparseNet(nn.Sequential):
                 k_inference_factor=k_inference_factor,
                 boost_strength=boost_strength,
                 boost_strength_factor=boost_strength_factor,
+                activation_fct_before_max_pool=activation_fct_before_max_pool
             )
 
             # Compute next layer input shape
