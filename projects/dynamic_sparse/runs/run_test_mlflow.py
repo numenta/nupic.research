@@ -19,7 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-# Commented to avoid issues with FLAKE8 on the order of libraries not installed in the execution server
+# Commented to avoid issues with FLAKE8
+# on the order of libraries not installed in the execution server
 # TODO:: require fix
 
 # import os
