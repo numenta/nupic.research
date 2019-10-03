@@ -26,6 +26,7 @@ from itertools import product
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
@@ -100,6 +101,7 @@ class BaseModel:
 
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
+        # self.loss_func = F.nll_loss
 
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")

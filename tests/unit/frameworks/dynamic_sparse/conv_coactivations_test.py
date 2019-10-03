@@ -44,8 +44,7 @@ def coactivation(t1, t2, alpha, mean_activations):
     return s
 
 
-def get_indices_of_input_and_filter(
-        n, m, in_channels, kernel_size, padding, stride):
+def get_indices_of_input_and_filter(n, m, in_channels, kernel_size, padding, stride):
     """
     Assumes dilation=1 and grouping=1
     """
@@ -74,13 +73,7 @@ def get_indices_of_input_and_filter(
 
 
 def calc_coactivations(
-    shape,
-    padding,
-    stride,
-    input_tensor,
-    output_tensor,
-    mean_activations,
-    alpha
+    shape, padding, stride, input_tensor, output_tensor, mean_activations, alpha
 ):
 
     c_out = shape[0]
@@ -98,15 +91,15 @@ def calc_coactivations(
                 for m_out_ in range(m_out):
                     unit_1 = output_tensor[b_, c_out_, n_out_, m_out_]
                     indxs = get_indices_of_input_and_filter(
-                        n_out_, m_out_, c_in, kernel_size, padding, stride)
+                        n_out_, m_out_, c_in, kernel_size, padding, stride
+                    )
 
                     for input_indx, filter_indx in indxs:
                         c_in_, n_in_, m_in_ = input_indx
                         c_fl_, n_fl_, m_fl_ = filter_indx
                         unit_2 = input_tensor[b_, c_in_, n_in_, m_in_]
 
-                        if coactivation(unit_2,
-                                        unit_1, alpha, mean_activations):
+                        if coactivation(unit_2, unit_1, alpha, mean_activations):
                             h[c_out_, c_fl_, n_fl_, m_fl_] += 1
     return h
 
@@ -152,8 +145,14 @@ class CoactivationsTest(unittest.TestCase):
         alpha = conv.get_activity_threshold(input_tensor, output_tensor)
 
         coacts = calc_coactivations(
-            conv.weight.shape, padding, stride,
-            input_tensor, output_tensor, mean_activations, alpha)
+            conv.weight.shape,
+            padding,
+            stride,
+            input_tensor,
+            output_tensor,
+            mean_activations,
+            alpha,
+        )
         self.assertTrue(conv.coactivations.allclose(coacts, atol=0, rtol=0))
         conv.reset_coactivations()
 
@@ -163,8 +162,14 @@ class CoactivationsTest(unittest.TestCase):
         mean_activations = (input_tensor.mean(), output_tensor.mean())
 
         coacts = calc_coactivations(
-            conv.weight.shape, padding, stride,
-            input_tensor, output_tensor, mean_activations, alpha)
+            conv.weight.shape,
+            padding,
+            stride,
+            input_tensor,
+            output_tensor,
+            mean_activations,
+            alpha,
+        )
         self.assertTrue(conv.coactivations.allclose(coacts, atol=0, rtol=0))
 
 
