@@ -257,7 +257,6 @@ class GSCHeb(HebbianNetwork):
                 **kwargs,
             ),
             DSLinearBlock(self.hidden_neurons_fc, self.num_classes),
-            # nn.LogSoftmax(dim=1)
         ]
 
         self.features = nn.Sequential(*conv_layers)
