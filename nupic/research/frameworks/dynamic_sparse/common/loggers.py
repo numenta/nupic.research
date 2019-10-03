@@ -23,10 +23,10 @@ import distutils.version
 import logging
 import os
 from io import BytesIO
-import PIL.Image
 
 import matplotlib.pyplot as plt
 import numpy as np
+import PIL.Image
 import seaborn as sns
 from pandas import DataFrame
 from ray.tune.logger import CSVLogger, JsonLogger, Logger
@@ -86,9 +86,9 @@ def to_tf_values(result, path, histo_bins=1000):
                 canvas = ax.figure.canvas
                 canvas.draw()
                 (w, h) = canvas.get_width_height()
-                pilImage = PIL.Image.frombytes(
+                pilimage = PIL.Image.frombytes(
                     "RGB", (w, h), canvas.tostring_rgb())
-                pilImage.save(stream, "PNG")
+                pilimage.save(stream, "PNG")
 
                 # Create an Image object
                 img_sum = tf.Summary.Image(
