@@ -19,6 +19,7 @@
 #
 
 import numpy as np
+from nupic.research.frameworks.pytorch.modules import KWinners2dLocal
 from torch import nn
 
 from nupic.torch.modules import (
@@ -41,6 +42,7 @@ def add_sparse_cnn_layer(
     k_inference_factor,
     boost_strength,
     boost_strength_factor,
+    use_kwinners_local,
 ):
     """Add sparse cnn layer to network.
 
@@ -55,7 +57,10 @@ def add_sparse_cnn_layer(
     :param boost_strength: boost strength (0.0 implies no boosting)
     :param boost_strength_factor:
         boost strength is multiplied by this factor after each epoch
-    """
+    :param use_kwinners_local:
+        Whether or not to choose the k-winners 2d locally only across the
+        channels instead of the whole input
+   """
     cnn = nn.Conv2d(
         in_channels=in_channels,
         out_channels=out_channels,
@@ -77,7 +82,8 @@ def add_sparse_cnn_layer(
         network.add_module("cnn{}_bn".format(suffix), bn)
 
     if 0 < percent_on < 1.0:
-        kwinner = KWinners2d(
+        kwinner_class = KWinners2dLocal if use_kwinners_local else KWinners2d
+        kwinner = kwinner_class(
             channels=out_channels,
             percent_on=percent_on,
             k_inference_factor=k_inference_factor,
@@ -175,6 +181,9 @@ class LeSparseNet(nn.Sequential):
     :param boost_strength: boost strength (0.0 implies no boosting)
     :param boost_strength_factor: Boost strength factor to use [0..1]
     :param duty_cycle_period: The period used to calculate duty cycles
+    :param use_kwinners_local:
+        Whether or not to choose the k-winners 2d locally only across the
+        channels instead of the whole input
     """
 
     def __init__(self,
@@ -191,6 +200,7 @@ class LeSparseNet(nn.Sequential):
                  k_inference_factor=1.5,
                  use_batch_norm=True,
                  dropout=False,
+                 use_kwinners_local=False,
                  ):
         super(LeSparseNet, self).__init__()
 
@@ -210,6 +220,7 @@ class LeSparseNet(nn.Sequential):
                 k_inference_factor=k_inference_factor,
                 boost_strength=boost_strength,
                 boost_strength_factor=boost_strength_factor,
+                use_kwinners_local=use_kwinners_local,
             )
 
             # Compute next layer input shape
