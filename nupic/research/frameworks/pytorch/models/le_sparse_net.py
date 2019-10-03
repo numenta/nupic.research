@@ -19,9 +19,9 @@
 #
 
 import numpy as np
-from nupic.research.frameworks.pytorch.modules import KWinners2dLocal
 from torch import nn
 
+from nupic.research.frameworks.pytorch.modules import KWinners2dLocal
 from nupic.torch.modules import (
     Flatten,
     KWinners,
@@ -60,7 +60,7 @@ def add_sparse_cnn_layer(
     :param use_kwinners_local:
         Whether or not to choose the k-winners 2d locally only across the
         channels instead of the whole input
-   """
+    """
     cnn = nn.Conv2d(
         in_channels=in_channels,
         out_channels=out_channels,
