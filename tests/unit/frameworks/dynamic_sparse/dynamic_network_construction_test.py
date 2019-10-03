@@ -44,9 +44,7 @@ class NetworkConstructionTests(unittest.TestCase):
 
     def test_dynamic_gsc(self):
 
-        config = dict(
-            prune_methods=[None, "dynamic-conv", "dynamic-linear", None]
-        )
+        config = dict(prune_methods=[None, "dynamic-conv", "dynamic-linear", None])
 
         net = GSCSparseCNN()
 
@@ -73,12 +71,14 @@ class NetworkConstructionTests(unittest.TestCase):
 
         # Squash dynamic conv layer with its activation.
         net = squash_layers(
-            net, DSConv2d, nn.BatchNorm2d, KWinners2d, transfer_forward_hook=True)
+            net, DSConv2d, nn.BatchNorm2d, KWinners2d, transfer_forward_hook=True
+        )
         self.assertTrue(len(net) == 12)
 
         # Squash linear conv layer with its activation.
         net = squash_layers(
-            net, DSLinear, nn.BatchNorm1d, KWinners, transfer_forward_hook=True)
+            net, DSLinear, nn.BatchNorm1d, KWinners, transfer_forward_hook=True
+        )
         self.assertTrue(len(net) == 10)
 
         # Exercise forward pass.
