@@ -41,7 +41,6 @@ def count_params(network):
 
 
 class SparseModelTest(unittest.TestCase):
-
     def setUp(self):
         self.network1 = MLPHeb(
             config=dict(
