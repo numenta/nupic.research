@@ -26,7 +26,6 @@ from itertools import product
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
@@ -99,7 +98,6 @@ class BaseModel:
 
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
-        # self.loss_func = F.nll_loss
 
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")
@@ -275,9 +273,7 @@ class SparseModel(BaseModel):
 
         # add specific defaults
         new_defaults = dict(
-            start_sparse=None,
-            end_sparse=None,
-            sparse_linear_only=False,
+            start_sparse=None, end_sparse=None, sparse_linear_only=False
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
@@ -288,12 +284,11 @@ class SparseModel(BaseModel):
 
         # define all modules (those that are sparsifiable)
         self.all_modules = self.get_all_modules(self.network)
-        self.all_modules = self.all_modules[self.start_sparse: self.end_sparse]
+        self.all_modules = self.all_modules[self.start_sparse : self.end_sparse]
         if self.sparse_linear_only:
-            self.all_modules = list(filter(
-                lambda m: isinstance(m, nn.Linear),
-                self.all_modules
-            ))
+            self.all_modules = list(
+                filter(lambda m: isinstance(m, nn.Linear), self.all_modules)
+            )
 
         # added option to define sparsity by on_perc
         if "on_perc" in self.__dict__:
@@ -302,10 +297,14 @@ class SparseModel(BaseModel):
 
             self.on_perc_sparse = [p for p in self.on_perc if p is not None]
 
-            assert len(self.on_perc) == len(self.all_modules), """
+            assert len(self.on_perc) == len(
+                self.all_modules
+            ), """
             `on_perc` should have been made into an iterable to coincide with
                 `all_modules` = {}
-            """.format([m.__class__.__name__ for m in self.all_modules])
+            """.format(
+                [m.__class__.__name__ for m in self.all_modules]
+            )
 
         # define sparse modules according to `on_perc`
         self.sparse_modules = self.get_sparse_modules()
@@ -317,10 +316,14 @@ class SparseModel(BaseModel):
 
         # quick sanity check
         if "on_perc" in self.__dict__:
-            assert len(self.on_perc_sparse) == len(self.sparse_modules), """
+            assert len(self.on_perc_sparse) == len(
+                self.sparse_modules
+            ), """
             `on_perc_sparse` should have been made into an iterable to coincide with
                 `sparse_modules` = {}
-            """.format([m.__class__.__name__ for m in self.sparse_modules])
+            """.format(
+                [m.__class__.__name__ for m in self.sparse_modules]
+            )
 
         with torch.no_grad():
             on_perc = self.on_perc_sparse
