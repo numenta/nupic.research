@@ -32,6 +32,7 @@ from __future__ import absolute_import, division, print_function
 import copy
 import glob
 import json
+import numbers
 import os
 import warnings
 from collections import defaultdict
@@ -186,8 +187,11 @@ def _get_value(
 
         # add all remaining params, for easy aggregations
         for k, v in params[e].items():
-            if isinstance(v, list):
+            if isinstance(v, list) and all([isinstance(n, numbers.Number) for n in v]):
                 stats[k].append(np.mean(v))
+            elif isinstance(v, list):
+                v = '-'.join([str(v_i) for v_i in v])
+                stats[k].append(v)
             else:
                 stats[k].append(v)
 
