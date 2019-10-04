@@ -126,7 +126,8 @@ def main(config, experiments, tablefmt):
                     with open(filename, "r") as f:
                         noise = json.load(f)
 
-                    noise_scores[i] = sum(x["total_correct"] for x in list(noise.values()))
+                    noise_scores[i] = sum(x["total_correct"]
+                                          for x in list(noise.values()))
 
             test_score = "{0:.2f} ± {1:.2f}".format(
                 test_scores.mean(), test_scores.std()
