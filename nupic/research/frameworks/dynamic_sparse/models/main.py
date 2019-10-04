@@ -283,6 +283,7 @@ class SparseModel(BaseModel):
             end_sparse=None,
             sparse_linear_only=False,
             log_magnitude_vs_coactivations=False,  # scatter plot of magn. vs coacts.
+            reset_coactivations=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
@@ -579,8 +580,9 @@ class SparseModel(BaseModel):
             self._log_sparse_levels()
 
     def _pre_epoch_setup(self):
-        for m in self.dynamic_sparse_modules:
-            m.reset_coactivations()
+        if self.reset_coactivations:
+            for m in self.dynamic_sparse_modules:
+                m.reset_coactivations()
 
     def _log_sparse_levels(self):
         with torch.no_grad():
