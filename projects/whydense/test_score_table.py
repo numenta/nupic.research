@@ -72,7 +72,8 @@ def main(config, experiments, tablefmt):
     def key_func(x):
         s = re.split("[,_]", re.sub(",|\\d+_|seed=\\d+", "", x["experiment_tag"]))
         if len(s[0]) == 0:
-            return ["_"]
+            return [" "]
+        return s
 
     for exp in configs:
         config = configs[exp]
@@ -114,17 +115,18 @@ def main(config, experiments, tablefmt):
                 # For each checkpoint select the epoch with the best accuracy as
                 # the best epoch
                 best_result = max(results, key=lambda x: x["mean_accuracy"])
-                test_scores[i] = best_result["mean_accuracy"] * 100.0
+                test_scores[i] = best_result["mean_accuracy"]
 
                 # Load noise score
                 logdir = os.path.join(
                     experiment_path, os.path.basename(checkpoint["logdir"])
                 )
                 filename = os.path.join(logdir, "noise.json")
-                with open(filename, "r") as f:
-                    noise = json.load(f)
+                if os.path.exists(filename):
+                    with open(filename, "r") as f:
+                        noise = json.load(f)
 
-                noise_scores[i] = sum(x["total_correct"] for x in list(noise.values()))
+                    noise_scores[i] = sum(x["total_correct"] for x in list(noise.values()))
 
             test_score = "{0:.2f} ± {1:.2f}".format(
                 test_scores.mean(), test_scores.std()
