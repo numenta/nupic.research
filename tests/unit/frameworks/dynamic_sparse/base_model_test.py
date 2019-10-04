@@ -25,7 +25,6 @@ from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb
 
 
 class BaseModelTest(unittest.TestCase):
-
     def test_post_epoch_updates(self):
         """Ensure boost strength is updated in post_epoch."""
         model = BaseModel(
@@ -49,10 +48,12 @@ class BaseModelTest(unittest.TestCase):
 
         model._post_epoch_updates()
 
-        self.assertAlmostEqual(float(model.network.classifier[1][1].boost_strength),
-                               1.4 * 0.7, places=5)
-        self.assertAlmostEqual(float(model.network.classifier[3][1].boost_strength),
-                               1.6 * 0.9, places=5)
+        self.assertAlmostEqual(
+            float(model.network.classifier[1][1].boost_strength), 1.4 * 0.7, places=5
+        )
+        self.assertAlmostEqual(
+            float(model.network.classifier[3][1].boost_strength), 1.6 * 0.9, places=5
+        )
 
 
 if __name__ == "__main__":

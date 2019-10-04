@@ -38,6 +38,7 @@ class DSLinearBlock(nn.Sequential):
         out_features,
         bias=True,
         batch_norm=None,
+        batch_norm_affine=True,
         dropout=None,
         activation_func=None,
         config=None
@@ -51,7 +52,7 @@ class DSLinearBlock(nn.Sequential):
         config = config or {}
         layers = [DSLinear(in_features, out_features, bias=bias, config=config)]
         if batch_norm:
-            layers.append(nn.BatchNorm1d(out_features))
+            layers.append(nn.BatchNorm1d(out_features, affine=batch_norm_affine))
         if activation_func:
             layers.append(activation_func)
         if dropout:
@@ -257,6 +258,7 @@ class GSCHeb(HebbianNetwork):
                 self.hidden_neurons_conv[1] * 25,
                 self.hidden_neurons_fc,
                 activation_func=linear_activation,
+                batch_norm_affine=False,
                 config=config,
                 **kwargs,
             ),
