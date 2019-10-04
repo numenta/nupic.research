@@ -109,6 +109,7 @@ class BaseModel:
         self.current_epoch = epoch + 1
         self.log = {}
         self.network.train()
+        self._pre_epoch_setup()
         self._run_one_pass(dataset.train_loader, train=True)
         self.network.eval()
         self._run_one_pass(dataset.test_loader, train=False)
@@ -130,6 +131,9 @@ class BaseModel:
         if not isinstance(value, Iterable):
             value = [value]
         setattr(self, attr, NumScheduler(value))
+
+    def _pre_epoch_setup(self):
+        pass
 
     def _post_epoch_updates(self, dataset=None):
         # update learning rate
@@ -567,8 +571,7 @@ class SparseModel(BaseModel):
         if train and self.debug_sparse:
             self._log_sparse_levels()
 
-    def _post_epoch_updates(self, dataset=None):
-        super()._post_epoch_updates(dataset)
+    def _pre_epoch_setup(self):
         for m in self.dynamic_sparse_modules:
             m.reset_coactivations()
 
