@@ -36,12 +36,7 @@ class CoactivationsTest(unittest.TestCase):
 
         # network with 4 layers: input (3), hidden(4), hidden(5), output(2)
         network = MLPHeb(
-            config=dict(
-                input_size=3,
-                num_classes=2,
-                hidden_sizes=[4, 5],
-                bias=False,
-            )
+            config=dict(input_size=3, num_classes=2, hidden_sizes=[4, 5], bias=False)
         )
         network.init_hebbian()
 
@@ -128,17 +123,14 @@ class CoactivationsTest(unittest.TestCase):
 
     def test_non_hebbian(self):
         network = MLPHeb(
-            config=dict(
-                input_size=5,
-                num_classes=2,
-                hidden_sizes=[4, 5],
-                bias=False,
-            )
+            config=dict(input_size=5, num_classes=2, hidden_sizes=[4, 5], bias=False)
         )
         inp = torch.randn((1, 5))
         network(inp.view(1, 1, 5))
-        self.assertTrue(len(network.coactivations) == 0,
-                        "Without init_hebbian it shouldn't compute coactivations.")
+        self.assertTrue(
+            len(network.coactivations) == 0,
+            "Without init_hebbian it shouldn't compute coactivations.",
+        )
 
     def test_k_winner_construction(self):
         """Test that we can create k-winners independently in each layer."""
@@ -178,13 +170,16 @@ class CoactivationsTest(unittest.TestCase):
 
         # setting initial weights
         weights = [
-            torch.tensor([
-                [1, 0.0, 0, 0],
-                [1, 1.1, 0, 0],
-                [0, 1.0, 1, 0],
-                [0, 0.0, 1, 1],
-                [0, 0.0, 0, 1],
-            ], dtype=torch.float),
+            torch.tensor(
+                [
+                    [1, 0.0, 0, 0],
+                    [1, 1.1, 0, 0],
+                    [0, 1.0, 1, 0],
+                    [0, 0.0, 1, 1],
+                    [0, 0.0, 0, 1],
+                ],
+                dtype=torch.float,
+            ),
             torch.randn((4, 2)) - 0.5,
         ]
         weights_iter = iter(weights)
@@ -195,22 +190,30 @@ class CoactivationsTest(unittest.TestCase):
 
         # ---------- Run forward pass - the first unit should win -----------
 
-        coact1 = torch.tensor([[1., 0., 0., 0.],
-                               [1., 0., 0., 0.],
-                               [0., 0., 0., 0.],
-                               [0., 0., 0., 0.],
-                               [0., 0., 0., 0.]])
+        coact1 = torch.tensor(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         inp = torch.tensor([[1.0, 1.0, 0.0, 0.0, 0.0]])
         network(inp.view(1, 1, 5))
         self.assertAlmostEqual(float((network.coactivations[0] - coact1).sum()), 0.0)
 
         # ---------- Run forward pass - the second unit should win -----------
 
-        coact2 = torch.tensor([[1., 0., 0., 0.],
-                               [1., 1., 0., 0.],
-                               [0., 1., 0., 0.],
-                               [0., 0., 0., 0.],
-                               [0., 0., 0., 0.]])
+        coact2 = torch.tensor(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         inp = torch.tensor([[0.0, 1.0, 1.0, 0.0, 0.0]])
         network(inp.view(1, 1, 5))
         self.assertAlmostEqual(float((network.coactivations[0] - coact2).sum()), 0.0)

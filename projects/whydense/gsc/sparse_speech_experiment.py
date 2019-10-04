@@ -96,6 +96,7 @@ class SparseSpeechExperiment(object):
                 dropout=config.get("dropout", 0.0),
                 num_classes=self.num_classes,
                 k_inference_factor=config["k_inference_factor"],
+                activation_fct_before_max_pool=config["activation_fct_before_max_pool"],
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
 
