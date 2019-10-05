@@ -21,10 +21,9 @@
 
 import os
 
+import numpy as np
 import ray
 import torch
-
-import numpy as np
 
 from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from nupic.research.frameworks.dynamic_sparse.common.utils import (
