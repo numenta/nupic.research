@@ -27,6 +27,7 @@ import torch
 from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from nupic.research.frameworks.dynamic_sparse.common.utils import (
     Trainable,
+    download_dataset,
     new_experiment,
     run_experiment,
 )
@@ -74,17 +75,17 @@ base_exp_config = dict(
 )
 
 # ray configurations
-experiment_name = "mlp-heb-coacts-vs-magn-2019-10-04"
+experiment_name = "mlp-heb-coacts-comparison-2019-10-01-C"
 tune_config = dict(
     name=experiment_name,
     num_samples=1,
     local_dir=os.path.expanduser(os.path.join("~/nta/results", experiment_name)),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 90},
+    stop={"training_iteration": 5},
     resources_per_trial={
-        "cpu": os.cpu_count() / 2.0,
-        "gpu": torch.cuda.device_count() / 2.0,
+        "cpu": os.cpu_count() / 4.0,
+        "gpu": torch.cuda.device_count() / 4.0,
     },
     loggers=DEFAULT_LOGGERS,
     verbose=1,
@@ -93,93 +94,59 @@ tune_config = dict(
 
 # define experiments
 experiments = {
-    # "mlp-dense": dict(
-    #     model=ray.tune.grid_search(["SparseModel"]),
-    #     on_perc=ray.tune.grid_search([1.0]),
-    #     log_magnitude_vs_coactivations=True,
+    # "mlp-dense-relu": dict(
+    #     model=ray.tune.grid_search(["BaseModel"]),
     # ),
-    # "mlp-sparse-kw": dict(
+    # "mlp-sparse-relu": dict(
     #     model=ray.tune.grid_search(["SparseModel"]),
-    #     on_perc=ray.tune.grid_search([0.1]),
-    #     percent_on_k_winner=[0.12] * 3,
-    #     log_magnitude_vs_coactivations=True,
+    #     on_perc=ray.tune.grid_search([0.02]),
     # ),
-
-    # "mlp-SET-kw-binary-coacts": dict(
+    # "mlp-SET-relu": dict(
     #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
-    #     on_perc=ray.tune.grid_search([0.1]),
-    #     percent_on_k_winner=[0.12] * 3,
-    #     log_magnitude_vs_coactivations=True,
+    #     on_perc=ray.tune.grid_search([0.02]),
     #     hebbian_prune_perc=None,
     #     hebbian_grow=False,
     #     weight_prune_perc=0.3,
     #     pruning_early_stop=2,
     # ),
-    "mlp-SET-binary-coacts": dict(
+    "mlp-Heb-coacts-xixj-relu-plots": dict(
         model=ray.tune.grid_search(["DSNNMixedHeb"]),
         on_perc=ray.tune.grid_search([0.02]),
         log_magnitude_vs_coactivations=True,
-        hebbian_prune_perc=None,
-        hebbian_grow=False,
-        weight_prune_perc=0.3,
+        hebbian_prune_perc=0.3,
+        hebbian_grow=ray.tune.grid_search([True]),
+        weight_prune_perc=None,
         pruning_early_stop=2,
+        moving_average_alpha=ray.tune.grid_search([0.6]),
+        reset_coactivations=ray.tune.grid_search([True]),
+        use_binary_coactivations=False,
     ),
 
-    # "mlp-Heb-kw-binary-coacts": dict(
+    # "mlp-hebbian-1": dict(
     #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
-    #     on_perc=ray.tune.grid_search([0.1]),
-    #     percent_on_k_winner=[0.12] * 3,
-    #     log_magnitude_vs_coactivations=True,
+    #     # sparse related
+    #     on_perc=0.1,
     #     hebbian_prune_perc=0.3,
     #     hebbian_grow=False,
     #     weight_prune_perc=None,
     #     pruning_early_stop=2,
-    # ),
-    # "mlp-SET-kw-nonbinary-coacts": dict(
-    #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
-    #     on_perc=ray.tune.grid_search([0.1]),
-    #     percent_on_k_winner=[0.12] * 3,
     #     log_magnitude_vs_coactivations=True,
-    #     hebbian_prune_perc=None,
-    #     hebbian_grow=False,
-    #     weight_prune_perc=0.3,
-    #     pruning_early_stop=2,
-    #     use_binary_coactivations=False,
-    #     moving_average_alpha=0.6,
     # ),
-    "mlp-Heb-kw-nonbinary-coacts": dict(
-        model=ray.tune.grid_search(["DSNNMixedHeb"]),
-        on_perc=ray.tune.grid_search([0.02]),
-        percent_on_k_winner=[0.12] * 3,
-        log_magnitude_vs_coactivations=True,
-        hebbian_prune_perc=0.3,
-        hebbian_grow=True,
-        weight_prune_perc=None,
-        pruning_early_stop=2,
-        use_binary_coactivations=False,
-        moving_average_alpha=0.6,
-    ),
-
-    "mlp-Heb-nonbinary-coacts": dict(
-        model=ray.tune.grid_search(["DSNNMixedHeb"]),
-        on_perc=ray.tune.grid_search([0.02]),
-        log_magnitude_vs_coactivations=True,
-        hebbian_prune_perc=0.3,
-        hebbian_grow=True,
-        weight_prune_perc=None,
-        pruning_early_stop=2,
-        use_binary_coactivations=False,
-        moving_average_alpha=0.6,
-    ),
-
-    # "mlp-WeightedMag-kw": dict(
-    #     model=ray.tune.grid_search(["DSNNWeightedMag"]),
+    # "gsc-hebbian-0": dict(
+    #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
+    #     # network related
+    #     network="gsc_sparse_dsnn",
+    #     prune_methods=[None, "dynamic-conv", "dynamic-linear", None],
+    #     # dataset related
+    #     dataset_name="PreprocessedGSC",
+    #     data_dir="~/nta/datasets/gsc",
+    #     batch_size_train=(4, 16),
+    #     batch_size_test=(1000),
     #     # sparse related
-    #     on_perc=ray.tune.grid_search([0.1]),
-    #     percent_on_k_winner=[0.12] * 3,
-    #     hebbian_prune_perc=None,
+    #     on_perc=0.1,
+    #     hebbian_prune_perc=0.3,
     #     hebbian_grow=False,
-    #     weight_prune_perc=0.3,
+    #     weight_prune_perc=None,
     #     pruning_early_stop=2,
     #     log_magnitude_vs_coactivations=True,
     # ),
@@ -189,6 +156,9 @@ exp_configs = (
     if experiments
     else [(experiment_name, base_exp_config)]
 )
+
+# Download dataset.
+# download_dataset(base_exp_config)
 
 # Register serializers.
 ray.init()
