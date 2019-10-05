@@ -21,6 +21,7 @@
 import numpy as np
 from torch import nn
 
+from nupic.research.frameworks.pytorch.modules import KWinners2dLocal
 from nupic.torch.modules import (
     Flatten,
     KWinners,
@@ -42,6 +43,7 @@ def add_sparse_cnn_layer(
     boost_strength,
     boost_strength_factor,
     activation_fct_before_max_pool,
+    use_kwinners_local,
 ):
     """Add sparse cnn layer to network.
 
@@ -58,6 +60,9 @@ def add_sparse_cnn_layer(
         boost strength is multiplied by this factor after each epoch
     :param activation_fct_before_max_pool:
         If true ReLU/K-winners will be placed before the max_pool step
+    :param use_kwinners_local:
+        Whether or not to choose the k-winners 2d locally only across the
+        channels instead of the whole input
     """
     cnn = nn.Conv2d(
         in_channels=in_channels,
@@ -83,7 +88,8 @@ def add_sparse_cnn_layer(
     if percent_on >= 1.0 or percent_on <= 0:
         network.add_module("cnn{}_relu".format(suffix), nn.ReLU())
     else:
-        kwinner = KWinners2d(
+        kwinner_class = KWinners2dLocal if use_kwinners_local else KWinners2d
+        kwinner = kwinner_class(
             channels=out_channels,
             percent_on=percent_on,
             k_inference_factor=k_inference_factor,
@@ -183,6 +189,9 @@ class LeSparseNet(nn.Sequential):
     :param boost_strength: boost strength (0.0 implies no boosting)
     :param boost_strength_factor: Boost strength factor to use [0..1]
     :param duty_cycle_period: The period used to calculate duty cycles
+    :param use_kwinners_local:
+        Whether or not to choose the k-winners 2d locally only across the
+        channels instead of the whole input
     """
 
     def __init__(self,
@@ -200,6 +209,7 @@ class LeSparseNet(nn.Sequential):
                  use_batch_norm=True,
                  dropout=False,
                  activation_fct_before_max_pool=False,
+                 use_kwinners_local=False,
                  ):
         super(LeSparseNet, self).__init__()
 
@@ -219,7 +229,8 @@ class LeSparseNet(nn.Sequential):
                 k_inference_factor=k_inference_factor,
                 boost_strength=boost_strength,
                 boost_strength_factor=boost_strength_factor,
-                activation_fct_before_max_pool=activation_fct_before_max_pool
+                activation_fct_before_max_pool=activation_fct_before_max_pool,
+                use_kwinners_local=use_kwinners_local,
             )
 
             # Compute next layer input shape
