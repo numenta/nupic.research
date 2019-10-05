@@ -26,6 +26,9 @@ from io import BytesIO
 
 import matplotlib.pyplot as plt
 import numpy as np
+import PIL.Image
+import seaborn as sns
+from pandas import DataFrame
 from ray.tune.logger import CSVLogger, JsonLogger, Logger
 from ray.tune.result import TIME_TOTAL_S, TIMESTEPS_TOTAL, TRAINING_ITERATION
 
@@ -49,6 +52,57 @@ def to_tf_values(result, path, histo_bins=1000):
     values = []
     for attr, value in result.items():
         if value is not None:
+            if attr.startswith("scatter_"):
+
+                # Validate value, should have structure like:
+                #
+                #   value = {
+                #      data: Dataframe
+                #      x: String - col of data
+                #      y: String - col of data, same size as x
+                #      hue: None or array like, same size as x and y
+                #   }
+                #
+                valid = False
+                if isinstance(value, dict):
+                    data = value.get("data")
+                    x = value.get("x")
+                    y = value.get("y")
+                    hue = value.get("hue")
+                    if isinstance(data, DataFrame) and x in data and y in data:
+                        valid = True
+
+                # Continue if not value.
+                if not valid:
+                    continue
+
+                # Plot scatter plot.
+                seaborn_config = value.get("seaborn_config", {})
+                sns.set(**seaborn_config)
+                ax = sns.scatterplot(x=x, y=y, hue=hue, data=data)
+
+                # Save to BytesIO stream.
+                stream = BytesIO()
+                canvas = ax.figure.canvas
+                canvas.draw()
+                (w, h) = canvas.get_width_height()
+                pilimage = PIL.Image.frombytes(
+                    "RGB", (w, h), canvas.tostring_rgb())
+                pilimage.save(stream, "PNG")
+
+                # Create an Image object
+                img_sum = tf.Summary.Image(
+                    encoded_image_string=stream.getvalue(),
+                    height=h,
+                    width=w,
+                )
+
+                # Create a Summary value
+                values.append(
+                    tf.Summary.Value(tag="/".join(path + [attr]), image=img_sum)
+                )
+                plt.clf()
+
             if attr.startswith("img_"):
                 # for nr, img in enumerate(value):
                 # Write the image to a string

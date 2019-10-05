@@ -132,13 +132,29 @@ def init_coactivation_tracking(m):
 
 
 class DynamicSparseBase(torch.nn.Module):
-    def _init_coactivations(self, weight, update_nsteps=1):
+    def _init_coactivations(
+            self, weight, update_nsteps=1, config=None):
         """
         This method
             1. registers a buffer the shape of weight to track coactivations
             2. adds a forward hook to the module to update the coactivations
                every 'update_nsteps'.
+
+        :param weight: torch.tensor - corresponding weight of coactivations
+        :param update_nsteps: int - number of training steps before updating
+                                    the coactivations, helps reduce number of
+                                    computations - could be called `update_interval`.
+        :param config: dict - configurable parameters for tracking coactivations
         """
+
+        # Init defaults and override only when params are specified in the config.
+        config = config or {}
+        defaults = dict(
+            moving_average_alpha=None,           # See `_update_coactivations`
+            update_func=None,  # See `_update_coactivations`
+        )
+        new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
+        self.__dict__.update(new_defaults)
 
         # Init buffer to keep track of coactivations.
         self._track_coactivations = False
@@ -164,7 +180,15 @@ class DynamicSparseBase(torch.nn.Module):
     def _update_coactivations(self, input_tensor, output_tensor):
 
         new_coacts = self.calc_coactivations(input_tensor, output_tensor)
-        self.coactivations[:] += new_coacts
+        if self.update_func:
+            updated_coacts = self.update_func(self.coactivations, new_coacts)
+        elif self.moving_average_alpha:
+            alpha = self.moving_average_alpha
+            updated_coacts = (1 - alpha) * self.coactivations + alpha * new_coacts
+        else:
+            updated_coacts = self.coactivations + new_coacts
+
+        self.coactivations[:] = updated_coacts
 
     @staticmethod
     def forward_hook(module, input_tensor, output_tensor):
@@ -188,12 +212,24 @@ class DynamicSparseBase(torch.nn.Module):
 
 
 class DSLinear(torch.nn.Linear, DynamicSparseBase):
-    def __init__(self, in_features, out_features, bias=False):
+    def __init__(self, in_features, out_features, bias=False, config=None):
 
         super().__init__(in_features, out_features, bias=bias)
 
         # Initialize dynamic sparse attributes.
-        self._init_coactivations(weight=self.weight)
+        config = config or {}
+        self._init_coactivations(weight=self.weight, config=config)
+
+    def _init_coactivations(self, weight, config=None):
+        super()._init_coactivations(weight, config=config)
+
+        # Init defaults and override only when params are specified in the config.
+        config = config or {}
+        defaults = dict(
+            use_binary_coactivations=True,
+        )
+        new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
+        self.__dict__.update(new_defaults)
 
     def calc_coactivations(self, x, y):
         outer = 0
@@ -201,17 +237,20 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
         with torch.no_grad():
 
             # Get active units.
-            curr_act = (x > 0).detach().float()
-            prev_act = (y > 0).detach().float()
+            if self.use_binary_coactivations:
+                prev_act = (x > 0).detach().float()
+                curr_act = (y > 0).detach().float()
+            else:
+                prev_act = x.clone().detach().float()
+                curr_act = y.clone().detach().float()
 
             # Cumulate outer product over all samples.
             # TODO: Vectorize this sum; for instance, using torch.einsum().
             for s in range(n_samples):
-                outer += torch.ger(prev_act[s], curr_act[s])
+                outer += torch.ger(curr_act[s], prev_act[s])
 
         # Return coactivations.
         return outer
-
 
 # ------------------
 # Conv Layers
