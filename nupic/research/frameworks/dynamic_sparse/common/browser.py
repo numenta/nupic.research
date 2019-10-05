@@ -190,7 +190,7 @@ def _get_value(
             if isinstance(v, list) and all([isinstance(n, numbers.Number) for n in v]):
                 stats[k].append(np.mean(v))
             elif isinstance(v, list):
-                v = '-'.join([str(v_i) for v_i in v])
+                v = "-".join([str(v_i) for v_i in v])
                 stats[k].append(v)
             else:
                 stats[k].append(v)
