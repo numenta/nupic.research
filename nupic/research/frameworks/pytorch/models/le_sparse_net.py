@@ -21,6 +21,9 @@
 import numpy as np
 from torch import nn
 
+from nupic.research.frameworks.pytorch.modules.consolidated_sparse_weights import (
+    ConsolidatedSparseWeights,
+)
 from nupic.torch.modules import (
     Flatten,
     KWinners,
@@ -109,6 +112,7 @@ def add_sparse_linear_layer(
     k_inference_factor,
     boost_strength,
     boost_strength_factor,
+    consolidated_sparse_weights,
 ):
     """Add sparse linear layer to network.
 
@@ -129,9 +133,15 @@ def add_sparse_linear_layer(
     """
     linear = nn.Linear(input_size, linear_n)
     if 0 < weight_sparsity < 1.0:
-        network.add_module(
-            "linear{}".format(suffix), SparseWeights(linear, weight_sparsity)
-        )
+        if consolidated_sparse_weights:
+            network.add_module(
+                "linear{}".format(suffix),
+                ConsolidatedSparseWeights(linear, weight_sparsity)
+            )
+        else:
+            network.add_module(
+                "linear{}".format(suffix), SparseWeights(linear, weight_sparsity)
+            )
     else:
         network.add_module("linear{}_linear".format(suffix), linear)
 
@@ -198,8 +208,9 @@ class LeSparseNet(nn.Sequential):
                  boost_strength_factor=0.9,
                  k_inference_factor=1.5,
                  use_batch_norm=True,
-                 dropout=False,
+                 dropout=0.0,
                  activation_fct_before_max_pool=False,
+                 consolidated_sparse_weights=False,
                  ):
         super(LeSparseNet, self).__init__()
 
@@ -245,6 +256,7 @@ class LeSparseNet(nn.Sequential):
                 k_inference_factor=k_inference_factor,
                 boost_strength=boost_strength,
                 boost_strength_factor=boost_strength_factor,
+                consolidated_sparse_weights=consolidated_sparse_weights,
             )
             input_size = linear_n[i]
 
