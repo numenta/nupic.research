@@ -100,7 +100,8 @@ class SparseSpeechExperiment(object):
                 activation_fct_before_max_pool=config.get(
                     "activation_fct_before_max_pool", False),
                 consolidated_sparse_weights=config.get(
-                    "consolidated_sparse_weights", False)
+                    "consolidated_sparse_weights", False),
+                use_kwinners_local=config.get("use_kwinner_local", False),
             )
 
         elif self.model_type == "resnet9":

@@ -1,4 +1,3 @@
-# ------------------------------------------------------------------------------
 #  Numenta Platform for Intelligent Computing (NuPIC)
 #  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
@@ -18,19 +17,4 @@
 #
 #  http://numenta.org/licenses/
 #
-# ------------------------------------------------------------------------------
-nupic.torch
-nupic.tensorflow
-numpy
-matplotlib
-pandas
-tabulate
-librosa
-scikit-image
-requests
-ray
-tqdm
-torchvision
-python-dotenv
-elasticsearch
-seaborn>=0.9.0
+from .k_winners import KWinners2dLocal
