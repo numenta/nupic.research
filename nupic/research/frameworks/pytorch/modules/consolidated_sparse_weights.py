@@ -83,7 +83,6 @@ class ConsolidatedSparseWeights(SparseWeights):
 
         output_indices = np.arange(output_size)
         input_indices = np.array(
-            # [np.random.permutation(input_size)[:num_zeros] for _ in output_indices],
             [consolidated_zero_indices(input_size, self.weight_sparsity)
              for _ in output_indices],
             dtype=np.long,
