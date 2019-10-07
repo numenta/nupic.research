@@ -28,8 +28,11 @@ tabulate
 librosa
 scikit-image
 requests
-ray
+ray[dashboard,debug]
 tqdm
 torchvision
 python-dotenv
 elasticsearch
+boto3
+awscli
+jupyter
