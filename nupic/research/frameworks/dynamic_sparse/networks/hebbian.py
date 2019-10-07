@@ -41,6 +41,7 @@ class DSLinearBlock(nn.Sequential):
         batch_norm_affine=True,
         dropout=None,
         activation_func=None,
+        config=None
     ):
 
         # Clarifications on batch norm position at the linear block:
@@ -48,7 +49,8 @@ class DSLinearBlock(nn.Sequential):
         # - bn after relu in recent work
         # (see fchollet @ https://github.com/keras-team/keras/issues/1802)
         # - however, if applied after RELU or kWinners, breaks sparsity
-        layers = [DSLinear(in_features, out_features, bias=bias)]
+        config = config or {}
+        layers = [DSLinear(in_features, out_features, bias=bias, config=config)]
         if batch_norm:
             layers.append(nn.BatchNorm1d(out_features, affine=batch_norm_affine))
         if activation_func:
@@ -155,6 +157,7 @@ class MLPHeb(HebbianNetwork):
                 self.input_size,
                 self.hidden_sizes[0],
                 activation_func=self.activation_funcs[0],
+                config=config,
                 **kwargs,
             )
         )
@@ -165,12 +168,14 @@ class MLPHeb(HebbianNetwork):
                     self.hidden_sizes[i - 1],
                     self.hidden_sizes[i],
                     activation_func=self.activation_funcs[i],
+                    config=config,
                     **kwargs,
                 )
             )
         # Add last layer.
         layers.append(
-            DSLinearBlock(self.hidden_sizes[-1], self.num_classes, bias=self.bias)
+            DSLinearBlock(
+                self.hidden_sizes[-1], self.num_classes, bias=self.bias, config=config)
         )
 
         # Create the classifier.
@@ -254,9 +259,10 @@ class GSCHeb(HebbianNetwork):
                 self.hidden_neurons_fc,
                 activation_func=linear_activation,
                 batch_norm_affine=False,
+                config=config,
                 **kwargs,
             ),
-            DSLinearBlock(self.hidden_neurons_fc, self.num_classes),
+            DSLinearBlock(self.hidden_neurons_fc, self.num_classes, config=config),
         ]
 
         self.features = nn.Sequential(*conv_layers)
