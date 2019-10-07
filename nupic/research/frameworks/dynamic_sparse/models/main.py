@@ -28,10 +28,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
+from pandas import DataFrame
 
 from nupic.research.frameworks.dynamic_sparse.networks import (
     DynamicSparseBase,
     NumScheduler,
+    init_coactivation_tracking,
 )
 from nupic.torch.modules import update_boost_strength
 
@@ -107,6 +109,7 @@ class BaseModel:
         self.current_epoch = epoch + 1
         self.log = {}
         self.network.train()
+        self._pre_epoch_setup()
         self._run_one_pass(dataset.train_loader, train=True)
         self.network.eval()
         self._run_one_pass(dataset.test_loader, train=False)
@@ -128,6 +131,9 @@ class BaseModel:
         if not isinstance(value, Iterable):
             value = [value]
         setattr(self, attr, NumScheduler(value))
+
+    def _pre_epoch_setup(self):
+        pass
 
     def _post_epoch_updates(self, dataset=None):
         # update learning rate
@@ -273,7 +279,11 @@ class SparseModel(BaseModel):
 
         # add specific defaults
         new_defaults = dict(
-            start_sparse=None, end_sparse=None, sparse_linear_only=False
+            start_sparse=None,
+            end_sparse=None,
+            sparse_linear_only=False,
+            log_magnitude_vs_coactivations=False,  # scatter plot of magn. vs coacts.
+            reset_coactivations=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
@@ -341,6 +351,9 @@ class SparseModel(BaseModel):
                 m.weight.data *= mask
                 self.masks.append(mask)
                 self.num_params.append(torch.sum(mask).item())
+
+        if self.log_magnitude_vs_coactivations:
+            self.network.apply(init_coactivation_tracking)
 
     def is_sparsifiable(self, module):
         return isinstance(module, (nn.Linear, nn.Conv2d))
@@ -524,12 +537,52 @@ class SparseModel(BaseModel):
                 self.log["val_loss"] = loss
                 self.log["val_acc"] = acc
 
+        # save scatter plot of magn vs coacts.
+        if train and self.log_magnitude_vs_coactivations:
+            for i, m in enumerate(self.dynamic_sparse_modules):
+
+                coacts = m.coactivations.clone().detach().to("cpu").numpy()
+                weight = m.weight.clone().detach().to("cpu").numpy()
+                grads = m.weight.grad.clone().detach().to("cpu").numpy()
+
+                mask = ((m.weight.grad != 0)).to("cpu").numpy()
+
+                coacts = coacts[mask]
+                weight = weight[mask]
+                grads = grads[mask]
+                grads = np.log(np.abs(grads))
+
+                x, y, hue = "coactivations", "weight", "log_abs_grads"
+
+                dataframe = DataFrame({
+                    x: coacts.flatten(),
+                    y: weight.flatten(),
+                    hue: grads.flatten()
+                })
+                seaborn_config = dict(
+                    rc={"figure.figsize": (11.7, 8.27)},
+                    style="white"
+                )
+
+                self.log["scatter_mag_vs_coacts_layer-{}".format(str(i))] = dict(
+                    data=dataframe,
+                    x=x,
+                    y=y,
+                    hue=hue,
+                    seaborn_config=seaborn_config,
+                )
+
         if train and self.debug_weights:
             self._log_weights()
 
         # add monitoring of sparse levels
         if train and self.debug_sparse:
             self._log_sparse_levels()
+
+    def _pre_epoch_setup(self):
+        if self.reset_coactivations:
+            for m in self.dynamic_sparse_modules:
+                m.reset_coactivations()
 
     def _log_sparse_levels(self):
         with torch.no_grad():

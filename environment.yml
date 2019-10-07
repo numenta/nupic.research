@@ -24,6 +24,7 @@ dependencies:
   - tqdm
   - python-dotenv
   - elasticsearch
+  - seaborn
   - boto3
   - awscli
   - jupyter
