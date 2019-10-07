@@ -24,6 +24,15 @@ dependencies:
   - tqdm
   - python-dotenv
   - elasticsearch
+  - seaborn
+  - boto3
+  - awscli
+  - jupyter
+
+  # ray[debug,dashboard]
+  - psutil
+  - setproctitle
+  - aiohttp
 
   # See requirements-dev.txt
   - pytest-runner
@@ -43,7 +52,7 @@ dependencies:
 
   - pip:
       # Dependencies not available in conda
-      - ray
+      - ray[debug,dashboard]
 
       # See requirements-dev.txt
       - docformatter
