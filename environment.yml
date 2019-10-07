@@ -32,7 +32,6 @@ dependencies:
   # ray[debug,dashboard]
   - psutil
   - setproctitle
-  - py-spy
   - aiohttp
 
   # See requirements-dev.txt
