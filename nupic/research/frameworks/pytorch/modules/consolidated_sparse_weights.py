@@ -38,7 +38,7 @@ def consolidated_zero_indices(input_size, percent_on):
     num_blocks = math.ceil(input_size / 64.0)
 
     # Randomly select which blocks are going to be zero and non-zero
-    num_zero_blocks = int(num_blocks - (4 * percent_on * num_blocks))
+    num_zero_blocks = int(num_blocks - (3 * percent_on * num_blocks))
     num_nonzero_blocks = num_blocks - num_zero_blocks
     randomized_blocks = np.random.permutation(num_blocks)
     zero_blocks = randomized_blocks[:num_zero_blocks]
