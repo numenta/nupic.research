@@ -24,6 +24,8 @@ import argparse
 import configparser
 import logging
 import os
+import sys
+from pathlib import Path
 
 import ray
 import torch
@@ -227,14 +229,17 @@ if __name__ == "__main__":
     # Load and parse command line option and experiment configurations
     options = parse_options()
     configs = parse_config(options.config, options.experiments)
+    if len(configs) == 0:
+        print("No experiments to run!")
+        sys.exit()
 
     # Use configuration file location as the project location.
     project_dir = os.path.dirname(options.config.name)
     project_dir = os.path.abspath(project_dir)
 
-    # Pre-download dataset
-    data_dir = os.path.join(project_dir, "data")
-    train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
+    # Default data dir if not specified
+    data_dir = os.path.join(os.environ["HOME"], "nta", "data")
+    data_dir = configs.get("data_dir", data_dir)
 
     print("Using torch version", torch.__version__)
     print("Torch device count=", torch.cuda.device_count())
@@ -263,12 +268,15 @@ if __name__ == "__main__":
 
         # Make sure local directories are relative to the project location
         path = config.get("path", "results")
-        if not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+        path = Path(path).expanduser().resolve()
+        config["path"] = path
 
-        data_dir = config.get("data_dir", "data")
-        if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
+        data_dir = config.get("data_dir", data_dir)
+        data_dir = Path(data_dir).expanduser().resolve()
+        config["data_dir"] = data_dir
+
+        # Pre-download dataset
+        train_dataset = datasets.CIFAR10(data_dir, download=True, train=True)
 
         # When running multiple hyperparameter searches on different experiments,
         # ray.tune will run one experiment at the time. We use "ray.remote" to
