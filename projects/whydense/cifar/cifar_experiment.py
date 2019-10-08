@@ -67,7 +67,8 @@ def create_test_loaders(noise_values, batch_size, data_dir):
         testset = datasets.CIFAR10(
             root=data_dir, train=False, transform=transform_noise_test
         )
-        loaders.append(DataLoader(testset, batch_size=batch_size, shuffle=False))
+        loaders.append(DataLoader(testset, batch_size=batch_size, shuffle=False,
+                                  pin_memory=True))
 
     return loaders
 
@@ -194,10 +195,12 @@ class TinyCIFAR(object):
         )
 
         self.train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True
+            train_dataset, batch_size=batch_size, shuffle=True,
+            pin_memory=True,
         )
         self.first_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=first_epoch_batch_size, shuffle=True
+            train_dataset, batch_size=first_epoch_batch_size, shuffle=True,
+            pin_memory=True,
         )
         self.test_loaders = create_test_loaders(
             self.noise_values, self.test_batch_size, self.data_dir
