@@ -19,27 +19,23 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from __future__ import print_function, division
-import os
-import torch
-import pandas as pd
-import numpy as np
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
+from __future__ import division, print_function
 
+import os
 import shutil
-import tempfile
+
+import pandas as pd
 from torchvision.datasets.folder import ImageFolder
-from torchvision.datasets.utils import check_integrity, download_and_extract_archive, extract_archive, \
-    verify_str_arg
+from torchvision.datasets.utils import check_integrity, download_and_extract_archive
 
 ARCHIVE_DICT = {
-    'url': 'http://cs231n.stanford.edu/tiny-imagenet-200.zip',
-    'md5': '90528d7ca1a48142e341f4ef8d21d0de',
+    "url": "http://cs231n.stanford.edu/tiny-imagenet-200.zip",
+    "md5": "90528d7ca1a48142e341f4ef8d21d0de",
 }
-VAL_ANNOTATIONS = 'val_annotations.txt'
-META_FILE = 'words.txt'
-DATASET_FOLDER = 'tiny-imagenet-200'
+VAL_ANNOTATIONS = "val_annotations.txt"
+META_FILE = "words.txt"
+DATASET_FOLDER = "tiny-imagenet-200"
+
 
 class TinyImageNet(ImageFolder):
     """`Tiny ImageNet <https://tiny-imagenet.herokuapp.com/>`Classification Dataset.
@@ -47,7 +43,7 @@ class TinyImageNet(ImageFolder):
 
     Args:
         root (string): Root directory of the TinyImageNet Dataset.
-        train (boolean, optional): If true, loads the training set, otherwise validation set
+        train (boolean, optional): If true, loads training set, otherwise validation set
         download (bool, optional): If true, downloads the dataset from the internet and
             puts it in root directory. If dataset is already downloaded, it is not
             downloaded again.
@@ -73,9 +69,9 @@ class TinyImageNet(ImageFolder):
         img_folder = os.path.join(os.path.expanduser(root), DATASET_FOLDER)
         self.meta_file = os.path.join(img_folder, META_FILE)
         if self.train:
-            img_folder = os.path.join(img_folder, 'train')
+            img_folder = os.path.join(img_folder, "train")
         else:
-            img_folder = os.path.join(img_folder, 'val')
+            img_folder = os.path.join(img_folder, "val")
 
         # if for the first time, download
         if download:
@@ -88,43 +84,47 @@ class TinyImageNet(ImageFolder):
         self.wnids = self.classes
         self.wnid_to_idx = self.class_to_idx
         self.classes = [wnid_to_classes[wnid] for wnid in self.wnids]
-        self.class_to_idx = {cls: idx
-                             for idx, clss in enumerate(self.classes)
-                             for cls in clss}
+        self.class_to_idx = {
+            cls: idx for idx, clss in enumerate(self.classes) for cls in clss
+        }
 
     def download(self, root, img_folder):
 
         # regular download
         if not check_integrity(self.meta_file):
-            download_and_extract_archive(ARCHIVE_DICT['url'], root,
-                                         md5=ARCHIVE_DICT['md5'])
+            download_and_extract_archive(
+                ARCHIVE_DICT["url"], root, md5=ARCHIVE_DICT["md5"]
+            )
         else:
             print("Dataset already downloaded.")
 
         # if validation, take extra step to organize images if not yet
-        if not self.train and os.path.isdir(os.path.join(img_folder, 'images')):
+        if not self.train and os.path.isdir(os.path.join(img_folder, "images")):
             print("Rearranging validation folder.")
             annotations = self._load_val_annotations(img_folder)
             prepare_val_folder(img_folder, annotations)
         else:
             print("Validation set rearranged")
- 
+
     def _load_meta_file(self):
         # TODO: make it faster
         mapping = pd.read_csv(self.meta_file, sep="\t", index_col=None, header=None)
-        return {wnid:classes for _, (wnid, classes) in mapping.iterrows()}
+        return {wnid: classes for _, (wnid, classes) in mapping.iterrows()}
 
     def _load_val_annotations(self, img_folder):
         annotations_file = os.path.join(img_folder, VAL_ANNOTATIONS)
         return pd.read_csv(annotations_file, sep="\t", index_col=None, header=None)
-        
+
+
 def prepare_val_folder(img_folder, annotations):
     # create folders
     for wnid in annotations.iloc[:, 1].unique():
         os.mkdir(os.path.join(img_folder, wnid))
     # move files
     for _, (img_file, wnid) in annotations.iloc[:, :2].iterrows():
-        img_path = os.path.join(img_folder, 'images', img_file)
-        shutil.move(img_path, os.path.join(img_folder, wnid, os.path.basename(img_file)))
+        img_path = os.path.join(img_folder, "images", img_file)
+        shutil.move(
+            img_path, os.path.join(img_folder, wnid, os.path.basename(img_file))
+        )
     # delete images file
-    os.rmdir(os.path.join(img_folder, 'images'))
+    os.rmdir(os.path.join(img_folder, "images"))
