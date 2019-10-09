@@ -287,8 +287,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         The primary params are the same for a regular Conv2d layer.
         Otherwise, they're described below.
 
-        :param update_nsteps: period of training steps to wait before calculating the
-                              coactivations needed for Hebbian pruning.
         :param half_precision: whether to operate in half precision when calculating
                                calculating the coactivation - this only works when the
                                device is "cuda" and is mainly for memory saving during
@@ -306,7 +304,9 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             padding_mode,
         )
 
-        self._init_coactivations(self.weight, update_nsteps=update_nsteps)
+        # Initialize dynamic sparse attributes.
+        config = config or {}
+        self._init_coactivations(weight=self.weight, config=config)
 
         # -------------------------------------
         # 'calc_coactivation' related attr's
@@ -364,10 +364,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         self.grouped_conv.weight = torch.nn.Parameter(
             stacked_weights, requires_grad=False
         )
-
-        # Initialize dynamic sparse attributes.
-        config = config or {}
-        self._init_coactivations(weight=self.weight, config=config)
 
     def _init_coactivations(self, weight, config=None):
         super()._init_coactivations(weight, config=config)
