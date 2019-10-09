@@ -28,9 +28,12 @@ tabulate
 librosa
 scikit-image
 requests
-ray
+ray[dashboard,debug]
 tqdm
 torchvision
 python-dotenv
 elasticsearch
 seaborn>=0.9.0
+boto3
+awscli
+jupyter
