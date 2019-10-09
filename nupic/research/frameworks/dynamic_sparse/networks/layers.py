@@ -281,11 +281,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         dilation=1,
         groups=1,
         bias=True,
-        padding_mode="zeros",
-        update_nsteps=100,
-        half_precision=False,
-        coactivation_test="correlation_proxy",
-        threshold_multiplier=1,
+        config=None,
     ):
         """
         The primary params are the same for a regular Conv2d layer.
@@ -368,6 +364,25 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         self.grouped_conv.weight = torch.nn.Parameter(
             stacked_weights, requires_grad=False
         )
+
+        # Initialize dynamic sparse attributes.
+        config = config or {}
+        self._init_coactivations(weight=self.weight, config=config)
+
+    def _init_coactivations(self, weight, config=None):
+        super()._init_coactivations(weight, config=config)
+
+        # Init defaults and override only when params are specified in the config.
+        config = config or {}
+        defaults = dict(
+            padding_mode="zeros",
+            update_nsteps=100,
+            half_precision=False,
+            coactivation_test="correlation_proxy",
+            threshold_multiplier=1,
+        )
+        new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
+        self.__dict__.update(new_defaults)
 
     def _get_single_unit_weights(self, c, j, h):
         """

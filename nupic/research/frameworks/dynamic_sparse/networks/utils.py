@@ -310,32 +310,33 @@ def make_dsnn(net, config=None):
         num_convs, prune_methods
     )
 
-    # Populate kwargs for new layers.
-    possible_args = {
-        "dynamic-conv": [
-            "update_nsteps",
-            "half_precision",
-            "coactivation_test",
-            "threshold_multiplier",
-        ],
-        "dynamic-linear": [],
-        None: [],
-    }
-    kwargs_s = []
-    for c_i in range(num_convs):
-        layer_args = {}
-        prune_method = prune_methods[c_i]
-        for arg in possible_args[prune_method]:
-            if arg in config:
-                layer_args[arg] = tolist(config.get(arg))[c_i]
-        kwargs_s.append(layer_args)
+    # # Populate kwargs for new layers.
+    # possible_args = {
+    #     "dynamic-conv": [
+    #         "update_nsteps",
+    #         "half_precision",
+    #         "coactivation_test",
+    #         "threshold_multiplier",
+    #     ],
+    #     "dynamic-linear": [
+    #     ],
+    #     None: [],
+    # }
+    # kwargs_s = []
+    # for c_i in range(num_convs):
+    #     layer_args = {}
+    #     prune_method = prune_methods[c_i]
+    #     for arg in possible_args[prune_method]:
+    #         if arg in config:
+    #             layer_args[arg] = tolist(config.get(arg))[c_i]
+    #     kwargs_s.append(layer_args)
 
-    assert (
-        len((kwargs_s)) == len(named_layers) == len(prune_methods)
-    ), "Sizes do not match"
+    # assert (
+    #     len((kwargs_s)) == len(named_layers) == len(prune_methods)
+    # ), "Sizes do not match"
 
     # Replace conv layers.
-    for method, kwargs, (name, layer) in zip(prune_methods, kwargs_s, named_layers):
+    for method, (name, layer) in zip(prune_methods, named_layers):
 
         layer_type = get_layer_type(method)
         if layer_type is None:
@@ -355,7 +356,7 @@ def make_dsnn(net, config=None):
                     dilation=layer.dilation,
                     groups=layer.groups,
                     bias=(layer.bias is not None),
-                    **kwargs,
+                    config=config,
                 ),
             )
 
@@ -367,7 +368,7 @@ def make_dsnn(net, config=None):
                     in_features=layer.in_features,
                     out_features=layer.out_features,
                     bias=(layer.bias is not None),
-                    **kwargs,
+                    config=config,
                 ),
             )
 
