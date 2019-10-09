@@ -95,11 +95,10 @@ class DSNNHeb(SparseModel):
                     # Iterate for just a sparse module.
                     # Don't update the masks - keep sparsity as is.
                     s_idx += 1
-                    continue
 
                 # Case 2: Dynamic.
                 # Update masks - make the sparsity dynamic.
-                coacts = m.coactivations
+                coacts = m.coactivations if hasattr(m "coactivations")
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(),
                     self.num_params[s_idx],
