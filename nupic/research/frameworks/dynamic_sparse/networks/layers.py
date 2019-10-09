@@ -137,7 +137,7 @@ class DynamicSparseBase(torch.nn.Module):
         This method
             1. registers a buffer the shape of weight to track coactivations
             2. adds a forward hook to the module to update the coactivations
-               every 'update_nsteps'.
+               every 'update_interval'.
 
         :param weight: torch.tensor - corresponding weight of coactivations
         :param config: dict - configurable parameters for tracking coactivations
@@ -148,7 +148,7 @@ class DynamicSparseBase(torch.nn.Module):
         defaults = dict(
             moving_average_alpha=None,           # See `_update_coactivations`
             update_func=None,  # See `_update_coactivations`
-            update_nsteps=1,  # See `forward_hook`
+            update_interval=1,  # See `forward_hook`
         )
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
         self.__dict__.update(new_defaults)
@@ -197,7 +197,7 @@ class DynamicSparseBase(torch.nn.Module):
             #       work for all module.
             input_tensor = input_tensor[0]
         if module.training:
-            if module.learning_iterations % module.update_nsteps == 0:
+            if module.learning_iterations % module.update_interval == 0:
                 module._update_coactivations(input_tensor, output_tensor)
             module.learning_iterations += 1
 
@@ -368,7 +368,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         config = config or {}
         defaults = dict(
             padding_mode="zeros",
-            update_nsteps=100,
+            update_interval=100,
             half_precision=False,
             coactivation_test="correlation_proxy",
             threshold_multiplier=1,
