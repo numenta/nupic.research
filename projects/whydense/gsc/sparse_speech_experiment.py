@@ -28,7 +28,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
-from nupic.research.frameworks.pytorch.model_utils import set_random_seed
+from nupic.research.frameworks.pytorch.model_utils import (
+    count_nonzero_params,
+    set_random_seed,
+)
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
@@ -80,8 +83,6 @@ class SparseSpeechExperiment(object):
         self.load_datasets()
 
         if self.model_type == "le_sparse":
-            print("linear_n", config["linear_n"], config["seed"])
-            print()
             model = LeSparseNet(
                 input_shape=config.get("input_shape", (1, 32, 32)),
                 cnn_out_channels=config["cnn_out_channels"],
@@ -96,7 +97,10 @@ class SparseSpeechExperiment(object):
                 dropout=config.get("dropout", 0.0),
                 num_classes=self.num_classes,
                 k_inference_factor=config["k_inference_factor"],
-                activation_fct_before_max_pool=config["activation_fct_before_max_pool"],
+                activation_fct_before_max_pool=config.get(
+                    "activation_fct_before_max_pool", False),
+                consolidated_sparse_weights=config.get(
+                    "consolidated_sparse_weights", False),
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
 
@@ -129,6 +133,7 @@ class SparseSpeechExperiment(object):
 
         self.model = model
         self.logger.debug("Model: %s", self.model)
+        self.logger.debug("Model non-zero params: %s", count_nonzero_params(self.model))
         self.learning_rate = config["learning_rate"]
         self.optimizer = self.create_optimizer(config, self.model)
         self.lr_scheduler = self.create_learning_rate_scheduler(config, self.optimizer)
@@ -256,6 +261,7 @@ class SparseSpeechExperiment(object):
             "mean_loss": test_loss,
             "mean_accuracy": test_error,
             "entropy": float(entropy),
+            "total_samples": len(test_loader.sampler)
         }
 
         return ret
