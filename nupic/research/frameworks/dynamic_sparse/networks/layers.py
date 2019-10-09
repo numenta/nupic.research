@@ -223,9 +223,11 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
         config = config or {}
         defaults = dict(
             use_binary_coactivations=True,
+            lin_update_interval=1,
         )
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
         self.__dict__.update(new_defaults)
+        self.update_interval = self.lin_update_interval
 
     def calc_coactivations(self, x, y):
         outer = 0
@@ -368,13 +370,14 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         config = config or {}
         defaults = dict(
             padding_mode="zeros",
-            update_interval=100,
+            conv_update_interval=100,
             half_precision=False,
             coactivation_test="correlation_proxy",
             threshold_multiplier=1,
         )
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
         self.__dict__.update(new_defaults)
+        self.update_interval = self.conv_update_interval
 
     def _get_single_unit_weights(self, c, j, h):
         """
