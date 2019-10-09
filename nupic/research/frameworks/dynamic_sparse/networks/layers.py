@@ -132,8 +132,7 @@ def init_coactivation_tracking(m):
 
 
 class DynamicSparseBase(torch.nn.Module):
-    def _init_coactivations(
-            self, weight, update_nsteps=1, config=None):
+    def _init_coactivations(self, weight, config=None):
         """
         This method
             1. registers a buffer the shape of weight to track coactivations
@@ -141,9 +140,6 @@ class DynamicSparseBase(torch.nn.Module):
                every 'update_nsteps'.
 
         :param weight: torch.tensor - corresponding weight of coactivations
-        :param update_nsteps: int - number of training steps before updating
-                                    the coactivations, helps reduce number of
-                                    computations - could be called `update_interval`.
         :param config: dict - configurable parameters for tracking coactivations
         """
 
@@ -152,6 +148,7 @@ class DynamicSparseBase(torch.nn.Module):
         defaults = dict(
             moving_average_alpha=None,           # See `_update_coactivations`
             update_func=None,  # See `_update_coactivations`
+            update_nsteps=1,  # See `forward_hook`
         )
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
         self.__dict__.update(new_defaults)
@@ -162,7 +159,6 @@ class DynamicSparseBase(torch.nn.Module):
 
         # Init helper attrs to keep track of when to update coactivations.
         self.learning_iterations = 0
-        self.update_nsteps = update_nsteps
 
         # Register hook to update coactivations.
         assert hasattr(
