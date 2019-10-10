@@ -103,6 +103,7 @@ class BaseModel:
 
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")
+        # TODO: why do test batches per epoch need to be schedulable?
         self._make_attr_schedulable("test_batches_per_epoch")
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):

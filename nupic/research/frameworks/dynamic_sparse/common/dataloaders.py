@@ -34,7 +34,6 @@ CLASSES = (
     " eight, nine".split(", ")
 )
 
-
 class VaryingDataLoader(object):
     def __init__(self, dataset, batch_sizes=(1,), *args, **kwargs):
 
@@ -95,6 +94,8 @@ class PreprocessedSpeechDataset(Dataset):
         """
         self.classes = classes
 
+        # backward compatibility
+        if root[-3:] != 'gsc': root += '/gsc'
         self._root = root
         self._subset = subset
 
