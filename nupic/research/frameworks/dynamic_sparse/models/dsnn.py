@@ -285,13 +285,12 @@ class DSNNWeightedMag(DSNNHeb):
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
-            # multiply correlation by weight, and then apply regular weight pruning
-            weight *= corr
-
             # ----------- PRUNING ----------------
             weight_prune_perc = self.weight_prune_perc[idx]
 
             if weight_prune_perc is not None:
+                # multiply correlation by weight, and then apply regular weight pruning
+                weight *= corr
                 keep_mask = self._get_magnitude_mask(
                     weight, active_synapses, weight_prune_perc
                 )
