@@ -130,8 +130,10 @@ class CoactivationsTest(unittest.TestCase):
             padding=padding,
             dilation=1,
             groups=1,
-            coactivation_test="variance",
-            update_nsteps=1,
+            config=dict(
+                coactivation_test="variance",
+                conv_update_interval=1,
+            )
         )
         conv.init_coactivation_tracking()
 
