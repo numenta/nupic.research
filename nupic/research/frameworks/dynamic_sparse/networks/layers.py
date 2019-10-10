@@ -279,6 +279,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         dilation=1,
         groups=1,
         bias=True,
+        padding_mode="zeros",
         config=None,
     ):
         """
@@ -309,11 +310,6 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         # -------------------------------------
         # 'calc_coactivation' related attr's
         # -------------------------------------
-
-        # Init params for calculating coactivations.
-        self.half_precision = half_precision
-        self.coactivation_test = coactivation_test
-        self.threshold_multiplier = threshold_multiplier
 
         # Specify number of groups for the helper convolutional layer.
         # This is equal to the number of connections in the last three dimensions:
