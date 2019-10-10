@@ -56,6 +56,33 @@ class NumScheduler(object):
 # General Utils - network mutators
 # -------------------------------------------------
 
+def remove_layers(sequential, *types):
+    """
+    Removes all nn.Modules of any type in types.
+    Returns new sequential object - does not overwrite the one passed
+    to this function.
+
+    :param sequential: torch.nn.Sequential
+    :param types: types of layers
+    """
+
+    old_seq = dict(sequential.named_children())
+    names = list(old_seq.keys())
+    modules = list(old_seq.values())
+
+    # Make copy of sequence.
+    new_seq = OrderedDict()
+
+    # Edit copy in place.
+    for name, m in sequential.named_children():
+
+        if not isinstance(m, types):
+            new_seq[name] = m
+
+    # Return new sequential.
+    new_seq = torch.nn.Sequential(new_seq)
+    return new_seq
+
 
 def replace_sparse_weights(sequence):
 
