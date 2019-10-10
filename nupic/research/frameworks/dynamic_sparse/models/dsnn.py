@@ -26,7 +26,6 @@ import torch
 
 from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     DSConv2d,
-    DynamicSparseBase,
     calc_sparsity,
     init_coactivation_tracking,
 )
@@ -42,7 +41,12 @@ class DSNNHeb(SparseModel):
 
         # Set some attributes to be a list corresponding to self.dynamic_sparse_modules.
         for attr in ["hebbian_prune_perc", "weight_prune_perc"]:
-            self._make_attr_iterable(attr, counterpart=self.dynamic_sparse_modules)
+            self._make_attr_iterable(attr, counterpart=self.sparse_modules)
+        for h_perc, m in zip(self.hebbian_prune_perc, self.sparse_modules):
+            if h_perc is not None:
+                assert hasattr(m, "coactivations"), """
+                Expected {} module to have associated coactivations for Hebbian pruning.
+                """.format(m.__class__.__name__)
 
         self.added_synapses = [None for m in self.masks]
         self.last_gradients = [None for m in self.masks]
@@ -86,45 +90,33 @@ class DSNNHeb(SparseModel):
             # keep track of added synapes
             survival_ratios = []
 
-            s_idx = 0  # mask index (+1 per sparse module)
-            ds_idx = 0  # pruning index (+1 per dynamic-sparse module)
-            for m in self.sparse_modules:
+            for idx, m in enumerate(self.sparse_modules):
 
-                # Case 1: Not Dynamic
-                if not isinstance(m, DynamicSparseBase):
-                    # Iterate for just a sparse module.
-                    # Don't update the masks - keep sparsity as is.
-                    s_idx += 1
-
-                # Case 2: Dynamic.
                 # Update masks - make the sparsity dynamic.
                 coacts = m.coactivations if hasattr(m, "coactivations") else None
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(),
-                    self.num_params[s_idx],
+                    self.num_params[idx],
                     coacts,
-                    idx=ds_idx,
+                    idx=idx,
                 )
                 with torch.no_grad():
-                    self.masks[s_idx] = new_mask.float()
-                    m.weight.data *= self.masks[s_idx]
+
+                    self.masks[idx] = new_mask.float()
+                    m.weight.data *= self.masks[idx]
 
                     # count how many synapses from last round have survived
-                    if self.added_synapses[s_idx] is not None:
-                        total_added = torch.sum(self.added_synapses[s_idx]).item()
+                    if self.added_synapses[idx] is not None:
+                        total_added = torch.sum(self.added_synapses[idx]).item()
                         surviving = torch.sum(
-                            self.added_synapses[s_idx] & keep_mask
+                            self.added_synapses[idx] & keep_mask
                         ).item()
                         if total_added:
                             survival_ratio = surviving / total_added
                             survival_ratios.append(survival_ratio)
 
                     # keep track of new synapses to count surviving on next round
-                    self.added_synapses[s_idx] = new_synapses
-
-                # Iterate as dynamic-sparse and sparse module (it's technically both)
-                s_idx += 1
-                ds_idx += 1
+                    self.added_synapses[idx] = new_synapses
 
             # logging
             if self.debug_sparse:
