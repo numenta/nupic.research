@@ -231,7 +231,7 @@ def run_experiment(name, trainable, exp_config, tune_config):
     download_dataset(exp_config)
 
     # run
-    # tune_config["name"] = name
+    tune_config["name"] = name
     tune_config["config"] = exp_config
     tune.run(Trainable, **tune_config)
 
