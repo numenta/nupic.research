@@ -20,63 +20,39 @@
 # ----------------------------------------------------------------------
 
 
-import os
-
 from ray import tune
 
-from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
-
-# define a small convolutional network
-# in line with the
 
 # experiment configurations
 base_exp_config = dict(
     device="cuda",
-    # dataset related
-    dataset_name="PreprocessedGSC",
-    data_dir="~/nta/datasets/gsc",
-    batch_size_train=(4, 16),
-    batch_size_test=1000,
-    # network related
-    # test 2 networks - create a new one equivalent
-    # need to load into notebook and found out size
-    network=tune.grid_search(["GSCHeb", "GSCHebSmall"]),
-    optim_alg="SGD",
-    momentum=0,  # 0.9,
-    learning_rate=0.01,  # 0.1,
-    weight_decay=0.01,  # 1e-4,
-    lr_scheduler="MultiStepLR",
-    lr_milestones=[30, 60, 90],
-    lr_gamma=0.9,  # 0.1,
-    use_kwinners=True,
-    # sparse_linear_only=True, # False
-    # model related
+    dataset_name="TinyImageNet",
+    network="WideResNet",
     model="BaseModel",
-    # on_perc=0.04,
-    # sparse related
-    on_perc=1,
-    hebbian_prune_perc=None,
-    hebbian_grow=False,
-    # weight_prune_perc=tune.grid_search(list(np.arange(0, 1.001, 0.05))),
-    # pruning_early_stop=2,
-    # additional validation
-    test_noise=False,
-    # debugging
-    debug_weights=True,
-    # debug_sparse=False,
+    epochs=200,
+    # ---- network related
+    num_classes=200,
+    dropout_rate=0.3,
+    # ---- optimizer related
+    optim_alg="SGD",
+    learning_rate=0.1,
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[60, 120, 160],
+    lr_gamma=0.2,
+    weight_decay=0.0005,
+    momentum=0.9,
+    widen_factor=8,
+    depth=28
 )
 
 # ray configurations
 tune_config = dict(
-    name=__file__.replace(".py", "") + "_test2",
-    num_samples=10,
-    local_dir=os.path.expanduser("~/nta/results"),
+    num_samples=1,
+    name=__file__.replace(".py", ""),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 100},
-    resources_per_trial={"cpu": 1, "gpu": 0.25},
-    loggers=DEFAULT_LOGGERS,
+    resources_per_trial={"cpu": 1, "gpu": 1},
     verbose=0,
 )
 
