@@ -29,6 +29,7 @@ from .layers import DSConv2d, DSLinear
 from .utils import (
     get_dynamic_sparse_modules,
     make_dsnn,
+    remove_layers,
     replace_sparse_weights,
     squash_layers,
     swap_layers,
@@ -238,6 +239,7 @@ def gsc_sparse_dsnn(config):
     net = swap_layers(net, nn.MaxPool2d, KWinners2d)
     net = squash_layers(net, DSConv2d, nn.BatchNorm2d, KWinners2d)
     net = squash_layers(net, DSLinear, nn.BatchNorm1d, KWinners)
+    net = remove_layers(net, nn.LogSoftmax)
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
