@@ -500,12 +500,12 @@ def vgg19_bn_kw(config):
     return model
 
 
-def resnet18(config):
-    return models.resnet18(num_classes=config["num_classes"])
+# def resnet18(config):
+#     return models.resnet18(num_classes=config["num_classes"])
 
 
-def resnet50(config):
-    return models.resnet50(num_classes=config["num_classes"])
+# def resnet50(config):
+#     return models.resnet50(num_classes=config["num_classes"])
 
 
 def vgg19_dsnn(config):

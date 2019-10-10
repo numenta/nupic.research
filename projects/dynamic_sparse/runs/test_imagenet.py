@@ -27,13 +27,20 @@ from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 # experiment configurations
 base_exp_config = dict(
     device="cuda",
-    dataset_name="TinyImageNet",
-    network="WideResNet",
+    dataset_name="CIFAR10",
     model="BaseModel",
+    data_dir="~/nta/datasets",
     epochs=200,
     # ---- network related
-    num_classes=200,
-    dropout_rate=0.3,
+    network="resnet152",
+    percent_on_k_winner=0.25,
+    boost_strength=1.4,
+    boost_strength_factor=0.7,
+    k_inference_factor=1.0,            
+    # wideresnet parameters
+    # widen_factor=8,
+    # depth=28,
+    # dropout_rate=0.3,
     # ---- optimizer related
     optim_alg="SGD",
     learning_rate=0.1,
@@ -42,8 +49,6 @@ base_exp_config = dict(
     lr_gamma=0.2,
     weight_decay=0.0005,
     momentum=0.9,
-    widen_factor=8,
-    depth=28
 )
 
 # ray configurations
