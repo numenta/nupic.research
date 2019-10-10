@@ -98,7 +98,7 @@ class DSNNHeb(SparseModel):
 
                 # Case 2: Dynamic.
                 # Update masks - make the sparsity dynamic.
-                coacts = m.coactivations if hasattr(m "coactivations")
+                coacts = m.coactivations if hasattr(m, "coactivations") else None
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(),
                     self.num_params[s_idx],
