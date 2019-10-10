@@ -19,11 +19,15 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+# adapted from https://github.com/timgaripov/swa/blob/master/models/wide_resnet.py
+# based on https://github.com/meliketoy/wide-resnet.pytorch/
+
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
-
+# import torch
+# from torchsummary import summary
 
 def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(
@@ -76,7 +80,7 @@ class WideResNet(nn.Module):
         - Depth and widen_factor are specific to wide resnet architecture
     """
 
-    def __init__(self, config):
+    def __init__(self, config=None):
         super(WideResNet, self).__init__()
 
         # update config
@@ -104,6 +108,7 @@ class WideResNet(nn.Module):
             WideBasic, n_stages[3], n, self.dropout_rate, stride=2
         )  # 4x2
         self.bn1 = nn.BatchNorm2d(n_stages[3], momentum=0.9)
+        self.avg_pool = nn.AdaptiveAvgPool2d((1,1)) # added
         self.linear = nn.Linear(n_stages[3], self.num_classes)  # 1
 
         # where are the other 2?
@@ -127,12 +132,16 @@ class WideResNet(nn.Module):
         out = self.layer2(out)
         out = self.layer3(out)
         out = F.relu(self.bn1(out))
-        out = F.avg_pool2d(out, 8)
+        out = self.avg_pool(out)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
 
         return out
 
-
-# net=WideResNet(28, 10, 0.3, 10)
-# y = net(Variable(torch.randn(1,3,32,32)))
+# net=WideResNet(config=dict(
+#     depth=28,
+#     widen_factor=10,
+#     num_classes=10,
+#     dropout_rate=0.3)
+# )
+# summary(net, input_size=(3,32,32))
