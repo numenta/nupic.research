@@ -28,7 +28,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import PIL.Image
 import seaborn as sns
-from pandas import DataFrame
 from ray.tune.logger import CSVLogger, JsonLogger, Logger
 from ray.tune.result import TIME_TOTAL_S, TIMESTEPS_TOTAL, TRAINING_ITERATION
 
@@ -54,7 +53,7 @@ def to_tf_values(result, path, histo_bins=1000):
         if value is not None:
             if attr.startswith("scatter_"):
 
-                # Validate value, should have structure like:
+                # Value should be a dict which may be unpacked to sns.scatterplot e.g.
                 #
                 #   value = {
                 #      data: Dataframe
@@ -63,23 +62,13 @@ def to_tf_values(result, path, histo_bins=1000):
                 #      hue: None or array like, same size as x and y
                 #   }
                 #
-                valid = False
-                if isinstance(value, dict):
-                    data = value.get("data")
-                    x = value.get("x")
-                    y = value.get("y")
-                    hue = value.get("hue")
-                    if isinstance(data, DataFrame) and x in data and y in data:
-                        valid = True
-
-                # Continue if not value.
-                if not valid:
+                if not isinstance(value, dict):
                     continue
 
                 # Plot scatter plot.
-                seaborn_config = value.get("seaborn_config", {})
+                seaborn_config = value.pop("seaborn_config", {})
                 sns.set(**seaborn_config)
-                ax = sns.scatterplot(x=x, y=y, hue=hue, data=data)
+                ax = sns.scatterplot(**value)
 
                 # Save to BytesIO stream.
                 stream = BytesIO()
