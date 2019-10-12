@@ -28,11 +28,6 @@ import time
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
-
-from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from nupic.torch.modules import (
     Flatten,
     KWinners,
@@ -42,6 +37,12 @@ from nupic.torch.modules import (
     rezero_weights,
     update_boost_strength,
 )
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+
+from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
+from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
+from nupic.research.frameworks.pytorch.models import VGGSparseNet
 
 
 def cnn_size(width, kernel_size, padding=1, stride=1):
@@ -53,7 +54,6 @@ def create_test_loaders(noise_values, batch_size, data_dir):
     print("Creating test loaders for noise values:", noise_values)
     loaders = []
     for noise in noise_values:
-
         transform_noise_test = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -300,127 +300,26 @@ class TinyCIFAR(object):
                 torch.load(checkpoint_file, map_location=self.device)
             )
 
-    def _add_cnn_layer(
-        self,
-        index_str,
-        in_channels,
-        out_channels,
-        kernel_size,
-        percent_on,
-        weight_sparsity,
-        add_pooling,
-    ):
-        """Add a single CNN layer to our modules."""
-        # Add CNN layer
-        if kernel_size == 3:
-            padding = 1
-        else:
-            padding = 2
-
-        conv2d = nn.Conv2d(
-            in_channels, out_channels, kernel_size=kernel_size, padding=padding
-        )
-        if weight_sparsity < 1.0:
-            conv2d = SparseWeights2d(conv2d, weight_sparsity=weight_sparsity)
-        self.model.add_module("cnn_" + index_str, conv2d)
-
-        self.model.add_module("bn_" + index_str, nn.BatchNorm2d(out_channels)),
-
-        if add_pooling:
-            if self.use_max_pooling:
-                self.model.add_module(
-                    "maxpool_" + index_str, nn.MaxPool2d(kernel_size=2, stride=2)
-                )
-            else:
-                self.model.add_module(
-                    "avgpool_" + index_str, nn.AvgPool2d(kernel_size=2, stride=2)
-                )
-
-        if percent_on < 1.0:
-            self.model.add_module(
-                "kwinners_2d_" + index_str,
-                KWinners2d(
-                    percent_on=percent_on,
-                    channels=out_channels,
-                    k_inference_factor=self.k_inference_factor,
-                    boost_strength=self.boost_strength,
-                    boost_strength_factor=self.boost_strength_factor,
-                ),
-            )
-        else:
-            self.model.add_module("ReLU_" + index_str, nn.ReLU(inplace=True))
 
     def _create_vgg_model(self):
-        """
-        block_sizes = [1,1,1] - number of CNN layers in each block
-        cnn_out_channels = [c1, c2, c3] - # out_channels in each layer of this block
-        cnn_kernel_size = [k1, k2, k3] - kernel_size in each layer of this block
-        cnn_weight_sparsity = [w1, w2, w3] - weight sparsity of each layer of this block
-        cnn_percent_on = [p1, p2, p3] - percent_on in each layer of this block
-        """
-        # Here we require exactly 3 blocks
-        # assert(len(self.block_sizes) == 3)
-
-        # Create simple CNN model, with options for sparsity
-        self.model = nn.Sequential()
-
-        in_channels = 3
-        output_size = 32 * 32
-        output_units = output_size * in_channels
-        for l, block_size in enumerate(self.block_sizes):
-            for b in range(block_size):
-                self._add_cnn_layer(
-                    index_str=str(l) + "_" + str(b),
-                    in_channels=in_channels,
-                    out_channels=self.cnn_out_channels[l],
-                    kernel_size=self.cnn_kernel_sizes[l],
-                    percent_on=self.cnn_percent_on[l],
-                    weight_sparsity=self.cnn_weight_sparsity[l],
-                    add_pooling=b == block_size - 1,
-                )
-                in_channels = self.cnn_out_channels[l]
-            output_size = int(output_size / 4)
-            output_units = output_size * in_channels
-
-        # Flatten CNN output before passing to linear layer
-        self.model.add_module("flatten", Flatten())
-
-        # Linear layer
-        input_size = output_units
-        for l, linear_n in enumerate(self.linear_n):
-            linear = nn.Linear(input_size, linear_n)
-            if self.linear_weight_sparsity[l] < 1.0:
-                self.model.add_module(
-                    "linear_" + str(l),
-                    SparseWeights(linear, self.linear_weight_sparsity[l]),
-                )
-            else:
-                self.model.add_module("linear_" + str(l), linear)
-
-            if self.linear_percent_on[l] < 1.0:
-                self.model.add_module(
-                    "kwinners_linear_" + str(l),
-                    KWinners(
-                        n=linear_n,
-                        percent_on=self.linear_percent_on[l],
-                        k_inference_factor=self.k_inference_factor,
-                        boost_strength=self.boost_strength,
-                        boost_strength_factor=self.boost_strength_factor,
-                    ),
-                )
-            else:
-                self.model.add_module("Linear_ReLU_" + str(l), nn.ReLU())
-
-            input_size = self.linear_n[l]
-
-        # Output layer
-        self.model.add_module("output", nn.Linear(input_size, self.output_size))
-
+        self.model = VGGSparseNet(
+            input_shape=(3, 32, 32),
+            block_sizes=self.block_sizes,
+            cnn_out_channels=self.cnn_out_channels,
+            cnn_kernel_sizes=self.cnn_kernel_sizes,
+            cnn_weight_sparsity=self.cnn_weight_sparsity,
+            cnn_percent_on=self.cnn_percent_on,
+            linear_units=self.linear_n,
+            linear_weight_sparsity=self.linear_weight_sparsity,
+            linear_percent_on=self.linear_percent_on,
+            k_inference_factor=self.k_inference_factor,
+            boost_strength=self.boost_strength,
+            boost_strength_factor=self.boost_strength_factor,
+            use_max_pooling=self.use_max_pooling,
+            num_classes=self.output_size
+        )
         print(self.model)
-
         self.model.to(self.device)
-
-        self._initialize_weights()
 
     def _create_optimizer(self, model):
         """Create a new instance of the optimizer."""
@@ -493,18 +392,3 @@ class TinyCIFAR(object):
         self._adjust_learning_rate(self.optimizer, epoch)
         self.model.apply(rezero_weights)
         self.model.apply(update_boost_strength)
-
-    def _initialize_weights(self):
-        for m in self.model.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2.0 / n))
-                if m.bias is not None:
-                    m.bias.data.zero_()
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-            elif isinstance(m, nn.Linear):
-                n = m.weight.size(1)
-                m.weight.data.normal_(0, 0.01)
-                m.bias.data.zero_()
