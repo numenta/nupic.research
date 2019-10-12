@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import sys
 
-from nupic.torch.modules import Flatten, KWinners, KWinners2d
+from nupic.torch.modules import Flatten, KWinners2d
 
 def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True)
@@ -150,7 +150,8 @@ class ResNet(nn.Module):
             self._make_layer(block, 16, num_blocks[0], stride=1),
             self._make_layer(block, 32, num_blocks[1], stride=2),
             self._make_layer(block, 64, num_blocks[2], stride=2),
-            nn.AdaptiveAvgPool2d((1,1))        
+            nn.AdaptiveAvgPool2d((1,1)),
+            Flatten()        
         )
         self.classifier = nn.Linear(64*block.expansion, self.num_classes)
 
@@ -175,9 +176,9 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         out = self.features(x)
-        out = out.view(out.size(0), -1)
         out = self.classifier(out)
         return out
+
 
 
 # convenience classes
