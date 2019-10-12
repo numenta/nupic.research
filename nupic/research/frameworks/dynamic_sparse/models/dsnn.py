@@ -32,7 +32,6 @@ from nupic.research.frameworks.dynamic_sparse.networks.layers import (
 
 from .main import BaseModel, SparseModel
 
-
 class DSNNHeb(SparseModel):
     """Parent class for DSNNHeb models. Not to be instantiated"""
 
@@ -42,11 +41,11 @@ class DSNNHeb(SparseModel):
         # Set some attributes to be a list corresponding to self.dynamic_sparse_modules.
         for attr in ["hebbian_prune_perc", "weight_prune_perc"]:
             self._make_attr_iterable(attr, counterpart=self.sparse_modules)
-        for h_perc, m in zip(self.hebbian_prune_perc, self.sparse_modules):
-            if h_perc is not None:
-                assert hasattr(m, "coactivations"), """
-                Expected {} module to have associated coactivations for Hebbian pruning.
-                """.format(m.__class__.__name__)
+
+        for idx, (hprune, wprune) in enumerate(zip(self.hebbian_prune_perc, self.weight_prune_perc)):
+            module = self.sparse_modules[idx]
+            module.hebbian_prune = hprune
+            module.weight_prune = wprune
 
         self.added_synapses = [None for m in self.masks]
         self.last_gradients = [None for m in self.masks]
@@ -90,20 +89,11 @@ class DSNNHeb(SparseModel):
             # keep track of added synapes
             survival_ratios = []
 
-            for idx, m in enumerate(self.sparse_modules):
-
-                # Update masks - make the sparsity dynamic.
-                coacts = m.coactivations if hasattr(m, "coactivations") else None
-                new_mask, keep_mask, new_synapses = self.prune(
-                    m.weight.clone().detach(),
-                    self.num_params[idx],
-                    coacts,
-                    idx=idx,
-                )
+            for idx, module in enumerate(self.sparse_modules):
+                new_mask, keep_mask, new_synapses = self.prune(module)
                 with torch.no_grad():
-
-                    self.masks[idx] = new_mask.float()
-                    m.weight.data *= self.masks[idx]
+                    module.mask = new_mask.float()
+                    module.apply_mask()
 
                     # count how many synapses from last round have survived
                     if self.added_synapses[idx] is not None:
@@ -269,27 +259,27 @@ class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
     def _init_coactivation_tracking(self):
-        modules_and_percs = zip(self.sparse_modules, self.weight_prune_perc)
-        for m, weight_prune_frac in modules_and_percs:
-            assert isinstance(m, torch.nn.Module), """
-            Expected a module but got `{}`.
-            """.format(m)
-            if weight_prune_frac is not None:
-                m.apply(init_coactivation_tracking)
+        for module in self.sparse_modules:
+            if module.weight_prune is not None:
+                module.m.apply(init_coactivation_tracking)
 
-    def prune(self, weight, num_params, corr, idx=0):
+    def prune(self, module):
         """
         Grow by correlation
         Prune by magnitude
         """
         with torch.no_grad():
+            # unpack module
+            weight = module.m.weight.clone().detach()
+            num_params = module.num_params
+            corr = module.m.coactivations
+            weight_prune_perc = module.weight_prune
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
             # ----------- PRUNING ----------------
-            weight_prune_perc = self.weight_prune_perc[idx]
 
             if weight_prune_perc is not None:
                 # multiply correlation by weight, and then apply regular weight pruning
@@ -330,30 +320,25 @@ class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
     def _init_coactivation_tracking(self):
-        modules_and_percs = zip(
-            self.sparse_modules,
-            self.hebbian_prune_perc,
-            self.weight_prune_perc
-        )
-        for m, heb_prune_frac, weight_prune_frac in modules_and_percs:
-            assert isinstance(m, torch.nn.Module), """
-            Expected a module but got `{}`.
-            """.format(m)
-            if (heb_prune_frac is not None) or (weight_prune_frac is not None):
-                m.apply(init_coactivation_tracking)
+        for module in self.sparse_modules:
+            if module.hebbian_prune is not None:
+                module.m.apply(init_coactivation_tracking)
 
-    def prune(self, weight, num_params, corr, idx=0):
+    def prune(self, module):
         """Allows pruning by magnitude and hebbian"""
         with torch.no_grad():
+            # unpack module
+            weight = module.m.weight.clone().detach()
+            num_params = module.num_params
+            corr = module.m.coactivations
+            hebbian_prune_perc = module.hebbian_prune
+            weight_prune_perc = module.weight_prune
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
             # ----------- PRUNE ----------------
-            hebbian_prune_perc = self.hebbian_prune_perc[idx]
-            weight_prune_perc = self.weight_prune_perc[idx]
-
             if hebbian_prune_perc is not None:
                 hebbian_mask = self._get_hebbian_mask(
                     weight, corr, active_synapses, hebbian_prune_perc
@@ -413,18 +398,21 @@ class DSNNMixedHeb(DSNNHeb):
         # track added connections
         return new_mask, keep_mask, add_mask
 
-    def prune_inverse(self, weight, num_params, corr, idx=0):
+    def prune_inverse(self, module):
         """Allows pruning by magnitude and hebbian"""
         with torch.no_grad():
+            # unpack module
+            weight = module.m.weight.clone().detach()
+            num_params = module.num_params
+            corr = module.m.coactivations
+            hebbian_prune_perc = module.hebbian_prune
+            weight_prune_perc = module.weight_prune            
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
             # ----------- PRUNE ----------------
-
-            hebbian_prune_perc = self.hebbian_prune_perc[idx]
-            weight_prune_perc = self.weight_prune_perc[idx]
 
             if hebbian_prune_perc is not None:
                 hebbian_mask = self._get_inverse_hebbian_mask(
@@ -483,119 +471,3 @@ class DSNNMixedHeb(DSNNHeb):
 
         # track added connections
         return new_mask, keep_mask, add_mask
-
-
-class DSNNConvHeb(DSNNMixedHeb):
-    """
-    Similar to other sparse models, but the focus here is on convolutional layers as
-    opposed to dense layers.
-    """
-
-    log_attrs = [
-        "pruning_iterations",
-        "kept_frac",
-        "prune_mask_sparsity",
-        "keep_mask_sparsity",
-        "weight_sparsity",
-        "last_coactivations",
-    ]
-
-    def is_sparse(self, module):
-        if isinstance(module, DSConv2d):
-            return "sparse_conv"
-
-    def setup(self):
-        super().setup()
-        # find sparse layers
-        self.sparse_conv_modules = []
-        for m in list(self.network.modules()):
-            if self.is_sparse(m):
-                self.sparse_conv_modules.append(m)
-        # print(self.sparse_conv_modules)
-
-    def _post_epoch_updates(self, dataset=None):
-        """
-        Only change in the model is here.
-        In order to work, need to use networks which have DSConv2d layer
-        which network is being used?
-        """
-        print("calling post epoch")
-        super()._post_epoch_updates(dataset)
-
-        # go through named modules
-        for idx, module in enumerate(self.sparse_conv_modules):
-            # if it is a dsconv layer
-            # print("layer type: ", module.__class__)
-            # print(isinstance(module, DSConv2d))
-            # print("progressing connections")
-            # Log coactivation before pruning - otherwise they get reset.
-            self.log["hist_" + "coactivations_" + str(idx)] = module.coactivations
-            # Prune. Then log some params.
-            module.progress_connections()
-            print("progressing")
-            for attr in self.log_attrs:
-                value = getattr(module, attr) if hasattr(module, attr) else -2
-                if isinstance(value, Iterable):
-                    attr = "hist_" + attr
-                self.log[attr + "_" + str(idx)] = value
-
-            if isinstance(module, DSConv2d):
-                self.log["sparsity_" + str(idx)] = calc_sparsity(module.weight)
-
-
-class DSNNConvOnlyHeb(BaseModel):
-    """
-    Similar to other sparse models, but the focus here is on convolutional layers as
-    opposed to dense layers.
-    """
-
-    log_attrs = [
-        "pruning_iterations",
-        "kept_frac",
-        "prune_mask_sparsity",
-        "keep_mask_sparsity",
-        "weight_sparsity",
-        "last_coactivations",
-    ]
-
-    def is_sparse(self, module):
-        if isinstance(module, DSConv2d):
-            return "sparse_conv"
-
-    def setup(self):
-        super().setup()
-        # find sparse layers
-        self.sparse_conv_modules = []
-        for m in list(self.network.modules()):
-            if self.is_sparse(m):
-                self.sparse_conv_modules.append(m)
-        # print(self.sparse_conv_modules)
-
-    def _post_epoch_updates(self, dataset=None):
-        """
-        Only change in the model is here.
-        In order to work, need to use networks which have DSConv2d layer
-        which network is being used?
-        """
-        print("calling post epoch")
-        super()._post_epoch_updates(dataset)
-
-        # go through named modules
-        for idx, module in enumerate(self.sparse_conv_modules):
-            # if it is a dsconv layer
-            # print("layer type: ", module.__class__)
-            # print(isinstance(module, DSConv2d))
-            # print("progressing connections")
-            # Log coactivation before pruning - otherwise they get reset.
-            self.log["hist_" + "coactivations_" + str(idx)] = module.coactivations
-            # Prune. Then log some params.
-            module.progress_connections()
-            print("progressing")
-            for attr in self.log_attrs:
-                value = getattr(module, attr) if hasattr(module, attr) else -2
-                if isinstance(value, Iterable):
-                    attr = "hist_" + attr
-                self.log[attr + "_" + str(idx)] = value
-
-            if isinstance(module, DSConv2d):
-                self.log["sparsity_" + str(idx)] = calc_sparsity(module.weight)
