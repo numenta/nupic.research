@@ -41,7 +41,7 @@ class DSLinearBlock(nn.Sequential):
         batch_norm_affine=True,
         dropout=None,
         activation_func=None,
-        config=None
+        config=None,
     ):
 
         # Clarifications on batch norm position at the linear block:
@@ -175,7 +175,8 @@ class MLPHeb(HebbianNetwork):
         # Add last layer.
         layers.append(
             DSLinearBlock(
-                self.hidden_sizes[-1], self.num_classes, bias=self.bias, config=config)
+                self.hidden_sizes[-1], self.num_classes, bias=self.bias, config=config
+            )
         )
 
         # Create the classifier.

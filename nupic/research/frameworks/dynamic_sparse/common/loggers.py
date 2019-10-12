@@ -75,15 +75,12 @@ def to_tf_values(result, path, histo_bins=1000):
                 canvas = ax.figure.canvas
                 canvas.draw()
                 (w, h) = canvas.get_width_height()
-                pilimage = PIL.Image.frombytes(
-                    "RGB", (w, h), canvas.tostring_rgb())
+                pilimage = PIL.Image.frombytes("RGB", (w, h), canvas.tostring_rgb())
                 pilimage.save(stream, "PNG")
 
                 # Create an Image object
                 img_sum = tf.Summary.Image(
-                    encoded_image_string=stream.getvalue(),
-                    height=h,
-                    width=w,
+                    encoded_image_string=stream.getvalue(), height=h, width=w
                 )
 
                 # Create a Summary value
