@@ -120,7 +120,6 @@ experiments = {
         reset_coactivations=ray.tune.grid_search([True]),
         use_binary_coactivations=False,
     ),
-
     # "mlp-hebbian-1": dict(
     #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
     #     # sparse related

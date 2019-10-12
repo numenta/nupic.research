@@ -132,8 +132,7 @@ def init_coactivation_tracking(m):
 
 
 class DynamicSparseBase(torch.nn.Module):
-    def _init_coactivations(
-            self, weight, update_nsteps=1, config=None):
+    def _init_coactivations(self, weight, update_nsteps=1, config=None):
         """
         This method
             1. registers a buffer the shape of weight to track coactivations
@@ -150,7 +149,7 @@ class DynamicSparseBase(torch.nn.Module):
         # Init defaults and override only when params are specified in the config.
         config = config or {}
         defaults = dict(
-            moving_average_alpha=None,           # See `_update_coactivations`
+            moving_average_alpha=None,  # See `_update_coactivations`
             update_func=None,  # See `_update_coactivations`
         )
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
@@ -225,9 +224,7 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
 
         # Init defaults and override only when params are specified in the config.
         config = config or {}
-        defaults = dict(
-            use_binary_coactivations=True,
-        )
+        defaults = dict(use_binary_coactivations=True)
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
         self.__dict__.update(new_defaults)
 
@@ -251,6 +248,7 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
 
         # Return coactivations.
         return outer
+
 
 # ------------------
 # Conv Layers

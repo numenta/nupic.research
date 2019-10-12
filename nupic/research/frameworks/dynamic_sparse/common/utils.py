@@ -20,27 +20,19 @@
 # ----------------------------------------------------------------------
 
 import os
-from collections.abc import Iterable
 from copy import deepcopy
 
-import numpy as np
 import ray
 import torch  # to remove later
 from ray import tune
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from torchvision import datasets
 
 import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
-from nupic.research.frameworks.dynamic_sparse.common.dataloaders import (
-    PreprocessedSpeechDataLoader,
-    VaryingDataLoader,
-)
-from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
-from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
 from .datasets import Dataset
+
 
 class Trainable(tune.Trainable):
     """ray.tune trainable generic class Adaptable to any pytorch module."""
@@ -65,6 +57,7 @@ class Trainable(tune.Trainable):
     def _restore(self, checkpoint):
         self.model.restore(checkpoint)
 
+
 def download_dataset(config):
     """Pre-downloads dataset.
     Required to avoid multiple simultaneous attempts to download same
@@ -76,10 +69,12 @@ def download_dataset(config):
             download=True, root=os.path.expanduser(config["data_dir"])
         )
 
+
 def new_experiment(base_config, new_config):
     modified_config = deepcopy(base_config)
     modified_config.update(new_config)
     return modified_config
+
 
 @ray.remote
 def run_experiment(name, trainable, exp_config, tune_config):
@@ -96,6 +91,7 @@ def run_experiment(name, trainable, exp_config, tune_config):
     # tune_config["name"] = name
     tune_config["config"] = exp_config
     tune.run(Trainable, **tune_config)
+
 
 def init_ray():
 
@@ -125,6 +121,7 @@ def init_ray():
             t, serializer=serializer, deserializer=deserializer
         )
 
+
 def run_ray(tune_config, exp_config, fix_seed=False):
 
     # update config
@@ -137,15 +134,15 @@ def run_ray(tune_config, exp_config, fix_seed=False):
         tune_config["resources_per_trial"] = {"cpu": 1}
 
     # move epochs to tune_config, to keep track
-    if 'stop' not in tune_config:
-        if 'epochs' in exp_config:
-            tune_config['stop'] = {"training_iteration": exp_config['epochs']}
+    if "stop" not in tune_config:
+        if "epochs" in exp_config:
+            tune_config["stop"] = {"training_iteration": exp_config["epochs"]}
 
     # expand path in dir
-    if 'local_dir' in tune_config:
-        tune_config['local_dir']=os.path.expanduser(tune_config['local_dir'])
+    if "local_dir" in tune_config:
+        tune_config["local_dir"] = os.path.expanduser(tune_config["local_dir"])
     else:
-        tune_config['local_dir']=os.path.expanduser("~/nta/results")
+        tune_config["local_dir"] = os.path.expanduser("~/nta/results")
 
     # init ray
     ray.init(load_code_from_local=True)
@@ -180,6 +177,7 @@ def run_ray(tune_config, exp_config, fix_seed=False):
         set_random_seed(32)
 
     tune.run(Trainable, **tune_config)
+
 
 def run_ray_many(tune_config, exp_config, experiments, fix_seed=False):
 

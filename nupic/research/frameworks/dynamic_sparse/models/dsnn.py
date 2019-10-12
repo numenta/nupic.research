@@ -338,9 +338,7 @@ class DSNNMixedHeb(DSNNHeb):
 
     def _init_coactivation_tracking(self):
         modules_and_percs = zip(
-            self.dynamic_sparse_modules,
-            self.hebbian_prune_perc,
-            self.weight_prune_perc
+            self.dynamic_sparse_modules, self.hebbian_prune_perc, self.weight_prune_perc
         )
         for m, heb_prune_frac, weight_prune_frac in modules_and_percs:
             if (heb_prune_frac is not None) or (weight_prune_frac is not None):

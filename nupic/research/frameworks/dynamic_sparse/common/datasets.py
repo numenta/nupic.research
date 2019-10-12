@@ -21,54 +21,32 @@
 
 import os
 from collections.abc import Iterable
-from copy import deepcopy
 
 import numpy as np
-import ray
-import torch  # to remove later
-from ray import tune
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-import nupic.research.frameworks.dynamic_sparse.models as models
-import nupic.research.frameworks.dynamic_sparse.networks as networks
 from nupic.research.frameworks.dynamic_sparse.common.dataloaders import (
     PreprocessedSpeechDataLoader,
     VaryingDataLoader,
 )
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
-custom_datasets = {
-    'TinyImageNet': TinyImageNet
-}
+custom_datasets = {"TinyImageNet": TinyImageNet}
 
-datasets_numclasses = {
-    'TinyImageNet': 200,
-    'CIFAR10': 10,
-    'CIFAR100': 100,
-    'MNIST': 10,
-}
+datasets_numclasses = {"TinyImageNet": 200, "CIFAR10": 10, "CIFAR100": 100, "MNIST": 10}
 
 datasets_stats = {
-    'TinyImageNet': (
-        (0.485, 0.456, 0.406),
-        (0.229, 0.224, 0.225)
-    ),
-    'CIFAR10': (
-        (0.4914, 0.4822, 0.4465),
-        (0.2023, 0.1994, 0.2010),
-    ),
-    'CIFAR100': (
+    "TinyImageNet": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    "CIFAR10": ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    "CIFAR100": (
         (0.50707516, 0.48654887, 0.44091784),
         (0.26733429, 0.25643846, 0.27615047),
     ),
-    'MNIST': (
-        (0.13062755,), 
-        (0.30810780,)
-    )
+    "MNIST": ((0.13062755,), (0.30810780,)),
 }
+
 
 class Dataset:
     """Loads a dataset.
@@ -129,12 +107,12 @@ class Dataset:
             root=self.data_dir, train=True, transform=transforms.ToTensor()
         )
         if isinstance(tempset.data, np.ndarray):
-            self.stats_mean = (tempset.data.mean() / 255,)
-            self.stats_std = (tempset.data.std() / 255,)
+            stats_mean = (tempset.data.mean() / 255,)
+            stats_std = (tempset.data.std() / 255,)
         else:
-            self.stats_mean = (tempset.data.float().mean().item() / 255,)
-            self.stats_std = (tempset.data.float().std().item() / 255,)
-        del tempset # explicit garbage collect to avoid memory leakage
+            stats_mean = (tempset.data.float().mean().item() / 255,)
+            stats_std = (tempset.data.float().std().item() / 255,)
+        del tempset  # explicit gc to avoid memory leakage
 
         return stats_mean, stats_std
 
@@ -186,17 +164,13 @@ class Dataset:
             )
 
         # load train set
-        train_set = dataset(
-            root=self.data_dir, train=True, transform=aug_transform
-        )
+        train_set = dataset(root=self.data_dir, train=True, transform=aug_transform)
         self.train_loader = dataloader_type(
             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
         )
 
         # load test set
-        test_set = dataset(
-            root=self.data_dir, train=False, transform=transform
-        )
+        test_set = dataset(root=self.data_dir, train=False, transform=transform)
         self.test_loader = dataloader_type(
             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
         )
