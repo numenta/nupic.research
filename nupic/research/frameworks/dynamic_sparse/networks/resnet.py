@@ -30,27 +30,8 @@ import sys
 
 from nupic.torch.modules import Flatten, KWinners2d
 
-def conv3x3(in_planes, out_planes, stride=1):
+def resnet_conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True)
-
-def conv_init(m):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
-        init.xavier_uniform(m.weight, gain=np.sqrt(2))
-        init.constant(m.bias, 0)
-
-def cfg(depth):
-    depth_lst = [18, 34, 50, 101, 152]
-    assert (depth in depth_lst), "Error : Resnet depth should be either 18, 34, 50, 101, 152"
-    cf_dict = {
-        '18': (BasicBlock, [2,2,2,2]),
-        '34': (BasicBlock, [3,4,6,3]),
-        '50': (Bottleneck, [3,4,6,3]),
-        '101':(Bottleneck, [3,4,23,3]),
-        '152':(Bottleneck, [3,8,36,3]),
-    }
-
-    return cf_dict[str(depth)]
 
 class BasicBlock(nn.Module):
 
@@ -58,10 +39,10 @@ class BasicBlock(nn.Module):
         super(BasicBlock, self).__init__()
 
         self.regular_path = nn.Sequential(
-            conv3x3(in_planes, planes, stride),
+            resnet_conv3x3(in_planes, planes, stride),
             nn.BatchNorm2d(planes),
             activation_func(planes),
-            conv3x3(planes, planes),
+            resnet_conv3x3(planes, planes),
             nn.BatchNorm2d(planes)
         )
 
@@ -141,10 +122,10 @@ class ResNet(nn.Module):
 
         self.in_planes = 16
 
-        block, num_blocks = cfg(self.depth)
+        block, num_blocks = self._config_layers()
 
         self.features = nn.Sequential(
-            conv3x3(3,16),
+            resnet_conv3x3(3,16),
             nn.BatchNorm2d(16),
             self.activation_func(16),
             self._make_layer(block, 16, num_blocks[0], stride=1),
@@ -154,6 +135,20 @@ class ResNet(nn.Module):
             Flatten()        
         )
         self.classifier = nn.Linear(64*block.expansion, self.num_classes)
+
+    def _config_layers(self):
+        depth_lst = [18, 34, 50, 101, 152]
+        assert (self.depth in depth_lst), "Error : Resnet depth should be either 18, 34, 50, 101, 152"
+        cf_dict = {
+            '18': (BasicBlock, [2,2,2,2]),
+            '34': (BasicBlock, [3,4,6,3]),
+            '50': (Bottleneck, [3,4,6,3]),
+            '101':(Bottleneck, [3,4,23,3]),
+            '152':(Bottleneck, [3,8,36,3]),
+        }
+
+        return cf_dict[str(self.depth)]
+
 
     def _kwinners(self, out):
         return KWinners2d(

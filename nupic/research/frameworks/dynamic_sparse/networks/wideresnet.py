@@ -37,17 +37,6 @@ def conv3x3(in_planes, out_planes, stride=1):
         in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True
     )
 
-
-def conv_init(m):
-    classname = m.__class__.__name__
-    if classname.find("Conv") != -1:
-        init.xavier_uniform(m.weight, gain=np.sqrt(2))
-        init.constant(m.bias, 0)
-    elif classname.find("BatchNorm") != -1:
-        init.constant(m.weight, 1)
-        init.constant(m.bias, 0)
-
-
 class WideBasic(nn.Module):
     def __init__(self, in_planes, planes, dropout_rate, stride=1,
             activation_func=nn.ReLU):
@@ -55,11 +44,11 @@ class WideBasic(nn.Module):
 
         self.regular_path = nn.Sequential(
             nn.BatchNorm2d(in_planes),
-            self.activation_func(in_planes),
+            activation_func(in_planes),
             nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, bias=True),
             nn.Dropout(p=dropout_rate),
             nn.BatchNorm2d(planes),
-            self.activation_func(planes),
+            activation_func(planes),
             nn.Conv2d(
                 planes, planes, kernel_size=3, stride=stride, padding=1, bias=True
             )
@@ -94,7 +83,7 @@ class WideResNet(nn.Module):
 
         # update config
         defaults = dict(
-            epth=28, 
+            depth=28, 
             widen_factor=2, 
             num_classes=10, 
             dropout_rate=0.3,
