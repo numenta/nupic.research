@@ -22,14 +22,12 @@
 # adapted from https://github.com/timgaripov/swa/blob/master/models/wide_resnet.py
 # based on https://github.com/meliketoy/wide-resnet.pytorch/
 
-import numpy as np
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.init as init
-# import torch
-# from torchsummary import summary
 
 from nupic.torch.modules import Flatten, KWinners2d
+
+# import torch
+# from torchsummary import summary
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -37,9 +35,11 @@ def conv3x3(in_planes, out_planes, stride=1):
         in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True
     )
 
+
 class WideBasic(nn.Module):
-    def __init__(self, in_planes, planes, dropout_rate, stride=1,
-            activation_func=nn.ReLU):
+    def __init__(
+        self, in_planes, planes, dropout_rate, stride=1, activation_func=nn.ReLU
+    ):
         super(WideBasic, self).__init__()
 
         self.regular_path = nn.Sequential(
@@ -51,7 +51,7 @@ class WideBasic(nn.Module):
             activation_func(planes),
             nn.Conv2d(
                 planes, planes, kernel_size=3, stride=stride, padding=1, bias=True
-            )
+            ),
         )
 
         # resnet shortcut
@@ -83,27 +83,33 @@ class WideResNet(nn.Module):
 
         # update config
         defaults = dict(
-            depth=28, 
-            widen_factor=2, 
-            num_classes=10, 
+            depth=28,
+            widen_factor=2,
+            num_classes=10,
             dropout_rate=0.3,
             percent_on_k_winner=1.0,
             boost_strength=1.4,
             boost_strength_factor=0.7,
-            k_inference_factor=1.0,                        
+            k_inference_factor=1.0,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
 
         # adds kwinners
-        for attr in ['percent_on_k_winner', 'boost_strength', 
-        'boost_strength_factor', 'k_inference_factor']:
+        for attr in [
+            "percent_on_k_winner",
+            "boost_strength",
+            "boost_strength_factor",
+            "k_inference_factor",
+        ]:
             if type(self.__dict__[attr]) == list:
-                raise ValueError("""ResNet currently supports only single 
-                    percentage of activations for KWinners layers""") 
+                raise ValueError(
+                    """ResNet currently supports only single
+                    percentage of activations for KWinners layers"""
+                )
 
         if self.percent_on_k_winner < 0.5:
-            self.activation_func = lambda out: self._kwinners(out) 
+            self.activation_func = lambda out: self._kwinners(out)
         else:
             self.activation_func = lambda _: nn.ReLU()
 
@@ -115,7 +121,6 @@ class WideResNet(nn.Module):
 
         print("| Wide-Resnet %dx%d" % (self.depth, k))
         n_stages = [16, 16 * k, 32 * k, 64 * k]
-
 
         self.features = nn.Sequential(
             conv3x3(3, n_stages[0]),
@@ -130,8 +135,8 @@ class WideResNet(nn.Module):
             ),  # 4x2
             nn.BatchNorm2d(n_stages[3], momentum=0.9),
             self.activation_func(n_stages[3]),
-            nn.AdaptiveAvgPool2d((1,1)),
-            Flatten()
+            nn.AdaptiveAvgPool2d((1, 1)),
+            Flatten(),
         )
 
         self.classifier = nn.Linear(n_stages[3], self.num_classes)  # 1
@@ -155,8 +160,11 @@ class WideResNet(nn.Module):
 
         # will be the size of N. In WideResnet28, will be 4
         for stride in strides:
-            layers.append(block(self.in_planes, planes, dropout_rate, stride,
-                self.activation_func))
+            layers.append(
+                block(
+                    self.in_planes, planes, dropout_rate, stride, self.activation_func
+                )
+            )
             self.in_planes = planes
 
         return nn.Sequential(*layers)
@@ -166,6 +174,7 @@ class WideResNet(nn.Module):
         out = self.features(x)
         out = self.classifier(out)
         return out
+
 
 # net=WideResNet(config=dict(
 #     depth=28,
