@@ -103,6 +103,7 @@ class BaseModel:
 
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")
+        # TODO: why do test batches per epoch need to be schedulable?
         self._make_attr_schedulable("test_batches_per_epoch")
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):
@@ -554,22 +555,15 @@ class SparseModel(BaseModel):
 
                 x, y, hue = "coactivations", "weight", "log_abs_grads"
 
-                dataframe = DataFrame({
-                    x: coacts.flatten(),
-                    y: weight.flatten(),
-                    hue: grads.flatten()
-                })
+                dataframe = DataFrame(
+                    {x: coacts.flatten(), y: weight.flatten(), hue: grads.flatten()}
+                )
                 seaborn_config = dict(
-                    rc={"figure.figsize": (11.7, 8.27)},
-                    style="white"
+                    rc={"figure.figsize": (11.7, 8.27)}, style="white"
                 )
 
                 self.log["scatter_mag_vs_coacts_layer-{}".format(str(i))] = dict(
-                    data=dataframe,
-                    x=x,
-                    y=y,
-                    hue=hue,
-                    seaborn_config=seaborn_config,
+                    data=dataframe, x=x, y=y, hue=hue, seaborn_config=seaborn_config
                 )
 
         if train and self.debug_weights:
