@@ -33,7 +33,7 @@ base_exp_config = dict(
     epochs=200,
     # ---- network related
     network="resnet152",
-    percent_on_k_winner=0.25,
+    percent_on_k_winner=tune.grid_search([0.25, 1]),
     boost_strength=1.4,
     boost_strength_factor=0.7,
     k_inference_factor=1.0,            
