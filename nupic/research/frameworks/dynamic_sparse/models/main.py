@@ -61,6 +61,7 @@ class BaseModel:
             sparse_linear_only=False,
             epsilon=None,
             sparsify_fixed=True,
+            sparsify_fixed_per_output=False,
             verbose=0,
             train_batches_per_epoch=np.inf,  # default - don't limit the batches
             test_batches_per_epoch=np.inf,  # default - don't limit the batches
@@ -345,8 +346,10 @@ class SparseModel(BaseModel):
                     on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
                 if on_perc[idx] >= 1:
                     mask = torch.ones(shape).float().to(self.device)
-                elif self.sparsify_fixed:
+                elif self.sparsify_fixed_per_output:
                     mask = self._sparsify_fixed_per_output(shape, on_perc[idx])
+                elif self.sparsify_fixed:
+                    mask = self._sparsify_fixed(shape, on_perc[idx])
                 else:
                     mask = self._sparsify_stochastic(shape, on_perc[idx])
                 m.weight.data *= mask

@@ -132,17 +132,14 @@ def init_coactivation_tracking(m):
 
 
 class DynamicSparseBase(torch.nn.Module):
-    def _init_coactivations(self, weight, update_nsteps=1, config=None):
+    def _init_coactivations(self, weight, config=None):
         """
         This method
             1. registers a buffer the shape of weight to track coactivations
             2. adds a forward hook to the module to update the coactivations
-               every 'update_nsteps'.
+               every 'update_interval'.
 
         :param weight: torch.tensor - corresponding weight of coactivations
-        :param update_nsteps: int - number of training steps before updating
-                                    the coactivations, helps reduce number of
-                                    computations - could be called `update_interval`.
         :param config: dict - configurable parameters for tracking coactivations
         """
 
@@ -151,6 +148,7 @@ class DynamicSparseBase(torch.nn.Module):
         defaults = dict(
             moving_average_alpha=None,  # See `_update_coactivations`
             update_func=None,  # See `_update_coactivations`
+            update_interval=1,  # See `forward_hook`
         )
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
         self.__dict__.update(new_defaults)
@@ -161,7 +159,6 @@ class DynamicSparseBase(torch.nn.Module):
 
         # Init helper attrs to keep track of when to update coactivations.
         self.learning_iterations = 0
-        self.update_nsteps = update_nsteps
 
         # Register hook to update coactivations.
         assert hasattr(
@@ -200,7 +197,7 @@ class DynamicSparseBase(torch.nn.Module):
             #       work for all module.
             input_tensor = input_tensor[0]
         if module.training:
-            if module.learning_iterations % module.update_nsteps == 0:
+            if module.learning_iterations % module.update_interval == 0:
                 module._update_coactivations(input_tensor, output_tensor)
             module.learning_iterations += 1
 
@@ -224,9 +221,13 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
 
         # Init defaults and override only when params are specified in the config.
         config = config or {}
-        defaults = dict(use_binary_coactivations=True)
+        defaults = dict(
+            use_binary_coactivations=True,
+            lin_update_interval=1,
+        )
         new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
         self.__dict__.update(new_defaults)
+        self.update_interval = self.lin_update_interval
 
     def calc_coactivations(self, x, y):
         outer = 0
@@ -280,17 +281,12 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         groups=1,
         bias=True,
         padding_mode="zeros",
-        update_nsteps=100,
-        half_precision=False,
-        coactivation_test="correlation_proxy",
-        threshold_multiplier=1,
+        config=None,
     ):
         """
         The primary params are the same for a regular Conv2d layer.
         Otherwise, they're described below.
 
-        :param update_nsteps: period of training steps to wait before calculating the
-                              coactivations needed for Hebbian pruning.
         :param half_precision: whether to operate in half precision when calculating
                                calculating the coactivation - this only works when the
                                device is "cuda" and is mainly for memory saving during
@@ -308,16 +304,13 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             padding_mode,
         )
 
-        self._init_coactivations(self.weight, update_nsteps=update_nsteps)
+        # Initialize dynamic sparse attributes.
+        config = config or {}
+        self._init_coactivations(weight=self.weight, config=config)
 
         # -------------------------------------
         # 'calc_coactivation' related attr's
         # -------------------------------------
-
-        # Init params for calculating coactivations.
-        self.half_precision = half_precision
-        self.coactivation_test = coactivation_test
-        self.threshold_multiplier = threshold_multiplier
 
         # Specify number of groups for the helper convolutional layer.
         # This is equal to the number of connections in the last three dimensions:
@@ -366,6 +359,22 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         self.grouped_conv.weight = torch.nn.Parameter(
             stacked_weights, requires_grad=False
         )
+
+    def _init_coactivations(self, weight, config=None):
+        super()._init_coactivations(weight, config=config)
+
+        # Init defaults and override only when params are specified in the config.
+        config = config or {}
+        defaults = dict(
+            padding_mode="zeros",
+            conv_update_interval=100,
+            half_precision=False,
+            coactivation_test="correlation_proxy",
+            threshold_multiplier=1,
+        )
+        new_defaults = {k: (config.get(k, None) or v) for k, v in defaults.items()}
+        self.__dict__.update(new_defaults)
+        self.update_interval = self.conv_update_interval
 
     def _get_single_unit_weights(self, c, j, h):
         """
