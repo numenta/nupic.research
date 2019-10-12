@@ -146,7 +146,7 @@ class DynamicSparseBase(torch.nn.Module):
         # Init defaults and override only when params are specified in the config.
         config = config or {}
         defaults = dict(
-            moving_average_alpha=None,           # See `_update_coactivations`
+            moving_average_alpha=None,  # See `_update_coactivations`
             update_func=None,  # See `_update_coactivations`
             update_interval=1,  # See `forward_hook`
         )
@@ -249,6 +249,7 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
 
         # Return coactivations.
         return outer
+
 
 # ------------------
 # Conv Layers

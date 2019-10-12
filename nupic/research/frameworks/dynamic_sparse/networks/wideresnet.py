@@ -19,10 +19,15 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import numpy as np
+# adapted from https://github.com/timgaripov/swa/blob/master/models/wide_resnet.py
+# based on https://github.com/meliketoy/wide-resnet.pytorch/
+
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.init as init
+
+from nupic.torch.modules import Flatten, KWinners2d
+
+# import torch
+# from torchsummary import summary
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -31,25 +36,22 @@ def conv3x3(in_planes, out_planes, stride=1):
     )
 
 
-def conv_init(m):
-    classname = m.__class__.__name__
-    if classname.find("Conv") != -1:
-        init.xavier_uniform(m.weight, gain=np.sqrt(2))
-        init.constant(m.bias, 0)
-    elif classname.find("BatchNorm") != -1:
-        init.constant(m.weight, 1)
-        init.constant(m.bias, 0)
-
-
 class WideBasic(nn.Module):
-    def __init__(self, in_planes, planes, dropout_rate, stride=1):
+    def __init__(
+        self, in_planes, planes, dropout_rate, stride=1, activation_func=nn.ReLU
+    ):
         super(WideBasic, self).__init__()
-        self.bn1 = nn.BatchNorm2d(in_planes)
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, bias=True)
-        self.dropout = nn.Dropout(p=dropout_rate)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(
-            planes, planes, kernel_size=3, stride=stride, padding=1, bias=True
+
+        self.regular_path = nn.Sequential(
+            nn.BatchNorm2d(in_planes),
+            activation_func(in_planes),
+            nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, bias=True),
+            nn.Dropout(p=dropout_rate),
+            nn.BatchNorm2d(planes),
+            activation_func(planes),
+            nn.Conv2d(
+                planes, planes, kernel_size=3, stride=stride, padding=1, bias=True
+            ),
         )
 
         # resnet shortcut
@@ -61,10 +63,10 @@ class WideBasic(nn.Module):
             )
 
     def forward(self, x):
-        out = self.dropout(self.conv1(F.relu(self.bn1(x))))
-        out = self.conv2(F.relu(self.bn2(out)))
-        out += self.shortcut(x)
 
+        out = self.regular_path(x)
+        out += self.shortcut(x)
+        # TODO: no activation function after shortcut? verify
         return out
 
 
@@ -76,13 +78,40 @@ class WideResNet(nn.Module):
         - Depth and widen_factor are specific to wide resnet architecture
     """
 
-    def __init__(self, config):
+    def __init__(self, config=None):
         super(WideResNet, self).__init__()
 
         # update config
-        defaults = dict(depth=28, widen_factor=2, num_classes=10, dropout_rate=0.3)
+        defaults = dict(
+            depth=28,
+            widen_factor=2,
+            num_classes=10,
+            dropout_rate=0.3,
+            percent_on_k_winner=1.0,
+            boost_strength=1.4,
+            boost_strength_factor=0.7,
+            k_inference_factor=1.0,
+        )
         defaults.update(config or {})
         self.__dict__.update(defaults)
+
+        # adds kwinners
+        for attr in [
+            "percent_on_k_winner",
+            "boost_strength",
+            "boost_strength_factor",
+            "k_inference_factor",
+        ]:
+            if type(self.__dict__[attr]) == list:
+                raise ValueError(
+                    """ResNet currently supports only single
+                    percentage of activations for KWinners layers"""
+                )
+
+        if self.percent_on_k_winner < 0.5:
+            self.activation_func = lambda out: self._kwinners(out)
+        else:
+            self.activation_func = lambda _: nn.ReLU()
 
         self.in_planes = 16
 
@@ -93,22 +122,37 @@ class WideResNet(nn.Module):
         print("| Wide-Resnet %dx%d" % (self.depth, k))
         n_stages = [16, 16 * k, 32 * k, 64 * k]
 
-        self.conv1 = conv3x3(3, n_stages[0])  # 1
-        self.layer1 = self._wide_layer(
-            WideBasic, n_stages[1], n, self.dropout_rate, stride=1
-        )  # 4x2 (2 convs each)
-        self.layer2 = self._wide_layer(
-            WideBasic, n_stages[2], n, self.dropout_rate, stride=2
-        )  # 4x2
-        self.layer3 = self._wide_layer(
-            WideBasic, n_stages[3], n, self.dropout_rate, stride=2
-        )  # 4x2
-        self.bn1 = nn.BatchNorm2d(n_stages[3], momentum=0.9)
-        self.linear = nn.Linear(n_stages[3], self.num_classes)  # 1
+        self.features = nn.Sequential(
+            conv3x3(3, n_stages[0]),
+            self._make_wide_layer(
+                WideBasic, n_stages[1], n, self.dropout_rate, stride=1
+            ),  # 4x2 (2 convs each)
+            self._make_wide_layer(
+                WideBasic, n_stages[2], n, self.dropout_rate, stride=2
+            ),  # 4x2
+            self._make_wide_layer(
+                WideBasic, n_stages[3], n, self.dropout_rate, stride=2
+            ),  # 4x2
+            nn.BatchNorm2d(n_stages[3], momentum=0.9),
+            self.activation_func(n_stages[3]),
+            nn.AdaptiveAvgPool2d((1, 1)),
+            Flatten(),
+        )
+
+        self.classifier = nn.Linear(n_stages[3], self.num_classes)  # 1
 
         # where are the other 2?
 
-    def _wide_layer(self, block, planes, num_blocks, dropout_rate, stride):
+    def _kwinners(self, out):
+        return KWinners2d(
+            out,
+            percent_on=self.percent_on_k_winner,
+            boost_strength=self.boost_strength,
+            boost_strength_factor=self.boost_strength_factor,
+            k_inference_factor=self.k_inference_factor,
+        )
+
+    def _make_wide_layer(self, block, planes, num_blocks, dropout_rate, stride):
         # first one can define stride - downsampling
         # others are always 1
         strides = [stride] + [1] * (num_blocks - 1)
@@ -116,23 +160,26 @@ class WideResNet(nn.Module):
 
         # will be the size of N. In WideResnet28, will be 4
         for stride in strides:
-            layers.append(block(self.in_planes, planes, dropout_rate, stride))
+            layers.append(
+                block(
+                    self.in_planes, planes, dropout_rate, stride, self.activation_func
+                )
+            )
             self.in_planes = planes
 
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = self.conv1(x)
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = F.relu(self.bn1(out))
-        out = F.avg_pool2d(out, 8)
-        out = out.view(out.size(0), -1)
-        out = self.linear(out)
 
+        out = self.features(x)
+        out = self.classifier(out)
         return out
 
 
-# net=WideResNet(28, 10, 0.3, 10)
-# y = net(Variable(torch.randn(1,3,32,32)))
+# net=WideResNet(config=dict(
+#     depth=28,
+#     widen_factor=10,
+#     num_classes=10,
+#     dropout_rate=0.3)
+# )
+# summary(net, input_size=(3,32,32))
