@@ -24,12 +24,6 @@ from collections.abc import Iterable
 import numpy as np
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.networks.layers import (
-    DSConv2d,
-    calc_sparsity,
-    init_coactivation_tracking,
-)
-
 from .main import BaseModel, SparseModel
 
 class DSNNHeb(SparseModel):
@@ -62,15 +56,18 @@ class DSNNHeb(SparseModel):
         self.__dict__.update(new_defaults)
 
         # initialize hebbian learning
-        self._init_coactivation_tracking()
+        self._init_hebbian(reset=True)
         self.prune_cycles_completed = 0
 
-    def _init_coactivation_tracking(self):
+    def _init_hebbian(self, reset=True):
         """
         Override method in children classes
         Should only track coactivations if required by the algorithm
         """
-        self.network.apply(init_coactivation_tracking)
+        for module in sparse_modules:
+            module.init_coactivation_tracking(reset)
+        if hasattr(self.network, 'forward_with_coactivations'):
+            self.network.forward = self.network.forward_with_coactivations        
 
     def _post_epoch_updates(self, dataset=None):
         super()._post_epoch_updates(dataset)
@@ -82,6 +79,8 @@ class DSNNHeb(SparseModel):
                 self.prune_cycles_completed += 1
                 if self.prune_cycles_completed >= self.pruning_early_stop:
                     self.pruning_active = False
+        # restart tracking
+        self._init_hebbian(reset=False)
 
     def _reinitialize_weights(self):
         """Reinitialize weights - prune and grow"""
@@ -254,14 +253,13 @@ class DSNNHeb(SparseModel):
 
         return add_mask
 
-
 class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
-    def _init_coactivation_tracking(self):
+    def _init_hebbian(self):
         for module in self.sparse_modules:
             if module.weight_prune is not None:
-                module.m.apply(init_coactivation_tracking)
+                module.init_coactivation_tracking()
 
     def prune(self, module):
         """
@@ -315,14 +313,13 @@ class DSNNWeightedMag(DSNNHeb):
         # track added connections
         return new_mask, keep_mask, add_mask
 
-
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
-    def _init_coactivation_tracking(self):
+    def _init_hebbian(self):
         for module in self.sparse_modules:
             if module.hebbian_prune is not None:
-                module.m.apply(init_coactivation_tracking)
+                module.init_coactivation_tracking()
 
     def prune(self, module):
         """Allows pruning by magnitude and hebbian"""

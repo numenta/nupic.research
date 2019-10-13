@@ -36,24 +36,10 @@ from nupic.research.frameworks.dynamic_sparse.networks import (
     NumScheduler,
     init_coactivation_tracking,
 )
+from nupic.research.frameworks.dynamic_sparse.networks.layers import (
+    init_coactivation_tracking,
+)
 from nupic.torch.modules import update_boost_strength
-
-class SparseModule:
-    def __init__(self, m=None, on_perc=None, num_params=None, mask=None, 
-        weight_prune=None, hebbian_prune=None):
-        self.m = module
-        self.on_perc = on_perc
-        self.num_params = num_params
-        self.mask = mask
-        self.hebbian_prune = hebbian_prune
-        self.weight_prune = weight_prune
-
-    def nonzero_params(self):
-        return torch.sum(mask).item()
-
-    def apply_mask(self):
-        module.m.weight.data *= module.mask
-
 
 class BaseModel:
     """Base model, with training loops and logging functions."""
@@ -279,7 +265,6 @@ class BaseModel:
                 results[var].append(log[var])
 
         return results
-
 
 class SparseModel(BaseModel):
     """Sparsity implemented by:
@@ -522,3 +507,25 @@ class SparseModel(BaseModel):
                             torch.sum(m.weight, dim=[2, 3]).float() * ratio
                         ).int()
                         self.log["img_" + log_name] = heatmap.tolist()
+
+class SparseModule:
+    def __init__(self, m=None, on_perc=None, num_params=None, mask=None, 
+        weight_prune=None, hebbian_prune=None):
+        self.m = module
+        self.on_perc = on_perc
+        self.num_params = num_params
+        self.mask = mask
+        self.hebbian_prune = hebbian_prune
+        self.weight_prune = weight_prune
+
+    def nonzero_params(self):
+        return torch.sum(mask).item()
+
+    def init_coactivation_tracking(self, reset=True):
+        if isinstance(self.m, DynamicSparseBase) and reset:
+            self.m.apply(init_coactivation_tracking)
+        else:
+            self.m.coactivations = torch.zeros(self.m.weight.shape)
+
+    def apply_mask(self):
+        module.m.weight.data *= module.mask
