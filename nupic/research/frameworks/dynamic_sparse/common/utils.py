@@ -33,6 +33,7 @@ from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 
 from .datasets import Dataset
 
+
 class Trainable(tune.Trainable):
     """ray.tune trainable generic class Adaptable to any pytorch module."""
 

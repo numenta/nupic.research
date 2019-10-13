@@ -21,7 +21,9 @@
 
 import torch
 from torch import nn
+
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
+
 
 class HebbianNetwork(nn.Module):
     """Parent class with shared methods. Not to be instantiated"""
@@ -37,29 +39,25 @@ class HebbianNetwork(nn.Module):
         )
 
     def _has_params(self, layer):
-        return (
-            isinstance(layer, nn.Linear)
-            or isinstance(layer, nn.Conv2d)
-        )
+        return isinstance(layer, nn.Linear) or isinstance(layer, nn.Conv2d)
 
     def forward(self, x):
-        if 'features' in self._modules:
+        if "features" in self._modules:
             x = self.features(x)
         x = self.classifier(x)
         return x
 
     def forward_with_coactivations(self, x):
         """A faster and approximate way to track correlations"""
-    
-        if 'features' in self._modules:
+
+        if "features" in self._modules:
             x = self.features(x)
 
         prev_act = (x > 0).detach().float()
-        idx_activation = 0
         for idx_layer, layer in enumerate(self.classifier):
             # do the forward calculation normally
             x = layer(x)
-            if self._has_params(layer) and hasattr(layer, 'coactivations'):
+            if self._has_params(layer) and hasattr(layer, "coactivations"):
                 prev_layer = layer
             if self._has_activation(idx_layer, layer):
                 with torch.no_grad():
@@ -73,6 +71,7 @@ class HebbianNetwork(nn.Module):
                     prev_act = curr_act
 
         return x
+
 
 class MLPHeb(HebbianNetwork):
     """Simple 3 hidden layers + output MLP"""
@@ -136,7 +135,8 @@ class MLPHeb(HebbianNetwork):
     def _kwinners(self, num_units):
         return KWinners(
             n=num_units, percent_on=0.25, boost_strength=1.4, boost_strength_factor=0.7
-        )        
+        )
+
 
 class GSCHeb(HebbianNetwork):
     """Simple 3 hidden layers + output MLP"""
@@ -145,7 +145,7 @@ class GSCHeb(HebbianNetwork):
         super().__init__()
 
         defaults = dict(
-            device='cpu',
+            device="cpu",
             input_size=1024,
             num_classes=12,
             boost_strength=1.5,
@@ -221,7 +221,7 @@ class GSCHebSmall(GSCHeb):
         super().__init__()
 
         defaults = dict(
-            device='cpu',
+            device="cpu",
             input_size=1024,
             num_classes=12,
             boost_strength=1.5,
