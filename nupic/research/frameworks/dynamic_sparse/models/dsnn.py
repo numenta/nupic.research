@@ -32,15 +32,6 @@ class DSNNHeb(SparseModel):
     def setup(self):
         super().setup()
 
-        # Set some attributes to be a list corresponding to self.dynamic_sparse_modules.
-        for attr in ["hebbian_prune_perc", "weight_prune_perc"]:
-            self._make_attr_iterable(attr, counterpart=self.sparse_modules)
-
-        for idx, (hprune, wprune) in enumerate(zip(self.hebbian_prune_perc, self.weight_prune_perc)):
-            module = self.sparse_modules[idx]
-            module.hebbian_prune = hprune
-            module.weight_prune = wprune
-
         # add specific defaults
         new_defaults = dict(
             pruning_active=True,
@@ -51,6 +42,15 @@ class DSNNHeb(SparseModel):
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
+
+        # Set some attributes to be a list corresponding to self.dynamic_sparse_modules.
+        for attr in ["hebbian_prune_perc", "weight_prune_perc"]:
+            self._make_attr_iterable(attr, counterpart=self.sparse_modules)
+
+        for idx, (hprune, wprune) in enumerate(zip(self.hebbian_prune_perc, self.weight_prune_perc)):
+            module = self.sparse_modules[idx]
+            module.hebbian_prune = hprune
+            module.weight_prune = wprune
 
         # initialize hebbian learning
         self._init_hebbian()

@@ -36,6 +36,12 @@ class HebbianNetwork(nn.Module):
             or isinstance(layer, KWinners)
         )
 
+    def _has_params(self, layer):
+        return (
+            isinstance(layer, nn.Linear)
+            or isinstance(layer, nn.Conv2d)
+        )
+
     def forward(self, x):
         if 'features' in self._modules:
             x = self.features(x)
@@ -53,14 +59,16 @@ class HebbianNetwork(nn.Module):
         for idx_layer, layer in enumerate(self.classifier):
             # do the forward calculation normally
             x = layer(x)
-            n_samples = x.shape[0]
-            if self._has_activation(idx_layer, layer) and hasattr(layer, 'coactivations'):
+            if self._has_params(layer) and hasattr(layer, 'coactivations'):
+                prev_layer = layer
+            if self._has_activation(idx_layer, layer):
                 with torch.no_grad():
                     curr_act = (x > 0).detach().float()
                     # add outer product to the coactivations, per sample
+                    n_samples = x.shape[0]
                     for s in range(n_samples):
-                        outer = torch.ger(prev_act[s], curr_act[s])
-                        layer.coactivations = outer.T
+                        outer = torch.ger(curr_act[s], prev_act[s])
+                        prev_layer.coactivations += outer
                     # reassigning to the next
                     prev_act = curr_act
 

@@ -448,7 +448,7 @@ class SparseModule:
         if isinstance(self.m, DynamicSparseBase):
             self.m.apply(init_coactivation_tracking)
         else:
-            self.m.coactivations = torch.zeros(self.m.weight.shape)
+            self.m.coactivations = torch.zeros(self.m.weight.shape).to(self.device)
 
     def reset_coactivations(self, reset=True):
         if isinstance(self.m, DynamicSparseBase):

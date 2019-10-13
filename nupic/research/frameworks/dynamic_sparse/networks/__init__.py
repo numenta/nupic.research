@@ -5,4 +5,4 @@ from .main import *
 from .resnet import *
 from .utils import *
 from .wideresnet import *
-# import hebbian_v0
+from .hebbian_v0 import GSCHeb as GSCHeb_v0
