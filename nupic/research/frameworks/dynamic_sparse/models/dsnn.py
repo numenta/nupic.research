@@ -19,12 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections.abc import Iterable
-
 import numpy as np
 import torch
 
-from .main import BaseModel, SparseModel
+from .main import SparseModel
+
 
 class DSNNHeb(SparseModel):
     """Parent class for DSNNHeb models. Not to be instantiated"""
@@ -47,7 +46,9 @@ class DSNNHeb(SparseModel):
         for attr in ["hebbian_prune_perc", "weight_prune_perc"]:
             self._make_attr_iterable(attr, counterpart=self.sparse_modules)
 
-        for idx, (hprune, wprune) in enumerate(zip(self.hebbian_prune_perc, self.weight_prune_perc)):
+        for idx, (hprune, wprune) in enumerate(
+            zip(self.hebbian_prune_perc, self.weight_prune_perc)
+        ):
             module = self.sparse_modules[idx]
             module.hebbian_prune = hprune
             module.weight_prune = wprune
@@ -61,10 +62,10 @@ class DSNNHeb(SparseModel):
         Override method in children classes
         Should only track coactivations if required by the algorithm
         """
-        for module in sparse_modules:
+        for module in self.sparse_modules:
             module.init_coactivation_tracking()
-        if hasattr(self.network, 'forward_with_coactivations'):
-            self.network.forward = self.network.forward_with_coactivations        
+        if hasattr(self.network, "forward_with_coactivations"):
+            self.network.forward = self.network.forward_with_coactivations
 
     def _pre_epoch_setup(self):
         if self.reset_coactivations:
@@ -97,9 +98,7 @@ class DSNNHeb(SparseModel):
                     # count how many synapses from last round have survived
                     if module.added_synapses is not None:
                         total_added = torch.sum(module.added_synapses).item()
-                        surviving = torch.sum(
-                            module.added_synapses & keep_mask
-                        ).item()
+                        surviving = torch.sum(module.added_synapses & keep_mask).item()
                         if total_added:
                             survival_ratio = surviving / total_added
                             survival_ratios.append(survival_ratio)
@@ -253,6 +252,7 @@ class DSNNHeb(SparseModel):
 
         return add_mask
 
+
 class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
@@ -260,8 +260,8 @@ class DSNNWeightedMag(DSNNHeb):
         for module in self.sparse_modules:
             if module.weight_prune is not None:
                 module.init_coactivation_tracking()
-        if hasattr(self.network, 'forward_with_coactivations'):
-            self.network.forward = self.network.forward_with_coactivations        
+        if hasattr(self.network, "forward_with_coactivations"):
+            self.network.forward = self.network.forward_with_coactivations
 
     def prune(self, module):
         """
@@ -316,6 +316,7 @@ class DSNNWeightedMag(DSNNHeb):
         # track added connections
         return new_mask, keep_mask, add_mask
 
+
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
@@ -323,8 +324,8 @@ class DSNNMixedHeb(DSNNHeb):
         for module in self.sparse_modules:
             if module.hebbian_prune is not None:
                 module.init_coactivation_tracking()
-        if hasattr(self.network, 'forward_with_coactivations'):
-            self.network.forward = self.network.forward_with_coactivations        
+        if hasattr(self.network, "forward_with_coactivations"):
+            self.network.forward = self.network.forward_with_coactivations
 
     def prune(self, module):
         """Allows pruning by magnitude and hebbian"""
@@ -409,7 +410,7 @@ class DSNNMixedHeb(DSNNHeb):
             num_params = module.num_params
             corr = module.m.coactivations
             hebbian_prune_perc = module.hebbian_prune
-            weight_prune_perc = module.weight_prune            
+            weight_prune_perc = module.weight_prune
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
@@ -454,7 +455,7 @@ class DSNNMixedHeb(DSNNHeb):
             new_mask = keep_mask | add_mask
 
             # logging
-            idx = module.pos            
+            idx = module.pos
             if self.debug_sparse:
                 self.log["keep_mask_l" + str(idx)] = (
                     torch.sum(keep_mask).item() / num_synapses

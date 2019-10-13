@@ -21,7 +21,6 @@
 
 from collections import defaultdict
 from collections.abc import Iterable
-from collections import namedtuple
 from itertools import product
 
 import numpy as np
@@ -34,12 +33,12 @@ from pandas import DataFrame
 from nupic.research.frameworks.dynamic_sparse.networks import (
     DynamicSparseBase,
     NumScheduler,
-    init_coactivation_tracking,
 )
 from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     init_coactivation_tracking,
 )
 from nupic.torch.modules import update_boost_strength
+
 
 class BaseModel:
     """Base model, with training loops and logging functions."""
@@ -62,7 +61,7 @@ class BaseModel:
             weight_decay=1e-4,
             sparse_linear_only=False,
             epsilon=None,
-            sparse_type='precise', # precise, precise_per_output, approximate
+            sparse_type="precise",  # precise, precise_per_output, approximate
             verbose=0,
             train_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
@@ -203,7 +202,7 @@ class BaseModel:
         if isinstance(module, nn.Linear):
             return "linear"
         elif isinstance(module, nn.Conv2d) and not self.sparse_linear_only:
-            return "conv"            
+            return "conv"
 
     def _log_weights(self):
         """Log weights for all layers which have params."""
@@ -269,6 +268,7 @@ class BaseModel:
 
         return results
 
+
 class SparseModel(BaseModel):
     """Sparsity implemented by:
     - Masking on the weights
@@ -282,12 +282,15 @@ class SparseModel(BaseModel):
                 module.apply_mask()
 
     def _is_sparsifiable(self, module):
-        return (isinstance(module, nn.Linear) or 
-            (isinstance(module, nn.Conv2d) and not self.sparse_linear_only))
+        return isinstance(module, nn.Linear) or (
+            isinstance(module, nn.Conv2d) and not self.sparse_linear_only
+        )
 
     def _get_sparse_modules(self):
         sparse_modules = []
-        for idx, m in enumerate(list(self.network.modules())[self.start_sparse : self.end_sparse]):
+        for idx, m in enumerate(
+            list(self.network.modules())[self.start_sparse : self.end_sparse]
+        ):
             if self._is_sparsifiable(m):
                 sparse_modules.append(SparseModule(m=m, device=self.device, pos=idx))
 
@@ -333,10 +336,6 @@ class SparseModel(BaseModel):
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
 
-        # calculate sparsity masks
-        self.masks = []
-        self.num_params = []  # added for paper implementation
-
         # define all modules (those that are sparsifiable)
         self.sparse_modules = self._get_sparse_modules()
 
@@ -349,12 +348,13 @@ class SparseModel(BaseModel):
         for idx, module in enumerate(self.sparse_modules):
             # define on_perc
             if self.epsilon:
+                shape = module.shape
                 module.on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
             else:
                 module.on_perc = self.on_perc[idx]
             if module.on_perc < 1:
                 module.create_mask(self.sparse_type)
-                with torch.no_grad():        
+                with torch.no_grad():
                     module.apply_mask()
                     module.save_num_params()
 
@@ -412,19 +412,45 @@ class SparseModel(BaseModel):
 
                 # log image as well
                 if self.log_images:
-                    if self.has_params(m) == "conv":
+                    if self.has_params(module.m) == "conv":
                         ratio = 255 / np.prod(module.shape[2:])
                         heatmap = (
                             torch.sum(module.m.weight, dim=[2, 3]).float() * ratio
                         ).int()
                         self.log["img_" + log_name] = heatmap.tolist()
 
-class SparseModule:
-    """Module wrapper for sparse layers"""
 
-    def __init__(self, m=None, pos=None, on_perc=None, num_params=None, mask=None, 
-        weight_prune=None, hebbian_prune=None, device=None):
-        """ document attributes """
+class SparseModule:
+    """Module wrapper for sparse layers
+    Attributes:
+        m (torch.nn.module): Original module to be wrapped.
+        pos (int): Position in the list of sparse modules, used for logging
+        on_perc (float): Percentage of non-zero weights
+        shape (tuple): Shape of the underlying weight matrix
+        num_params (int): Number of non-zero params at initialization/
+            before training
+        mask (tensor): Binary tensor. 1 where connection is active, 0 otherwise
+        weight_prune (float): Percentage to be pruned based on magnitude
+        hebbian_prune (float): Percentage to be pruned based on hebbian stats
+        device (torch.device): Device where to save and compute data.
+        added_synapses (tensor): Tensor with synapses added at last growth round.
+            Required to log custom metrics.
+        last_gradients (tensor): Tensor with gradients at last iteration.
+            Required to log custom metrics.
+    """
+
+    def __init__(
+        self,
+        m=None,
+        pos=None,
+        on_perc=None,
+        num_params=None,
+        mask=None,
+        weight_prune=None,
+        hebbian_prune=None,
+        device=None,
+    ):
+        """document attributes"""
         self.m = m
         self.pos = pos
         self.shape = m.weight.shape
@@ -460,14 +486,16 @@ class SparseModule:
         self.m.weight.data *= self.mask
 
     def create_mask(self, sparse_type):
-        if sparse_type == 'precise':
+        if sparse_type == "precise":
             self._mask_fixed()
-        elif sparse_type == 'precise_per_output':
+        elif sparse_type == "precise_per_output":
             self._mask_fixed_per_output()
-        elif sparse_type == 'approximate':
+        elif sparse_type == "approximate":
             self._mask_stochastic()
         else:
-            raise ValueError("{} is an invalid option for sparse type. ".format(sparse_type))
+            raise ValueError(
+                "{} is an invalid option for sparse type. ".format(sparse_type)
+            )
 
     def _mask_fixed_per_output(self):
         """
