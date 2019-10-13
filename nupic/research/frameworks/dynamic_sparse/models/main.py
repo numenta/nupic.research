@@ -332,6 +332,7 @@ class SparseModel(BaseModel):
             init_sparse_fixed_per_output=False,
             log_magnitude_vs_coactivations=False,  # scatter plot of magn. vs coacts.
             reset_coactivations=True,
+            on_perc=0.1,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
@@ -441,7 +442,7 @@ class SparseModule:
 
     def __init__(
         self,
-        m=None,
+        m,
         pos=None,
         on_perc=None,
         num_params=None,
@@ -452,8 +453,8 @@ class SparseModule:
     ):
         """document attributes"""
         self.m = m
-        self.pos = pos
         self.shape = m.weight.shape
+        self.pos = pos
         self.on_perc = on_perc
         self.num_params = num_params
         self.mask = mask
@@ -463,6 +464,19 @@ class SparseModule:
         # logging
         self.added_synapses = None
         self.last_gradients = None
+
+    def __repr__(self):
+        return str(
+            {
+                "name": self.m._get_name(),
+                "index": self.pos,
+                "shape": self.shape,
+                "on_perc": self.on_perc,
+                "hebbian_prune": self.hebbian_prune,
+                "weight_prune": self.weight_prune,
+                "num_params": self.num_params,
+            }
+        )
 
     def nonzero_params(self):
         return torch.sum(self.mask).item()

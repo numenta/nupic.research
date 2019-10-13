@@ -106,9 +106,6 @@ class SparseModelTest(unittest.TestCase):
 
         sparse_modules1 = model.sparse_modules
         self.assertTrue(len(sparse_modules1) == 4)
-        ds_modules_1 = model.dynamic_sparse_modules
-        self.assertTrue(len(ds_modules_1) == 4)
-        self.assertTrue(set(ds_modules_1) <= set(sparse_modules1))
 
         network = self.network2
         on_perc = 0.1
@@ -120,9 +117,6 @@ class SparseModelTest(unittest.TestCase):
 
         sparse_modules2 = model.sparse_modules
         self.assertTrue(len(sparse_modules2) == 4)
-        ds_modules_2 = model.dynamic_sparse_modules
-        self.assertTrue(len(ds_modules_2) == 0)
-        self.assertTrue(set(ds_modules_2) <= set(sparse_modules2))
 
 
 if __name__ == "__main__":
