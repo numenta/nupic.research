@@ -18,8 +18,6 @@
 #  http://numenta.org/licenses/
 import math
 
-from torch import nn
-
 from nupic.torch.modules import (
     Flatten,
     KWinners,
@@ -27,6 +25,7 @@ from nupic.torch.modules import (
     SparseWeights,
     SparseWeights2d,
 )
+from torch import nn
 
 
 class VGGSparseNet(nn.Sequential):
@@ -201,40 +200,47 @@ class VGGSparseNet(nn.Sequential):
                 m.bias.data.zero_()
 
 
-class VGG19SparseNet(VGGSparseNet):
+def vgg19_sparse_net():
     """
-    VGG-19 network configured for CIFAR-10 dataset as described in
+    VGG-19 Sparse network configured for CIFAR-10 dataset as described in
     `How Can We Be So Dense?` paper
-
-    :param cnn_percent_on: Percent of units allowed to remain on each convolution
-                           layer
-    :param cnn_weight_sparsity: Percent of weights that are allowed to be
-                                non-zero in the convolution layer
-    :param k_inference_factor: During inference (training=False) we increase
-                               `percent_on` in all sparse layers by this factor
-    :param boost_strength: boost strength (0.0 implies no boosting)
-    :param boost_strength_factor: Boost strength factor to use [0..1]
     """
 
-    def __init__(self,
-                 cnn_percent_on,
-                 cnn_weight_sparsity,
-                 k_inference_factor,
-                 boost_strength,
-                 boost_strength_factor,
-                 ):
-        super(VGG19SparseNet, self).__init__(
-            block_sizes=(2, 2, 4, 4, 4),
-            input_shape=(3, 32, 32),
-            cnn_out_channels=(64, 128, 256, 512, 512),
-            cnn_kernel_sizes=(3, 3, 3, 3, 3),
-            linear_weight_sparsity=(),
-            linear_percent_on=(),
-            cnn_percent_on=cnn_percent_on,
-            cnn_weight_sparsity=cnn_weight_sparsity,
-            k_inference_factor=k_inference_factor,
-            boost_strength=boost_strength,
-            boost_strength_factor=boost_strength_factor,
-            use_max_pooling=True,
-            num_classes=10,
-        )
+    return VGGSparseNet(
+        block_sizes=(2, 2, 4, 4, 4),
+        input_shape=(3, 32, 32),
+        cnn_out_channels=(64, 128, 256, 512, 512),
+        cnn_kernel_sizes=(3, 3, 3, 3, 3),
+        linear_weight_sparsity=(),
+        linear_percent_on=(),
+        cnn_percent_on=[0.25, 0.25, 0.25, 0.25, 0.25],
+        cnn_weight_sparsity=[1.0, 0.5, 0.5, 0.5, 0.5],
+        k_inference_factor=1.0,
+        boost_strength=1.5,
+        boost_strength_factor=0.85,
+        use_max_pooling=True,
+        num_classes=10,
+    )
+
+
+def vgg19_dense_net():
+    """
+    VGG-19 Dense network configured for CIFAR-10 dataset as described in
+    `How Can We Be So Dense?` paper
+    """
+
+    return VGGSparseNet(
+        block_sizes=(2, 2, 4, 4, 4),
+        input_shape=(3, 32, 32),
+        cnn_out_channels=(64, 128, 256, 512, 512),
+        cnn_kernel_sizes=(3, 3, 3, 3, 3),
+        linear_weight_sparsity=(),
+        linear_percent_on=(),
+        cnn_percent_on=[1.0, 1.0, 1.0, 1.0, 1.0],
+        cnn_weight_sparsity=[1.0, 1.0, 1.0, 1.0, 1.0],
+        k_inference_factor=1.0,
+        boost_strength=1.5,
+        boost_strength_factor=0.85,
+        use_max_pooling=True,
+        num_classes=10,
+    )
