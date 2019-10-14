@@ -20,7 +20,6 @@
 # Original Code here:
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 
-import math
 import os
 import random
 import sys
@@ -28,21 +27,13 @@ import time
 
 import torch
 import torch.nn as nn
-from nupic.torch.modules import (
-    Flatten,
-    KWinners,
-    KWinners2d,
-    SparseWeights,
-    SparseWeights2d,
-    rezero_weights,
-    update_boost_strength,
-)
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from nupic.research.frameworks.pytorch.models import VGGSparseNet
+from nupic.torch.modules import rezero_weights, update_boost_strength
 
 
 def cnn_size(width, kernel_size, padding=1, stride=1):
@@ -299,7 +290,6 @@ class TinyCIFAR(object):
             self.model.load_state_dict(
                 torch.load(checkpoint_file, map_location=self.device)
             )
-
 
     def _create_vgg_model(self):
         self.model = VGGSparseNet(

@@ -18,11 +18,15 @@
 #  http://numenta.org/licenses/
 import math
 
-from nupic.torch.modules import (
-    Flatten, KWinners, SparseWeights, SparseWeights2d,
-    KWinners2d
-)
 from torch import nn
+
+from nupic.torch.modules import (
+    Flatten,
+    KWinners,
+    KWinners2d,
+    SparseWeights,
+    SparseWeights2d,
+)
 
 
 class VGGSparseNet(nn.Sequential):
