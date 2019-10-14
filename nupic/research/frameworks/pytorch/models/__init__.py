@@ -18,6 +18,9 @@
 #  http://numenta.org/licenses/
 #
 
+from .le_sparse_net import (
+    LeSparseNet
+)
 from .mobilenetv1 import (
     MobileNetV1,
     mobile_net_v1_sparse_depth,
@@ -27,12 +30,9 @@ from .mobilenetv1 import (
 from .not_so_densenet import (
     DenseNetCIFAR, NoSoDenseNetCIFAR
 )
-from .le_sparse_net import (
-    LeSparseNet
-)
 from .resnet_models import (
     resnet9, ResNet
 )
 from .vgg_sparse_net import (
-    VGG19SparseNet, VGGSparseNet
+    VGGSparseNet, vgg19_dense_net, vgg19_sparse_net
 )
