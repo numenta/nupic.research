@@ -38,6 +38,7 @@ class DSNNHeb(SparseModel):
             hebbian_prune_perc=None,
             weight_prune_perc=None,
             hebbian_grow=True,
+            reset_coactivations=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
@@ -58,19 +59,20 @@ class DSNNHeb(SparseModel):
         self.prune_cycles_completed = 0
 
     def _init_hebbian(self):
-        """
-        Override method in children classes
-        Should only track coactivations if required by the algorithm
-        """
         for module in self.sparse_modules:
-            module.init_coactivation_tracking()
+            if self._is_dynamic(module):
+                module.init_coactivation_tracking()
         if hasattr(self.network, "forward_with_coactivations"):
             self.network.forward = self.network.forward_with_coactivations
+
+    def _is_dynamic(self):
+        return True
 
     def _pre_epoch_setup(self):
         if self.reset_coactivations:
             for module in self.sparse_modules:
-                module.reset_coactivations()
+                if self._is_dynamic(module):
+                    module.reset_coactivations()
 
     def _post_epoch_updates(self, dataset=None):
         super()._post_epoch_updates(dataset)
@@ -90,21 +92,24 @@ class DSNNHeb(SparseModel):
             survival_ratios = []
 
             for module in self.sparse_modules:
-                new_mask, keep_mask, new_synapses = self.prune(module)
-                with torch.no_grad():
-                    module.mask = new_mask.float()
-                    module.apply_mask()
+                if self._is_dynamic(module):
+                    new_mask, keep_mask, new_synapses = self.prune(module)
+                    with torch.no_grad():
+                        module.mask = new_mask.float()
+                        module.apply_mask()
 
-                    # count how many synapses from last round have survived
-                    if module.added_synapses is not None:
-                        total_added = torch.sum(module.added_synapses).item()
-                        surviving = torch.sum(module.added_synapses & keep_mask).item()
-                        if total_added:
-                            survival_ratio = surviving / total_added
-                            survival_ratios.append(survival_ratio)
+                        # count how many synapses from last round have survived
+                        if module.added_synapses is not None:
+                            total_added = torch.sum(module.added_synapses).item()
+                            surviving = torch.sum(
+                                module.added_synapses & keep_mask
+                            ).item()
+                            if total_added:
+                                survival_ratio = surviving / total_added
+                                survival_ratios.append(survival_ratio)
 
-                    # keep track of new synapses to count surviving on next round
-                    module.added_synapses = new_synapses
+                        # keep track of new synapses to count surviving on next round
+                        module.added_synapses = new_synapses
 
             # logging
             if self.debug_sparse:
@@ -252,16 +257,15 @@ class DSNNHeb(SparseModel):
 
         return add_mask
 
+    def prune(self, module):
+        pass
+
 
 class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
-    def _init_hebbian(self):
-        for module in self.sparse_modules:
-            if module.weight_prune is not None:
-                module.init_coactivation_tracking()
-        if hasattr(self.network, "forward_with_coactivations"):
-            self.network.forward = self.network.forward_with_coactivations
+    def _is_dynamic(self, module):
+        return module.weight_prune is not None
 
     def prune(self, module):
         """
@@ -272,7 +276,7 @@ class DSNNWeightedMag(DSNNHeb):
             # unpack module
             weight = module.m.weight.clone().detach()
             num_params = module.num_params
-            corr = module.m.coactivations
+            corr = module.get_coactivations()
             weight_prune_perc = module.weight_prune
             # init shared variables
             num_synapses = np.prod(weight.shape)
@@ -320,12 +324,8 @@ class DSNNWeightedMag(DSNNHeb):
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
-    def _init_hebbian(self):
-        for module in self.sparse_modules:
-            if module.hebbian_prune is not None:
-                module.init_coactivation_tracking()
-        if hasattr(self.network, "forward_with_coactivations"):
-            self.network.forward = self.network.forward_with_coactivations
+    def _is_dynamic(self, module):
+        return module.hebbian_prune is not None
 
     def prune(self, module):
         """Allows pruning by magnitude and hebbian"""
@@ -333,7 +333,7 @@ class DSNNMixedHeb(DSNNHeb):
             # unpack module
             weight = module.m.weight.clone().detach()
             num_params = module.num_params
-            corr = module.m.coactivations
+            corr = module.get_coactivations()
             hebbian_prune_perc = module.hebbian_prune
             weight_prune_perc = module.weight_prune
             # init shared variables
@@ -402,13 +402,17 @@ class DSNNMixedHeb(DSNNHeb):
         # track added connections
         return new_mask, keep_mask, add_mask
 
-    def prune_inverse(self, module):
+
+class DSNNMixedHebInverse(DSNNMixedHeb):
+    """Test the extreme alternative hypothesis"""
+
+    def prune(self, module):
         """Allows pruning by magnitude and hebbian"""
         with torch.no_grad():
             # unpack module
             weight = module.m.weight.clone().detach()
             num_params = module.num_params
-            corr = module.m.coactivations
+            corr = module.get_coactivations()
             hebbian_prune_perc = module.hebbian_prune
             weight_prune_perc = module.weight_prune
             # init shared variables

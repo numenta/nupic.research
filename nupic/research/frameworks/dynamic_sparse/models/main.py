@@ -59,9 +59,6 @@ class BaseModel:
             grad_prune_perc=0,
             test_noise=False,
             weight_decay=1e-4,
-            sparse_linear_only=False,
-            epsilon=None,
-            sparse_type="precise",  # precise, precise_per_output, approximate
             verbose=0,
             train_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
@@ -275,51 +272,6 @@ class SparseModel(BaseModel):
     - Zeroing out gradients in backprop before optimizer steps
     """
 
-    def _post_optimize_updates(self):
-        # zero out the weights after the step - avoid propagating bias
-        with torch.no_grad():
-            for module in self.sparse_modules:
-                module.apply_mask()
-
-    def _is_sparsifiable(self, module):
-        return isinstance(module, nn.Linear) or (
-            isinstance(module, nn.Conv2d) and not self.sparse_linear_only
-        )
-
-    def _get_sparse_modules(self):
-        sparse_modules = []
-        for idx, m in enumerate(
-            list(self.network.modules())[self.start_sparse : self.end_sparse]
-        ):
-            if self._is_sparsifiable(m):
-                sparse_modules.append(SparseModule(m=m, device=self.device, pos=idx))
-
-        return sparse_modules
-
-    def _make_attr_iterable(self, attr, counterpart):
-        """
-        This function (called in setup), ensures that a pre-existing attr
-        in an iterable (list) of length equal to self.sparse_modules.
-
-        :param attr: str - name of attribute to make into iterable
-        :param counterpart: Iterable with defined length - determines how many times
-                            to repeat the value of 'attr'. Defaults to
-                            self.sparse_modules.
-        """
-        value = getattr(self, attr)
-        if isinstance(value, Iterable):
-            assert len(value) == len(
-                counterpart
-            ), """
-                Expected "{}" to be of same length as counterpart ({}).
-                Got {} of type {}.
-                """.format(
-                attr, counterpart, value, type(value)
-            )
-        else:
-            value = [value] * len(counterpart)
-            setattr(self, attr, value)
-
     def setup(self):
         super(SparseModel, self).setup()
 
@@ -328,11 +280,11 @@ class SparseModel(BaseModel):
             start_sparse=None,
             end_sparse=None,
             sparse_linear_only=False,
-            init_sparse_fixed=True,
-            init_sparse_fixed_per_output=False,
             log_magnitude_vs_coactivations=False,  # scatter plot of magn. vs coacts.
-            reset_coactivations=True,
             on_perc=0.1,
+            epsilon=None,
+            sparse_type="precise",  # precise, precise_per_output, approximate
+            dynamic_layer=False,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
@@ -362,6 +314,58 @@ class SparseModel(BaseModel):
         # TODO: remove logging to separate class
         # if self.log_magnitude_vs_coactivations:
         #     self.network.apply(init_coactivation_tracking)
+
+    def _post_optimize_updates(self):
+        # zero out the weights after the step - avoid propagating bias
+        with torch.no_grad():
+            for module in self.sparse_modules:
+                module.apply_mask()
+
+    def _is_sparsifiable(self, module):
+        return isinstance(module, nn.Linear) or (
+            isinstance(module, nn.Conv2d) and not self.sparse_linear_only
+        )
+
+    def _get_sparse_modules(self):
+        sparse_modules = []
+        for idx, m in enumerate(
+            list(self.network.modules())[self.start_sparse : self.end_sparse]
+        ):
+            if self._is_sparsifiable(m):
+                sparse_modules.append(
+                    SparseModule(
+                        m=m,
+                        device=self.device,
+                        pos=idx,
+                        dynamic_layer=self.dynamic_layer,
+                    )
+                )
+
+        return sparse_modules
+
+    def _make_attr_iterable(self, attr, counterpart):
+        """
+        This function (called in setup), ensures that a pre-existing attr
+        in an iterable (list) of length equal to self.sparse_modules.
+
+        :param attr: str - name of attribute to make into iterable
+        :param counterpart: Iterable with defined length - determines how many times
+                            to repeat the value of 'attr'. Defaults to
+                            self.sparse_modules.
+        """
+        value = getattr(self, attr)
+        if isinstance(value, Iterable):
+            assert len(value) == len(
+                counterpart
+            ), """
+                Expected "{}" to be of same length as counterpart ({}).
+                Got {} of type {}.
+                """.format(
+                attr, counterpart, value, type(value)
+            )
+        else:
+            value = [value] * len(counterpart)
+            setattr(self, attr, value)
 
     def _run_one_pass(self, loader, train, noise=False):
         """TODO: remove logging to separate class"""
@@ -434,6 +438,7 @@ class SparseModule:
         weight_prune (float): Percentage to be pruned based on magnitude
         hebbian_prune (float): Percentage to be pruned based on hebbian stats
         device (torch.device): Device where to save and compute data.
+        dynamic_layer (bool): Adds compatibility to DynamicallyBaseLayers modules
         added_synapses (tensor): Tensor with synapses added at last growth round.
             Required to log custom metrics.
         last_gradients (tensor): Tensor with gradients at last iteration.
@@ -450,6 +455,7 @@ class SparseModule:
         weight_prune=None,
         hebbian_prune=None,
         device=None,
+        dynamic_layer=False,
     ):
         """document attributes"""
         self.m = m
@@ -461,6 +467,7 @@ class SparseModule:
         self.hebbian_prune = hebbian_prune
         self.weight_prune = weight_prune
         self.device = device
+        self.dynamic_layer = dynamic_layer
         # logging
         self.added_synapses = None
         self.last_gradients = None
@@ -510,6 +517,9 @@ class SparseModule:
             raise ValueError(
                 "{} is an invalid option for sparse type. ".format(sparse_type)
             )
+
+    def get_coactivations(self):
+        return self.m.coactivations
 
     def _mask_fixed_per_output(self):
         """
