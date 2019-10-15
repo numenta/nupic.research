@@ -54,7 +54,7 @@ base_exp_config = dict(
     # on_perc=0.04,
     # sparse related
     on_perc=tune.grid_search([0.02, 0.03, 0.04]),
-    weight_prune_perc=0.3,
+    weight_prune_perc=[None, None, 0.3, 0.3],
     # weight_prune_perc=tune.grid_search(list(np.arange(0, 1.001, 0.05))),
     # pruning_early_stop=2,
     # additional validation
@@ -66,7 +66,7 @@ base_exp_config = dict(
 
 # ray configurations
 tune_config = dict(
-    name=__file__.replace(".py", "") + "_3",
+    name=__file__.replace(".py", "") + "_5",
     num_samples=10,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
