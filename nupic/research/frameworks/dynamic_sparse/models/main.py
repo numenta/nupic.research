@@ -284,7 +284,6 @@ class SparseModel(BaseModel):
             on_perc=0.1,
             epsilon=None,
             sparse_type="precise",  # precise, precise_per_output, approximate
-            dynamic_layer=False,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
@@ -332,14 +331,7 @@ class SparseModel(BaseModel):
             list(self.network.modules())[self.start_sparse : self.end_sparse]
         ):
             if self._is_sparsifiable(m):
-                sparse_modules.append(
-                    SparseModule(
-                        m=m,
-                        device=self.device,
-                        pos=idx,
-                        dynamic_layer=self.dynamic_layer,
-                    )
-                )
+                sparse_modules.append(SparseModule(m=m, device=self.device, pos=idx))
 
         return sparse_modules
 
@@ -438,7 +430,6 @@ class SparseModule:
         weight_prune (float): Percentage to be pruned based on magnitude
         hebbian_prune (float): Percentage to be pruned based on hebbian stats
         device (torch.device): Device where to save and compute data.
-        dynamic_layer (bool): Adds compatibility to DynamicallyBaseLayers modules
         added_synapses (tensor): Tensor with synapses added at last growth round.
             Required to log custom metrics.
         last_gradients (tensor): Tensor with gradients at last iteration.
@@ -455,7 +446,6 @@ class SparseModule:
         weight_prune=None,
         hebbian_prune=None,
         device=None,
-        dynamic_layer=False,
     ):
         """document attributes"""
         self.m = m
@@ -467,7 +457,6 @@ class SparseModule:
         self.hebbian_prune = hebbian_prune
         self.weight_prune = weight_prune
         self.device = device
-        self.dynamic_layer = dynamic_layer
         # logging
         self.added_synapses = None
         self.last_gradients = None
