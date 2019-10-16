@@ -33,6 +33,8 @@ from pandas import DataFrame
 from nupic.research.frameworks.dynamic_sparse.networks import (
     DynamicSparseBase,
     NumScheduler,
+)
+from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     init_coactivation_tracking,
 )
 from nupic.torch.modules import update_boost_strength
@@ -53,18 +55,12 @@ class BaseModel:
             debug_weights=False,
             pruning_interval=1,
             log_images=False,
-            flip=False,
             weight_prune_perc=0,
             grad_prune_perc=0,
             test_noise=False,
             weight_decay=1e-4,
-            sparse_linear_only=False,
-            epsilon=None,
-            sparsify_fixed=True,
-            sparsify_fixed_per_output=False,
             verbose=0,
             train_batches_per_epoch=np.inf,  # default - don't limit the batches
-            test_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -104,14 +100,12 @@ class BaseModel:
 
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")
-        # TODO: why do test batches per epoch need to be schedulable?
-        self._make_attr_schedulable("test_batches_per_epoch")
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
         self.log = {}
-        self.network.train()
         self._pre_epoch_setup()
+        self.network.train()
         self._run_one_pass(dataset.train_loader, train=True)
         self.network.eval()
         self._run_one_pass(dataset.test_loader, train=False)
@@ -148,6 +142,9 @@ class BaseModel:
             if isinstance(val, NumScheduler):
                 val.step()
 
+    def _post_optimize_updates(self):
+        pass
+
     def _run_one_pass(self, loader, train=True, noise=False):
         epoch_loss = 0
         correct = 0
@@ -156,9 +153,6 @@ class BaseModel:
             # Limit number of batches per epoch if desired.
             if train:
                 if idx >= self.train_batches_per_epoch.get_value():
-                    break
-            else:
-                if idx >= self.test_batches_per_epoch.get_value():
                     break
 
             # setup for training
@@ -175,6 +169,7 @@ class BaseModel:
                 if train:
                     loss.backward()
                     self.optimizer.step()
+                    self._post_optimize_updates()
 
             # keep track of loss
             epoch_loss += loss.item() * inputs.size(0)
@@ -222,9 +217,11 @@ class BaseModel:
                 self.log[ltype + "_" + str(idx) + "_std"] = torch.std(m.weight).item()
 
     def save(self, checkpoint_dir):
+        # TODO: Implement
         pass
 
     def restore(self, checkpoint_dir):
+        # TODO: Implement
         pass
 
     # def _save(self, checkpoint_dir):
@@ -271,7 +268,6 @@ class BaseModel:
 
 class SparseModel(BaseModel):
     """Sparsity implemented by:
-
     - Masking on the weights
     - Zeroing out gradients in backprop before optimizer steps
     """
@@ -285,130 +281,59 @@ class SparseModel(BaseModel):
             end_sparse=None,
             sparse_linear_only=False,
             log_magnitude_vs_coactivations=False,  # scatter plot of magn. vs coacts.
-            reset_coactivations=True,
+            on_perc=0.1,
+            epsilon=None,
+            sparse_type="precise",  # precise, precise_per_output, approximate
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
 
-        # calculate sparsity masks
-        self.masks = []
-        self.num_params = []  # added for paper implementation
-
         # define all modules (those that are sparsifiable)
-        self.all_modules = self.get_all_modules(self.network)
-        self.all_modules = self.all_modules[self.start_sparse : self.end_sparse]
-        if self.sparse_linear_only:
-            self.all_modules = list(
-                filter(lambda m: isinstance(m, nn.Linear), self.all_modules)
-            )
+        self.sparse_modules = self._get_sparse_modules()
 
-        # added option to define sparsity by on_perc
+        # option to define sparsity by on_perc instead of epsilon
         if "on_perc" in self.__dict__:
-            self._make_attr_iterable("on_perc", self.all_modules)
+            self._make_attr_iterable("on_perc", self.sparse_modules)
             self.epsilon = None
 
-            self.on_perc_sparse = [p for p in self.on_perc if p is not None]
+        # define sparse modules
+        for idx, module in enumerate(self.sparse_modules):
+            # define on_perc
+            if self.epsilon:
+                shape = module.shape
+                module.on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
+            else:
+                module.on_perc = self.on_perc[idx]
+            if module.on_perc < 1:
+                module.create_mask(self.sparse_type)
+                with torch.no_grad():
+                    module.apply_mask()
+                    module.save_num_params()
 
-            assert len(self.on_perc) == len(
-                self.all_modules
-            ), """
-            `on_perc` should have been made into an iterable to coincide with
-                `all_modules` = {}
-            """.format(
-                [m.__class__.__name__ for m in self.all_modules]
-            )
+        # TODO: remove logging to separate class
+        # if self.log_magnitude_vs_coactivations:
+        #     self.network.apply(init_coactivation_tracking)
 
-        # define sparse modules according to `on_perc`
-        self.sparse_modules = self.get_sparse_modules()
-
-        # define the subset of sparse_modules that are dynamic
-        self.dynamic_sparse_modules = self.get_dynamic_sparse_modules()
-
-        assert set(self.dynamic_sparse_modules) <= set(self.sparse_modules)
-
-        # quick sanity check
-        if "on_perc" in self.__dict__:
-            assert len(self.on_perc_sparse) == len(
-                self.sparse_modules
-            ), """
-            `on_perc_sparse` should have been made into an iterable to coincide with
-                `sparse_modules` = {}
-            """.format(
-                [m.__class__.__name__ for m in self.sparse_modules]
-            )
-
+    def _post_optimize_updates(self):
+        # zero out the weights after the step - avoid propagating bias
         with torch.no_grad():
-            on_perc = self.on_perc_sparse
-            for idx, m in enumerate(self.sparse_modules):
-                shape = m.weight.shape
-                # two approaches of defining epsilon
-                if self.epsilon:
-                    on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
-                if on_perc[idx] >= 1:
-                    mask = torch.ones(shape).float().to(self.device)
-                elif self.sparsify_fixed_per_output:
-                    mask = self._sparsify_fixed_per_output(shape, on_perc[idx])
-                elif self.sparsify_fixed:
-                    mask = self._sparsify_fixed(shape, on_perc[idx])
-                else:
-                    mask = self._sparsify_stochastic(shape, on_perc[idx])
-                m.weight.data *= mask
-                self.masks.append(mask)
-                self.num_params.append(torch.sum(mask).item())
+            for module in self.sparse_modules:
+                module.apply_mask()
 
-        if self.log_magnitude_vs_coactivations:
-            self.network.apply(init_coactivation_tracking)
+    def _is_sparsifiable(self, module):
+        return isinstance(module, nn.Linear) or (
+            isinstance(module, nn.Conv2d) and not self.sparse_linear_only
+        )
 
-    def is_sparsifiable(self, module):
-        return isinstance(module, (nn.Linear, nn.Conv2d))
-
-    def get_all_modules(self, network):
-        """
-        This function recursively finds which modules are "sparsifiable".
-        The encapsulated logic crucially assumes that no conv or linear
-        layers have sub-children that need sparsifying.
-
-        Note: For instance DSConv2d layers have Conv2d children.
-        """
-        all_modules = []
-        for m in network.children():
-
-            # Check if Conv or Linear.
-            if self.is_sparsifiable(m):
-                all_modules.append(m)
-
-            # Check if recursion needed.
-            elif len(list(m.children())) > 0:
-                all_modules.extend(self.get_all_modules(m))
-
-        return all_modules
-
-    def get_sparse_modules(self):
-        """
-        This function gets the modules of `all_modules` which have an
-        `on_perc` that is not None.
-        """
+    def _get_sparse_modules(self):
         sparse_modules = []
-        for m, on_perc in zip(self.all_modules, self.on_perc):
-
-            if on_perc is not None:
-                sparse_modules.append(m)
+        for idx, m in enumerate(
+            list(self.network.modules())[self.start_sparse : self.end_sparse]
+        ):
+            if self._is_sparsifiable(m):
+                sparse_modules.append(SparseModule(m=m, device=self.device, pos=idx))
 
         return sparse_modules
-
-    def get_dynamic_sparse_modules(self):
-        """
-        This function gets the modules of `sparse_modules` which are
-        sub-classed from `DynamicSparseBase`
-        """
-        dynamic_sparse_modules = []
-        for m in self.sparse_modules:
-
-            # Check if Conv or Linear.
-            if isinstance(m, (DynamicSparseBase)):
-                dynamic_sparse_modules.append(m)
-
-        return dynamic_sparse_modules
 
     def _make_attr_iterable(self, attr, counterpart):
         """
@@ -434,116 +359,13 @@ class SparseModel(BaseModel):
             value = [value] * len(counterpart)
             setattr(self, attr, value)
 
-    def _sparsify_fixed_per_output(self, shape, on_perc):
-        """
-        Similar implementation to how so dense
-        Works in any number of dimension, considering the 1st one is the output
-        """
-        output_size = shape[0]
-        input_size = np.prod(shape[1:])
-        num_add = int(on_perc * input_size)
-        mask = torch.zeros(shape, dtype=torch.bool)
-        # loop over outputs
-        for dim in range(output_size):
-            # select a subsample of the indexes in the output unit
-            all_idxs = np.array(list(product(*[range(s) for s in shape[1:]])))
-            sampled_idxs = np.random.choice(
-                range(len(all_idxs)), num_add, replace=False
-            )
-            selected = all_idxs[sampled_idxs]
-            if len(selected) > 0:
-                # change from long to wide format
-                selected_wide = list(zip(*selected))
-                # append the output dimension to wide format
-                selected_wide.insert(0, tuple([dim] * len(selected_wide[0])))
-                # apply the mask
-                mask[selected_wide] = True
-        return mask.float().to(self.device)
-
-    # def _sparsify_fixed(self, shape, on_perc):
-    #     """
-    #     Deterministic in number of params approach of sparsifying a tensor
-    #     Sample N from all possible indices
-    #     """
-    #     all_idxs = np.array(list(product(*[range(s) for s in shape])))
-    #     num_add = int(on_perc * np.prod(shape))
-    #     sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
-    #     selected = all_idxs[sampled_idxs]
-
-    #     mask = torch.zeros(shape, dtype=torch.bool)
-    #     if len(selected.shape) > 1:
-    #         mask[list(zip(*selected))] = True
-    #     else:
-    #         mask[selected] = True
-
-    #     return mask.float().to(self.device)
-
-    def _sparsify_stochastic(self, shape, on_perc):
-        """Sthocastic in num of params approach of sparsifying a tensor"""
-        return (torch.rand(shape) < on_perc).float().to(self.device)
-
-    def _sparsify_fixed(self, shape, on_perc):
-        """
-        Deterministic in number of params approach of sparsifying a tensor
-        Sample N from all possible indices
-        """
-        all_idxs = np.array(list(product(*[range(s) for s in shape])))
-        num_add = int(on_perc * np.prod(shape))
-        sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
-        selected = all_idxs[sampled_idxs]
-
-        mask = torch.zeros(shape, dtype=torch.bool)
-        if len(selected.shape) > 1:
-            mask[list(zip(*selected))] = True
-        else:
-            mask[selected] = True
-
-        return mask.float().to(self.device)
-
     def _run_one_pass(self, loader, train, noise=False):
-        """TODO: reimplement by calling super and passing a hook"""
-        epoch_loss = 0
-        epoch_correct = 0
-        for inputs, targets in loader:
-            # setup for training
-            inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
-            self.optimizer.zero_grad()  # zero out gradients
-
-            # forward + backward + optimize
-            with torch.set_grad_enabled(train):
-                outputs = self.network(inputs)
-                _, preds = torch.max(outputs, 1)
-                epoch_correct += torch.sum(targets == preds).item()
-                loss = self.loss_func(outputs, targets)
-                if train:
-                    loss.backward()
-                    self.optimizer.step()
-                    # zero out the weights after the step - avoid propagating bias
-                    with torch.no_grad():
-                        for mask, m in zip(self.masks, self.sparse_modules):
-                            m.weight.data *= mask
-
-            # keep track of loss and accuracy
-            epoch_loss += loss.item() * inputs.size(0)
-
-        # store loss and acc at each pass
-        loss = epoch_loss / len(loader.dataset)
-        acc = epoch_correct / len(loader.dataset)
-        if train:
-            self.log["train_loss"] = loss
-            self.log["train_acc"] = acc
-        else:
-            if noise:
-                self.log["noise_loss"] = loss
-                self.log["noise_acc"] = acc
-            else:
-                self.log["val_loss"] = loss
-                self.log["val_acc"] = acc
+        """TODO: remove logging to separate class"""
+        super()._run_one_pass(loader, train, noise)
 
         # save scatter plot of magn vs coacts.
         if train and self.log_magnitude_vs_coactivations:
-            for i, m in enumerate(self.dynamic_sparse_modules):
+            for i, m in enumerate(self.sparse_modules):
 
                 coacts = m.coactivations.clone().detach().to("cpu").numpy()
                 weight = m.weight.clone().detach().to("cpu").numpy()
@@ -576,25 +398,163 @@ class SparseModel(BaseModel):
         if train and self.debug_sparse:
             self._log_sparse_levels()
 
-    def _pre_epoch_setup(self):
-        if self.reset_coactivations:
-            for m in self.dynamic_sparse_modules:
-                m.reset_coactivations()
-
     def _log_sparse_levels(self):
         with torch.no_grad():
-            for idx, m in enumerate(self.sparse_modules):
-                zero_mask = m.weight == 0
+            for idx, module in enumerate(self.sparse_modules):
+                zero_mask = module.m.weight == 0
                 zero_count = torch.sum(zero_mask.int()).item()
-                size = np.prod(m.weight.shape)
+                size = np.prod(module.shape)
                 log_name = "sparse_level_l" + str(idx)
                 self.log[log_name] = 1 - zero_count / size
 
                 # log image as well
                 if self.log_images:
-                    if self.has_params(m) == "conv":
-                        ratio = 255 / np.prod(m.weight.shape[2:])
+                    if self.has_params(module.m) == "conv":
+                        ratio = 255 / np.prod(module.shape[2:])
                         heatmap = (
-                            torch.sum(m.weight, dim=[2, 3]).float() * ratio
+                            torch.sum(module.m.weight, dim=[2, 3]).float() * ratio
                         ).int()
                         self.log["img_" + log_name] = heatmap.tolist()
+
+
+class SparseModule:
+    """Module wrapper for sparse layers
+    Attributes:
+        m (torch.nn.module): Original module to be wrapped.
+        pos (int): Position in the list of sparse modules, used for logging
+        on_perc (float): Percentage of non-zero weights
+        shape (tuple): Shape of the underlying weight matrix
+        num_params (int): Number of non-zero params at initialization/
+            before training
+        mask (tensor): Binary tensor. 1 where connection is active, 0 otherwise
+        weight_prune (float): Percentage to be pruned based on magnitude
+        hebbian_prune (float): Percentage to be pruned based on hebbian stats
+        device (torch.device): Device where to save and compute data.
+        added_synapses (tensor): Tensor with synapses added at last growth round.
+            Required to log custom metrics.
+        last_gradients (tensor): Tensor with gradients at last iteration.
+            Required to log custom metrics.
+    """
+
+    def __init__(
+        self,
+        m,
+        pos=None,
+        on_perc=None,
+        num_params=None,
+        mask=None,
+        weight_prune=None,
+        hebbian_prune=None,
+        device=None,
+    ):
+        """document attributes"""
+        self.m = m
+        self.shape = m.weight.shape
+        self.pos = pos
+        self.on_perc = on_perc
+        self.num_params = num_params
+        self.mask = mask
+        self.hebbian_prune = hebbian_prune
+        self.weight_prune = weight_prune
+        self.device = device
+        # logging
+        self.added_synapses = None
+        self.last_gradients = None
+
+    def __repr__(self):
+        return str(
+            {
+                "name": self.m._get_name(),
+                "index": self.pos,
+                "shape": self.shape,
+                "on_perc": self.on_perc,
+                "hebbian_prune": self.hebbian_prune,
+                "weight_prune": self.weight_prune,
+                "num_params": self.num_params,
+            }
+        )
+
+    def nonzero_params(self):
+        return torch.sum(self.mask).item()
+
+    def save_num_params(self):
+        self.num_params = self.nonzero_params()
+
+    def init_coactivation_tracking(self):
+        if isinstance(self.m, DynamicSparseBase):
+            self.m.apply(init_coactivation_tracking)
+        else:
+            self.m.coactivations = torch.zeros(self.m.weight.shape).to(self.device)
+
+    def reset_coactivations(self, reset=True):
+        if isinstance(self.m, DynamicSparseBase):
+            self.m.reset_coactivations()
+        else:
+            self.m.coactivations[:] = 0
+
+    def apply_mask(self):
+        self.m.weight.data *= self.mask
+
+    def create_mask(self, sparse_type):
+        if sparse_type == "precise":
+            self._mask_fixed()
+        elif sparse_type == "precise_per_output":
+            self._mask_fixed_per_output()
+        elif sparse_type == "approximate":
+            self._mask_stochastic()
+        else:
+            raise ValueError(
+                "{} is an invalid option for sparse type. ".format(sparse_type)
+            )
+
+    def get_coactivations(self):
+        return self.m.coactivations
+
+    def _mask_fixed_per_output(self):
+        """
+        Similar implementation to how so dense
+        Works in any number of dimension, considering the 1st one is the output
+        """
+        output_size = self.shape[0]
+        input_size = np.prod(self.shape[1:])
+        num_add = int(self.on_perc * input_size)
+        mask = torch.zeros(self.shape, dtype=torch.bool)
+        # loop over outputs
+        for dim in range(output_size):
+            # select a subsample of the indexes in the output unit
+            all_idxs = np.array(list(product(*[range(s) for s in self.shape[1:]])))
+            sampled_idxs = np.random.choice(
+                range(len(all_idxs)), num_add, replace=False
+            )
+            selected = all_idxs[sampled_idxs]
+            if len(selected) > 0:
+                # change from long to wide format
+                selected_wide = list(zip(*selected))
+                # append the output dimension to wide format
+                selected_wide.insert(0, tuple([dim] * len(selected_wide[0])))
+                # apply the mask
+                mask[selected_wide] = True
+
+        self.mask = mask.float().to(self.device)
+
+    def _mask_stochastic(self):
+        """Sthocastic in num of params approach of sparsifying a tensor"""
+        self.mask = (torch.rand(self.shape) < self.on_perc).float().to(self.device)
+
+    def _mask_fixed(self):
+        """
+        Deterministic in number of params approach of sparsifying a tensor
+        Sample N from all possible indices
+        """
+        all_idxs = np.array(list(product(*[range(s) for s in self.shape])))
+        num_add = int(self.on_perc * np.prod(self.shape))
+        sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
+        selected = all_idxs[sampled_idxs]
+
+        mask = torch.zeros(self.shape, dtype=torch.bool)
+        if len(selected.shape) > 1:
+            mask[list(zip(*selected))] = True
+        else:
+            mask[selected] = True
+
+        self.mask = mask.float().to(self.device)
