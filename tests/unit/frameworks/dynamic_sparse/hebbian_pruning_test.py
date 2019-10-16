@@ -27,6 +27,7 @@ import torch
 from nupic.research.frameworks.dynamic_sparse.models import (
     DSNNMixedHeb,
     DSNNWeightedMag,
+    SparseModule,
 )
 from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb
 
@@ -42,8 +43,13 @@ def expand(list_of_indices):
 class WeightedMagPruningTest(unittest.TestCase):
     def setUp(self):
 
+        self.model = DSNNWeightedMag(network=MLPHeb())
+        self.model.setup()
+
+        self.sparse_module = SparseModule(m=torch.nn.Linear(5, 5))
+
         # dummy coactivation matrix
-        self.corr = torch.tensor(
+        self.sparse_module.m.coactivations = torch.tensor(
             [
                 [0.3201, 0.8318, 0.3382, 0.9734, 0.0985],
                 [0.0401, 0.8620, 0.0845, 0.3778, 0.3996],
@@ -71,6 +77,10 @@ class WeightedMagPruningTest(unittest.TestCase):
                 [-14, 18, -6, 0, 0],
             ]
         ).float()
+        self.sparse_module.m.weight = torch.nn.Parameter(self.weight)
+        self.sparse_module.mask = (self.weight != 0).float()
+        self.sparse_module.pos = 1
+        self.sparse_module.save_num_params()
 
         # weights
         # [[ 6.0819,  0.0802, -5.9448,  0.0000,  0.0000],
@@ -90,17 +100,11 @@ class WeightedMagPruningTest(unittest.TestCase):
 
     def test_pruning_partial(self):
 
-        network = MLPHeb(
-            config=dict(input_size=3, num_classes=2, hidden_sizes=[4, 5], bias=False)
-        )
-        model = DSNNWeightedMag(
-            network=network,
-            config=dict(on_perc=0.5, hebbian_prune_perc=0, weight_prune_perc=0.5),
-        )
-        model.setup()
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        self.sparse_module.on_perc = 0.5
+        self.sparse_module.hebbian_prune = 0
+        self.sparse_module.weight_prune = 0.5
+
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         # test keep mask
         falses = ~keep_mask[expand(self.lowest_50_mag)]
@@ -138,15 +142,11 @@ class WeightedMagPruningTest(unittest.TestCase):
 
     def test_pruning_all(self):
 
-        model = DSNNWeightedMag(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=1),
-        )
-        model.setup()
+        self.sparse_module.on_perc = 0.1
+        self.sparse_module.hebbian_prune = 0
+        self.sparse_module.weight_prune = 1
 
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         # keep mask should not include any of previously existing connections
         self.assertEqual(
@@ -171,15 +171,11 @@ class WeightedMagPruningTest(unittest.TestCase):
 
     def test_pruning_none(self):
 
-        model = DSNNWeightedMag(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=0),
-        )
-        model.setup()
+        self.sparse_module.on_perc = 0.1
+        self.sparse_module.hebbian_prune = 0
+        self.sparse_module.weight_prune = 0
 
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         # keep mask should not include any of previously existing connections
         self.assertEqual(
@@ -206,8 +202,13 @@ class WeightedMagPruningTest(unittest.TestCase):
 class HebbianPruningTest(unittest.TestCase):
     def setUp(self):
 
+        self.model = DSNNMixedHeb(network=MLPHeb())
+        self.model.setup()
+
+        self.sparse_module = SparseModule(m=torch.nn.Linear(5, 5))
+
         # dummy coactivation matrix
-        self.corr = torch.tensor(
+        self.sparse_module.m.coactivations = torch.tensor(
             [
                 [0.3201, 0.8318, 0.3382, 0.9734, 0.0985],
                 [0.0401, 0.8620, 0.0845, 0.3778, 0.3996],
@@ -235,6 +236,10 @@ class HebbianPruningTest(unittest.TestCase):
                 [-14, 18, -6, 0, 0],
             ]
         ).float()
+        self.sparse_module.m.weight = torch.nn.Parameter(self.weight)
+        self.sparse_module.mask = (self.weight != 0).float()
+        self.sparse_module.pos = 1
+        self.sparse_module.save_num_params()
 
         # manually define which connections will be pruned
         # select lowest 25% correlations
@@ -252,14 +257,11 @@ class HebbianPruningTest(unittest.TestCase):
 
     def test_partial_magnitude_and_hebbian(self):
 
-        model = DSNNMixedHeb(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=0.25, weight_prune_perc=0.50),
-        )
-        model.setup()
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        self.sparse_module.on_perc = 0.1
+        self.sparse_module.hebbian_prune = 0.25
+        self.sparse_module.weight_prune = 0.50
+
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         intersection = self.mag_hebb_intersection
         complement = set(self.nonzero_idxs).difference(intersection)
@@ -296,14 +298,11 @@ class HebbianPruningTest(unittest.TestCase):
 
     def test_partial_magnitude(self):
 
-        model = DSNNMixedHeb(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=0.5),
-        )
-        model.setup()
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        self.sparse_module.on_perc = 0.1
+        self.sparse_module.hebbian_prune = 0
+        self.sparse_module.weight_prune = 0.5
+
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         # test keep mask
         falses = ~keep_mask[expand(self.lowest_50_mag)]
@@ -341,20 +340,18 @@ class HebbianPruningTest(unittest.TestCase):
 
     def test_partial_hebbian(self):
 
-        model = DSNNMixedHeb(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=0.25, weight_prune_perc=0),
-        )
-        model.setup()
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        self.sparse_module.on_perc = 0.1
+        self.sparse_module.hebbian_prune = 0.25
+        self.sparse_module.weight_prune = 0
+
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         # test keep mask
         falses = ~keep_mask[expand(self.lowest_25_hebb)]
         highest_75 = set(self.nonzero_idxs).difference(self.lowest_25_hebb)
         trues = keep_mask[expand(highest_75)]
 
+        # print(keep_mask)
         self.assertEqual(
             torch.sum(falses).item(), 3, "Lowest 25perc in correlations should be False"
         )
@@ -386,15 +383,11 @@ class HebbianPruningTest(unittest.TestCase):
 
     def test_full_hebbian(self):
 
-        model = DSNNMixedHeb(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=1, weight_prune_perc=0),
-        )
-        model.setup()
+        self.sparse_module.on_perc = 0.1
+        self.sparse_module.hebbian_prune = 1
+        self.sparse_module.weight_prune = 0
 
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         # keep mask should not include any of the previously existing connections
         self.assertEqual(
@@ -419,15 +412,11 @@ class HebbianPruningTest(unittest.TestCase):
 
     def test_full_magnitude(self):
 
-        model = DSNNMixedHeb(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=0, weight_prune_perc=1),
-        )
-        model.setup()
+        self.sparse_module.on_perc = 0.1
+        self.sparse_module.hebbian_prune = 0
+        self.sparse_module.weight_prune = 1
 
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         # keep mask should not include any of previously existing connections
         self.assertEqual(
@@ -452,15 +441,11 @@ class HebbianPruningTest(unittest.TestCase):
 
     def test_full_magnitude_and_hebbian(self):
 
-        model = DSNNMixedHeb(
-            network=MLPHeb(),
-            config=dict(on_perc=0.1, hebbian_prune_perc=1, weight_prune_perc=1),
-        )
-        model.setup()
+        self.sparse_module.on_perc = 0.1
+        self.sparse_module.hebbian_prune = 1
+        self.sparse_module.weight_prune = 1
 
-        new_mask, keep_mask, add_mask = model.prune(
-            self.weight, self.num_params, self.corr
-        )
+        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
         # keep mask should not include any of the previously existing connections
         self.assertEqual(

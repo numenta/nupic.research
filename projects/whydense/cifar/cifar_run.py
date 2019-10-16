@@ -23,6 +23,8 @@
 import argparse
 import json
 import os
+import sys
+from pathlib import Path
 
 import torch
 from torchvision import datasets
@@ -39,6 +41,7 @@ def train_models(configs, project_dir):
     # Run all experiments in serial
     if len(configs) == 0:
         print("No experiments to run!")
+        sys.exit()
 
     for exp in configs:
         config = configs[exp]
@@ -47,13 +50,13 @@ def train_models(configs, project_dir):
 
         # Make sure local directories are relative to the project location
         path = config.get("path", "results")
-        if not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+        path = Path(path).expanduser().resolve()
+        config["path"] = path
 
-        if "data_dir" not in config:
-            config["data_dir"] = data_dir
-        if not os.path.isabs(config["data_dir"]):
-            config["data_dir"] = os.path.abspath(config["data_dir"])
+        data_dir = config.get("data_dir", data_dir)
+        data_dir = Path(data_dir).expanduser().resolve()
+        config["data_dir"] = data_dir
+
         datasets.CIFAR10(data_dir, download=True, train=True)
 
         model = TinyCIFAR()

@@ -98,9 +98,7 @@ tune_config = dict(
 
 # define experiments
 experiments = {
-    "mlp-sparse": dict(
-        model=ray.tune.grid_search(["SparseModel"]),
-    ),
+    "mlp-sparse": dict(model=ray.tune.grid_search(["SparseModel"])),
     "mlp-SET": dict(
         model=ray.tune.grid_search(["DSNNMixedHeb"]),
         # sparse related

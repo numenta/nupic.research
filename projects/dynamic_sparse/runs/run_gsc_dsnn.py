@@ -93,30 +93,32 @@ tune_config = dict(
 
 # define experiments
 experiments = {
-    "gsc-BaseModel": dict(
-        model=ray.tune.grid_search(["BaseModel"]),
-    ),
+    "gsc-BaseModel": dict(model=ray.tune.grid_search(["BaseModel"])),
     "gsc-Static": dict(
         model=ray.tune.grid_search(["SparseModel"]),
         # sparse related
-        on_perc=ray.tune.grid_search([
-            [None, None, 0.4, None],
-            [None, None, 0.1, None],
-            [None, None, 0.05, None],
-            [None, None, 0.025, None],
-        ])
+        on_perc=ray.tune.grid_search(
+            [
+                [None, None, 0.4, None],
+                [None, None, 0.1, None],
+                [None, None, 0.05, None],
+                [None, None, 0.025, None],
+            ]
+        ),
     ),
     "gsc-Heb": dict(
         model=ray.tune.grid_search(["DSNNMixedHeb"]),
         # network related
         prune_methods=[None, None, "dynamic-linear", None],
         # sparse related
-        on_perc=ray.tune.grid_search([
-            [None, None, 0.4, None],
-            [None, None, 0.1, None],
-            [None, None, 0.05, None],
-            [None, None, 0.025, None],
-        ]),
+        on_perc=ray.tune.grid_search(
+            [
+                [None, None, 0.4, None],
+                [None, None, 0.1, None],
+                [None, None, 0.05, None],
+                [None, None, 0.025, None],
+            ]
+        ),
         hebbian_prune_perc=0.3,
         hebbian_grow=True,
         weight_prune_perc=None,
@@ -130,12 +132,14 @@ experiments = {
         # network related
         prune_methods=[None, None, "dynamic-linear", None],
         # sparse related
-        on_perc=ray.tune.grid_search([
-            [None, None, 0.4, None],
-            [None, None, 0.1, None],
-            [None, None, 0.05, None],
-            [None, None, 0.025, None],
-        ]),
+        on_perc=ray.tune.grid_search(
+            [
+                [None, None, 0.4, None],
+                [None, None, 0.1, None],
+                [None, None, 0.05, None],
+                [None, None, 0.025, None],
+            ]
+        ),
         hebbian_prune_perc=None,
         hebbian_grow=False,
         weight_prune_perc=0.3,
