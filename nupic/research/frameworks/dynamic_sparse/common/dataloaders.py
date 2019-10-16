@@ -95,6 +95,9 @@ class PreprocessedSpeechDataset(Dataset):
         """
         self.classes = classes
 
+        # backward compatibility
+        if root[-3:] != "gsc":
+            root += "/gsc"
         self._root = root
         self._subset = subset
 

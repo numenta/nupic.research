@@ -19,19 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections.abc import Iterable
-
 import numpy as np
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.networks.layers import (
-    DSConv2d,
-    DynamicSparseBase,
-    calc_sparsity,
-    init_coactivation_tracking,
-)
-
-from .main import BaseModel, SparseModel
+from .main import SparseModel
 
 
 class DSNNHeb(SparseModel):
@@ -40,13 +31,6 @@ class DSNNHeb(SparseModel):
     def setup(self):
         super().setup()
 
-        # Set some attributes to be a list corresponding to self.dynamic_sparse_modules.
-        for attr in ["hebbian_prune_perc", "weight_prune_perc"]:
-            self._make_attr_iterable(attr, counterpart=self.dynamic_sparse_modules)
-
-        self.added_synapses = [None for m in self.masks]
-        self.last_gradients = [None for m in self.masks]
-
         # add specific defaults
         new_defaults = dict(
             pruning_active=True,
@@ -54,20 +38,41 @@ class DSNNHeb(SparseModel):
             hebbian_prune_perc=None,
             weight_prune_perc=None,
             hebbian_grow=True,
+            reset_coactivations=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
 
+        # Set some attributes to be a list corresponding to self.dynamic_sparse_modules.
+        for attr in ["hebbian_prune_perc", "weight_prune_perc"]:
+            self._make_attr_iterable(attr, counterpart=self.sparse_modules)
+
+        for idx, (hprune, wprune) in enumerate(
+            zip(self.hebbian_prune_perc, self.weight_prune_perc)
+        ):
+            module = self.sparse_modules[idx]
+            module.hebbian_prune = hprune
+            module.weight_prune = wprune
+
         # initialize hebbian learning
-        self._init_coactivation_tracking()
+        self._init_hebbian()
         self.prune_cycles_completed = 0
 
-    def _init_coactivation_tracking(self):
-        """
-        Override method in children classes
-        Should only track coactivations if required by the algorithm
-        """
-        self.network.apply(init_coactivation_tracking)
+    def _init_hebbian(self):
+        for module in self.sparse_modules:
+            if self._is_dynamic(module):
+                module.init_coactivation_tracking()
+        if hasattr(self.network, "forward_with_coactivations"):
+            self.network.forward = self.network.forward_with_coactivations
+
+    def _is_dynamic(self, module):
+        return True
+
+    def _pre_epoch_setup(self):
+        if self.reset_coactivations:
+            for module in self.sparse_modules:
+                if self._is_dynamic(module):
+                    module.reset_coactivations()
 
     def _post_epoch_updates(self, dataset=None):
         super()._post_epoch_updates(dataset)
@@ -86,52 +91,31 @@ class DSNNHeb(SparseModel):
             # keep track of added synapes
             survival_ratios = []
 
-            s_idx = 0  # mask index (+1 per sparse module)
-            ds_idx = 0  # pruning index (+1 per dynamic-sparse module)
-            for m in self.sparse_modules:
+            for module in self.sparse_modules:
+                if self._is_dynamic(module):
+                    new_mask, keep_mask, new_synapses = self.prune(module)
+                    with torch.no_grad():
+                        module.mask = new_mask.float()
+                        module.apply_mask()
 
-                # Case 1: Not Dynamic
-                if not isinstance(m, DynamicSparseBase):
-                    # Iterate for just a sparse module.
-                    # Don't update the masks - keep sparsity as is.
-                    s_idx += 1
-                    continue
+                        # count how many synapses from last round have survived
+                        if module.added_synapses is not None:
+                            total_added = torch.sum(module.added_synapses).item()
+                            surviving = torch.sum(
+                                module.added_synapses & keep_mask
+                            ).item()
+                            if total_added:
+                                survival_ratio = surviving / total_added
+                                survival_ratios.append(survival_ratio)
 
-                # Case 2: Dynamic.
-                # Update masks - make the sparsity dynamic.
-                coacts = m.coactivations
-                new_mask, keep_mask, new_synapses = self.prune(
-                    m.weight.clone().detach(),
-                    self.num_params[s_idx],
-                    coacts,
-                    idx=ds_idx,
-                )
-                with torch.no_grad():
-                    self.masks[s_idx] = new_mask.float()
-                    m.weight.data *= self.masks[s_idx]
-
-                    # count how many synapses from last round have survived
-                    if self.added_synapses[s_idx] is not None:
-                        total_added = torch.sum(self.added_synapses[s_idx]).item()
-                        surviving = torch.sum(
-                            self.added_synapses[s_idx] & keep_mask
-                        ).item()
-                        if total_added:
-                            survival_ratio = surviving / total_added
-                            survival_ratios.append(survival_ratio)
-
-                    # keep track of new synapses to count surviving on next round
-                    self.added_synapses[s_idx] = new_synapses
-
-                # Iterate as dynamic-sparse and sparse module (it's technically both)
-                s_idx += 1
-                ds_idx += 1
+                        # keep track of new synapses to count surviving on next round
+                        module.added_synapses = new_synapses
 
             # logging
             if self.debug_sparse:
-                for idx, (m, sr) in enumerate(zip(self.masks, survival_ratios)):
-                    self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
-                    self.log["surviving_synapses_l" + str(idx)] = sr
+                for module, sr in zip(self.sparse_modules, survival_ratios):
+                    self.log["mask_sizes_l" + str(module.pos)] = module.nonzero_params()
+                    self.log["surviving_synapses_l" + str(module.pos)] = sr
                 self.log["surviving_synapses_avg"] = np.mean(survival_ratios)
 
     def _get_hebbian_mask(self, weight, corr, active_synapses, prune_perc):
@@ -273,34 +257,37 @@ class DSNNHeb(SparseModel):
 
         return add_mask
 
+    def prune(self, module):
+        pass
+
 
 class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
-    def _init_coactivation_tracking(self):
-        modules_and_percs = zip(self.dynamic_sparse_modules, self.weight_prune_perc)
-        for m, weight_prune_frac in modules_and_percs:
-            if weight_prune_frac is not None:
-                m.apply(init_coactivation_tracking)
+    def _is_dynamic(self, module):
+        return module.weight_prune is not None
 
-    def prune(self, weight, num_params, corr, idx=0):
+    def prune(self, module):
         """
         Grow by correlation
         Prune by magnitude
         """
         with torch.no_grad():
+            # unpack module
+            weight = module.m.weight.clone().detach()
+            num_params = module.num_params
+            corr = module.get_coactivations()
+            weight_prune_perc = module.weight_prune
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
-            # multiply correlation by weight, and then apply regular weight pruning
-            weight *= corr
-
             # ----------- PRUNING ----------------
-            weight_prune_perc = self.weight_prune_perc[idx]
 
             if weight_prune_perc is not None:
+                # multiply correlation by weight, and then apply regular weight pruning
+                weight *= corr
                 keep_mask = self._get_magnitude_mask(
                     weight, active_synapses, weight_prune_perc
                 )
@@ -317,6 +304,7 @@ class DSNNWeightedMag(DSNNHeb):
             new_mask = keep_mask | add_mask
 
             # logging
+            idx = module.pos
             if self.debug_sparse:
                 self.log["keep_mask_l" + str(idx)] = (
                     torch.sum(keep_mask).item() / num_synapses
@@ -336,28 +324,24 @@ class DSNNWeightedMag(DSNNHeb):
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
-    def _init_coactivation_tracking(self):
-        modules_and_percs = zip(
-            self.dynamic_sparse_modules,
-            self.hebbian_prune_perc,
-            self.weight_prune_perc
-        )
-        for m, heb_prune_frac, weight_prune_frac in modules_and_percs:
-            if (heb_prune_frac is not None) or (weight_prune_frac is not None):
-                m.apply(init_coactivation_tracking)
+    def _is_dynamic(self, module):
+        return module.hebbian_prune is not None
 
-    def prune(self, weight, num_params, corr, idx=0):
+    def prune(self, module):
         """Allows pruning by magnitude and hebbian"""
         with torch.no_grad():
+            # unpack module
+            weight = module.m.weight.clone().detach()
+            num_params = module.num_params
+            corr = module.get_coactivations()
+            hebbian_prune_perc = module.hebbian_prune
+            weight_prune_perc = module.weight_prune
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
             # ----------- PRUNE ----------------
-            hebbian_prune_perc = self.hebbian_prune_perc[idx]
-            weight_prune_perc = self.weight_prune_perc[idx]
-
             if hebbian_prune_perc is not None:
                 hebbian_mask = self._get_hebbian_mask(
                     weight, corr, active_synapses, hebbian_prune_perc
@@ -393,6 +377,7 @@ class DSNNMixedHeb(DSNNHeb):
             new_mask = keep_mask | add_mask
 
             # logging
+            idx = module.pos
             if self.debug_sparse:
                 self.log["keep_mask_l" + str(idx)] = (
                     torch.sum(keep_mask).item() / num_synapses
@@ -417,18 +402,25 @@ class DSNNMixedHeb(DSNNHeb):
         # track added connections
         return new_mask, keep_mask, add_mask
 
-    def prune_inverse(self, weight, num_params, corr, idx=0):
+
+class DSNNMixedHebInverse(DSNNMixedHeb):
+    """Test the extreme alternative hypothesis"""
+
+    def prune(self, module):
         """Allows pruning by magnitude and hebbian"""
         with torch.no_grad():
+            # unpack module
+            weight = module.m.weight.clone().detach()
+            num_params = module.num_params
+            corr = module.get_coactivations()
+            hebbian_prune_perc = module.hebbian_prune
+            weight_prune_perc = module.weight_prune
             # init shared variables
             num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
             # ----------- PRUNE ----------------
-
-            hebbian_prune_perc = self.hebbian_prune_perc[idx]
-            weight_prune_perc = self.weight_prune_perc[idx]
 
             if hebbian_prune_perc is not None:
                 hebbian_mask = self._get_inverse_hebbian_mask(
@@ -467,6 +459,7 @@ class DSNNMixedHeb(DSNNHeb):
             new_mask = keep_mask | add_mask
 
             # logging
+            idx = module.pos
             if self.debug_sparse:
                 self.log["keep_mask_l" + str(idx)] = (
                     torch.sum(keep_mask).item() / num_synapses
@@ -487,119 +480,3 @@ class DSNNMixedHeb(DSNNHeb):
 
         # track added connections
         return new_mask, keep_mask, add_mask
-
-
-class DSNNConvHeb(DSNNMixedHeb):
-    """
-    Similar to other sparse models, but the focus here is on convolutional layers as
-    opposed to dense layers.
-    """
-
-    log_attrs = [
-        "pruning_iterations",
-        "kept_frac",
-        "prune_mask_sparsity",
-        "keep_mask_sparsity",
-        "weight_sparsity",
-        "last_coactivations",
-    ]
-
-    def is_sparse(self, module):
-        if isinstance(module, DSConv2d):
-            return "sparse_conv"
-
-    def setup(self):
-        super().setup()
-        # find sparse layers
-        self.sparse_conv_modules = []
-        for m in list(self.network.modules()):
-            if self.is_sparse(m):
-                self.sparse_conv_modules.append(m)
-        # print(self.sparse_conv_modules)
-
-    def _post_epoch_updates(self, dataset=None):
-        """
-        Only change in the model is here.
-        In order to work, need to use networks which have DSConv2d layer
-        which network is being used?
-        """
-        print("calling post epoch")
-        super()._post_epoch_updates(dataset)
-
-        # go through named modules
-        for idx, module in enumerate(self.sparse_conv_modules):
-            # if it is a dsconv layer
-            # print("layer type: ", module.__class__)
-            # print(isinstance(module, DSConv2d))
-            # print("progressing connections")
-            # Log coactivation before pruning - otherwise they get reset.
-            self.log["hist_" + "coactivations_" + str(idx)] = module.coactivations
-            # Prune. Then log some params.
-            module.progress_connections()
-            print("progressing")
-            for attr in self.log_attrs:
-                value = getattr(module, attr) if hasattr(module, attr) else -2
-                if isinstance(value, Iterable):
-                    attr = "hist_" + attr
-                self.log[attr + "_" + str(idx)] = value
-
-            if isinstance(module, DSConv2d):
-                self.log["sparsity_" + str(idx)] = calc_sparsity(module.weight)
-
-
-class DSNNConvOnlyHeb(BaseModel):
-    """
-    Similar to other sparse models, but the focus here is on convolutional layers as
-    opposed to dense layers.
-    """
-
-    log_attrs = [
-        "pruning_iterations",
-        "kept_frac",
-        "prune_mask_sparsity",
-        "keep_mask_sparsity",
-        "weight_sparsity",
-        "last_coactivations",
-    ]
-
-    def is_sparse(self, module):
-        if isinstance(module, DSConv2d):
-            return "sparse_conv"
-
-    def setup(self):
-        super().setup()
-        # find sparse layers
-        self.sparse_conv_modules = []
-        for m in list(self.network.modules()):
-            if self.is_sparse(m):
-                self.sparse_conv_modules.append(m)
-        # print(self.sparse_conv_modules)
-
-    def _post_epoch_updates(self, dataset=None):
-        """
-        Only change in the model is here.
-        In order to work, need to use networks which have DSConv2d layer
-        which network is being used?
-        """
-        print("calling post epoch")
-        super()._post_epoch_updates(dataset)
-
-        # go through named modules
-        for idx, module in enumerate(self.sparse_conv_modules):
-            # if it is a dsconv layer
-            # print("layer type: ", module.__class__)
-            # print(isinstance(module, DSConv2d))
-            # print("progressing connections")
-            # Log coactivation before pruning - otherwise they get reset.
-            self.log["hist_" + "coactivations_" + str(idx)] = module.coactivations
-            # Prune. Then log some params.
-            module.progress_connections()
-            print("progressing")
-            for attr in self.log_attrs:
-                value = getattr(module, attr) if hasattr(module, attr) else -2
-                if isinstance(value, Iterable):
-                    attr = "hist_" + attr
-                self.log[attr + "_" + str(idx)] = value
-
-            if isinstance(module, DSConv2d):
-                self.log["sparsity_" + str(idx)] = calc_sparsity(module.weight)
