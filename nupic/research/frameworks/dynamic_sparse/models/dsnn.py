@@ -65,7 +65,7 @@ class DSNNHeb(SparseModel):
         if hasattr(self.network, "forward_with_coactivations"):
             self.network.forward = self.network.forward_with_coactivations
 
-    def _is_dynamic(self):
+    def _is_dynamic(self, module):
         return True
 
     def _pre_epoch_setup(self):
