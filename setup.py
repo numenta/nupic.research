@@ -55,10 +55,6 @@ setup(
     version=nupic.research.__version__,
     packages=find_namespace_packages(include=["nupic.*"]),
     install_requires=requirements,
-    dependency_links=[
-        "git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch",
-        "git+https://github.com/numenta/nupic.tensorflow.git#egg=nupic.tensorflow",
-    ],
     python_requires=">=3.6, <4",
     classifiers=[
         "Programming Language :: Python :: 3",
