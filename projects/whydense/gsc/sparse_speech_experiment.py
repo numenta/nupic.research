@@ -79,6 +79,8 @@ class SparseSpeechExperiment(object):
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+        self.min_epoch_for_checkpoint = config.get("min_epoch_for_checkpoint", 0)
+        self.last_training_epoch = -1
 
         self.load_datasets()
 
@@ -140,7 +142,8 @@ class SparseSpeechExperiment(object):
 
     def save(self, checkpoint_path):
         checkpoint_path = os.path.join(checkpoint_path, "model.pt")
-        torch.save(self.model.state_dict(), checkpoint_path)
+        if self.last_training_epoch >= self.min_epoch_for_checkpoint:
+            torch.save(self.model.state_dict(), checkpoint_path)
         return checkpoint_path
 
     def restore(self, checkpoint_path):
@@ -226,6 +229,7 @@ class SparseSpeechExperiment(object):
         self.post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
+        self.last_training_epoch = epoch
 
     def post_epoch(self):
         self.model.apply(rezero_weights)
@@ -261,7 +265,8 @@ class SparseSpeechExperiment(object):
             "mean_loss": test_loss,
             "mean_accuracy": test_error,
             "entropy": float(entropy),
-            "total_samples": len(test_loader.sampler)
+            "total_samples": len(test_loader.sampler),
+            "non_zero_parameters": count_nonzero_params(self.model)[1]
         }
 
         return ret
