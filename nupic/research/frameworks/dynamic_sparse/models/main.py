@@ -51,15 +51,11 @@ class BaseModel:
             device="cpu",
             lr_scheduler=False,
             lr_step_size=1,
-            debug_sparse=False,
-            debug_weights=False,
             pruning_interval=1,
-            log_images=False,
             weight_prune_perc=0,
             grad_prune_perc=0,
             test_noise=False,
             weight_decay=1e-4,
-            verbose=0,
             train_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
         defaults.update(config or {})
@@ -101,9 +97,12 @@ class BaseModel:
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")
 
+        self.logger = BaseLogger(self)
+
+
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
-        self.log = {}
+        self.logger.log_pre_epoch()
         self._pre_epoch_setup()
         self.network.train()
         self._run_one_pass(dataset.train_loader, train=True)
@@ -113,10 +112,9 @@ class BaseModel:
         if self.test_noise or test_noise_local:
             self._run_one_pass(dataset.noise_loader, train=False, noise=True)
         self._post_epoch_updates(dataset)
-        if self.verbose > 0:
-            print(self.log)
+        self.logger.log_post_epoch()
 
-        return self.log
+        return self.logger.log
 
     def _make_attr_schedulable(self, attr):
 
@@ -142,6 +140,8 @@ class BaseModel:
             if isinstance(val, NumScheduler):
                 val.step()
 
+        self.logger.log_post_epoch()
+
     def _post_optimize_updates(self):
         pass
 
@@ -149,12 +149,11 @@ class BaseModel:
         epoch_loss = 0
         correct = 0
         for idx, (inputs, targets) in enumerate(loader):
-
+            self.logger.log_pre_batch()
             # Limit number of batches per epoch if desired.
             if train:
                 if idx >= self.train_batches_per_epoch.get_value():
                     break
-
             # setup for training
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
@@ -173,48 +172,18 @@ class BaseModel:
 
             # keep track of loss
             epoch_loss += loss.item() * inputs.size(0)
+            self.logger.log_post_batch()
 
         # store loss and acc at each pass
         loss = epoch_loss / len(loader.dataset)
         acc = correct / len(loader.dataset)
-        if train:
-            self.log["train_loss"] = loss
-            self.log["train_acc"] = acc
-            if self.lr_scheduler:
-                self.log["learning_rate"] = self.lr_scheduler.get_lr()[0]
-            else:
-                self.log["learning_rate"] = self.learning_rate
-        else:
-            if noise:
-                self.log["noise_loss"] = loss
-                self.log["noise_acc"] = acc
-            else:
-                self.log["val_loss"] = loss
-                self.log["val_acc"] = acc
-
-        if train and self.debug_weights:
-            self._log_weights()
+        self.logger.log_metrics(loss, acc, train, noise)
 
     def has_params(self, module):
         if isinstance(module, nn.Linear):
             return "linear"
         elif isinstance(module, nn.Conv2d) and not self.sparse_linear_only:
             return "conv"
-
-    def _log_weights(self):
-        """Log weights for all layers which have params."""
-        if "param_layers" not in self.__dict__:
-            self.param_layers = defaultdict(list)
-            for m, ltype in [(m, self.has_params(m)) for m in self.network.modules()]:
-                if ltype:
-                    self.param_layers[ltype].append(m)
-
-        # log stats (mean and weight instead of standard distribution)
-        for ltype, layers in self.param_layers.items():
-            for idx, m in enumerate(layers):
-                # keep track of mean and std of weights
-                self.log[ltype + "_" + str(idx) + "_mean"] = torch.mean(m.weight).item()
-                self.log[ltype + "_" + str(idx) + "_std"] = torch.std(m.weight).item()
 
     def save(self, checkpoint_dir):
         # TODO: Implement
@@ -280,7 +249,6 @@ class SparseModel(BaseModel):
             start_sparse=None,
             end_sparse=None,
             sparse_linear_only=False,
-            log_magnitude_vs_coactivations=False,  # scatter plot of magn. vs coacts.
             on_perc=0.1,
             epsilon=None,
             sparse_type="precise",  # precise, precise_per_output, approximate
@@ -310,9 +278,11 @@ class SparseModel(BaseModel):
                     module.apply_mask()
                     module.save_num_params()
 
-        # TODO: remove logging to separate class
+        self.logger = SparseLogger(self)
+        # TODO: is this still required?
         # if self.log_magnitude_vs_coactivations:
         #     self.network.apply(init_coactivation_tracking)
+
 
     def _post_optimize_updates(self):
         # zero out the weights after the step - avoid propagating bias
@@ -363,59 +333,8 @@ class SparseModel(BaseModel):
         """TODO: remove logging to separate class"""
         super()._run_one_pass(loader, train, noise)
 
-        # save scatter plot of magn vs coacts.
-        if train and self.log_magnitude_vs_coactivations:
-            for i, m in enumerate(self.sparse_modules):
-
-                coacts = m.coactivations.clone().detach().to("cpu").numpy()
-                weight = m.weight.clone().detach().to("cpu").numpy()
-                grads = m.weight.grad.clone().detach().to("cpu").numpy()
-
-                mask = ((m.weight.grad != 0)).to("cpu").numpy()
-
-                coacts = coacts[mask]
-                weight = weight[mask]
-                grads = grads[mask]
-                grads = np.log(np.abs(grads))
-
-                x, y, hue = "coactivations", "weight", "log_abs_grads"
-
-                dataframe = DataFrame(
-                    {x: coacts.flatten(), y: weight.flatten(), hue: grads.flatten()}
-                )
-                seaborn_config = dict(
-                    rc={"figure.figsize": (11.7, 8.27)}, style="white"
-                )
-
-                self.log["scatter_mag_vs_coacts_layer-{}".format(str(i))] = dict(
-                    data=dataframe, x=x, y=y, hue=hue, seaborn_config=seaborn_config
-                )
-
         if train and self.debug_weights:
             self._log_weights()
-
-        # add monitoring of sparse levels
-        if train and self.debug_sparse:
-            self._log_sparse_levels()
-
-    def _log_sparse_levels(self):
-        with torch.no_grad():
-            for idx, module in enumerate(self.sparse_modules):
-                zero_mask = module.m.weight == 0
-                zero_count = torch.sum(zero_mask.int()).item()
-                size = np.prod(module.shape)
-                log_name = "sparse_level_l" + str(idx)
-                self.log[log_name] = 1 - zero_count / size
-
-                # log image as well
-                if self.log_images:
-                    if self.has_params(module.m) == "conv":
-                        ratio = 255 / np.prod(module.shape[2:])
-                        heatmap = (
-                            torch.sum(module.m.weight, dim=[2, 3]).float() * ratio
-                        ).int()
-                        self.log["img_" + log_name] = heatmap.tolist()
-
 
 class SparseModule:
     """Module wrapper for sparse layers
