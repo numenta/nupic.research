@@ -149,9 +149,6 @@ def add_sparse_linear_layer(
     else:
         network.add_module("linear{}_linear".format(suffix), linear)
 
-    if percent_on >= 1.0 or percent_on <= 0:
-        network.add_module("linear{}_relu".format(suffix), nn.ReLU())
-
     if use_batch_norm:
         network.add_module("linear{}_bn".format(suffix),
                            nn.BatchNorm1d(linear_n, affine=False))
@@ -167,6 +164,8 @@ def add_sparse_linear_layer(
                 boost_strength_factor=boost_strength_factor,
             ),
         )
+    else:
+        network.add_module("linear{}_relu".format(suffix), nn.ReLU())
 
     if dropout > 0.0:
         network.add_module("linear{}_dropout".format(suffix), nn.Dropout(dropout))

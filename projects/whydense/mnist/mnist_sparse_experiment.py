@@ -114,6 +114,8 @@ class MNISTSparseExperiment(object):
                     k_inference_factor=k_inference_factor,
                     boost_strength=boost_strength,
                     boost_strength_factor=boost_strength_factor,
+                    activation_fct_before_max_pool=False,
+                    use_kwinners_local=False,
                 )
 
                 # Feed this layer output into next layer input
@@ -142,6 +144,7 @@ class MNISTSparseExperiment(object):
                 k_inference_factor=k_inference_factor,
                 boost_strength=boost_strength,
                 boost_strength_factor=boost_strength_factor,
+                consolidated_sparse_weights=False,
             )
             input_size = linear_n[i]
 

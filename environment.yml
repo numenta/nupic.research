@@ -12,7 +12,7 @@ dependencies:
   - pip
 
   # See nupic.torch requirements.txt
-  - pytorch=1.2.0
+  - pytorch=1.3.0
 
   # See requirements.txt
   - awscli
@@ -28,7 +28,7 @@ dependencies:
   - scikit-image
   - seaborn
   - tabulate
-  - torchvision=0.4.0
+  - torchvision=0.4.1
   - tqdm
 
   # ray[debug,dashboard]
