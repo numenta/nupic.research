@@ -28,7 +28,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
-from pandas import DataFrame
 
 from nupic.research.frameworks.dynamic_sparse.networks import (
     DynamicSparseBase,
@@ -38,6 +37,8 @@ from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     init_coactivation_tracking,
 )
 from nupic.torch.modules import update_boost_strength
+
+from .loggers import BaseLogger, SparseLogger
 
 
 class BaseModel:
@@ -98,7 +99,6 @@ class BaseModel:
         self._make_attr_schedulable("train_batches_per_epoch")
 
         self.logger = BaseLogger(self)
-
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
@@ -283,7 +283,6 @@ class SparseModel(BaseModel):
         # if self.log_magnitude_vs_coactivations:
         #     self.network.apply(init_coactivation_tracking)
 
-
     def _post_optimize_updates(self):
         # zero out the weights after the step - avoid propagating bias
         with torch.no_grad():
@@ -335,6 +334,7 @@ class SparseModel(BaseModel):
 
         if train and self.debug_weights:
             self._log_weights()
+
 
 class SparseModule:
     """Module wrapper for sparse layers

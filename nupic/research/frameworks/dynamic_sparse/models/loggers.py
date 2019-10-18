@@ -19,14 +19,16 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-class BaseLogger:
+from collections import defaultdict
 
+import numpy as np
+import torch
+from pandas import DataFrame
+
+
+class BaseLogger:
     def __init__(self, model, config=None):
-        defaults = dict(
-            debug_weights=False,
-            log_images=False,
-            verbose=0,
-        )
+        defaults = dict(debug_weights=False, verbose=0)
         defaults.update(config or {})
         self.__dict__.update(defaults)
         self.model = model
@@ -68,7 +70,9 @@ class BaseLogger:
         """Log weights for all layers which have params."""
         if "param_layers" not in self.model.__dict__:
             self.model.param_layers = defaultdict(list)
-            for m, ltype in [(m, self.model.has_params(m)) for m in self.model.network.modules()]:
+            for m, ltype in [
+                (m, self.model.has_params(m)) for m in self.model.network.modules()
+            ]:
                 if ltype:
                     self.model.param_layers[ltype].append(m)
 
@@ -79,13 +83,14 @@ class BaseLogger:
                 self.log[ltype + "_" + str(idx) + "_mean"] = torch.mean(m.weight).item()
                 self.log[ltype + "_" + str(idx) + "_std"] = torch.std(m.weight).item()
 
-class SparseLogger(BaseLogger):
 
+class SparseLogger(BaseLogger):
     def __init__(self, model, config=None):
         super().__init__(model, config)
         defaults = dict(
             log_magnitude_vs_coactivations=False,  # scatter plot of magn. vs coacts.
             debug_sparse=False,
+            log_sparse_layers_grid=False,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -96,7 +101,7 @@ class SparseLogger(BaseLogger):
         if train and self.debug_sparse:
             self._log_sparse_levels()
         if train and self.log_magnitude_vs_coactivations:
-            self._log_magnitude_and_coactivations(train)        
+            self._log_magnitude_and_coactivations(train)
 
     def _log_magnitude_and_coactivations(self, train):
 
@@ -119,9 +124,7 @@ class SparseLogger(BaseLogger):
             dataframe = DataFrame(
                 {x: coacts.flatten(), y: weight.flatten(), hue: grads.flatten()}
             )
-            seaborn_config = dict(
-                rc={"figure.figsize": (11.7, 8.27)}, style="white"
-            )
+            seaborn_config = dict(rc={"figure.figsize": (11.7, 8.27)}, style="white")
 
             self.log["scatter_mag_vs_coacts_layer-{}".format(str(i))] = dict(
                 data=dataframe, x=x, y=y, hue=hue, seaborn_config=seaborn_config
@@ -137,7 +140,7 @@ class SparseLogger(BaseLogger):
                 self.log[log_name] = 1 - zero_count / size
 
                 # log image as well
-                if self.log_images:
+                if self.log_sparse_layers_grid:
                     if self.model.has_params(module.m) == "conv":
                         ratio = 255 / np.prod(module.shape[2:])
                         heatmap = (
@@ -145,23 +148,29 @@ class SparseLogger(BaseLogger):
                         ).int()
                         self.log["img_" + log_name] = heatmap.tolist()
 
-class DSNNLogger(SparseLogger):
 
+class DSNNLogger(SparseLogger):
     def __init__(self, model, config=None):
-        super().__init__(model config)
-        defaults = dict(
-            log_surviving_synapses=False,
-            log_masks=False
-        )
+        super().__init__(model, config)
+        defaults = dict(log_surviving_synapses=False, log_masks=False)
         defaults.update(config or {})
         self.__dict__.update(defaults)
         self.model = model
 
-    def log_masks(self, idx, new_mask, keep_mask, add_mask, num_add, hebbian_mask=None, magnitude_mask=None):
+    def save_masks(
+        self,
+        idx,
+        new_mask,
+        keep_mask,
+        add_mask,
+        num_add,
+        hebbian_mask=None,
+        magnitude_mask=None,
+    ):
+        """Log different masks in DSNN"""
 
-        # log_masks
-        num_synapses = np.prod(new_mask.shape)
         if self.log_masks:
+            num_synapses = np.prod(new_mask.shape)
             self.log["keep_mask_l" + str(idx)] = (
                 torch.sum(keep_mask).item() / num_synapses
             )
@@ -173,38 +182,37 @@ class DSNNLogger(SparseLogger):
             )
             self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
 
-        # conditional logs
-        if hebbian_mask is not None:
-            self.log["hebbian_mask_l" + str(idx)] = (
-                torch.sum(hebbian_mask).item() / num_synapses
-            )
-        if magnitude_mask is not None:
-            self.log["magnitude_mask_l" + str(idx)] = (
-                torch.sum(magnitude_mask).item() / num_synapses
-            )        
+            # conditional logs
+            if hebbian_mask is not None:
+                self.log["hebbian_mask_l" + str(idx)] = (
+                    torch.sum(hebbian_mask).item() / num_synapses
+                )
+            if magnitude_mask is not None:
+                self.log["magnitude_mask_l" + str(idx)] = (
+                    torch.sum(magnitude_mask).item() / num_synapses
+                )
 
-    def log_surviving_synapses(self):
+    def save_surviving_synapses(self, module, keep_mask, add_mask):
+        """Tracks added and surviving synapses"""
 
-        # log surviving synapses
+        self.survival_ratios = []
         if self.log_surviving_synapses and self.model.pruning_active:
-            survival_ratios = []
-            for module in self.model.sparse_modules:
-                # count how many synapses from last round have survived
-                if module.added_synapses is not None:
-                    total_added = torch.sum(module.added_synapses).item()
-                    surviving = torch.sum(
-                        module.added_synapses & keep_mask
-                    ).item()
-                    if total_added:
-                        survival_ratio = surviving / total_added
-                        survival_ratios.append(survival_ratio)
+            self.survival_ratios = []
+            # count how many synapses from last round have survived
+            if module.added_synapses is not None:
+                total_added = torch.sum(module.added_synapses).item()
+                surviving = torch.sum(module.added_synapses & keep_mask).item()
+                if total_added:
+                    survival_ratio = surviving / total_added
+                    self.survival_ratios.append(survival_ratio)
 
                 # keep track of new synapses to count surviving on next round
-                module.added_synapses = new_synapses
-
-            for module, sr in zip(self.model.sparse_modules, survival_ratios):
+                module.added_synapses = add_mask
                 self.log["mask_sizes_l" + str(module.pos)] = module.nonzero_params()
-                self.log["surviving_synapses_l" + str(module.pos)] = sr
+                self.log["surviving_synapses_l" + str(module.pos)] = survival_ratio
 
-            self.log["surviving_synapses_avg"] = np.mean(survival_ratios)
-
+    def log_post_epoch(self):
+        super().log_post_epoch()
+        # adds tracking of average surviving synapses
+        if self.log_surviving_synapses and self.model.pruning_active:
+            self.log["surviving_synapses_avg"] = np.mean(self.survival_ratios)
