@@ -24,7 +24,9 @@ import os
 import numpy as np
 from ray import tune
 
-from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
+    DEFAULT_LOGGERS,
+)
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # experiment configurations
