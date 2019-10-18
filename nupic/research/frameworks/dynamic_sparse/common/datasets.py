@@ -177,19 +177,24 @@ class Dataset:
 
         # noise dataset
         if self.test_noise:
-            noise = self.noise_level
-            noise_transform = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Normalize(self.stats_mean, self.stats_std),
-                    RandomNoise(
-                        noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2
-                    ),
-                ]
-            )
-            noise_set = dataset(
-                root=self.data_dir, train=False, transform=noise_transform
-            )
-            self.noise_loader = dataloader_type(
-                dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
-            )
+            self.set_noise_loader(self.noise_level)
+
+    def set_noise_loader(self, noise):
+        """Defines noise loader"""
+        noise_transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(self.stats_mean, self.stats_std),
+                RandomNoise(
+                    noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2
+                ),
+            ]
+        )
+        noise_set = dataset(
+            root=self.data_dir, train=False, transform=noise_transform
+        )
+        self.noise_loader = dataloader_type(
+            dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
+        )
+
+

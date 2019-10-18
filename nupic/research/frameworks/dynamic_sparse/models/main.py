@@ -22,6 +22,7 @@
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
+import pickle
 
 import numpy as np
 import torch
@@ -44,7 +45,15 @@ from .loggers import BaseLogger, SparseLogger
 class BaseModel:
     """Base model, with training loops and logging functions."""
 
-    def __init__(self, network, config=None):
+    def __init__(self, network=None, config=None):
+
+        if self.load_from_checkpoint:
+            network, new_config = self.restore()
+            # overwrites device - allows testing in CPU
+            if 'device' in config:
+                new_config['device'] = config['device']
+            config = new_config
+
         defaults = dict(
             load_from_checkpoint=False,
             optim_alg="SGD",
@@ -65,8 +74,6 @@ class BaseModel:
 
         # init remaining
         self.device = torch.device(self.device)
-        if self.load_from_checkpoint:
-            self.network = self.restore()
         self.network = network.to(self.device)
 
     def setup(self):
@@ -193,18 +200,34 @@ class BaseModel:
         Save the model in this directory.
         :param checkpoint_dir:
         """
-        checkpoint_path = os.path.join(checkpoint_dir, experiment_name)
-        torch.save(self.network.state_dict(), checkpoint_path)
+        experiment_root = os.path.join(checkpoint_dir, experiment_name)
+        checkpoint_file = os.path.join(experiment_root, experiment_name + '.pth')
+        torch.save(self.network.state_dict(), checkpoint_file)
 
-    def restore(self, checkpoint_path, experiment_name):
+        config_file = os.path.join(experiment_root, experiment_name + '.txt')
+        pickle.dump(self.config, config_file)
+
+    def restore(self, checkpoint_dir, experiment_name):
         """
         :param checkpoint_path: Loads model from this checkpoint path.
         If path is a directory, will append the parameter model_filename
         """
         # print("loading from", checkpoint_path)
-        checkpoint_file = os.path.join(checkpoint_path, experiment_name)
+        experiment_root = os.path.join(checkpoint_dir, experiment_name)
+        checkpoint_file = os.path.join(experiment_root, experiment_name + '.pth')        
         network = torch.load(checkpoint_file, map_location=self.device)
-        return network
+
+        config_file = os.path.join(experiment_root, experiment_name + '.txt')
+        config = pickle.load(config_file)
+
+        return network, config
+
+    def evaluate(self, dataset):
+        """External function used to evaluate noise on pre-trained models"""
+        self.network.eval()
+        self._run_one_pass(dataset.noise_loader, train=False, noise=True)
+        loss, acc = self.logger.log['loss'], self.logger.log['acc']
+        return loss, acc
 
     def train(self, dataset, num_epochs, test_noise=False):
         """
