@@ -64,6 +64,9 @@ def train_model(
     :type progress_bar: dict or None
     """
     model.train()
+    # Use asynchronous GPU copies when the memory is pinned
+    # See https://pytorch.org/docs/master/notes/cuda.html
+    async_gpu = loader.pin_memory
     if progress_bar is not None:
         loader = tqdm(loader, **progress_bar)
         # update progress bar total based on batches_in_epoch
@@ -73,7 +76,8 @@ def train_model(
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
-        data, target = data.to(device), target.to(device)
+        data = data.to(device, non_blocking=async_gpu)
+        target = target.to(device, non_blocking=async_gpu)
         optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)

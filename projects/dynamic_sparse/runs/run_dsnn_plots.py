@@ -104,7 +104,6 @@ experiments = {
     #     percent_on_k_winner=[0.12] * 3,
     #     log_magnitude_vs_coactivations=True,
     # ),
-
     # "mlp-SET-kw-binary-coacts": dict(
     #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
     #     on_perc=ray.tune.grid_search([0.1]),
@@ -124,7 +123,6 @@ experiments = {
         weight_prune_perc=0.3,
         pruning_early_stop=2,
     ),
-
     # "mlp-Heb-kw-binary-coacts": dict(
     #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
     #     on_perc=ray.tune.grid_search([0.1]),
@@ -159,7 +157,6 @@ experiments = {
         use_binary_coactivations=False,
         moving_average_alpha=0.6,
     ),
-
     "mlp-Heb-nonbinary-coacts": dict(
         model=ray.tune.grid_search(["DSNNMixedHeb"]),
         on_perc=ray.tune.grid_search([0.02]),
@@ -171,7 +168,6 @@ experiments = {
         use_binary_coactivations=False,
         moving_average_alpha=0.6,
     ),
-
     # "mlp-WeightedMag-kw": dict(
     #     model=ray.tune.grid_search(["DSNNWeightedMag"]),
     #     # sparse related

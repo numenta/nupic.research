@@ -111,6 +111,9 @@ class HardConcreteGatedLinear(Module):
             (torch.log(x) - torch.log(1 - x) + self.loga) / self.temperature)
         return y * (LIMIT_B - LIMIT_A) + LIMIT_A
 
+    def weight_size(self):
+        return self.weight.size()
+
     def regularization(self):
         """
         Expected L0 norm under the stochastic gates, takes into account and
@@ -129,7 +132,9 @@ class HardConcreteGatedLinear(Module):
         # To capture the -1, subtract it, but only in cases where there is at
         # least one weight.
         nz_by_unit = self.get_inference_nonzeros()
-        return (2 * torch.sum(nz_by_unit) - torch.sum(nz_by_unit > 0)).item()
+        multiplies = torch.sum(nz_by_unit)
+        adds = multiplies - torch.sum(nz_by_unit > 0)
+        return multiplies.item(), adds.item()
 
     def count_expected_flops_and_l0(self):
         """
@@ -287,6 +292,9 @@ class HardConcreteGatedConv2d(Module):
             (torch.log(x) - torch.log(1 - x) + self.loga) / self.temperature)
         return y * (LIMIT_B - LIMIT_A) + LIMIT_A
 
+    def weight_size(self):
+        return self.weight.size()
+
     def regularization(self):
         """
         Expected L0 norm under the stochastic gates, takes into account and
@@ -303,7 +311,8 @@ class HardConcreteGatedConv2d(Module):
         # For each unit, multiply with n inputs then do n - 1 additions.
         # Only subtract 1 in cases where is at least one weight.
         nz_by_unit = self.get_inference_nonzeros()
-        flops_per_instance = 2 * torch.sum(nz_by_unit) - torch.sum(nz_by_unit > 0)
+        multiplies_per_instance = torch.sum(nz_by_unit)
+        adds_per_instance = multiplies_per_instance - torch.sum(nz_by_unit > 0)
 
         # for rows
         instances = (
@@ -314,7 +323,10 @@ class HardConcreteGatedConv2d(Module):
             (self.input_shape[-1] - self.kernel_size[1] + 2 * self.padding[1])
             / self.stride[1]) + 1
 
-        return (instances * flops_per_instance).item()
+        multiplies = multiplies_per_instance * instances
+        adds = adds_per_instance * instances
+
+        return multiplies.item(), adds.item()
 
     def count_expected_flops_and_l0(self):
         """
