@@ -31,8 +31,8 @@ base_exp_config = dict(
     model=tune.grid_search(["BaseModel", "SparseModel"]),
     data_dir="~/nta/datasets",
     augment_images=True,
-    epochs=120,
-    # train_batches_per_epoch=np.inf,  # default - don't limit the batches,
+    epochs=200,
+    # train_batches_per_epoch=400,
     # ---- network related
     # network="resnet152",
     # network="WideResNet",
@@ -50,11 +50,12 @@ base_exp_config = dict(
     optim_alg="SGD",
     learning_rate=0.1,
     lr_scheduler="MultiStepLR",
-    lr_milestones=[60, 90, 110],
-    # lr_milestones=[60, 120, 160],
+    # lr_milestones=[60, 90, 110],
+    lr_milestones=[60, 120, 160],
     lr_gamma=0.2,
     weight_decay=0.0005,
     momentum=0.9,
+    nesterov_momentum=True,
     # ---- debugs and noise related
     test_noise=False,
 )
@@ -62,10 +63,10 @@ base_exp_config = dict(
 # ray configurations
 tune_config = dict(
     num_samples=1,
-    name=__file__.replace(".py", "") + "4",
+    name=__file__.replace(".py", "") + "1",
     checkpoint_freq=0,
     checkpoint_at_end=True,
-    resources_per_trial={"cpu": 1, "gpu": 0.5},
+    resources_per_trial={"cpu": 1, "gpu": 0.50},
     verbose=0,
 )
 
