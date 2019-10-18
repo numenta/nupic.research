@@ -46,6 +46,7 @@ class BaseModel:
 
     def __init__(self, network, config=None):
         defaults = dict(
+            load_from_checkpoint=False,
             optim_alg="SGD",
             learning_rate=0.1,
             momentum=0.9,
@@ -64,6 +65,8 @@ class BaseModel:
 
         # init remaining
         self.device = torch.device(self.device)
+        if self.load_from_checkpoint:
+            self.network = self.restore()
         self.network = network.to(self.device)
 
     def setup(self):
@@ -185,25 +188,23 @@ class BaseModel:
         elif isinstance(module, nn.Conv2d) and not self.sparse_linear_only:
             return "conv"
 
-    def save(self, checkpoint_dir):
-        # TODO: Implement
-        pass
+    def save(self, checkpoint_dir, experiment_name):
+        """
+        Save the model in this directory.
+        :param checkpoint_dir:
+        """
+        checkpoint_path = os.path.join(checkpoint_dir, experiment_name)
+        torch.save(self.network.state_dict(), checkpoint_path)
 
-    def restore(self, checkpoint_dir):
-        # TODO: Implement
-        pass
-
-    # def _save(self, checkpoint_dir):
-    #     return self.model_save(checkpoint_dir)
-
-    # def _restore(self, checkpoint):
-    #     """Subclasses should override this to implement restore().
-
-    #     Args:
-    #         checkpoint (str | dict): Value as returned by `_save`.
-    #             If a string, then it is the checkpoint path.
-    #     """
-    #     self.model_restore(checkpoint)
+    def restore(self, checkpoint_path, experiment_name):
+        """
+        :param checkpoint_path: Loads model from this checkpoint path.
+        If path is a directory, will append the parameter model_filename
+        """
+        # print("loading from", checkpoint_path)
+        checkpoint_file = os.path.join(checkpoint_path, experiment_name)
+        network = torch.load(checkpoint_file, map_location=self.device)
+        return network
 
     def train(self, dataset, num_epochs, test_noise=False):
         """

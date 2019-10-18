@@ -62,7 +62,7 @@ tune_config = dict(
     num_samples=1,
     name=__file__.replace(".py", "") + "4",
     checkpoint_freq=0,
-    checkpoint_at_end=False,
+    checkpoint_at_end=True,
     resources_per_trial={"cpu": 1, "gpu": 0.5},
     verbose=0,
 )
