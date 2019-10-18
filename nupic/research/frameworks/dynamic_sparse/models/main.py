@@ -328,13 +328,6 @@ class SparseModel(BaseModel):
             value = [value] * len(counterpart)
             setattr(self, attr, value)
 
-    def _run_one_pass(self, loader, train, noise=False):
-        """TODO: remove logging to separate class"""
-        super()._run_one_pass(loader, train, noise)
-
-        if train and self.debug_weights:
-            self._log_weights()
-
 
 class SparseModule:
     """Module wrapper for sparse layers

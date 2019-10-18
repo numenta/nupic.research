@@ -39,6 +39,8 @@ class BaseLogger:
     def log_post_epoch(self):
         if self.verbose > 0:
             print(self.log)
+        if self.debug_weights:
+            self.log_weights()
 
     def log_pre_batch(self):
         pass
