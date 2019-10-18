@@ -22,6 +22,7 @@
 import numpy as np
 import torch
 
+from .loggers import DSNNLogger
 from .main import SparseModel
 
 
@@ -58,6 +59,8 @@ class DSNNHeb(SparseModel):
         self._init_hebbian()
         self.prune_cycles_completed = 0
 
+        self.logger = DSNNLogger(self)
+
     def _init_hebbian(self):
         for module in self.sparse_modules:
             if self._is_dynamic(module):
@@ -89,34 +92,13 @@ class DSNNHeb(SparseModel):
         """Reinitialize weights - prune and grow"""
         if self.pruning_active:
             # keep track of added synapes
-            survival_ratios = []
-
             for module in self.sparse_modules:
                 if self._is_dynamic(module):
-                    new_mask, keep_mask, new_synapses = self.prune(module)
+                    new_mask, keep_mask, add_mask = self.prune(module)
                     with torch.no_grad():
                         module.mask = new_mask.float()
                         module.apply_mask()
-
-                        # count how many synapses from last round have survived
-                        if module.added_synapses is not None:
-                            total_added = torch.sum(module.added_synapses).item()
-                            surviving = torch.sum(
-                                module.added_synapses & keep_mask
-                            ).item()
-                            if total_added:
-                                survival_ratio = surviving / total_added
-                                survival_ratios.append(survival_ratio)
-
-                        # keep track of new synapses to count surviving on next round
-                        module.added_synapses = new_synapses
-
-            # logging
-            if self.debug_sparse:
-                for module, sr in zip(self.sparse_modules, survival_ratios):
-                    self.log["mask_sizes_l" + str(module.pos)] = module.nonzero_params()
-                    self.log["surviving_synapses_l" + str(module.pos)] = sr
-                self.log["surviving_synapses_avg"] = np.mean(survival_ratios)
+                    self.logger.save_surviving_synapses(module, keep_mask)
 
     def _get_hebbian_mask(self, weight, corr, active_synapses, prune_perc):
 
@@ -279,7 +261,6 @@ class DSNNWeightedMag(DSNNHeb):
             corr = module.get_coactivations()
             weight_prune_perc = module.weight_prune
             # init shared variables
-            num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
@@ -303,19 +284,7 @@ class DSNNWeightedMag(DSNNHeb):
             # calculate the new mask
             new_mask = keep_mask | add_mask
 
-            # logging
-            idx = module.pos
-            if self.debug_sparse:
-                self.log["keep_mask_l" + str(idx)] = (
-                    torch.sum(keep_mask).item() / num_synapses
-                )
-                self.log["add_mask_l" + str(idx)] = (
-                    torch.sum(add_mask).item() / num_synapses
-                )
-                self.log["new_mask_l" + str(idx)] = (
-                    torch.sum(new_mask).item() / num_synapses
-                )
-                self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
+            self.logger.save_masks(module.pos, new_mask, keep_mask, add_mask, num_add)
 
         # track added connections
         return new_mask, keep_mask, add_mask
@@ -337,7 +306,6 @@ class DSNNMixedHeb(DSNNHeb):
             hebbian_prune_perc = module.hebbian_prune
             weight_prune_perc = module.weight_prune
             # init shared variables
-            num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
@@ -346,11 +314,15 @@ class DSNNMixedHeb(DSNNHeb):
                 hebbian_mask = self._get_hebbian_mask(
                     weight, corr, active_synapses, hebbian_prune_perc
                 )
+            else:
+                hebbian_mask = None
 
             if weight_prune_perc is not None:
                 magnitude_mask = self._get_magnitude_mask(
                     weight, active_synapses, weight_prune_perc
                 )
+            else:
+                magnitude_mask = None
 
             # join both masks
             if hebbian_prune_perc and weight_prune_perc:
@@ -377,27 +349,15 @@ class DSNNMixedHeb(DSNNHeb):
             new_mask = keep_mask | add_mask
 
             # logging
-            idx = module.pos
-            if self.debug_sparse:
-                self.log["keep_mask_l" + str(idx)] = (
-                    torch.sum(keep_mask).item() / num_synapses
-                )
-                self.log["add_mask_l" + str(idx)] = (
-                    torch.sum(add_mask).item() / num_synapses
-                )
-                self.log["new_mask_l" + str(idx)] = (
-                    torch.sum(new_mask).item() / num_synapses
-                )
-                self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
-                # conditional logs
-                if hebbian_prune_perc is not None:
-                    self.log["hebbian_mask_l" + str(idx)] = (
-                        torch.sum(hebbian_mask).item() / num_synapses
-                    )
-                if weight_prune_perc is not None:
-                    self.log["magnitude_mask_l" + str(idx)] = (
-                        torch.sum(magnitude_mask).item() / num_synapses
-                    )
+            self.logger.save_masks(
+                module.pos,
+                new_mask,
+                keep_mask,
+                add_mask,
+                num_add,
+                hebbian_mask,
+                magnitude_mask,
+            )
 
         # track added connections
         return new_mask, keep_mask, add_mask
@@ -416,7 +376,6 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
             hebbian_prune_perc = module.hebbian_prune
             weight_prune_perc = module.weight_prune
             # init shared variables
-            num_synapses = np.prod(weight.shape)
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
@@ -426,11 +385,15 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
                 hebbian_mask = self._get_inverse_hebbian_mask(
                     weight, active_synapses, hebbian_prune_perc
                 )
+            else:
+                hebbian_mask = None
 
             if weight_prune_perc is not None:
                 magnitude_mask = self._get_magnitude_mask(
                     weight, corr, active_synapses, weight_prune_perc
                 )
+            else:
+                magnitude_mask = None
 
             # join both masks
             if hebbian_prune_perc and weight_prune_perc:
@@ -459,24 +422,15 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
             new_mask = keep_mask | add_mask
 
             # logging
-            idx = module.pos
-            if self.debug_sparse:
-                self.log["keep_mask_l" + str(idx)] = (
-                    torch.sum(keep_mask).item() / num_synapses
-                )
-                self.log["add_mask_l" + str(idx)] = (
-                    torch.sum(add_mask).item() / num_synapses
-                )
-                self.log["missing_weights_l" + str(idx)] = num_add / num_synapses
-                # conditional logs
-                if hebbian_prune_perc is not None:
-                    self.log["hebbian_mask_l" + str(idx)] = (
-                        torch.sum(hebbian_mask).item() / num_synapses
-                    )
-                if weight_prune_perc is not None:
-                    self.log["magnitude_mask_l" + str(idx)] = (
-                        torch.sum(magnitude_mask).item() / num_synapses
-                    )
+            self.logger.save_masks(
+                module.pos,
+                new_mask,
+                keep_mask,
+                add_mask,
+                num_add,
+                hebbian_mask,
+                magnitude_mask,
+            )
 
         # track added connections
         return new_mask, keep_mask, add_mask
