@@ -77,6 +77,7 @@ def run_noise_test(config):
         best_result = max(results, key=lambda x: x["mean_accuracy"])
         best_epoch = best_result["training_iteration"]
         best_config = best_result["config"]
+        print("best_epoch: ", best_epoch)
 
         # Update path
         best_config["path"] = config["path"]
@@ -93,7 +94,6 @@ def run_noise_test(config):
         with open(noise_test, "w") as f:
             res = experiment.run_noise_tests()
             json.dump(res, f)
-            print(res)
 
         # Compute total noise score
         total_correct = 0
