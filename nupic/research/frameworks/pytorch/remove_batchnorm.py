@@ -22,7 +22,7 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-from torch.quantization.fuse_modules import fuse_modules, fuse_known_modules
+from torch.quantization.fuse_modules import fuse_known_modules, fuse_modules
 
 
 def fold_batchnorm_conv(conv2d, bn_2d):

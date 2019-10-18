@@ -22,17 +22,12 @@ import unittest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from nupic.torch.models.sparse_cnn import gsc_sparse_cnn
-from nupic.torch.modules.sparse_weights import (
-    rezero_weights
-)
 
 from nupic.research.frameworks.pytorch.model_compare import compare_models
-from nupic.research.frameworks.pytorch.models import (
-    LeSparseNet
-)
+from nupic.research.frameworks.pytorch.models import LeSparseNet
 from nupic.research.frameworks.pytorch.remove_batchnorm import remove_batchnorm
-
+from nupic.torch.models.sparse_cnn import gsc_sparse_cnn
+from nupic.torch.modules.sparse_weights import rezero_weights
 
 BATCH_NORM_CLASSES = (nn.BatchNorm1d, nn.BatchNorm2d,)
 
