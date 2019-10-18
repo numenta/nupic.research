@@ -63,14 +63,15 @@ def main(config, experiments, tablefmt):
     project_dir = os.path.dirname(config.name)
     project_dir = os.path.abspath(project_dir)
     print("project_dir =", project_dir)
-    test_scores_table = [["Network", "Test Score", "Noise Score"]]
+    test_scores_table = [["Network", "Test Score", "Noise Score", "Noise Accuracy",
+                          "Nonzero Parameters", "Num Trials"]]
 
     # Load and parse experiment configurations
     configs = parse_config(config, experiments, globals_param=globals())
 
     # Select tags ignoring seed value
     def key_func(x):
-        s = re.split("[,_]", re.sub(",|\\d+_|seed=\\d+", "", x["experiment_tag"]))
+        s = re.split("[,]", re.sub(",|\\d+_|seed=\\d+", "", x["experiment_tag"]))
         if len(s[0]) == 0:
             return [" "]
         return s
@@ -88,9 +89,13 @@ def main(config, experiments, tablefmt):
 
         # Load experiment data
         experiment_path = os.path.join(config["path"], exp)
-        experiment_state = load_ray_tune_experiment(
-            experiment_path=experiment_path, load_results=True
-        )
+        try:
+            experiment_state = load_ray_tune_experiment(
+                experiment_path=experiment_path, load_results=True
+            )
+        except RuntimeError:
+            print("Could not locate experiment state for " + exp + " ...skipping")
+            continue
 
         # Go through all checkpoints in the experiment
         all_checkpoints = experiment_state["checkpoints"]
@@ -106,28 +111,46 @@ def main(config, experiments, tablefmt):
             num_exps = len(checkpoints)
             test_scores = np.zeros(num_exps)
             noise_scores = np.zeros(num_exps)
+            noise_accuracies = np.zeros(num_exps)
+            noise_samples = np.zeros(num_exps)
+            nonzero_params = np.zeros(num_exps)
 
-            for i, checkpoint in enumerate(checkpoints):
-                results = checkpoint["results"]
-                if results is None:
-                    continue
+            try:
+                for i, checkpoint in enumerate(checkpoints):
+                    results = checkpoint["results"]
+                    if results is None:
+                        continue
 
-                # For each checkpoint select the epoch with the best accuracy as
-                # the best epoch
-                best_result = max(results, key=lambda x: x["mean_accuracy"])
-                test_scores[i] = best_result["mean_accuracy"]
+                    # For each checkpoint select the epoch with the best accuracy as
+                    # the best epoch
+                    best_result = max(results, key=lambda x: x["mean_accuracy"])
+                    test_scores[i] = best_result["mean_accuracy"]
 
-                # Load noise score
-                logdir = os.path.join(
-                    experiment_path, os.path.basename(checkpoint["logdir"])
-                )
-                filename = os.path.join(logdir, "noise.json")
-                if os.path.exists(filename):
-                    with open(filename, "r") as f:
-                        noise = json.load(f)
+                    # Load noise score
+                    logdir = os.path.join(
+                        experiment_path, os.path.basename(checkpoint["logdir"])
+                    )
+                    filename = os.path.join(logdir, "noise.json")
+                    if os.path.exists(filename):
+                        with open(filename, "r") as f:
+                            noise = json.load(f)
 
-                    noise_scores[i] = sum(x["total_correct"]
-                                          for x in list(noise.values()))
+                        noise_scores[i] = sum(x["total_correct"]
+                                              for x in list(noise.values()))
+                        noise_samples[i] = sum(
+                            x["total_samples"] for x in list(noise.values()))
+                    else:
+                        print("No noise file for " + experiment_path + " ...skipping")
+                        continue
+
+                    noise_accuracies[i] = (
+                        float(100.0 * noise_scores[i]) / noise_samples[i])
+                    nonzero_params[i] = max(x["non_zero_parameters"]
+                                            for x in list(noise.values()))
+            except Exception:
+                print("Problem with checkpoint group" + tag + " in " + exp
+                      + " ...skipping")
+                continue
 
             test_score = "{0:.2f} ± {1:.2f}".format(
                 test_scores.mean(), test_scores.std()
@@ -135,8 +158,13 @@ def main(config, experiments, tablefmt):
             noise_score = "{0:,.0f} ± {1:.2f}".format(
                 noise_scores.mean(), noise_scores.std()
             )
+            noise_accuracy = "{0:,.2f} ± {1:.2f}".format(
+                noise_accuracies.mean(), noise_accuracies.std()
+            )
+            nonzero = "{0:,.0f}".format(nonzero_params.mean())
             test_scores_table.append(
-                ["{} {}".format(exp, tag), test_score, noise_score]
+                ["{} {}".format(exp, tag), test_score, noise_score, noise_accuracy,
+                 nonzero, num_exps]
             )
 
     print()
