@@ -20,3 +20,30 @@
 # ----------------------------------------------------------------------
 
 # script to run noise tests 
+
+# load the model and the configurations
+# could then run a specific model 
+
+import os
+import pickle
+from nupic.research.frameworks.dynamic_sparse.models import SparseModel
+from nupic.research.frameworks.dynamic_sparse.common.datasets import Dataset
+
+# load
+model = SparseModel(config=dict(load_from_checkpoint=True, device='cpu'))
+dataset = Dataset(model.config)
+noise_levels = [0, 0.025, 0.05, 0.075, 0.10, 0.125, 0.15, 0.175, 0.20]
+
+# calculate
+results = []
+for noise_level in noise_levels:
+    dataset.set_noise_loader(noise_level)
+    loss, acc = model.evaluate(dataset)
+    results.append((noise_level, loss, acc))
+
+# save
+save_path = os.path.join(os.path.expanduser("~/nta/results"), "noise_tests")
+if not os.path.exists(save_path):
+    os.mkdir(save_path)
+pickle.dump(results, os.path.join(save_path, 'results.txt'))
+
