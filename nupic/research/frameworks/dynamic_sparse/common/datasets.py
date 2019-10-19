@@ -101,9 +101,9 @@ class Dataset:
         else:
             self.noise_loader = None
 
-    def calc_statistics(self, dataset):
+    def calc_statistics(self):
 
-        tempset = dataset(
+        tempset = self.dataset(
             root=self.data_dir, train=True, transform=transforms.ToTensor()
         )
         if isinstance(tempset.data, np.ndarray):
@@ -120,9 +120,9 @@ class Dataset:
 
         # allow for custom datasets
         if self.dataset_name in custom_datasets:
-            dataset = custom_datasets[self.dataset_name]
+            self.dataset = custom_datasets[self.dataset_name]
         elif hasattr(datasets, self.dataset_name):
-            dataset = getattr(datasets, self.dataset_name)
+            self.dataset = getattr(datasets, self.dataset_name)
         else:
             raise Exception("Dataset {} not available".format(self.dataset_name))
 
@@ -139,7 +139,7 @@ class Dataset:
 
         # calculate statistics only if not already stored
         if self.dataset_name not in datasets_stats:
-            self.stats_mean, self.stats_std = self.calc_statistics(dataset)
+            self.stats_mean, self.stats_std = self.calc_statistics()
         else:
             self.stats_mean, self.stats_std = datasets_stats[self.dataset_name]
 
@@ -164,13 +164,13 @@ class Dataset:
             )
 
         # load train set
-        train_set = dataset(root=self.data_dir, train=True, transform=aug_transform)
+        train_set = self.dataset(root=self.data_dir, train=True, transform=aug_transform)
         self.train_loader = dataloader_type(
             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
         )
 
         # load test set
-        test_set = dataset(root=self.data_dir, train=False, transform=transform)
+        test_set = self.dataset(root=self.data_dir, train=False, transform=transform)
         self.test_loader = dataloader_type(
             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
         )
@@ -190,10 +190,10 @@ class Dataset:
                 ),
             ]
         )
-        noise_set = dataset(
+        noise_set = self.dataset(
             root=self.data_dir, train=False, transform=noise_transform
         )
-        self.noise_loader = dataloader_type(
+        self.noise_loader = DataLoader(
             dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
         )
 

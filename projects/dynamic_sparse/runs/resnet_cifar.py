@@ -63,8 +63,8 @@ base_exp_config = dict(
 # ray configurations
 tune_config = dict(
     num_samples=1,
-    name=__file__.replace(".py", "") + "1",
-    checkpoint_freq=0,
+    name=__file__.replace(".py", "") + "2",
+    checkpoint_freq=1,
     checkpoint_at_end=True,
     resources_per_trial={"cpu": 1, "gpu": 0.50},
     verbose=0,
