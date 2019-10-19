@@ -25,25 +25,54 @@
 # could then run a specific model 
 
 import os
-import pickle
-from nupic.research.frameworks.dynamic_sparse.models import SparseModel
+import nupic.research.frameworks.dynamic_sparse.models as models
+import nupic.research.frameworks.dynamic_sparse.networks as networks
 from nupic.research.frameworks.dynamic_sparse.common.datasets import Dataset
+import json
 
 # load
-model = SparseModel(config=dict(load_from_checkpoint=True, device='cpu'))
-dataset = Dataset(model.config)
+root = os.path.expanduser("~/nta/results")
+experiment_name = "resnet_cifar1"
+experiment_path = os.path.join(root, experiment_name)
 noise_levels = [0, 0.025, 0.05, 0.075, 0.10, 0.125, 0.15, 0.175, 0.20]
+results = {}
+dataset = None
 
-# calculate
-results = []
-for noise_level in noise_levels:
-    dataset.set_noise_loader(noise_level)
-    loss, acc = model.evaluate(dataset)
-    results.append((noise_level, loss, acc))
+# iterate through all experiment instances
+print(experiment_path)
+for instance in os.listdir(experiment_path):
+    instance_path = os.path.join(experiment_path, instance)
+    if os.path.isdir(instance_path):
+        print(instance_path)
+        # open checkpoint folder
+        for file in os.listdir(instance_path):
+            checkpoint_path = os.path.join(instance_path, file)
+            if file.startswith("checkpoint") and os.path.isdir(checkpoint_path):
+                print(checkpoint_path)
+                # load config file
+                config_path = os.path.join(checkpoint_path, experiment_name + '.json')
+                with open(config_path, 'r') as file:
+                    config = json.load(file)
+                config['load_from_checkpoint'] = True
+                # config['device'] = 'cuda' # only if local
+                # load network and model, restore parameters
+                network = getattr(networks, config['network'])(config)
+                model = getattr(models, config['model'])(network, config)
+                model.setup()
+                model.restore(checkpoint_path, config['name'])
+                # initialize dataset, only once is required
+                if dataset is None:
+                    dataset = Dataset(config)
+                # run noise tests 
+                for noise_level in noise_levels:
+                    print("noise: ", noise_level)
+                    dataset.set_noise_loader(noise_level)
+                    loss, acc = model.evaluate_noise(dataset)
+                    print("acc: ", acc)
+                    if instance not in results:
+                        results[instance] = {}
+                    results[instance][noise_level] = acc
 
-# save
-save_path = os.path.join(os.path.expanduser("~/nta/results"), "noise_tests")
-if not os.path.exists(save_path):
-    os.mkdir(save_path)
-pickle.dump(results, os.path.join(save_path, 'results.txt'))
-
+# save results
+with open(os.path.join(experiment_path, 'noise_results.json'), 'w') as file:
+    json.dump(results, file)
