@@ -262,10 +262,6 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
     configs = parse_config(config, experiments, globals_param=globals())
     print("experiments =", list(configs.keys()))
 
-    # download dataset
-    data_dir = os.path.join(project_dir, "data")
-    datasets.MNIST(data_dir, download=True, train=True)
-
     # Initialize ray cluster
     if redis_address is not None:
         ray.init(redis_address=redis_address, include_webui=True)
@@ -279,13 +275,17 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
         config["name"] = exp
 
         # Make sure local directories are relative to the project location
-        path = config.get("path", None)
+        path = os.path.expanduser(config.get("path", "results"))
         if path and not os.path.isabs(path):
             config["path"] = os.path.join(project_dir, path)
 
-        data_dir = config.get("data_dir", "data")
+        data_dir = os.path.expanduser(config.get("data_dir", "data"))
         if not os.path.isabs(data_dir):
             config["data_dir"] = os.path.join(project_dir, data_dir)
+
+        # download dataset
+        data_dir = os.path.join(project_dir, "data")
+        datasets.MNIST(data_dir, download=True, train=True)
 
         # Avoid "tune.sample_from"
         config["seed"] = 18
