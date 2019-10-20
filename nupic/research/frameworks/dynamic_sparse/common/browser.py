@@ -42,7 +42,6 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
-
 def flatten_dict(dt, delimiter="/"):
     dt = copy.deepcopy(dt)
     while any(isinstance(v, dict) for v in dt.values()):
@@ -61,7 +60,7 @@ def flatten_dict(dt, delimiter="/"):
 
 def load(experiment_path, metrics=None):
     """Load a single experiment into a dataframe"""
-    experiment_path = os.path.abspath(experiment_path)
+    experiment_path = os.path.expanduser(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
 
     # run once per experiment state
@@ -141,6 +140,7 @@ def _get_value(
     if performance_metrics is None:
         performance_metrics = [m for m in progress[exps[0]].keys() if "acc" in m]
 
+    # TODO: currently not working, refactor
     if full_metrics is None:
         full_metrics = ["val_acc"]
 
@@ -187,16 +187,20 @@ def _get_value(
 
         # add all remaining params, for easy aggregations
         for k, v in params[e].items():
-            if isinstance(v, list) and all([isinstance(n, numbers.Number) for n in v]):
-                stats[k].append(np.mean(v))
-            elif isinstance(v, list):
-                v = "-".join([str(v_i) for v_i in v])
-                stats[k].append(v)
-            else:
-                stats[k].append(v)
+            # TODO: fix this hard coded check, added as temporary fix
+            if k != 'epochs':            
+                # take the mean if a list of numbers
+                if isinstance(v, list) and all([isinstance(n, numbers.Number) for n in v]):
+                    stats[k].append(np.mean(v))
+                # concatenate if a list of strings
+                elif isinstance(v, list):
+                    v = "-".join([str(v_i) for v_i in v])
+                    stats[k].append(v)
+                # otherwise append the value as it is
+                else:
+                    stats[k].append(v)
 
     return pd.DataFrame(stats)
-
 
 def _get_experiment_states(experiment_path, exit_on_fail=False):
     """
