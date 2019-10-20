@@ -25,7 +25,9 @@ import ray
 import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
+    DEFAULT_LOGGERS,
+)
 from nupic.research.frameworks.dynamic_sparse.common.utils import (
     Trainable,
     new_experiment,
