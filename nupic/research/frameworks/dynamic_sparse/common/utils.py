@@ -46,7 +46,7 @@ class Trainable(tune.Trainable):
         self.model = getattr(models, config["model"])(network, config=config)
         self.dataset = Dataset(config=config)
         self.model.setup()
-        self.experiment_name = config['name']
+        self.experiment_name = config["name"]
 
     def _train(self):
         log = self.model.run_epoch(self.dataset, self._iteration)
@@ -96,6 +96,7 @@ def run_experiment(name, trainable, exp_config, tune_config):
     # save after training
     # if tune_config['checkpoint_at_end']:
     #     model.save(exp_config['checkpoint_dir'])
+
 
 def init_ray():
 

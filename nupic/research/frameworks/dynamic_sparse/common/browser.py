@@ -42,6 +42,7 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
+
 def flatten_dict(dt, delimiter="/"):
     dt = copy.deepcopy(dt)
     while any(isinstance(v, dict) for v in dt.values()):
@@ -188,9 +189,11 @@ def _get_value(
         # add all remaining params, for easy aggregations
         for k, v in params[e].items():
             # TODO: fix this hard coded check, added as temporary fix
-            if k != 'epochs':            
+            if k != "epochs":
                 # take the mean if a list of numbers
-                if isinstance(v, list) and all([isinstance(n, numbers.Number) for n in v]):
+                if isinstance(v, list) and all(
+                    [isinstance(n, numbers.Number) for n in v]
+                ):
                     stats[k].append(np.mean(v))
                 # concatenate if a list of strings
                 elif isinstance(v, list):
@@ -201,6 +204,7 @@ def _get_value(
                     stats[k].append(v)
 
     return pd.DataFrame(stats)
+
 
 def _get_experiment_states(experiment_path, exit_on_fail=False):
     """

@@ -164,7 +164,9 @@ class Dataset:
             )
 
         # load train set
-        train_set = self.dataset(root=self.data_dir, train=True, transform=aug_transform)
+        train_set = self.dataset(
+            root=self.data_dir, train=True, transform=aug_transform
+        )
         self.train_loader = dataloader_type(
             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
         )
@@ -185,9 +187,7 @@ class Dataset:
             [
                 transforms.ToTensor(),
                 transforms.Normalize(self.stats_mean, self.stats_std),
-                RandomNoise(
-                    noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2
-                ),
+                RandomNoise(noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2),
             ]
         )
         noise_set = self.dataset(
@@ -196,5 +196,3 @@ class Dataset:
         self.noise_loader = DataLoader(
             dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
         )
-
-

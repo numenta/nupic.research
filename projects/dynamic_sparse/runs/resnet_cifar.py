@@ -41,11 +41,11 @@ base_exp_config = dict(
     boost_strength=1.5,
     boost_strength_factor=0.85,
     k_inference_factor=1.0,
-    sparse_type='precise_per_output',
+    sparse_type="precise_per_output",
     sparse_start=1,
     sparse_end=None,
     on_perc=0.5,
-    dropout_rate=0, # zero dropout in wideresnet
+    dropout_rate=0,  # zero dropout in wideresnet
     # ---- optimizer related
     optim_alg="SGD",
     learning_rate=0.1,
@@ -62,8 +62,8 @@ base_exp_config = dict(
 
 # ray configurations
 tune_config = dict(
-    num_samples=1,
-    name=__file__.replace(".py", "") + "2",
+    num_samples=5,
+    name=__file__.replace(".py", "") + "3",
     checkpoint_freq=1,
     checkpoint_at_end=True,
     resources_per_trial={"cpu": 1, "gpu": 0.50},
