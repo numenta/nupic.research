@@ -105,7 +105,9 @@ class DSNNHeb(SparseModel):
                     with torch.no_grad():
                         module.mask = new_mask.float()
                         module.apply_mask()
-                    self.logger.save_masks(module.pos, new_mask, keep_mask, add_mask, num_add)
+                    self.logger.save_masks(
+                        module.pos, new_mask, keep_mask, add_mask, num_add
+                    )
                     self.logger.save_surviving_synapses(module, keep_mask)
 
     def _get_hebbian_mask(self, weight, corr, active_synapses, prune_perc):
@@ -282,7 +284,7 @@ class DSNNWeightedMag(DSNNHeb):
         with torch.no_grad():
             nonactive_synapses = module.m.weight == 0
             add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
-            add_mask = add_mask.to(keep_mask.device)
+            add_mask = add_mask.to(self.device)
 
         return add_mask
 
@@ -341,9 +343,9 @@ class DSNNMixedHeb(DSNNHeb):
                 add_mask = self._get_hebbian_add_mask(corr, nonactive_synapses, num_add)
             else:
                 add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
-            add_mask = add_mask.to(keep_mask.device)
+            add_mask = add_mask.to(self.device)
 
-        return add_mask        
+        return add_mask
 
 
 class DSNNMixedHebInverse(DSNNMixedHeb):
@@ -392,7 +394,7 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
     def grow(self, module, num_add):
         """Add randomly"""
         with torch.no_grad():
-            corr = module.get_coactivations()            
+            corr = module.get_coactivations()
             nonactive_synapses = module.m.weight == 0
             if self.hebbian_grow:
                 add_mask = self._get_inverse_hebbian_add_mask(
@@ -400,6 +402,6 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
                 )
             else:
                 add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
-            add_mask = add_mask.to(keep_mask.device)
+            add_mask = add_mask.to(self.device)
 
-        return add_mask        
+        return add_mask
