@@ -19,18 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-# script to run noise tests 
+# script to run noise tests
 
 # load the model and the configurations
-# could then run a specific model 
+# could then run a specific model
 
-import os
 import json
+import os
+
 import numpy as np
 
-from nupic.research.frameworks.dynamic_sparse.common import browser
 import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
+from nupic.research.frameworks.dynamic_sparse.common import browser
 from nupic.research.frameworks.dynamic_sparse.common.datasets import Dataset
 
 # load
@@ -49,27 +50,27 @@ for instance in os.listdir(experiment_path):
     instance_path = os.path.join(experiment_path, instance)
     if os.path.isdir(instance_path):
         print(instance_path)
-        # get best epoch 
+        # get best epoch
         exp_name = instance[10:][:-28]
-        best_epoch = df[df['Experiment Name'] == exp_name]['train_acc_max_epoch'].item()
+        best_epoch = df[df["Experiment Name"] == exp_name]["train_acc_max_epoch"].item()
         # open checkpoint folder
-        checkpoint_path = os.path.join(instance_path, 'checkpoint_' + str(best_epoch))
+        checkpoint_path = os.path.join(instance_path, "checkpoint_" + str(best_epoch))
         print(checkpoint_path)
         # load config file
-        config_path = os.path.join(checkpoint_path, experiment_name + '.json')
-        with open(config_path, 'r') as file:
+        config_path = os.path.join(checkpoint_path, experiment_name + ".json")
+        with open(config_path, "r") as file:
             config = json.load(file)
-        config['load_from_checkpoint'] = True
+        config["load_from_checkpoint"] = True
         # config['device'] = 'cuda' # only if local
         # load network and model, restore parameters
-        network = getattr(networks, config['network'])(config)
-        model = getattr(models, config['model'])(network, config)
+        network = getattr(networks, config["network"])(config)
+        model = getattr(models, config["model"])(network, config)
         model.setup()
-        model.restore(checkpoint_path, config['name'])
+        model.restore(checkpoint_path, config["name"])
         # initialize dataset, only once is required
         if dataset is None:
             dataset = Dataset(config)
-        # run noise tests 
+        # run noise tests
         for noise_level in noise_levels:
             print("noise: ", noise_level)
             accuracies = []
@@ -84,5 +85,5 @@ for instance in os.listdir(experiment_path):
             results[exp_name][noise_level] = avg_accuracy
 
 # save results
-with open(os.path.join(experiment_path, 'noise_results.json'), 'w') as file:
+with open(os.path.join(experiment_path, "noise_results.json"), "w") as file:
     json.dump(results, file)

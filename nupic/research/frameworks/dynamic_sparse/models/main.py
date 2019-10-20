@@ -19,11 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import json
+import os
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
-import os
-import json
 
 import numpy as np
 import torch
@@ -67,7 +67,7 @@ class BaseModel:
         self.__dict__.update(defaults)
 
         # save config to restore the model later
-        self.config = config        
+        self.config = config
         self.device = torch.device(self.device)
         self.network = network.to(self.device)
 
@@ -85,7 +85,7 @@ class BaseModel:
                 lr=self.learning_rate,
                 momentum=self.momentum,
                 weight_decay=self.weight_decay,
-                nesterov=self.nesterov_momentum
+                nesterov=self.nesterov_momentum,
             )
 
         # add a learning rate scheduler
@@ -200,14 +200,14 @@ class BaseModel:
         # if not os.path.exists(experiment_root):
         #     os.mkdir(experiment_root)
 
-        checkpoint_path = os.path.join(checkpoint_dir, experiment_name + '.pth')
+        checkpoint_path = os.path.join(checkpoint_dir, experiment_name + ".pth")
         torch.save(self.network.state_dict(), checkpoint_path)
 
-        config_file = os.path.join(checkpoint_dir, experiment_name + '.json')
-        with open(config_file, 'w') as config_handler:
+        config_file = os.path.join(checkpoint_dir, experiment_name + ".json")
+        with open(config_file, "w") as config_handler:
             json.dump(self.config, config_handler)
 
-        return 
+        return
 
     def restore(self, checkpoint_dir, experiment_name):
         """
@@ -216,14 +216,16 @@ class BaseModel:
         """
         # print("loading from", checkpoint_path)
         # experiment_root = os.path.join(checkpoint_dir, experiment_name)
-        checkpoint_path = os.path.join(checkpoint_dir, experiment_name + '.pth')        
-        self.network.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
+        checkpoint_path = os.path.join(checkpoint_dir, experiment_name + ".pth")
+        self.network.load_state_dict(
+            torch.load(checkpoint_path, map_location=self.device)
+        )
 
     def evaluate_noise(self, dataset):
         """External function used to evaluate noise on pre-trained models"""
         self.network.eval()
         self._run_one_pass(dataset.noise_loader, train=False, noise=True)
-        loss, acc = self.logger.log['noise_loss'], self.logger.log['noise_acc']
+        loss, acc = self.logger.log["noise_loss"], self.logger.log["noise_acc"]
         return loss, acc
 
     def train(self, dataset, num_epochs, test_noise=False):
