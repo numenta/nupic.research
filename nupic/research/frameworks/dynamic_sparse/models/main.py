@@ -405,7 +405,8 @@ class SparseModule:
             self.m.coactivations[:] = 0
 
     def apply_mask(self):
-        self.m.weight.data *= self.mask
+        if self.mask is not None:
+            self.m.weight.data *= self.mask
 
     def create_mask(self, sparse_type):
         if sparse_type == "precise":
