@@ -322,7 +322,7 @@ class SparseModel(BaseModel):
                 Expected "{}" to be of same length as counterpart ({}).
                 Got {} of type {}.
                 """.format(
-                attr, counterpart, value, type(value)
+                attr, len(counterpart), value, type(value)
             )
         else:
             value = [value] * len(counterpart)
