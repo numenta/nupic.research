@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import numpy as np
 import torch
 from torch import nn
 
@@ -177,6 +178,23 @@ class GSCHebDepreciated(nn.Module):
                         idx_activation += 1
 
         return x
+
+
+def _make_dsnn(net, config):
+    """
+    This function performs "surgery" - so to speak on the
+    `MNISTSparseCNN` and `GSCSparseCNN` networks to enable
+    them to be dynamically sparse.
+    """
+    net = replace_sparse_weights(net)
+    net = make_dsnn(net, config)
+    net = swap_layers(net, nn.MaxPool2d, KWinners2d)
+    net = squash_layers(net, DSConv2d, KWinners2d)
+    net = squash_layers(net, DSLinear, nn.BatchNorm1d, KWinners)
+
+    net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
+
+    return net
 
 
 # make a conv heb just by replacing the conv layers by special DSNN Conv layers
@@ -361,4 +379,107 @@ def gsc_sparse_dsnn_fullyconv(config):
 
     net.dynamic_sparse_modules = get_dynamic_sparse_modules(net)
 
+    return net
+
+
+def _get_gsc_small_dense_params(equivalent_on_perc, verbose=False):
+
+    def vprint(*args):
+        if verbose:
+            print(*args)
+
+    # Define number of params in dense GSC.
+    # TODO: make configurable based off orignal `cnn_out_channels` and `linear_units`
+    # default_config = dict(
+    #     cnn_out_channels=(64, 64),
+    #     linear_units=1000,
+    # )
+    large_dense_params = np.array([1600, 102400, 1600000, 12000])
+
+    # Cacluate num params in large sparse GSC.
+    large_sparse_params = large_dense_params * equivalent_on_perc
+
+    # Init desired congfig.
+    cnn_out_channels = np.array([0, 0])
+    linear_units = None
+
+    # Assume 1 channel input to first conv
+    cnn_out_channels[0] = large_sparse_params[0] / 25
+    cnn_out_channels[1] = large_sparse_params[1] / (cnn_out_channels[0] * 25)
+    cnn_out_channels = np.round(cnn_out_channels).astype(np.int)
+    linear_units = large_sparse_params[2] / (25 * cnn_out_channels[1])
+    linear_units = int(np.round(linear_units))
+
+    # Simulate foward pass for sanity check
+    conv1 = torch.nn.Conv2d(1, cnn_out_channels[0], 5)
+    maxp1 = torch.nn.MaxPool2d(2)
+    conv2 = torch.nn.Conv2d(cnn_out_channels[0], cnn_out_channels[1], 5)
+    maxp2 = torch.nn.MaxPool2d(2)
+    flat = torch.nn.Flatten()
+    lin1 = torch.nn.Linear(25 * cnn_out_channels[1], linear_units)
+    lin2 = torch.nn.Linear(linear_units, 12)
+
+    x = torch.rand(10, 1, 32, 32)
+    x = conv1(x)
+    x = maxp1(x)
+    x = conv2(x)
+    x = maxp2(x)
+    x = flat(x)
+    x = lin1(x)
+    x = lin2(x)
+
+    # Calculate number of params.
+    small_dense_params = {
+        "conv_1": np.prod(conv1.weight.shape),
+        "conv_2": np.prod(conv2.weight.shape),
+        "lin1": np.prod(lin1.weight.shape),
+        "lin2": np.prod(lin2.weight.shape),
+    }
+
+    # Compare with desired.
+    total_new = 0
+    total_old = 0
+    for p_old, (layer, p_new) in zip(large_sparse_params, small_dense_params.items()):
+        abs_diff = p_new - p_old
+        rel_diff = abs_diff / float(p_old)
+        vprint("---- {} -----".format(layer))
+        vprint("   new - ", p_new)
+        vprint("   old - ", p_old)
+        vprint("   abs diff:", abs_diff)
+        vprint("   rel diff: {}% change".format(100 * rel_diff))
+        vprint()
+        total_new += p_new
+        total_old += p_old
+
+    total_abs_diff = total_new - total_old
+    total_rel_diff = total_abs_diff / float(total_old)
+    vprint("---- Summary ----")
+    vprint("   total new - ", total_new)
+    vprint("   total old - ", total_old)
+    vprint("   total abs diff:", total_abs_diff)
+    vprint("   total rel diff: {}% change".format(100 * total_rel_diff))
+
+    # New config
+    new_config = dict(
+        cnn_out_channels=tuple(cnn_out_channels),
+        linear_units=linear_units,
+    )
+    return new_config
+
+
+def small_dense_gsc(config):
+
+    equivalent_on_perc = config.get("equivalent_on_perc")
+    verbose = config.get("debug_small_dense")
+    small_gsc_config = _get_gsc_small_dense_params(equivalent_on_perc, verbose=verbose)
+
+    net_params = config.get("net_params", {})
+    net_params.update(small_gsc_config)
+
+    return GSCSparseCNN(**net_params)
+
+
+def small_dense_gsc_dsnn(config):
+    net = small_dense_gsc(config)
+    net = _make_dsnn(net, config)
     return net
