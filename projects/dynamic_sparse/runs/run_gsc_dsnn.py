@@ -76,17 +76,20 @@ base_exp_config = dict(
 )
 
 # ray configurations
-experiment_name = "gsc-trials-2019-10-03-test"
+# experiment_name = "gsc-trials-2019-10-07"
+# experiment_name = "gsc-plots-2019-10-09" # hist of pruned weights
+# experiment_name = "gsc-plots-2019-10-11"
+experiment_name = "gsc-plots-2019-10-11"  # reproduce after merge
 tune_config = dict(
     name=experiment_name,
-    num_samples=5,
+    num_samples=1,
     local_dir=os.path.expanduser(os.path.join("~/nta/results", experiment_name)),
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 30},
     resources_per_trial={
-        "cpu": os.cpu_count() / 2.0,
-        "gpu": torch.cuda.device_count() / 2.0,
+        "cpu": os.cpu_count(),
+        "gpu": torch.cuda.device_count(),
     },
     loggers=DEFAULT_LOGGERS,
     verbose=1,
@@ -94,60 +97,190 @@ tune_config = dict(
 )
 
 # define experiments
+net_params = dict(
+    boost_strength=1.5,
+    boost_strength_factor=0.9,
+    k_inference_factor=1.5,
+    duty_cycle_period=1000
+)
 experiments = {
-    "gsc-BaseModel": dict(model=ray.tune.grid_search(["BaseModel"])),
+
+    # -------
+    # Plots
+    # -------
+
     "gsc-Static": dict(
         model=ray.tune.grid_search(["SparseModel"]),
+        network="gsc_sparse_dsnn",
         # sparse related
-        on_perc=ray.tune.grid_search(
-            [
-                [None, None, 0.4, None],
-                [None, None, 0.1, None],
-                [None, None, 0.05, None],
-                [None, None, 0.025, None],
-            ]
-        ),
-    ),
-    "gsc-Heb": dict(
-        model=ray.tune.grid_search(["DSNNMixedHeb"]),
-        # network related
-        prune_methods=[None, None, "dynamic-linear", None],
-        # sparse related
-        on_perc=ray.tune.grid_search(
-            [
-                [None, None, 0.4, None],
-                [None, None, 0.1, None],
-                [None, None, 0.05, None],
-                [None, None, 0.025, None],
-            ]
-        ),
-        hebbian_prune_perc=0.3,
-        hebbian_grow=True,
-        weight_prune_perc=None,
-        moving_average_alpha=ray.tune.grid_search([0.6]),
-        use_binary_coactivations=False,
-        # debug related
+        prune_methods=[None, "dynamic-conv", "dynamic-linear", None],
+        on_perc=ray.tune.grid_search([
+            # [None, None, 0.4, None],
+            # [None, None, 0.1, None],
+            # [None, None, 0.05, None],
+            [0.5, 0.1, 0.1, 1.0],
+        ]),
         log_magnitude_vs_coactivations=True,
+        track_coactivation_variants=True,
+        net_params=net_params,
     ),
-    "gsc-SET": dict(
-        model=ray.tune.grid_search(["DSNNMixedHeb"]),
-        # network related
-        prune_methods=[None, None, "dynamic-linear", None],
-        # sparse related
-        on_perc=ray.tune.grid_search(
-            [
-                [None, None, 0.4, None],
-                [None, None, 0.1, None],
-                [None, None, 0.05, None],
-                [None, None, 0.025, None],
-            ]
-        ),
-        hebbian_prune_perc=None,
-        hebbian_grow=False,
-        weight_prune_perc=0.3,
-        # debugging related
-        log_magnitude_vs_coactivations=True,
-    ),
+
+    # "gsc-SET": dict(
+    #     model=ray.tune.grid_search(["SET"]),
+    #     network="gsc_sparse_dsnn",
+    #     # network related
+    #     prune_methods=[None, "dynamic-conv", "dynamic-linear", None],
+    #     # sparse related
+    #     on_perc=ray.tune.grid_search([
+    #         # [None, None, 0.4, None],
+    #         # [None, None, 0.1, None],
+    #         # [None, None, 0.05, None],
+    #         [0.5, 0.1, 0.1, None],
+    #     ]),
+    #     hebbian_prune_perc=None,
+    #     hebbian_grow=False,
+    #     # weight_prune_perc=0.3,
+    #     weight_prune_perc=0.3,
+    #     log_magnitude_vs_coactivations=True,
+    #     track_coactivation_variants=True,
+    #     net_params=net_params,
+    # ),
+
+    # "gsc-WeightedMag": dict(
+    #     model=ray.tune.grid_search(["DSNNWeightedMag"]),
+    #     # network related
+    #     network="gsc_sparse_dsnn",
+    #     prune_methods=[None, "dynamic-conv", "dynamic-linear", None],
+    #     # sparse related
+    #     on_perc=ray.tune.grid_search([
+    #         # [None, None, 0.4, None],
+    #         # [None, None, 0.1, None],
+    #         # [None, None, 0.05, None],
+    #         [0.5, 0.1, 0.1, None],
+    #     ]),
+    #     hebbian_prune_perc=None,
+    #     hebbian_grow=False,
+    #     weight_prune_perc=0.3,
+    #     log_magnitude_vs_coactivations=True,
+    #     track_coactivation_variants=True,
+    #     net_params=net_params,
+    # ),
+
+    # "gsc-Heb": dict(
+    #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
+    #     # network related
+    #     network="gsc_sparse_dsnn",
+    #     prune_methods=[None, "dynamic-conv", "dynamic-linear", None],
+    #     # sparse related
+    #     on_perc=ray.tune.grid_search([
+    #         # [None, None, 0.4, None],
+    #         # [None, None, 0.1, None],
+    #         # [None, None, 0.05, None],
+    #         [0.5, 0.1, 0.1, None],
+    #     ]),
+    #     hebbian_prune_perc=0.3,
+    #     hebbian_grow=False,
+    #     weight_prune_perc=None,
+    #     log_magnitude_vs_coactivations=True,
+    #     track_coactivation_variants=True,
+    #     net_params=net_params,
+    # ),
+
+    # ---------
+    # Trials
+    # ---------
+
+    # "gsc-BaseModel": dict(
+    #     model=ray.tune.grid_search(["BaseModel"]),
+    #     on_perc=ray.tune.grid_search([
+    #         [None, None, 0.40, None],
+    #     ]),
+    # ),
+    # "gsc-Static": dict(
+    #     model=ray.tune.grid_search(["SparseModel"]),
+    #     # sparse related
+    #     on_perc=ray.tune.grid_search([
+    #         # [None, None, 0.4, None],
+    #         # [None, None, 0.1, None],
+    #         # [None, None, 0.05, None],
+    #         [None, None, 0.02, None],
+    #     ]),
+    # ),
+
+    # "gsc-SET": dict(
+    #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
+    #     # network related
+    #     prune_methods=[None, None, "dynamic-linear", None],
+    #     # sparse related
+    #     on_perc=ray.tune.grid_search([
+    #         # [None, None, 0.4, None],
+    #         # [None, None, 0.1, None],
+    #         # [None, None, 0.05, None],
+    #         [None, None, 0.02, None],
+    #     ]),
+    #     hebbian_prune_perc=None,
+    #     hebbian_grow=False,
+    #     weight_prune_perc=0.3,
+    #     # debugging related
+    # ),
+    # "gsc-Heb-nonbinary": dict(
+    #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
+    #     # network related
+    #     prune_methods=[None, None, "dynamic-linear", None],
+    #     # sparse related
+    #     on_perc=ray.tune.grid_search([
+    #         # [None, None, 0.4, None],
+    #         # [None, None, 0.1, None],
+    #         # [None, None, 0.05, None],
+    #         [None, None, 0.02, None],
+    #     ]),
+    #     hebbian_prune_perc=0.3,
+    #     hebbian_grow=ray.tune.grid_search([True, False]),
+    #     weight_prune_perc=None,
+    #     moving_average_alpha=ray.tune.grid_search([0.6, 0.8, 1.0]),
+    #     reset_coactivations=ray.tune.grid_search([True, False]),
+    #     use_binary_coactivations=False,
+    #     # debug related
+    # ),
+
+    # "gsc-WeightedMag-nonbinary": dict(
+    #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
+    #     # network related
+    #     prune_methods=[None, None, "dynamic-linear", None],
+    #     # sparse related
+    #     on_perc=ray.tune.grid_search([
+    #         # [None, None, 0.4, None],
+    #         # [None, None, 0.1, None],
+    #         # [None, None, 0.05, None],
+    #         [None, None, 0.02, None],
+    #     ]),
+    #     hebbian_prune_perc=None,
+    #     hebbian_grow=ray.tune.grid_search([True, False]),
+    #     weight_prune_perc=0.3,
+    #     # debug related
+    #     moving_average_alpha=ray.tune.grid_search([0.8]),
+    #     use_binary_coactivations=False,
+    #     # debug related
+    # ),
+
+    # "gsc-WeightedMag": dict(
+    #     model=ray.tune.grid_search(["DSNNMixedHeb"]),
+    #     # network related
+    #     prune_methods=[None, None, "dynamic-linear", None],
+    #     # sparse related
+    #     on_perc=ray.tune.grid_search([
+    #         # [None, None, 0.4, None],
+    #         # [None, None, 0.1, None],
+    #         # [None, None, 0.05, None],
+    #         [None, None, 0.02, None],
+    #     ]),
+    #     hebbian_prune_perc=None,
+    #     hebbian_grow=False,
+    #     weight_prune_perc=0.3,
+    #     # debug related
+    # ),
+
+
 }
 exp_configs = (
     [(name, new_experiment(base_exp_config, c)) for name, c in experiments.items()]
