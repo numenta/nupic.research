@@ -78,7 +78,7 @@ base_exp_config = dict(
 # ray configurations
 # experiment_name = "mlp-heb-coacts-vs-magn-2019-10-04-D" # dominant / directions
 # experiment_name = "mlp-heb-coacts-vs-magn-2019-10-04-H" # alts
-experiment_name = "mlp-heb-coacts-vs-magn-2019-10-04-I" # directions  / alts
+experiment_name = "mlp-heb-coacts-vs-magn-2019-10-04-I"  # directions  / alts
 tune_config = dict(
     name=experiment_name,
     num_samples=1,
