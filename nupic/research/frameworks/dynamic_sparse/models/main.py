@@ -21,6 +21,7 @@
 
 from collections import defaultdict
 from collections.abc import Iterable
+from copy import deepcopy
 from itertools import product
 
 import numpy as np
@@ -65,6 +66,7 @@ class BaseModel:
         # init remaining
         self.device = torch.device(self.device)
         self.network = network.to(self.device)
+        self.config = deepcopy(config)
 
     def setup(self):
 
@@ -98,7 +100,7 @@ class BaseModel:
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")
 
-        self.logger = BaseLogger(self)
+        self.logger = BaseLogger(self, config=self.config)
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
@@ -278,7 +280,7 @@ class SparseModel(BaseModel):
                     module.apply_mask()
                     module.save_num_params()
 
-        self.logger = SparseLogger(self)
+        self.logger = SparseLogger(self, config=self.config)
         # TODO: is this still required?
         # if self.log_magnitude_vs_coactivations:
         #     self.network.apply(init_coactivation_tracking)
