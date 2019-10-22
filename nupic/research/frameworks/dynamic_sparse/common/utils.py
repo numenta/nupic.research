@@ -46,16 +46,18 @@ class Trainable(tune.Trainable):
         self.model = getattr(models, config["model"])(network, config=config)
         self.dataset = Dataset(config=config)
         self.model.setup()
+        self.experiment_name = config["name"]
 
     def _train(self):
         log = self.model.run_epoch(self.dataset, self._iteration)
         return log
 
     def _save(self, checkpoint_dir):
-        self.model.save(checkpoint_dir)
+        self.model.save(checkpoint_dir, self.experiment_name)
+        return checkpoint_dir
 
     def _restore(self, checkpoint):
-        self.model.restore(checkpoint)
+        self.model.restore(checkpoint, self.experiment_name)
 
 
 def download_dataset(config):
@@ -91,6 +93,9 @@ def run_experiment(name, trainable, exp_config, tune_config):
     tune_config["name"] = name
     tune_config["config"] = exp_config
     tune.run(Trainable, **tune_config)
+    # save after training
+    # if tune_config['checkpoint_at_end']:
+    #     model.save(exp_config['checkpoint_dir'])
 
 
 def init_ray():
@@ -143,6 +148,14 @@ def run_ray(tune_config, exp_config, fix_seed=False):
         tune_config["local_dir"] = os.path.expanduser(tune_config["local_dir"])
     else:
         tune_config["local_dir"] = os.path.expanduser("~/nta/results")
+
+    # set default checkpoint dir
+    # temp: name and checkpoint dir in tune_config for backwards compatibility
+    exp_config["name"] = tune_config["name"]
+    if "checkpoint dir" in tune_config:
+        exp_config["checkpoint_dir"] = os.path.expanduser(exp_config["checkpoint_dir"])
+    else:
+        exp_config["checkpoint_dir"] = os.path.expanduser("~/nta/checkpoints")
 
     # init ray
     ray.init(load_code_from_local=True)
