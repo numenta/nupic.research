@@ -36,7 +36,7 @@ base_exp_config = dict(
     # ---- network related
     # network="resnet152",
     # network="WideResNet",
-    network=tune.grid_search(["resnet152", "WideResNet"]),
+    network="WideResNet",
     percent_on_k_winner=tune.grid_search([0.25, 1]),
     boost_strength=1.5,
     boost_strength_factor=0.85,
@@ -63,7 +63,7 @@ base_exp_config = dict(
 # ray configurations
 tune_config = dict(
     num_samples=5,
-    name=__file__.replace(".py", "") + "3",
+    name=__file__.replace(".py", "") + "3b-test",
     checkpoint_freq=1,
     checkpoint_at_end=True,
     resources_per_trial={"cpu": 1, "gpu": 0.50},
