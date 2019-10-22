@@ -86,11 +86,6 @@ if __name__ == "__main__":
     print(experiment_path)
     noise_levels = [0, 0.025, 0.05, 0.075, 0.10, 0.125, 0.15, 0.175, 0.20]
     results = {}
-    # dataset = Dataset(config=dict(
-    #     device="cuda",
-    #     dataset_name="CIFAR10",
-    #     data_dir="~/nta/datasets",
-    # ))
     number_noise_tests = 10
     df = browser.load(experiment_path)
 
