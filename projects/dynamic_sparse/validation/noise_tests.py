@@ -101,11 +101,11 @@ if __name__ == "__main__":
         for idx, instance in enumerate(os.listdir(experiment_path))
         if os.path.isdir(os.path.join(experiment_path, instance))
     ]
-    ray.get(all_instances)
+    results_per_instance = ray.get(all_instances)
 
     # aggregate results
-    full_results = []
-    for instance, results in all_instances:
+    full_results = {}
+    for instance, results in results_per_instance:
         # define short name for aggregation
         exp_short_name = re.sub(r"^\d+_", "", instance[10:][:-28])
         # iterate through results
