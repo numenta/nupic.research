@@ -36,6 +36,7 @@ import nupic.research.frameworks.dynamic_sparse.networks as networks
 from nupic.research.frameworks.dynamic_sparse.common import browser
 from nupic.research.frameworks.dynamic_sparse.common.datasets import Dataset
 
+
 @ray.remote(num_gpus=0.10)
 def test_noise(instance, experiment_path, idx):
     print(idx)
@@ -75,6 +76,7 @@ def test_noise(instance, experiment_path, idx):
 
     return instance, results
 
+
 if __name__ == "__main__":
 
     # load
@@ -93,9 +95,9 @@ if __name__ == "__main__":
     df = browser.load(experiment_path)
 
     # iterate through all experiment instances, in parallel
-    ray.init(num_gpus=4)  
+    ray.init(num_gpus=4)
     all_instances = [
-        test_noise.remote(instance, experiment_path, idx) 
+        test_noise.remote(instance, experiment_path, idx)
         for idx, instance in enumerate(os.listdir(experiment_path))
         if os.path.isdir(os.path.join(experiment_path, instance))
     ]
@@ -105,9 +107,9 @@ if __name__ == "__main__":
     full_results = []
     for instance, results in all_instances:
         # define short name for aggregation
-        exp_short_name = re.sub(r'^\d+_', '', instance[10:][:-28])
+        exp_short_name = re.sub(r"^\d+_", "", instance[10:][:-28])
         # iterate through results
-        for noise_level, acc in results.items():    
+        for noise_level, acc in results.items():
             # creat entry for experiment, if doesn't exist
             if exp_short_name not in full_results:
                 full_results[exp_short_name] = {}
@@ -120,4 +122,3 @@ if __name__ == "__main__":
     # save results
     with open(os.path.join(experiment_path, "noise_results.json"), "w") as file:
         json.dump(full_results, file)
-
