@@ -32,6 +32,7 @@ from pathlib import Path
 import numpy as np
 import ray
 import torch
+import torch.utils.data
 from ray import tune
 from ray.tune.logger import CSVLogger, JsonLogger
 from torch import nn
@@ -182,13 +183,12 @@ class StochasticGSCExperiment(tune.Trainable):
                                                          gamma=config["gamma"])
 
     def _train(self):
-        train_dataset = preprocessed_dataset(
-            DATAPATH / get_train_filename(self.iteration))
-
+        batch_size = (FIRST_EPOCH_BATCH_SIZE if self.iteration == 0
+                      else TRAIN_BATCH_SIZE)
         train_loader = torch.utils.data.DataLoader(
-            train_dataset,
-            batch_size=(FIRST_EPOCH_BATCH_SIZE if self.iteration == 0
-                        else TRAIN_BATCH_SIZE),
+            preprocessed_dataset(
+                DATAPATH / get_train_filename(self.iteration)),
+            batch_size=batch_size,
             shuffle=True,
             pin_memory=torch.cuda.is_available()
         )
@@ -206,7 +206,8 @@ class StochasticGSCExperiment(tune.Trainable):
         for data, target in batches:
             data, target = data.to(self.device), target.to(self.device)
             output = self.model(data)
-            loss = self.loss_function(output, target)
+            loss = self.loss_function(output, target,
+                                      batch_size / len(train_loader.dataset))
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -235,7 +236,10 @@ class StochasticGSCExperiment(tune.Trainable):
             for data, target in batches:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
-                val_loss += torch.sum(self.loss_function(output, target)).item()
+                val_loss += torch.sum(
+                    self.loss_function(
+                        output, target,
+                        VALID_BATCH_SIZE / len(self.val_loader.dataset))).item()
                 # get the index of the max log-probability
                 pred = output.argmax(dim=1, keepdim=True)
                 val_correct += pred.eq(target.view_as(pred)).sum().item()
@@ -246,6 +250,7 @@ class StochasticGSCExperiment(tune.Trainable):
             "mean_loss": val_loss / len(self.val_loader.dataset),
             "mean_training_loss": train_loss / len(train_loader.dataset),
             "total_correct": val_correct,
+            "lr": self.optimizer.state_dict()["param_groups"][0]["lr"],
         }
         result.update(self.nonzero_counts())
 
@@ -275,9 +280,9 @@ class StochasticGSCExperiment(tune.Trainable):
         checkpoint_path = os.path.join(tmp_checkpoint_dir, "model.pth")
         self.model.load_state_dict(torch.load(checkpoint_path))
 
-    def loss_function(self, output, target):
+    def loss_function(self, output, target, dataset_percent):
         loss = self.loglike(output, target)
-        loss += self.regularization()
+        loss += dataset_percent * self.regularization()
         return loss
 
     def regularization(self):
@@ -320,8 +325,8 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="HardConcrete",
                         choices=["HardConcrete", "Binary"])
     parser.add_argument("--lr", type=float, nargs="+", default=[0.01])
-    # Suggested: 7e-6 for HardConcrete, 1e-6 for Binary
-    parser.add_argument("--l0", type=float, nargs="+", default=[7e-6])
+    # Suggested: 7e-4 for HardConcrete, 1e-4 for Binary
+    parser.add_argument("--l0", type=float, nargs="+", default=[7e-4])
     parser.add_argument("--l2", type=float, nargs="+", default=[0])
     parser.add_argument("--gamma", type=float, nargs="+", default=[0.9825])
     # Suggested: 0.5 for HardConcrete, 0.8 for Binary

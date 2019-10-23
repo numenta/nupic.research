@@ -57,16 +57,16 @@ class StochasticMNISTExperiment(tune.Trainable):
         self.use_tqdm = config["use_tqdm"]
 
         data_path = os.path.expanduser("~/nta/datasets")
-        batch_size = 100
+        self.batch_size = 100
         transform = transforms.Compose([transforms.ToTensor()])
         self.train_loader = torch.utils.data.DataLoader(
             datasets.MNIST(data_path, train=True, download=True,
                            transform=transform),
-            batch_size=batch_size, shuffle=True, num_workers=4,
+            batch_size=self.batch_size, shuffle=True, num_workers=4,
             pin_memory=torch.cuda.is_available())
         self.val_loader = torch.utils.data.DataLoader(
             datasets.MNIST(data_path, train=False, transform=transform),
-            batch_size=batch_size, num_workers=4,
+            batch_size=self.batch_size, num_workers=4,
             pin_memory=torch.cuda.is_available())
         num_classes = 10
         input_size = (1, 28, 28)
@@ -164,7 +164,9 @@ class StochasticMNISTExperiment(tune.Trainable):
         for data, target in batches:
             data, target = data.to(self.device), target.to(self.device)
             output = self.model(data)
-            loss = self.loss_function(output, target)
+            loss = self.loss_function(
+                output, target,
+                self.batch_size / len(self.train_loader.dataset))
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -188,7 +190,11 @@ class StochasticMNISTExperiment(tune.Trainable):
             for data, target in batches:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
-                loss += torch.sum(self.loss_function(output, target)).item()
+                loss += torch.sum(
+                    self.loss_function(
+                        output, target,
+                        self.batch_size / len(self.val_loader.dataset))
+                ).item()
                 # get the index of the max log-probability
                 pred = output.argmax(dim=1, keepdim=True)
                 total_correct += pred.eq(target.view_as(pred)).sum().item()
@@ -210,8 +216,10 @@ class StochasticMNISTExperiment(tune.Trainable):
         checkpoint_path = os.path.join(tmp_checkpoint_dir, "model.pth")
         self.model.load_state_dict(torch.load(checkpoint_path))
 
-    def loss_function(self, output, target):
-        return self.loglike(output, target) + self.regularization()
+    def loss_function(self, output, target, dataset_percent):
+        loss = self.loglike(output, target)
+        loss += dataset_percent * self.regularization()
+        return loss
 
     def regularization(self):
         reg = torch.tensor(0.).to(self.device)
@@ -243,7 +251,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="HardConcrete",
                         choices=["HardConcrete", "Binary"])
     parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--l0", type=float, nargs="+", default=[2e-5])
+    parser.add_argument("--l0", type=float, nargs="+", default=[7e-4])
     parser.add_argument("--l2", type=float, nargs="+", default=[0])
     parser.add_argument("--gamma", type=float, nargs="+", default=[1.0])
     parser.add_argument("--droprate-init", type=float, nargs="+", default=[0.5])
