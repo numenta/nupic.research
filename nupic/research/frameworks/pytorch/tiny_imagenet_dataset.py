@@ -62,7 +62,7 @@ class TinyImageNet(ImageFolder):
         targets (list): The class_index value for each image in the dataset
     """
 
-    def __init__(self, root, train=True, download=True, **kwargs):
+    def __init__(self, root, train=True, download=False, **kwargs):
 
         # load different models whether training or validation
         self.train = train
