@@ -51,14 +51,12 @@ from nupic.torch.modules import Flatten
 
 DATAPATH = Path(os.path.expanduser("~/nta/datasets/GSC"))
 
-FIRST_EPOCH_BATCH_SIZE = 4
-TRAIN_BATCH_SIZE = 16
 VALID_BATCH_SIZE = 1000
 TEST_BATCH_SIZE = 1000
 
 
 def get_train_filename(iteration):
-    return "gsc_train{}.npz".format(iteration)
+    return "gsc_train{}.npz".format(iteration % 100)
 
 
 def preprocessed_dataset(filepath):
@@ -84,6 +82,9 @@ class StochasticGSCExperiment(tune.Trainable):
         droprate_init = config["droprate_init"]
         self.use_tqdm = config["use_tqdm"]
         self.model_type = config["model_type"]
+        self.train_batch_size = config["batch_size"]
+        self.train_first_batch_size = config["first_batch_size"]
+        self.lr_decay_period = config["lr_decay_period"]
 
         self.val_loader = torch.utils.data.DataLoader(
             preprocessed_dataset(DATAPATH / "gsc_valid.npz"),
@@ -183,8 +184,8 @@ class StochasticGSCExperiment(tune.Trainable):
                                                          gamma=config["gamma"])
 
     def _train(self):
-        batch_size = (FIRST_EPOCH_BATCH_SIZE if self.iteration == 0
-                      else TRAIN_BATCH_SIZE)
+        batch_size = (self.train_first_batch_size if self.iteration == 0
+                      else self.train_batch_size)
         train_loader = torch.utils.data.DataLoader(
             preprocessed_dataset(
                 DATAPATH / get_train_filename(self.iteration)),
@@ -222,7 +223,8 @@ class StochasticGSCExperiment(tune.Trainable):
                 layer = getattr(self.model, layername)
                 layer.constrain_parameters()
 
-        self.scheduler.step()
+        if self.iteration != 0 and (self.iteration % self.lr_decay_period) == 0:
+            self.scheduler.step()
 
         self.model.eval()
         val_loss = 0
@@ -325,15 +327,19 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="HardConcrete",
                         choices=["HardConcrete", "Binary"])
     parser.add_argument("--lr", type=float, nargs="+", default=[0.01])
+    parser.add_argument("--lr-decay-period", type=int, nargs="+", default=[1])
     # Suggested: 7e-4 for HardConcrete, 1e-4 for Binary
     parser.add_argument("--l0", type=float, nargs="+", default=[7e-4])
     parser.add_argument("--l2", type=float, nargs="+", default=[0])
     parser.add_argument("--gamma", type=float, nargs="+", default=[0.9825])
     # Suggested: 0.5 for HardConcrete, 0.8 for Binary
     parser.add_argument("--droprate-init", type=float, nargs="+", default=[0.5])
+    parser.add_argument("--batch-size", type=int, nargs="+", default=[16])
+    parser.add_argument("--first-batch-size", type=int, nargs="+", default=[16])
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--samples", type=int, default=1)
     parser.add_argument("--ray-address", type=str, default="localhost:6379")
+    parser.add_argument("--checkpoint-freq", type=int, default=0)
     parser.add_argument("--fixedweight", action="store_true")
     parser.add_argument("--progress", action="store_true")
     parser.add_argument("--local", action="store_true")
@@ -353,6 +359,7 @@ if __name__ == "__main__":
     analysis = tune.run(StochasticGSCExperiment,
                         name=exp_name,
                         num_samples=args.samples,
+                        checkpoint_freq=args.checkpoint_freq,
                         config={
                             "lr": tune.grid_search(args.lr),
                             # "l0_strength": tune.sample_from(
@@ -365,6 +372,9 @@ if __name__ == "__main__":
                             "use_tqdm": args.progress,
                             "gamma": tune.grid_search(args.gamma),
                             "droprate_init": tune.grid_search(args.droprate_init),
+                            "first_batch_size": tune.grid_search(args.first_batch_size),
+                            "batch_size": tune.grid_search(args.batch_size),
+                            "lr_decay_period": tune.grid_search(args.lr_decay_period),
                         },
                         stop={"training_iteration": args.epochs},
                         checkpoint_at_end=True,
