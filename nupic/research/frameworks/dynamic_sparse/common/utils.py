@@ -32,7 +32,9 @@ import nupic.research.frameworks.dynamic_sparse.networks as networks
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 
 from .datasets import Dataset
+from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
+custom_datasets = {"TinyImageNet": TinyImageNet}
 
 class Trainable(tune.Trainable):
     """ray.tune trainable generic class Adaptable to any pytorch module."""
@@ -70,7 +72,10 @@ def download_dataset(config):
         getattr(datasets, config["dataset_name"])(
             download=True, root=os.path.expanduser(config["data_dir"])
         )
-
+    elif dataset_name in custom_datasets.keys():
+        custom_datasets[dataset_name](
+            download=True, root=os.path.expanduser(config["data_dir"])
+        )
 
 def new_experiment(base_config, new_config):
     modified_config = deepcopy(base_config)

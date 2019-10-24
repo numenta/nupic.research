@@ -24,13 +24,32 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+from torchvision.models.utils import load_state_dict_from_url
 
 from nupic.torch.modules import Flatten, KWinners2d
 
-
-def resnet_conv3x3(in_planes, out_planes, stride=1):
+def conv1x1(in_planes, out_planes, stride=1, padding=0, bias=False):
     return nn.Conv2d(
-        in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True
+        in_planes, out_planes, 
+        kernel_size=1, stride=stride, padding=padding, bias=bias
+    )
+
+def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
+    return nn.Conv2d(
+        in_planes, out_planes, 
+        kernel_size=3, stride=stride, padding=padding, bias=bias
+    )
+
+def conv5x5(in_planes, out_planes, stride=1, padding=2, bias=False):
+    return nn.Conv2d(
+        in_planes, out_planes, 
+        kernel_size=7, stride=stride, padding=padding, bias=bias
+    )
+
+def conv7x7(in_planes, out_planes, stride=1, padding=3, bias=False):
+    return nn.Conv2d(
+        in_planes, out_planes, 
+        kernel_size=7, stride=stride, padding=padding, bias=bias
     )
 
 
@@ -39,17 +58,17 @@ class BasicBlock(nn.Module):
         super(BasicBlock, self).__init__()
 
         self.regular_path = nn.Sequential(
-            resnet_conv3x3(in_planes, planes, stride),
+            conv3x3(in_planes, planes, stride),
             nn.BatchNorm2d(planes),
             activation_func(planes),
-            resnet_conv3x3(planes, planes),
+            conv3x3(planes, planes),
             nn.BatchNorm2d(planes),
         )
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride, bias=True),
+                conv1x1(in_planes, planes, stride=stride),
                 nn.BatchNorm2d(planes),
             )
 
@@ -61,35 +80,29 @@ class BasicBlock(nn.Module):
         out = self.post_activation(out)
         return out
 
-
 class Bottleneck(nn.Module):
     expansion = 4
 
     def __init__(self, in_planes, planes, stride=1, activation_func=nn.ReLU):
         super(Bottleneck, self).__init__()
         self.regular_path = nn.Sequential(
-            nn.Conv2d(in_planes, planes, kernel_size=1, bias=True),
+            # 1st layer
+            conv1x1(in_planes, planes),
             nn.BatchNorm2d(planes),
             activation_func(planes),
-            nn.Conv2d(
-                planes, planes, kernel_size=3, stride=stride, padding=1, bias=True
-            ),
+            # 2nd layer
+            conv3x3(planes,planes, stride=stride),
             nn.BatchNorm2d(planes),
             activation_func(planes),
-            nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=True),
+            # 3rd layer
+            conv1x1(planes,self.expansion * planes),
             nn.BatchNorm2d(self.expansion * planes),
         )
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(
-                    in_planes,
-                    self.expansion * planes,
-                    kernel_size=1,
-                    stride=stride,
-                    bias=True,
-                ),
+                conv1x1(in_planes, self.expansion * planes, stride=stride),
                 nn.BatchNorm2d(self.expansion * planes),
             )
 
@@ -108,7 +121,7 @@ class ResNet(nn.Module):
 
         # update config
         defaults = dict(
-            depth=28,
+            depth=50,
             num_classes=10,
             percent_on_k_winner=1.0,
             boost_strength=1.4,
@@ -136,21 +149,25 @@ class ResNet(nn.Module):
         else:
             self.activation_func = lambda _: nn.ReLU()
 
-        self.in_planes = 16
+        self.in_planes = 64
+        # TODO: analyze what are these attributes used for in torchvision:
+        # self.groups, self.base_width
 
         block, num_blocks = self._config_layers()
 
         self.features = nn.Sequential(
-            resnet_conv3x3(3, 16),
-            nn.BatchNorm2d(16),
-            self.activation_func(16),
-            self._make_layer(block, 16, num_blocks[0], stride=1),
-            self._make_layer(block, 32, num_blocks[1], stride=2),
-            self._make_layer(block, 64, num_blocks[2], stride=2),
-            nn.AdaptiveAvgPool2d((1, 1)),
-            Flatten(),
+            conv7x7(3, 64, stride=2),
+            nn.BatchNorm2d(64),
+            self.activation_func(64),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            self._make_layer(block, 64, num_blocks[0], stride=1),
+            self._make_layer(block, 128, num_blocks[1], stride=2),
+            self._make_layer(block, 256, num_blocks[2], stride=2),
+            self._make_layer(block, 512, num_blocks[3], stride=2),
+            nn.AdaptiveAvgPool2d(1),
+            Flatten(), # TODO: see if I still need it
         )
-        self.classifier = nn.Linear(64 * block.expansion, self.num_classes)
+        self.classifier = nn.Linear(512 * block.expansion, self.num_classes)
 
     def _config_layers(self):
         depth_lst = [18, 34, 50, 101, 152]
@@ -194,6 +211,37 @@ class ResNet(nn.Module):
 
 # convenience classes
 
+def resnet50_pretrained(config=None):
+    config = config or {}
+    config["depth"] = 50
+    new_num_classes = config['num_classes']
+    config['num_classes'] = 1000
+    net = ResNet(config)
+
+    model_url = 'https://download.pytorch.org/models/resnet50-19c8e357.pth'
+    state_dict = load_state_dict_from_url(model_url, progress=True)
+
+    def is_incompatible(layer):
+        return (layer.endswith('num_batches_tracked') or 
+                layer.endswith('boost_strength') or
+                layer.endswith('duty_cycle'))
+
+    # get keys, remove all num_batches_tracked
+    original_state_dict = list(net.modules())[0].state_dict() 
+    original_keys = original_state_dict.keys()
+    original_keys = [k for k in original_keys if not is_incompatible(k)]
+
+    # load state dict from torchvision
+    assert(len(original_keys) == len(state_dict),
+        "Incompatible number of layers between the created network and preloaded network")
+    new_state_dict = {k:v for k,v in zip(original_keys, state_dict.values())}
+    net.load_state_dict(new_state_dict, strict=False)
+
+    # remove the last layer
+    classifier_shape = (net.classifier.weight.shape[1], new_num_classes)
+    net.classifier = nn.Linear(*classifier_shape)
+
+    return net
 
 def resnet18(config=None):
     config = config or {}
@@ -206,12 +254,10 @@ def resnet34(config=None):
     config["depth"] = 34
     return ResNet(config)
 
-
 def resnet50(config=None):
     config = config or {}
     config["depth"] = 50
     return ResNet(config)
-
 
 def resnet101(config=None):
     config = config or {}
