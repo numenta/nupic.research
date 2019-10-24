@@ -19,16 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import codecs
+import csv
 import distutils.version
 import logging
 import os
+import pickle
 from io import BytesIO
 
 import matplotlib.pyplot as plt
 import numpy as np
 import PIL.Image
 import seaborn as sns
-from ray.tune.logger import CSVLogger, JsonLogger, Logger
+from ray.tune.logger import CSVLogger, JsonLogger, Logger, flatten_dict
 from ray.tune.result import TIME_TOTAL_S, TIMESTEPS_TOTAL, TRAINING_ITERATION
 
 logger = logging.getLogger(__name__)
@@ -197,4 +200,30 @@ class TFLoggerPlus(Logger):
         self._file_writer.close()
 
 
-DEFAULT_LOGGERS = (JsonLogger, CSVLogger, TFLoggerPlus)
+class CSVLoggerPlus(CSVLogger):
+
+    def on_result(self, result):
+        tmp = result.copy()
+        if "config" in tmp:
+            del tmp["config"]
+        result = flatten_dict(tmp, delimiter="/")
+        if self._csv_out is None:
+            self._csv_out = csv.DictWriter(self._file, result.keys())
+            if not self._continuing:
+                self._csv_out.writeheader()
+
+        encode_results = {}
+        for k, v in result.items():
+            if k not in self._csv_out.fieldnames:
+                continue
+
+            if isinstance(v, np.ndarray):
+                v = pickle.dumps(v)
+                v = codecs.encode(v, "base64").decode()
+            encode_results[k] = v
+
+        self._csv_out.writerow(encode_results)
+        self._file.flush()
+
+
+DEFAULT_LOGGERS = (JsonLogger, CSVLoggerPlus, TFLoggerPlus)

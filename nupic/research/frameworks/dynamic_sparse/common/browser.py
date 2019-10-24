@@ -29,11 +29,13 @@ Converted to a module
 
 from __future__ import absolute_import, division, print_function
 
+import codecs
 import copy
 import glob
 import json
 import numbers
 import os
+import pickle
 import warnings
 from collections import defaultdict
 
@@ -41,6 +43,10 @@ import numpy as np
 import pandas as pd
 
 warnings.filterwarnings("ignore")
+
+# ---------
+# Utils
+# ---------
 
 
 def flatten_dict(dt, delimiter="/"):
@@ -59,7 +65,29 @@ def flatten_dict(dt, delimiter="/"):
     return dt
 
 
-def load(experiment_path, metrics=None):
+def numpy_from_pickled(x):
+    """
+    Decodes pickled `np.ndarrays` that are encoded in `base64`.
+
+    Example:
+    ```
+        a = np.array([1, 2, 3])
+        pickled = codecs.encode(pickle.dumps(a), "base64").decode()
+        unpickled = numpy_from_pickled(pickled)
+        assert np.allclose(a, unpickled)
+    ```
+
+    """
+    x = x.encode()
+    x = codecs.decode(x, "base64")
+    x = pickle.loads(x)
+    return x
+
+# ---------------------------
+# Browsing functionalities.
+# ---------------------------
+
+
 def load(experiment_path, performance_metrics=None, raw_metrics=None):
     """Load a single experiment into a dataframe"""
     experiment_path = os.path.expanduser(experiment_path)
@@ -150,7 +178,6 @@ def _get_value(
     if full_metrics is None:
         full_metrics = ["val_acc"]
     if raw_metrics is None:
-        print('raw_metrics', raw_metrics)
         raw_metrics = []
 
     # populate stats
