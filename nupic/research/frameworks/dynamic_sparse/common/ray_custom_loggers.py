@@ -29,10 +29,12 @@ from io import BytesIO
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import PIL.Image
 import seaborn as sns
-from ray.tune.logger import CSVLogger, JsonLogger, Logger, flatten_dict
+from ray.tune.logger import CSVLogger, JsonLogger, Logger
 from ray.tune.result import TIME_TOTAL_S, TIMESTEPS_TOTAL, TRAINING_ITERATION
+from ray.tune.util import flatten_dict
 
 logger = logging.getLogger(__name__)
 
