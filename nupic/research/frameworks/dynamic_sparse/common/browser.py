@@ -65,9 +65,9 @@ def flatten_dict(dt, delimiter="/"):
     return dt
 
 
-def numpy_from_pickled(x):
+def unpickle_object(x):
     """
-    Decodes pickled `np.ndarrays` that are encoded in `base64`.
+    Decodes pickled objects that are encoded in `base64`.
 
     Example:
     ```
