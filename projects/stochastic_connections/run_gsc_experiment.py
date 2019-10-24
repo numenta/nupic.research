@@ -110,6 +110,7 @@ class StochasticGSCExperiment(tune.Trainable):
 
         model_type = config["model_type"]
         learn_weight = config["learn_weight"]
+        random_weight = config["random_weight"]
         if model_type == "HardConcrete":
             temperature = 2 / 3
             self.model = nn.Sequential(OrderedDict([
@@ -147,14 +148,16 @@ class StochasticGSCExperiment(tune.Trainable):
                 ("cnn1", BinaryGatedConv2d(
                     input_size[0], cnn_out_channels[0], kernel_size,
                     droprate_init=droprate_init, l2_strength=l2_strength,
-                    l0_strength=l0_strengths[0], learn_weight=learn_weight)),
+                    l0_strength=l0_strengths[0], learn_weight=learn_weight,
+                    random_weight=random_weight)),
                 ("cnn1_bn", nn.BatchNorm2d(cnn_out_channels[0], affine=False)),
                 ("cnn1_maxpool", nn.MaxPool2d(maxpool_stride)),
                 ("cnn1_relu", nn.ReLU()),
                 ("cnn2", BinaryGatedConv2d(
                     cnn_out_channels[0], cnn_out_channels[1], kernel_size,
                     droprate_init=droprate_init, l2_strength=l2_strength,
-                    l0_strength=l0_strengths[1], learn_weight=learn_weight)),
+                    l0_strength=l0_strengths[1], learn_weight=learn_weight,
+                    random_weight=random_weight)),
                 ("cnn2_bn", nn.BatchNorm2d(cnn_out_channels[0], affine=False)),
                 ("cnn2_maxpool", nn.MaxPool2d(maxpool_stride)),
                 ("cnn2_relu", nn.ReLU()),
@@ -163,13 +166,13 @@ class StochasticGSCExperiment(tune.Trainable):
                     (feature_map_sidelength**2) * cnn_out_channels[1],
                     linear_units, droprate_init=droprate_init,
                     l2_strength=l2_strength, l0_strength=l0_strengths[2],
-                    learn_weight=learn_weight)),
+                    learn_weight=learn_weight, random_weight=random_weight)),
                 ("fc1_bn", nn.BatchNorm1d(linear_units, affine=False)),
                 ("fc1_relu", nn.ReLU()),
                 ("fc2", BinaryGatedLinear(
                     linear_units, num_classes, droprate_init=droprate_init,
                     l2_strength=l2_strength, l0_strength=l0_strengths[3],
-                    learn_weight=learn_weight)),
+                    learn_weight=learn_weight, random_weight=random_weight)),
             ]))
         else:
             raise ValueError("Unrecognized model type: {}".format(model_type))
@@ -341,6 +344,7 @@ if __name__ == "__main__":
     parser.add_argument("--ray-address", type=str, default="localhost:6379")
     parser.add_argument("--checkpoint-freq", type=int, default=0)
     parser.add_argument("--fixedweight", action="store_true")
+    parser.add_argument("--weight1", action="store_true")
     parser.add_argument("--progress", action="store_true")
     parser.add_argument("--local", action="store_true")
     args = parser.parse_args()
@@ -369,6 +373,7 @@ if __name__ == "__main__":
                             "l2_strength": tune.grid_search(args.l2),
                             "model_type": tune.grid_search([args.model]),
                             "learn_weight": not args.fixedweight,
+                            "random_weight": not args.weight1,
                             "use_tqdm": args.progress,
                             "gamma": tune.grid_search(args.gamma),
                             "droprate_init": tune.grid_search(args.droprate_init),
