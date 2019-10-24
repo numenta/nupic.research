@@ -83,6 +83,29 @@ def unpickle_object(x):
     x = pickle.loads(x)
     return x
 
+
+def unpickle_within_series(series):
+    """
+    Helps unpickle items within pandas series.
+    """
+    if isinstance(series, pd.core.series.Series):
+        series = series.apply(unpickle_object)
+    else:
+        series = unpickle_object(series)
+    return series
+
+
+def unpickle_within_dataframe(df, conditions):
+    """
+    Helps unpickle items within Dataframe.
+    """
+    df_copy = df.copy()
+    for col in df.columns:
+        if any([cond(col) for cond in conditions]):
+            df_copy[col] = df[col].apply(unpickle_within_series)
+    return df_copy
+
+
 # ---------------------------
 # Browsing functionalities.
 # ---------------------------
@@ -205,8 +228,11 @@ def _get_value(
 
         # add specific metrics without any processing
         for m in raw_metrics:
-            if m in progress[e]:
-                stats[m].append(progress[e][m])
+            for k, v in progress[e].items():
+                if callable(m) and m(k):
+                    stats[k].append(v)
+                elif m in progress[e]:
+                    stats[k].append(progress[e][m])
 
         # remaining custom tags - specific
         stats["epochs"].append(progress[e]["training_iteration"].iloc[-1])
