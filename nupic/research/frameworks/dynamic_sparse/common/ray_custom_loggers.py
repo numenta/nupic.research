@@ -202,6 +202,9 @@ class TFLoggerPlus(Logger):
 
 class CSVLoggerPlus(CSVLogger):
 
+    # Define object types in which to save in pickled form.
+    pickle_types = (np.ndarray, pd.DataFrame)
+
     def on_result(self, result):
         tmp = result.copy()
         if "config" in tmp:
@@ -217,7 +220,7 @@ class CSVLoggerPlus(CSVLogger):
             if k not in self._csv_out.fieldnames:
                 continue
 
-            if isinstance(v, np.ndarray):
+            if isinstance(v, self.pickle_types):
                 v = pickle.dumps(v)
                 v = codecs.encode(v, "base64").decode()
             encode_results[k] = v
