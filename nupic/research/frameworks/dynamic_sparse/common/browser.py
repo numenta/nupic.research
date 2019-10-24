@@ -60,6 +60,7 @@ def flatten_dict(dt, delimiter="/"):
 
 
 def load(experiment_path, metrics=None):
+def load(experiment_path, performance_metrics=None, raw_metrics=None):
     """Load a single experiment into a dataframe"""
     experiment_path = os.path.expanduser(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
@@ -69,7 +70,8 @@ def load(experiment_path, metrics=None):
     dataframes = []
     for exp_state, exp_name in experiment_states:
         progress, params = _read_experiment(exp_state, experiment_path)
-        dataframes.append(_get_value(progress, params, exp_name, metrics))
+        dataframes.append(_get_value(
+            progress, params, exp_name, performance_metrics, raw_metrics=raw_metrics))
 
     # concats all dataframes if there are any and return
     if not dataframes:
@@ -77,9 +79,11 @@ def load(experiment_path, metrics=None):
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
 
-def load_many(experiment_paths, metrics=None):
+def load_many(experiment_paths, performance_metrics=None, raw_metrics=None):
     """Load several experiments into a single dataframe"""
-    dataframes = [load(path, metrics) for path in experiment_paths]
+    dataframes = [
+        load(path, performance_metrics, raw_metrics) for path in experiment_paths
+    ]
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
 
@@ -118,6 +122,7 @@ def _get_value(
     exp_name,
     performance_metrics=None,
     full_metrics=None,
+    raw_metrics=None,
     exp_substring="",
 ):
     """
@@ -144,6 +149,9 @@ def _get_value(
     # TODO: currently not working, refactor
     if full_metrics is None:
         full_metrics = ["val_acc"]
+    if raw_metrics is None:
+        print('raw_metrics', raw_metrics)
+        raw_metrics = []
 
     # populate stats
     stats = defaultdict(list)
@@ -151,6 +159,7 @@ def _get_value(
         # add relevant progress metrics
         stats["Experiment Name"].append(e)
         for m in performance_metrics:
+
             # max
             stats[m + "_max"].append(progress[e][m].max())
             stats[m + "_max_epoch"].append(progress[e][m].idxmax())
@@ -163,7 +172,14 @@ def _get_value(
 
         # add all data for one metric - required to plot
         for m in full_metrics:
-            stats[m + "_all"].append(progress[e][m])
+
+            if m in progress[e]:
+                stats[m + "_all"].append(progress[e][m])
+
+        # add specific metrics without any processing
+        for m in raw_metrics:
+            if m in progress[e]:
+                stats[m].append(progress[e][m])
 
         # remaining custom tags - specific
         stats["epochs"].append(progress[e]["training_iteration"].iloc[-1])
