@@ -56,7 +56,8 @@ def sample_weight(p1, p1_unclamped, weight):
         with torch.no_grad():
             p1_unclamped.backward(grad * weight)
             # Learn only on synapses that weren't gated.
-            weight.backward(grad * z)
+            if weight.requires_grad:
+                weight.backward(grad * z)
 
     ret.requires_grad_()
     ret.register_hook(handle_gradient)
