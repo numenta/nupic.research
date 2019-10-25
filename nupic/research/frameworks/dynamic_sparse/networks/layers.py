@@ -256,17 +256,52 @@ class DSLinear(torch.nn.Linear, DynamicSparseBase):
 # ------------------
 
 
-class _NullConv(torch.nn.Conv2d):
+class _NullConv2d(object):
     """
-    Exactly a regular conv, but without it's weights initialized. This is a helper class
-    to DSConv2d. In some cases, like when initializing 'grouped_conv', we may want to
-    manually set the weights and avoid the potentially computationally expensive
-    procedure of random initializing them.
+    Exactly like a regular conv, but
+        1) the weights are not initialized
+        2) it's not subclasses from `torch.nn.Module`
+
+    This is a helper class. In some cases, we may want to initialize a conv to something
+    specific and ensure no outside caller handles or sees it's values
+    For example, through `net.modules()`, all children of net are recursively returned,
+    but this module won't be.
     """
 
-    def reset_parameters(self):
-        # Do nothing and don't initialize the weights.
-        pass
+    class __Conv2d(torch.nn.Conv2d):
+
+        def reset_parameters(self):
+            # Do nothing and don't initialize the weights.
+            pass
+
+    def __init__(self, *args, **kwargs):
+        self.conv = self.__Conv2d(*args, **kwargs)
+
+    @property
+    def weight(self):
+        return self.conv.weight
+
+    @weight.setter
+    def weight(self, value):
+        self.conv.weight = value
+        self.conv.weight = value
+
+    @property
+    def bias(self):
+        return self.conv.bias
+
+    @bias.setter
+    def bias(self, value):
+        self.conv.bias = value
+
+    def __call__(self, *args, **kwargs):
+        return self.conv(*args, **kwargs)
+
+    def _apply(self, fn):
+        self.conv._apply(fn)
+
+    def forward(self, *args, **kwargs):
+        return self.conv.forward(*args, **kwargs)
 
 
 class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
@@ -339,7 +374,7 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
             self.perm_indices.extend([c_i] * self.new_groups)
 
         # Create helper conv layer to aid in coactivation calculations.
-        self.grouped_conv = _NullConv(
+        self.grouped_conv = _NullConv2d(
             in_channels=self.in_channels * self.new_groups,
             out_channels=self.new_groups,
             kernel_size=self.kernel_size,
@@ -391,6 +426,14 @@ class DSConv2d(torch.nn.Conv2d, DynamicSparseBase):
         weight[0, c, j, h] = 1
 
         return weight
+
+    def _apply(self, fn):
+        """
+        Override torch.nn.Module's `_apply` method to ensure `fn`
+        if applied to the `grouped_conv`.
+        """
+        self.grouped_conv._apply(fn)
+        super()._apply(fn)
 
     def get_activity_threshold(self, input_tensor, output_tensor):
         """
