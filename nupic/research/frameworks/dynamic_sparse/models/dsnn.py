@@ -98,7 +98,7 @@ class DSNNHeb(SparseModel):
                     with torch.no_grad():
                         module.mask = new_mask.float()
                         module.apply_mask()
-                    self.logger.save_surviving_synapses(module, keep_mask)
+                    self.logger.save_surviving_synapses(module, keep_mask, add_mask)
 
     def _get_hebbian_mask(self, weight, corr, active_synapses, prune_perc):
 
