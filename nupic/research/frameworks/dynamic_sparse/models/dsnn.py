@@ -59,11 +59,11 @@ class DSNNHeb(SparseModel):
         self._init_hebbian()
         self.prune_cycles_completed = 0
 
-        self.logger = DSNNLogger(self, config)
+        self.logger = DSNNLogger(self, config=self.config)
 
     def _init_hebbian(self):
         for module in self.sparse_modules:
-            if module.hebbian_prune is not None:
+            if self._is_dynamic(module):
                 module.init_coactivation_tracking()
         if hasattr(self.network, "forward_with_coactivations"):
             self.network.forward = self.network.forward_with_coactivations
@@ -247,7 +247,7 @@ class DSNNWeightedMag(DSNNHeb):
     """Weight weights using correlation"""
 
     def _is_dynamic(self, module):
-        return module.hebbian_prune is not None
+        return module.weight_prune is not None
 
     def prune(self, module):
         """
@@ -259,18 +259,18 @@ class DSNNWeightedMag(DSNNHeb):
             weight = module.m.weight.clone().detach()
             num_params = module.num_params
             corr = module.get_coactivations()
-            hebbian_prune_perc = module.hebbian_prune
+            weight_prune_perc = module.weight_prune
             # init shared variables
             active_synapses = weight != 0
             nonactive_synapses = weight == 0
 
             # ----------- PRUNING ----------------
 
-            if hebbian_prune_perc is not None:
+            if weight_prune_perc is not None:
                 # multiply correlation by weight, and then apply regular weight pruning
                 weight *= corr
                 keep_mask = self._get_magnitude_mask(
-                    weight, active_synapses, hebbian_prune_perc
+                    weight, active_synapses, weight_prune_perc
                 )
             else:
                 keep_mask = active_synapses.to(self.device)
@@ -294,7 +294,7 @@ class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
     def _is_dynamic(self, module):
-        return module.hebbian_prune is not None or module.weight_prune is not None
+        return module.hebbian_prune is not None
 
     def prune(self, module):
         """Allows pruning by magnitude and hebbian"""

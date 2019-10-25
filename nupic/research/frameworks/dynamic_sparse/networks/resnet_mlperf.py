@@ -21,35 +21,33 @@
 
 # adapted from https://github.com/meliketoy/wide-resnet.pytorch/
 
-import torch
 import torch.nn as nn
-from torch.autograd import Variable
 from torchvision.models.utils import load_state_dict_from_url
 
 from nupic.torch.modules import Flatten, KWinners2d
 
+
 def conv1x1(in_planes, out_planes, stride=1, padding=0, bias=False):
     return nn.Conv2d(
-        in_planes, out_planes, 
-        kernel_size=1, stride=stride, padding=padding, bias=bias
+        in_planes, out_planes, kernel_size=1, stride=stride, padding=padding, bias=bias
     )
+
 
 def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
     return nn.Conv2d(
-        in_planes, out_planes, 
-        kernel_size=3, stride=stride, padding=padding, bias=bias
+        in_planes, out_planes, kernel_size=3, stride=stride, padding=padding, bias=bias
     )
+
 
 def conv5x5(in_planes, out_planes, stride=1, padding=2, bias=False):
     return nn.Conv2d(
-        in_planes, out_planes, 
-        kernel_size=7, stride=stride, padding=padding, bias=bias
+        in_planes, out_planes, kernel_size=7, stride=stride, padding=padding, bias=bias
     )
+
 
 def conv7x7(in_planes, out_planes, stride=1, padding=3, bias=False):
     return nn.Conv2d(
-        in_planes, out_planes, 
-        kernel_size=7, stride=stride, padding=padding, bias=bias
+        in_planes, out_planes, kernel_size=7, stride=stride, padding=padding, bias=bias
     )
 
 
@@ -68,8 +66,7 @@ class BasicBlock(nn.Module):
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(
-                conv1x1(in_planes, planes, stride=stride),
-                nn.BatchNorm2d(planes),
+                conv1x1(in_planes, planes, stride=stride), nn.BatchNorm2d(planes)
             )
 
         self.post_activation = activation_func(planes)
@@ -79,6 +76,7 @@ class BasicBlock(nn.Module):
         out += self.shortcut(x)
         out = self.post_activation(out)
         return out
+
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -91,11 +89,11 @@ class Bottleneck(nn.Module):
             nn.BatchNorm2d(planes),
             activation_func(planes),
             # 2nd layer
-            conv3x3(planes,planes, stride=stride),
+            conv3x3(planes, planes, stride=stride),
             nn.BatchNorm2d(planes),
             activation_func(planes),
             # 3rd layer
-            conv1x1(planes,self.expansion * planes),
+            conv1x1(planes, self.expansion * planes),
             nn.BatchNorm2d(self.expansion * planes),
         )
 
@@ -165,7 +163,7 @@ class ResNet(nn.Module):
             self._make_layer(block, 256, num_blocks[2], stride=2),
             self._make_layer(block, 512, num_blocks[3], stride=2),
             nn.AdaptiveAvgPool2d(1),
-            Flatten(), # TODO: see if I still need it
+            Flatten(),  # TODO: see if I still need it
         )
         self.classifier = nn.Linear(512 * block.expansion, self.num_classes)
 
@@ -211,30 +209,33 @@ class ResNet(nn.Module):
 
 # convenience classes
 
+
 def resnet50_pretrained(config=None):
     config = config or {}
     config["depth"] = 50
-    new_num_classes = config['num_classes']
-    config['num_classes'] = 1000
+    new_num_classes = config["num_classes"]
+    config["num_classes"] = 1000
     net = ResNet(config)
 
-    model_url = 'https://download.pytorch.org/models/resnet50-19c8e357.pth'
+    model_url = "https://download.pytorch.org/models/resnet50-19c8e357.pth"
     state_dict = load_state_dict_from_url(model_url, progress=True)
 
     def is_incompatible(layer):
-        return (layer.endswith('num_batches_tracked') or 
-                layer.endswith('boost_strength') or
-                layer.endswith('duty_cycle'))
+        return (
+            layer.endswith("num_batches_tracked")
+            or layer.endswith("boost_strength")
+            or layer.endswith("duty_cycle")
+        )
 
     # get keys, remove all num_batches_tracked
-    original_state_dict = list(net.modules())[0].state_dict() 
+    original_state_dict = list(net.modules())[0].state_dict()
     original_keys = original_state_dict.keys()
     original_keys = [k for k in original_keys if not is_incompatible(k)]
 
     # load state dict from torchvision
-    assert(len(original_keys) == len(state_dict),
-        "Incompatible number of layers between the created network and preloaded network")
-    new_state_dict = {k:v for k,v in zip(original_keys, state_dict.values())}
+    assert len(original_keys) == len(state_dict), \
+        "Incompatible number of layers between new network and preloaded network"
+    new_state_dict = {k: v for k, v in zip(original_keys, state_dict.values())}
     net.load_state_dict(new_state_dict, strict=False)
 
     # # freeze all layers
@@ -247,6 +248,7 @@ def resnet50_pretrained(config=None):
 
     return net
 
+
 def resnet18(config=None):
     config = config or {}
     config["depth"] = 18
@@ -258,10 +260,12 @@ def resnet34(config=None):
     config["depth"] = 34
     return ResNet(config)
 
+
 def resnet50(config=None):
     config = config or {}
     config["depth"] = 50
     return ResNet(config)
+
 
 def resnet101(config=None):
     config = config or {}
