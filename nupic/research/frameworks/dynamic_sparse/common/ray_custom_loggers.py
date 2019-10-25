@@ -19,17 +19,22 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import codecs
+import csv
 import distutils.version
 import logging
 import os
+import pickle
 from io import BytesIO
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import PIL.Image
 import seaborn as sns
 from ray.tune.logger import CSVLogger, JsonLogger, Logger
 from ray.tune.result import TIME_TOTAL_S, TIMESTEPS_TOTAL, TRAINING_ITERATION
+from ray.tune.util import flatten_dict
 
 logger = logging.getLogger(__name__)
 
@@ -51,28 +56,44 @@ def to_tf_values(result, path, histo_bins=1000):
     values = []
     for attr, value in result.items():
         if value is not None:
-            if attr.startswith("scatter_"):
+            if attr.startswith("seaborn_"):
 
-                # Value should be a dict which may be unpacked to sns.scatterplot e.g.
+                # Value should be a dict which defines the plot to make. For example:
                 #
                 #   value = {
-                #      data: Dataframe
-                #      x: String - col of data
-                #      y: String - col of data, same size as x
+                #
+                #      # Plot setup.
+                #      plot_type: string - name of seaborn plotting function
+                #      config: dict (optional) - passed to seaborn.set
+                #      edit_axes_func: callable (optional) - edits axes (e.g. set xlim)
+                #
+                #      # Params -  to be passed to seaborn plotting method.
+                #      data: DataFrame
+                #      x: string - col of data
+                #      y: string - col of data, same size as x
                 #      hue: None or array like, same size as x and y
+                #
                 #   }
                 #
                 if not isinstance(value, dict):
                     continue
 
                 # Plot scatter plot.
-                seaborn_config = value.pop("seaborn_config", {})
-                sns.set(**seaborn_config)
-                ax = sns.scatterplot(**value)
+                config = value.pop("config", {})
+                plot_type = value.pop("plot_type", None)
+                edit_axes_func = value.pop("edit_axes_func", lambda x: x)
+
+                if not hasattr(sns, plot_type):
+                    continue
+
+                plot_type = getattr(sns, plot_type)
+                sns.set(**config)
+                ax = plot_type(**value)
+                edit_axes_func(ax)
 
                 # Save to BytesIO stream.
                 stream = BytesIO()
-                canvas = ax.figure.canvas
+                canvas = ax.figure.canvas if hasattr(ax, "figure") else ax.fig.canvas
                 canvas.draw()
                 (w, h) = canvas.get_width_height()
                 pilimage = PIL.Image.frombytes("RGB", (w, h), canvas.tostring_rgb())
@@ -197,4 +218,33 @@ class TFLoggerPlus(Logger):
         self._file_writer.close()
 
 
-DEFAULT_LOGGERS = (JsonLogger, CSVLogger, TFLoggerPlus)
+class CSVLoggerPlus(CSVLogger):
+
+    # Define object types in which to save in pickled form.
+    pickle_types = (np.ndarray, pd.DataFrame)
+
+    def on_result(self, result):
+        tmp = result.copy()
+        if "config" in tmp:
+            del tmp["config"]
+        result = flatten_dict(tmp, delimiter="/")
+        if self._csv_out is None:
+            self._csv_out = csv.DictWriter(self._file, result.keys())
+            if not self._continuing:
+                self._csv_out.writeheader()
+
+        encode_results = {}
+        for k, v in result.items():
+            if k not in self._csv_out.fieldnames:
+                continue
+
+            if isinstance(v, self.pickle_types):
+                v = pickle.dumps(v)
+                v = codecs.encode(v, "base64").decode()
+            encode_results[k] = v
+
+        self._csv_out.writerow(encode_results)
+        self._file.flush()
+
+
+DEFAULT_LOGGERS = (JsonLogger, CSVLoggerPlus, TFLoggerPlus)
