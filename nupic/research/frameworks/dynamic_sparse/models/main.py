@@ -73,7 +73,11 @@ class BaseModel:
         self.network = network.to(self.device)
         self.config = deepcopy(config)
 
-    def setup(self):
+    def setup(self, config=None):
+
+        # allow setup to receive a new config
+        if config is not None:
+            self.__dict__.update(config)
 
         # init optimizer
         if self.optim_alg == "Adam":
@@ -266,8 +270,8 @@ class SparseModel(BaseModel):
     - Zeroing out gradients in backprop before optimizer steps
     """
 
-    def setup(self):
-        super(SparseModel, self).setup()
+    def setup(self, config=None):
+        super(SparseModel, self).setup(config)
 
         # add specific defaults
         new_defaults = dict(
