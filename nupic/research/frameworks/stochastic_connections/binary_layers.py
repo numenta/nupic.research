@@ -56,7 +56,8 @@ def sample_weight(p1, p1_unclamped, weight):
         with torch.no_grad():
             p1_unclamped.backward(grad * weight)
             # Learn only on synapses that weren't gated.
-            weight.backward(grad * z)
+            if weight.requires_grad:
+                weight.backward(grad * z)
 
     ret.requires_grad_()
     ret.register_hook(handle_gradient)
@@ -70,7 +71,7 @@ class BinaryGatedLinear(Module):
     """
     def __init__(self, in_features, out_features, l0_strength=1.,
                  l2_strength=1., learn_weight=True, bias=True, droprate_init=0.5,
-                 **kwargs):
+                 random_weight=True, **kwargs):
         """
         :param in_features: Input dimensionality
         :param out_features: Output dimensionality
@@ -86,8 +87,15 @@ class BinaryGatedLinear(Module):
         self.l2_strength = l2_strength
         self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
                             else torch.cuda.FloatTensor)
-        exc_weight = torch.Tensor(out_features, in_features)
-        inh_weight = torch.Tensor(out_features, in_features)
+
+        self.random_weight = random_weight
+        if random_weight:
+            exc_weight = torch.Tensor(out_features, in_features)
+            inh_weight = torch.Tensor(out_features, in_features)
+        else:
+            exc_weight = torch.ones(out_features, in_features)
+            inh_weight = torch.ones(out_features, in_features)
+
         if learn_weight:
             self.exc_weight = Parameter(exc_weight)
             self.inh_weight = Parameter(inh_weight)
@@ -110,10 +118,11 @@ class BinaryGatedLinear(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        init.kaiming_normal_(self.exc_weight, mode="fan_out")
-        init.kaiming_normal_(self.inh_weight, mode="fan_out")
-        self.exc_weight.data.abs_()
-        self.inh_weight.data.abs_()
+        if self.random_weight:
+            init.kaiming_normal_(self.exc_weight, mode="fan_out")
+            init.kaiming_normal_(self.inh_weight, mode="fan_out")
+            self.exc_weight.data.abs_()
+            self.inh_weight.data.abs_()
         self.exc_p1.data.normal_(1 - self.droprate_init, 1e-2)
         self.inh_p1.data.normal_(1 - self.droprate_init, 1e-2)
         if self.use_bias:
@@ -229,7 +238,7 @@ class BinaryGatedConv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1, learn_weight=True, bias=True,
                  droprate_init=0.5, l2_strength=1., l0_strength=1.,
-                 **kwargs):
+                 random_weight=True, **kwargs):
         """
         :param in_channels: Number of input channels
         :param out_channels: Number of output channels
@@ -262,10 +271,19 @@ class BinaryGatedConv2d(Module):
         self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
                             else torch.cuda.FloatTensor)
         self.use_bias = False
-        exc_weight = torch.Tensor(out_channels, in_channels // groups,
-                                  *self.kernel_size)
-        inh_weight = torch.Tensor(out_channels, in_channels // groups,
-                                  *self.kernel_size)
+
+        self.random_weight = random_weight
+        if random_weight:
+            exc_weight = torch.Tensor(out_channels, in_channels // groups,
+                                      *self.kernel_size)
+            inh_weight = torch.Tensor(out_channels, in_channels // groups,
+                                      *self.kernel_size)
+        else:
+            exc_weight = torch.ones(out_channels, in_channels // groups,
+                                    *self.kernel_size)
+            inh_weight = torch.ones(out_channels, in_channels // groups,
+                                    *self.kernel_size)
+
         if learn_weight:
             self.exc_weight = Parameter(exc_weight)
             self.inh_weight = Parameter(inh_weight)
@@ -290,10 +308,11 @@ class BinaryGatedConv2d(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        init.kaiming_normal_(self.exc_weight, mode="fan_out")
-        init.kaiming_normal_(self.inh_weight, mode="fan_out")
-        self.exc_weight.data.abs_()
-        self.inh_weight.data.abs_()
+        if self.random_weight:
+            init.kaiming_normal_(self.exc_weight, mode="fan_out")
+            init.kaiming_normal_(self.inh_weight, mode="fan_out")
+            self.exc_weight.data.abs_()
+            self.inh_weight.data.abs_()
         self.exc_p1.data.normal_(1 - self.droprate_init, 1e-2)
         self.inh_p1.data.normal_(1 - self.droprate_init, 1e-2)
 

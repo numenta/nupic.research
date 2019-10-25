@@ -23,6 +23,7 @@ import json
 import os
 from collections import defaultdict
 from collections.abc import Iterable
+from copy import deepcopy
 from itertools import product
 
 import numpy as np
@@ -70,8 +71,13 @@ class BaseModel:
         self.config = config
         self.device = torch.device(self.device)
         self.network = network.to(self.device)
+        self.config = deepcopy(config)
 
-    def setup(self):
+    def setup(self, config=None):
+
+        # allow setup to receive a new config
+        if config is not None:
+            self.__dict__.update(config)
 
         # init optimizer
         if self.optim_alg == "Adam":
@@ -104,7 +110,7 @@ class BaseModel:
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")
 
-        self.logger = BaseLogger(self)
+        self.logger = BaseLogger(self, config=self.config)
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
@@ -264,8 +270,8 @@ class SparseModel(BaseModel):
     - Zeroing out gradients in backprop before optimizer steps
     """
 
-    def setup(self):
-        super(SparseModel, self).setup()
+    def setup(self, config=None):
+        super(SparseModel, self).setup(config)
 
         # add specific defaults
         new_defaults = dict(
@@ -301,7 +307,7 @@ class SparseModel(BaseModel):
                     module.apply_mask()
                     module.save_num_params()
 
-        self.logger = SparseLogger(self)
+        self.logger = SparseLogger(self, config=self.config)
         # TODO: is this still required?
         # if self.log_magnitude_vs_coactivations:
         #     self.network.apply(init_coactivation_tracking)
@@ -345,7 +351,7 @@ class SparseModel(BaseModel):
                 Expected "{}" to be of same length as counterpart ({}).
                 Got {} of type {}.
                 """.format(
-                attr, counterpart, value, type(value)
+                attr, len(counterpart), value, type(value)
             )
         else:
             value = [value] * len(counterpart)
@@ -428,7 +434,8 @@ class SparseModule:
             self.m.coactivations[:] = 0
 
     def apply_mask(self):
-        self.m.weight.data *= self.mask
+        if self.mask is not None:
+            self.m.weight.data *= self.mask
 
     def create_mask(self, sparse_type):
         if sparse_type == "precise":

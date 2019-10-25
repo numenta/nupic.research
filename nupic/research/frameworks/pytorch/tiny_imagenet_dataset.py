@@ -62,20 +62,21 @@ class TinyImageNet(ImageFolder):
         targets (list): The class_index value for each image in the dataset
     """
 
-    def __init__(self, root, train=True, download=True, **kwargs):
+    def __init__(self, root, train=True, download=False, **kwargs):
 
         # load different models whether training or validation
         self.train = train
         img_folder = os.path.join(os.path.expanduser(root), DATASET_FOLDER)
         self.meta_file = os.path.join(img_folder, META_FILE)
+
+        # if for the first time, download
+        if download:
+            self.download(root, os.path.join(img_folder, "val"))
+
         if self.train:
             img_folder = os.path.join(img_folder, "train")
         else:
             img_folder = os.path.join(img_folder, "val")
-
-        # if for the first time, download
-        if download:
-            self.download(root, img_folder)
 
         super(TinyImageNet, self).__init__(img_folder, **kwargs)
 
@@ -88,43 +89,38 @@ class TinyImageNet(ImageFolder):
             cls: idx for idx, clss in enumerate(self.classes) for cls in clss
         }
 
-    def download(self, root, img_folder):
+    def download(self, root, val_folder):
 
         # regular download
         if not check_integrity(self.meta_file):
             download_and_extract_archive(
                 ARCHIVE_DICT["url"], root, md5=ARCHIVE_DICT["md5"]
             )
+            print("Rearranging validation folder.")
+            annotations = self._load_val_annotations(val_folder)
+            prepare_val_folder(val_folder, annotations)
         else:
             print("Dataset already downloaded.")
-
-        # if validation, take extra step to organize images if not yet
-        if not self.train and os.path.isdir(os.path.join(img_folder, "images")):
-            print("Rearranging validation folder.")
-            annotations = self._load_val_annotations(img_folder)
-            prepare_val_folder(img_folder, annotations)
-        else:
-            print("Validation set rearranged")
 
     def _load_meta_file(self):
         # TODO: make it faster
         mapping = pd.read_csv(self.meta_file, sep="\t", index_col=None, header=None)
         return {wnid: classes for _, (wnid, classes) in mapping.iterrows()}
 
-    def _load_val_annotations(self, img_folder):
-        annotations_file = os.path.join(img_folder, VAL_ANNOTATIONS)
+    def _load_val_annotations(self, val_folder):
+        annotations_file = os.path.join(val_folder, VAL_ANNOTATIONS)
         return pd.read_csv(annotations_file, sep="\t", index_col=None, header=None)
 
 
-def prepare_val_folder(img_folder, annotations):
+def prepare_val_folder(val_folder, annotations):
     # create folders
     for wnid in annotations.iloc[:, 1].unique():
-        os.mkdir(os.path.join(img_folder, wnid))
+        os.mkdir(os.path.join(val_folder, wnid))
     # move files
     for _, (img_file, wnid) in annotations.iloc[:, :2].iterrows():
-        img_path = os.path.join(img_folder, "images", img_file)
+        img_path = os.path.join(val_folder, "images", img_file)
         shutil.move(
-            img_path, os.path.join(img_folder, wnid, os.path.basename(img_file))
+            img_path, os.path.join(val_folder, wnid, os.path.basename(img_file))
         )
     # delete images file
-    os.rmdir(os.path.join(img_folder, "images"))
+    os.rmdir(os.path.join(val_folder, "images"))
