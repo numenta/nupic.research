@@ -108,7 +108,7 @@ class DSNNHeb(SparseModel):
                     self.logger.save_masks(
                         module.pos, new_mask, keep_mask, add_mask, num_add
                     )
-                    self.logger.save_surviving_synapses(module, keep_mask)
+                    self.logger.save_surviving_synapses(module, keep_mask, add_mask)
 
     def _get_hebbian_mask(self, weight, corr, active_synapses, prune_perc):
 
