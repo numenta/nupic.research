@@ -35,6 +35,7 @@ def wide_conv3x3(in_planes, out_planes, stride=1):
         in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True
     )
 
+
 class WideBasic(nn.Module):
     def __init__(
         self, in_planes, planes, dropout_rate, stride=1, activation_func=nn.ReLU
