@@ -42,7 +42,7 @@ from nupic.research.frameworks.dynamic_sparse.networks.layers import (
 from nupic.torch.modules import update_boost_strength
 
 from .loggers import BaseLogger, SparseLogger
-
+from .modules import SparseModule
 
 class BaseModel:
     """Base model, with training loops and logging functions."""
@@ -308,9 +308,9 @@ class SparseModel(BaseModel):
                     module.save_num_params()
 
         self.logger = SparseLogger(self, config=self.config)
-        # TODO: is this still required?
-        # if self.log_magnitude_vs_coactivations:
-        #     self.network.apply(init_coactivation_tracking)
+
+    def _sparse_module_type(self):
+        return SparseModule
 
     def _post_optimize_updates(self):
         # zero out the weights after the step - avoid propagating bias
@@ -325,11 +325,12 @@ class SparseModel(BaseModel):
 
     def _get_sparse_modules(self):
         sparse_modules = []
+        module_type = self._sparse_module_type()
         for idx, m in enumerate(
             list(self.network.modules())[self.start_sparse : self.end_sparse]
         ):
             if self._is_sparsifiable(m):
-                sparse_modules.append(SparseModule(m=m, device=self.device, pos=idx))
+                sparse_modules.append(module_type(m=m, device=self.device, pos=idx))
 
         return sparse_modules
 
@@ -357,146 +358,3 @@ class SparseModel(BaseModel):
             value = [value] * len(counterpart)
             setattr(self, attr, value)
 
-
-class SparseModule:
-    """Module wrapper for sparse layers
-    Attributes:
-        m (torch.nn.module): Original module to be wrapped.
-        pos (int): Position in the list of sparse modules, used for logging
-        on_perc (float): Percentage of non-zero weights
-        shape (tuple): Shape of the underlying weight matrix
-        num_params (int): Number of non-zero params at initialization/
-            before training
-        mask (tensor): Binary tensor. 1 where connection is active, 0 otherwise
-        weight_prune (float): Percentage to be pruned based on magnitude
-        hebbian_prune (float): Percentage to be pruned based on hebbian stats
-        device (torch.device): Device where to save and compute data.
-        added_synapses (tensor): Tensor with synapses added at last growth round.
-            Required to log custom metrics.
-        last_gradients (tensor): Tensor with gradients at last iteration.
-            Required to log custom metrics.
-    """
-
-    def __init__(
-        self,
-        m,
-        pos=None,
-        on_perc=None,
-        num_params=None,
-        mask=None,
-        weight_prune=None,
-        hebbian_prune=None,
-        device=None,
-    ):
-        """document attributes"""
-        self.m = m
-        self.shape = m.weight.shape
-        self.pos = pos
-        self.on_perc = on_perc
-        self.num_params = num_params
-        self.mask = mask
-        self.hebbian_prune = hebbian_prune
-        self.weight_prune = weight_prune
-        self.device = device
-        # logging
-        self.added_synapses = None
-        self.last_gradients = None
-
-    def __repr__(self):
-        return str(
-            {
-                "name": self.m._get_name(),
-                "index": self.pos,
-                "shape": self.shape,
-                "on_perc": self.on_perc,
-                "hebbian_prune": self.hebbian_prune,
-                "weight_prune": self.weight_prune,
-                "num_params": self.num_params,
-            }
-        )
-
-    def nonzero_params(self):
-        return torch.sum(self.mask).item()
-
-    def save_num_params(self):
-        self.num_params = self.nonzero_params()
-
-    def init_coactivation_tracking(self):
-        if isinstance(self.m, DynamicSparseBase):
-            self.m.apply(init_coactivation_tracking)
-        else:
-            self.m.coactivations = torch.zeros(self.m.weight.shape).to(self.device)
-
-    def reset_coactivations(self, reset=True):
-        if isinstance(self.m, DynamicSparseBase):
-            self.m.reset_coactivations()
-        else:
-            self.m.coactivations[:] = 0
-
-    def apply_mask(self):
-        if self.mask is not None:
-            self.m.weight.data *= self.mask
-
-    def create_mask(self, sparse_type):
-        if sparse_type == "precise":
-            self._mask_fixed()
-        elif sparse_type == "precise_per_output":
-            self._mask_fixed_per_output()
-        elif sparse_type == "approximate":
-            self._mask_stochastic()
-        else:
-            raise ValueError(
-                "{} is an invalid option for sparse type. ".format(sparse_type)
-            )
-
-    def get_coactivations(self):
-        return self.m.coactivations
-
-    def _mask_fixed_per_output(self):
-        """
-        Similar implementation to how so dense
-        Works in any number of dimension, considering the 1st one is the output
-        """
-        output_size = self.shape[0]
-        input_size = np.prod(self.shape[1:])
-        num_add = int(self.on_perc * input_size)
-        mask = torch.zeros(self.shape, dtype=torch.bool)
-        # loop over outputs
-        for dim in range(output_size):
-            # select a subsample of the indexes in the output unit
-            all_idxs = np.array(list(product(*[range(s) for s in self.shape[1:]])))
-            sampled_idxs = np.random.choice(
-                range(len(all_idxs)), num_add, replace=False
-            )
-            selected = all_idxs[sampled_idxs]
-            if len(selected) > 0:
-                # change from long to wide format
-                selected_wide = list(zip(*selected))
-                # append the output dimension to wide format
-                selected_wide.insert(0, tuple([dim] * len(selected_wide[0])))
-                # apply the mask
-                mask[selected_wide] = True
-
-        self.mask = mask.float().to(self.device)
-
-    def _mask_stochastic(self):
-        """Sthocastic in num of params approach of sparsifying a tensor"""
-        self.mask = (torch.rand(self.shape) < self.on_perc).float().to(self.device)
-
-    def _mask_fixed(self):
-        """
-        Deterministic in number of params approach of sparsifying a tensor
-        Sample N from all possible indices
-        """
-        all_idxs = np.array(list(product(*[range(s) for s in self.shape])))
-        num_add = int(self.on_perc * np.prod(self.shape))
-        sampled_idxs = np.random.choice(range(len(all_idxs)), num_add, replace=False)
-        selected = all_idxs[sampled_idxs]
-
-        mask = torch.zeros(self.shape, dtype=torch.bool)
-        if len(selected.shape) > 1:
-            mask[list(zip(*selected))] = True
-        else:
-            mask[selected] = True
-
-        self.mask = mask.float().to(self.device)
