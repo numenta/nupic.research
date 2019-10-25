@@ -29,11 +29,13 @@ Converted to a module
 
 from __future__ import absolute_import, division, print_function
 
+import codecs
 import copy
 import glob
 import json
 import numbers
 import os
+import pickle
 import warnings
 from collections import defaultdict
 
@@ -41,6 +43,10 @@ import numpy as np
 import pandas as pd
 
 warnings.filterwarnings("ignore")
+
+# ---------
+# Utils
+# ---------
 
 
 def flatten_dict(dt, delimiter="/"):
@@ -59,9 +65,55 @@ def flatten_dict(dt, delimiter="/"):
     return dt
 
 
-def load(experiment_path, metrics=None):
+def unpickle_object(x):
+    """
+    Decodes pickled objects that are encoded in `base64`.
+
+    Example:
+    ```
+        a = np.array([1, 2, 3])
+        pickled = codecs.encode(pickle.dumps(a), "base64").decode()
+        unpickled = numpy_from_pickled(pickled)
+        assert np.allclose(a, unpickled)
+    ```
+
+    """
+    x = x.encode()
+    x = codecs.decode(x, "base64")
+    x = pickle.loads(x)
+    return x
+
+
+def unpickle_within_series(series):
+    """
+    Helps unpickle items within pandas series.
+    """
+    if isinstance(series, pd.core.series.Series):
+        series = series.apply(unpickle_object)
+    else:
+        series = unpickle_object(series)
+    return series
+
+
+def unpickle_within_dataframe(df, conditions):
+    """
+    Helps unpickle items within Dataframe.
+    """
+    df_copy = df.copy()
+    for col in df.columns:
+        if any([cond(col) for cond in conditions]):
+            df_copy[col] = df[col].apply(unpickle_within_series)
+    return df_copy
+
+
+# ---------------------------
+# Browsing functionalities.
+# ---------------------------
+
+
+def load(experiment_path, performance_metrics=None, raw_metrics=None):
     """Load a single experiment into a dataframe"""
-    experiment_path = os.path.abspath(experiment_path)
+    experiment_path = os.path.expanduser(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
 
     # run once per experiment state
@@ -69,7 +121,8 @@ def load(experiment_path, metrics=None):
     dataframes = []
     for exp_state, exp_name in experiment_states:
         progress, params = _read_experiment(exp_state, experiment_path)
-        dataframes.append(_get_value(progress, params, exp_name, metrics))
+        dataframes.append(_get_value(
+            progress, params, exp_name, performance_metrics, raw_metrics=raw_metrics))
 
     # concats all dataframes if there are any and return
     if not dataframes:
@@ -77,9 +130,11 @@ def load(experiment_path, metrics=None):
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
 
-def load_many(experiment_paths, metrics=None):
+def load_many(experiment_paths, performance_metrics=None, raw_metrics=None):
     """Load several experiments into a single dataframe"""
-    dataframes = [load(path, metrics) for path in experiment_paths]
+    dataframes = [
+        load(path, performance_metrics, raw_metrics) for path in experiment_paths
+    ]
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
 
@@ -118,6 +173,7 @@ def _get_value(
     exp_name,
     performance_metrics=None,
     full_metrics=None,
+    raw_metrics=None,
     exp_substring="",
 ):
     """
@@ -141,8 +197,11 @@ def _get_value(
     if performance_metrics is None:
         performance_metrics = [m for m in progress[exps[0]].keys() if "acc" in m]
 
+    # TODO: currently not working, refactor
     if full_metrics is None:
         full_metrics = ["val_acc"]
+    if raw_metrics is None:
+        raw_metrics = []
 
     # populate stats
     stats = defaultdict(list)
@@ -150,6 +209,7 @@ def _get_value(
         # add relevant progress metrics
         stats["Experiment Name"].append(e)
         for m in performance_metrics:
+
             # max
             stats[m + "_max"].append(progress[e][m].max())
             stats[m + "_max_epoch"].append(progress[e][m].idxmax())
@@ -162,7 +222,17 @@ def _get_value(
 
         # add all data for one metric - required to plot
         for m in full_metrics:
-            stats[m + "_all"].append(progress[e][m])
+
+            if m in progress[e]:
+                stats[m + "_all"].append(progress[e][m])
+
+        # add specific metrics without any processing
+        for m in raw_metrics:
+            for k, v in progress[e].items():
+                if callable(m) and m(k):
+                    stats[k].append(v)
+                elif m in progress[e]:
+                    stats[k].append(progress[e][m])
 
         # remaining custom tags - specific
         stats["epochs"].append(progress[e]["training_iteration"].iloc[-1])
@@ -187,13 +257,20 @@ def _get_value(
 
         # add all remaining params, for easy aggregations
         for k, v in params[e].items():
-            if isinstance(v, list) and all([isinstance(n, numbers.Number) for n in v]):
-                stats[k].append(np.mean(v))
-            elif isinstance(v, list):
-                v = "-".join([str(v_i) for v_i in v])
-                stats[k].append(v)
-            else:
-                stats[k].append(v)
+            # TODO: fix this hard coded check, added as temporary fix
+            if k != "epochs":
+                # take the mean if a list of numbers
+                if isinstance(v, list) and all(
+                    [isinstance(n, numbers.Number) for n in v]
+                ):
+                    stats[k].append(np.mean(v))
+                # concatenate if a list of strings
+                elif isinstance(v, list):
+                    v = "-".join([str(v_i) for v_i in v])
+                    stats[k].append(v)
+                # otherwise append the value as it is
+                else:
+                    stats[k].append(v)
 
     return pd.DataFrame(stats)
 

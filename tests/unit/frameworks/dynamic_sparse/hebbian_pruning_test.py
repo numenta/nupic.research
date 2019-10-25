@@ -101,10 +101,14 @@ class WeightedMagPruningTest(unittest.TestCase):
     def test_pruning_partial(self):
 
         self.sparse_module.on_perc = 0.5
-        self.sparse_module.hebbian_prune = 0
-        self.sparse_module.weight_prune = 0.5
+        self.sparse_module.hebbian_prune = 0.5
+        self.sparse_module.weight_prune = 0
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         # test keep mask
         falses = ~keep_mask[expand(self.lowest_50_mag)]
@@ -143,10 +147,14 @@ class WeightedMagPruningTest(unittest.TestCase):
     def test_pruning_all(self):
 
         self.sparse_module.on_perc = 0.1
-        self.sparse_module.hebbian_prune = 0
-        self.sparse_module.weight_prune = 1
+        self.sparse_module.hebbian_prune = 1
+        self.sparse_module.weight_prune = 0
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         # keep mask should not include any of previously existing connections
         self.assertEqual(
@@ -175,7 +183,11 @@ class WeightedMagPruningTest(unittest.TestCase):
         self.sparse_module.hebbian_prune = 0
         self.sparse_module.weight_prune = 0
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         # keep mask should not include any of previously existing connections
         self.assertEqual(
@@ -261,7 +273,11 @@ class HebbianPruningTest(unittest.TestCase):
         self.sparse_module.hebbian_prune = 0.25
         self.sparse_module.weight_prune = 0.50
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         intersection = self.mag_hebb_intersection
         complement = set(self.nonzero_idxs).difference(intersection)
@@ -302,7 +318,11 @@ class HebbianPruningTest(unittest.TestCase):
         self.sparse_module.hebbian_prune = 0
         self.sparse_module.weight_prune = 0.5
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         # test keep mask
         falses = ~keep_mask[expand(self.lowest_50_mag)]
@@ -344,7 +364,11 @@ class HebbianPruningTest(unittest.TestCase):
         self.sparse_module.hebbian_prune = 0.25
         self.sparse_module.weight_prune = 0
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         # test keep mask
         falses = ~keep_mask[expand(self.lowest_25_hebb)]
@@ -387,7 +411,11 @@ class HebbianPruningTest(unittest.TestCase):
         self.sparse_module.hebbian_prune = 1
         self.sparse_module.weight_prune = 0
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         # keep mask should not include any of the previously existing connections
         self.assertEqual(
@@ -416,7 +444,11 @@ class HebbianPruningTest(unittest.TestCase):
         self.sparse_module.hebbian_prune = 0
         self.sparse_module.weight_prune = 1
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         # keep mask should not include any of previously existing connections
         self.assertEqual(
@@ -445,7 +477,11 @@ class HebbianPruningTest(unittest.TestCase):
         self.sparse_module.hebbian_prune = 1
         self.sparse_module.weight_prune = 1
 
-        new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
+        keep_mask = self.model.prune(self.sparse_module)
+        num_params = self.sparse_module.num_params
+        num_add = int(max(num_params - torch.sum(keep_mask).item(), 0))
+        add_mask = self.model.grow(self.sparse_module, num_add)
+        new_mask = keep_mask | add_mask
 
         # keep mask should not include any of the previously existing connections
         self.assertEqual(

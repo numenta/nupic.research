@@ -27,47 +27,46 @@ from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 # experiment configurations
 base_exp_config = dict(
     device="cuda",
-    dataset_name="TinyImageNet",
+    dataset_name="CIFAR10",
     model=tune.grid_search(["BaseModel", "SparseModel"]),
     data_dir="~/nta/datasets",
-    num_classes=200,
-    # epochs=200,
-    epochs=50,
+    augment_images=True,
+    epochs=200,
+    # train_batches_per_epoch=400,
     # ---- network related
-    network=tune.grid_search(["resnet50", "resnet50_pretrained"]),
+    # network="resnet152",
+    # network="WideResNet",
+    network=tune.grid_search(["resnet152", "WideResNet"]),
     percent_on_k_winner=tune.grid_search([0.25, 1]),
     boost_strength=1.5,
     boost_strength_factor=0.85,
     k_inference_factor=1.0,
-    # ---- sparse model related
     sparse_type="precise_per_output",
     sparse_start=1,
     sparse_end=None,
     on_perc=0.5,
+    dropout_rate=0,  # zero dropout in wideresnet
     # ---- optimizer related
-    # optim_alg="SGD",
-    # learning_rate=0.1,
-    optim_alg="Adam",
-    learning_rate=0.001,
-    # lr_scheduler="MultiStepLR",
+    optim_alg="SGD",
+    learning_rate=0.1,
+    lr_scheduler="MultiStepLR",
     # lr_milestones=[60, 90, 110],
-    # lr_milestones=[60, 120, 160],
-    # lr_milestones=[14,22,27],
-    # lr_gamma=0.2,
+    lr_milestones=[60, 120, 160],
+    lr_gamma=0.2,
     weight_decay=0.0005,
-    # momentum=0.9,
-    # nesterov_momentum=True,
+    momentum=0.9,
+    nesterov_momentum=True,
     # ---- debugs and noise related
     test_noise=False,
 )
 
 # ray configurations
 tune_config = dict(
-    num_samples=1,
-    name=__file__.replace(".py", "") + "_finetuning",
-    checkpoint_freq=0,
+    num_samples=5,
+    name=__file__.replace(".py", "") + "3",
+    checkpoint_freq=1,
     checkpoint_at_end=True,
-    resources_per_trial={"cpu": 1, "gpu": 0.5},
+    resources_per_trial={"cpu": 1, "gpu": 0.50},
     verbose=0,
 )
 
