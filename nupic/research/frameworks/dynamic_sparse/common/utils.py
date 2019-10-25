@@ -30,8 +30,11 @@ from torchvision import datasets
 import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
+from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
 from .datasets import Dataset
+
+custom_datasets = {"TinyImageNet": TinyImageNet}
 
 
 class Trainable(tune.Trainable):
@@ -68,6 +71,10 @@ def download_dataset(config):
     dataset_name = config["dataset_name"]
     if hasattr(datasets, dataset_name):
         getattr(datasets, config["dataset_name"])(
+            download=True, root=os.path.expanduser(config["data_dir"])
+        )
+    elif dataset_name in custom_datasets.keys():
+        custom_datasets[dataset_name](
             download=True, root=os.path.expanduser(config["data_dir"])
         )
 
