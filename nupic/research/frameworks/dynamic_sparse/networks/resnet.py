@@ -21,9 +21,7 @@
 
 # adapted from https://github.com/meliketoy/wide-resnet.pytorch/
 
-import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from nupic.torch.modules import Flatten, KWinners2d
 
