@@ -237,7 +237,11 @@ def resnet50_pretrained(config=None):
     new_state_dict = {k:v for k,v in zip(original_keys, state_dict.values())}
     net.load_state_dict(new_state_dict, strict=False)
 
-    # remove the last layer
+    # # freeze all layers
+    # for param in net.parameters():
+    #     param.requires_grad=False
+
+    # replace the last layer
     classifier_shape = (net.classifier.weight.shape[1], new_num_classes)
     net.classifier = nn.Linear(*classifier_shape)
 

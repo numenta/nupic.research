@@ -59,7 +59,7 @@ class DSNNHeb(SparseModel):
         self._init_hebbian()
         self.prune_cycles_completed = 0
 
-        self.logger = DSNNLogger(self)
+        self.logger = DSNNLogger(self, config)
 
     def _init_hebbian(self):
         for module in self.sparse_modules:

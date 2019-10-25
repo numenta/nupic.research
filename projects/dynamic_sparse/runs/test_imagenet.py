@@ -31,8 +31,8 @@ base_exp_config = dict(
     model=tune.grid_search(["BaseModel", "SparseModel"]),
     data_dir="~/nta/datasets",
     num_classes=200,
-    epochs=200,
-    # epochs = 120,
+    # epochs=200,
+    epochs=50,
     # ---- network related
     network=tune.grid_search(["resnet50", "resnet50_pretrained"]),
     percent_on_k_winner=tune.grid_search([0.25, 1]),
@@ -45,24 +45,26 @@ base_exp_config = dict(
     sparse_end=None,
     on_perc=0.5,
     # ---- optimizer related
-    optim_alg="SGD",
-    learning_rate=0.1,
-    lr_scheduler="MultiStepLR",
+    # optim_alg="SGD",
+    # learning_rate=0.1,
+    optim_alg="Adam",
+    learning_rate=0.001,
+    # lr_scheduler="MultiStepLR",
     # lr_milestones=[60, 90, 110],
-    lr_milestones=[60, 120, 160],
-    lr_gamma=0.2,
+    # lr_milestones=[60, 120, 160],
+    # lr_milestones=[14,22,27],
+    # lr_gamma=0.2,
     weight_decay=0.0005,
-    momentum=0.9,
-    nesterov_momentum=True,
+    # momentum=0.9,
+    # nesterov_momentum=True,
     # ---- debugs and noise related
-    test_noise=True,
-    noise_level=0.15,
+    test_noise=False,
 )
 
 # ray configurations
 tune_config = dict(
     num_samples=1,
-    name=__file__.replace(".py", "") + "_test",
+    name=__file__.replace(".py", "") + "_finetuning",
     checkpoint_freq=0,
     checkpoint_at_end=True,
     resources_per_trial={"cpu": 1, "gpu": 0.5},
