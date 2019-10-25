@@ -57,6 +57,8 @@ class HebbianNetwork(nn.Module):
         for idx_layer, layer in enumerate(self.classifier):
             # do the forward calculation normally
             x = layer(x)
+            # TODO: local variable 'prev_layer' referenced before assignment
+            # in DSNNMixedHeb run
             if self._has_params(layer) and hasattr(layer, "coactivations"):
                 prev_layer = layer
             if self._has_activation(idx_layer, layer):

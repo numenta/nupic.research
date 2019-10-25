@@ -19,8 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import json
+import os
 from collections import defaultdict
 from collections.abc import Iterable
+from copy import deepcopy
 from itertools import product
 
 import numpy as np
@@ -44,11 +47,13 @@ from .loggers import BaseLogger, SparseLogger
 class BaseModel:
     """Base model, with training loops and logging functions."""
 
-    def __init__(self, network, config=None):
+    def __init__(self, network=None, config=None):
+
         defaults = dict(
             optim_alg="SGD",
             learning_rate=0.1,
             momentum=0.9,
+            nesterov_momentum=False,
             device="cpu",
             lr_scheduler=False,
             lr_step_size=1,
@@ -62,11 +67,17 @@ class BaseModel:
         defaults.update(config or {})
         self.__dict__.update(defaults)
 
-        # init remaining
+        # save config to restore the model later
+        self.config = config
         self.device = torch.device(self.device)
         self.network = network.to(self.device)
+        self.config = deepcopy(config)
 
-    def setup(self):
+    def setup(self, config=None):
+
+        # allow setup to receive a new config
+        if config is not None:
+            self.__dict__.update(config)
 
         # init optimizer
         if self.optim_alg == "Adam":
@@ -80,6 +91,7 @@ class BaseModel:
                 lr=self.learning_rate,
                 momentum=self.momentum,
                 weight_decay=self.weight_decay,
+                nesterov=self.nesterov_momentum,
             )
 
         # add a learning rate scheduler
@@ -98,7 +110,7 @@ class BaseModel:
         # init batch info per epic.
         self._make_attr_schedulable("train_batches_per_epoch")
 
-        self.logger = BaseLogger(self)
+        self.logger = BaseLogger(self, config=self.config)
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
@@ -185,25 +197,42 @@ class BaseModel:
         elif isinstance(module, nn.Conv2d) and not self.sparse_linear_only:
             return "conv"
 
-    def save(self, checkpoint_dir):
-        # TODO: Implement
-        pass
+    def save(self, checkpoint_dir, experiment_name):
+        """
+        Save the model in this directory.
+        :param checkpoint_dir:
+        """
+        # experiment_root = os.path.join(checkpoint_dir, experiment_name)
+        # if not os.path.exists(experiment_root):
+        #     os.mkdir(experiment_root)
 
-    def restore(self, checkpoint_dir):
-        # TODO: Implement
-        pass
+        checkpoint_path = os.path.join(checkpoint_dir, experiment_name + ".pth")
+        torch.save(self.network.state_dict(), checkpoint_path)
 
-    # def _save(self, checkpoint_dir):
-    #     return self.model_save(checkpoint_dir)
+        config_file = os.path.join(checkpoint_dir, experiment_name + ".json")
+        with open(config_file, "w") as config_handler:
+            json.dump(self.config, config_handler)
 
-    # def _restore(self, checkpoint):
-    #     """Subclasses should override this to implement restore().
+        return
 
-    #     Args:
-    #         checkpoint (str | dict): Value as returned by `_save`.
-    #             If a string, then it is the checkpoint path.
-    #     """
-    #     self.model_restore(checkpoint)
+    def restore(self, checkpoint_dir, experiment_name):
+        """
+        :param checkpoint_path: Loads model from this checkpoint path.
+        If path is a directory, will append the parameter model_filename
+        """
+        # print("loading from", checkpoint_path)
+        # experiment_root = os.path.join(checkpoint_dir, experiment_name)
+        checkpoint_path = os.path.join(checkpoint_dir, experiment_name + ".pth")
+        self.network.load_state_dict(
+            torch.load(checkpoint_path, map_location=self.device)
+        )
+
+    def evaluate_noise(self, dataset):
+        """External function used to evaluate noise on pre-trained models"""
+        self.network.eval()
+        self._run_one_pass(dataset.noise_loader, train=False, noise=True)
+        loss, acc = self.logger.log["noise_loss"], self.logger.log["noise_acc"]
+        return loss, acc
 
     def train(self, dataset, num_epochs, test_noise=False):
         """
@@ -241,8 +270,8 @@ class SparseModel(BaseModel):
     - Zeroing out gradients in backprop before optimizer steps
     """
 
-    def setup(self):
-        super(SparseModel, self).setup()
+    def setup(self, config=None):
+        super(SparseModel, self).setup(config)
 
         # add specific defaults
         new_defaults = dict(
@@ -278,7 +307,7 @@ class SparseModel(BaseModel):
                     module.apply_mask()
                     module.save_num_params()
 
-        self.logger = SparseLogger(self)
+        self.logger = SparseLogger(self, config=self.config)
         # TODO: is this still required?
         # if self.log_magnitude_vs_coactivations:
         #     self.network.apply(init_coactivation_tracking)
@@ -322,7 +351,7 @@ class SparseModel(BaseModel):
                 Expected "{}" to be of same length as counterpart ({}).
                 Got {} of type {}.
                 """.format(
-                attr, counterpart, value, type(value)
+                attr, len(counterpart), value, type(value)
             )
         else:
             value = [value] * len(counterpart)
@@ -405,7 +434,8 @@ class SparseModule:
             self.m.coactivations[:] = 0
 
     def apply_mask(self):
-        self.m.weight.data *= self.mask
+        if self.mask is not None:
+            self.m.weight.data *= self.mask
 
     def create_mask(self, sparse_type):
         if sparse_type == "precise":

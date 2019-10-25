@@ -30,7 +30,7 @@ from nupic.torch.modules import Flatten, KWinners2d
 # from torchsummary import summary
 
 
-def conv3x3(in_planes, out_planes, stride=1):
+def wide_conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(
         in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True
     )
@@ -123,7 +123,7 @@ class WideResNet(nn.Module):
         n_stages = [16, 16 * k, 32 * k, 64 * k]
 
         self.features = nn.Sequential(
-            conv3x3(3, n_stages[0]),
+            wide_conv3x3(3, n_stages[0]),
             self._make_wide_layer(
                 WideBasic, n_stages[1], n, self.dropout_rate, stride=1
             ),  # 4x2 (2 convs each)

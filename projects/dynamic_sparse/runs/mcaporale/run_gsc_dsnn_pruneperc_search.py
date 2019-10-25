@@ -21,12 +21,11 @@
 
 import os
 
+import numpy as np
 import ray
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
-    DEFAULT_LOGGERS,
-)
+from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from nupic.research.frameworks.dynamic_sparse.common.utils import (
     Trainable,
     new_experiment,
@@ -55,19 +54,29 @@ base_exp_config = dict(
     # dataset related
     dataset_name="PreprocessedGSC",
     data_dir="~/nta/datasets/gsc",
-    batch_size_train=16,
-    batch_size_test=(1000),
-    # network related
-    network="GSCHeb",
-    # ----- Optimizer Related ----
+    # batch_size_train=16,
+    # batch_size_test=(1000),
+    # # network related
+    # network="GSCHeb",
+    # # ----- Optimizer Related ----
+    # optim_alg="SGD",
+    # momentum=0.0,
+    # learning_rate=0.01,
+    # weight_decay=1e-2,
+    # # ----- LR Scheduler Related ----
+    # lr_scheduler="StepLR",
+    # lr_step_size=1,
+    # lr_gamma=0.9,
+    batch_size_train=(4, 16),
+    batch_size_test=1000,
     optim_alg="SGD",
-    momentum=0.0,
-    learning_rate=0.01,
-    weight_decay=1e-2,
-    # ----- LR Scheduler Related ----
-    lr_scheduler="StepLR",
-    lr_step_size=1,
-    lr_gamma=0.9,
+    momentum=0,  # 0.9,
+    learning_rate=0.01,  # 0.1,
+    weight_decay=0.01,  # 1e-4,
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[30, 60, 90],
+    lr_gamma=0.9,  # 0.1,
+
     # additional validation
     test_noise=False,
     # debugging
@@ -76,17 +85,18 @@ base_exp_config = dict(
 )
 
 # ray configurations
-experiment_name = "gsc-trials-2019-10-03-test"
+# experiment_name = "gsc-trials-2019-10-07"
+experiment_name = "gsc-dsnn-2019-10-11-D"
 tune_config = dict(
     name=experiment_name,
-    num_samples=5,
+    num_samples=8,
     local_dir=os.path.expanduser(os.path.join("~/nta/results", experiment_name)),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 30},
+    stop={"training_iteration": 100},
     resources_per_trial={
-        "cpu": os.cpu_count() / 2.0,
-        "gpu": torch.cuda.device_count() / 2.0,
+        "cpu": os.cpu_count() / torch.cuda.device_count(),
+        "gpu": 1,
     },
     loggers=DEFAULT_LOGGERS,
     verbose=1,
@@ -94,60 +104,37 @@ tune_config = dict(
 )
 
 # define experiments
+weight_prune_levels = np.arange(0, 1.001, 0.05)
 experiments = {
-    "gsc-BaseModel": dict(model=ray.tune.grid_search(["BaseModel"])),
-    "gsc-Static": dict(
-        model=ray.tune.grid_search(["SparseModel"]),
-        # sparse related
-        on_perc=ray.tune.grid_search(
-            [
-                [None, None, 0.4, None],
-                [None, None, 0.1, None],
-                [None, None, 0.05, None],
-                [None, None, 0.025, None],
-            ]
-        ),
-    ),
-    "gsc-Heb": dict(
-        model=ray.tune.grid_search(["DSNNMixedHeb"]),
-        # network related
-        prune_methods=[None, None, "dynamic-linear", None],
-        # sparse related
-        on_perc=ray.tune.grid_search(
-            [
-                [None, None, 0.4, None],
-                [None, None, 0.1, None],
-                [None, None, 0.05, None],
-                [None, None, 0.025, None],
-            ]
-        ),
-        hebbian_prune_perc=0.3,
-        hebbian_grow=True,
-        weight_prune_perc=None,
-        moving_average_alpha=ray.tune.grid_search([0.6]),
-        use_binary_coactivations=False,
-        # debug related
-        log_magnitude_vs_coactivations=True,
-    ),
+
     "gsc-SET": dict(
-        model=ray.tune.grid_search(["DSNNMixedHeb"]),
+        model=ray.tune.grid_search(["SET"]),
+        network="gsc_sparse_dsnn",
         # network related
-        prune_methods=[None, None, "dynamic-linear", None],
+        prune_methods=[None, None, None, None],
         # sparse related
-        on_perc=ray.tune.grid_search(
-            [
-                [None, None, 0.4, None],
-                [None, None, 0.1, None],
-                [None, None, 0.05, None],
-                [None, None, 0.025, None],
-            ]
-        ),
+        on_perc=[0.04, 0.04, 0.04, 0.04],
         hebbian_prune_perc=None,
         hebbian_grow=False,
-        weight_prune_perc=0.3,
-        # debugging related
-        log_magnitude_vs_coactivations=True,
+        weight_prune_perc=ray.tune.grid_search([
+            [None, None, perc, perc] for perc in weight_prune_levels
+        ]),
     ),
+
+    "gsc-WeightedMag": dict(
+        model=ray.tune.grid_search(["DSNNWeightedMag"]),
+        network="gsc_sparse_dsnn",
+        # network related
+        prune_methods=[None, None, "dynamic-linear", "dynamic-linear"],
+        # sparse related
+        on_perc=[0.04, 0.04, 0.04, 0.04],
+        hebbian_prune_perc=None,
+        hebbian_grow=False,
+        weight_prune_perc=ray.tune.grid_search([
+            [perc, perc] for perc in weight_prune_levels
+        ]),
+    ),
+
 }
 exp_configs = (
     [(name, new_experiment(base_exp_config, c)) for name, c in experiments.items()]
