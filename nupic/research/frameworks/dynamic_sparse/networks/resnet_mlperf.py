@@ -26,6 +26,14 @@ from torchvision.models.utils import load_state_dict_from_url
 
 from nupic.torch.modules import Flatten, KWinners2d
 
+model_urls = {
+    18: "https://download.pytorch.org/models/resnet18-5c106cde.pth",
+    34: "https://download.pytorch.org/models/resnet34-333f7ec4.pth",
+    50: "https://download.pytorch.org/models/resnet50-19c8e357.pth",
+    101: "https://download.pytorch.org/models/resnet101-5d3b4d8f.pth",
+    152: "https://download.pytorch.org/models/resnet152-b121ed2d.pth",
+}
+
 
 def conv1x1(in_planes, out_planes, stride=1, padding=0, bias=False):
     return nn.Conv2d(
@@ -207,17 +215,14 @@ class ResNet(nn.Module):
         return out
 
 
-# convenience classes
+def load_pretrained(config):
+    """Loads pretrained resnets from torchvision"""
 
-
-def resnet50_pretrained(config=None):
-    config = config or {}
-    config["depth"] = 50
     new_num_classes = config["num_classes"]
     config["num_classes"] = 1000
     net = ResNet(config)
 
-    model_url = "https://download.pytorch.org/models/resnet50-19c8e357.pth"
+    model_url = model_urls[config["depth"]]
     state_dict = load_state_dict_from_url(model_url, progress=True)
 
     def is_incompatible(layer):
@@ -227,18 +232,19 @@ def resnet50_pretrained(config=None):
             or layer.endswith("duty_cycle")
         )
 
-    # get keys, remove all num_batches_tracked
+    # sync keys between new model and pretrained model
     original_state_dict = list(net.modules())[0].state_dict()
     original_keys = original_state_dict.keys()
     original_keys = [k for k in original_keys if not is_incompatible(k)]
 
     # load state dict from torchvision
-    assert len(original_keys) == len(state_dict), \
-        "Incompatible number of layers between new network and preloaded network"
+    assert len(original_keys) == len(
+        state_dict
+    ), "Incompatible number of layers between new network and preloaded network"
     new_state_dict = {k: v for k, v in zip(original_keys, state_dict.values())}
     net.load_state_dict(new_state_dict, strict=False)
 
-    # # freeze all layers
+    # freeze all layers (commented out, decide strategy later)
     # for param in net.parameters():
     #     param.requires_grad=False
 
@@ -249,34 +255,35 @@ def resnet50_pretrained(config=None):
     return net
 
 
-def resnet18(config=None):
+# convenience classes
+def build_resnet(depth, config=None):
     config = config or {}
-    config["depth"] = 18
+    config["depth"] = depth
+    # adds option to load pretrained resnets
+    if "pretrained" in config:
+        if config["pretrained"]:
+            return load_pretrained(config)
     return ResNet(config)
+
+
+def resnet18(config=None):
+    return build_resnet(18, config)
 
 
 def resnet34(config=None):
-    config = config or {}
-    config["depth"] = 34
-    return ResNet(config)
+    return build_resnet(34, config)
 
 
 def resnet50(config=None):
-    config = config or {}
-    config["depth"] = 50
-    return ResNet(config)
+    return build_resnet(50, config)
 
 
 def resnet101(config=None):
-    config = config or {}
-    config["depth"] = 101
-    return ResNet(config)
+    return build_resnet(101, config)
 
 
 def resnet152(config=None):
-    config = config or {}
-    config["depth"] = 152
-    return ResNet(config)
+    return build_resnet(152, config)
 
 
 # TODO: move to tests
