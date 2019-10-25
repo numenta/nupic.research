@@ -17,35 +17,91 @@
 #
 #  http://numenta.org/licenses/
 #
-
-import pickle
+import copy
+from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-
-import nupic.torch
+from torch.quantization.fuse_modules import fuse_known_modules, fuse_modules
 
 
 def fold_batchnorm_conv(conv2d, bn_2d):
     """
-    Given a conv2d and its associated batchNorm2D, change the weights of
-    the conv so that batch norm is no longer required for inference.
+    Given a conv2d layer and its associated BatchNorm2d, returns a copy of the
+    original layer with the weights changed so that batch norm is no longer
+    required for inference.
     """
-    t = (bn_2d.running_var + bn_2d.eps).sqrt()
-    conv2d.bias.data = (conv2d.bias - bn_2d.running_mean) / t
-    t = t.reshape((conv2d.out_channels, 1, 1, 1))
-    conv2d.weight.data = conv2d.weight / t
+    assert (not (conv2d.training or bn_2d.training)), \
+        "This function should only be called during inference"
+
+    if bn_2d.affine:
+        bn_w = bn_2d.weight
+        bn_b = bn_2d.bias
+    else:
+        bn_w = torch.ones(bn_2d.num_features)
+        bn_b = torch.zeros(bn_2d.num_features)
+
+    folded = copy.deepcopy(conv2d)
+    t = (bn_2d.running_var + bn_2d.eps).rsqrt()
+    folded.weight = nn.Parameter(conv2d.weight * (bn_w * t).reshape((-1, 1, 1, 1)))
+    if conv2d.bias is not None:
+        folded.bias = nn.Parameter((conv2d.bias - bn_2d.running_mean) * t * bn_w + bn_b)
+
+    return folded
 
 
 def fold_batchnorm_linear(linear, bn_linear):
     """
-    Given a conv2d and its associated batchNorm2D, change the weights of
-    the conv so that batch norm is no longer required for inference.
+    Given a linear layer and its associated BatchNorm1d, returns a copy of the
+    original layer with the weights changed so that batch norm is no longer
+    required for inference.
     """
-    t = (bn_linear.running_var + bn_linear.eps).sqrt()
-    linear.bias.data = (linear.bias - bn_linear.running_mean) / t
-    t = t.reshape((linear.out_features, 1))
-    linear.weight.data = linear.weight / t
+    assert (not (linear.training or bn_linear.training)), \
+        "This function should only be called during inference"
+
+    folded = copy.deepcopy(linear)
+    t = (bn_linear.running_var + bn_linear.eps).rsqrt()
+    folded.bias = nn.Parameter((linear.bias - bn_linear.running_mean) * t)
+    folded.weight = nn.Parameter(linear.weight * t.reshape((-1, 1)))
+
+    return folded
+
+
+FUSE_MODULES_FUNCTIONS = {
+    (nn.Conv2d, nn.BatchNorm2d): fold_batchnorm_conv,
+    (nn.Linear, nn.BatchNorm1d): fold_batchnorm_linear,
+}
+FUSE_MODULES_TYPES = sum(FUSE_MODULES_FUNCTIONS.keys(), ())
+
+
+def fuse_conv_linear_bn(mod_list):
+    """
+    Modified `torch.quantization.fuse_known_modules` adding support for linear,
+    batch_norm modules.
+
+    Handles the following sequence of modules::
+
+        Conv2d, BatchNorm2d
+        Linear, BatchNorm1d
+
+    Everything else falls back to torch.quantization.fuse_known_modules
+
+    .. seealso:: :func:`torch.quantization.fuse_known_modules` for more details
+    """
+    module_types = tuple(type(m) for m in mod_list)
+    fuser_function = FUSE_MODULES_FUNCTIONS.get(module_types, None)
+    if fuser_function is None:
+        # Falls back to torch.quantization.fuse_known_modules
+        return fuse_known_modules(mod_list)
+
+    new_mod = [None] * len(mod_list)
+    new_mod[0] = fuser_function(*mod_list)
+
+    for i in range(1, len(mod_list)):
+        new_mod[i] = nn.Identity()
+        new_mod[i].training = mod_list[0].training
+
+    return new_mod
 
 
 def remove_batchnorm(model):
@@ -56,67 +112,27 @@ def remove_batchnorm(model):
     batchnorm is applied right after conv or linear layers, before relu, maxpool,
     or kwinners.
 
-    We don't currently support affine batchnorm (i.e. with gamma), but that should be a
-    straightforward extension:
-    https://stackoverflow.com/questions/49536856/
-                tensorflow-how-to-merge-batchnorm-into-convolution-for-faster-inference
-
-    https://discuss.pytorch.org/t/replacing-convs-modules-with-custom-convs-then-notimplementederror/17736
-    https://discuss.pytorch.org/t/how-to-replace-all-relu-activations-in-a-pretrained-network/31591/2
-
     Deleting a layer:
     https://spandan-madan.github.io/A-Collection-of-important-tasks-in-pytorch/
 
     :param model:
     :return:
     """
-    # Seems to be the best way to really ensure you're getting a copy
-    modelr = pickle.loads(pickle.dumps(model))
 
-    children = list(modelr.children())
-    names = list(modelr._modules.keys())
-    new_model = nn.Sequential()
+    # Create a list containing the names of all foldable layers in order of appearance
+    modules_to_fuse = [x[0] for x in model.named_modules()
+                       if isinstance(x[1], FUSE_MODULES_TYPES)]
 
-    modelr.eval()
-    with torch.no_grad():
-        last_module_with_weights = None
-        last_module_with_weights_type = None
-        for i, module in enumerate(children):
+    # Assuming every foldable layer is followed by a BatchNorm, group the modules
+    # into a list of layer_name, bn_name tuples
+    modules_to_fuse = list(zip(modules_to_fuse[0::2], modules_to_fuse[1::2]))
 
-            # If we have a conv layer, keep track of it and remove the next batchnorm
-            if ((type(module) == nn.modules.conv.Conv2d)
-                    or (type(module)
-                        == nupic.torch.modules.sparse_weights.SparseWeights2d)):
-                last_module_with_weights = module
-                last_module_with_weights_type = type(module)
-                new_model.add_module(names[i], module)
-            elif type(module) == nn.modules.batchnorm.BatchNorm2d:
-                if last_module_with_weights_type == nn.modules.conv.Conv2d:
-                    fold_batchnorm_conv(last_module_with_weights, module)
-                elif (last_module_with_weights_type
-                      == nupic.torch.modules.sparse_weights.SparseWeights2d):
-                    fold_batchnorm_conv(last_module_with_weights.module, module)
-                    last_module_with_weights.rezero_weights()
+    model.eval()
+    folded_model = fuse_modules(model, modules_to_fuse,
+                                fuser_func=fuse_conv_linear_bn)
+    # Remove Identity layers
+    modules = OrderedDict([(name, module)
+                           for name, module in folded_model.named_children()
+                           if not isinstance(module, nn.Identity)])
 
-            # If we have a linear layer, keep track of it and remove the next batchnorm
-            elif ((type(module) == nn.modules.linear.Linear)
-                  or (type(module)
-                      == nupic.torch.modules.sparse_weights.SparseWeights)):
-                last_module_with_weights = module
-                last_module_with_weights_type = type(module)
-                new_model.add_module(names[i], module)
-            elif type(module) == nn.modules.batchnorm.BatchNorm1d:
-                if last_module_with_weights_type == nn.modules.linear.Linear:
-                    fold_batchnorm_linear(last_module_with_weights, module)
-                elif (last_module_with_weights_type
-                      == nupic.torch.modules.sparse_weights.SparseWeights):
-                    fold_batchnorm_linear(last_module_with_weights.module, module)
-                    last_module_with_weights.rezero_weights()
-                else:
-                    raise AssertionError
-
-            # Everything else gets added back as is
-            else:
-                new_model.add_module(names[i], module)
-
-    return new_model
+    return nn.Sequential(modules)
