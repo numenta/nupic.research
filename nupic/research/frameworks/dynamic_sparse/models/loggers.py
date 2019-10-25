@@ -32,8 +32,10 @@ class BaseLogger:
         defaults.update(config or {})
         self.__dict__.update(defaults)
         self.model = model
+        self.log = {}
 
     def log_pre_epoch(self):
+        # reset log
         self.log = {}
 
     def log_post_epoch(self):
