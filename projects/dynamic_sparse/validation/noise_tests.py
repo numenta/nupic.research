@@ -86,11 +86,6 @@ if __name__ == "__main__":
     print(experiment_path)
     noise_levels = [0, 0.025, 0.05, 0.075, 0.10, 0.125, 0.15, 0.175, 0.20]
     results = {}
-    # dataset = Dataset(config=dict(
-    #     device="cuda",
-    #     dataset_name="CIFAR10",
-    #     data_dir="~/nta/datasets",
-    # ))
     number_noise_tests = 10
     df = browser.load(experiment_path)
 
@@ -101,11 +96,11 @@ if __name__ == "__main__":
         for idx, instance in enumerate(os.listdir(experiment_path))
         if os.path.isdir(os.path.join(experiment_path, instance))
     ]
-    ray.get(all_instances)
+    results_per_instance = ray.get(all_instances)
 
     # aggregate results
-    full_results = []
-    for instance, results in all_instances:
+    full_results = {}
+    for instance, results in results_per_instance:
         # define short name for aggregation
         exp_short_name = re.sub(r"^\d+_", "", instance[10:][:-28])
         # iterate through results
