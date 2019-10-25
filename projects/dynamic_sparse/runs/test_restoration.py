@@ -40,7 +40,7 @@ base_exp_config = dict(
     data_dir="~/nta/datasets/gsc",
     batch_size_train=(4, 16),
     batch_size_test=1000,
-# network related
+    # network related
     network=tune.grid_search(["GSCHeb_v0", "GSCHeb"]),
     optim_alg="SGD",
     momentum=0,  # 0.9,
