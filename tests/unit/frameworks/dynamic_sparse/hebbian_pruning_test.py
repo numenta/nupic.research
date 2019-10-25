@@ -101,8 +101,8 @@ class WeightedMagPruningTest(unittest.TestCase):
     def test_pruning_partial(self):
 
         self.sparse_module.on_perc = 0.5
-        self.sparse_module.hebbian_prune = 0
-        self.sparse_module.weight_prune = 0.5
+        self.sparse_module.hebbian_prune = 0.5
+        self.sparse_module.weight_prune = 0
 
         new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
@@ -143,8 +143,8 @@ class WeightedMagPruningTest(unittest.TestCase):
     def test_pruning_all(self):
 
         self.sparse_module.on_perc = 0.1
-        self.sparse_module.hebbian_prune = 0
-        self.sparse_module.weight_prune = 1
+        self.sparse_module.hebbian_prune = 1
+        self.sparse_module.weight_prune = 0
 
         new_mask, keep_mask, add_mask = self.model.prune(self.sparse_module)
 
