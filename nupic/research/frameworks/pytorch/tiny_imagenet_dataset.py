@@ -71,7 +71,7 @@ class TinyImageNet(ImageFolder):
 
         # if for the first time, download
         if download:
-            self.download(root, os.path.join(img_folder, 'val'))
+            self.download(root, os.path.join(img_folder, "val"))
 
         if self.train:
             img_folder = os.path.join(img_folder, "train")
