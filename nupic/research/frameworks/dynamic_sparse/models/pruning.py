@@ -42,7 +42,7 @@ class PruningModel(SparseModel):
 
         # interval
         if self.end_pruning_epoch is None:
-            self.end_pruning_epoch = self.epoch
+            self.end_pruning_epoch = self.epochs
         if self.start_pruning_epoch is None:
             self.start_pruning_epoch = 1
         interval = (
@@ -69,13 +69,14 @@ class PruningModel(SparseModel):
         super()._post_epoch_updates(dataset)
         if (
             self.current_epoch >= self.start_pruning_epoch
-            and self.epoch % self.pruning_interval == 0
+            and self.current_epoch <= self.end_pruning_epoch
+            and self.current_epoch % self.pruning_interval == 0
         ):
             self.prune_network()
 
     def prune_network(self):
         # define how much pruning is done
+        # print("Pruning in epoch {}".format(str(self.current_epoch)))
         for module in self.sparse_modules:
             module.prune()
             module.decay_density()
-            print("Pruning: ", str(self.current_epoch))
