@@ -178,34 +178,44 @@ class PrunableModule(SparseModule):
     def decay_density(self):
         self.target_density -= self.decay_amount
 
-    def update_mask(self, target, to_prune):
-        """Prunes at least 2 weihts"""
+    def update_mask(self, to_prune):
+        """
+        Prunes equally positive and negative weights
+        to_prune is upper bound of params being pruned, may prune less if not enough positive or negative weights to prune
+        """
 
         weight = self.m.weight.clone().detach()
-        pos_threshold, neg_threshold = 0, 0
-
-        # calculate the positive
+        
+        # prune positive
+        to_prune_pos = int(to_prune/2)
         weight_pos = weight[weight > 0]
-        pos_kth = int(to_prune / 2)
-        if len(weight_pos) > 0:
-            pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
-        pos_mask = weight >= pos_threshold
-        # get remaining
-        remaining_to_prune = to_prune - torch.sum(pos_mask).item()
-
-        # calculate the negative
+        pos_threshold = 0
+        if len(weight_pos) > 0 and to_prune_pos > 0:
+            pos_kth = min(to_prune_pos, len(weight_pos))
+            if len(weight_pos) > 0:
+                pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
+        prune_pos_mask = (weight <= pos_threshold) & (weight > 0)
+            
+        # prune negative
+        to_prune_neg = min(torch.sum(prune_pos_mask).item(), to_prune_pos)
         weight_neg = weight[weight < 0]
-        neg_kth = len(weight_neg) - remaining_to_prune
-        if len(weight_neg) > 0:
-            neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
-        neg_mask = weight <= neg_threshold
+        neg_threshold = 0
+        if len(weight_neg) > 0 and to_prune_neg > 0:
+            to_prune_neg = min(to_prune_neg, len(weight_neg))
+            neg_kth = len(weight_neg)-to_prune_neg+1
+            if len(weight_neg) > 0:
+                neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
+        prune_neg_mask = (weight >= neg_threshold) & (weight < 0)
 
-        # join and update mask
-        self.mask = (pos_mask & neg_mask).float().to(self.device)
+        # consolidate
+        prune_mask = prune_pos_mask | prune_neg_mask
+        new_mask = (weight != 0) & ~prune_mask
+        self.mask = new_mask.float().to(self.device)
 
-        assert (
-            torch.sum(self.mask).item() == target
-        ), "Number of weights doesn't match target density"
+        # print("Pruning {} params of {}".format(str(to_prune), str(torch.sum(prune_mask).item())))
+
+        # if torch.sum(prune_mask).item() != to_prune:
+        #     print("Number of weights pruned doesn't match target density") 
 
     def prune(self):
         """Prune to desired level of sparsity"""
@@ -214,5 +224,6 @@ class PrunableModule(SparseModule):
         target_params = int(np.prod(self.shape) * self.target_density)
         current_params = torch.sum(self.m.weight != 0).item()
         num_params_to_prune = current_params - target_params
+        # print(self.target_density, self.target_final_density, target_params, current_params)
         if num_params_to_prune > 1:
-            self.update_mask(target_params, num_params_to_prune)
+            self.update_mask(num_params_to_prune)
