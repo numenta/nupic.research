@@ -24,7 +24,6 @@ import os
 from collections import defaultdict
 from collections.abc import Iterable
 from copy import deepcopy
-from itertools import product
 
 import numpy as np
 import torch
@@ -32,17 +31,12 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
-from nupic.research.frameworks.dynamic_sparse.networks import (
-    DynamicSparseBase,
-    NumScheduler,
-)
-from nupic.research.frameworks.dynamic_sparse.networks.layers import (
-    init_coactivation_tracking,
-)
+from nupic.research.frameworks.dynamic_sparse.networks import NumScheduler
 from nupic.torch.modules import update_boost_strength
 
 from .loggers import BaseLogger, SparseLogger
 from .modules import SparseModule
+
 
 class BaseModel:
     """Base model, with training loops and logging functions."""
@@ -357,4 +351,3 @@ class SparseModel(BaseModel):
         else:
             value = [value] * len(counterpart)
             setattr(self, attr, value)
-

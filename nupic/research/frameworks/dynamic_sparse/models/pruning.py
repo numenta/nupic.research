@@ -19,12 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import numpy as np
-import torch
-
 from .loggers import DSNNLogger
-from .modules import PrunableModule
 from .main import SparseModel
+from .modules import PrunableModule
+
 
 class PruningModel(SparseModel):
     """Allows progressively pruning, building dense to sparse models"""
@@ -47,10 +45,14 @@ class PruningModel(SparseModel):
             self.end_pruning_epoch = self.epoch
         if self.start_pruning_epoch is None:
             self.start_pruning_epoch = 1
-        interval = (self.end_pruning_epoch - self.start_pruning_epoch) / self.pruning_interval
+        interval = (
+            self.end_pruning_epoch - self.start_pruning_epoch
+        ) / self.pruning_interval
 
         # set target density for each sparse module
-        self._make_attr_iterable("target_final_density", counterpart=self.sparse_modules)
+        self._make_attr_iterable(
+            "target_final_density", counterpart=self.sparse_modules
+        )
         for idx, (target_final_density) in enumerate(self.target_final_density):
             module = self.sparse_modules[idx]
             module.target_final_density = target_final_density
@@ -65,8 +67,10 @@ class PruningModel(SparseModel):
 
     def _post_epoch_updates(self, dataset=None):
         super()._post_epoch_updates(dataset)
-        if self.current_epoch >= self.start_pruning_epoch and 
-            self.epoch % self.pruning_interval == 0:
+        if (
+            self.current_epoch >= self.start_pruning_epoch
+            and self.epoch % self.pruning_interval == 0
+        ):
             self.prune_network()
 
     def prune_network(self):
@@ -74,3 +78,4 @@ class PruningModel(SparseModel):
         for module in self.sparse_modules:
             module.prune()
             module.decay_density()
+            print("Pruning: ", str(self.current_epoch))

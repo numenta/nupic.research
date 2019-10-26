@@ -19,28 +19,36 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-# import sys
-# sys.path.append("..")
-
-# from models.base_models import BaseModel
-# from .. import models
-
-# from dynamic_sparse.models import *
-
-
 import os
-import sys
 
-sys.path.append("../../")
-# sys.path.append(os.path.expanduser("~/nta/nupic.research/projects/"))
+from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
-# import dynamic_sparse.models as models
-# import dynamic_sparse.networks as networks
-# from dynamic_sparse.common import *
+# alternative initialization based on configuration
+exp_config = dict(
+    device="cuda",
+    network="resnet18",
+    dataset_name="CIFAR10",
+    input_size=(3,32,32),
+    num_classes=10,
+    model="PruningModel",
+    batch_size_train=10,
+    batch_size_test=10,
+    # specific pruning
+    target_final_density=0.2,
+    start_pruning_epoch=2,
+    end_pruning_epoch=10,
+    epochs=20,
+)
 
-print("test")
-print(__file__.replace(".py", ""))
-print("Current File Name : ", os.path.basename(__file__))
-print("Current File Path : ", os.path.realpath(__file__))
+# run
+tune_config = dict(
+    name=__file__,
+    num_samples=1,
+    local_dir=os.path.expanduser("~/nta/results"),
+    checkpoint_freq=0,
+    checkpoint_at_end=False,
+    resources_per_trial={"cpu": 1, "gpu": 1},
+    verbose=2,
+)
 
-# PYTHONPATH=~/nta/nupic.research/projects/ python mlp_heb.py
+run_ray(tune_config, exp_config)

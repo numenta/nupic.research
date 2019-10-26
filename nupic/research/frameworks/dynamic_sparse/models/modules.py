@@ -1,3 +1,34 @@
+# ----------------------------------------------------------------------
+# Numenta Platform for Intelligent Computing (NuPIC)
+# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# with Numenta, Inc., for a separate license for this software code, the
+# following terms and conditions apply:
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero Public License version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Affero Public License for more details.
+#
+# You should have received a copy of the GNU Affero Public License
+# along with this program.  If not, see http://www.gnu.org/licenses.
+#
+# http://numenta.org/licenses/
+# ----------------------------------------------------------------------
+
+from itertools import product
+
+import numpy as np
+import torch
+
+from nupic.research.frameworks.dynamic_sparse.networks import DynamicSparseBase
+from nupic.research.frameworks.dynamic_sparse.networks.layers import (
+    init_coactivation_tracking,
+)
+
 
 class SparseModule:
     """Module wrapper for sparse layers
@@ -142,29 +173,29 @@ class SparseModule:
 
         self.mask = mask.float().to(self.device)
 
-class PrunableModule(SparseModule):
 
+class PrunableModule(SparseModule):
     def decay_density(self):
         self.target_density -= self.decay_amount
 
     def update_mask(self, target, to_prune):
         """Prunes at least 2 weihts"""
 
-        weight = module.m.weight.clone().detach()
+        weight = self.m.weight.clone().detach()
         pos_threshold, neg_threshold = 0, 0
 
         # calculate the positive
         weight_pos = weight[weight > 0]
-        pos_kth = int(to_prune/2)
+        pos_kth = int(to_prune / 2)
         if len(weight_pos) > 0:
             pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
         pos_mask = weight >= pos_threshold
         # get remaining
-        remaining_to_prune = to_prune - torch.sum(pos_mask).item() 
+        remaining_to_prune = to_prune - torch.sum(pos_mask).item()
 
         # calculate the negative
         weight_neg = weight[weight < 0]
-        neg_kth = len(weight_neg) - to_prune
+        neg_kth = len(weight_neg) - remaining_to_prune
         if len(weight_neg) > 0:
             neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
         neg_mask = weight <= neg_threshold
@@ -172,18 +203,16 @@ class PrunableModule(SparseModule):
         # join and update mask
         self.mask = (pos_mask & neg_mask).float().to(self.device)
 
-        assert torch.sum(new_mask).item() == target, \
-            "Number of weights doesn't match target density"
+        assert (
+            torch.sum(self.mask).item() == target
+        ), "Number of weights doesn't match target density"
 
     def prune(self):
         """Prune to desired level of sparsity"""
 
         # calculate number of params to be pruned
         target_params = int(np.prod(self.shape) * self.target_density)
-        current_params = torch.sum(weight != 0).item()
+        current_params = torch.sum(self.m.weight != 0).item()
         num_params_to_prune = current_params - target_params
         if num_params_to_prune > 1:
             self.update_mask(target_params, num_params_to_prune)
-
-
-
