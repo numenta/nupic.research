@@ -181,7 +181,7 @@ class PrunableModule(SparseModule):
     def update_mask(self, to_prune):
         """
         Prunes equally positive and negative weights
-        to_prune is upper bound of params being pruned,
+        to_prune is an upper bound of params being pruned,
         may prune less if not enough positive or negative weights to prune
         """
 
