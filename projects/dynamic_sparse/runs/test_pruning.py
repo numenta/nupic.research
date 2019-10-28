@@ -23,6 +23,7 @@ import os
 
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 from ray import tune
+import numpy as np
 
 # alternative initialization based on configuration
 exp_config = dict(
@@ -39,7 +40,7 @@ exp_config = dict(
     end_pruning_epoch=150,
     epochs=200,
     # sparsity related
-    on_perc=tune.grid_search([1.0,0.7,0.4,0.1]),
+    on_perc=tune.grid_search(list(np.arange(0.1,1.01, 0.05))),
     sparse_start=1,
     sparse_end=None,
     # ---- optimizer related
@@ -55,7 +56,7 @@ exp_config = dict(
 
 # run
 tune_config = dict(
-    name=__file__.replace(".py", "") + "1",
+    name=__file__.replace(".py", "") + "3",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
@@ -64,4 +65,4 @@ tune_config = dict(
     verbose=2,
 )
 
-run_ray(tune_config, exp_config)
+run_ray(tune_config, exp_config, fix_seed=True)
