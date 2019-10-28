@@ -38,7 +38,7 @@ class DSNNHeb(SparseModel):
             pruning_early_stop=None,
             hebbian_prune_perc=None,
             weight_prune_perc=None,
-            hebbian_grow=True,
+            hebbian_grow=False,
             reset_coactivations=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
@@ -74,7 +74,7 @@ class DSNNHeb(SparseModel):
     def _pre_epoch_setup(self):
         if self.reset_coactivations:
             for module in self.sparse_modules:
-                if self._is_dynamic(module):
+                if module.hebbian_prune:
                     module.reset_coactivations()
 
     def _post_epoch_updates(self, dataset=None):
@@ -210,8 +210,8 @@ class DSNNHeb(SparseModel):
         Random mask that ensures the exact number of params is added
         For computationally faster method, see _get_random_add_mask_prob
         """
-        num_add = int(num_add)
         nonzero = torch.nonzero(nonactive_synapses, as_tuple=False)
+        num_add = min(int(num_add), len(nonzero)) # can't select more than available
         sampled_idxs = np.random.choice(range(len(nonzero)), num_add, replace=False)
         selected = nonzero[sampled_idxs]
 
@@ -290,7 +290,6 @@ class DSNNWeightedMag(DSNNHeb):
 
         return add_mask
 
-
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
 
@@ -302,13 +301,13 @@ class DSNNMixedHeb(DSNNHeb):
         with torch.no_grad():
             # unpack module
             weight = module.m.weight.clone().detach()
-            corr = module.get_coactivations()
             hebbian_prune_perc = module.hebbian_prune
             weight_prune_perc = module.weight_prune
             active_synapses = weight != 0
 
             # hebbian mask
             if hebbian_prune_perc is not None:
+                corr = module.get_coactivations()
                 hebbian_mask = self._get_hebbian_mask(
                     weight, corr, active_synapses, hebbian_prune_perc
                 )
@@ -339,9 +338,9 @@ class DSNNMixedHeb(DSNNHeb):
     def grow(self, module, num_add):
         """Add randomly"""
         with torch.no_grad():
-            corr = module.get_coactivations()
             nonactive_synapses = module.m.weight == 0
             if self.hebbian_grow:
+                corr = module.get_coactivations()
                 add_mask = self._get_hebbian_add_mask(corr, nonactive_synapses, num_add)
             else:
                 add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
@@ -349,6 +348,39 @@ class DSNNMixedHeb(DSNNHeb):
 
         return add_mask
 
+
+class SET(DSNNHeb):
+    """Improved results compared to DSNNHeb"""
+
+    def _is_dynamic(self, module):
+        return module.weight_prune is not None
+
+    def prune(self, module):
+        """Allows pruning by magnitude and hebbian"""
+        with torch.no_grad():
+            # unpack module
+            weight = module.m.weight.clone().detach()
+            weight_prune_perc = module.weight_prune
+            active_synapses = weight != 0
+
+            # weight mask
+            if weight_prune_perc is not None:
+                keep_mask = self._get_magnitude_mask(
+                    weight, active_synapses, weight_prune_perc
+                )
+            else:
+                keep_mask = active_synapses
+
+        return keep_mask.to(self.device)
+
+    def grow(self, module, num_add):
+        """Add randomly"""
+        with torch.no_grad():
+            nonactive_synapses = module.m.weight == 0
+            add_mask = self._get_random_add_mask(nonactive_synapses, num_add)
+            add_mask = add_mask.to(self.device)
+
+        return add_mask
 
 class DSNNMixedHebInverse(DSNNMixedHeb):
     """Test the extreme alternative hypothesis"""
@@ -358,7 +390,6 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
         with torch.no_grad():
             # unpack module
             weight = module.m.weight.clone().detach()
-            corr = module.get_coactivations()
             hebbian_prune_perc = module.hebbian_prune
             weight_prune_perc = module.weight_prune
             # init shared variables
@@ -366,8 +397,9 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
 
             # hebbian mask
             if hebbian_prune_perc is not None:
+                corr = module.get_coactivations()
                 hebbian_mask = self._get_inverse_hebbian_mask(
-                    weight, active_synapses, hebbian_prune_perc
+                    weight, corr, active_synapses, hebbian_prune_perc
                 )
             else:
                 hebbian_mask = None
@@ -375,7 +407,7 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
             # weight mask
             if weight_prune_perc is not None:
                 magnitude_mask = self._get_magnitude_mask(
-                    weight, corr, active_synapses, weight_prune_perc
+                    weight, active_synapses, weight_prune_perc
                 )
             else:
                 magnitude_mask = None
@@ -396,9 +428,9 @@ class DSNNMixedHebInverse(DSNNMixedHeb):
     def grow(self, module, num_add):
         """Add randomly"""
         with torch.no_grad():
-            corr = module.get_coactivations()
             nonactive_synapses = module.m.weight == 0
             if self.hebbian_grow:
+                corr = module.get_coactivations()
                 add_mask = self._get_inverse_hebbian_add_mask(
                     corr, nonactive_synapses, num_add
                 )
