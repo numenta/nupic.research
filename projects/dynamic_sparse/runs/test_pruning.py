@@ -21,16 +21,17 @@
 
 import os
 
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
-from ray import tune
 import numpy as np
+from ray import tune
+
+from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # alternative initialization based on configuration
 exp_config = dict(
     device="cuda",
     network="resnet18",
     dataset_name="CIFAR10",
-    input_size=(3,32,32),
+    input_size=(3, 32, 32),
     augment_images=True,
     num_classes=10,
     model="PruningModel",
@@ -40,7 +41,7 @@ exp_config = dict(
     end_pruning_epoch=150,
     epochs=200,
     # sparsity related
-    on_perc=tune.grid_search(list(np.arange(0.1,1.01, 0.05))),
+    on_perc=tune.grid_search(list(np.arange(0.1, 1.01, 0.05))),
     sparse_start=1,
     sparse_end=None,
     # ---- optimizer related
@@ -61,7 +62,7 @@ tune_config = dict(
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    resources_per_trial={"cpu": 1, "gpu": .245},
+    resources_per_trial={"cpu": 1, "gpu": 0.245},
     verbose=2,
 )
 
