@@ -181,13 +181,14 @@ class PrunableModule(SparseModule):
     def update_mask(self, to_prune):
         """
         Prunes equally positive and negative weights
-        to_prune is upper bound of params being pruned, may prune less if not enough positive or negative weights to prune
+        to_prune is upper bound of params being pruned,
+        may prune less if not enough positive or negative weights to prune
         """
 
         weight = self.m.weight.clone().detach()
-        
+
         # prune positive
-        to_prune_pos = int(to_prune/2)
+        to_prune_pos = int(to_prune / 2)
         weight_pos = weight[weight > 0]
         pos_threshold = 0
         if len(weight_pos) > 0 and to_prune_pos > 0:
@@ -195,14 +196,14 @@ class PrunableModule(SparseModule):
             if len(weight_pos) > 0:
                 pos_threshold, _ = torch.kthvalue(weight_pos, pos_kth)
         prune_pos_mask = (weight <= pos_threshold) & (weight > 0)
-            
+
         # prune negative
         to_prune_neg = min(torch.sum(prune_pos_mask).item(), to_prune_pos)
         weight_neg = weight[weight < 0]
         neg_threshold = 0
         if len(weight_neg) > 0 and to_prune_neg > 0:
             to_prune_neg = min(to_prune_neg, len(weight_neg))
-            neg_kth = len(weight_neg)-to_prune_neg+1
+            neg_kth = len(weight_neg) - to_prune_neg + 1
             if len(weight_neg) > 0:
                 neg_threshold, _ = torch.kthvalue(weight_neg, neg_kth)
         prune_neg_mask = (weight >= neg_threshold) & (weight < 0)
@@ -212,10 +213,8 @@ class PrunableModule(SparseModule):
         new_mask = (weight != 0) & ~prune_mask
         self.mask = new_mask.float().to(self.device)
 
-        # print("Pruning {} params of {}".format(str(to_prune), str(torch.sum(prune_mask).item())))
-
         # if torch.sum(prune_mask).item() != to_prune:
-        #     print("Number of weights pruned doesn't match target density") 
+        #     print("Number of weights pruned doesn't match target density")
 
     def prune(self):
         """Prune to desired level of sparsity"""
@@ -224,6 +223,5 @@ class PrunableModule(SparseModule):
         target_params = int(np.prod(self.shape) * self.target_density)
         current_params = torch.sum(self.m.weight != 0).item()
         num_params_to_prune = current_params - target_params
-        # print(self.target_density, self.target_final_density, target_params, current_params)
         if num_params_to_prune > 1:
             self.update_mask(num_params_to_prune)
