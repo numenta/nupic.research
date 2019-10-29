@@ -295,11 +295,10 @@ class SparseModel(BaseModel):
                 module.on_perc = self.epsilon * np.sum(shape) / np.prod(shape)
             else:
                 module.on_perc = self.on_perc[idx]
-            if module.on_perc < 1:
-                module.create_mask(self.sparse_type)
-                with torch.no_grad():
-                    module.apply_mask()
-                    module.save_num_params()
+            module.create_mask(self.sparse_type)
+            with torch.no_grad():
+                module.apply_mask()
+            module.save_num_params()
 
         self.logger = SparseLogger(self, config=self.config)
 

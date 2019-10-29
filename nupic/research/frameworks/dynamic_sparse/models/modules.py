@@ -106,7 +106,7 @@ class SparseModule:
             self.m.coactivations[:] = 0
 
     def apply_mask(self):
-        if self.mask is not None:
+        if self.mask is not None and self.on_perc < 1:
             self.m.weight.data *= self.mask
 
     def create_mask(self, sparse_type):

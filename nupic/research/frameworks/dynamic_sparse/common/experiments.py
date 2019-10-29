@@ -64,7 +64,7 @@ class IterativePruningExperiment:
         # get pruning schedule
         if "iterative_pruning_schedule" not in config["config"]:
             raise ValueError(
-                """IterativePruningExperiment requires a
+                """IterativePruningExperiment requires and
                 iterative_pruning_schedule to be defined"""
             )
         else:
