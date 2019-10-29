@@ -152,7 +152,7 @@ class BinaryGatedLinear(Module):
                     (inh_weight_decay_ungated + self.l0_strength) * inh_p1)
                 bias_l2 = (0 if not self.use_bias
                            else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
-                return -exc_weight_l2_l0 - inh_weight_l2_l0 - bias_l2
+                return exc_weight_l2_l0 + inh_weight_l2_l0 + bias_l2
         else:
             return 0
 
@@ -335,7 +335,7 @@ class BinaryGatedConv2d(Module):
                     (inh_weight_decay_ungated + self.l0_strength) * inh_p1)
                 bias_l2 = (0 if not self.use_bias
                            else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
-                return -exc_weight_l2_l0 - inh_weight_l2_l0 - bias_l2
+                return exc_weight_l2_l0 + inh_weight_l2_l0 + bias_l2
         else:
             return 0
 
