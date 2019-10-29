@@ -41,28 +41,19 @@ from torch.nn.modules.utils import _pair as pair
 from torch.nn.parameter import Parameter
 
 
-def sample_weight(p1, p1_unclamped, weight):
-    t = (torch.FloatTensor if not torch.cuda.is_available()
-         else torch.cuda.FloatTensor)
-    u = t(p1.size()).uniform_(0, 1)
-    mask = p1 > u
+def sample_weight(p1, weight, deterministic=False):
+    if deterministic:
+        u = 0.5
+    else:
+        t = (torch.FloatTensor if not torch.cuda.is_available()
+             else torch.cuda.FloatTensor)
+        u = t(p1.size()).uniform_(0, 1)
 
-    z = mask.float()
+    # Do this in a way that still propagates the gradient to p1.
+    z = p1.clone()
+    z.data = (z.data >= u).float()
 
-    with torch.no_grad():
-        ret = weight * z
-
-    def handle_gradient(grad):
-        with torch.no_grad():
-            p1_unclamped.backward(grad * weight)
-            # Learn only on synapses that weren't gated.
-            if weight.requires_grad:
-                weight.backward(grad * z)
-
-    ret.requires_grad_()
-    ret.register_hook(handle_gradient)
-
-    return ret
+    return weight * z
 
 
 class BinaryGatedLinear(Module):
@@ -71,7 +62,7 @@ class BinaryGatedLinear(Module):
     """
     def __init__(self, in_features, out_features, l0_strength=1.,
                  l2_strength=1., learn_weight=True, bias=True, droprate_init=0.5,
-                 random_weight=True, **kwargs):
+                 random_weight=True, deterministic=False, **kwargs):
         """
         :param in_features: Input dimensionality
         :param out_features: Output dimensionality
@@ -85,8 +76,7 @@ class BinaryGatedLinear(Module):
         self.out_features = out_features
         self.l0_strength = l0_strength
         self.l2_strength = l2_strength
-        self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
-                            else torch.cuda.FloatTensor)
+        self.deterministic = deterministic
 
         self.random_weight = random_weight
         if random_weight:
@@ -107,14 +97,9 @@ class BinaryGatedLinear(Module):
         self.inh_p1 = Parameter(torch.Tensor(out_features, in_features))
 
         self.droprate_init = droprate_init if droprate_init != 0. else 0.5
-        self.use_bias = False
+        self.use_bias = bias
         if bias:
-            b = torch.Tensor(out_features)
-            if learn_weight:
-                self.bias = Parameter(b)
-            else:
-                self.register_buffer("bias", b)
-            self.use_bias = True
+            self.bias = Parameter(torch.Tensor(out_features))
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -146,54 +131,57 @@ class BinaryGatedLinear(Module):
         Expected L0 norm under the stochastic gates, takes into account and
         re-weights also a potential L2 penalty
         """
-        exc_p1, inh_p1 = self.get_gate_probabilities()
+        if self.l0_strength > 0 or self.l2_strength > 0:
+            # Clamp these, but do it in a way that still always propagates the
+            # gradient.
+            exc_p1 = self.exc_p1.clone()
+            torch.clamp(exc_p1.data, min=0, max=1, out=exc_p1.data)
+            inh_p1 = self.exc_p1.clone()
+            torch.clamp(inh_p1.data, min=0, max=1, out=inh_p1.data)
 
-        exc_p1.requires_grad_()
-
-        def backpropagate_exc(grad):
-            self.exc_p1.backward(grad)
-        exc_p1.register_hook(backpropagate_exc)
-
-        inh_p1.requires_grad_()
-
-        def backpropagate_inh(grad):
-            self.inh_p1.backward(grad)
-        inh_p1.register_hook(backpropagate_inh)
-
-        exc_weight_decay_ungated = (
-            .5 * self.l2_strength * self.exc_weight.pow(2))
-        inh_weight_decay_ungated = (
-            .5 * self.l2_strength * self.inh_weight.pow(2))
-        exc_weight_l2_l0 = torch.sum(
-            (exc_weight_decay_ungated + self.l0_strength) * exc_p1)
-        inh_weight_l2_l0 = torch.sum(
-            (inh_weight_decay_ungated + self.l0_strength) * inh_p1)
-        bias_l2 = (0 if not self.use_bias
-                   else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
-        return -exc_weight_l2_l0 - inh_weight_l2_l0 - bias_l2
+            if self.l2_strength == 0:
+                return self.l0_strength * (exc_p1 + inh_p1).sum()
+            else:
+                exc_weight_decay_ungated = (
+                    .5 * self.l2_strength * self.exc_weight.pow(2))
+                inh_weight_decay_ungated = (
+                    .5 * self.l2_strength * self.inh_weight.pow(2))
+                exc_weight_l2_l0 = torch.sum(
+                    (exc_weight_decay_ungated + self.l0_strength) * exc_p1)
+                inh_weight_l2_l0 = torch.sum(
+                    (inh_weight_decay_ungated + self.l0_strength) * inh_p1)
+                bias_l2 = (0 if not self.use_bias
+                           else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
+                return -exc_weight_l2_l0 - inh_weight_l2_l0 - bias_l2
+        else:
+            return 0
 
     def get_inference_mask(self):
         exc_p1, inh_p1 = self.get_gate_probabilities()
 
-        exc_count1 = exc_p1.sum(dim=1).round().int()
-        inh_count1 = inh_p1.sum(dim=1).round().int()
+        if self.deterministic:
+            exc_mask = (exc_p1 >= 0.5).float()
+            inh_mask = (inh_p1 >= 0.5).float()
+            return exc_mask, inh_mask
+        else:
+            exc_count1 = exc_p1.sum(dim=1).round().int()
+            inh_count1 = inh_p1.sum(dim=1).round().int()
 
-        # pytorch doesn't offer topk with varying k values.
-        exc_mask = torch.zeros_like(exc_p1)
-        inh_mask = torch.zeros_like(inh_p1)
-        for i in range(exc_count1.size()[0]):
-            _, exc_indices = torch.topk(exc_p1[i], exc_count1[i].item())
-            _, inh_indices = torch.topk(inh_p1[i], inh_count1[i].item())
-            exc_mask[i].scatter_(-1, exc_indices, 1)
-            inh_mask[i].scatter_(-1, inh_indices, 1)
+            # pytorch doesn't offer topk with varying k values.
+            exc_mask = torch.zeros_like(exc_p1)
+            inh_mask = torch.zeros_like(inh_p1)
+            for i in range(exc_count1.size()[0]):
+                _, exc_indices = torch.topk(exc_p1[i], exc_count1[i].item())
+                _, inh_indices = torch.topk(inh_p1[i], inh_count1[i].item())
+                exc_mask[i].scatter_(-1, exc_indices, 1)
+                inh_mask[i].scatter_(-1, inh_indices, 1)
 
-        return exc_mask, inh_mask
+            return exc_mask, inh_mask
 
     def sample_weight(self):
         if self.training:
-            exc_p1, inh_p1 = self.get_gate_probabilities()
-            return (sample_weight(exc_p1, self.exc_p1, self.exc_weight)
-                    - sample_weight(inh_p1, self.inh_p1, self.inh_weight))
+            return (sample_weight(self.exc_p1, self.exc_weight, self.deterministic)
+                    - sample_weight(self.inh_p1, self.inh_weight, self.deterministic))
         else:
             exc_mask, inh_mask = self.get_inference_mask()
             return (exc_mask * self.exc_weight
@@ -238,7 +226,7 @@ class BinaryGatedConv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1, learn_weight=True, bias=True,
                  droprate_init=0.5, l2_strength=1., l0_strength=1.,
-                 random_weight=True, **kwargs):
+                 random_weight=True, deterministic=False, **kwargs):
         """
         :param in_channels: Number of input channels
         :param out_channels: Number of output channels
@@ -268,9 +256,7 @@ class BinaryGatedConv2d(Module):
         self.l2_strength = l2_strength
         self.l0_strength = l0_strength
         self.droprate_init = droprate_init if droprate_init != 0. else 0.5
-        self.floatTensor = (torch.FloatTensor if not torch.cuda.is_available()
-                            else torch.cuda.FloatTensor)
-        self.use_bias = False
+        self.deterministic = deterministic
 
         self.random_weight = random_weight
         if random_weight:
@@ -297,13 +283,9 @@ class BinaryGatedConv2d(Module):
         self.dim_z = out_channels
         self.input_shape = None
 
+        self.use_bias = bias
         if bias:
-            b = torch.Tensor(out_channels)
-            if learn_weight:
-                self.bias = Parameter(b)
-            else:
-                self.register_buffer("bias", b)
-            self.use_bias = True
+            self.bias = Parameter(torch.Tensor(out_channels))
 
         self.reset_parameters()
 
@@ -331,31 +313,31 @@ class BinaryGatedConv2d(Module):
         Expected L0 norm under the stochastic gates, takes into account and
         re-weights also a potential L2 penalty
         """
-        exc_p1, inh_p1 = self.get_gate_probabilities()
 
-        exc_p1.requires_grad_()
+        if self.l0_strength > 0 or self.l2_strength > 0:
+            # Clamp these, but do it in a way that still always propagates the
+            # gradient.
+            exc_p1 = self.exc_p1.clone()
+            torch.clamp(exc_p1.data, min=0, max=1, out=exc_p1.data)
+            inh_p1 = self.exc_p1.clone()
+            torch.clamp(inh_p1.data, min=0, max=1, out=inh_p1.data)
 
-        def backpropagate_exc(grad):
-            self.exc_p1.backward(grad)
-        exc_p1.register_hook(backpropagate_exc)
-
-        inh_p1.requires_grad_()
-
-        def backpropagate_inh(grad):
-            self.inh_p1.backward(grad)
-        inh_p1.register_hook(backpropagate_inh)
-
-        exc_weight_decay_ungated = (
-            .5 * self.l2_strength * self.exc_weight.pow(2))
-        inh_weight_decay_ungated = (
-            .5 * self.l2_strength * self.inh_weight.pow(2))
-        exc_weight_l2_l0 = torch.sum(
-            (exc_weight_decay_ungated + self.l0_strength) * exc_p1)
-        inh_weight_l2_l0 = torch.sum(
-            (inh_weight_decay_ungated + self.l0_strength) * inh_p1)
-        bias_l2 = (0 if not self.use_bias
-                   else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
-        return -exc_weight_l2_l0 - inh_weight_l2_l0 - bias_l2
+            if self.l2_strength == 0:
+                return self.l0_strength * (exc_p1 + inh_p1).sum()
+            else:
+                exc_weight_decay_ungated = (
+                    .5 * self.l2_strength * self.exc_weight.pow(2))
+                inh_weight_decay_ungated = (
+                    .5 * self.l2_strength * self.inh_weight.pow(2))
+                exc_weight_l2_l0 = torch.sum(
+                    (exc_weight_decay_ungated + self.l0_strength) * exc_p1)
+                inh_weight_l2_l0 = torch.sum(
+                    (inh_weight_decay_ungated + self.l0_strength) * inh_p1)
+                bias_l2 = (0 if not self.use_bias
+                           else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
+                return -exc_weight_l2_l0 - inh_weight_l2_l0 - bias_l2
+        else:
+            return 0
 
     def get_gate_probabilities(self):
         with torch.no_grad():
@@ -366,31 +348,35 @@ class BinaryGatedConv2d(Module):
     def get_inference_mask(self):
         exc_p1, inh_p1 = self.get_gate_probabilities()
 
-        exc_count1 = exc_p1.sum(
-            dim=tuple(range(1, len(exc_p1.shape)))
-        ).round().int()
-        inh_count1 = inh_p1.sum(
-            dim=tuple(range(1, len(inh_p1.shape)))
-        ).round().int()
+        if self.deterministic:
+            exc_mask = (exc_p1 >= 0.5).float()
+            inh_mask = (inh_p1 >= 0.5).float()
+            return exc_mask, inh_mask
+        else:
+            exc_count1 = exc_p1.sum(
+                dim=tuple(range(1, len(exc_p1.shape)))
+            ).round().int()
+            inh_count1 = inh_p1.sum(
+                dim=tuple(range(1, len(inh_p1.shape)))
+            ).round().int()
 
-        # pytorch doesn't offer topk with varying k values.
-        exc_mask = torch.zeros_like(exc_p1)
-        inh_mask = torch.zeros_like(inh_p1)
-        for i in range(exc_count1.size()[0]):
-            _, exc_indices = torch.topk(exc_p1[i].flatten(),
-                                        exc_count1[i].item())
-            _, inh_indices = torch.topk(inh_p1[i].flatten(),
-                                        inh_count1[i].item())
-            exc_mask[i].flatten().scatter_(-1, exc_indices, 1)
-            inh_mask[i].flatten().scatter_(-1, inh_indices, 1)
+            # pytorch doesn't offer topk with varying k values.
+            exc_mask = torch.zeros_like(exc_p1)
+            inh_mask = torch.zeros_like(inh_p1)
+            for i in range(exc_count1.size()[0]):
+                _, exc_indices = torch.topk(exc_p1[i].flatten(),
+                                            exc_count1[i].item())
+                _, inh_indices = torch.topk(inh_p1[i].flatten(),
+                                            inh_count1[i].item())
+                exc_mask[i].flatten().scatter_(-1, exc_indices, 1)
+                inh_mask[i].flatten().scatter_(-1, inh_indices, 1)
 
-        return exc_mask, inh_mask
+            return exc_mask, inh_mask
 
     def sample_weight(self):
         if self.training:
-            exc_p1, inh_p1 = self.get_gate_probabilities()
-            return (sample_weight(exc_p1, self.exc_p1, self.exc_weight)
-                    - sample_weight(inh_p1, self.inh_p1, self.inh_weight))
+            return (sample_weight(self.exc_p1, self.exc_weight, self.deterministic)
+                    - sample_weight(self.inh_p1, self.inh_weight, self.deterministic))
         else:
             exc_mask, inh_mask = self.get_inference_mask()
             return (exc_mask * self.exc_weight
