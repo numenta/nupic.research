@@ -19,55 +19,51 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import os
 
+import numpy as np
 from ray import tune
 
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
-# experiment configurations
-base_exp_config = dict(
+# alternative initialization based on configuration
+exp_config = dict(
     device="cuda",
+    network="resnet18",
     dataset_name="CIFAR10",
-    model=tune.grid_search(["BaseModel", "SparseModel"]),
-    data_dir="~/nta/datasets",
+    input_size=(3, 32, 32),
     augment_images=True,
+    num_classes=10,
+    model="PruningModel",
+    # specific pruning
+    target_final_density=0.1,
+    start_pruning_epoch=2,
+    end_pruning_epoch=150,
     epochs=200,
-    # train_batches_per_epoch=400,
-    # ---- network related
-    # network="resnet152",
-    # network="WideResNet",
-    network="WideResNet",
-    percent_on_k_winner=tune.grid_search([0.25, 1]),
-    boost_strength=1.5,
-    boost_strength_factor=0.85,
-    k_inference_factor=1.0,
-    sparse_type="precise_per_output",
+    # sparsity related
+    on_perc=tune.grid_search(list(np.arange(0.1, 1.01, 0.05))),
     sparse_start=1,
     sparse_end=None,
-    on_perc=0.5,
-    dropout_rate=0,  # zero dropout in wideresnet
     # ---- optimizer related
     optim_alg="SGD",
     learning_rate=0.1,
     lr_scheduler="MultiStepLR",
-    # lr_milestones=[60, 90, 110],
     lr_milestones=[60, 120, 160],
     lr_gamma=0.2,
     weight_decay=0.0005,
     momentum=0.9,
     nesterov_momentum=True,
-    # ---- debugs and noise related
-    test_noise=False,
 )
 
-# ray configurations
+# run
 tune_config = dict(
-    num_samples=5,
-    name=__file__.replace(".py", "") + "3b-test",
-    checkpoint_freq=1,
-    checkpoint_at_end=True,
-    resources_per_trial={"cpu": 1, "gpu": 0.50},
-    verbose=0,
+    name=__file__.replace(".py", "") + "3",
+    num_samples=1,
+    local_dir=os.path.expanduser("~/nta/results"),
+    checkpoint_freq=0,
+    checkpoint_at_end=False,
+    resources_per_trial={"cpu": 1, "gpu": 0.245},
+    verbose=2,
 )
 
-run_ray(tune_config, base_exp_config)
+run_ray(tune_config, exp_config, fix_seed=True)
