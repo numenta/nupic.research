@@ -30,14 +30,11 @@ from torchvision import datasets
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
-from .experiments import RayTrainable, BaseExperiment, IterativePruningExperiment
+from .experiments import BaseExperiment, IterativePruningExperiment, RayTrainable
 
-custom_datasets = {
-    "TinyImageNet": TinyImageNet
-}
-custom_experiments = {
-    "IterativePruning": IterativePruningExperiment
-}
+custom_datasets = {"TinyImageNet": TinyImageNet}
+custom_experiments = {"IterativePruning": IterativePruningExperiment}
+
 
 def download_dataset(config):
     """Pre-downloads dataset.
@@ -108,6 +105,7 @@ def init_ray():
         ray.register_custom_serializer(
             t, serializer=serializer, deserializer=deserializer
         )
+
 
 def run_ray(tune_config, exp_config, fix_seed=False):
 
@@ -187,6 +185,7 @@ def run_ray(tune_config, exp_config, fix_seed=False):
 
     # run
     experiment_type(tune_config)
+
 
 def run_ray_many(tune_config, exp_config, experiments, fix_seed=False):
 

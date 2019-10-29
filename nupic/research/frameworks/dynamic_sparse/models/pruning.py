@@ -27,6 +27,7 @@ from .loggers import DSNNLogger
 from .main import SparseModel
 from .modules import PrunableModule
 
+
 class PruningModel(SparseModel):
     """Allows progressively pruning, building dense to sparse models"""
 
@@ -84,6 +85,7 @@ class PruningModel(SparseModel):
             module.prune()
             module.decay_density()
 
+
 class IterativePruningModel(SparseModel):
     """Extends the pruning model to train in the regime of Lottery Ticket Hypothesis"""
 
@@ -91,22 +93,19 @@ class IterativePruningModel(SparseModel):
         super().setup(config)
 
         # add specific defaults
-        new_defaults = dict(
-            first_run=False,
-            save_final_weights=True,
-        )
+        new_defaults = dict(first_run=False, save_final_weights=True)
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
 
-        self.last_weights = os.path.join(self.local_dir, self.name, 
-            'last_weights.pth')
-        self.initial_weights = os.path.join(self.local_dir, self.name, 
-            'initial_weights.pth')
+        self.last_weights = os.path.join(self.local_dir, self.name, "last_weights.pth")
+        self.initial_weights = os.path.join(
+            self.local_dir, self.name, "initial_weights.pth"
+        )
 
         # iterative pruning procedure
         if not self.first_run:
             self._load_weights(self.last_weights)
-            # apply the pruning at once to all modules  
+            # apply the pruning at once to all modules
             for module in self.sparse_modules:
                 module.target_density = self.target_final_density
                 module.prune()
@@ -115,7 +114,7 @@ class IterativePruningModel(SparseModel):
             # apply mask to all of them
             for module in self.sparse_modules:
                 module.apply_mask()
-        # first run only save weights            
+        # first run only save weights
         else:
             self._save_weights(self.initial_weights)
 
@@ -132,6 +131,3 @@ class IterativePruningModel(SparseModel):
         super()._post_epoch_updates(dataset)
         if self.current_epoch == self.epochs and self.save_final_weights:
             self._save_weights(self.last_weights)
-
-
-
