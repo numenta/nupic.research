@@ -125,7 +125,7 @@ class HardConcreteGatedLinear(Module):
             (weight_decay_ungated + self.l0_strength) * (1 - self.cdf_qz(0)))
         bias_l2 = (0 if not self.use_bias
                    else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
-        return -weight_l2_l0 - bias_l2
+        return weight_l2_l0 + bias_l2
 
     def count_inference_flops(self):
         # For each unit, multiply with its n inputs then do n - 1 additions.
@@ -305,7 +305,7 @@ class HardConcreteGatedConv2d(Module):
             (weight_decay_ungated + self.l0_strength) * (1 - self.cdf_qz(0)))
         bias_l2 = (0 if not self.use_bias
                    else torch.sum(.5 * self.l2_strength * self.bias.pow(2)))
-        return -weight_l2_l0 - bias_l2
+        return weight_l2_l0 + bias_l2
 
     def count_inference_flops(self):
         # For each unit, multiply with n inputs then do n - 1 additions.
