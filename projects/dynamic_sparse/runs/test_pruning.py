@@ -62,8 +62,10 @@ tune_config = dict(
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    resources_per_trial={"cpu": 1, "gpu": 0.245},
+    resources_per_trial={"cpu": 1, "gpu": 0.195},
     verbose=2,
 )
 
 run_ray(tune_config, exp_config, fix_seed=True)
+
+
