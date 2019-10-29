@@ -35,10 +35,10 @@ exp_config = dict(
     augment_images=True,
     num_classes=10,
     model="IterativePruningModel",
-    epochs=3,
+    epochs=200,
     # sparsity related
     experiment_type="IterativePruning",
-    iterative_pruning_schedule=tune.grid_search(list(np.arange(0.1, 1, 0.05))),
+    iterative_pruning_schedule=list(np.arange(0.1, 1, 0.05)),
     sparse_start=1,
     sparse_end=None,
     # ---- optimizer related
@@ -59,12 +59,12 @@ exp_config = dict(
 
 # run
 tune_config = dict(
-    name=__file__.replace(".py", "") + "_set",
+    name=__file__.replace(".py", "") + "_lt",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    resources_per_trial={"cpu": 1, "gpu": 0.245},
+    resources_per_trial={"cpu": 1, "gpu": 1},
     verbose=2,
 )
 

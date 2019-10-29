@@ -36,12 +36,12 @@ exp_config = dict(
     num_classes=10,
     model="PruningModel",
     # specific pruning
-    target_final_density=0.1,
-    start_pruning_epoch=2,
-    end_pruning_epoch=150,
+    on_perc=1.0,
+    start_pruning_epoch=1,
+    end_pruning_epoch=120,
     epochs=200,
     # sparsity related
-    on_perc=tune.grid_search(list(np.arange(0.1, 1.01, 0.05))),
+    target_final_density=tune.grid_search(list(np.arange(0.1, 1.01, 0.05))),
     sparse_start=1,
     sparse_end=None,
     # ---- optimizer related

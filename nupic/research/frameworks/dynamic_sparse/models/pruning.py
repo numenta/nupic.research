@@ -21,6 +21,8 @@
 
 import os
 
+import torch
+
 from .loggers import DSNNLogger
 from .main import SparseModel
 from .modules import PrunableModule
