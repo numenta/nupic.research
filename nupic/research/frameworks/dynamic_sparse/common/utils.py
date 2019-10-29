@@ -32,36 +32,15 @@ import nupic.research.frameworks.dynamic_sparse.networks as networks
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
+from .experiments import BaseTrainable, BaseExperiment, IterativePruningExperiment
 from .datasets import Dataset
 
-custom_datasets = {"TinyImageNet": TinyImageNet}
-
-
-class Trainable(tune.Trainable):
-    """ray.tune trainable generic class Adaptable to any pytorch module."""
-
-    def __init__(self, config=None, logger_creator=None):
-        tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
-
-    def _setup(self, config):
-        network = getattr(networks, config["network"])(config=config)
-        # summary(network.to(torch.device('cpu')), input_size=(1, 32, 32))
-        self.model = getattr(models, config["model"])(network, config=config)
-        self.dataset = Dataset(config=config)
-        self.model.setup()
-        self.experiment_name = config["name"]
-
-    def _train(self):
-        log = self.model.run_epoch(self.dataset, self._iteration)
-        return log
-
-    def _save(self, checkpoint_dir):
-        self.model.save(checkpoint_dir, self.experiment_name)
-        return checkpoint_dir
-
-    def _restore(self, checkpoint):
-        self.model.restore(checkpoint, self.experiment_name)
-
+custom_datasets = {
+    "TinyImageNet": TinyImageNet
+}
+custom_experiments = {
+    "IterativePruning": IterativePruningExperiment
+}
 
 def download_dataset(config):
     """Pre-downloads dataset.
@@ -99,7 +78,7 @@ def run_experiment(name, trainable, exp_config, tune_config):
     # run
     tune_config["name"] = name
     tune_config["config"] = exp_config
-    tune.run(Trainable, **tune_config)
+    tune.run(BaseTrainable, **tune_config)
     # save after training
     # if tune_config['checkpoint_at_end']:
     #     model.save(exp_config['checkpoint_dir'])
@@ -133,7 +112,6 @@ def init_ray():
             t, serializer=serializer, deserializer=deserializer
         )
 
-
 def run_ray(tune_config, exp_config, fix_seed=False):
 
     # update config
@@ -154,6 +132,8 @@ def run_ray(tune_config, exp_config, fix_seed=False):
         tune_config["local_dir"] = os.path.expanduser(tune_config["local_dir"])
     else:
         tune_config["local_dir"] = os.path.expanduser("~/nta/results")
+    # saves a copy of local dir to exp config for LT experiments
+    exp_config["local_dir"] = tune_config["local_dir"]
 
     if "data_dir" not in exp_config:
         exp_config["data_dir"] = os.path.expanduser("~/nta/datasets")
@@ -200,8 +180,16 @@ def run_ray(tune_config, exp_config, fix_seed=False):
     if fix_seed:
         set_random_seed(32)
 
-    tune.run(Trainable, **tune_config)
+    # allows different kind of experiments to run
+    experiment_type = BaseExperiment
+    if "experiment_type" in exp_config:
+        if exp_config["experiment_type"] in custom_experiments:
+            experiment_type = custom_experiments[exp_config["experiment_type"]]
+        else:
+            raise ValueError("Experiment type not available.")
 
+    # run
+    experiment_type(tune_config)
 
 def run_ray_many(tune_config, exp_config, experiments, fix_seed=False):
 
@@ -250,7 +238,7 @@ def run_ray_many(tune_config, exp_config, experiments, fix_seed=False):
     # init ray
     ray.init()
     results = [
-        run_experiment.remote(name, Trainable, c, tune_config)
+        run_experiment.remote(name, BaseTrainable, c, tune_config)
         for name, c in exp_configs
     ]
     ray.get(results)
