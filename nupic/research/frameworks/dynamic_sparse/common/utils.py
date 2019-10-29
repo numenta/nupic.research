@@ -27,13 +27,10 @@ import torch  # to remove later
 from ray import tune
 from torchvision import datasets
 
-import nupic.research.frameworks.dynamic_sparse.models as models
-import nupic.research.frameworks.dynamic_sparse.networks as networks
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
-from .experiments import BaseTrainable, BaseExperiment, IterativePruningExperiment
-from .datasets import Dataset
+from .experiments import RayTrainable, BaseExperiment, IterativePruningExperiment
 
 custom_datasets = {
     "TinyImageNet": TinyImageNet
@@ -78,7 +75,7 @@ def run_experiment(name, trainable, exp_config, tune_config):
     # run
     tune_config["name"] = name
     tune_config["config"] = exp_config
-    tune.run(BaseTrainable, **tune_config)
+    tune.run(RayTrainable, **tune_config)
     # save after training
     # if tune_config['checkpoint_at_end']:
     #     model.save(exp_config['checkpoint_dir'])
@@ -238,7 +235,7 @@ def run_ray_many(tune_config, exp_config, experiments, fix_seed=False):
     # init ray
     ray.init()
     results = [
-        run_experiment.remote(name, BaseTrainable, c, tune_config)
+        run_experiment.remote(name, RayTrainable, c, tune_config)
         for name, c in exp_configs
     ]
     ray.get(results)

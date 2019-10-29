@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import os
 from copy import deepcopy
 
 from ray import tune
@@ -28,7 +27,7 @@ import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
 from .datasets import Dataset
 
-class BaseTrainable(tune.Trainable):
+class RayTrainable(tune.Trainable):
     """ray.tune trainable generic class Adaptable to any pytorch module."""
 
     def __init__(self, config=None, logger_creator=None):
@@ -56,7 +55,7 @@ class BaseTrainable(tune.Trainable):
 class BaseExperiment():
 
     def __init__(self, config):
-         tune.run(BaseTrainable, **config)
+         tune.run(RayTrainable, **config)
 
 class IterativePruningExperiment():
 
@@ -71,10 +70,10 @@ class IterativePruningExperiment():
         instance_config = deepcopy(config)
         instance_config['config']['target_final_density'] = 1.0
         instance_config['config']['first_run'] = True        
-        tune.run(BaseTrainable, **config)
+        tune.run(RayTrainable, **instance_config)
 
         # ensures pruning_schedule is reversed
-        pruning_schedule = sorted(pruning_schedule, ascending=False)
+        pruning_schedule = sorted(pruning_schedule, reverse=True)
         # ensures 1.0 density is not included
         if pruning_schedule[0] >= 1.0:
             pruning_schedule = pruning_schedule[1:]
@@ -82,5 +81,5 @@ class IterativePruningExperiment():
         instance_config['config']['first_run'] = False                
         for target_density in pruning_schedule:
             instance_config['config']['target_final_density'] = target_density
-            tune.run(BaseTrainable, **config)
+            tune.run(RayTrainable, **instance_config)
 
