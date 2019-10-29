@@ -294,7 +294,7 @@ class StochasticGSCExperiment(tune.Trainable):
         reg = torch.tensor(0.).to(self.device)
         for layername in ["cnn1", "cnn2", "fc1", "fc2"]:
             layer = getattr(self.model, layername)
-            reg += - layer.regularization()
+            reg += layer.regularization()
         return reg
 
     def nonzero_counts(self):
