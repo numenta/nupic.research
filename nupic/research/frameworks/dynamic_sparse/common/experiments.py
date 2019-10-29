@@ -25,7 +25,9 @@ from ray import tune
 
 import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
+
 from .datasets import Dataset
+
 
 class RayTrainable(tune.Trainable):
     """ray.tune trainable generic class Adaptable to any pytorch module."""
@@ -52,24 +54,26 @@ class RayTrainable(tune.Trainable):
         self.model.restore(checkpoint, self.experiment_name)
 
 
-class BaseExperiment():
-
+class BaseExperiment:
     def __init__(self, config):
-         tune.run(RayTrainable, **config)
+        tune.run(RayTrainable, **config)
 
-class IterativePruningExperiment():
 
+class IterativePruningExperiment:
     def __init__(self, config):
         # get pruning schedule
-        if 'iterative_pruning_schedule' not in config['config']:
-            raise ValueError("IterativePruningExperiment requires a iterative_pruning_schedule to be defined")
+        if "iterative_pruning_schedule" not in config["config"]:
+            raise ValueError(
+                """IterativePruningExperiment requires a
+                iterative_pruning_schedule to be defined"""
+            )
         else:
-            pruning_schedule = config['config']['iterative_pruning_schedule']
+            pruning_schedule = config["config"]["iterative_pruning_schedule"]
 
         # first run saves its initial weights and final weights
         instance_config = deepcopy(config)
-        instance_config['config']['target_final_density'] = 1.0
-        instance_config['config']['first_run'] = True        
+        instance_config["config"]["target_final_density"] = 1.0
+        instance_config["config"]["first_run"] = True
         tune.run(RayTrainable, **instance_config)
 
         # ensures pruning_schedule is reversed
@@ -78,8 +82,7 @@ class IterativePruningExperiment():
         if pruning_schedule[0] >= 1.0:
             pruning_schedule = pruning_schedule[1:]
         # no longer need initial weights
-        instance_config['config']['first_run'] = False                
+        instance_config["config"]["first_run"] = False
         for target_density in pruning_schedule:
-            instance_config['config']['target_final_density'] = target_density
+            instance_config["config"]["target_final_density"] = target_density
             tune.run(RayTrainable, **instance_config)
-

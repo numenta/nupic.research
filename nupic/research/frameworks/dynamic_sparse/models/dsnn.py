@@ -211,7 +211,7 @@ class DSNNHeb(SparseModel):
         For computationally faster method, see _get_random_add_mask_prob
         """
         nonzero = torch.nonzero(nonactive_synapses, as_tuple=False)
-        num_add = min(int(num_add), len(nonzero)) # can't select more than available
+        num_add = min(int(num_add), len(nonzero))  # can't select more than available
         sampled_idxs = np.random.choice(range(len(nonzero)), num_add, replace=False)
         selected = nonzero[sampled_idxs]
 
@@ -289,6 +289,7 @@ class DSNNWeightedMag(DSNNHeb):
             add_mask = add_mask.to(self.device)
 
         return add_mask
+
 
 class DSNNMixedHeb(DSNNHeb):
     """Improved results compared to DSNNHeb"""
@@ -381,6 +382,7 @@ class SET(DSNNHeb):
             add_mask = add_mask.to(self.device)
 
         return add_mask
+
 
 class DSNNMixedHebInverse(DSNNMixedHeb):
     """Test the extreme alternative hypothesis"""
