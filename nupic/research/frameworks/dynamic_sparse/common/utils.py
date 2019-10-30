@@ -138,7 +138,6 @@ def run_ray(tune_config, exp_config, fix_seed=False):
 
     # update config
     tune_config["config"] = exp_config
-    download_dataset(exp_config)
 
     # override when running local for test
     if not torch.cuda.is_available():
@@ -155,6 +154,11 @@ def run_ray(tune_config, exp_config, fix_seed=False):
         tune_config["local_dir"] = os.path.expanduser(tune_config["local_dir"])
     else:
         tune_config["local_dir"] = os.path.expanduser("~/nta/results")
+
+    if "data_dir" not in exp_config:
+        exp_config["data_dir"] = os.path.expanduser("~/nta/datasets")
+
+    download_dataset(exp_config)
 
     # set default checkpoint dir
     # temp: name and checkpoint dir in tune_config for backwards compatibility
