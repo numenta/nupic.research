@@ -27,8 +27,8 @@ import torch  # to remove later
 from ray import tune
 from torchvision import datasets
 
-import nupic.research.frameworks.dynamic_sparse.models as models
-import nupic.research.frameworks.dynamic_sparse.networks as networks
+import nupic.research.frameworks.milab.models as models
+import nupic.research.frameworks.milab.networks as networks
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
