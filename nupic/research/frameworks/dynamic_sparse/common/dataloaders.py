@@ -128,9 +128,6 @@ class PreprocessedSpeechDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
-    def __getattr__(self, name):
-        return super().__getattr__(name)
-
     def __iter__(self, name):
         return super().__iter__(name)
 
