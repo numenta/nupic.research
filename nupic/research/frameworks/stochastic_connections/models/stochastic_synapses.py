@@ -32,7 +32,6 @@ from nupic.research.frameworks.stochastic_connections.reparameterization_layers 
     HardConcreteGatedLinear,
 )
 
-
 STOCHASTIC_MODULES = (
     BinaryGatedConv2d,
     BinaryGatedLinear,
