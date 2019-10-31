@@ -36,13 +36,13 @@ CLASSES = (
 
 
 class VaryingDataLoader(object):
-    def __init__(self, dataset, batch_sizes=(1,), *args, **kwargs):
-
-        if not isinstance(batch_sizes, Iterable):
-            batch_sizes = tuple([batch_sizes])
+    def __init__(self, dataset, batch_size=None, *args, **kwargs):
+        batch_size = batch_size or [1]
+        if not isinstance(batch_size, Iterable):
+            batch_size = tuple([batch_size])
         self.data_loaders = [
             DataLoader(dataset, batch_size, *args, **kwargs)
-            for batch_size in batch_sizes
+            for batch_size in batch_size
         ]
         self.epoch = 0
 
@@ -167,7 +167,7 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
         random_seed=0,
         noise_level=0,
         classes=CLASSES,
-        batch_sizes=1,
+        batch_size=1,
         *args,
         **kwargs,
     ):
@@ -175,7 +175,7 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
         self.dataset = PreprocessedSpeechDataset(
             root, subset, random_seed, noise_level, classes)
 
-        super().__init__(self.dataset, batch_sizes, *args, *kwargs)
+        super().__init__(self.dataset, batch_size, *args, *kwargs)
 
     def __iter__(self):
         iteration = super().__iter__()
@@ -195,20 +195,21 @@ if __name__ == "__main__":
         for _ in range(dataset_train.num_seeds + 1):
             dataset_train.next_seed()
 
-    batch_sizes = (4, 16)
+    batch_size = (4, 16)
 
     dataloader_1 = PreprocessedSpeechDataLoader(
-        root, "train", classes=CLASSES, batch_sizes=batch_sizes
+        root, "train", classes=CLASSES, batch_size=batch_size
     )
+
     for i in range(3):
         for (batch, _) in dataloader_1:
-            assert batch.size()[0] == batch_sizes[min(i, len(batch_sizes) - 1)]
+            assert batch.size()[0] == batch_size[min(i, len(batch_size) - 1)]
             break
 
-    dataloader_2 = VaryingDataLoader(dataset_train, batch_sizes=batch_sizes)
+    dataloader_2 = VaryingDataLoader(dataset_train, batch_size=batch_size)
     for i in range(3):
         for (batch, _) in dataloader_2:
-            assert batch.size()[0] == batch_sizes[min(i, len(batch_sizes) - 1)]
+            assert batch.size()[0] == batch_size[min(i, len(batch_size) - 1)]
             break
 
     dataloader_1.batch_size
@@ -226,8 +227,8 @@ if __name__ == "__main__":
         for _ in range(dataset_valid.num_seeds + 1):
             dataset_valid.next_seed()
 
-    dataset_test = PreprocessedSpeechDataset(root, "test_noise", classes=CLASSES)
+    dataset_test = PreprocessedSpeechDataset(
+        root, "test_noise", noise_level=[5, 10, 15], classes=CLASSES)
 
-    if test_loading_processes:
-        for _ in range(dataset_test.num_seeds + 1):
-            dataset_test.next_seed()
+    for _ in range(dataset_test.num_seeds + 1):
+        dataset_test.next_seed()
