@@ -87,7 +87,6 @@ class Dataset:
         self.test_loader = PreprocessedSpeechDataLoader(
             self.data_dir,
             subset="valid",
-            silence_percentage=0,
             batch_sizes=self.batch_size_test,
         )
 
@@ -95,7 +94,7 @@ class Dataset:
             self.noise_loader = PreprocessedSpeechDataLoader(
                 self.data_dir,
                 subset="test_noise",
-                silence_percentage=0,
+                noise_level=self.noise_level,
                 batch_sizes=self.batch_size_test,
             )
         else:
