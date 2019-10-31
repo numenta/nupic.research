@@ -18,5 +18,5 @@
 #  http://numenta.org/licenses/
 #
 
-from nupic.research.frameworks.dynamic_sparse.networks import *
-from nupic.research.frameworks.stochastic_connections.networks import *
+from .binary_cnn import *
+from .hard_concrete_cnn import *
