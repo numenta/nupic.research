@@ -86,14 +86,23 @@ class PreprocessedSpeechDataset(Dataset):
     Use the "process_dataset.py" script to create preprocessed dataset
     """
 
-    def __init__(self, root, subset, random_seed=0, classes=CLASSES):
+    def __init__(
+        self, root, subset, random_seed=0, noise_level=0, classes=CLASSES
+    ):
         """
         :param root: Dataset root directory
-        :param subset: Which dataset subset to use ("train", "test", "valid", "noise")
+        :param subset: Which dataset subset to use ("train", "valid", "test_noise")
+        :param noise_level: noise_level of dataset to load (in percent)
         :param classes: List of classes to load. See CLASSES for valid options
         :param silence_percentage: Percentage of the dataset to be filled with silence
         """
         self.classes = classes
+
+        # Set noise levels - used for `subset == "test_noise"`.
+        if isinstance(noise_level, Iterable):
+            noise_levels = noise_level
+        else:
+            noise_levels = [noise_level]
 
         # backward compatibility
         if root[-3:] != "gsc":
@@ -108,6 +117,8 @@ class PreprocessedSpeechDataset(Dataset):
         seeds = [re.search(r"gsc_" + subset + r"(\d+)", e) for e in os.listdir(root)]
         seeds = [int(e.group(1)) for e in seeds if e is not None]
         seeds = seeds if len(seeds) > 0 else [""]
+        if subset == "test_noise":
+            seeds = [seed for seed in seeds if int(seed) in noise_levels]
         self._all_seeds = itertools.cycle(seeds if len(seeds) > 0 else "")
         self.num_seeds = len(seeds)
 
@@ -154,13 +165,15 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
         root,
         subset,
         random_seed=0,
+        noise_level=0,
         classes=CLASSES,
         batch_sizes=1,
         *args,
         **kwargs,
     ):
 
-        self.dataset = PreprocessedSpeechDataset(root, subset, random_seed, classes)
+        self.dataset = PreprocessedSpeechDataset(
+            root, subset, random_seed, noise_level, classes)
 
         super().__init__(self.dataset, batch_sizes, *args, *kwargs)
 
