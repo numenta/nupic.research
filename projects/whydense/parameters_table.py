@@ -75,14 +75,15 @@ def main(config, experiment, tablefmt, show_list):
         [
             "Network",
             "L1 Filters",
-            "L1 Percent On",
+            "L1 Act Sparsity",
             "L1 Wt Sparsity",
             "L2 Filters",
-            "L2 Percent On",
+            "L2 Act Sparsity",
             "L2 Wt Sparsity",
             "L3 N",
-            "L3 Percent On",
+            "L3 Act Sparsity",
             "Wt Sparsity",
+            "Non-zero Weights"
         ]
     ]
 
@@ -93,10 +94,14 @@ def main(config, experiment, tablefmt, show_list):
         cnn_percent_on = params["cnn_percent_on"]
         cnn_out_channels = params["cnn_out_channels"]
         cnn_weight_sparsity = params["cnn_weight_sparsity"]
+        nzw = params.get("non_zero_parameters", "NA")
 
         l3_n = linear_n[0]
-        l3_sp = "{0:.1f}%".format(100 * linear_percent_on[0])
-        wt_sp = "{0}%".format(100 * weight_sparsity[0])
+        if linear_percent_on[0] > 0.50:
+            l3_sp = "ReLU"
+        else:
+            l3_sp = "{0:.1f}%".format(100 * (1.0 - linear_percent_on[0]))
+        wt_sp = "{0}%".format(100 * (1.0 - weight_sparsity[0]))
 
         l1_percent_on = cnn_percent_on[0]
         l1_wt_sparsity = cnn_weight_sparsity[0]
@@ -108,19 +113,25 @@ def main(config, experiment, tablefmt, show_list):
             l2_wt_sparsity = None
 
         l1_f = cnn_out_channels[0]
-        l1_sp = "{0:.1f}%".format(100 * l1_percent_on)
-        l1_wt = "{0:.1f}%".format(100 * l1_wt_sparsity)
+        if l1_percent_on > 0.50:
+            l1_sp = "ReLU"
+        else:
+            l1_sp = "{0:.1f}%".format(100 * (1.0 - l1_percent_on))
+        l1_wt = "{0:.1f}%".format(100 * (1.0 - l1_wt_sparsity))
         if len(cnn_out_channels) == 2:
             l2_f = cnn_out_channels[1]
-            l2_sp = "{0:.1f}%".format(100 * l2_percent_on)
-            l2_wt = "{0:.1f}%".format(100 * l2_wt_sparsity)
+            if l2_percent_on > 0.50:
+                l2_sp = "ReLU"
+            else:
+                l2_sp = "{0:.1f}%".format(100 * (1.0 - l2_percent_on))
+            l2_wt = "{0:.1f}%".format(100 * (1.0 - l2_wt_sparsity))
         else:
             l2_f = None
             l2_sp = None
             l2_wt = None
 
         params_table.append([name, l1_f, l1_sp, l1_wt, l2_f, l2_sp, l2_wt,
-                             l3_n, l3_sp, wt_sp])
+                             l3_n, l3_sp, wt_sp, nzw])
 
     print()
     print(tabulate(params_table, headers="firstrow", tablefmt=tablefmt,
