@@ -236,7 +236,7 @@ class SparseSpeechExperiment(object):
             test_loader = self.test_loader
 
         ret = evaluate_model(self.model, test_loader, self.device)
-        ret["mean_accuracy"] = 100.0*ret["mean_accuracy"]
+        ret["mean_accuracy"] = 100.0 * ret["mean_accuracy"]
 
         entropy = self.entropy()
         ret.update({
