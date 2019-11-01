@@ -29,6 +29,11 @@ from nupic.research.frameworks.dynamic_sparse.networks.layers import (
     init_coactivation_tracking,
 )
 
+__all__ = [
+    "SparseModule",
+    "PrunableModule",
+]
+
 
 class SparseModule:
     """Module wrapper for sparse layers
