@@ -270,7 +270,7 @@ class VGG19HebDepreciated(nn.Module):
                 m.bias.data.zero_()
 
 
-class MLPDeprecated(nn.Module):
+class MLP(nn.Module):
     """
     Simple 3 hidden layers + output MLP, similar to one used in SET Paper.
     """
@@ -339,115 +339,6 @@ class MLPDeprecated(nn.Module):
 
     def forward(self, x):
         return self.classifier(x.view(-1, self.input_size))
-
-    def _initialize_weights(self, bias):
-        for m in self.modules():
-            if isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight, 1)
-                if bias:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                if bias:
-                    nn.init.constant_(m.bias, 0)
-
-
-class MLPHebDeprecated(nn.Module):
-    """
-    Simple 3 hidden layers + output MLPHeb, similar to one used in SET Paper.
-    """
-
-    def __init__(self, config=None):
-        super().__init__()
-
-        defaults = dict(
-            input_size=784,
-            num_classes=10,
-            hidden_sizes=[1000, 1000, 1000],
-            batch_norm=False,
-            dropout=False,
-            bias=False,
-            init_weights=True,
-            hebbian_learning=False,
-        )
-        defaults.update(config or {})
-        self.__dict__.update(defaults)
-        self.device = torch.device(self.device)
-
-        if self.kwinners:
-            self.activation_func = self._kwinners
-        else:
-            self.activation_func = lambda fout: nn.ReLU()
-
-        # hidden layers
-        layers = [
-            *self._linear_block(self.input_size, self.hidden_sizes[0]),
-            *self._linear_block(self.hidden_sizes[0], self.hidden_sizes[1]),
-            *self._linear_block(self.hidden_sizes[1], self.hidden_sizes[2]),
-        ]
-        # output layer
-        layers.append(nn.Linear(self.hidden_sizes[2], self.num_classes, bias=self.bias))
-
-        # classifier (*redundancy on layers to facilitate traversing)
-        self.layers = layers
-        self.classifier = nn.Sequential(*layers)
-
-        if self.init_weights:
-            self._initialize_weights(self.bias)
-
-        # track correlations
-        self.correlations = []
-
-    def _kwinners(self, fout):
-        return KWinners(
-            n=fout,
-            percent_on=self.percent_on,
-            boost_strength=self.boost_strength,
-            boost_strength_factor=self.boost_strength_factor,
-        )
-
-    def _linear_block(self, fin, fout):
-        block = [nn.Linear(fin, fout, bias=self.bias), self.activation_func(fout)]
-        if self.batch_norm:
-            block.append(nn.BatchNorm1d(fout))
-        if self.dropout:
-            block.append(nn.Dropout(p=self.dropout))
-
-        return block
-
-    def _has_activation(self, idx, layer):
-        return (
-            idx == len(self.layers) - 1
-            or isinstance(layer, nn.ReLU)
-            or isinstance(layer, KWinners)
-        )
-
-    def forward(self, x):
-        """A faster and approximate way to track correlations"""
-        x = x.view(-1, self.input_size)  # resiaze if needed, eg mnist
-        prev_act = (x > 0).detach().float()
-        idx_activation = 0
-        for idx_layer, layer in enumerate(self.layers):
-            # do the forward calculation normally
-            x = layer(x)
-            if self.hebbian_learning:
-                n_samples = x.shape[0]
-                if self._has_activation(idx_layer, layer):
-                    with torch.no_grad():
-                        curr_act = (x > 0).detach().float()
-                        # add outer product to the correlations, per sample
-                        for s in range(n_samples):
-                            outer = torch.ger(prev_act[s], curr_act[s])
-                            if idx_activation + 1 > len(self.correlations):
-                                self.correlations.append(outer)
-                            else:
-                                self.correlations[idx_activation] += outer
-                        # reassigning to the next
-                        prev_act = curr_act
-                        # move to next activation
-                        idx_activation += 1
-
-        return x
 
     def _initialize_weights(self, bias):
         for m in self.modules():
