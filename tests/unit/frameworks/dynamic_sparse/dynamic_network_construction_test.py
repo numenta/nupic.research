@@ -26,7 +26,6 @@ from torch import nn
 from nupic.research.frameworks.dynamic_sparse.networks import (
     DSConv2d,
     DSLinear,
-    GSCSparseCNN,
     init_coactivation_tracking,
 )
 from nupic.research.frameworks.dynamic_sparse.networks.utils import (
@@ -35,6 +34,7 @@ from nupic.research.frameworks.dynamic_sparse.networks.utils import (
     squash_layers,
     swap_layers,
 )
+from nupic.torch.models.sparse_cnn import GSCSparseCNN
 from nupic.torch.modules import KWinners, KWinners2d
 
 

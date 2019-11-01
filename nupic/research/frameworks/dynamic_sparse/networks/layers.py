@@ -28,6 +28,7 @@ __all__ = [
     "DynamicSparseBase",
     "DSLinear",
     "DSConv2d",
+    "init_coactivation_tracking",
 ]
 
 
