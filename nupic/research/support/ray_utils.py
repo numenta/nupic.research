@@ -42,7 +42,7 @@ def load_ray_tune_experiment(
             os.path.join(experiment_path, "experiment_state*.json")
         )
         if not experiment_state_paths:
-            raise RuntimeError("No experiment state found!")
+            raise RuntimeError("No experiment state found: " + experiment_path)
 
         # Get latest experiment only
         experiment_filename = max(experiment_state_paths)
