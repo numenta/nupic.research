@@ -50,7 +50,7 @@ class PruningModel(SparseModel):
         if self.start_pruning_epoch is None:
             self.start_pruning_epoch = 1
         interval = (
-            self.end_pruning_epoch - self.start_pruning_epoch
+            self.end_pruning_epoch - self.start_pruning_epoch + 1
         ) / self.pruning_interval
 
         # set target density for each sparse module
@@ -78,12 +78,16 @@ class PruningModel(SparseModel):
         ):
             self.prune_network()
 
+            # DEBUG: print num params
+            # print(self.current_epoch)
+            # total_params, zero_params = self.calculate_num_params()
+            # print(total_params, zero_params)
+            # print("sparsity: {:.2f}".format(zero_params/total_params))
+
     def prune_network(self):
-        # define how much pruning is done
-        # print("Pruning in epoch {}".format(str(self.current_epoch)))
         for module in self.sparse_modules:
-            module.prune()
             module.decay_density()
+            module.prune()
 
 
 class IterativePruningModel(SparseModel):
@@ -104,6 +108,7 @@ class IterativePruningModel(SparseModel):
 
         # iterative pruning procedure
         if not self.first_run:
+            # load weights from last run
             self._load_weights(self.last_weights)
             # apply the pruning at once to all modules
             for module in self.sparse_modules:
@@ -114,9 +119,15 @@ class IterativePruningModel(SparseModel):
             # apply mask to all of them
             for module in self.sparse_modules:
                 module.apply_mask()
+                print(module.nonzero_params())
         # first run only save weights
         else:
             self._save_weights(self.initial_weights)
+
+        # DEBUG: print num params
+        # total_params, zero_params = self.calculate_num_params()
+        # print(total_params, zero_params)
+        # print("sparsity: {:.2f}".format(zero_params/total_params))
 
     def _save_weights(self, path):
         torch.save(self.network.state_dict(), path)
@@ -131,3 +142,4 @@ class IterativePruningModel(SparseModel):
         super()._post_epoch_updates(dataset)
         if self.current_epoch == self.epochs and self.save_final_weights:
             self._save_weights(self.last_weights)
+
