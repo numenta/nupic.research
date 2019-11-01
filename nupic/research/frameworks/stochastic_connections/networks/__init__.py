@@ -18,9 +18,5 @@
 #  http://numenta.org/licenses/
 #
 
-from .comparative import *
-from .dscnn import *
-from .dsnn import *
-from .main import *
-from .modules import *
-from .pruning import *
+from .binary_cnn import *
+from .hard_concrete_cnn import *

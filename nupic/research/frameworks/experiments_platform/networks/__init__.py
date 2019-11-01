@@ -18,9 +18,5 @@
 #  http://numenta.org/licenses/
 #
 
-from .comparative import *
-from .dscnn import *
-from .dsnn import *
-from .main import *
-from .modules import *
-from .pruning import *
+from nupic.research.frameworks.dynamic_sparse.networks import *
+from nupic.research.frameworks.stochastic_connections.networks import *
