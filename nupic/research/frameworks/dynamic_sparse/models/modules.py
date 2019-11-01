@@ -111,7 +111,7 @@ class SparseModule:
             self.m.coactivations[:] = 0
 
     def apply_mask(self):
-        if self.mask is not None:
+        if self.mask is not None and self.on_perc < 1:
             self.m.weight.data *= self.mask
 
     def create_mask(self, sparse_type):
@@ -180,8 +180,13 @@ class SparseModule:
 
 
 class PrunableModule(SparseModule):
+
     def decay_density(self):
         self.target_density -= self.decay_amount
+
+    def apply_mask(self):
+        if self.mask is not None:
+            self.m.weight.data *= self.mask
 
     def update_mask(self, to_prune):
         """
@@ -230,3 +235,4 @@ class PrunableModule(SparseModule):
         num_params_to_prune = current_params - target_params
         if num_params_to_prune > 1:
             self.update_mask(num_params_to_prune)
+            self.apply_mask()
