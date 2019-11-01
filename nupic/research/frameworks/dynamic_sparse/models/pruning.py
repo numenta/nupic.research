@@ -23,6 +23,10 @@ from .loggers import DSNNLogger
 from .main import SparseModel
 from .modules import PrunableModule
 
+__all__ = [
+    "PruningModel"
+]
+
 
 class PruningModel(SparseModel):
     """Allows progressively pruning, building dense to sparse models"""

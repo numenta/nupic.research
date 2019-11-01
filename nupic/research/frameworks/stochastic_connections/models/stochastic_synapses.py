@@ -40,6 +40,11 @@ STOCHASTIC_MODULES = (
 )
 
 
+__all__ = [
+    "StochasticSynapsesModel",
+]
+
+
 class StochasticSynapsesModel(BaseModel):
 
     def setup(self, config=None):

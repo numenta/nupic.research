@@ -24,6 +24,13 @@ from torch import nn
 
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
+__all__ = [
+    "HebbianNetwork",
+    "MLPHeb",
+    "GSCHeb",
+    "GSCHebSmall",
+]
+
 
 class HebbianNetwork(nn.Module):
     """Parent class with shared methods. Not to be instantiated"""

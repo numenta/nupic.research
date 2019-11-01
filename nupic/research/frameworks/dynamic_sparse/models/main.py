@@ -37,6 +37,11 @@ from nupic.torch.modules import update_boost_strength
 from .loggers import BaseLogger, SparseLogger
 from .modules import SparseModule
 
+__all__ = [
+    "BaseModel",
+    "SparseModel",
+]
+
 
 class BaseModel:
     """Base model, with training loops and logging functions."""

@@ -29,6 +29,12 @@ from nupic.research.frameworks.stochastic_connections.binary_layers import (
 )
 from nupic.torch.modules import Flatten
 
+__all__ = [
+    "BinaryCNN",
+    "gsc_binary_cnn",
+    "mnist_binary_cnn",
+]
+
 
 class BinaryCNN(nn.Sequential):
 

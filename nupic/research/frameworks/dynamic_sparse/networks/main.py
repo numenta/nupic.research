@@ -30,6 +30,13 @@ from nupic.torch.modules import Flatten, KWinners, KWinners2d
 from .layers import DSConv2d, DSLinear
 from .utils import make_dsnn, replace_sparse_weights, squash_layers, swap_layers
 
+__all__ = [
+    "VGG19",
+    "vgg19_bn",
+    "vgg19_bn_kw",
+    "vgg19_dsnn",
+]
+
 
 class VGG19(nn.Module):
     def __init__(self, config=None):

@@ -27,6 +27,18 @@ from nupic.torch.modules import SparseWeights, SparseWeights2d
 
 from .layers import DSConv2d, DSLinear, DynamicSparseBase
 
+__all__ = [
+    "NumScheduler",
+    "remove_layers",
+    "replace_sparse_weights",
+    "swap_layers",
+    "squash_layers",
+    "set_module",
+    "get_dynamic_sparse_modules",
+    "make_dsnn",
+]
+
+
 # -------------------------------------------------
 # General Utils - helper classes
 # -------------------------------------------------

@@ -29,6 +29,12 @@ from nupic.research.frameworks.stochastic_connections.reparameterization_layers 
 )
 from nupic.torch.modules import Flatten
 
+__all__ = [
+    "HardConcreteCNN",
+    "gsc_hard_concrete_cnn",
+    "mnist_hard_concrete_cnn",
+]
+
 
 class HardConcreteCNN(nn.Sequential):
 
