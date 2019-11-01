@@ -30,10 +30,10 @@ from torchvision import datasets
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
-from .experiments import BaseExperiment, IterativePruningExperiment, RayTrainable
+from .experiments import base_experiment, iterative_pruning_experiment, RayTrainable
 
 custom_datasets = {"TinyImageNet": TinyImageNet}
-custom_experiments = {"IterativePruning": IterativePruningExperiment}
+custom_experiments = {"IterativePruning": iterative_pruning_experiment}
 
 
 def download_dataset(config):
@@ -176,15 +176,15 @@ def run_ray(tune_config, exp_config, fix_seed=False):
         set_random_seed(32)
 
     # allows different kind of experiments to run
-    experiment_type = BaseExperiment
+    run_experiment = base_experiment
     if "experiment_type" in exp_config:
         if exp_config["experiment_type"] in custom_experiments:
-            experiment_type = custom_experiments[exp_config["experiment_type"]]
+            run_experiment = custom_experiments[exp_config["experiment_type"]]
         else:
             raise ValueError("Experiment type not available.")
 
     # run
-    experiment_type(tune_config)
+    run_experiment(tune_config)
 
 
 def run_ray_many(tune_config, exp_config, experiments, fix_seed=False):
