@@ -24,6 +24,13 @@ import itertools
 import numpy as np
 import torch
 
+__all__ = [
+    "DynamicSparseBase",
+    "DSLinear",
+    "DSConv2d",
+]
+
+
 # ------------------
 # Utilities
 # ------------------
