@@ -21,8 +21,6 @@
 
 import os
 
-import numpy as np
-
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 exp_config = dict(
@@ -30,7 +28,7 @@ exp_config = dict(
     network="MLP",
     dataset_name="MNIST",
     input_size=784,
-    hidden_sizes=[50,50,50],
+    hidden_sizes=[50, 50, 50],
     model="PruningModel",
     epochs=10,
     train_batches_per_epoch=10,
@@ -42,7 +40,7 @@ exp_config = dict(
     # ---- optimizer related
     optim_alg="SGD",
     learning_rate=0.1,
-    weight_decay=0
+    weight_decay=0,
 )
 
 # run
