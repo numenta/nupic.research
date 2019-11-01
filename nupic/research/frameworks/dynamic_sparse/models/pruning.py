@@ -142,4 +142,3 @@ class IterativePruningModel(SparseModel):
         super()._post_epoch_updates(dataset)
         if self.current_epoch == self.epochs and self.save_final_weights:
             self._save_weights(self.last_weights)
-

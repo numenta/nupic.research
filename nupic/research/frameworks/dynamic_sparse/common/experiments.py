@@ -53,8 +53,10 @@ class RayTrainable(tune.Trainable):
     def _restore(self, checkpoint):
         self.model.restore(checkpoint, self.experiment_name)
 
+
 def base_experiment(config):
     tune.run(RayTrainable, **config)
+
 
 def iterative_pruning_experiment(config):
     # get pruning schedule

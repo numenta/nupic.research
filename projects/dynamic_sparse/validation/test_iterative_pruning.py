@@ -30,7 +30,7 @@ exp_config = dict(
     network="MLP",
     dataset_name="MNIST",
     input_size=784,
-    hidden_sizes=[50,50,50],
+    hidden_sizes=[50, 50, 50],
     model="IterativePruningModel",
     epochs=2,
     train_batches_per_epoch=2,
@@ -44,7 +44,7 @@ exp_config = dict(
     # ---- optimizer related
     optim_alg="SGD",
     learning_rate=0.1,
-    weight_decay=0
+    weight_decay=0,
 )
 
 # run
