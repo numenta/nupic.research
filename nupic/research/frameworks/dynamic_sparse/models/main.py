@@ -228,6 +228,19 @@ class BaseModel:
         loss, acc = self.logger.log["noise_loss"], self.logger.log["noise_acc"]
         return loss, acc
 
+    def calculate_num_params(self):
+        total_params = 0
+        zero_params = 0
+        for m in self.network.modules():
+            if self.has_params(m):
+                total_params += np.prod(m.weight.data.shape)
+                zero_params += torch.sum((m.weight.data == 0).float()).item()
+                if m.bias is not None:
+                    total_params += np.prod(m.bias.data.shape)
+                    zero_params += torch.sum((m.bias.data == 0).float()).item()
+
+        return total_params, zero_params
+
     def train(self, dataset, num_epochs, test_noise=False):
         """
         Added method to allow running the class outside Ray

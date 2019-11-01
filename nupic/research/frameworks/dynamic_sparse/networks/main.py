@@ -398,7 +398,6 @@ def vgg19_bn_kw(config):
 # def resnet50(config):
 #     return models.resnet50(num_classes=config["num_classes"])
 
-
 def vgg19_dsnn(config):
 
     net = VGG19(config=config)
