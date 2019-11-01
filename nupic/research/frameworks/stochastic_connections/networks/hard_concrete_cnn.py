@@ -33,7 +33,6 @@ from nupic.torch.modules import Flatten
 class HardConcreteCNN(nn.Sequential):
 
     def __init__(self, config=None):
-        super().__init__()
 
         config = config or {}
         defaults = dict(
