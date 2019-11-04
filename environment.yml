@@ -26,12 +26,13 @@ dependencies:
   - numpy
   - pandas
   - pillow==6.0.0
+  - python-dateutil==2.8.0
   - python-dotenv
   - requests
   - scikit-image
   - seaborn
   - tabulate
-  - torchvision=0.4.1
+  - torchvision
   - tqdm
 
   # ray[debug,dashboard]

@@ -31,6 +31,7 @@ librosa==0.7.1
 matplotlib
 numpy
 pandas
+python-dateutil==2.8.0
 fastai
 pillow==6.0.0
 python-dotenv
@@ -39,5 +40,5 @@ requests
 scikit-image
 seaborn>=0.9.0
 tabulate
-torchvision==0.4.1
+torchvision
 tqdm
