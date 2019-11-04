@@ -31,6 +31,8 @@ librosa==0.7.1
 matplotlib
 numpy
 pandas
+fastai
+pillow==6.0.0
 python-dotenv
 ray[dashboard,debug]==0.7.5
 requests
