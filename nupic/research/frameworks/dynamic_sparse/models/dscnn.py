@@ -31,6 +31,10 @@ from nupic.research.frameworks.dynamic_sparse.networks.layers import (
 
 from .main import BaseModel
 
+__all__ = [
+    "DSCNN",
+]
+
 
 class DSCNN(BaseModel):
     """
