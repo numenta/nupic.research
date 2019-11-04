@@ -26,6 +26,24 @@ from torchvision.models.utils import load_state_dict_from_url
 
 from nupic.torch.modules import Flatten, KWinners2d
 
+__all__ = [
+    "conv1x1",
+    "conv3x3",
+    "conv5x5",
+    "conv7x7",
+    "BasicBlock",
+    "Bottleneck",
+    "ResNet",
+    "load_pretrained",
+    "build_resnet",
+    "resnet18",
+    "resnet34",
+    "resnet50",
+    "resnet101",
+    "resnet152",
+]
+
+
 model_urls = {
     18: "https://download.pytorch.org/models/resnet18-5c106cde.pth",
     34: "https://download.pytorch.org/models/resnet34-333f7ec4.pth",
