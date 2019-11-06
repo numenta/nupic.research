@@ -29,7 +29,7 @@ import click
 import numpy as np
 from tabulate import tabulate
 
-from nupic.research.support import load_ray_tune_experiment, parse_config
+from nupic.research.support import load_ray_tune_experiments, parse_config
 
 
 @click.command(help="Train models")
@@ -54,20 +54,28 @@ from nupic.research.support import load_ray_tune_experiment, parse_config
     "--format",
     "tablefmt",
     help="Table format",
-    type=click.Choice(choices=["grid", "latex"]),
+    type=click.Choice(choices=["grid", "latex_raw"]),
     show_default=True,
     default="grid",
 )
 def main(config, experiments, tablefmt):
-    # Use configuration file location as the project location.
-    project_dir = os.path.dirname(config.name)
-    project_dir = os.path.abspath(project_dir)
-    print("project_dir =", project_dir)
-    test_scores_table = [["Network", "Test Score", "Noise Score", "Noise Accuracy",
-                          "Nonzero Parameters", "Num Trials"]]
+
+    # The table we use in the paper
+    test_scores_table = [["Network", "Test Score", "Noise Score",
+                          "Params"]]
+
+    # A more detailed table
+    test_scores_table_long = [["Network", "Test Score", "Noise Score", "Noise Accuracy",
+                               "Total Entropy", "Nonzero Parameters", "Num Trials"]]
 
     # Load and parse experiment configurations
     configs = parse_config(config, experiments, globals_param=globals())
+
+    # Use the appropriate plus/minus sign for latex
+    if tablefmt == "grid":
+        pm = "±"
+    else:
+        pm = "$\\pm$"
 
     # Select tags ignoring seed value
     def key_func(x):
@@ -90,85 +98,100 @@ def main(config, experiments, tablefmt):
         # Load experiment data
         experiment_path = os.path.join(config["path"], exp)
         try:
-            experiment_state = load_ray_tune_experiment(
+            states = load_ray_tune_experiments(
                 experiment_path=experiment_path, load_results=True
             )
+
         except RuntimeError:
-            print("Could not locate experiment state for " + exp + " ...skipping")
+            # print("Could not locate experiment state for " + exp + " ...skipping")
             continue
 
-        # Go through all checkpoints in the experiment
-        all_checkpoints = experiment_state["checkpoints"]
+        for experiment_state in states:
+            # Go through all checkpoints in the experiment
+            all_checkpoints = experiment_state["checkpoints"]
 
-        # Group checkpoints by tags
-        checkpoint_groups = {
-            k[0]: list(v)
-            for k, v in groupby(sorted(all_checkpoints, key=key_func), key=key_func)
-        }
+            # Group checkpoints by tags
+            checkpoint_groups = {
+                k[0]: list(v)
+                for k, v in groupby(sorted(all_checkpoints, key=key_func), key=key_func)
+            }
 
-        for tag in checkpoint_groups:
-            checkpoints = checkpoint_groups[tag]
-            num_exps = len(checkpoints)
-            test_scores = np.zeros(num_exps)
-            noise_scores = np.zeros(num_exps)
-            noise_accuracies = np.zeros(num_exps)
-            noise_samples = np.zeros(num_exps)
-            nonzero_params = np.zeros(num_exps)
+            for tag in checkpoint_groups:
+                checkpoints = checkpoint_groups[tag]
+                num_exps = len(checkpoints)
+                test_scores = np.zeros(num_exps)
+                noise_scores = np.zeros(num_exps)
+                noise_accuracies = np.zeros(num_exps)
+                noise_samples = np.zeros(num_exps)
+                nonzero_params = np.zeros(num_exps)
+                entropies = np.zeros(num_exps)
 
-            try:
-                for i, checkpoint in enumerate(checkpoints):
-                    results = checkpoint["results"]
-                    if results is None:
-                        continue
+                try:
+                    for i, checkpoint in enumerate(checkpoints):
+                        results = checkpoint["results"]
+                        if results is None:
+                            continue
 
-                    # For each checkpoint select the epoch with the best accuracy as
-                    # the best epoch
-                    best_result = max(results, key=lambda x: x["mean_accuracy"])
-                    test_scores[i] = best_result["mean_accuracy"]
+                        # For each checkpoint select the epoch with the best accuracy as
+                        # the best epoch
+                        best_result = max(results, key=lambda x: x["mean_accuracy"])
+                        test_scores[i] = best_result["mean_accuracy"]
+                        entropies[i] = best_result["entropy"]
+                        # print("best result:", best_result)
 
-                    # Load noise score
-                    logdir = os.path.join(
-                        experiment_path, os.path.basename(checkpoint["logdir"])
-                    )
-                    filename = os.path.join(logdir, "noise.json")
-                    if os.path.exists(filename):
-                        with open(filename, "r") as f:
-                            noise = json.load(f)
+                        # Load noise score
+                        logdir = os.path.join(
+                            experiment_path, os.path.basename(checkpoint["logdir"])
+                        )
+                        filename = os.path.join(logdir, "noise.json")
+                        if os.path.exists(filename):
+                            with open(filename, "r") as f:
+                                noise = json.load(f)
 
-                        noise_scores[i] = sum(x["total_correct"]
-                                              for x in list(noise.values()))
-                        noise_samples[i] = sum(
-                            x["total_samples"] for x in list(noise.values()))
-                    else:
-                        print("No noise file for " + experiment_path + " ...skipping")
-                        continue
+                            noise_scores[i] = sum(x["total_correct"]
+                                                  for x in list(noise.values()))
+                            noise_samples[i] = sum(
+                                x["total_samples"] for x in list(noise.values()))
+                        else:
+                            print("No noise file for " + experiment_path
+                                  + " ...skipping")
+                            continue
 
-                    noise_accuracies[i] = (
-                        float(100.0 * noise_scores[i]) / noise_samples[i])
-                    nonzero_params[i] = max(x["non_zero_parameters"]
-                                            for x in list(noise.values()))
-            except Exception:
-                print("Problem with checkpoint group" + tag + " in " + exp
-                      + " ...skipping")
-                continue
+                        noise_accuracies[i] = (
+                            float(100.0 * noise_scores[i]) / noise_samples[i])
+                        nonzero_params[i] = max(x["non_zero_parameters"]
+                                                for x in list(noise.values()))
+                except Exception:
+                    print("Problem with checkpoint group" + tag + " in " + exp
+                          + " ...skipping")
+                    continue
 
-            test_score = "{0:.2f} ± {1:.2f}".format(
-                test_scores.mean(), test_scores.std()
-            )
-            noise_score = "{0:,.0f} ± {1:.2f}".format(
-                noise_scores.mean(), noise_scores.std()
-            )
-            noise_accuracy = "{0:,.2f} ± {1:.2f}".format(
-                noise_accuracies.mean(), noise_accuracies.std()
-            )
-            nonzero = "{0:,.0f}".format(nonzero_params.mean())
-            test_scores_table.append(
-                ["{} {}".format(exp, tag), test_score, noise_score, noise_accuracy,
-                 nonzero, num_exps]
-            )
+                test_score = "{0:.2f} {1:} {2:.2f}".format(
+                    test_scores.mean(), pm, test_scores.std()
+                )
+                entropy = "{0:.2f} {1:} {2:.2f}".format(
+                    entropies.mean(), pm, entropies.std()
+                )
+                noise_score = "{0:,.0f} {1:}  {2:.2f}".format(
+                    noise_scores.mean(), pm, noise_scores.std()
+                )
+                noise_accuracy = "{0:,.2f} {1:}  {2:.2f}".format(
+                    noise_accuracies.mean(), pm, noise_accuracies.std()
+                )
+                nonzero = "{0:,.0f}".format(nonzero_params.mean())
+                test_scores_table.append(
+                    ["{} {}".format(exp, tag), test_score, noise_accuracy,
+                     nonzero]
+                )
+                test_scores_table_long.append(
+                    ["{} {}".format(exp, tag), test_score, noise_score, noise_accuracy,
+                     entropy, nonzero, num_exps]
+                )
 
     print()
     print(tabulate(test_scores_table, headers="firstrow", tablefmt=tablefmt))
+    print()
+    print(tabulate(test_scores_table_long, headers="firstrow", tablefmt=tablefmt))
 
 
 if __name__ == "__main__":
