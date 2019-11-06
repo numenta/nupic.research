@@ -27,17 +27,13 @@ PAGI9 = [[2, 4, 0, 7, 8, 1, 6, 1, 8], [2, 7, 4, 9, 5, 9, 3, 1, 0], [5, 7, 3, 4, 
     2, 9, 1, 9, 2, 8, 3, 2, 7], [1, 2, 6, 4, 8, 3, 5, 0, 3], [3, 8, 0, 5, 6, 4, 1, 3, 9], [4, 7, 5, 3, 7, 6, 7, 2, 4]]
 PLOT_INT = 100
 
-model = baseline_models.LSTMModel(
-                vocab_size=10,
-                nhid=200,
-                d_in=28**2,
-                d_out=28**2
-            )
+
 predictor = rsm.RSMPredictor(
                 d_in=28**2,
                 d_out=10,
                 hidden_size=1200
             )
+
 
 class BPTTTrainer():
     def __init__(self, model, loader, k1=1, k2=30, predictor=None, 
@@ -212,13 +208,13 @@ if __name__ == "__main__":
         help="# of minibatches",
     )
     optparser.add_argument(
-        "-e",
-        "--epochs",
-        dest="epochs",
+        "-t",
+        "--total",
+        dest="total",
         type=int,
-        default=1000,
-        help="# of epochs"
-    )
+        default=350000,
+        help="Total batches"
+    )    
     optparser.add_argument(
         "-k",
         "--k2",
@@ -256,9 +252,17 @@ if __name__ == "__main__":
         "--lr",
         dest="lr",
         type=float,
-        default=1e-5,
+        default=2e-5,
         help="Learning rate"
     )
+    optparser.add_argument(
+        "-d",
+        "--nhid",
+        dest="nhid",
+        type=int,
+        default=450,
+        help="Hidden dim"
+    )    
     optparser.add_argument(
         "-s",
         "--cs",
@@ -268,6 +272,15 @@ if __name__ == "__main__":
         help="Reconnect cell state"
     )
     opts = optparser.parse_args()    
+
+    model = baseline_models.LSTMModel(
+                    vocab_size=10,
+                    nhid=opts.nhid,
+                    d_in=28**2,
+                    d_out=28**2
+                )
+    print("LSTM parameters: ", util.count_parameters(model))
+
 
     dataset = rsm_samplers.MNISTBufferedDataset(expanduser("~/nta/datasets"), download=True,
                                                 transform=transforms.Compose([
@@ -285,7 +298,12 @@ if __name__ == "__main__":
                  batch_sampler=sampler,
                  collate_fn=rsm_samplers.pred_sequence_collate)    
 
+    continuous = opts.total == opts.mbs
+    if continuous:
+        epochs = 0
+    else:
+        epochs = int(opts.total / opts.mbs)
     trainer = BPTTTrainer(model, loader, predictor=predictor, k1=1, k2=opts.k2, mbs=opts.mbs, use_optimizer=not opts.clip, lr=opts.lr, link_cell_state=opts.cs)
-    filename = "%d_mbs-%d_epochs-%d_k2-%d_fixed-%s_noise-%s_clip-%s_cs-%s_lr-%s" % (int(time.time()), opts.mbs, opts.epochs, opts.k2, opts.fixed, opts.noise, opts.clip, opts.cs, opts.lr)
-    trainer.run(epochs=opts.epochs, filename=filename)
+    filename = "%d_mbs-%d_epochs-%d_k2-%d_fixed-%s_noise-%s_clip-%s_cs-%s_lr-%s_nhid-%d" % (int(time.time()), opts.mbs, epochs, opts.k2, opts.fixed, opts.noise, opts.clip, opts.cs, opts.lr, opts.nhid)
+    trainer.run(epochs=epochs, filename=filename)
 

@@ -139,7 +139,7 @@ class RSMNet(torch.nn.Module):
         # Zero KWinner boost strengths since learning in RSM is pausing
         for layer in self.children():
             for mod in layer.children():
-                if isinstance(mod, KWinners):
+                if isinstance(mod, KWinners) and mod.boost_strength_factor < 1.0:
                     print("Zeroing boost strength for %s" % mod)
                     mod.boost_strength = 0.0
 
@@ -363,8 +363,7 @@ class RSMLayer(torch.nn.Module):
         self.decay = nn.Parameter(decay_init, requires_grad=self.trainable_decay)
         self.register_parameter("decay", self.decay)
         self.learning_iterations = 0
-        self.duty_cycle = torch.zeros(self.total_cells)
-        self.register_buffer("duty_cycle", self.duty_cycle)
+        self.register_buffer("duty_cycle", torch.zeros(self.total_cells))
 
         print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
 
@@ -612,7 +611,7 @@ class RSMLayer(torch.nn.Module):
 
         return sigma  # total_cells
 
-    def _update_duty_cycle(winners):
+    def _update_duty_cycle(self, winners):
         '''
         For tracking layer entropy (across both inhibition/boosting approaches)
         '''
@@ -683,8 +682,9 @@ class RSMLayer(torch.nn.Module):
                 col_winners = winning_cols
 
             self._debug_log({"m_lambda": m_lambda})
-            self._update_duty_cycle(col_winners)
             y_pre_act = m_pi * m_lambda * sigma
+
+        self._update_duty_cycle(col_winners.squeeze())
 
 
         del m_pi

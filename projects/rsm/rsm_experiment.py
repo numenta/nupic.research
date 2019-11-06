@@ -167,6 +167,7 @@ class RSMExperiment(object):
         self.word_cache_decay = config.get("word_cache_decay", 0.0)
         self.word_cache_pct = config.get("word_cache_pct", 0.0)
         self.unif_smoothing = config.get("unif_smoothing", 0.0)
+        self.kn5_pct = config.get("kn5_pct", 0.0)
 
         # Predictor network
         self.predictor_hidden_size = config.get("predictor_hidden_size", None)
@@ -417,6 +418,10 @@ class RSMExperiment(object):
         if self.word_cache_decay:
             self.word_cache = torch.zeros((self.eval_batch_size, self.vocab_size), device=self.device, requires_grad=False)        
 
+        if self.kn5_pct:
+            # This KN5 model likely needs to be generated / downloaded
+            self.kn5_distr = torch.load(self.data_dir + '/PTB/KN5/kn5_distr_remapped.pt', map_location=self.device)
+
     def _repackage_hidden(self, h):
         """Wraps hidden states in new Tensors, to detach them from their history."""
         if isinstance(h, torch.Tensor):
@@ -470,7 +475,7 @@ class RSMExperiment(object):
         else:
             self.optimizer.step()
 
-    def _interpolated_loss(self, predictor_dist, pred_targets, train=False):
+    def _interpolated_loss(self, predictor_dist, pred_targets, loader=None, train=False):
         predictor_dist_size = list(predictor_dist.size())        
         num_classes = predictor_dist_size[1]
         labels_one_hot = torch.nn.functional.one_hot(pred_targets, num_classes=num_classes)
@@ -491,6 +496,12 @@ class RSMExperiment(object):
                 predictor_mass_pct -= mass_pct
                 predictions += mass_pct * torch.ones_like(predictor_dist) / self.vocab_size
 
+            if self.kn5_pct:
+                # KN5 model interpolation
+                mass_pct = self.kn5_pct
+                predictor_mass_pct -= mass_pct
+                predictions += mass_pct * self.kn5_distr[loader.batch_sampler.batch_idxs, :]
+
         predictions += predictor_mass_pct * predictor_dist
         ll = (labels_one_hot * torch.log(predictions)).sum(dim=[0,1])
         interp_loss = -ll  # sum negative log likelihood
@@ -503,7 +514,8 @@ class RSMExperiment(object):
         pred_targets,
         pcounts,
         train=False,
-        batch_idx=0
+        batch_idx=0,
+        loader=None
     ):
         """
         Do prediction.
@@ -518,7 +530,7 @@ class RSMExperiment(object):
             pred_loss = self.predictor_loss(predictor_logits, pred_targets)  # cross-entropy loss
 
             # This loss is for the interpolated model
-            interp_loss = self._interpolated_loss(predictor_dist, pred_targets, train=train)
+            interp_loss = self._interpolated_loss(predictor_dist, pred_targets, loader=loader, train=train)
 
             _, class_predictions = torch.max(predictor_dist, 1)
             pcounts['total_samples'] += pred_targets.size(0)
@@ -608,9 +620,17 @@ class RSMExperiment(object):
 
         return loss
 
-    def eval_epoch(self, epoch):
+    def eval_epoch(self, epoch, loader=None):
         ret = {}
         print("Evaluating...")
+        if not loader:
+            loader = self.val_loader
+
+        if self.instrumentation:
+            # Capture entropy prior to evaluation
+            _, train_entropy = binary_entropy(self.model.RSM_1.duty_cycle)
+            ret['train_entropy'] = train_entropy.item()
+            self.model.RSM_1.duty_cycle.fill_(0.0)  # Clear duty cycle
 
         self.model.eval()
         if self.predictor:
@@ -636,9 +656,7 @@ class RSMExperiment(object):
             read_out_pred = []
             metrics = {}
 
-            for _b_idx, (inputs, targets, pred_targets, input_labels) in enumerate(
-                self.val_loader
-            ):
+            for _b_idx, (inputs, targets, pred_targets, input_labels) in enumerate(loader):
 
                 # Forward
                 inputs = inputs.to(self.device)
@@ -660,7 +678,8 @@ class RSMExperiment(object):
                 pcounts, class_predictions, correct_arr = (
                     self._do_prediction(
                         pred_input, pred_targets, pcounts,
-                        batch_idx=_b_idx
+                        batch_idx=_b_idx,
+                        loader=loader
                     )
                 )
 
@@ -692,7 +711,9 @@ class RSMExperiment(object):
                 # After all eval batches, generate stats & figures
                 ret.update(self._generate_instr_charts(metrics))
                 ret.update(self._store_instr_hists())
-                _, ret['layer_entropy'] = binary_entropy(self.model.RSM_1.duty_cycle)
+                _, test_entropy = binary_entropy(self.model.RSM_1.duty_cycle)
+                ret['test_entropy'] = test_entropy.item()
+                self.model.RSM_1.duty_cycle.fill_(0.0)  # Clear duty cycle
 
             num_batches = (_b_idx + 1)
             num_samples = pcounts['total_samples']
@@ -800,7 +821,8 @@ class RSMExperiment(object):
             pcounts, class_predictions, correct_arr = (
                 self._do_prediction(
                     pred_input, pred_targets, pcounts, train=True,
-                    batch_idx=batch_idx
+                    batch_idx=batch_idx,
+                    loader=self.train_loader
                 )
             )
 
