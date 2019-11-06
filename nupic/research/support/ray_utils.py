@@ -22,6 +22,34 @@ import json
 import os
 
 
+def load_ray_tune_experiments(
+    experiment_path, load_results=False
+):
+    """Load multiple ray tune experiment state. This is useful if you want
+    to collect the results from multiple runs into one collection
+
+    :param experiment_path: ray tune experiment directory
+    :type experiment_path: str
+    :param load_results: Whether or not to load experiment results
+    :type load_results: bool
+
+    :return: list of dictionaries with ray tune experiment state results
+    :rtype: dict
+    """
+    experiment_state_paths = glob.glob(
+        os.path.join(experiment_path, "experiment_state*.json")
+    )
+    if not experiment_state_paths:
+        raise RuntimeError("No experiment state found: " + experiment_path)
+
+    experiment_states = [
+        load_ray_tune_experiment(experiment_path, filename, load_results)
+        for filename in experiment_state_paths
+    ]
+
+    return experiment_states
+
+
 def load_ray_tune_experiment(
     experiment_path, experiment_filename=None, load_results=False
 ):

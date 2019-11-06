@@ -24,7 +24,6 @@ from __future__ import print_function
 import click
 from tabulate import tabulate
 
-# Constants values used across all experiments
 from nupic.research.support import parse_config
 
 STRIDE = 1
@@ -87,6 +86,34 @@ def main(config, experiment, tablefmt, show_list):
         ]
     ]
 
+    params_table1 = [
+        [
+            "Network",
+            "L1 Channels",
+            "L2 Channels",
+            "L3 N",
+        ]
+    ]
+
+    params_table2 = [
+        [
+            "Network",
+            "L1 Act Sparsity",
+            "L2 Act Sparsity",
+            "L3 Act Sparsity",
+        ]
+    ]
+
+    params_table3 = [
+        [
+            "Network",
+            "L1 Wt Sparsity",
+            "L2 Wt Sparsity",
+            "L3 Wt Sparsity",
+            "Non-zero Weights"
+        ]
+    ]
+
     for name, params in configs.items():
         linear_n = params["linear_n"]
         linear_percent_on = params["linear_percent_on"]
@@ -132,10 +159,25 @@ def main(config, experiment, tablefmt, show_list):
 
         params_table.append([name, l1_f, l1_sp, l1_wt, l2_f, l2_sp, l2_wt,
                              l3_n, l3_sp, wt_sp, nzw])
+        params_table1.append([name, l1_f, l2_f, l3_n])
+        params_table2.append([name, l1_sp, l2_sp, l3_sp])
+        params_table3.append([name, l1_wt, l2_wt, wt_sp, nzw])
 
     print()
     print(tabulate(params_table, headers="firstrow", tablefmt=tablefmt,
                    stralign="center",))
+
+    print()
+    print(tabulate(params_table1, headers="firstrow", tablefmt=tablefmt,
+                   stralign="left", numalign="center"))
+
+    print()
+    print(tabulate(params_table2, headers="firstrow", tablefmt=tablefmt,
+                   stralign="left", numalign="center"))
+
+    print()
+    print(tabulate(params_table3, headers="firstrow", tablefmt=tablefmt,
+                   stralign="left", numalign="center"))
 
 
 if __name__ == "__main__":
