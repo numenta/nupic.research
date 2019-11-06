@@ -26,6 +26,15 @@ from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 from .layers import DSLinear, init_coactivation_tracking
 
+__all__ = [
+    "DSLinearBlock",
+    "HebbianNetwork",
+    "MLPHeb",
+    "GSCHeb",
+    "gsc_heb_small",
+]
+
+
 # ------------------------------------------------------------------------------------
 # DynamicSparse Linear Block
 # ------------------------------------------------------------------------------------

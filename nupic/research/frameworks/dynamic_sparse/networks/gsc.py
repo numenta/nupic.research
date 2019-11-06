@@ -36,6 +36,21 @@ from .utils import (
     swap_layers,
 )
 
+__all__ = [
+    "GSCHebDepreciated",
+    "gsc_conv_heb_depreciated",
+    "gsc_conv_only_heb_depreciated",
+    "mnist_sparse_cnn",
+    "mnist_sparse_dsnn",
+    "gsc_sparse_cnn",
+    "gsc_sparse_dsnn",
+    "GSCSparseFullCNN",
+    "gsc_sparse_dsnn_fullyconv",
+    "small_dense_gsc",
+    "small_dense_gsc_dsnn",
+]
+
+
 # --------------
 # GSC Networks
 # --------------
