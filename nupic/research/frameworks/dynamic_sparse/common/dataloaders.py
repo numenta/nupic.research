@@ -36,13 +36,13 @@ CLASSES = (
 
 
 class VaryingDataLoader(object):
-    def __init__(self, dataset, batch_sizes=(1,), *args, **kwargs):
-
-        if not isinstance(batch_sizes, Iterable):
-            batch_sizes = tuple([batch_sizes])
+    def __init__(self, dataset, batch_size=None, *args, **kwargs):
+        batch_size = batch_size or [1]
+        if not isinstance(batch_size, Iterable):
+            batch_size = tuple([batch_size])
         self.data_loaders = [
             DataLoader(dataset, batch_size, *args, **kwargs)
-            for batch_size in batch_sizes
+            for batch_size in batch_size
         ]
         self.epoch = 0
 
@@ -86,14 +86,23 @@ class PreprocessedSpeechDataset(Dataset):
     Use the "process_dataset.py" script to create preprocessed dataset
     """
 
-    def __init__(self, root, subset, random_seed=0, classes=CLASSES):
+    def __init__(
+        self, root, subset, random_seed=0, noise_level=0, classes=CLASSES
+    ):
         """
         :param root: Dataset root directory
-        :param subset: Which dataset subset to use ("train", "test", "valid", "noise")
+        :param subset: Which dataset subset to use ("train", "valid", "test_noise")
+        :param noise_level: noise_level of dataset to load (in percent)
         :param classes: List of classes to load. See CLASSES for valid options
         :param silence_percentage: Percentage of the dataset to be filled with silence
         """
         self.classes = classes
+
+        # Set noise levels - used for `subset == "test_noise"`.
+        if isinstance(noise_level, Iterable):
+            noise_levels = noise_level
+        else:
+            noise_levels = [noise_level]
 
         # backward compatibility
         if root[-3:] != "gsc":
@@ -108,6 +117,8 @@ class PreprocessedSpeechDataset(Dataset):
         seeds = [re.search(r"gsc_" + subset + r"(\d+)", e) for e in os.listdir(root)]
         seeds = [int(e.group(1)) for e in seeds if e is not None]
         seeds = seeds if len(seeds) > 0 else [""]
+        if subset == "test_noise":
+            seeds = [seed for seed in seeds if int(seed) in noise_levels]
         self._all_seeds = itertools.cycle(seeds if len(seeds) > 0 else "")
         self.num_seeds = len(seeds)
 
@@ -116,9 +127,6 @@ class PreprocessedSpeechDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
-
-    def __getattr__(self, name):
-        return super().__getattr__(name)
 
     def __iter__(self, name):
         return super().__iter__(name)
@@ -154,15 +162,17 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
         root,
         subset,
         random_seed=0,
+        noise_level=0,
         classes=CLASSES,
-        batch_sizes=1,
+        batch_size=1,
         *args,
         **kwargs,
     ):
 
-        self.dataset = PreprocessedSpeechDataset(root, subset, random_seed, classes)
+        self.dataset = PreprocessedSpeechDataset(
+            root, subset, random_seed, noise_level, classes)
 
-        super().__init__(self.dataset, batch_sizes, *args, *kwargs)
+        super().__init__(self.dataset, batch_size, *args, *kwargs)
 
     def __iter__(self):
         iteration = super().__iter__()
@@ -182,20 +192,21 @@ if __name__ == "__main__":
         for _ in range(dataset_train.num_seeds + 1):
             dataset_train.next_seed()
 
-    batch_sizes = (4, 16)
+    batch_size = (4, 16)
 
     dataloader_1 = PreprocessedSpeechDataLoader(
-        root, "train", classes=CLASSES, batch_sizes=batch_sizes
+        root, "train", classes=CLASSES, batch_size=batch_size
     )
+
     for i in range(3):
         for (batch, _) in dataloader_1:
-            assert batch.size()[0] == batch_sizes[min(i, len(batch_sizes) - 1)]
+            assert batch.size()[0] == batch_size[min(i, len(batch_size) - 1)]
             break
 
-    dataloader_2 = VaryingDataLoader(dataset_train, batch_sizes=batch_sizes)
+    dataloader_2 = VaryingDataLoader(dataset_train, batch_size=batch_size)
     for i in range(3):
         for (batch, _) in dataloader_2:
-            assert batch.size()[0] == batch_sizes[min(i, len(batch_sizes) - 1)]
+            assert batch.size()[0] == batch_size[min(i, len(batch_size) - 1)]
             break
 
     dataloader_1.batch_size
@@ -213,8 +224,8 @@ if __name__ == "__main__":
         for _ in range(dataset_valid.num_seeds + 1):
             dataset_valid.next_seed()
 
-    dataset_test = PreprocessedSpeechDataset(root, "test_noise", classes=CLASSES)
+    dataset_test = PreprocessedSpeechDataset(
+        root, "test_noise", noise_level=[5, 10, 15], classes=CLASSES)
 
-    if test_loading_processes:
-        for _ in range(dataset_test.num_seeds + 1):
-            dataset_test.next_seed()
+    for _ in range(dataset_test.num_seeds + 1):
+        dataset_test.next_seed()
