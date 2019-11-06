@@ -222,6 +222,8 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
             reuse_actors=config.get("reuse_actors", False),
             trial_executor=config.get("trial_executor", None),
             raise_on_failed_trial=config.get("raise_on_failed_trial", True),
+            keep_checkpoints_num=1,
+            checkpoint_score_attr="mean_accuracy",
         )
 
     ray.shutdown()
@@ -306,5 +308,5 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
 
 
 if __name__ == "__main__":
-    set_random_seed(18)
+    set_random_seed(20)
     cli()
