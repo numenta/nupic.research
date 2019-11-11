@@ -66,7 +66,8 @@ def main(config, experiments, tablefmt):
 
     # A more detailed table
     test_scores_table_long = [["Network", "Test Score", "Noise Score", "Noise Accuracy",
-                               "Total Entropy", "Nonzero Parameters", "Num Trials"]]
+                               "Total Entropy", "Nonzero Parameters", "Num Trials",
+                               "Session"]]
 
     # Load and parse experiment configurations
     configs = parse_config(config, experiments, globals_param=globals())
@@ -185,7 +186,8 @@ def main(config, experiments, tablefmt):
                 )
                 test_scores_table_long.append(
                     ["{} {}".format(exp, tag), test_score, noise_score, noise_accuracy,
-                     entropy, nonzero, num_exps]
+                     entropy, nonzero, num_exps,
+                     experiment_state["runner_data"]["_session_str"]]
                 )
 
     print()

@@ -82,7 +82,6 @@ def main(config, experiment, tablefmt, show_list):
             "L3 N",
             "L3 Act Sparsity",
             "Wt Sparsity",
-            "Non-zero Weights"
         ]
     ]
 
@@ -98,19 +97,18 @@ def main(config, experiment, tablefmt, show_list):
     params_table2 = [
         [
             "Network",
-            "L1 Act Sparsity",
-            "L2 Act Sparsity",
-            "L3 Act Sparsity",
+            "L1 Activation Sparsity",
+            "L2 Activation Sparsity",
+            "L3 Activation Sparsity",
         ]
     ]
 
     params_table3 = [
         [
             "Network",
-            "L1 Wt Sparsity",
-            "L2 Wt Sparsity",
-            "L3 Wt Sparsity",
-            "Non-zero Weights"
+            "L1 Weight Sparsity",
+            "L2 Weight Sparsity",
+            "L3 Weight Sparsity",
         ]
     ]
 
@@ -121,7 +119,6 @@ def main(config, experiment, tablefmt, show_list):
         cnn_percent_on = params["cnn_percent_on"]
         cnn_out_channels = params["cnn_out_channels"]
         cnn_weight_sparsity = params["cnn_weight_sparsity"]
-        nzw = params.get("non_zero_parameters", "NA")
 
         l3_n = linear_n[0]
         if linear_percent_on[0] > 0.50:
@@ -158,10 +155,10 @@ def main(config, experiment, tablefmt, show_list):
             l2_wt = None
 
         params_table.append([name, l1_f, l1_sp, l1_wt, l2_f, l2_sp, l2_wt,
-                             l3_n, l3_sp, wt_sp, nzw])
+                             l3_n, l3_sp, wt_sp])
         params_table1.append([name, l1_f, l2_f, l3_n])
         params_table2.append([name, l1_sp, l2_sp, l3_sp])
-        params_table3.append([name, l1_wt, l2_wt, wt_sp, nzw])
+        params_table3.append([name, l1_wt, l2_wt, wt_sp])
 
     print()
     print(tabulate(params_table, headers="firstrow", tablefmt=tablefmt,

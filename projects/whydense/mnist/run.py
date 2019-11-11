@@ -301,6 +301,8 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
 
 if __name__ == "__main__":
     # Set a random random seed, and print it for reproducibility
+    # This enables variability in the random seeds that Ray generates for
+    # experiments with multiple repetitions.
     seed = int(time.time())
     print("Global random seed set to", seed)
     set_random_seed(seed)
