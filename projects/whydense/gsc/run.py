@@ -21,6 +21,7 @@
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import click
@@ -222,6 +223,8 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
             reuse_actors=config.get("reuse_actors", False),
             trial_executor=config.get("trial_executor", None),
             raise_on_failed_trial=config.get("raise_on_failed_trial", True),
+            keep_checkpoints_num=1,
+            checkpoint_score_attr="mean_accuracy",
         )
 
     ray.shutdown()
@@ -306,5 +309,8 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
 
 
 if __name__ == "__main__":
-    set_random_seed(18)
+    # Set a random random seed, and print it for reproducibility
+    seed = int(time.time())
+    print("Global random seed set to", seed)
+    set_random_seed(seed)
     cli()
