@@ -22,9 +22,7 @@ import logging
 import os
 import time
 
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
 
@@ -33,15 +31,13 @@ from nupic.research.frameworks.pytorch.dataset_utils import (
 )
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.model_utils import (
+    count_nonzero_params,
     evaluate_model,
     set_random_seed,
     train_model,
 )
-from nupic.research.frameworks.pytorch.models.le_sparse_net import (
-    add_sparse_cnn_layer,
-    add_sparse_linear_layer,
-)
-from nupic.torch.modules import Flatten, rezero_weights, update_boost_strength
+from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
+from nupic.torch.modules import rezero_weights, update_boost_strength
 
 
 def get_logger(name, verbose):
@@ -78,79 +74,31 @@ class MNISTSparseExperiment(object):
         self.validation = config.get("validation", 50000.0 / 60000.0)
         self.learning_rate_factor = config["learning_rate_factor"]
         self.lr_scheduler_params = config.get("lr_scheduler_params", None)
+        self.num_classes = 10
 
         self._configure_dataloaders()
 
         # Configure Model
-        cnn_input_shape = config.get("cnn_input_shape", (1, 28, 28))
-        linear_n = config["linear_n"]
-        linear_percent_on = config["linear_percent_on"]
-        cnn_out_channels = config["cnn_out_channels"]
-        cnn_percent_on = config["cnn_percent_on"]
-        boost_strength = config["boost_strength"]
-        weight_sparsity = config["weight_sparsity"]
-        cnn_weight_sparsity = config["cnn_weight_sparsity"]
-        boost_strength_factor = config["boost_strength_factor"]
-        k_inference_factor = config["k_inference_factor"]
-        use_batch_norm = config["use_batch_norm"]
-        dropout = config.get("dropout", 0.0)
-
-        model = nn.Sequential()
-
-        # Add CNN Layers
-        input_shape = cnn_input_shape
-        cnn_layers = len(cnn_out_channels)
-        if cnn_layers > 0:
-            for i in range(cnn_layers):
-                in_channels, height, width = input_shape
-                add_sparse_cnn_layer(
-                    network=model,
-                    suffix=i + 1,
-                    in_channels=in_channels,
-                    out_channels=cnn_out_channels[i],
-                    use_batch_norm=use_batch_norm,
-                    weight_sparsity=cnn_weight_sparsity,
-                    percent_on=cnn_percent_on[i],
-                    k_inference_factor=k_inference_factor,
-                    boost_strength=boost_strength,
-                    boost_strength_factor=boost_strength_factor,
-                    activation_fct_before_max_pool=False,
-                    use_kwinners_local=False,
-                )
-
-                # Feed this layer output into next layer input
-                in_channels = cnn_out_channels[i]
-
-                # Compute next layer input shape
-                wout = (width - 5) + 1
-                maxpool_width = wout // 2
-                input_shape = (in_channels, maxpool_width, maxpool_width)
-
-        # Flatten CNN output before passing to linear layer
-        model.add_module("flatten", Flatten())
-
-        # Add Linear layers
-        input_size = np.prod(input_shape)
-        for i in range(len(linear_n)):
-            add_sparse_linear_layer(
-                network=model,
-                suffix=i + 1,
-                input_size=input_size,
-                linear_n=linear_n[i],
-                dropout=dropout,
-                use_batch_norm=False,
-                weight_sparsity=weight_sparsity,
-                percent_on=linear_percent_on[i],
-                k_inference_factor=k_inference_factor,
-                boost_strength=boost_strength,
-                boost_strength_factor=boost_strength_factor,
-                consolidated_sparse_weights=False,
-            )
-            input_size = linear_n[i]
-
-        # Output layer
-        model.add_module("output", nn.Linear(input_size, 10))
-        model.add_module("softmax", nn.LogSoftmax(dim=1))
+        model = LeSparseNet(
+            input_shape=(1, 28, 28),
+            cnn_out_channels=config["cnn_out_channels"],
+            cnn_activity_percent_on=config["cnn_percent_on"],
+            cnn_weight_percent_on=config["cnn_weight_sparsity"],
+            linear_n=config["linear_n"],
+            linear_activity_percent_on=config["linear_percent_on"],
+            linear_weight_percent_on=config["weight_sparsity"],
+            boost_strength=config["boost_strength"],
+            boost_strength_factor=config["boost_strength_factor"],
+            use_batch_norm=config["use_batch_norm"],
+            dropout=config.get("dropout", 0.0),
+            num_classes=self.num_classes,
+            k_inference_factor=config["k_inference_factor"],
+            activation_fct_before_max_pool=config.get(
+                "activation_fct_before_max_pool", False),
+            consolidated_sparse_weights=config.get(
+                "consolidated_sparse_weights", False),
+            use_kwinners_local=config.get("use_kwinner_local", False),
+        )
 
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -217,7 +165,13 @@ class MNISTSparseExperiment(object):
 
         t0 = time.time()
         results = evaluate_model(model=self.model, device=self.device, loader=loader)
-        results.update({"entropy": float(self.entropy())})
+        results["mean_accuracy"] = 100.0 * results["mean_accuracy"]
+
+        results.update({
+            "entropy": float(self.entropy()),
+            "total_samples": len(loader.sampler),
+            "non_zero_parameters": count_nonzero_params(self.model)[1],
+        })
 
         self.logger.info("testing duration: %s", time.time() - t0)
         self.logger.info("mean_accuracy: %s", results["mean_accuracy"])
@@ -249,10 +203,9 @@ class MNISTSparseExperiment(object):
         )
 
     def pre_epoch(self):
-        pass
+        self.model.apply(update_boost_strength)
 
     def post_epoch(self):
-        self.model.apply(update_boost_strength)
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
 
