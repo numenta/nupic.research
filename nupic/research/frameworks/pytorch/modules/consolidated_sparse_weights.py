@@ -25,7 +25,7 @@ import torch
 import torch.nn as nn
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
-from nupic.torch.modules.sparse_weights import SparseWeights
+from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
 
 def consolidated_zero_indices(input_size, percent_on):
@@ -94,6 +94,49 @@ class ConsolidatedSparseWeights(SparseWeights):
         zero_indices[:, :, 1] = input_indices
         zero_indices = zero_indices.reshape(-1, 2)
         return torch.from_numpy(zero_indices.transpose())
+
+
+class ConsolidatedSparseWeights2D(SparseWeights2d):
+    def __init__(self, module, weight_sparsity):
+        """Enforce weight sparsity on CNN modules Sample usage:
+
+          model = nn.Conv2d(in_channels, out_channels, kernel_size, ...)
+          model = SparseWeights2d(model, 0.4)
+
+        :param module:
+          The module to sparsify the weights
+        :param weight_sparsity:
+          Pct of weights that are allowed to be non-zero in the layer.
+        """
+        super(ConsolidatedSparseWeights2D, self).__init__(module, weight_sparsity)
+        assert isinstance(module, nn.Conv2d)
+
+    def compute_indices(self):
+        # For each unit, decide which weights are going to be zero
+        in_channels = self.module.in_channels
+        out_channels = self.module.out_channels
+        kernel_size = self.module.kernel_size
+
+        input_size = in_channels * kernel_size[0] * kernel_size[1]
+        num_zeros = int(round((1.0 - self.weight_sparsity) * input_size))
+
+        output_indices = np.arange(out_channels)
+        input_indices = np.array(
+            [np.random.permutation(input_size)[:num_zeros] for _ in output_indices],
+            dtype=np.long,
+        )
+
+        # Create tensor indices for all non-zero weights
+        zero_indices = np.empty((out_channels, num_zeros, 2), dtype=np.long)
+        zero_indices[:, :, 0] = output_indices[:, None]
+        zero_indices[:, :, 1] = input_indices
+        zero_indices = zero_indices.reshape(-1, 2)
+
+        return torch.from_numpy(zero_indices.transpose())
+
+    def rezero_weights(self):
+        zero_idx = (self.zero_weights[0], self.zero_weights[1])
+        self.module.weight.data.view(self.module.out_channels, -1)[zero_idx] = 0.0
 
 
 if __name__ == "__main__":
