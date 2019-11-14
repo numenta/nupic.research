@@ -23,7 +23,8 @@ from torch import nn
 
 from nupic.research.frameworks.pytorch.modules import KWinners2dLocal
 from nupic.research.frameworks.pytorch.modules.consolidated_sparse_weights import (
-    ConsolidatedSparseWeights, ConsolidatedSparseWeights2D
+    ConsolidatedSparseWeights,
+    ConsolidatedSparseWeights2D,
 )
 from nupic.torch.modules import (
     Flatten,
@@ -232,7 +233,7 @@ class LeSparseNet(nn.Sequential):
             in_channels, height, width = current_input_shape
 
             # We only do consolidated weights for the second CNN layer
-            csw = (i==1) and consolidated_sparse_weights
+            csw = (i == 1) and consolidated_sparse_weights
             add_sparse_cnn_layer(
                 network=self,
                 suffix=i + 1,
