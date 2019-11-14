@@ -28,7 +28,23 @@ from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
 
-def consolidated_zero_indices(input_size, percent_on):
+def select_random_blocks(num_blocks, num_zero_blocks, verbose=False):
+    """
+    Return a list of block indices that should be zero, and a list of block indices
+    that should be non-zero.  The number of zero blocks and non-zero blocks total
+    to num_blocks.
+    """
+    randomized_blocks = np.random.permutation(num_blocks)
+    zero_blocks = randomized_blocks[:num_zero_blocks]
+    non_zero_blocks = randomized_blocks[num_zero_blocks:]
+    if verbose:
+        print("zero blocks:", zero_blocks)
+        print("non zero blocks:", non_zero_blocks)
+    return zero_blocks, non_zero_blocks
+
+
+def consolidated_zero_indices(input_size, percent_on, zero_blocks=None,
+                              non_zero_blocks=None):
     """
     Return the indices of zero elements for one linear unit. Ensure that we have a
     large number of runs of 64 elements with all zeros.
@@ -38,11 +54,12 @@ def consolidated_zero_indices(input_size, percent_on):
     num_blocks = math.ceil(input_size / 64.0)
 
     # Randomly select which blocks are going to be zero and non-zero
-    num_zero_blocks = int(num_blocks - (3 * percent_on * num_blocks))
+    if zero_blocks is None:
+        num_zero_blocks = int(num_blocks - (3 * percent_on * num_blocks))
+        zero_blocks, non_zero_blocks = select_random_blocks(num_blocks, num_zero_blocks)
+    else:
+        num_zero_blocks = len(zero_blocks)
     num_nonzero_blocks = num_blocks - num_zero_blocks
-    randomized_blocks = np.random.permutation(num_blocks)
-    zero_blocks = randomized_blocks[:num_zero_blocks]
-    non_zero_blocks = randomized_blocks[num_zero_blocks:]
 
     num_zero_bits_in_nonzero_blocks = num_nonzero_blocks * 64 - round(
         percent_on * input_size)
@@ -60,7 +77,7 @@ def consolidated_zero_indices(input_size, percent_on):
 
 class ConsolidatedSparseWeights(SparseWeights):
     def __init__(self, module, weight_sparsity):
-        """Enforce weight sparsity on linear module during training.
+        """Enforce somewhat blocky weight sparsity on linear module during training.
 
         Sample usage:
 
@@ -76,7 +93,7 @@ class ConsolidatedSparseWeights(SparseWeights):
         assert isinstance(module, nn.Linear)
 
     def compute_indices(self):
-        print("In ConsolidatedSparseWeights")
+        # print("In ConsolidatedSparseWeights linear")
         # For each unit, decide which weights are going to be zero
         output_size, input_size = self.module.weight.shape
         num_zeros = int(round((1.0 - self.weight_sparsity) * input_size))
@@ -98,7 +115,7 @@ class ConsolidatedSparseWeights(SparseWeights):
 
 class ConsolidatedSparseWeights2D(SparseWeights2d):
     def __init__(self, module, weight_sparsity):
-        """Enforce weight sparsity on CNN modules Sample usage:
+        """Enforce somewhat blocky weight sparsity on CNN modules Sample usage:
 
           model = nn.Conv2d(in_channels, out_channels, kernel_size, ...)
           model = SparseWeights2d(model, 0.4)
@@ -112,6 +129,7 @@ class ConsolidatedSparseWeights2D(SparseWeights2d):
         assert isinstance(module, nn.Conv2d)
 
     def compute_indices(self):
+        # print("In ConsolidatedSparseWeights Conv2d")
         # For each unit, decide which weights are going to be zero
         in_channels = self.module.in_channels
         out_channels = self.module.out_channels
@@ -120,16 +138,37 @@ class ConsolidatedSparseWeights2D(SparseWeights2d):
         input_size = in_channels * kernel_size[0] * kernel_size[1]
         num_zeros = int(round((1.0 - self.weight_sparsity) * input_size))
 
+        # Store a set of out_channels/4 blocks.
+        num_blocks = math.ceil(input_size / 64.0)
+        num_zero_blocks = int(num_blocks - (self.weight_sparsity * num_blocks + 2))
+        output_indices = np.arange(out_channels/4)
+
+        sparse_blocks = [
+            select_random_blocks(num_blocks, num_zero_blocks, False)
+            for _ in output_indices
+        ]
         output_indices = np.arange(out_channels)
         input_indices = np.array(
-            [np.random.permutation(input_size)[:num_zeros] for _ in output_indices],
+            [consolidated_zero_indices(input_size, self.weight_sparsity,
+                                       zero_blocks=sparse_blocks[int(i/4)][0],
+                                       non_zero_blocks=sparse_blocks[int(i/4)][1]
+                                       )
+             for i in output_indices],
             dtype=np.long,
         )
+
 
         # Create tensor indices for all non-zero weights
         zero_indices = np.empty((out_channels, num_zeros, 2), dtype=np.long)
         zero_indices[:, :, 0] = output_indices[:, None]
         zero_indices[:, :, 1] = input_indices
+
+        # for i in range(10):
+        #     for channel in range(0, 8):
+        #         print("channel ", channel, "block", i)
+        #         for j in range(i*64, (i+1)*64):
+        #             print(zero_indices[channel][j], end=" "),
+        #         print()
         zero_indices = zero_indices.reshape(-1, 2)
 
         return torch.from_numpy(zero_indices.transpose())
@@ -140,9 +179,22 @@ class ConsolidatedSparseWeights2D(SparseWeights2d):
 
 
 if __name__ == "__main__":
-    inds = consolidated_zero_indices(1600, 0.05)
+    # inds = consolidated_zero_indices(1600, 0.05)
 
-    model = torch.nn.Sequential(
-        ConsolidatedSparseWeights(torch.nn.Linear(1600, 1500), 0.05),
+    # model = torch.nn.Sequential(
+    #     ConsolidatedSparseWeights(torch.nn.Linear(1600, 1500), 0.05),
+    # )
+    # print("Number of non-zero weights:", count_nonzero_params(model))
+
+    # inds = consolidated_zero_indices(64*5*5, 0.1)
+    model2 = torch.nn.Sequential(
+        ConsolidatedSparseWeights2D(
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=5,
+                padding=0,
+                stride=1,
+            ), 0.1)
     )
-    print("Number of non-zero weights:", count_nonzero_params(model))
+    print("Number of non-zero weights:", count_nonzero_params(model2))
