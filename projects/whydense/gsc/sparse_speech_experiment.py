@@ -23,14 +23,15 @@ import os
 import time
 
 import torch
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
+    evaluate_model,
     set_random_seed,
+    train_model,
 )
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
@@ -79,8 +80,6 @@ class SparseSpeechExperiment(object):
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-        self.min_epoch_for_checkpoint = config.get("min_epoch_for_checkpoint", 0)
-        self.last_training_epoch = -1
 
         self.load_datasets()
 
@@ -142,8 +141,7 @@ class SparseSpeechExperiment(object):
 
     def save(self, checkpoint_path):
         checkpoint_path = os.path.join(checkpoint_path, "model.pt")
-        if self.last_training_epoch >= self.min_epoch_for_checkpoint:
-            torch.save(self.model.state_dict(), checkpoint_path)
+        torch.save(self.model.state_dict(), checkpoint_path)
         return checkpoint_path
 
     def restore(self, checkpoint_path):
@@ -214,22 +212,11 @@ class SparseSpeechExperiment(object):
         )
 
         self.pre_epoch()
-        self.model.train()
-        for batch_idx, (data, target) in enumerate(self.train_loader):
-            # data = torch.unsqueeze(data, 1)
-            data, target = data.to(self.device), target.to(self.device)
-            self.optimizer.zero_grad()
-            output = self.model(data)
-            loss = F.nll_loss(output, target)
-            loss.backward()
-            self.optimizer.step()
-
-            if batch_idx >= self.batches_in_epoch:
-                break
+        train_model(self.model, self.train_loader, self.optimizer, self.device,
+                    batches_in_epoch=self.batches_in_epoch)
         self.post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
-        self.last_training_epoch = epoch
 
     def post_epoch(self):
         self.model.apply(rezero_weights)
@@ -244,30 +231,15 @@ class SparseSpeechExperiment(object):
         if test_loader is None:
             test_loader = self.test_loader
 
-        self.model.eval()
-        test_loss = 0
-        correct = 0
-
-        with torch.no_grad():
-            for data, target in test_loader:
-                data, target = data.to(self.device), target.to(self.device)
-                output = self.model(data)
-                test_loss += F.nll_loss(output, target, reduction="sum").item()
-                pred = output.max(1, keepdim=True)[1]
-                correct += pred.eq(target.view_as(pred)).sum().item()
-
-        test_loss /= len(test_loader.sampler)
-        test_error = 100.0 * correct / len(test_loader.sampler)
+        ret = evaluate_model(self.model, test_loader, self.device)
+        ret["mean_accuracy"] = 100.0 * ret["mean_accuracy"]
 
         entropy = self.entropy()
-        ret = {
-            "total_correct": correct,
-            "mean_loss": test_loss,
-            "mean_accuracy": test_error,
+        ret.update({
             "entropy": float(entropy),
             "total_samples": len(test_loader.sampler),
-            "non_zero_parameters": count_nonzero_params(self.model)[1]
-        }
+            "non_zero_parameters": count_nonzero_params(self.model)[1],
+        })
 
         return ret
 

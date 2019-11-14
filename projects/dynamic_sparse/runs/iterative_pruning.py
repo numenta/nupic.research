@@ -22,7 +22,6 @@
 import os
 
 import numpy as np
-from ray import tune
 
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
@@ -34,14 +33,11 @@ exp_config = dict(
     input_size=(3, 32, 32),
     augment_images=True,
     num_classes=10,
-    model="SET",
-    # specific pruning
-    target_final_density=0.1,
-    start_pruning_epoch=1,
-    end_pruning_epoch=120,
+    model="IterativePruningModel",
     epochs=200,
     # sparsity related
-    on_perc=tune.grid_search(list(np.arange(0.1, 1.01, 0.05))),
+    experiment_type="IterativePruning",
+    iterative_pruning_schedule=list(np.arange(0.1, 1, 0.05)),
     sparse_start=1,
     sparse_end=None,
     # ---- optimizer related
@@ -55,61 +51,19 @@ exp_config = dict(
     nesterov_momentum=True,
     # ---- optimizer related
     hebbian_prune_perc=None,
-    weight_prune_perc=0.25,
+    weight_prune_perc=0.2,
     pruning_early_stop=2,
     hebbian_grow=False,
 )
 
 # run
 tune_config = dict(
-    name="comparison_set",
+    name=__file__.replace(".py", "") + "_lt",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    resources_per_trial={"cpu": 1, "gpu": 0.195},
-    verbose=2,
-)
-
-run_ray(tune_config, exp_config, fix_seed=True)
-
-# alternative initialization based on configuration
-exp_config = dict(
-    device="cuda",
-    network="resnet18",
-    dataset_name="CIFAR10",
-    input_size=(3, 32, 32),
-    augment_images=True,
-    num_classes=10,
-    model="PruningModel",
-    # specific pruning
-    on_perc=1.0,
-    start_pruning_epoch=1,
-    end_pruning_epoch=120,
-    epochs=200,
-    # sparsity related
-    target_final_density=tune.grid_search(list(np.arange(0.1, 1.01, 0.05))),
-    sparse_start=1,
-    sparse_end=None,
-    # ---- optimizer related
-    optim_alg="SGD",
-    learning_rate=0.1,
-    lr_scheduler="MultiStepLR",
-    lr_milestones=[60, 120, 160],
-    lr_gamma=0.2,
-    weight_decay=0.0005,
-    momentum=0.9,
-    nesterov_momentum=True,
-)
-
-# run
-tune_config = dict(
-    name="comparison_pruning",
-    num_samples=1,
-    local_dir=os.path.expanduser("~/nta/results"),
-    checkpoint_freq=0,
-    checkpoint_at_end=False,
-    resources_per_trial={"cpu": 1, "gpu": 0.195},
+    resources_per_trial={"cpu": 1, "gpu": 1},
     verbose=2,
 )
 

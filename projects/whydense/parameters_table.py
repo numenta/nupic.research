@@ -24,7 +24,6 @@ from __future__ import print_function
 import click
 from tabulate import tabulate
 
-# Constants values used across all experiments
 from nupic.research.support import parse_config
 
 STRIDE = 1
@@ -74,51 +73,108 @@ def main(config, experiment, tablefmt, show_list):
     params_table = [
         [
             "Network",
-            "L1 F",
-            "L1 Sparsity",
-            "L2 F",
-            "L2 Sparsity",
+            "L1 Filters",
+            "L1 Act Sparsity",
+            "L1 Wt Sparsity",
+            "L2 Filters",
+            "L2 Act Sparsity",
+            "L2 Wt Sparsity",
             "L3 N",
-            "L3 Sparsity",
+            "L3 Act Sparsity",
             "Wt Sparsity",
         ]
     ]
+
+    params_table1 = [
+        [
+            "Network",
+            "L1 Channels",
+            "L2 Channels",
+            "L3 N",
+        ]
+    ]
+
+    params_table2 = [
+        [
+            "Network",
+            "L1 Activation Sparsity",
+            "L2 Activation Sparsity",
+            "L3 Activation Sparsity",
+        ]
+    ]
+
+    params_table3 = [
+        [
+            "Network",
+            "L1 Weight Sparsity",
+            "L2 Weight Sparsity",
+            "L3 Weight Sparsity",
+        ]
+    ]
+
     for name, params in configs.items():
         linear_n = params["linear_n"]
         linear_percent_on = params["linear_percent_on"]
         weight_sparsity = params["weight_sparsity"]
         cnn_percent_on = params["cnn_percent_on"]
         cnn_out_channels = params["cnn_out_channels"]
+        cnn_weight_sparsity = params["cnn_weight_sparsity"]
 
         l3_n = linear_n[0]
-        l3_sp = "{0:.1f}%".format(100 * linear_percent_on[0])
-        wt_sp = "{0}%".format(100 * weight_sparsity)
+        if linear_percent_on[0] > 0.50:
+            l3_sp = "ReLU"
+        else:
+            l3_sp = "{0:.1f}%".format(100 * (1.0 - linear_percent_on[0]))
+        wt_sp = "{0}%".format(100 * (1.0 - weight_sparsity[0]))
 
+        l1_percent_on = cnn_percent_on[0]
+        l1_wt_sparsity = cnn_weight_sparsity[0]
         if len(cnn_percent_on) == 2:
-            l1_percent_on = cnn_percent_on[0]
             l2_percent_on = cnn_percent_on[1]
+            l2_wt_sparsity = cnn_weight_sparsity[1]
         else:
-            l1_percent_on = cnn_percent_on[0]
             l2_percent_on = None
+            l2_wt_sparsity = None
 
-        if len(cnn_out_channels) == 2:
-            l1_f = cnn_out_channels[0]
-            l1_sp = "{0:.1f}%".format(100 * l1_percent_on)
-
-            # Feed CNN-1 output to CNN-2
-            l2_f = cnn_out_channels[1]
-            l2_sp = "{0:.1f}%".format(100 * l2_percent_on)
+        l1_f = cnn_out_channels[0]
+        if l1_percent_on > 0.50:
+            l1_sp = "ReLU"
         else:
-            l1_f = cnn_out_channels[0]
-            l1_sp = "{0:.1f}%".format(100 * l1_percent_on)
-
+            l1_sp = "{0:.1f}%".format(100 * (1.0 - l1_percent_on))
+        l1_wt = "{0:.1f}%".format(100 * (1.0 - l1_wt_sparsity))
+        if len(cnn_out_channels) == 2:
+            l2_f = cnn_out_channels[1]
+            if l2_percent_on > 0.50:
+                l2_sp = "ReLU"
+            else:
+                l2_sp = "{0:.1f}%".format(100 * (1.0 - l2_percent_on))
+            l2_wt = "{0:.1f}%".format(100 * (1.0 - l2_wt_sparsity))
+        else:
             l2_f = None
             l2_sp = None
+            l2_wt = None
 
-        params_table.append([name, l1_f, l1_sp, l2_f, l2_sp, l3_n, l3_sp, wt_sp])
+        params_table.append([name, l1_f, l1_sp, l1_wt, l2_f, l2_sp, l2_wt,
+                             l3_n, l3_sp, wt_sp])
+        params_table1.append([name, l1_f, l2_f, l3_n])
+        params_table2.append([name, l1_sp, l2_sp, l3_sp])
+        params_table3.append([name, l1_wt, l2_wt, wt_sp])
 
     print()
-    print(tabulate(params_table, headers="firstrow", tablefmt=tablefmt))
+    print(tabulate(params_table, headers="firstrow", tablefmt=tablefmt,
+                   stralign="center",))
+
+    print()
+    print(tabulate(params_table1, headers="firstrow", tablefmt=tablefmt,
+                   stralign="left", numalign="center"))
+
+    print()
+    print(tabulate(params_table2, headers="firstrow", tablefmt=tablefmt,
+                   stralign="left", numalign="center"))
+
+    print()
+    print(tabulate(params_table3, headers="firstrow", tablefmt=tablefmt,
+                   stralign="left", numalign="center"))
 
 
 if __name__ == "__main__":

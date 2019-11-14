@@ -25,6 +25,13 @@ import torch
 from .loggers import DSNNLogger
 from .main import SparseModel
 
+__all__ = [
+    "DSNNHeb",
+    "DSNNWeightedMag",
+    "DSNNMixedHeb",
+    "DSNNMixedHebInverse",
+]
+
 
 class DSNNHeb(SparseModel):
     """Parent class for DSNNHeb models. Not to be instantiated"""
