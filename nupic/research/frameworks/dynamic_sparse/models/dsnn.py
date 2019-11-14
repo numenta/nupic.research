@@ -30,6 +30,7 @@ __all__ = [
     "DSNNWeightedMag",
     "DSNNMixedHeb",
     "DSNNMixedHebInverse",
+    "SET"
 ]
 
 
