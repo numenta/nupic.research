@@ -20,13 +20,14 @@
 # ----------------------------------------------------------------------
 import json
 import os
+import time
+from pathlib import Path
 
 import click
 import numpy as np  # noqa F401
 import ray
 import ray.tune as tune
 import torch
-from torchvision import datasets
 
 from mnist_sparse_experiment import MNISTSparseExperiment
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
@@ -79,7 +80,16 @@ def run_noise_test(config):
         # Load pre-trained model from checkpoint and run noise test on it
         logdir = os.path.join(experiment_path, os.path.basename(checkpoint["logdir"]))
         checkpoint_path = os.path.join(logdir, "checkpoint_{}".format(best_epoch))
-        experiment = MNISTSparseExperiment(config)
+
+        # Get the actual config from the saved version (required for sample
+        # or grid search experiments). Replace paths to be the locally correct ones
+        filename = os.path.join(logdir, "params.json")
+        with open(filename, "r") as f:
+            saved_params = json.load(f)
+        saved_params["data_dir"] = config["data_dir"]
+        saved_params["path"] = config["path"]
+
+        experiment = MNISTSparseExperiment(saved_params)
         experiment.restore(checkpoint_path)
 
         # Save noise results in checkpoint log dir
@@ -154,19 +164,17 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
 
     print("experiments =", list(configs.keys()))
 
-    # download dataset
-    data_dir = os.path.join(project_dir, "data")
-    datasets.MNIST(data_dir, download=True, train=True)
-
     # Initialize ray cluster
     if redis_address is not None:
         ray.init(redis_address=redis_address, include_webui=True)
-        num_cpus = 1
     else:
         ray.init(num_cpus=num_cpus, num_gpus=num_gpus, local_mode=num_cpus == 1)
 
     # Run experiments
-    resources_per_trial = {"cpu": 1, "gpu": num_gpus / num_cpus}
+    gpu_percent = 0
+    if num_gpus > 0:
+        gpu_percent = configs.get("gpu_percentage", 0.5)
+    resources_per_trial = {"cpu": 1, "gpu": gpu_percent}
     print("resources_per_trial =", resources_per_trial)
     for exp in configs:
         print("experiment =", exp)
@@ -178,14 +186,13 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
         stop_criteria.update(config.get("stop", {}))
         print("stop_criteria =", stop_criteria)
 
-        # Make sure local directories are relative to the project location
-        path = config.get("path", None)
-        if path and not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+        # Make sure path and data_dir are relative to the project location,
+        # handling both ~/nta and ../results style paths.
+        path = config.get("path", ".")
+        config["path"] = str(Path(path).expanduser().resolve())
 
         data_dir = config.get("data_dir", "data")
-        if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
+        config["data_dir"] = str(Path(data_dir).expanduser().resolve())
 
         tune.run(
             MNISTExperimentTune,
@@ -208,6 +215,8 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
             reuse_actors=config.get("reuse_actors", False),
             trial_executor=config.get("trial_executor", None),
             raise_on_failed_trial=config.get("raise_on_failed_trial", True),
+            keep_checkpoints_num=1,
+            checkpoint_score_attr="mean_accuracy",
         )
 
     ray.shutdown()
@@ -274,21 +283,13 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
         config = configs[exp]
         config["name"] = exp
 
-        # Make sure local directories are relative to the project location
-        path = os.path.expanduser(config.get("path", "results"))
-        if path and not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+        # Make sure path and data_dir are relative to the project location,
+        # handling both ~/nta and ../results style paths.
+        path = config.get("path", ".")
+        config["path"] = str(Path(path).expanduser().resolve())
 
-        data_dir = os.path.expanduser(config.get("data_dir", "data"))
-        if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
-
-        # download dataset
-        data_dir = os.path.join(project_dir, "data")
-        datasets.MNIST(data_dir, download=True, train=True)
-
-        # Avoid "tune.sample_from"
-        config["seed"] = 18
+        data_dir = config.get("data_dir", "data")
+        config["data_dir"] = str(Path(data_dir).expanduser().resolve())
 
         # Run each experiment in parallel
         results.append(run_noise_test.remote(config))
@@ -299,5 +300,10 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
 
 
 if __name__ == "__main__":
-    set_random_seed(18)
+    # Set a random random seed, and print it for reproducibility
+    # This enables variability in the random seeds that Ray generates for
+    # experiments with multiple repetitions.
+    seed = int(time.time())
+    print("Global random seed set to", seed)
+    set_random_seed(seed)
     cli()

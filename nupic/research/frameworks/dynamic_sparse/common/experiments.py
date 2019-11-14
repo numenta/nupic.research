@@ -23,8 +23,8 @@ from copy import deepcopy
 
 from ray import tune
 
-import nupic.research.frameworks.dynamic_sparse.models as models
-import nupic.research.frameworks.dynamic_sparse.networks as networks
+import nupic.research.frameworks.experiments_platform.models as models
+import nupic.research.frameworks.experiments_platform.networks as networks
 
 from .datasets import Dataset
 

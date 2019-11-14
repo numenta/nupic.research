@@ -80,23 +80,22 @@ class Dataset:
         self.train_loader = PreprocessedSpeechDataLoader(
             self.data_dir,
             subset="train",
-            batch_sizes=self.batch_size_train,
+            batch_size=self.batch_size_train,
             shuffle=True,
         )
 
         self.test_loader = PreprocessedSpeechDataLoader(
             self.data_dir,
             subset="valid",
-            silence_percentage=0,
-            batch_sizes=self.batch_size_test,
+            batch_size=self.batch_size_test,
         )
 
         if self.test_noise:
             self.noise_loader = PreprocessedSpeechDataLoader(
                 self.data_dir,
                 subset="test_noise",
-                silence_percentage=0,
-                batch_sizes=self.batch_size_test,
+                noise_level=self.noise_level,
+                batch_size=self.batch_size_test,
             )
         else:
             self.noise_loader = None
