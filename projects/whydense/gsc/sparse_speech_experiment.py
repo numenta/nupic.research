@@ -80,9 +80,6 @@ class SparseSpeechExperiment(object):
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-        self.min_epoch_for_checkpoint = config.get("min_epoch_for_checkpoint", 0)
-        self.last_training_epoch = -1
-        self.best_accuracy = 0.0
 
         self.load_datasets()
 
@@ -220,7 +217,6 @@ class SparseSpeechExperiment(object):
         self.post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
-        self.last_training_epoch = epoch
 
     def post_epoch(self):
         self.model.apply(rezero_weights)
@@ -243,14 +239,8 @@ class SparseSpeechExperiment(object):
             "entropy": float(entropy),
             "total_samples": len(test_loader.sampler),
             "non_zero_parameters": count_nonzero_params(self.model)[1],
-            "should_checkpoint":
-                (self.best_accuracy < ret["mean_accuracy"]
-                 and self.last_training_epoch >= self.min_epoch_for_checkpoint)
         })
 
-        # Keep track of best accuracy that we have checkpointed so far
-        if self.last_training_epoch >= self.min_epoch_for_checkpoint:
-            self.best_accuracy = max(ret["mean_accuracy"], self.best_accuracy)
         return ret
 
     def entropy(self):
