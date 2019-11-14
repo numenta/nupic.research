@@ -141,7 +141,7 @@ class ConsolidatedSparseWeights2D(SparseWeights2d):
         # Store a set of out_channels/4 blocks.
         num_blocks = math.ceil(input_size / 64.0)
         num_zero_blocks = int(num_blocks - (self.weight_sparsity * num_blocks + 2))
-        output_indices = np.arange(out_channels/4)
+        output_indices = np.arange(out_channels / 4)
 
         sparse_blocks = [
             select_random_blocks(num_blocks, num_zero_blocks, False)
@@ -150,13 +150,12 @@ class ConsolidatedSparseWeights2D(SparseWeights2d):
         output_indices = np.arange(out_channels)
         input_indices = np.array(
             [consolidated_zero_indices(input_size, self.weight_sparsity,
-                                       zero_blocks=sparse_blocks[int(i/4)][0],
-                                       non_zero_blocks=sparse_blocks[int(i/4)][1]
+                                       zero_blocks=sparse_blocks[int(i / 4)][0],
+                                       non_zero_blocks=sparse_blocks[int(i / 4)][1]
                                        )
              for i in output_indices],
             dtype=np.long,
         )
-
 
         # Create tensor indices for all non-zero weights
         zero_indices = np.empty((out_channels, num_zeros, 2), dtype=np.long)
