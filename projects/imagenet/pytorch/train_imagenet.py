@@ -91,7 +91,7 @@ def main(args=CONFIG):
         main_worker(args.gpu, ngpus_per_node, args)
 
 
-def main_worker(gpu, ngpus_per_node, args):
+def main_worker(gpu, ngpus_per_node, args):  # noqa: C901 main_worker is too complex
     global best_acc1
     args.gpu = gpu
 
