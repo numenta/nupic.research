@@ -225,7 +225,7 @@ class BaseModel:
         self.network.load_state_dict(
             torch.load(checkpoint_path, map_location=self.device)
         )
-
+        
     def evaluate_noise(self, dataset):
         """External function used to evaluate noise on pre-trained models"""
         self.network.eval()
