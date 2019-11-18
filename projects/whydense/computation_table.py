@@ -25,7 +25,6 @@ from tabulate import tabulate
 
 from nupic.research.support import parse_config
 
-
 STRIDE = 1
 PADDING = 0
 KERNEL_SIZE = 5
