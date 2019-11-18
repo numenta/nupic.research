@@ -48,6 +48,15 @@ datasets_stats = {
 }
 
 
+class CustomDataset:
+
+    def __init__(self, config=None):
+        pass
+
+    def set_loaders(self, train_loader, test_loader):
+        self.train_loader = train_loader
+        self.test_loader = test_loader
+
 class Dataset:
     """Loads a dataset.
     Returns object with a pytorch train and test loader
