@@ -35,24 +35,12 @@ from time import time
 
 SMALL_IMAGENET = False
 
-# local test 
-# train_path = os.path.expanduser("~/nta/datasets/tiny-imagenet-200/train")
-# val_path = os.path.expanduser("~/nta/datasets/tiny-imagenet-200/val")
-
 train_path = os.path.expanduser("~/nta/data/imagenet/train")
 val_path = os.path.expanduser("~/nta/data/imagenet/val")
 
-if SMALL_IMAGENET:
-    train_path = os.path.expanduser("~/nta/datasets/imagenet/train")
-    val_path = os.path.expanduser("~/nta/datasets/imagenet/val")
-
-# cifar10 stats
-# stats_mean = (0.4914, 0.4822, 0.4465)
-# stats_std = (0.2023, 0.1994, 0.2010)
-# imagenet stats
+# preprocessing: https://github.com/pytorch/vision/issues/39
 stats_mean = (0.485, 0.456, 0.406)
 stats_std = (0.229, 0.224, 0.225)
-# preprocessing: https://github.com/pytorch/vision/issues/39
 train_transform = transforms.Compose([
     transforms.RandomSizedCrop(224),
     transforms.RandomHorizontalFlip(),    
@@ -66,12 +54,6 @@ val_transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(stats_mean, stats_std),
 ])
-
-# dataset = datasets.CIFAR10(root=os.path.expanduser("~/nta/datasets"),
-#     transform=transform, download=True)
-# data_loader = utils.data.DataLoader(dataset, batch_size=16, shuffle=True)
-
-# how to save and load data on the fly
 
 # load train dataset
 t0 = time()
@@ -87,6 +69,7 @@ print("Loaded test dataset")
 t1 = time()
 print("Time spent to load test dataset: {:.2f}".format(t1-t0))
 
+# load dataloaders
 t0 = time()
 train_dataloader = utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
 print("Loaded train dataloader")
@@ -95,14 +78,9 @@ print("Loaded test dataloader")
 t1 = time()
 print("Time spent to load dataloaders: {:.2f}".format(t1-t0))
 
-# import pdb; pdb.set_trace()
-
+# load network
 t0 = time()
 network = models.resnet50(pretrained=True)
-# required to remove head if smaller dataset
-if SMALL_IMAGENET:
-    last_layer_shape = network.fc.weight.shape
-    network.fc = nn.Linear(last_layer_shape[1], 5)
 print("Loaded network")
 t1 = time()
 print("Time spent to load network: {:.2f}".format(t1-t0))
@@ -121,7 +99,7 @@ model.setup()
 # simple dataset
 dataset  = CustomDataset(exp_config)
 dataset.set_loaders(train_dataloader, test_dataloader)
-epochs = 5
+epochs = 3
 t1 = time()
 print("Time spent to setup experiment: {:.2f}".format(t1-t0))
 for epoch in range(epochs):
@@ -131,32 +109,3 @@ for epoch in range(epochs):
     t1 = time()
     print("Train acc: {:.4f}, Val acc: {:.4f}".format(log['train_acc'], log['val_acc']))
     print("Time spent in epoch: {:.2f}".format(t1-t0))
-
-# # ------------------------- RAY LOOP 
-# from ray import tune
-# import ray
-# from nupic.research.frameworks.dynamic_sparse.common.experiments import CustomTrainable 
-# from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import DEFAULT_LOGGERS
-
-# exp_config['unpack_params'] = lambda: (model, dataset)
-# ray.init()
-# tune.run(CustomTrainable, 
-#     name='imagenet-testscript',
-#     config=exp_config, 
-#     num_samples=1, 
-#     resources_per_trial={"cpu": 1, "gpu": 1},
-#     local_dir=os.path.expanduser("~/nta/results"),
-#     checkpoint_freq=0,
-#     checkpoint_at_end=False,
-#     stop={"training_iteration": 3},    
-#     loggers=DEFAULT_LOGGERS,
-#     verbose=2,    
-# )
-# ray.shutdown()
-
-
-# ------------------------- DEPRECATED (OUTER TRAINING LOOP)
-
-# loss_func = nn.CrossEntropyLoss()
-# print("Loaded model")
-
