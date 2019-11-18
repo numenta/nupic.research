@@ -27,7 +27,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, Subset
 from torchvision.datasets import DatasetFolder, VisionDataset
-from torchvision.datasets.folder import make_dataset, default_loader, IMG_EXTENSIONS
+from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader, make_dataset
 
 
 def create_validation_data_sampler(dataset, ratio):
@@ -181,7 +181,7 @@ class CachedDatasetFolder(DatasetFolder):
                                             target_transform=target_transform)
 
         # Check for cached files
-        cache_filename = os.path.join(root, "cache.p")
+        cache_filename = os.path.join(root, "__cached_dataset_folder__.p")
         if os.path.exists(cache_filename):
             classes, class_to_idx, samples = pickle.load(open(cache_filename, "rb"))
         else:
@@ -190,9 +190,10 @@ class CachedDatasetFolder(DatasetFolder):
             samples = make_dataset(self.root, class_to_idx, extensions, is_valid_file)
             if len(samples) == 0:
                 raise (
-                    RuntimeError("Found 0 files in subfolders of: " +
-                                 self.root + "\nSupported extensions are: " +
-                                 ",".join(extensions)))
+                    RuntimeError(
+                        "Found 0 files in subfolders of: " + self.root
+                        + "\nSupported extensions are: "
+                        + ",".join(extensions)))
             pickle.dump((classes, class_to_idx, samples),
                         file=open(cache_filename, "wb"),
                         protocol=pickle.HIGHEST_PROTOCOL)
