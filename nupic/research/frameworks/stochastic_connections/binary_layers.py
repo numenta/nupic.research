@@ -41,13 +41,34 @@ from torch.nn.modules.utils import _pair as pair
 from torch.nn.parameter import Parameter
 
 
-def sample_weight(p1, weight, deterministic=False):
+class HeavisideStep(Module):
+    def __init__(self, neg1_activation, cancel_gradient, inplace):
+        super(HeavisideStep, self).__init__()
+        self.neg1_activation = neg1_activation
+        self.cancel_gradient = cancel_gradient
+        self.inplace = inplace
+
+    def forward(self, x):
+        if self.cancel_gradient:
+            x = F.hardtanh(x, -1, 1)
+        if not self.inplace:
+            x = x.clone()
+        mask = x.data >= 0
+        x.data[mask] = 1
+        x.data[~mask] = (-1 if self.neg1_activation else 0)
+        return x
+
+
+def sample_weight(p1, weight, deterministic=False, samples=1):
     if deterministic:
         u = 0.5
     else:
         t = (torch.FloatTensor if not torch.cuda.is_available()
              else torch.cuda.FloatTensor)
-        u = t(p1.size()).uniform_(0, 1)
+        if samples > 1:
+            u = t(samples, *p1.size()).uniform_(0, 1)
+        else:
+            u = t(p1.size()).uniform_(0, 1)
 
     # Do this in a way that still propagates the gradient to p1.
     z = p1.clone()
@@ -61,8 +82,10 @@ class BinaryGatedLinear(Module):
     Linear layer with stochastic binary gates
     """
     def __init__(self, in_features, out_features, l0_strength=1.,
-                 l2_strength=1., learn_weight=True, bias=True, droprate_init=0.5,
-                 random_weight=True, deterministic=False, **kwargs):
+                 l2_strength=1., learn_weight=True, bias=True,
+                 droprate_init=0.5, random_weight=True, deterministic=False,
+                 use_baseline_bias=False, optimize_inference=False,
+                 one_sample_per_item=False, **kwargs):
         """
         :param in_features: Input dimensionality
         :param out_features: Output dimensionality
@@ -77,6 +100,9 @@ class BinaryGatedLinear(Module):
         self.l0_strength = l0_strength
         self.l2_strength = l2_strength
         self.deterministic = deterministic
+        self.use_baseline_bias = use_baseline_bias
+        self.optimize_inference = optimize_inference
+        self.one_sample_per_item = one_sample_per_item
 
         self.random_weight = random_weight
         if random_weight:
@@ -118,9 +144,8 @@ class BinaryGatedLinear(Module):
         self.inh_weight.data.clamp_(min=0.)
 
     def get_gate_probabilities(self):
-        with torch.no_grad():
-            exc_p1 = torch.clamp(self.exc_p1, min=0., max=1.)
-            inh_p1 = torch.clamp(self.inh_p1, min=0., max=1.)
+        exc_p1 = torch.clamp(self.exc_p1.data, min=0., max=1.)
+        inh_p1 = torch.clamp(self.inh_p1.data, min=0., max=1.)
         return exc_p1, inh_p1
 
     def weight_size(self):
@@ -136,7 +161,7 @@ class BinaryGatedLinear(Module):
             # gradient.
             exc_p1 = self.exc_p1.clone()
             torch.clamp(exc_p1.data, min=0, max=1, out=exc_p1.data)
-            inh_p1 = self.exc_p1.clone()
+            inh_p1 = self.inh_p1.clone()
             torch.clamp(inh_p1.data, min=0, max=1, out=inh_p1.data)
 
             if self.l2_strength == 0:
@@ -178,18 +203,36 @@ class BinaryGatedLinear(Module):
 
             return exc_mask, inh_mask
 
-    def sample_weight(self):
-        if self.training:
-            return (sample_weight(self.exc_p1, self.exc_weight, self.deterministic)
-                    - sample_weight(self.inh_p1, self.inh_weight, self.deterministic))
+    def sample_weight_and_bias(self):
+        if self.training or not self.optimize_inference:
+            w = (sample_weight(self.exc_p1, self.exc_weight, self.deterministic)
+                 - sample_weight(self.inh_p1, self.inh_weight, self.deterministic))
         else:
             exc_mask, inh_mask = self.get_inference_mask()
-            return (exc_mask * self.exc_weight
-                    - inh_mask * self.inh_weight)
+            w = exc_mask * self.exc_weight - inh_mask * self.inh_weight
+
+        b = None
+        if self.use_baseline_bias:
+            b = -w.sum(dim=-1) / 2
+
+        if self.use_bias:
+            b = (b + self.bias
+                 if b is not None
+                 else self.bias)
+
+        return w, b
 
     def forward(self, x):
-        return F.linear(x, self.sample_weight(),
-                        (self.bias if self.use_bias else None))
+        if self.one_sample_per_item and self.training and len(x.size()) > 1:
+            results = []
+            for i in range(x.size(0)):
+                w, b = self.sample_weight_and_bias()
+                results.append(F.linear(x[i:i + 1], w, b))
+            return torch.cat(results)
+        else:
+            w, b = self.sample_weight_and_bias()
+            return F.linear(x, w, b)
+            return self._forward(x)
 
     def get_expected_nonzeros(self):
         exc_p1, inh_p1 = self.get_gate_probabilities()
@@ -226,7 +269,9 @@ class BinaryGatedConv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1, learn_weight=True, bias=True,
                  droprate_init=0.5, l2_strength=1., l0_strength=1.,
-                 random_weight=True, deterministic=False, **kwargs):
+                 random_weight=True, deterministic=False,
+                 use_baseline_bias=False, optimize_inference=True,
+                 one_sample_per_item=False, **kwargs):
         """
         :param in_channels: Number of input channels
         :param out_channels: Number of output channels
@@ -257,6 +302,9 @@ class BinaryGatedConv2d(Module):
         self.l0_strength = l0_strength
         self.droprate_init = droprate_init if droprate_init != 0. else 0.5
         self.deterministic = deterministic
+        self.use_baseline_bias = use_baseline_bias
+        self.optimize_inference = optimize_inference
+        self.one_sample_per_item = one_sample_per_item
 
         self.random_weight = random_weight
         if random_weight:
@@ -319,7 +367,7 @@ class BinaryGatedConv2d(Module):
             # gradient.
             exc_p1 = self.exc_p1.clone()
             torch.clamp(exc_p1.data, min=0, max=1, out=exc_p1.data)
-            inh_p1 = self.exc_p1.clone()
+            inh_p1 = self.inh_p1.clone()
             torch.clamp(inh_p1.data, min=0, max=1, out=inh_p1.data)
 
             if self.l2_strength == 0:
@@ -340,9 +388,8 @@ class BinaryGatedConv2d(Module):
             return 0
 
     def get_gate_probabilities(self):
-        with torch.no_grad():
-            exc_p1 = torch.clamp(self.exc_p1, min=0., max=1.)
-            inh_p1 = torch.clamp(self.inh_p1, min=0., max=1.)
+        exc_p1 = torch.clamp(self.exc_p1.data, min=0., max=1.)
+        inh_p1 = torch.clamp(self.inh_p1.data, min=0., max=1.)
         return exc_p1, inh_p1
 
     def get_inference_mask(self):
@@ -373,21 +420,50 @@ class BinaryGatedConv2d(Module):
 
             return exc_mask, inh_mask
 
-    def sample_weight(self):
-        if self.training:
-            return (sample_weight(self.exc_p1, self.exc_weight, self.deterministic)
-                    - sample_weight(self.inh_p1, self.inh_weight, self.deterministic))
+    def sample_weight_and_bias(self, samples=1):
+        if self.training or not self.optimize_inference:
+            w = (sample_weight(self.exc_p1, self.exc_weight,
+                               self.deterministic, samples)
+                 - sample_weight(self.inh_p1, self.inh_weight,
+                                 self.deterministic, samples))
         else:
             exc_mask, inh_mask = self.get_inference_mask()
-            return (exc_mask * self.exc_weight
-                    - inh_mask * self.inh_weight)
+            w = exc_mask * self.exc_weight - inh_mask * self.inh_weight
+
+        b = None
+        if self.use_baseline_bias:
+            b = -w.sum(dim=(-3, -2, -1)) / 2
+
+        if self.use_bias:
+            b = (b + self.bias
+                 if b is not None
+                 else self.bias)
+
+        return w, b
 
     def forward(self, x):
         if self.input_shape is None:
             self.input_shape = x.size()
-        return F.conv2d(x, self.sample_weight(),
-                        (self.bias if self.use_bias else None),
-                        self.stride, self.padding, self.dilation, self.groups)
+
+        if self.one_sample_per_item and self.training and len(x.size()) > 3:
+            w, b = self.sample_weight_and_bias(x.size(0))
+
+            if self.use_baseline_bias:
+                b = b.view(x.size(0) * self.out_channels)
+            else:
+                b = b.repeat(x.size(0))
+
+            x_ = x.view(1, x.size(0) * x.size(1), *x.size()[2:])
+            w_ = w.view(w.size(0) * w.size(1), *w.size()[2:])
+            result = F.conv2d(x_, w_, b,
+                              self.stride, self.padding, self.dilation,
+                              x.size(0) * self.groups)
+
+            return result.view(x.size(0), self.out_channels, *result.size()[2:])
+        else:
+            w, b = self.sample_weight_and_bias()
+            return F.conv2d(x, w, b,
+                            self.stride, self.padding, self.dilation, self.groups)
 
     def get_expected_nonzeros(self):
         exc_p1, inh_p1 = self.get_gate_probabilities()
@@ -427,3 +503,78 @@ class BinaryGatedConv2d(Module):
         adds = adds_per_instance * instances
 
         return multiplies.item(), adds.item()
+
+
+#
+# LOCAL REPARAMETERIZATION
+#
+
+class LocalReparamBinaryGatedLinear(BinaryGatedLinear):
+    """
+    Linear layer with stochastic binary gates
+    """
+    def forward(self, x):
+        if self.training:
+            # Allow gradient to keep pushing p1 outside (0,1).
+            exc_p1 = self.exc_p1.clone()
+            exc_p1.data.clamp_(0, 1)
+            inh_p1 = self.inh_p1.clone()
+            inh_p1.data.clamp_(0, 1)
+            w_mu = (self.exc_weight * exc_p1) - (self.inh_weight * inh_p1)
+            mu = F.linear(x, w_mu, (self.bias if self.use_bias else None))
+
+            # Don't pass back gradients to p1 for the variance when p1 is
+            # outside (0,1). They will be infinite (or very large with the
+            # divide-by-zero handling).
+            exc_p1 = torch.clamp(self.exc_p1, 0, 1)
+            inh_p1 = torch.clamp(self.inh_p1, 0, 1)
+            w_var = ((self.exc_weight.pow(2) * exc_p1 * (1 - exc_p1))
+                     + (self.inh_weight.pow(2) * inh_p1 * (1 - inh_p1)))
+            variance = F.linear(x.pow(2), w_var)
+            # Don't backpropagate beyond this variance for units with variance
+            # 0. It will divide by 0.
+            variance = variance.clamp(0.000001)
+            sigma = variance.sqrt()
+
+            t = (torch.FloatTensor if not torch.cuda.is_available()
+                 else torch.cuda.FloatTensor)
+            u = t(mu.size()).normal_()
+            return mu + (u * sigma)
+        else:
+            return super(LocalReparamBinaryGatedLinear, self).forward(x)
+
+
+class LocalReparamBinaryGatedConv2d(BinaryGatedConv2d):
+    """
+    Convolutional layer with binary stochastic gates
+    """
+    def forward(self, x):
+        if self.input_shape is None:
+            self.input_shape = x.size()
+
+        if self.training:
+            # Allow gradient to keep pushing p1 outside (0,1).
+            exc_p1 = self.exc_p1.clone()
+            exc_p1.data.clamp_(0, 1)
+            inh_p1 = self.inh_p1.clone()
+            inh_p1.data.clamp_(0, 1)
+            w_mu = (self.exc_weight * exc_p1) - (self.inh_weight * inh_p1)
+            mu = F.conv2d(x, w_mu, (self.bias if self.use_bias else None),
+                          self.stride, self.padding, self.dilation, self.groups)
+
+            w_var = ((self.exc_weight.pow(2) * exc_p1 * (1 - exc_p1))
+                     + (self.inh_weight.pow(2) * inh_p1 * (1 - inh_p1)))
+            variance = F.conv2d(x.pow(2), w_var, None,
+                                self.stride, self.padding, self.dilation,
+                                self.groups)
+            # Don't backpropagate beyond this variance for units with variance
+            # 0. It will divide by 0.
+            variance = variance.clamp(0.000001)
+            sigma = variance.sqrt()
+
+            t = (torch.FloatTensor if not torch.cuda.is_available()
+                 else torch.cuda.FloatTensor)
+            u = t(mu.size()).normal_()
+            return mu + (u * sigma)
+        else:
+            return super(LocalReparamBinaryGatedConv2d, self).forward(x)
