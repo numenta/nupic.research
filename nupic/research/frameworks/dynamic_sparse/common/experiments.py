@@ -26,7 +26,7 @@ from ray import tune
 import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
 
-from .datasets import Dataset
+from .datasets import load_dataset
 
 
 class RayTrainable(tune.Trainable):
@@ -38,7 +38,7 @@ class RayTrainable(tune.Trainable):
     def _setup(self, config):
         network = getattr(networks, config["network"])(config=config)
         self.model = getattr(models, config["model"])(network, config=config)
-        self.dataset = Dataset(config=config)
+        self.dataset = load_dataset(config['dataset_name'])(config=config)
         self.model.setup()
         self.experiment_name = config["name"]
 

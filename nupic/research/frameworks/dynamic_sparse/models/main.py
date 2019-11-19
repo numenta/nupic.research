@@ -61,7 +61,8 @@ class BaseModel:
             grad_prune_perc=0,
             test_noise=False,
             weight_decay=1e-4,
-            train_batches_per_epoch=np.inf,  # default - don't limit the batches
+            use_multiple_gpus=False,
+            train_batches_per_epoch=np.inf,  # default - don't limit the batches            
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -69,6 +70,8 @@ class BaseModel:
         # save config to restore the model later
         self.config = config
         self.device = torch.device(self.device)
+        if self.use_multiple_gpus:
+            network = nn.DataParallel(network)
         self.network = network.to(self.device)
         self.config = deepcopy(config)
 
@@ -225,7 +228,7 @@ class BaseModel:
         self.network.load_state_dict(
             torch.load(checkpoint_path, map_location=self.device)
         )
-        
+
     def evaluate_noise(self, dataset):
         """External function used to evaluate noise on pre-trained models"""
         self.network.eval()
