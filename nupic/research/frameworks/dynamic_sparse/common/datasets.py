@@ -34,6 +34,7 @@ from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 
+
 custom_datasets = {"TinyImageNet": TinyImageNet}
 
 datasets_numclasses = {"TinyImageNet": 200, "CIFAR10": 10, "CIFAR100": 100, "MNIST": 10}
@@ -205,15 +206,17 @@ class ImageNetDataset(BaseDataset):
         ])
 
         # load datasets
-        train_dataset = datasets.CachedDatasetFolder(train_path, transform=train_transform)
-        test_dataset = datasets.CachedDatasetFolder(val_path, transform=val_transform)
+        train_dataset = CachedDatasetFolder(train_path, transform=train_transform)
+        test_dataset = CachedDatasetFolder(val_path, transform=val_transform)
 
         # load dataloaders
+        # added pin_memory=True for faster data recovery
         self.train_loader = DataLoader(train_dataset, 
-            shuffle=True, batch_size=self.batch_size_train)
+            shuffle=True, batch_size=self.batch_size_train, 
+            pin_memory=True, num_workers=56)
         self.test_loader = DataLoader(test_dataset, 
-            shuffle=False, batch_size=self.batch_size_test)
-
+            shuffle=False, batch_size=self.batch_size_test, 
+            pin_memory=True, num_workers=56)
 
 class GSCDataset(BaseDataset):
 

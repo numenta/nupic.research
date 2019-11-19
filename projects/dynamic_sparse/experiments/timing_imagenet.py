@@ -32,6 +32,8 @@ from torchvision import models, datasets, transforms
 from torch import nn, utils
 import os
 from time import time
+from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
+
 
 SMALL_IMAGENET = False
 
@@ -57,14 +59,14 @@ val_transform = transforms.Compose([
 
 # load train dataset
 t0 = time()
-train_dataset = datasets.ImageFolder(train_path, transform=train_transform)
+train_dataset = CachedDatasetFolder(train_path, transform=train_transform)
 print("Loaded train dataset")
 t1 = time()
 print("Time spent to load train dataset: {:.2f}".format(t1-t0))
 
 # load test dataset
 t0 = time()
-test_dataset = datasets.ImageFolder(val_path, transform=val_transform)
+test_dataset = CachedDatasetFolder(val_path, transform=val_transform)
 print("Loaded test dataset")
 t1 = time()
 print("Time spent to load test dataset: {:.2f}".format(t1-t0))

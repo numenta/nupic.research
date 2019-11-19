@@ -177,7 +177,7 @@ class CachedDatasetFolder(DatasetFolder):
 
     def __init__(self, root, loader=default_loader, extensions=IMG_EXTENSIONS,
                  transform=None, target_transform=None, is_valid_file=None):
-        super(VisionDataset, self).__init__(root, transform=transform,
+        super(DatasetFolder, self).__init__(root, transform=transform,
                                             target_transform=target_transform)
 
         # Check for cached files

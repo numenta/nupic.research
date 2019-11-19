@@ -28,22 +28,24 @@ base_exp_config = dict(
     device="cuda",
     dataset_name="ImageNet",
     use_multiple_gpus=True,
-    model="BaseModel",
+    model="PruningModel",
     data_dir="~/nta/datasets",
     num_classes=1000,
-    epochs=5,
-    batch_size_train=512,
-    batch_size_test=512,
+    epochs=20,
+    batch_size_train=1024,
+    batch_size_test=1024, # 5120,
     # ---- network related
     network="resnet50",
     pretrained=True,
     # ---- optimizer related
     optim_alg="Adam",
-    learning_rate=1e-10,
-    weight_decay=0,
-    momentum=0,
-    # ---- debugs and noise related
-    test_noise=False,
+    learning_rate=1e-4,
+    weight_decay=1e-2,
+    # ---- sparsity related
+    on_perc=1.0,
+    target_final_density=0.2,
+    sparse_start=None,
+    sparse_end=None,
 )
 
 # ray configurations
@@ -51,7 +53,7 @@ tune_config = dict(
     num_samples=1,
     name=__file__.replace(".py", ""),
     checkpoint_freq=0,
-    checkpoint_at_end=False,
+    checkpoint_at_end=True,
     resources_per_trial={"cpu": 60, "gpu": 8},
     verbose=2,
 )
