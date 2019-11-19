@@ -169,8 +169,8 @@ class BaseModel:
                 if idx >= self.train_batches_per_epoch.get_value():
                     break
             # setup for training
-            inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
+            inputs = inputs.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
             self.optimizer.zero_grad()
             # training loop
             with torch.set_grad_enabled(train):
