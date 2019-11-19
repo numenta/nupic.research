@@ -22,8 +22,8 @@
 # adapted from https://github.com/meliketoy/wide-resnet.pytorch/
 
 import torch.nn as nn
-from torchvision.models.utils import load_state_dict_from_url
 from torchvision import models
+from torchvision.models.utils import load_state_dict_from_url
 
 from nupic.torch.modules import Flatten, KWinners2d
 
@@ -269,11 +269,11 @@ def load_pretrained(config):
 
     # freeze all layers (commented out, decide strategy later)
     # for param in net.parameters():
-    #     param.requires_grad=False
+    #     param.requires_grad = False
 
     # replace the last layer
-    # classifier_shape = (net.classifier.weight.shape[1], new_num_classes)
-    # net.classifier = nn.Linear(*classifier_shape)
+    classifier_shape = (net.classifier.weight.shape[1], new_num_classes)
+    net.classifier = nn.Linear(*classifier_shape)
 
     return net
 
@@ -297,13 +297,16 @@ def resnet18(config=None):
 def resnet34(config=None):
     return build_resnet(34, config)
 
+
 def resnet50(config=None):
     # return build_resnet(50, config)
     # temporarily use resnet50 from torchvision
     return models.resnet50(pretrained=True)
 
+
 def resnet101(config=None):
     return build_resnet(101, config)
+
 
 def resnet152(config=None):
     return build_resnet(152, config)

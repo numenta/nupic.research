@@ -37,10 +37,7 @@ from nupic.torch.modules import update_boost_strength
 from .loggers import BaseLogger, SparseLogger
 from .modules import SparseModule
 
-__all__ = [
-    "BaseModel",
-    "SparseModel",
-]
+__all__ = ["BaseModel", "SparseModel"]
 
 
 class BaseModel:
@@ -62,7 +59,7 @@ class BaseModel:
             test_noise=False,
             weight_decay=1e-4,
             use_multiple_gpus=False,
-            train_batches_per_epoch=np.inf,  # default - don't limit the batches            
+            train_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)

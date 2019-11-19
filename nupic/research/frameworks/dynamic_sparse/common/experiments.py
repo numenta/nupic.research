@@ -38,7 +38,7 @@ class RayTrainable(tune.Trainable):
     def _setup(self, config):
         network = getattr(networks, config["network"])(config=config)
         self.model = getattr(models, config["model"])(network, config=config)
-        self.dataset = load_dataset(config['dataset_name'])(config=config)
+        self.dataset = load_dataset(config["dataset_name"])(config=config)
         self.model.setup()
         self.experiment_name = config["name"]
 
@@ -53,6 +53,7 @@ class RayTrainable(tune.Trainable):
     def _restore(self, checkpoint):
         self.model.restore(checkpoint, self.experiment_name)
 
+
 class CustomTrainable(tune.Trainable):
     """ray.tune trainable generic class Adaptable to any pytorch module."""
 
@@ -60,7 +61,7 @@ class CustomTrainable(tune.Trainable):
         tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
 
     def _setup(self, config):
-        model, dataset = config['unpack_params']()
+        model, dataset = config["unpack_params"]()
         self.model = model
         self.dataset = dataset
         print("finished setting up trainable")
@@ -82,6 +83,7 @@ class CustomTrainable(tune.Trainable):
         self.model = model
         self.network = network
         self.dataset = dataset
+
 
 def base_experiment(config):
     tune.run(RayTrainable, **config)

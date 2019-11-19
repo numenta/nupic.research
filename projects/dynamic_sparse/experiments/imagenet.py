@@ -20,7 +20,7 @@
 # ----------------
 
 # investigate how to load and save the dataset
-# need to 
+# need to
 # 1 - loop once through the dataset to apply the transforms
 # 2 - save each batch of images
 # 3 - write a custom dataset that load from these saved files instead
@@ -28,14 +28,20 @@
 
 # file to test run imagenet
 
-from torchvision import models, datasets, transforms
-from torch import nn, utils
 import os
 from time import time
 
+import torch
+from torch import nn, utils
+from torchvision import datasets, models, transforms
+
+# load the model
+from nupic.research.frameworks.dynamic_sparse.common.datasets import CustomDataset
+from nupic.research.frameworks.dynamic_sparse.models import BaseModel
+
 SMALL_IMAGENET = False
 
-# local test 
+# local test
 # train_path = os.path.expanduser("~/nta/datasets/tiny-imagenet-200/train")
 # val_path = os.path.expanduser("~/nta/datasets/tiny-imagenet-200/val")
 
@@ -53,19 +59,23 @@ if SMALL_IMAGENET:
 stats_mean = (0.485, 0.456, 0.406)
 stats_std = (0.229, 0.224, 0.225)
 # preprocessing: https://github.com/pytorch/vision/issues/39
-train_transform = transforms.Compose([
-    transforms.RandomSizedCrop(224),
-    transforms.RandomHorizontalFlip(),    
-    transforms.ToTensor(),
-    transforms.Normalize(stats_mean, stats_std),
-])
+train_transform = transforms.Compose(
+    [
+        transforms.RandomSizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(stats_mean, stats_std),
+    ]
+)
 
-val_transform = transforms.Compose([
-    transforms.Scale(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(stats_mean, stats_std),
-])
+val_transform = transforms.Compose(
+    [
+        transforms.Scale(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(stats_mean, stats_std),
+    ]
+)
 
 # dataset = datasets.CIFAR10(root=os.path.expanduser("~/nta/datasets"),
 #     transform=transform, download=True)
@@ -78,14 +88,14 @@ t0 = time()
 train_dataset = datasets.ImageFolder(train_path, transform=train_transform)
 print("Loaded train dataset")
 t1 = time()
-print("Time spent to load train dataset: {:.2f}".format(t1-t0))
+print("Time spent to load train dataset: {:.2f}".format(t1 - t0))
 
 # load test dataset
 t0 = time()
 test_dataset = datasets.ImageFolder(val_path, transform=val_transform)
 print("Loaded test dataset")
 t1 = time()
-print("Time spent to load test dataset: {:.2f}".format(t1-t0))
+print("Time spent to load test dataset: {:.2f}".format(t1 - t0))
 
 t0 = time()
 train_dataloader = utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
@@ -93,7 +103,7 @@ print("Loaded train dataloader")
 test_dataloader = utils.data.DataLoader(test_dataset, batch_size=16, shuffle=True)
 print("Loaded test dataloader")
 t1 = time()
-print("Time spent to load dataloaders: {:.2f}".format(t1-t0))
+print("Time spent to load dataloaders: {:.2f}".format(t1 - t0))
 
 # import pdb; pdb.set_trace()
 
@@ -105,64 +115,33 @@ if SMALL_IMAGENET:
     network.fc = nn.Linear(last_layer_shape[1], 5)
 print("Loaded network")
 t1 = time()
-print("Time spent to load network: {:.2f}".format(t1-t0))
+print("Time spent to load network: {:.2f}".format(t1 - t0))
 
 # ------------------------- RUN MODEL
 
-# load the model
-from nupic.research.frameworks.dynamic_sparse.common.datasets import CustomDataset
-from nupic.research.frameworks.dynamic_sparse.models import BaseModel
 
 # simple base model
 t0 = time()
-exp_config = dict(device='cuda')
+exp_config = dict(device="cuda")
 model = BaseModel(network, exp_config)
 model.setup()
 # simple dataset
-dataset  = CustomDataset(exp_config)
+dataset = CustomDataset(exp_config)
 dataset.set_loaders(train_dataloader, test_dataloader)
 epochs = 5
 t1 = time()
-print("Time spent to setup experiment: {:.2f}".format(t1-t0))
+print("Time spent to setup experiment: {:.2f}".format(t1 - t0))
 for epoch in range(epochs):
     t0 = time()
     print("Running epoch {}".format(str(epoch)))
     log = model.run_epoch(dataset, epoch)
     t1 = time()
-    print("Train acc: {:.4f}, Val acc: {:.4f}".format(log['train_acc'], log['val_acc']))
-    print("Time spent in epoch: {:.2f}".format(t1-t0))
-
-# # ------------------------- RAY LOOP 
-# from ray import tune
-# import ray
-# from nupic.research.frameworks.dynamic_sparse.common.experiments import CustomTrainable 
-# from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import DEFAULT_LOGGERS
-
-# exp_config['unpack_params'] = lambda: (model, dataset)
-# ray.init()
-# tune.run(CustomTrainable, 
-#     name='imagenet-testscript',
-#     config=exp_config, 
-#     num_samples=1, 
-#     resources_per_trial={"cpu": 1, "gpu": 1},
-#     local_dir=os.path.expanduser("~/nta/results"),
-#     checkpoint_freq=0,
-#     checkpoint_at_end=False,
-#     stop={"training_iteration": 3},    
-#     loggers=DEFAULT_LOGGERS,
-#     verbose=2,    
-# )
-# ray.shutdown()
+    print("Train acc: {:.4f}, Val acc: {:.4f}".format(log["train_acc"], log["val_acc"]))
+    print("Time spent in epoch: {:.2f}".format(t1 - t0))
 
 
 # ------------------------- DEPRECATED (OUTER TRAINING LOOP)
 
-# loss_func = nn.CrossEntropyLoss()
-# print("Loaded model")
-
-
-
-    
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     with torch.no_grad():

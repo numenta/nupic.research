@@ -20,7 +20,7 @@
 # ----------------
 
 # investigate how to load and save the dataset
-# need to 
+# need to
 # 1 - loop once through the dataset to apply the transforms
 # 2 - save each batch of images
 # 3 - write a custom dataset that load from these saved files instead
@@ -28,12 +28,16 @@
 
 # file to test run imagenet
 
-from torchvision import models, datasets, transforms
-from torch import nn, utils
 import os
 from time import time
-from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 
+from torch import utils
+from torchvision import models, transforms
+
+# load the model
+from nupic.research.frameworks.dynamic_sparse.common.datasets import CustomDataset
+from nupic.research.frameworks.dynamic_sparse.models import BaseModel
+from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 
 SMALL_IMAGENET = False
 
@@ -43,33 +47,37 @@ val_path = os.path.expanduser("~/nta/data/imagenet/val")
 # preprocessing: https://github.com/pytorch/vision/issues/39
 stats_mean = (0.485, 0.456, 0.406)
 stats_std = (0.229, 0.224, 0.225)
-train_transform = transforms.Compose([
-    transforms.RandomSizedCrop(224),
-    transforms.RandomHorizontalFlip(),    
-    transforms.ToTensor(),
-    transforms.Normalize(stats_mean, stats_std),
-])
+train_transform = transforms.Compose(
+    [
+        transforms.RandomSizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(stats_mean, stats_std),
+    ]
+)
 
-val_transform = transforms.Compose([
-    transforms.Scale(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(stats_mean, stats_std),
-])
+val_transform = transforms.Compose(
+    [
+        transforms.Scale(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(stats_mean, stats_std),
+    ]
+)
 
 # load train dataset
 t0 = time()
 train_dataset = CachedDatasetFolder(train_path, transform=train_transform)
 print("Loaded train dataset")
 t1 = time()
-print("Time spent to load train dataset: {:.2f}".format(t1-t0))
+print("Time spent to load train dataset: {:.2f}".format(t1 - t0))
 
 # load test dataset
 t0 = time()
 test_dataset = CachedDatasetFolder(val_path, transform=val_transform)
 print("Loaded test dataset")
 t1 = time()
-print("Time spent to load test dataset: {:.2f}".format(t1-t0))
+print("Time spent to load test dataset: {:.2f}".format(t1 - t0))
 
 # load dataloaders
 t0 = time()
@@ -78,36 +86,33 @@ print("Loaded train dataloader")
 test_dataloader = utils.data.DataLoader(test_dataset, batch_size=16, shuffle=True)
 print("Loaded test dataloader")
 t1 = time()
-print("Time spent to load dataloaders: {:.2f}".format(t1-t0))
+print("Time spent to load dataloaders: {:.2f}".format(t1 - t0))
 
 # load network
 t0 = time()
 network = models.resnet50(pretrained=True)
 print("Loaded network")
 t1 = time()
-print("Time spent to load network: {:.2f}".format(t1-t0))
+print("Time spent to load network: {:.2f}".format(t1 - t0))
 
 # ------------------------- RUN MODEL
 
-# load the model
-from nupic.research.frameworks.dynamic_sparse.common.datasets import CustomDataset
-from nupic.research.frameworks.dynamic_sparse.models import BaseModel
 
 # simple base model
 t0 = time()
-exp_config = dict(device='cuda')
+exp_config = dict(device="cuda")
 model = BaseModel(network, exp_config)
 model.setup()
 # simple dataset
-dataset  = CustomDataset(exp_config)
+dataset = CustomDataset(exp_config)
 dataset.set_loaders(train_dataloader, test_dataloader)
 epochs = 3
 t1 = time()
-print("Time spent to setup experiment: {:.2f}".format(t1-t0))
+print("Time spent to setup experiment: {:.2f}".format(t1 - t0))
 for epoch in range(epochs):
     t0 = time()
     print("Running epoch {}".format(str(epoch)))
     log = model.run_epoch(dataset, epoch)
     t1 = time()
-    print("Train acc: {:.4f}, Val acc: {:.4f}".format(log['train_acc'], log['val_acc']))
-    print("Time spent in epoch: {:.2f}".format(t1-t0))
+    print("Train acc: {:.4f}, Val acc: {:.4f}".format(log["train_acc"], log["val_acc"]))
+    print("Time spent in epoch: {:.2f}".format(t1 - t0))

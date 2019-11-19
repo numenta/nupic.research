@@ -56,6 +56,7 @@ def download_dataset(config):
             download=True, root=os.path.expanduser(config["data_dir"])
         )
 
+
 def new_experiment(base_config, new_config):
     modified_config = deepcopy(base_config)
     modified_config.update(new_config)
