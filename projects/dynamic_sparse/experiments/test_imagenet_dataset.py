@@ -20,7 +20,6 @@
 # ----------------------------------------------------------------------
 
 
-from ray import tune
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # experiment configurations
@@ -33,7 +32,7 @@ base_exp_config = dict(
     num_classes=1000,
     epochs=20,
     batch_size_train=1024,
-    batch_size_test=1024, # 5120,
+    batch_size_test=1024,  # 5120,
     # ---- network related
     network="resnet50",
     pretrained=True,

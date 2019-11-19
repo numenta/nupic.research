@@ -30,10 +30,9 @@ from nupic.research.frameworks.dynamic_sparse.common.dataloaders import (
     PreprocessedSpeechDataLoader,
     VaryingDataLoader,
 )
+from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
-from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
-
 
 custom_datasets = {"TinyImageNet": TinyImageNet}
 
@@ -49,6 +48,7 @@ datasets_stats = {
     "MNIST": ((0.13062755,), (0.30810780,)),
 }
 
+
 def load_dataset(dataset_name):
     if dataset_name == "PreprocessedGSC":
         return GSCDataset
@@ -56,6 +56,7 @@ def load_dataset(dataset_name):
         return ImageNetDataset
     else:
         return BaseDataset
+
 
 class BaseDataset:
     """Loads a dataset.
@@ -176,10 +177,10 @@ class BaseDataset:
             dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
         )
 
-class ImageNetDataset(BaseDataset):
 
+class ImageNetDataset(BaseDataset):
     def load_dataset(self):
-        """ 
+        """
         Overrides base dataset loading
         Fixes path to data
         Fixes all tranformations to be identical
@@ -191,19 +192,23 @@ class ImageNetDataset(BaseDataset):
 
         stats_mean = (0.485, 0.456, 0.406)
         stats_std = (0.229, 0.224, 0.225)
-        train_transform = transforms.Compose([
-            transforms.RandomSizedCrop(224),
-            transforms.RandomHorizontalFlip(),    
-            transforms.ToTensor(),
-            transforms.Normalize(stats_mean, stats_std),
-        ])
+        train_transform = transforms.Compose(
+            [
+                transforms.RandomSizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(stats_mean, stats_std),
+            ]
+        )
 
-        val_transform = transforms.Compose([
-            transforms.Scale(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(stats_mean, stats_std),
-        ])
+        val_transform = transforms.Compose(
+            [
+                transforms.Scale(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(stats_mean, stats_std),
+            ]
+        )
 
         # load datasets
         train_dataset = CachedDatasetFolder(train_path, transform=train_transform)
@@ -211,15 +216,23 @@ class ImageNetDataset(BaseDataset):
 
         # load dataloaders
         # added pin_memory=True for faster data recovery
-        self.train_loader = DataLoader(train_dataset, 
-            shuffle=True, batch_size=self.batch_size_train, 
-            pin_memory=True, num_workers=56)
-        self.test_loader = DataLoader(test_dataset, 
-            shuffle=False, batch_size=self.batch_size_test, 
-            pin_memory=True, num_workers=56)
+        self.train_loader = DataLoader(
+            train_dataset,
+            shuffle=True,
+            batch_size=self.batch_size_train,
+            pin_memory=True,
+            num_workers=56,
+        )
+        self.test_loader = DataLoader(
+            test_dataset,
+            shuffle=False,
+            batch_size=self.batch_size_test,
+            pin_memory=True,
+            num_workers=56,
+        )
+
 
 class GSCDataset(BaseDataset):
-
     def load_dataset(self):
         """ Overrides base dataset loading"""
 
@@ -231,9 +244,7 @@ class GSCDataset(BaseDataset):
         )
 
         self.test_loader = PreprocessedSpeechDataLoader(
-            self.data_dir,
-            subset="valid",
-            batch_size=self.batch_size_test,
+            self.data_dir, subset="valid", batch_size=self.batch_size_test
         )
 
         if self.test_noise:
@@ -244,14 +255,13 @@ class GSCDataset(BaseDataset):
                 batch_size=self.batch_size_test,
             )
         else:
-            self.noise_loader = None            
+            self.noise_loader = None
+
 
 class CustomDataset:
-
     def __init__(self, config=None):
         pass
 
     def set_loaders(self, train_loader, test_loader):
         self.train_loader = train_loader
         self.test_loader = test_loader
-
