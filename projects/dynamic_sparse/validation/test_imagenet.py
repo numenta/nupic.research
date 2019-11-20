@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import os
 
 from ray import tune
 
@@ -64,7 +65,7 @@ base_exp_config = dict(
 # ray configurations
 tune_config = dict(
     num_samples=1,
-    name=__file__.replace(".py", "") + "_finetuning",
+    name=os.path.basename(__file__).replace(".py", "") + "_finetuning",
     checkpoint_freq=0,
     checkpoint_at_end=True,
     resources_per_trial={"cpu": 1, "gpu": 0.5},
