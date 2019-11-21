@@ -26,7 +26,7 @@ import pickle
 import numpy as np
 import torch
 from torch.utils.data import Dataset, Subset
-from torchvision.datasets import DatasetFolder, VisionDataset
+from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader, make_dataset
 
 
