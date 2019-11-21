@@ -42,8 +42,13 @@ jobs:
     steps:
       - attach_workspace:
           at: ~/nta
+      - run:
+          name: Get nupic.torch and nupic.tensorflow latest SHA
+          command: |
+            git ls-remote git://github.com/numenta/nupic.torch.git HEAD > nupic.torch.sha
+            git ls-remote git://github.com/numenta/nupic.tensorflow.git HEAD > nupic.tensorflow.sha
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run: pip install --user flake8-formatter-junit-xml
       - run: pip install --user -I git+https://github.com/numenta/nupic.tensorflow.git#egg=nupic.tensorflow
       - run: pip install --user -I git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch
@@ -51,9 +56,12 @@ jobs:
       - run: pip install --user -r requirements-dev.txt
       - run: python setup.py develop --user
       - save_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
           paths:
             - ~/.local
+      - persist_to_workspace:
+          root: ~/nta
+          paths: nupic.research
 
   check_style:
     working_directory: ~/nta/nupic.research
@@ -63,7 +71,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run:
           name: Check Style
           command: |
@@ -80,7 +88,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run:
           name: Run python tests
           environment:
@@ -99,7 +107,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run:
           name: Build wheel
           environment:
