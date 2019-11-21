@@ -21,6 +21,8 @@
 import json
 import os
 import subprocess
+import time
+from pathlib import Path
 
 import click
 import numpy as np  # noqa F401
@@ -76,6 +78,7 @@ def run_noise_test(config):
         best_result = max(results, key=lambda x: x["mean_accuracy"])
         best_epoch = best_result["training_iteration"]
         best_config = best_result["config"]
+        print("best_epoch: ", best_epoch)
 
         # Update path
         best_config["path"] = config["path"]
@@ -90,7 +93,15 @@ def run_noise_test(config):
         # Save noise results in checkpoint log dir
         noise_test = os.path.join(logdir, "noise.json")
         with open(noise_test, "w") as f:
-            json.dump(experiment.run_noise_tests(), f)
+            res = experiment.run_noise_tests()
+            json.dump(res, f)
+
+        # Compute total noise score
+        total_correct = 0
+        for k, v in res.items():
+            print(k, v, v["total_correct"])
+            total_correct += v["total_correct"]
+        print("Total across all noise values", total_correct)
 
     # Upload results to S3
     sync_function = config.get("sync_function", None)
@@ -154,11 +165,6 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
     print("num_cpus =", num_cpus)
     print("redis_address =", redis_address)
 
-    # Use configuration file location as the project location.
-    project_dir = os.path.dirname(config.name)
-    project_dir = os.path.abspath(project_dir)
-    print("project_dir =", project_dir)
-
     # Load and parse experiment configurations
     configs = parse_config(config, experiments, globals_param=globals())
 
@@ -169,12 +175,14 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
     # Initialize ray cluster
     if redis_address is not None:
         ray.init(redis_address=redis_address, include_webui=True)
-        num_cpus = 1
     else:
         ray.init(num_cpus=num_cpus, num_gpus=num_gpus, local_mode=num_cpus == 1)
 
     # Run experiments
-    resources_per_trial = {"cpu": 1, "gpu": num_gpus / num_cpus}
+    gpu_percent = 0
+    if num_gpus > 0:
+        gpu_percent = configs.get("gpu_percentage", 0.5)
+    resources_per_trial = {"cpu": 1, "gpu": gpu_percent}
     print("resources_per_trial =", resources_per_trial)
     for exp in configs:
         print("experiment =", exp)
@@ -186,14 +194,13 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
         stop_criteria.update(config.get("stop", {}))
         print("stop_criteria =", stop_criteria)
 
-        # Make sure local directories are relative to the project location
-        path = config.get("path", None)
-        if path and not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+        # Make sure path and data_dir are relative to the project location,
+        # handling both ~/nta and ../results style paths.
+        path = config.get("path", ".")
+        config["path"] = str(Path(path).expanduser().resolve())
 
         data_dir = config.get("data_dir", "data")
-        if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
+        config["data_dir"] = str(Path(data_dir).expanduser().resolve())
 
         tune.run(
             SpeechExperimentTune,
@@ -216,6 +223,8 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
             reuse_actors=config.get("reuse_actors", False),
             trial_executor=config.get("trial_executor", None),
             raise_on_failed_trial=config.get("raise_on_failed_trial", True),
+            keep_checkpoints_num=1,
+            checkpoint_score_attr="mean_accuracy",
         )
 
     ray.shutdown()
@@ -261,11 +270,6 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
     print("num_cpus =", num_cpus)
     print("redis_address =", redis_address)
 
-    # Use configuration file location as the project location.
-    project_dir = os.path.dirname(config.name)
-    project_dir = os.path.abspath(project_dir)
-    print("project_dir =", project_dir)
-
     # Load and parse experiment configurations
     configs = parse_config(config, experiments, globals_param=globals())
 
@@ -286,14 +290,13 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
         config = configs[exp]
         config["name"] = exp
 
-        # Make sure local directories are relative to the project location
-        path = config.get("path", None)
-        if path and not os.path.isabs(path):
-            config["path"] = os.path.join(project_dir, path)
+        # Make sure path and data_dir are relative to the project location,
+        # handling both ~/nta and ../results style paths.
+        path = config.get("path", ".")
+        config["path"] = str(Path(path).expanduser().resolve())
 
         data_dir = config.get("data_dir", "data")
-        if not os.path.isabs(data_dir):
-            config["data_dir"] = os.path.join(project_dir, data_dir)
+        config["data_dir"] = str(Path(data_dir).expanduser().resolve())
 
         # Run each experiment in parallel
         results.append(run_noise_test.remote(config))
@@ -302,7 +305,12 @@ def noise(config, experiments, num_cpus, num_gpus, redis_address):
     ray.get(results)
     ray.shutdown()
 
+    print(results)
+
 
 if __name__ == "__main__":
-    set_random_seed(18)
+    # Set a random random seed, and print it for reproducibility
+    seed = int(time.time())
+    print("Global random seed set to", seed)
+    set_random_seed(seed)
     cli()
