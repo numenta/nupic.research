@@ -97,9 +97,12 @@ class KWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         return (
             "n={0}, percent_on={1}, boost_strength={2}, boost_strength_factor={3}, "
             "k_inference_factor={4}, duty_cycle_period={5}".format(
-                self.n, self.percent_on, self.boost_strength,
-                self.boost_strength_factor, self.k_inference_factor,
-                self.duty_cycle_period
+                self.n,
+                self.percent_on,
+                self.boost_strength,
+                self.boost_strength_factor,
+                self.k_inference_factor,
+                self.duty_cycle_period,
             )
         )
 
@@ -198,7 +201,10 @@ class KWinners(KWinnersBase):
             self.update_duty_cycle(x)
         else:
             x = F.KWinners.apply(
-                x, self.duty_cycle, int(k * self.k_inference_factor), self.boost_strength
+                x,
+                self.duty_cycle,
+                int(k * self.k_inference_factor),
+                self.boost_strength,
             )
 
         return x

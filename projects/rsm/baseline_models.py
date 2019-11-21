@@ -73,7 +73,7 @@ class LSTMModel(nn.Module):
         weight = next(self.parameters())
         return (
             weight.new_zeros(self.nlayers, bsz, self.nhid),  # h_0
-            weight.new_zeros(self.nlayers, bsz, self.nhid)  # c_0
+            weight.new_zeros(self.nlayers, bsz, self.nhid),  # c_0
         )
 
     def _track_weights(self):

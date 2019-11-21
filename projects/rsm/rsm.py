@@ -55,7 +55,7 @@ class RSMPredictor(torch.nn.Module):
             nn.LeakyReLU(),
             nn.Linear(self.hidden_size, self.d_out),
             nn.LeakyReLU(),
-            nn.Softmax(dim=1)
+            nn.Softmax(dim=1),
         )
         self._init_linear_weights()
 
@@ -93,35 +93,37 @@ class RSMNet(torch.nn.Module):
         self.n_layers = n_layers
         self.hooks_registered = False
 
-        eps_arr = self._parse_param_array(kwargs['eps'])
-        k_winners_arr = self._parse_param_array(kwargs['k'])
-        boost_strength_arr = self._parse_param_array(kwargs['boost_strength'])
-        duty_cycle_period_arr = self._parse_param_array(kwargs.get('duty_cycle_period', 1000))
-        m_arr = self._parse_param_array(kwargs['m'])
-        n_arr = self._parse_param_array(kwargs['n'])
+        eps_arr = self._parse_param_array(kwargs["eps"])
+        k_winners_arr = self._parse_param_array(kwargs["k"])
+        boost_strength_arr = self._parse_param_array(kwargs["boost_strength"])
+        duty_cycle_period_arr = self._parse_param_array(
+            kwargs.get("duty_cycle_period", 1000)
+        )
+        m_arr = self._parse_param_array(kwargs["m"])
+        n_arr = self._parse_param_array(kwargs["n"])
         last_output_dim = None
         self.total_cells = []
         for i in range(n_layers):
             first_layer = i == 0
             top_layer = i == n_layers - 1
             if not first_layer:
-                kwargs['d_in'] = last_output_dim
+                kwargs["d_in"] = last_output_dim
                 # Output is of same dim as input (predictive autoencoder)
-                kwargs['d_out'] = kwargs['d_in']
+                kwargs["d_out"] = kwargs["d_in"]
             if not top_layer:
-                kwargs['d_above'] = m_arr[i+1] * n_arr[i+1]
-            if kwargs.get('lateral_conn', True):
+                kwargs["d_above"] = m_arr[i + 1] * n_arr[i + 1]
+            if kwargs.get("lateral_conn", True):
                 if top_layer:
-                    kwargs['lateral_conn'] = kwargs.get('top_lateral_conn', False)
-            kwargs['eps'] = eps_arr[i]
-            kwargs['m'] = m_arr[i]
-            kwargs['n'] = n_arr[i]
-            kwargs['k'] = k_winners_arr[i]
-            kwargs['boost_strength'] = boost_strength_arr[i]
-            kwargs['duty_cycle_period'] = duty_cycle_period_arr[i]
-            self.total_cells.append(kwargs['m'] * kwargs['n'])
-            last_output_dim = kwargs['m'] * kwargs['n']
-            self.add_module("RSM_%d" % (i+1), RSMLayer(**kwargs))
+                    kwargs["lateral_conn"] = kwargs.get("top_lateral_conn", False)
+            kwargs["eps"] = eps_arr[i]
+            kwargs["m"] = m_arr[i]
+            kwargs["n"] = n_arr[i]
+            kwargs["k"] = k_winners_arr[i]
+            kwargs["boost_strength"] = boost_strength_arr[i]
+            kwargs["duty_cycle_period"] = duty_cycle_period_arr[i]
+            self.total_cells.append(kwargs["m"] * kwargs["n"])
+            last_output_dim = kwargs["m"] * kwargs["n"]
+            self.add_module("RSM_%d" % (i + 1), RSMLayer(**kwargs))
 
         print("Created RSMNet with %d layer(s)" % n_layers)
 
@@ -175,11 +177,13 @@ class RSMNet(torch.nn.Module):
         layer_input = x_a_batch
 
         lid = 0
-        for (layer_name, layer), lay_phi, lay_psi in zip(self.named_children(), phi, psi):
+        for (layer_name, layer), lay_phi, lay_psi in zip(
+            self.named_children(), phi, psi
+        ):
             last_layer = lid == len(phi) - 1
             lay_above = list(self.children())[lid + 1] if not last_layer else None
             lay_x_b = x_b[lid]
-            lay_x_above = x_b[lid+1] if not last_layer else None
+            lay_x_above = x_b[lid + 1] if not last_layer else None
 
             # Update memory psi with prior step winners and apply decay as per config
             if lay_x_above is not None:
@@ -214,18 +218,18 @@ class RSMNet(torch.nn.Module):
 
     def init_hidden(self, batch_size):
         param = next(self.parameters())
-        x_b = [param.new_zeros(
-            (batch_size, tc), 
-            dtype=torch.float32, requires_grad=False
-        ) for tc in self.total_cells]
-        phi = [param.new_zeros(
-            (batch_size, tc), 
-            dtype=torch.float32, requires_grad=False
-        ) for tc in self.total_cells]
-        psi = [param.new_zeros(
-            (batch_size, tc), 
-            dtype=torch.float32, requires_grad=False
-        ) for tc in self.total_cells]
+        x_b = [
+            param.new_zeros((batch_size, tc), dtype=torch.float32, requires_grad=False)
+            for tc in self.total_cells
+        ]
+        phi = [
+            param.new_zeros((batch_size, tc), dtype=torch.float32, requires_grad=False)
+            for tc in self.total_cells
+        ]
+        psi = [
+            param.new_zeros((batch_size, tc), dtype=torch.float32, requires_grad=False)
+            for tc in self.total_cells
+        ]
         return (x_b, phi, psi)
 
 
@@ -274,7 +278,7 @@ class RSMLayer(torch.nn.Module):
         stoch_decay=False,
         stoch_k_sd=0.0,
         rec_active_dendrites=0,
-        **kwargs
+        **kwargs,
     ):
         """
         This class includes an attempted replication of the Recurrent Sparse Memory
@@ -354,10 +358,14 @@ class RSMLayer(torch.nn.Module):
         self._build_layers_and_kwinners()
 
         if self.additive_decay:
-            decay_init = torch.ones(self.total_cells, dtype=torch.float32).uniform_(-3.0, 3.0)
+            decay_init = torch.ones(self.total_cells, dtype=torch.float32).uniform_(
+                -3.0, 3.0
+            )
         elif self.stoch_decay:
             # Fixed random decay rates, test with trainable_decay = False
-            decay_init = torch.ones(self.total_cells, dtype=torch.float32).uniform_(-3.0, 3.0)
+            decay_init = torch.ones(self.total_cells, dtype=torch.float32).uniform_(
+                -3.0, 3.0
+            )
         else:
             decay_init = self.eps * torch.ones(self.total_cells, dtype=torch.float32)
         self.decay = nn.Parameter(decay_init, requires_grad=self.trainable_decay)
@@ -365,13 +373,22 @@ class RSMLayer(torch.nn.Module):
         self.learning_iterations = 0
         self.register_buffer("duty_cycle", torch.zeros(self.total_cells))
 
-        print("Created %s with %d trainable params" % (str(self), count_parameters(self)))
+        print(
+            "Created %s with %d trainable params" % (str(self), count_parameters(self))
+        )
 
     def __str__(self):
         fp = ""
         if self.fpartition:
             fp = " partition=(%.2f,%.2f)" % (self.fpartition[0], self.fpartition[1])
-        return "<RSMLayer m=%d n=%d k=%d d_in=%d eps=%.2f%s />" % (self.m, self.n, self.k, self.d_in, self.eps, fp)
+        return "<RSMLayer m=%d n=%d k=%d d_in=%d eps=%.2f%s />" % (
+            self.m,
+            self.n,
+            self.k,
+            self.d_in,
+            self.eps,
+            fp,
+        )
 
     def _debug_log(self, tensor_dict, truncate_len=400):
         if self.debug:
@@ -413,7 +430,7 @@ class RSMLayer(torch.nn.Module):
                             plt.show()
 
     def _build_layers_and_kwinners(self):
-        self.sparse_mods = []        
+        self.sparse_mods = []
         if self.fpartition:
             m_ff, m_int, m_rec = self._partition_sizes()
             # Partition memory into fpartition % FF & remainder recurrent
@@ -425,7 +442,9 @@ class RSMLayer(torch.nn.Module):
                 # Add two additional layers for integrating ff & rec input
                 # NOTE: Testing int layer that gets only input from prior int (no ff)
                 self.linear_a_int = nn.Linear(self.d_in, m_int, bias=self.input_bias)
-                self.linear_b_int = nn.Linear(self.total_cells, m_int, bias=self.input_bias)
+                self.linear_b_int = nn.Linear(
+                    self.total_cells, m_int, bias=self.input_bias
+                )
         else:
             # Standard architecture, no partition
             self.linear_a = nn.Linear(
@@ -438,7 +457,12 @@ class RSMLayer(torch.nn.Module):
                 # Recurrent weights (per cell)
                 if self.rec_active_dendrites:
                     sparsity = 0.3
-                    self.linear_b = ActiveDendriteLayer(d1, n_cells=d2, n_dendrites=self.rec_active_dendrites, sparsity=sparsity)
+                    self.linear_b = ActiveDendriteLayer(
+                        d1,
+                        n_cells=d2,
+                        n_dendrites=self.rec_active_dendrites,
+                        sparsity=sparsity,
+                    )
                     if sparsity:
                         self.sparse_mods.append(self.linear_b.linear_dend)
                 else:
@@ -446,8 +470,9 @@ class RSMLayer(torch.nn.Module):
 
             if self.feedback_conn:
                 # Linear layers for both recurrent input from above and below
-                self.linear_b_above = nn.Linear(self.d_above, self.total_cells,
-                                                bias=self.input_bias)
+                self.linear_b_above = nn.Linear(
+                    self.d_above, self.total_cells, bias=self.input_bias
+                )
 
         pct_on = self.k / self.m
         if self.fpartition and self.balance_part_winners:
@@ -473,7 +498,9 @@ class RSMLayer(torch.nn.Module):
         self.linear_d = nn.Linear(decode_d_in, self.d_out, bias=self.decode_bias)
 
         if self.trainable_decay_rec:
-            self.linear_decay_rec = nn.Linear(self.total_cells, self.total_cells, bias=True)
+            self.linear_decay_rec = nn.Linear(
+                self.total_cells, self.total_cells, bias=True
+            )
 
         self._init_linear_weights()
 
@@ -503,7 +530,7 @@ class RSMLayer(torch.nn.Module):
             pct_on,
             boost_strength=self.boost_strength,
             duty_cycle_period=self.duty_cycle_period,
-            k_inference_factor=1.0, 
+            k_inference_factor=1.0,
             stoch_sd=self.stoch_k_sd,
             boost_strength_factor=self.boost_strength_factor,
         )
@@ -526,10 +553,11 @@ class RSMLayer(torch.nn.Module):
             t.retain_grad()
             t.register_hook(get_grad_printer(label))
 
-
     def _decay_memory(self, psi_last, x_b):
         if self.trainable_decay_rec:
-            decay_param = self.max_decay * torch.sigmoid(self.linear_decay_rec(psi_last))
+            decay_param = self.max_decay * torch.sigmoid(
+                self.linear_decay_rec(psi_last)
+            )
         elif self.trainable_decay:
             decay_param = self.max_decay * torch.sigmoid(self.decay)
         else:
@@ -576,7 +604,11 @@ class RSMLayer(torch.nn.Module):
                 z_int_ff = self.linear_a_int(x_a)
                 # NOTE: Testing from only int/rec portion of mem (no ff)
                 z_int_rec = self.linear_b_int(x_b)
-                z_int = z_int_ff * z_int_rec if self.mult_integration else z_int_ff + z_int_rec
+                z_int = (
+                    z_int_ff * z_int_rec
+                    if self.mult_integration
+                    else z_int_ff + z_int_rec
+                )
                 sigma = torch.cat((z_a, z_int, z_b), 1)  # bsz x m
             else:
                 z_b = self.linear_b(x_b)  # bsz x m_rec
@@ -612,9 +644,9 @@ class RSMLayer(torch.nn.Module):
         return sigma  # total_cells
 
     def _update_duty_cycle(self, winners):
-        '''
+        """
         For tracking layer entropy (across both inhibition/boosting approaches)
-        '''
+        """
         batch_size = winners.shape[0]
         self.learning_iterations += batch_size
         period = min(1000, self.learning_iterations)
@@ -674,18 +706,16 @@ class RSMLayer(torch.nn.Module):
                     winners.append(winners_rec)
                 m_lambda = (torch.cat(winners, 1).abs() > 0).float()
             else:
-                winning_cols = (self.kwinners_col(lambda_).view(bsz, self.m, 1).abs() > 0).float()
-                m_lambda = (
-                    winning_cols.repeat(1, 1, self.n)
-                    .view(bsz, self.total_cells)
-                )
+                winning_cols = (
+                    self.kwinners_col(lambda_).view(bsz, self.m, 1).abs() > 0
+                ).float()
+                m_lambda = winning_cols.repeat(1, 1, self.n).view(bsz, self.total_cells)
                 col_winners = winning_cols
 
             self._debug_log({"m_lambda": m_lambda})
             y_pre_act = m_pi * m_lambda * sigma
 
         self._update_duty_cycle(col_winners.squeeze())
-
 
         del m_pi
         del m_lambda
@@ -755,8 +785,7 @@ class RSMLayer(torch.nn.Module):
 
         self._debug_log({"x_b": x_b, "x_a_batch": x_a_batch})
 
-        sigma = self._fc_weighted_ave(x_a_batch, x_b,
-                                      x_b_above=x_b_above)
+        sigma = self._fc_weighted_ave(x_a_batch, x_b, x_b_above=x_b_above)
         self._debug_log({"sigma": sigma})
 
         y = self._inhibited_winners(sigma, phi)

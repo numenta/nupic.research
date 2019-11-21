@@ -290,6 +290,7 @@ def get_grad_printer(msg):
     This function returns a printer function, that prints information about a
     tensor's gradient. Used by register_hook in the backward pass.
     """
+
     def printer(grad):
         if grad.nelement() == 1:
             print(f"{msg} {grad}")
@@ -368,7 +369,7 @@ def _plot_grad_flow(model, top=0.01):
             Line2D([0], [0], color="b", lw=4),
             Line2D([0], [0], color="k", lw=4),
         ],
-        LABELS
+        LABELS,
     )
 
 
@@ -408,9 +409,10 @@ def print_aligned_sentences(s1, s2, labels=None):
 
 
 def _is_long(x):
-    if hasattr(x, 'data'):
+    if hasattr(x, "data"):
         x = x.data
     return isinstance(x, torch.LongTensor) or isinstance(x, torch.cuda.LongTensor)
+
 
 def onehot(indexes, N=None, ignore_index=None):
     """
@@ -428,17 +430,30 @@ def onehot(indexes, N=None, ignore_index=None):
         output.masked_fill_(indexes.eq(ignore_index).unsqueeze(-1), 0)
     return output
 
-def smoothed_cross_entropy(inputs, target, weight=None, ignore_index=-100, reduction='mean',
-                  smooth_eps=None, smooth_dist=None, from_logits=True):
+
+def smoothed_cross_entropy(
+    inputs,
+    target,
+    weight=None,
+    ignore_index=-100,
+    reduction="mean",
+    smooth_eps=None,
+    smooth_dist=None,
+    from_logits=True,
+):
     """cross entropy loss, with support for target distributions and label smoothing https://arxiv.org/abs/1512.00567"""
     smooth_eps = smooth_eps or 0
 
     # ordinary log-liklihood - use cross_entropy from nn
     if _is_long(target) and smooth_eps == 0:
         if from_logits:
-            return F.cross_entropy(inputs, target, weight, ignore_index=ignore_index, reduction=reduction)
+            return F.cross_entropy(
+                inputs, target, weight, ignore_index=ignore_index, reduction=reduction
+            )
         else:
-            return F.nll_loss(inputs, target, weight, ignore_index=ignore_index, reduction=reduction)
+            return F.nll_loss(
+                inputs, target, weight, ignore_index=ignore_index, reduction=reduction
+            )
 
     if from_logits:
         # log-softmax of inputs
@@ -464,7 +479,7 @@ def smoothed_cross_entropy(inputs, target, weight=None, ignore_index=-100, reduc
 
     if _is_long(target):
         eps_sum = smooth_eps / num_classes
-        eps_nll = 1. - eps_sum - smooth_eps
+        eps_nll = 1.0 - eps_sum - smooth_eps
         likelihood = lsm.gather(dim=-1, index=target.unsqueeze(-1)).squeeze(-1)
         loss = -(eps_nll * likelihood + eps_sum * lsm.sum(-1))
     else:
@@ -473,9 +488,9 @@ def smoothed_cross_entropy(inputs, target, weight=None, ignore_index=-100, reduc
     if masked_indices is not None:
         loss.masked_fill_(masked_indices, 0)
 
-    if reduction == 'sum':
+    if reduction == "sum":
         loss = loss.sum()
-    elif reduction == 'mean':
+    elif reduction == "mean":
         if masked_indices is None:
             loss = loss.mean()
         else:
@@ -487,9 +502,18 @@ def smoothed_cross_entropy(inputs, target, weight=None, ignore_index=-100, reduc
 class SmoothedCrossEntropyLoss(nn.CrossEntropyLoss):
     """CrossEntropyLoss - with ability to recieve distrbution as targets, and optional label smoothing"""
 
-    def __init__(self, weight=None, ignore_index=-100, reduction='mean', smooth_eps=None, smooth_dist=None, from_logits=True):
-        super(SmoothedCrossEntropyLoss, self).__init__(weight=weight,
-                                               ignore_index=ignore_index, reduction=reduction)
+    def __init__(
+        self,
+        weight=None,
+        ignore_index=-100,
+        reduction="mean",
+        smooth_eps=None,
+        smooth_dist=None,
+        from_logits=True,
+    ):
+        super(SmoothedCrossEntropyLoss, self).__init__(
+            weight=weight, ignore_index=ignore_index, reduction=reduction
+        )
         self.smooth_eps = smooth_eps
         self.smooth_dist = smooth_dist
         self.from_logits = from_logits
@@ -497,9 +521,17 @@ class SmoothedCrossEntropyLoss(nn.CrossEntropyLoss):
     def forward(self, input, target, smooth_dist=None):
         if smooth_dist is None:
             smooth_dist = self.smooth_dist
-        return smoothed_cross_entropy(input, target, weight=self.weight, ignore_index=self.ignore_index,
-                             reduction=self.reduction, smooth_eps=self.smooth_eps,
-                             smooth_dist=smooth_dist, from_logits=self.from_logits)
+        return smoothed_cross_entropy(
+            input,
+            target,
+            weight=self.weight,
+            ignore_index=self.ignore_index,
+            reduction=self.reduction,
+            smooth_eps=self.smooth_eps,
+            smooth_dist=smooth_dist,
+            from_logits=self.from_logits,
+        )
+
 
 def plot_tensors(model, tuples, detailed=False, return_fig=False):
     """
@@ -536,9 +568,14 @@ def plot_tensors(model, tuples, detailed=False, return_fig=False):
                 tmin = t.min()
                 tmax = t.max()
                 tsum = t.sum()
-                title = "L%d %s" % (l+1, label)
+                title = "L%d %s" % (l + 1, label)
                 if detailed:
-                    title += " (%s, rng: %.3f-%.3f, sum: %.3f)" % (size, tmin, tmax, tsum)
+                    title += " (%s, rng: %.3f-%.3f, sum: %.3f)" % (
+                        size,
+                        tmin,
+                        tmax,
+                        tsum,
+                    )
                 ax.set_title(title)
     if return_fig:
         return fig
