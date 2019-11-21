@@ -127,7 +127,7 @@ def run_experiment(config, trainable):
         sync_function=config.get("sync_function", None),
         resume=config.get("resume", False),
         reuse_actors=config.get("reuse_actors", False),
-        loggers=(JsonLogger, CSVLogger, TFLoggerPlus), #ElasticsearchLogger),
+        loggers=(JsonLogger, CSVLogger, TFLoggerPlus),  # ElasticsearchLogger),
         verbose=config.get("verbose", 0),
         resources_per_trial={
             # With lots of trials, optimal seems to be 0.5, or 2 trials per GPU
