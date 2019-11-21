@@ -21,10 +21,13 @@
 import collections
 import itertools
 import os
+import pickle
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset, Subset
+from torchvision.datasets import DatasetFolder
+from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader, make_dataset
 
 
 def create_validation_data_sampler(dataset, ratio):
@@ -164,3 +167,41 @@ class PreprocessedDataset(Dataset):
                                  self.basename + "{}.npz".format(qualifier))
         self.tensors = list(np.load(file_name).values())
         return file_name
+
+
+class CachedDatasetFolder(DatasetFolder):
+    """A cached version of `torchvision.datasets.DatasetFolder` where the
+    classes and image list are static and cached skiping the costly `os.walk`
+    and `os.scandir` calls
+    """
+
+    def __init__(self, root, loader=default_loader, extensions=IMG_EXTENSIONS,
+                 transform=None, target_transform=None, is_valid_file=None):
+        super(DatasetFolder, self).__init__(root, transform=transform,
+                                            target_transform=target_transform)
+
+        # Check for cached files
+        cache_filename = os.path.join(root, "__cached_dataset_folder__.p")
+        if os.path.exists(cache_filename):
+            classes, class_to_idx, samples = pickle.load(open(cache_filename, "rb"))
+        else:
+            # Cache file list
+            classes, class_to_idx = self._find_classes(self.root)
+            samples = make_dataset(self.root, class_to_idx, extensions, is_valid_file)
+            if len(samples) == 0:
+                raise (
+                    RuntimeError(
+                        "Found 0 files in subfolders of: " + self.root
+                        + "\nSupported extensions are: "
+                        + ",".join(extensions)))
+            pickle.dump((classes, class_to_idx, samples),
+                        file=open(cache_filename, "wb"),
+                        protocol=pickle.HIGHEST_PROTOCOL)
+
+        self.loader = loader
+        self.extensions = extensions
+
+        self.classes = classes
+        self.class_to_idx = class_to_idx
+        self.samples = samples
+        self.targets = [s[1] for s in samples]
