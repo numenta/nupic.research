@@ -47,7 +47,7 @@ def create_elastic_client(**kwargs):
     :return: Configured :class:`elasticsearch.Elasticsearch` client
     :rtype: :class:`Elasticsearch`
     """
-    hosts = os.environ.get("ELASTIC_HOST")
+    hosts = os.environ.get("ELASTIC_HOSTS")
     hosts = None if hosts is None else hosts.split(",")
     elasticsearch_args = {
         "cloud_id": os.environ.get("ELASTIC_CLOUD_ID"),
@@ -86,6 +86,7 @@ class ElasticsearchLogger(Logger):
     """
 
     def _init(self):
+
         elasticsearch_args = self.config.get("elasticsearch_client", {})
         self.client = create_elastic_client(**elasticsearch_args)
 
@@ -178,7 +179,7 @@ def elastic_dsl(client, dsl, index, **kwargs):
     data = []
     for row in response:
         # Normalize nested dicts in '_source' such as 'config' or 'git'
-        source = json_normalize(row)
+        source = json_normalize(row["_source"]) if "_source" in row else {}
 
         # Squeeze scalar fields returned as arrays in the response by the search API
         fields = row.get("fields", {})

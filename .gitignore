@@ -111,3 +111,7 @@ venv.bak/
 .domino*
 domino*
 /projects/whydense/cifar/results1
+
+# local scripts
+cleancode.sh
+checkcode.sh

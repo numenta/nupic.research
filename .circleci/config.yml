@@ -24,46 +24,44 @@ version: 2
 jobs:
 
   validate_contributor:
-    working_directory: ~/nupic.research
+    working_directory: ~/nta/nupic.research
     machine: true
     steps:
-      - restore_cache:
-          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
       - checkout
       - run:
           name: Validate contributor license
           command: ci/validate-contributor.sh
-      - save_cache:
-          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
-          paths:
-            - ~/nupic.research
+      - persist_to_workspace:
+          root: ~/nta
+          paths: nupic.research
 
   install_dependencies:
-    working_directory: ~/nupic.research
+    working_directory: ~/nta/nupic.research
     docker:
       - image: circleci/python:3.6
     steps:
-      - restore_cache:
-          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - attach_workspace:
+          at: ~/nta
       - restore_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run: pip install --user flake8-formatter-junit-xml
+      - run: pip install --user -I git+https://github.com/numenta/nupic.tensorflow.git#egg=nupic.tensorflow
+      - run: pip install --user -I git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch
+      - run: pip install --user -r requirements.txt
       - run: pip install --user -r requirements-dev.txt
-      - run: pip install --user ray
-      - run: python setup.py install --user
+      - run: python setup.py develop --user
       - save_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
           paths:
             - ~/.local
-            - ~/.cache
 
   check_style:
-    working_directory: ~/nupic.research
+    working_directory: ~/nta/nupic.research
     docker:
       - image: circleci/python:3.6
     steps:
-      - restore_cache:
-          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - attach_workspace:
+          at: ~/nta
       - restore_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run:
@@ -75,12 +73,12 @@ jobs:
           path: test_results
 
   test:
-    working_directory: ~/nupic.research
+    working_directory: ~/nta/nupic.research
     docker:
       - image: circleci/python:3.6
     steps:
-      - restore_cache:
-          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - attach_workspace:
+          at: ~/nta
       - restore_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run:
@@ -94,12 +92,12 @@ jobs:
           path: test_results
 
   build:
-    working_directory: ~/nupic.research
+    working_directory: ~/nta/nupic.research
     docker:
       - image: circleci/python:3.6
     steps:
-      - restore_cache:
-          key: source-cache-{{ .Environment.CIRCLE_SHA1 }}
+      - attach_workspace:
+          at: ~/nta
       - restore_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run:

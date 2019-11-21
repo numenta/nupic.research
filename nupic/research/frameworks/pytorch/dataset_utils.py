@@ -20,10 +20,14 @@
 # ----------------------------------------------------------------------
 import collections
 import itertools
+import os
+import pickle
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset, Subset
+from torchvision.datasets import DatasetFolder
+from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader, make_dataset
 
 
 def create_validation_data_sampler(dataset, ratio):
@@ -111,3 +115,93 @@ def split_dataset(dataset, groupby):
         zip(*(sorted(list(indices_by_group.items()), key=lambda x: x[0])))
     )
     return [Subset(dataset, indices=i) for i in indices]
+
+
+class PreprocessedDataset(Dataset):
+    def __init__(self, cachefilepath, basename, qualifiers):
+        """
+        A Pytorch Dataset class representing a pre-generated processed dataset stored in
+        an efficient compressed numpy format (.npz). The dataset is represented by
+        num_files copies, where each copy is a different variation of the full dataset.
+        For example, for training with data augmentation, each copy might have been
+        generated with a different random seed.  This class is useful if the
+        pre-processing time is a significant fraction of training time.
+
+        :param cachefilepath: String for the directory containing pre-processed data.
+
+        :param basename: Base file name from which to construct actual file names.
+        Actual file name will be "basename{}.npz".format(i) where i cycles through the
+        list of qualifiers.
+
+        :param qualifiers: List of qualifiers for each preprocessed files in this
+        dataset.
+        """
+        self.path = cachefilepath
+        self.basename = basename
+        self.num_cycle = itertools.cycle(qualifiers)
+        self.tensors = []
+        self.load_next()
+
+    def __getitem__(self, index):
+        return tuple(tensor[index] for tensor in self.tensors)
+
+    def __len__(self):
+        return len(self.tensors[0])
+
+    def load_next(self):
+        """
+        Call this to load the next copy into memory, such as at the end of an epoch.
+
+        :return: Name of the file that was actually loaded.
+        """
+        return self.load_qualifier(next(self.num_cycle))
+
+    def load_qualifier(self, qualifier):
+        """
+        Call this to load the a copy of a dataset with the specific qualifier into
+        memory.
+
+        :return: Name of the file that was actually loaded.
+        """
+        file_name = os.path.join(self.path,
+                                 self.basename + "{}.npz".format(qualifier))
+        self.tensors = list(np.load(file_name).values())
+        return file_name
+
+
+class CachedDatasetFolder(DatasetFolder):
+    """A cached version of `torchvision.datasets.DatasetFolder` where the
+    classes and image list are static and cached skiping the costly `os.walk`
+    and `os.scandir` calls
+    """
+
+    def __init__(self, root, loader=default_loader, extensions=IMG_EXTENSIONS,
+                 transform=None, target_transform=None, is_valid_file=None):
+        super(DatasetFolder, self).__init__(root, transform=transform,
+                                            target_transform=target_transform)
+
+        # Check for cached files
+        cache_filename = os.path.join(root, "__cached_dataset_folder__.p")
+        if os.path.exists(cache_filename):
+            classes, class_to_idx, samples = pickle.load(open(cache_filename, "rb"))
+        else:
+            # Cache file list
+            classes, class_to_idx = self._find_classes(self.root)
+            samples = make_dataset(self.root, class_to_idx, extensions, is_valid_file)
+            if len(samples) == 0:
+                raise (
+                    RuntimeError(
+                        "Found 0 files in subfolders of: " + self.root
+                        + "\nSupported extensions are: "
+                        + ",".join(extensions)))
+            pickle.dump((classes, class_to_idx, samples),
+                        file=open(cache_filename, "wb"),
+                        protocol=pickle.HIGHEST_PROTOCOL)
+
+        self.loader = loader
+        self.extensions = extensions
+
+        self.classes = classes
+        self.class_to_idx = class_to_idx
+        self.samples = samples
+        self.targets = [s[1] for s in samples]
