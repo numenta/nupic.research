@@ -49,7 +49,7 @@ exp_config = dict(
 
 # run
 tune_config = dict(
-    name=__file__.replace(".py", "") + "_lt",
+    name=os.path.basename(__file__).replace(".py", "") + "_lt",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,

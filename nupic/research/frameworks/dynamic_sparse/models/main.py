@@ -37,10 +37,7 @@ from nupic.torch.modules import update_boost_strength
 from .loggers import BaseLogger, SparseLogger
 from .modules import SparseModule
 
-__all__ = [
-    "BaseModel",
-    "SparseModel",
-]
+__all__ = ["BaseModel", "SparseModel"]
 
 
 class BaseModel:
@@ -61,6 +58,7 @@ class BaseModel:
             grad_prune_perc=0,
             test_noise=False,
             weight_decay=1e-4,
+            use_multiple_gpus=False,
             train_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
         defaults.update(config or {})
@@ -69,6 +67,8 @@ class BaseModel:
         # save config to restore the model later
         self.config = config
         self.device = torch.device(self.device)
+        if self.use_multiple_gpus:
+            network = nn.DataParallel(network)
         self.network = network.to(self.device)
         self.config = deepcopy(config)
 
@@ -166,8 +166,8 @@ class BaseModel:
                 if idx >= self.train_batches_per_epoch.get_value():
                     break
             # setup for training
-            inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
+            inputs = inputs.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
             self.optimizer.zero_grad()
             # training loop
             with torch.set_grad_enabled(train):

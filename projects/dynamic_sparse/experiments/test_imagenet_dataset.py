@@ -19,41 +19,42 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import os
 
 from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
-exp_config = dict(
+# experiment configurations
+base_exp_config = dict(
     device="cuda",
-    network="MLP",
-    dataset_name="MNIST",
-    input_size=784,
-    hidden_sizes=[50, 50, 50],
+    dataset_name="ImageNet",
+    use_multiple_gpus=True,
     model="PruningModel",
-    epochs=10,
-    train_batches_per_epoch=10,
+    data_dir="~/nta/datasets",
+    num_classes=1000,
+    epochs=20,
+    batch_size_train=1024,
+    batch_size_test=1024,  # 5120,
+    # ---- network related
+    network="resnet50",
+    pretrained=True,
+    # ---- optimizer related
+    optim_alg="Adam",
+    learning_rate=1e-4,
+    weight_decay=1e-2,
     # ---- sparsity related
+    on_perc=1.0,
     target_final_density=0.2,
     sparse_start=None,
     sparse_end=None,
-    on_perc=1.0,
-    # ---- optimizer related
-    optim_alg="SGD",
-    learning_rate=0.1,
-    weight_decay=0,
 )
 
-# run
+# ray configurations
 tune_config = dict(
-    name=os.path.basename(__file__).replace(".py", "") + "_lt",
     num_samples=1,
-    local_dir=os.path.expanduser("~/nta/results"),
+    name=__file__.replace(".py", ""),
     checkpoint_freq=0,
-    checkpoint_at_end=False,
-    resources_per_trial={"cpu": 1, "gpu": 1},
-    verbose=0,
+    checkpoint_at_end=True,
+    resources_per_trial={"cpu": 60, "gpu": 8},
+    verbose=2,
 )
 
-run_ray(tune_config, exp_config, fix_seed=True)
-
-# 10/31 - ran script, working ok, results as expected
+run_ray(tune_config, base_exp_config)
