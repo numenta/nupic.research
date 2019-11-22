@@ -42,13 +42,14 @@ conv_types = {
 LayerParams = namedtuple(
     "LayerParams",
     [
-        "percent_on_k_winner",
+        "percent_on",
         "boost_strength",
         "boost_strength_factor",
         "k_inference_factor",
+        "local",
         "weights_density",
     ],
-    defaults=[0.25, 1.4, 0.7, 1.0, 0.5],
+    defaults=[0.25, 1.4, 0.7, 1.0, False, 0.5],
 )
 
 # Defines default sparse params for layers without activations
@@ -128,23 +129,25 @@ def conv_layer(
 
 def activation_layer(
     out,
-    percent_on_k_winner,
+    percent_on,
     boost_strength,
     boost_strength_factor,
     k_inference_factor,
+    local,
     *args,
 ):
     """Basic activation layer.
     Defaults to ReLU if percent_on is < 0.5. Otherwise KWinners is used."""
-    if percent_on_k_winner >= 0.5:
+    if percent_on >= 0.5:
         return nn.ReLU()
     else:
         return KWinners2d(
             out,
-            percent_on=percent_on_k_winner,
+            percent_on=percent_on,
             boost_strength=boost_strength,
             boost_strength_factor=boost_strength_factor,
             k_inference_factor=k_inference_factor,
+            local=local
         )
 
 
@@ -433,22 +436,22 @@ if __name__ == "__main__":
         stem=LayerParams(),
         filters64=dict(
             conv1x1_1=LayerParams(
-                percent_on_k_winner=0.3,
+                percent_on=0.3,
                 boost_strength=1.2,
                 boost_strength_factor=1.0,
+                local=False,
                 weights_density=0.3,
             ),
             conv3x3_2=LayerParams(
-                percent_on_k_winner=0.1,
+                percent_on=0.1,
                 boost_strength=1.2,
                 boost_strength_factor=1.0,
+                local=True,
                 weights_density=0.1,
             ),
             conv1x1_3=NoactLayerParams(weights_density=0.1),
             shortcut=LayerParams(
-                percent_on_k_winner=0.4,
-                boost_strength=1.2,
-                boost_strength_factor=1.0,
+                percent_on=0.4,
                 weights_density=0.4,
             ),
         ),
@@ -485,7 +488,13 @@ if __name__ == "__main__":
         stem=LayerParams(),
         filters64=[  # 3 blocks
             dict(
-                conv1x1_1=LayerParams(),
+                conv1x1_1=LayerParams(
+                    percent_on=0.3,
+                    boost_strength=1.2,
+                    boost_strength_factor=1.0,
+                    local=False,
+                    weights_density=0.3,
+                ),
                 conv3x3_2=LayerParams(),
                 conv1x1_3=NoactLayerParams(),
                 shortcut=LayerParams(),
