@@ -1,27 +1,45 @@
-import os, sys, inspect
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+
+import argparse
+import inspect
+import os
+import random
+import sys
+import time
+from os.path import expanduser
+
+import torch
+from torch.nn import CrossEntropyLoss
+from torch.utils.data import DataLoader
+from torchvision import transforms
+
+import baseline_models
+import rsm
+import rsm_samplers
+import util
+from tensorboardX import SummaryWriter
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
-import random
-from os.path import expanduser
-import argparse
-import torch
-from torch.utils.data import DataLoader
-from rsm_samplers import MNISTSequenceSampler
-from torchvision import datasets, transforms
-from torch.nn import CrossEntropyLoss, MSELoss
-import rsm
-import numpy as np
-import torchvision.utils as vutils
-from tensorboardX import SummaryWriter
-
-import time
-import rsm_samplers
-import rsm
-import util
-import baseline_models
 
 BSZ = 300
 PAGI9 = [
@@ -151,7 +169,7 @@ class BPTTTrainer:
 
         outputs, targets, states = self.init()
 
-        for i, (inp, target, pred_tgts, input_labels) in enumerate(self.loader):
+        for i, (inp, target, pred_tgts, _input_labels) in enumerate(self.loader):
             inp = inp.to(self.device)
             target = target.to(self.device)
             pred_tgts = pred_tgts.to(self.device)
@@ -178,7 +196,6 @@ class BPTTTrainer:
                 self.optimizer.zero_grad()
 
                 # backprop last module (keep graph only if they ever overlap)
-                start = time.time()
                 for j in range(self.k2 - 1):
                     # print('j', j)
                     if j < self.k1:

@@ -17,7 +17,6 @@
 #
 #  http://numenta.org/licenses/
 
-import math
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -362,14 +361,14 @@ def _plot_grad_flow(model, top=0.01):
     plt.ylabel("average gradient")
     plt.title("Gradient flow (* indicates 0 grad)")
     plt.grid(True)
-    LABELS = ["max-gradient", "mean-gradient", "zero-gradient"]
+    labels = ["max-gradient", "mean-gradient", "zero-gradient"]
     plt.legend(
         [
             Line2D([0], [0], color="c", lw=4),
             Line2D([0], [0], color="b", lw=4),
             Line2D([0], [0], color="k", lw=4),
         ],
-        LABELS,
+        labels,
     )
 
 
@@ -414,17 +413,17 @@ def _is_long(x):
     return isinstance(x, torch.LongTensor) or isinstance(x, torch.cuda.LongTensor)
 
 
-def onehot(indexes, N=None, ignore_index=None):
+def onehot(indexes, n=None, ignore_index=None):
     """
     Creates a one-representation of indexes with N possible entries
     if N is not specified, it will suit the maximum index appearing.
     indexes is a long-tensor of indexes
     ignore_index will be zero in onehot representation
     """
-    if N is None:
-        N = indexes.max() + 1
+    if n is None:
+        n = indexes.max() + 1
     sz = list(indexes.size())
-    output = indexes.new().byte().resize_(*sz, N).zero_()
+    output = indexes.new().byte().resize_(*sz, n).zero_()
     output.scatter_(-1, indexes.unsqueeze(-1), 1)
     if ignore_index is not None and ignore_index >= 0:
         output.masked_fill_(indexes.eq(ignore_index).unsqueeze(-1), 0)
@@ -441,7 +440,8 @@ def smoothed_cross_entropy(
     smooth_dist=None,
     from_logits=True,
 ):
-    """cross entropy loss, with support for target distributions and label smoothing https://arxiv.org/abs/1512.00567"""
+    """cross entropy loss, with support for target distributions and label smoothing
+    https://arxiv.org/abs/1512.00567"""
     smooth_eps = smooth_eps or 0
 
     # ordinary log-liklihood - use cross_entropy from nn
@@ -500,7 +500,10 @@ def smoothed_cross_entropy(
 
 
 class SmoothedCrossEntropyLoss(nn.CrossEntropyLoss):
-    """CrossEntropyLoss - with ability to recieve distrbution as targets, and optional label smoothing"""
+    """
+    CrossEntropyLoss - with ability to recieve distrbution as targets,
+    and optional label smoothing
+    """
 
     def __init__(
         self,
@@ -518,11 +521,11 @@ class SmoothedCrossEntropyLoss(nn.CrossEntropyLoss):
         self.smooth_dist = smooth_dist
         self.from_logits = from_logits
 
-    def forward(self, input, target, smooth_dist=None):
+    def forward(self, x, target, smooth_dist=None):
         if smooth_dist is None:
             smooth_dist = self.smooth_dist
         return smoothed_cross_entropy(
-            input,
+            x,
             target,
             weight=self.weight,
             ignore_index=self.ignore_index,

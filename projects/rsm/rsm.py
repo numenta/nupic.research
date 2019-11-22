@@ -21,13 +21,12 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 from torch import nn
-import numpy as np
 
+from active_dendrite import ActiveDendriteLayer
 # from nupic.torch.modules.k_winners import KWinners
 from k_winners import KWinners
 from nupic.torch.modules.sparse_weights import SparseWeights
 from util import activity_square, count_parameters, get_grad_printer
-from active_dendrite import ActiveDendriteLayer
 
 
 def topk_mask(x, k=2):
@@ -64,7 +63,8 @@ class RSMPredictor(torch.nn.Module):
         Receive input as hidden memory state from RSM, batch
         x^B is with shape (batch_size, total_cells)
 
-        Output is two tensors of shape (batch_size, d_out) being distribution and logits respectively.
+        Output is two tensors of shape (batch_size, d_out) being distribution and
+        logits respectively.
         """
         x1 = None
         x2 = x
@@ -164,7 +164,8 @@ class RSMNet(torch.nn.Module):
                 - x_b is (possibly normalized) winners without hysteresis/decayed memory
 
         Returns:
-            output_by_layer: List of tensors (n_layers, bsz, dim (total_cells or d_in for first layer))
+            output_by_layer: List of tensors
+                (n_layers, bsz, dim (total_cells or d_in for first layer))
             new_hidden: Tuple of tensors (n_layers, bsz, total_cells)
         """
         output_by_layer = []
@@ -177,7 +178,7 @@ class RSMNet(torch.nn.Module):
         layer_input = x_a_batch
 
         lid = 0
-        for (layer_name, layer), lay_phi, lay_psi in zip(
+        for (_layer_name, layer), lay_phi, lay_psi in zip(
             self.named_children(), phi, psi
         ):
             last_layer = lid == len(phi) - 1
@@ -196,7 +197,7 @@ class RSMNet(torch.nn.Module):
 
             pred_output, hidden = layer(layer_input, hidden_in)
 
-            # If layers > 1, higher layers predict lower layer's phi (TOOD: or should be x_b?)
+            # If layers > 1, higher layers predict lower layer's phi
             # phi has hysteresis (if decay active), x_b is just winners
             layer_input = hidden[1]  # phi
 
@@ -769,10 +770,11 @@ class RSMLayer(torch.nn.Module):
         :param x_a_batch: Input batch of batch_size items from
         generating process (batch_size, d_in)
         :param hidden:
-            x_b: Memory at same layer at t-1 (possibly with decayed/hysteresis memory from prior time steps)
+            x_b: Memory at same layer at t-1 (possibly with decayed/hysteresis memory
+                from prior time steps)
             x_b_above: memory state at layer above at t-1
             phi: inhibition state (used only for boost_strat=='rsm_inhibition')
-            psi: memory state at t-1, inclusive of hysteresis / ramped values if applicable
+            psi: memory state at t-1, inclusive of hysteresis
 
         Note that RSMLayer takes a 4-tuple that includes the feedback state
         from the layer above, x_c, while the RSMNet takes only 3-tuple for
