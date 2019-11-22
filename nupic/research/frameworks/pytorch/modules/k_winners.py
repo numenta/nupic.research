@@ -17,13 +17,12 @@
 #
 #  http://numenta.org/licenses/
 #
-import numpy as np
+import warnings
 
-from nupic.research.frameworks.pytorch.functions import k_winners2d_local
-from nupic.torch.modules import KWinners2d
+import nupic.torch.modules
 
 
-class KWinners2dLocal(KWinners2d):
+class KWinners2dLocal(nupic.torch.modules.KWinners2d):
     """
     A K-winner 2d module where the k-winners are chosen locally across all the
     channels
@@ -32,19 +31,10 @@ class KWinners2dLocal(KWinners2d):
     def __init__(self, channels, percent_on=0.1, k_inference_factor=1.5,
                  boost_strength=1.0, boost_strength_factor=0.9,
                  duty_cycle_period=1000):
-        super().__init__(channels, percent_on, k_inference_factor, boost_strength,
-                         boost_strength_factor, duty_cycle_period)
-        self.k = int(round(self.channels * self.percent_on))
-        self.k_inference = int(round(self.channels * self.percent_on_inference))
-
-    def forward(self, x):
-        if self.n == 0:
-            self.n = np.prod(x.shape[1:])
-
-        if self.training:
-            x = k_winners2d_local(x, self.duty_cycle, self.k, self.boost_strength)
-            self.update_duty_cycle(x)
-        else:
-            x = k_winners2d_local(x, self.duty_cycle, self.k_inference,
-                                  self.boost_strength)
-        return x
+        super().__init__(channels=channels, percent_on=percent_on,
+                         k_inference_factor=k_inference_factor,
+                         boost_strength=boost_strength,
+                         boost_strength_factor=boost_strength_factor,
+                         duty_cycle_period=duty_cycle_period, local=True)
+        warnings.warn("KWinners2dLocal moved to nupic.torch. This class will "
+                      "soon be removed from nupic.research", DeprecationWarning)
