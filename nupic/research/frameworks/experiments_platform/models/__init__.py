@@ -19,4 +19,4 @@
 #
 
 from nupic.research.frameworks.dynamic_sparse.models import *
-from nupic.research.frameworks.stochastic_connections.models import *
+from nupic.research.frameworks.stochastic_connections.dynamic_sparse_compat.models import *

@@ -40,7 +40,7 @@ base_exp_config = dict(
     # ---- Dataset ----
     dataset_name="MNIST",
     data_dir=os.path.expanduser("~/nta/datasets/"),
-    batch_size_train=(4, 16),
+    batch_size_train=(100, 100),
     batch_size_test=1000,
 
     # ---- Network ----

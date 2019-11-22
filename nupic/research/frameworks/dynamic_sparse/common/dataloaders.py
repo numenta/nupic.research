@@ -118,7 +118,8 @@ class PreprocessedSpeechDataset(Dataset):
         seeds = [int(e.group(1)) for e in seeds if e is not None]
         seeds = seeds if len(seeds) > 0 else [""]
         if subset == "test_noise":
-            seeds = [seed for seed in seeds if int(seed) in noise_levels]
+            seeds = sorted([seed for seed in seeds
+                            if int(seed) in noise_levels])
         self._all_seeds = itertools.cycle(seeds if len(seeds) > 0 else "")
         self.num_seeds = len(seeds)
 
@@ -171,12 +172,15 @@ class PreprocessedSpeechDataLoader(VaryingDataLoader):
 
         self.dataset = PreprocessedSpeechDataset(
             root, subset, random_seed, noise_level, classes)
+        self.first_iter_occurred = False
 
         super().__init__(self.dataset, batch_size, *args, *kwargs)
 
     def __iter__(self):
+        if self.first_iter_occurred:
+            self.dataset.next_seed()
         iteration = super().__iter__()
-        self.dataset.next_seed()
+        self.first_iter_occurred = True
         return iteration
 
 
