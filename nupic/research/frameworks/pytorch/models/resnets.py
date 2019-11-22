@@ -23,7 +23,6 @@
 
 from collections import namedtuple
 
-import torch
 import torch.nn as nn
 
 import nupic.torch.modules as nupic_modules
@@ -55,6 +54,7 @@ LayerParams.__new__.__defaults__ = (0.25, 1.4, 0.7, 1.0, False, 0.5)
 # Defines default sparse params for layers without activations
 NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"])
 NoactLayerParams.__new__.__defaults__ = (0.5,)
+
 
 def default_sparse_params(group_type, number_layers):
     """Creates dictionary with default parameters.
@@ -416,5 +416,3 @@ def resnet101(config=None):
 
 def resnet152(config=None):
     return build_resnet(152, config)
-
-
