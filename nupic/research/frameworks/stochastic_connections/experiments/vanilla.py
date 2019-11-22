@@ -120,6 +120,7 @@ class Vanilla(object):
         }
 
         test_result = self.test(self.dataset.test_loader)
+        result.update(test_result)
         return result
 
     def save(self, checkpoint_dir):
