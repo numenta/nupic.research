@@ -26,7 +26,7 @@ from ray import tune
 import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
 
-from .datasets import Dataset
+from .datasets import load_dataset
 
 
 class RayTrainable(tune.Trainable):
@@ -38,7 +38,7 @@ class RayTrainable(tune.Trainable):
     def _setup(self, config):
         network = getattr(networks, config["network"])(config=config)
         self.model = getattr(models, config["model"])(network, config=config)
-        self.dataset = Dataset(config=config)
+        self.dataset = load_dataset(config["dataset_name"])(config=config)
         self.model.setup()
         self.experiment_name = config["name"]
 
@@ -52,6 +52,37 @@ class RayTrainable(tune.Trainable):
 
     def _restore(self, checkpoint):
         self.model.restore(checkpoint, self.experiment_name)
+
+
+class CustomTrainable(tune.Trainable):
+    """ray.tune trainable generic class Adaptable to any pytorch module."""
+
+    def __init__(self, config=None, logger_creator=None):
+        tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
+
+    def _setup(self, config):
+        model, dataset = config["unpack_params"]()
+        self.model = model
+        self.dataset = dataset
+        print("finished setting up trainable")
+
+    def _train(self):
+        print("running epoch")
+        log = self.model.run_epoch(self.dataset, self._iteration)
+        return log
+
+    def _save(self, checkpoint_dir):
+        self.model.save(checkpoint_dir, self.experiment_name)
+        return checkpoint_dir
+
+    def _restore(self, checkpoint):
+        self.model.restore(checkpoint, self.experiment_name)
+
+    # added method to setup new model
+    def setup(self, model, network, dataset):
+        self.model = model
+        self.network = network
+        self.dataset = dataset
 
 
 def base_experiment(config):
