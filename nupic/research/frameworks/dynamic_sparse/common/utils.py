@@ -42,10 +42,15 @@ def download_dataset(config):
     dataset
     """
     dataset_name = config["dataset_name"]
-    if hasattr(datasets, dataset_name):
+    # exception: never attempt to download ImageNet
+    if dataset_name == "ImageNet":
+        return
+    # regular torchvision datasets
+    elif hasattr(datasets, dataset_name):
         getattr(datasets, config["dataset_name"])(
             download=True, root=os.path.expanduser(config["data_dir"])
         )
+    # other custom datasets
     elif dataset_name in custom_datasets.keys():
         custom_datasets[dataset_name](
             download=True, root=os.path.expanduser(config["data_dir"])
