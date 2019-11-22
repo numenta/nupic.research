@@ -29,6 +29,7 @@ import torch.nn as nn
 import nupic.torch.modules as nupic_modules
 from nupic.torch.modules import Flatten, KWinners2d
 
+# Defines default convolutional params for different size conv layers
 ConvParams = namedtuple("ConvParams", ["kernel_size", "padding"])
 conv_types = {
     "1x1": ConvParams(kernel_size=1, padding=0),
@@ -37,8 +38,7 @@ conv_types = {
     "7x7": ConvParams(kernel_size=7, padding=3),
 }
 
-NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"], defaults=[0.3])
-
+# Defines default sparse params for regular layers with activations
 LayerParams = namedtuple(
     "LayerParams",
     [
@@ -51,10 +51,22 @@ LayerParams = namedtuple(
     defaults=[0.2, 1.4, 0.7, 1.0, 0.5],
 )
 
+# Defines default sparse params for layers without activations
+NoactLayerParams = namedtuple(
+    "NoactLayerParams", 
+    ["weights_density"], 
+    defaults=[0.3]
+)
 
 def default_sparse_params(group_type, number_layers):
-    """Defines default parameters in case not passed as argument"""
+    """Creates dictionary with default parameters. 
+    If sparse_params is passed to the model, default params are not used.
 
+    :param group_type: defines whether group is BasicBlock or Bottleneck
+    :param number_layers: number of layers to be assigned to each group
+
+    :returns dictionary with default parameters
+    """
     if group_type == BasicBlock:
         params = dict(
             conv3x3_1=LayerParams(),
@@ -80,7 +92,7 @@ def default_sparse_params(group_type, number_layers):
 
 
 def linear_layer(input_size, output_size, weights_density, sparse_layer_type):
-
+    """Basic linear layer, which accepts different sparse layer types."""
     layer = nn.Linear(input_size, output_size)
 
     # adds sparsity to last linear layer
@@ -89,7 +101,6 @@ def linear_layer(input_size, output_size, weights_density, sparse_layer_type):
         return sparse_layer_type(layer, weights_density)
     else:
         return layer
-
 
 def conv_layer(
     conv_type,
@@ -100,6 +111,7 @@ def conv_layer(
     stride=1,
     bias=False,
 ):
+    """Basic conv layer, which accepts different sparse layer types."""
     kernel_size, padding = conv_types[conv_type]
     layer = nn.Conv2d(
         in_planes,
@@ -124,6 +136,8 @@ def activation_layer(
     k_inference_factor,
     *args,
 ):
+    """Basic activation layer. 
+    Defaults to ReLU if percent_on is < 0.5. Otherwise KWinners is used."""
     if percent_on_k_winner >= 0.5:
         return nn.ReLU()
     else:
@@ -137,6 +151,7 @@ def activation_layer(
 
 
 class BasicBlock(nn.Module):
+    """Default block for ResNets with < 50 layers."""
     expansion = 1
 
     def __init__(self, in_planes, planes, sparse_layer_type, layer_params, stride=1):
@@ -187,6 +202,7 @@ class BasicBlock(nn.Module):
 
 
 class Bottleneck(nn.Module):
+    """Default block for ResNets with >= 50 layers."""
     expansion = 4
 
     def __init__(self, in_planes, planes, sparse_layer_type, layer_params, stride=1):
@@ -248,7 +264,7 @@ class Bottleneck(nn.Module):
         out = self.post_activation(out)
         return out
 
-
+# Number of blocks per group for different size Resnets.
 cf_dict = {
     "18": (BasicBlock, [2, 2, 2, 2]),
     "34": (BasicBlock, [3, 4, 6, 3]),
@@ -257,6 +273,7 @@ cf_dict = {
     "152": (Bottleneck, [3, 8, 36, 3]),
 }
 
+# URLs to access pretrained models
 model_urls = {
     18: "https://download.pytorch.org/models/resnet18-5c106cde.pth",
     34: "https://download.pytorch.org/models/resnet34-333f7ec4.pth",
@@ -265,8 +282,10 @@ model_urls = {
     152: "https://download.pytorch.org/models/resnet152-b121ed2d.pth",
 }
 
-
 class ResNet(nn.Module):
+    """Based of torchvision Resnet @ 
+    https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py"""
+
     def __init__(self, config=None):
         super(ResNet, self).__init__()
 
@@ -288,6 +307,7 @@ class ResNet(nn.Module):
         block, num_blocks = self._config_layers()
 
         self.features = nn.Sequential(
+            # stem
             conv_layer(
                 "7x7",
                 3,
@@ -299,6 +319,7 @@ class ResNet(nn.Module):
             nn.BatchNorm2d(64),
             activation_layer(64, *self.sparse_params["stem"]),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            # groups 1 to 4
             self._make_group(
                 block, 64, num_blocks[0], self.sparse_params["filters64"], stride=1
             ),
@@ -315,6 +336,7 @@ class ResNet(nn.Module):
             Flatten(),
         )
 
+        # last output layer
         self.classifier = linear_layer(
             512 * block.expansion,
             self.num_classes,
@@ -333,6 +355,11 @@ class ResNet(nn.Module):
     def _make_group(self, block, planes, num_blocks, sparse_params, stride):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
+
+        # allows sparse params to be defined per group
+        if type(sparse_params) == dict:
+            sparse_params = [sparse_params] * num_blocks  
+
         assert (
             len(sparse_params) == num_blocks
         ), "Length of sparse params {:d} should equal num of blocks{:d}".format(
@@ -384,13 +411,70 @@ def resnet101(config=None):
 def resnet152(config=None):
     return build_resnet(152, config)
 
-
 # base tests
 if __name__ == "__main__":
 
     from torch.autograd import Variable
 
-    # test run
+    # ----- Regular resnet, not customized
+
+    # regular resnet, not customized
+    net = ResNet(config=dict(depth=50, num_classes=10))
+    y = net(Variable(torch.randn(2, 3, 32, 32)))
+    print("ResNet50 with default parameters: ok")    
+
+    # ----- Resnets customized per group
+
+    custom_sparse_params = dict(
+        stem=LayerParams(),
+        filters64=dict(
+                conv1x1_1=LayerParams(
+                    percent_on_k_winner=0.3,
+                    boost_strength=1.2,
+                    boost_strength_factor=1.0,
+                    weights_density=0.3
+                ),
+                conv3x3_2=LayerParams(
+                    percent_on_k_winner=0.1,
+                    boost_strength=1.2,
+                    boost_strength_factor=1.0,
+                    weights_density=0.1
+                ),
+                conv1x1_3=NoactLayerParams(weights_density=0.1),
+                shortcut=LayerParams(
+                    percent_on_k_winner=0.4,
+                    boost_strength=1.2,
+                    boost_strength_factor=1.0,
+                    weights_density=0.4                    
+                )
+        ),
+        filters128=dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+        ),
+        filters256=dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+        ),
+        filters512=dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+        ),
+        linear=NoactLayerParams(weights_density=0.5),
+    )
+
+    net = ResNet(config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params))
+    y = net(Variable(torch.randn(2, 3, 32, 32)))
+    print("ResNet50 customized per group: ok")
+
+    # ----- Fully customized resnets
+
     custom_sparse_params = dict(
         stem=LayerParams(),
         filters64=[  # 3 blocks
@@ -500,26 +584,16 @@ if __name__ == "__main__":
         linear=NoactLayerParams(),
     )
 
-    # regular resnet, not customized
-    net = ResNet(config=dict(depth=50, num_classes=10))
-    # from torchsummary import summary
-    # summary(net, input_size=(3,32,32))
+    net = ResNet(config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params))
     y = net(Variable(torch.randn(2, 3, 32, 32)))
-    print(y.size())
+    print("ResNet50 fully customized: ok")
+
+    # ----- Test different size resnets
 
     # larger resnet
     net = resnet101()
     y = net(Variable(torch.randn(2, 3, 32, 32)))
-    print(y.size())
 
     # smaller resnet
     net = resnet18()
     y = net(Variable(torch.randn(2, 3, 32, 32)))
-    print(y.size())
-
-    # custom resnet
-    net = ResNet(
-        config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params)
-    )
-    y = net(Variable(torch.randn(2, 3, 32, 32)))
-    print(y.size())
