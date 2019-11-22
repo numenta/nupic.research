@@ -19,32 +19,38 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import torch
 from ray import tune
 
 from .vanilla import Vanilla
 
 
 class Noise(Vanilla):
-    def __init__(self, noise_test_epochs, **kwargs):
+    def __init__(self, noise_test_epochs, noise_levels, **kwargs):
         super(Noise, self).__init__(**kwargs)
         self.noise_test_epochs = noise_test_epochs
-        self.noise_levels = kwargs["dataset_config"]["noise_level"]
+        self.noise_levels = noise_levels
 
     def run_epoch(self, iteration):
         result = super(Noise, self).run_epoch(iteration)
 
-        noise_score = 0
-
-        noise_results = {}
         if iteration in self.noise_test_epochs:
+            noise_score = 0
+            noise_results = {}
             for noise_level in self.noise_levels:
-                noise_result = self.test(self.dataset.noise_loader)
+                loader = torch.utils.data.DataLoader(
+                    self.dataset_manager.get_test_dataset(noise_level),
+                    batch_size=self.batch_size_test,
+                    shuffle=False,
+                    pin_memory=torch.cuda.is_available()
+                )
+                noise_result = self.test(loader)
                 noise_score += noise_result["total_correct"]
                 noise_results[str(noise_level)] = noise_result
-                print("Noise level {}, result {}".format(noise_level, noise_result))
 
-        result["noise_results"] = noise_results
-        result["noise_score"] = noise_score
+            result["noise_results"] = noise_results
+            result["noise_score"] = noise_score
+
         return result
 
 

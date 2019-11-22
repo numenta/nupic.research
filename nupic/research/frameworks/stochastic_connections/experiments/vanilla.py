@@ -26,16 +26,22 @@ import torch.nn as nn
 from ray import tune
 from tqdm import tqdm
 
+import nupic.research.frameworks.stochastic_connections.dataset_managers as dm
 import nupic.research.frameworks.stochastic_connections.networks as networks
-from nupic.research.frameworks.dynamic_sparse.common.datasets import Dataset
 
 
 class Vanilla(object):
-    def __init__(self, model_alg, model_params, optim_alg, optim_params,
+    def __init__(self,
+                 model_alg, model_params,
+                 dataset_name, dataset_params,
+                 optim_alg, optim_params,
                  lr_scheduler_alg, lr_scheduler_params,
-                 dataset_config, use_tqdm=False):
+                 batch_size_train, batch_size_test,
+                 use_tqdm=False, tqdm_mininterval=None):
+        self.batch_size_train = batch_size_train
+        self.batch_size_test = batch_size_test
         self.use_tqdm = use_tqdm
-        self.tqdm_mininterval = None
+        self.tqdm_mininterval = tqdm_mininterval
 
         self.device = torch.device("cuda"
                                    if torch.cuda.is_available()
@@ -44,6 +50,9 @@ class Vanilla(object):
         model_constructor = getattr(networks, model_alg)
         self.model = model_constructor(**model_params)
         self.model.to(self.device)
+
+        dm_constructor = getattr(dm, dataset_name)
+        self.dataset_manager = dm_constructor(**dataset_params)
 
         optim_constructor = getattr(torch.optim, optim_alg)
         self.optimizer = optim_constructor(self.model.parameters(),
@@ -54,7 +63,14 @@ class Vanilla(object):
                                               **lr_scheduler_params)
 
         self.loss_func = nn.CrossEntropyLoss()
-        self.dataset = Dataset(dataset_config)
+
+        # Caching
+        self.test_loader = torch.utils.data.DataLoader(
+            self.dataset_manager.get_test_dataset(),
+            batch_size=self.batch_size_test,
+            shuffle=False,
+            pin_memory=torch.cuda.is_available()
+        )
 
     def test(self, loader):
         self.model.eval()
@@ -85,11 +101,18 @@ class Vanilla(object):
     def run_epoch(self, iteration):
         self.model.train()
 
+        train_loader = torch.utils.data.DataLoader(
+            self.dataset_manager.get_train_dataset(iteration),
+            batch_size=self.batch_size_train,
+            shuffle=True,
+            pin_memory=torch.cuda.is_available()
+        )
+
         if self.use_tqdm:
-            batches = tqdm(self.dataset.train_loader, leave=False,
+            batches = tqdm(train_loader, leave=False,
                            desc="Training", mininterval=self.tqdm_mininterval)
         else:
-            batches = self.dataset.train_loader
+            batches = train_loader
 
         train_loss = 0.
         train_correct = 0.
@@ -113,13 +136,12 @@ class Vanilla(object):
         self.lr_scheduler.step()
 
         result = {
-            "mean_train_accuracy": (train_correct
-                                    / len(self.dataset.train_loader.dataset)),
+            "mean_train_accuracy": train_correct / len(train_loader.dataset),
             "mean_training_loss": train_loss / num_train_batches,
             "lr": self.optimizer.state_dict()["param_groups"][0]["lr"],
         }
 
-        test_result = self.test(self.dataset.test_loader)
+        test_result = self.test(self.test_loader)
         result.update(test_result)
         return result
 
