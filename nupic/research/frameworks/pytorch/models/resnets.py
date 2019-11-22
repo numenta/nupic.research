@@ -52,14 +52,11 @@ LayerParams = namedtuple(
 )
 
 # Defines default sparse params for layers without activations
-NoactLayerParams = namedtuple(
-    "NoactLayerParams", 
-    ["weights_density"], 
-    defaults=[0.3]
-)
+NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"], defaults=[0.3])
+
 
 def default_sparse_params(group_type, number_layers):
-    """Creates dictionary with default parameters. 
+    """Creates dictionary with default parameters.
     If sparse_params is passed to the model, default params are not used.
 
     :param group_type: defines whether group is BasicBlock or Bottleneck
@@ -102,6 +99,7 @@ def linear_layer(input_size, output_size, weights_density, sparse_layer_type):
     else:
         return layer
 
+
 def conv_layer(
     conv_type,
     in_planes,
@@ -136,7 +134,7 @@ def activation_layer(
     k_inference_factor,
     *args,
 ):
-    """Basic activation layer. 
+    """Basic activation layer.
     Defaults to ReLU if percent_on is < 0.5. Otherwise KWinners is used."""
     if percent_on_k_winner >= 0.5:
         return nn.ReLU()
@@ -152,6 +150,7 @@ def activation_layer(
 
 class BasicBlock(nn.Module):
     """Default block for ResNets with < 50 layers."""
+
     expansion = 1
 
     def __init__(self, in_planes, planes, sparse_layer_type, layer_params, stride=1):
@@ -203,6 +202,7 @@ class BasicBlock(nn.Module):
 
 class Bottleneck(nn.Module):
     """Default block for ResNets with >= 50 layers."""
+
     expansion = 4
 
     def __init__(self, in_planes, planes, sparse_layer_type, layer_params, stride=1):
@@ -264,6 +264,7 @@ class Bottleneck(nn.Module):
         out = self.post_activation(out)
         return out
 
+
 # Number of blocks per group for different size Resnets.
 cf_dict = {
     "18": (BasicBlock, [2, 2, 2, 2]),
@@ -282,8 +283,9 @@ model_urls = {
     152: "https://download.pytorch.org/models/resnet152-b121ed2d.pth",
 }
 
+
 class ResNet(nn.Module):
-    """Based of torchvision Resnet @ 
+    """Based of torchvision Resnet @
     https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py"""
 
     def __init__(self, config=None):
@@ -358,12 +360,13 @@ class ResNet(nn.Module):
 
         # allows sparse params to be defined per group
         if type(sparse_params) == dict:
-            sparse_params = [sparse_params] * num_blocks  
+            sparse_params = [sparse_params] * num_blocks
 
         assert (
             len(sparse_params) == num_blocks
         ), "Length of sparse params {:d} should equal num of blocks{:d}".format(
-            len(sparse_params), num_blocks)
+            len(sparse_params), num_blocks
+        )
 
         for layer_params, stride in zip(sparse_params, strides):
             layers.append(
@@ -411,6 +414,7 @@ def resnet101(config=None):
 def resnet152(config=None):
     return build_resnet(152, config)
 
+
 # base tests
 if __name__ == "__main__":
 
@@ -421,55 +425,57 @@ if __name__ == "__main__":
     # regular resnet, not customized
     net = ResNet(config=dict(depth=50, num_classes=10))
     y = net(Variable(torch.randn(2, 3, 32, 32)))
-    print("ResNet50 with default parameters: ok")    
+    print("ResNet50 with default parameters: ok")
 
     # ----- Resnets customized per group
 
     custom_sparse_params = dict(
         stem=LayerParams(),
         filters64=dict(
-                conv1x1_1=LayerParams(
-                    percent_on_k_winner=0.3,
-                    boost_strength=1.2,
-                    boost_strength_factor=1.0,
-                    weights_density=0.3
-                ),
-                conv3x3_2=LayerParams(
-                    percent_on_k_winner=0.1,
-                    boost_strength=1.2,
-                    boost_strength_factor=1.0,
-                    weights_density=0.1
-                ),
-                conv1x1_3=NoactLayerParams(weights_density=0.1),
-                shortcut=LayerParams(
-                    percent_on_k_winner=0.4,
-                    boost_strength=1.2,
-                    boost_strength_factor=1.0,
-                    weights_density=0.4                    
-                )
+            conv1x1_1=LayerParams(
+                percent_on_k_winner=0.3,
+                boost_strength=1.2,
+                boost_strength_factor=1.0,
+                weights_density=0.3,
+            ),
+            conv3x3_2=LayerParams(
+                percent_on_k_winner=0.1,
+                boost_strength=1.2,
+                boost_strength_factor=1.0,
+                weights_density=0.1,
+            ),
+            conv1x1_3=NoactLayerParams(weights_density=0.1),
+            shortcut=LayerParams(
+                percent_on_k_winner=0.4,
+                boost_strength=1.2,
+                boost_strength_factor=1.0,
+                weights_density=0.4,
+            ),
         ),
         filters128=dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams()
+            conv1x1_1=LayerParams(),
+            conv3x3_2=LayerParams(),
+            conv1x1_3=NoactLayerParams(),
+            shortcut=LayerParams(),
         ),
         filters256=dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams()
+            conv1x1_1=LayerParams(),
+            conv3x3_2=LayerParams(),
+            conv1x1_3=NoactLayerParams(),
+            shortcut=LayerParams(),
         ),
         filters512=dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams()
+            conv1x1_1=LayerParams(),
+            conv3x3_2=LayerParams(),
+            conv1x1_3=NoactLayerParams(),
+            shortcut=LayerParams(),
         ),
         linear=NoactLayerParams(weights_density=0.5),
     )
 
-    net = ResNet(config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params))
+    net = ResNet(
+        config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params)
+    )
     y = net(Variable(torch.randn(2, 3, 32, 32)))
     print("ResNet50 customized per group: ok")
 
@@ -584,7 +590,9 @@ if __name__ == "__main__":
         linear=NoactLayerParams(),
     )
 
-    net = ResNet(config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params))
+    net = ResNet(
+        config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params)
+    )
     y = net(Variable(torch.randn(2, 3, 32, 32)))
     print("ResNet50 fully customized: ok")
 
