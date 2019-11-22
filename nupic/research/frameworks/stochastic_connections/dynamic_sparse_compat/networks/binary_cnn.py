@@ -102,7 +102,7 @@ class BinaryCNN(nn.Sequential):
                 learn_weight=self.learn_weight,
                 random_weight=self.random_weight)),
             ("cnn2_bn", nn.BatchNorm2d(
-                self.cnn_out_channels[0],
+                self.cnn_out_channels[1],
                 affine=False)),
             ("cnn2_maxpool", nn.MaxPool2d(
                 self.maxpool_stride)),
