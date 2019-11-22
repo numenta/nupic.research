@@ -23,16 +23,13 @@ import sys
 import time
 from functools import partial, reduce
 
-import numpy as np
 import torch
 import torchvision.utils as vutils
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from ptb import lang_util
-from baseline_models import LSTMModel, RNNModel
-from nupic.torch.modules.k_winners import KWinners
 from nupic.torch.duty_cycle_metrics import binary_entropy
+from ptb import lang_util
 from rsm import RSMNet, RSMPredictor
 from rsm_samplers import (
     MNISTBufferedDataset,
@@ -50,7 +47,6 @@ from util import (
     plot_tensors,
     print_aligned_sentences,
     print_epoch_values,
-    SmoothedCrossEntropyLoss,
 )
 
 torch.autograd.set_detect_anomaly(True)
@@ -311,14 +307,12 @@ class RSMExperiment(object):
         self.predictor_loss = None
         if self.predictor:
             # https://pytorch.org/docs/stable/nn.html#crossentropyloss
-            # "This criterion combines nn.LogSoftmax() and nn.NLLLoss() in one single class."
-            # "The input is expected to contain raw, unnormalized scores for each class."
             self.predictor_loss = torch.nn.CrossEntropyLoss(reduction="sum")
 
-    def _get_one_optimizer(self, type, params, lr, l2_reg=0.0):
-        if type == "adam":
+    def _get_one_optimizer(self, otype, params, lr, l2_reg=0.0):
+        if otype == "adam":
             optimizer = torch.optim.Adam(params, lr=lr, weight_decay=l2_reg)
-        elif type == "sgd":
+        elif otype == "sgd":
             optimizer = torch.optim.SGD(
                 params, lr=lr, momentum=self.momentum, weight_decay=l2_reg
             )
@@ -538,7 +532,7 @@ class RSMExperiment(object):
         return interp_loss.item()
 
     def _do_prediction(
-        self, input, pred_targets, pcounts, train=False, batch_idx=0, loader=None
+        self, inputs, pred_targets, pcounts, train=False, batch_idx=0, loader=None
     ):
         """
         Do prediction.
@@ -547,7 +541,7 @@ class RSMExperiment(object):
         if self.predictor:
             pred_targets = pred_targets.flatten()
 
-            predictor_dist, predictor_logits = self.predictor(input.detach())
+            predictor_dist, predictor_logits = self.predictor(inputs.detach())
 
             # This loss is without inference-time model interpolation
             pred_loss = self.predictor_loss(
@@ -574,7 +568,6 @@ class RSMExperiment(object):
         if self.batch_log_interval and batch_idx % self.batch_log_interval == 0:
             print("Finished batch %d" % batch_idx)
             if self.predictor:
-                acc = 100 * pcounts["correct_samples"] / pcounts["total_samples"]
                 batch_acc = correct_arr.float().mean() * 100
                 batch_ppl = lang_util.perpl(pred_loss_ / pred_targets.size(0))
                 print(
@@ -588,8 +581,10 @@ class RSMExperiment(object):
         """
         Compute loss across multiple layers (if applicable).
 
-        First layer loss (l1_loss) is between last image prediction and actual input image
-        Layers > 1 loss (ls_loss) is between last output (hidden predictions) and actual hidden
+        First layer loss (l1_loss) is between last image prediction and actual input
+            image
+        Layers > 1 loss (ls_loss) is between last output (hidden predictions) and
+            actual hidden
 
         Args:
             - predicted_outputs: list of len n_layers of (bsz, d_in or total_cells)
@@ -597,7 +592,7 @@ class RSMExperiment(object):
                 - list of actual_input (bsz, d_in) by layer
                 - list of x_b (bsz, total_cells)) by layer
 
-        Note that batch size will differ if using a smaller first epoch batch size. 
+        Note that batch size will differ if using a smaller first epoch batch size.
         In this case we crop target tensors to match predictions.
 
         TODO: Decision to be made on whether to compute loss vs max-pooled column
@@ -762,7 +757,8 @@ class RSMExperiment(object):
                         self.n_upticks += 1
                         if self.n_upticks >= self.pause_after_upticks:
                             print(
-                                ">>> Pausing learning after %d upticks, validation loss rose to %.3f, best: %.3f"
+                                ">>> Pausing learning after %d upticks, validation "
+                                "loss rose to %.3f, best: %.3f"
                                 % (self.n_upticks, val_loss, self.best_val_loss)
                             )
                             self._pause_learning(epoch)
@@ -804,14 +800,11 @@ class RSMExperiment(object):
 
         bsz = self.batch_size
 
-        read_out_tgt = []
-        read_out_pred = []
-
         hidden = self.train_hidden_buffer[-1] if self.train_hidden_buffer else None
         if hidden is None:
             hidden = self._init_hidden(self.batch_size)
 
-        for batch_idx, (inputs, targets, pred_targets, input_labels) in enumerate(
+        for batch_idx, (inputs, targets, pred_targets, _input_labels) in enumerate(
             self.train_loader
         ):
             # Inputs are of shape (batch, input_size)
@@ -917,7 +910,7 @@ class RSMExperiment(object):
         can be later passed to `model_restore()`.
 
         NOTE: Embedding is not saved with model, so results may vary if a different
-        embedding binary (even if re-generated with same config) is used with the 
+        embedding binary (even if re-generated with same config) is used with the
         restored model.
         """
         checkpoint_file = os.path.join(checkpoint_dir, self.model_filename)
