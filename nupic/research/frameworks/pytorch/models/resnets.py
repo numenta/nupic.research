@@ -48,11 +48,11 @@ LayerParams = namedtuple(
         "k_inference_factor",
         "weights_density",
     ],
-    defaults=[0.2, 1.4, 0.7, 1.0, 0.5],
+    defaults=[0.25, 1.4, 0.7, 1.0, 0.5],
 )
 
 # Defines default sparse params for layers without activations
-NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"], defaults=[0.3])
+NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"], defaults=[0.5])
 
 
 def default_sparse_params(group_type, number_layers):
@@ -595,6 +595,8 @@ if __name__ == "__main__":
     )
     y = net(Variable(torch.randn(2, 3, 32, 32)))
     print("ResNet50 fully customized: ok")
+
+    print(net)
 
     # ----- Test different size resnets
 
