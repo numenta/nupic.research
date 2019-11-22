@@ -24,8 +24,18 @@
 import torch.nn as nn
 from torchvision import models
 from torchvision.models.utils import load_state_dict_from_url
+from collections import namedtuple
 
 from nupic.torch.modules import Flatten, KWinners2d
+import nupic.torch.modules as nupic_modules
+
+cf_dict = {
+    "18": (BasicBlock, [2, 2, 2, 2]),
+    "34": (BasicBlock, [3, 4, 6, 3]),
+    "50": (Bottleneck, [3, 4, 6, 3]),
+    "101": (Bottleneck, [3, 4, 23, 3]),
+    "152": (Bottleneck, [3, 8, 36, 3]),
+}
 
 model_urls = {
     18: "https://download.pytorch.org/models/resnet18-5c106cde.pth",
@@ -35,51 +45,103 @@ model_urls = {
     152: "https://download.pytorch.org/models/resnet152-b121ed2d.pth",
 }
 
-def conv_factory(in_planes, out_planes, stride, padding, bias, density)
-    conv_layer = nn.Conv2d(in_planes, out_planes, 
+ConvParams = namedtuple('ConvParams', ['kernel_size', 'padding'])
+conv_types = {
+    '1x1': ConvParams(kernel_size=1, padding=0),
+    '3x3': ConvParams(kernel_size=3, padding=1),
+    '5x5': ConvParams(kernel_size=5, padding=2),
+    '7x7': ConvParams(kernel_size=7, padding=3),
+}
+
+NoactLayerParams = namedtuple('NoactLayerParams', 
+    ["density"],
+    defaults=[1.0]
+)
+
+LayerParams = namedtuple('LayerParams', 
+    [
+    "density",
+    "percent_on",
+    "boost_strength",
+    "boost_strength_factor",
+    "k_inference_factor",
+    ],
+    defaults=[1.0, 1.0, 1.4, 0.7, 1.0]
+)
+
+def default_sparse_params(group_type, number_layers):
+    """Defines default parameters in case not passed as argument"""
+
+    if group_type == BasicBlock:
+        params = dict(
+            conv3x3_1=LayerParams(), 
+            conv3x3_2=NoactLayerParams(), 
+            shortcut=LayerParams()
+        )
+    elif group_type == Bottleneck:
+        params = dict(
+            conv1x1_1=LayerParams(), 
+            conv3x3_2=LayerParams(), 
+            conv3x3_3=NoactLayerParams(), 
+            shortcut=LayerParams()
+        )
+
+    return dict(
+        stem=LayerParams(),
+        filters64=[params] * number_layers[0],
+        filters128=[params] * number_layers[1],
+        filters256=[params] * number_layers[2],
+        filters512=[params] * number_layers[3],
+        linear=NoactLayerParams()
+    )
+
+def conv_layer(conv_type, in_planes, out_planes, stride, padding, bias, density, sparse_layer_type):
+    kernel_size, padding = conv_types[conv_type]
+    layer = nn.Conv2d(in_planes, out_planes, 
             kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
     if density < 1.0:
-        return SparseWeights2d(conv_layer, density)
+        sparse_layer_type = getattr(nupic_modules, sparse_layer_type)
+        return sparse_layer_type(layer, density)
     else:
-        return conv_layer
+        return layer
 
-def conv1x1(in_planes, out_planes, stride=1, padding=0, bias=False, density=1.0):
-    return conv_factory(in_planes, out_planes, 
-        kernel_size=1, stride=stride, padding=padding, bias=bias)
-
-def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False, density=1.0):
-    return conv_factory(in_planes, out_planes, 
-        kernel_size=3, stride=stride, padding=padding, bias=bias)
-
-def conv5x5(in_planes, out_planes, stride=1, padding=2, bias=False, density=1.0):
-    return conv_factory(in_planes, out_planes, 
-        kernel_size=7, stride=stride, padding=padding, bias=bias)
-
-def conv7x7(in_planes, out_planes, stride=1, padding=3, bias=False, density=1.0):
-    return conv_factory(in_planes, out_planes, 
-        kernel_size=7, stride=stride, padding=padding, bias=bias)
+def activation_layer(out, percent_on, boost_strength, boost_strength_factor, k_inference_factor, **kwargs):
+    if percent_on >= 0.5:
+        return ReLU()
+    else:
+        return KWinners2d(
+            out,
+            percent_on=percent_on_k_winner,
+            boost_strength=boost_strength,
+            boost_strength_factor=boost_strength_factor,
+            k_inference_factor=k_inference_factor,
+        )
 
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, activation_func=nn.ReLU):
+    def __init__(self, in_planes, planes, sparse_layer_type, layer_params, stride=1):
         super(BasicBlock, self).__init__()
 
         self.regular_path = nn.Sequential(
-            conv3x3(in_planes, planes, stride),
+            conv_layer('3x3', in_planes, planes, stride, layer_params['conv3x3_1'].density,
+                sparse_layer_type=sparse_layer_type),
             nn.BatchNorm2d(planes),
-            activation_func(planes),
-            conv3x3(planes, planes),
+            activation_layer(planes, *layer_params['conv3x3_1']),
+            conv_layer('3x3', planes, planes, layer_params['conv3x3_2'].density,
+                sparse_layer_type=sparse_layer_type),
             nn.BatchNorm2d(planes),
         )
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(
-                conv1x1(in_planes, planes, stride=stride), nn.BatchNorm2d(planes)
+                conv_layer('1x1', in_planes, planes, stride=stride, layer_params['shortcut'].density
+                    sparse_layer_type=sparse_layer_type), 
+                nn.BatchNorm2d(planes)
             )
 
-        self.post_activation = activation_func(planes)
+        self.post_activation = activation_layer(planes, *layer_params['shortcut'])
 
     def forward(self, x):
         out = self.regular_path(x)
@@ -87,34 +149,37 @@ class BasicBlock(nn.Module):
         out = self.post_activation(out)
         return out
 
-
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, in_planes, planes, stride=1, activation_func=nn.ReLU):
+    def __init__(self, in_planes, planes, sparse_layer_type, layer_params, stride=1):
         super(Bottleneck, self).__init__()
         self.regular_path = nn.Sequential(
             # 1st layer
-            conv1x1(in_planes, planes),
+            conv_layer('1x1', in_planes, planes, layer_params['conv1x1_1'].density
+                sparse_layer_type=sparse_layer_type),
             nn.BatchNorm2d(planes),
-            activation_func(planes),
+            activation_layer(planes, *layer_params['conv1x1_1']),
             # 2nd layer
-            conv3x3(planes, planes, stride=stride),
+            conv_layer('3x3', planes, planes, stride=stride, layer_params['conv3x3_2'].density
+                sparse_layer_type=sparse_layer_type),
             nn.BatchNorm2d(planes),
-            activation_func(planes),
+            activation_layer(planes, *layer_params['conv3x3_2']),
             # 3rd layer
-            conv1x1(planes, self.expansion * planes),
+            conv_layer('1x1', planes, self.expansion * planes, layer_params['conv3x3_3'].density
+                sparse_layer_type=sparse_layer_type),
             nn.BatchNorm2d(self.expansion * planes),
         )
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(
-                conv1x1(in_planes, self.expansion * planes, stride=stride),
+                conv_layer('1x1', in_planes, self.expansion * planes, stride=stride, 
+                    layer_params['shortcut'].density, sparse_layer_type=sparse_layer_type),
                 nn.BatchNorm2d(self.expansion * planes),
             )
 
-        self.post_activation = activation_func(self.expansion * planes)
+        self.post_activation = activation_layer(self.expansion * planes, *layer_params['shortcut'])
 
     def forward(self, x):
         out = self.regular_path(x)
@@ -130,55 +195,38 @@ class ResNet(nn.Module):
         defaults = dict(
             depth=50,
             num_classes=10,
-            percent_on_k_winner=1.0,
-            boost_strength=1.4,
-            boost_strength_factor=0.7,
-            k_inference_factor=1.0,
+            sparse_linear_layer_type='SparseWeights',
+            sparse_conv_layer_type='SparseWeights2d',
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
 
-        # adds kwinners
-        for attr in [
-            "percent_on_k_winner",
-            "boost_strength",
-            "boost_strength_factor",
-            "k_inference_factor",
-        ]:
-            if type(self.__dict__[attr]) == list:
-                raise ValueError(
-                    """ResNet currently supports only single
-                    percentage of activations for KWinners layers"""
-                )
-
-        if self.percent_on_k_winner < 0.5:
-            self.activation_func = lambda out: self._kwinners(out)
-        else:
-            self.activation_func = lambda _: nn.ReLU()
+        if not hasattr(self, 'sparse_params')
+            self.sparse_params = default_sparse_params(*cf_dict[str(self.depth)])
 
         self.in_planes = 64
-        # TODO: analyze what are these attributes used for in torchvision:
-        # self.groups, self.base_width
-
+ 
         block, num_blocks = self._config_layers()
 
         self.features = nn.Sequential(
-            conv7x7(3, 64, stride=2),
+            conv_layer('7x7', 3, 64, stride=2, sparse_layer_type=self.sparse_conv_layer_type),
             nn.BatchNorm2d(64),
-            self.activation_func(64),
+            activation_layer(64, sparse_params['stem']),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
-            self._make_layer(block, 64, num_blocks[0], stride=1),
-            self._make_layer(block, 128, num_blocks[1], stride=2),
-            self._make_layer(block, 256, num_blocks[2], stride=2),
-            self._make_layer(block, 512, num_blocks[3], stride=2),
+            self._make_group(block, 64, num_blocks[0], stride=1, sparse_params['filters64']),
+            self._make_group(block, 128, num_blocks[1], stride=2, sparse_params['filters128']),
+            self._make_group(block, 256, num_blocks[2], stride=2, sparse_params['filters256']),
+            self._make_group(block, 512, num_blocks[3], stride=2, sparse_params['filters512']),
             nn.AdaptiveAvgPool2d(1),
-            Flatten(),  # TODO: see if I still need it
+            Flatten(),
         )
 
         linear_layer = nn.Linear(512 * block.expansion, self.num_classes)
-        # adds linear density
-        if self.linear_density < 1.0:
-            self.classifier = SparseWeights(linear_layer, self.linear_density)
+
+        # adds sparsity to last linear layer
+        if sparse_params['linear'].density < 1.0:
+            sparse_layer_type = getattr(nupic_modules, self.sparse_linear_layer_type)
+            self.classifier = sparse_layer_type(linear_layer, sparse_params['linear'].density)
         else:
             self.classifier = linear_layer
 
@@ -187,31 +235,16 @@ class ResNet(nn.Module):
         assert (
             self.depth in depth_lst
         ), "Error : Resnet depth should be either 18, 34, 50, 101, 152"
-        cf_dict = {
-            "18": (BasicBlock, [2, 2, 2, 2]),
-            "34": (BasicBlock, [3, 4, 6, 3]),
-            "50": (Bottleneck, [3, 4, 6, 3]),
-            "101": (Bottleneck, [3, 4, 23, 3]),
-            "152": (Bottleneck, [3, 8, 36, 3]),
-        }
 
         return cf_dict[str(self.depth)]
 
-    def _kwinners(self, out):
-        return KWinners2d(
-            out,
-            percent_on=self.percent_on_k_winner,
-            boost_strength=self.boost_strength,
-            boost_strength_factor=self.boost_strength_factor,
-            k_inference_factor=self.k_inference_factor,
-        )
-
-    def _make_layer(self, block, planes, num_blocks, stride):
+    def _make_group(self, block, planes, num_blocks, stride, sparse_params):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
 
-        for stride in strides:
-            layers.append(block(self.in_planes, planes, stride, self.activation_func))
+        for idx, stride in enumerate(strides):
+            layers.append(block(self.in_planes, planes, stride, 
+                layer_params=sparse_params[idx], sparse_layer_type=self.sparse_conv_layer_type))
             self.in_planes = planes * block.expansion
 
         return nn.Sequential(*layers)
@@ -221,91 +254,157 @@ class ResNet(nn.Module):
         out = self.classifier(out)
         return out
 
-
-def load_pretrained(config):
-    """Loads pretrained resnets from torchvision"""
-
-    if "num_classes" not in config:
-        raise ValueError("Attribute num_classes need to be defined at config")
-    new_num_classes = config["num_classes"]
-    config["num_classes"] = 1000
-    net = ResNet(config)
-
-    model_url = model_urls[config["depth"]]
-    state_dict = load_state_dict_from_url(model_url, progress=True)
-
-    def is_incompatible(layer):
-        return (
-            layer.endswith("num_batches_tracked")
-            or layer.endswith("boost_strength")
-            or layer.endswith("duty_cycle")
-        )
-
-    # sync keys between new model and pretrained model
-    original_state_dict = list(net.modules())[0].state_dict()
-    original_keys = original_state_dict.keys()
-    original_keys = [k for k in original_keys if not is_incompatible(k)]
-
-    # load state dict from torchvision
-    assert len(original_keys) == len(
-        state_dict
-    ), "Incompatible number of layers between new network and preloaded network"
-    new_state_dict = {k: v for k, v in zip(original_keys, state_dict.values())}
-    net.load_state_dict(new_state_dict, strict=False)
-
-    # freeze all layers (commented out, decide strategy later)
-    # for param in net.parameters():
-    #     param.requires_grad = False
-
-    # replace the last layer
-    classifier_shape = (net.classifier.weight.shape[1], new_num_classes)
-    net.classifier = nn.Linear(*classifier_shape)
-
-    return net
-
-
 # convenience classes
 def build_resnet(depth, config=None):
     config = config or {}
     config["depth"] = depth
-    # adds option to load pretrained resnets
-    if "pretrained" in config:
-        if config["pretrained"]:
-            print("Loading pretrained model from torchvision")
-            return load_pretrained(config)
     return ResNet(config)
-
 
 def resnet18(config=None):
     return build_resnet(18, config)
 
-
 def resnet34(config=None):
     return build_resnet(34, config)
 
-
 def resnet50(config=None):
-    # return build_resnet(50, config)
-    # temporarily use resnet50 from torchvision
-    return models.resnet50(pretrained=True)
-
+    return build_resnet(50, config)
 
 def resnet101(config=None):
     return build_resnet(101, config)
-
 
 def resnet152(config=None):
     return build_resnet(152, config)
 
 
-# TODO: move to tests
-# if __name__ == "__main__":
-#     net = ResNet(config=dict(depth=50, num_classes=10))
-#     y = net(Variable(torch.randn(1, 3, 32, 32)))
-#     print(y.size())
-#     net = resnet101()
-#     y = net(Variable(torch.randn(1, 3, 32, 32)))
-#     print(y.size())
-#     net = resnet152(config=dict(percent_on_k_winner=0.3))
-#     y = net(Variable(torch.randn(1, 3, 32, 32)))
-#     print(y.size())
+# base tests
+if __name__ == "__main__":
+
+    # test run
+    sparse_params = dict(
+        stem=LayerParams(),
+        filters64=[ # 3 blocks
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+        ],
+        filters128=[ # 4 blocks
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+        ],
+        filters256=[ # 6 blocks
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+        ],
+        filters512=[ # 3 blocks
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+            dict(
+                conv1x1_1=LayerParams(),
+                conv3x3_2=LayerParams(),
+                conv1x1_3=NoactLayerParams(),
+                shortcut=LayerParams()
+            ),
+        ],
+        linear=NoactLayerParams()
+    )
+
+    # regular resnet, not customized
+    net = ResNet(config=dict(depth=50, num_classes=10))
+    y = net(Variable(torch.randn(1, 3, 32, 32)))
+    print(y.size())
+
+    # larger resnet
+    net = resnet101()
+    y = net(Variable(torch.randn(1, 3, 32, 32)))
+    print(y.size())
+
+    # smaller resnet
+    net = resnet18()
+    y = net(Variable(torch.randn(1, 3, 32, 32)))
+    print(y.size())
+
+    # custom resnet
+    net = ResNet(config=dict(depth=50, num_classes=10, sparse_params=sparse_params))
+    y = net(Variable(torch.randn(1, 3, 32, 32)))
+    print(y.size())
