@@ -49,12 +49,12 @@ LayerParams = namedtuple(
         "local",
         "weights_density",
     ],
-    defaults=[0.25, 1.4, 0.7, 1.0, False, 0.5],
 )
+LayerParams.__new__.__defaults__ = (0.25, 1.4, 0.7, 1.0, False, 0.5)
 
 # Defines default sparse params for layers without activations
-NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"], defaults=[0.5])
-
+NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"])
+NoactLayerParams.__new__.__defaults__ = (0.5,)
 
 def default_sparse_params(group_type, number_layers):
     """Creates dictionary with default parameters.
@@ -89,14 +89,14 @@ def default_sparse_params(group_type, number_layers):
     )
 
 
-def linear_layer(input_size, output_size, weights_density, sparse_layer_type):
+def linear_layer(input_size, output_size, weights_density, sparse_weights_type):
     """Basic linear layer, which accepts different sparse layer types."""
     layer = nn.Linear(input_size, output_size)
 
     # adds sparsity to last linear layer
     if weights_density < 1.0:
-        sparse_layer_type = getattr(nupic_modules, sparse_layer_type)
-        return sparse_layer_type(layer, weights_density)
+        sparse_weights_type = getattr(nupic_modules, sparse_weights_type)
+        return sparse_weights_type(layer, weights_density)
     else:
         return layer
 
@@ -106,7 +106,7 @@ def conv_layer(
     in_planes,
     out_planes,
     weights_density,
-    sparse_layer_type,
+    sparse_weights_type,
     stride=1,
     bias=False,
 ):
@@ -121,8 +121,8 @@ def conv_layer(
         bias=bias,
     )
     if weights_density < 1.0:
-        sparse_layer_type = getattr(nupic_modules, sparse_layer_type)
-        return sparse_layer_type(layer, weights_density)
+        sparse_weights_type = getattr(nupic_modules, sparse_weights_type)
+        return sparse_weights_type(layer, weights_density)
     else:
         return layer
 
@@ -156,7 +156,7 @@ class BasicBlock(nn.Module):
 
     expansion = 1
 
-    def __init__(self, in_planes, planes, sparse_layer_type, layer_params, stride=1):
+    def __init__(self, in_planes, planes, sparse_weights_type, layer_params, stride=1):
         super(BasicBlock, self).__init__()
 
         self.regular_path = nn.Sequential(
@@ -165,7 +165,7 @@ class BasicBlock(nn.Module):
                 in_planes,
                 planes,
                 layer_params["conv3x3_1"].weights_density,
-                sparse_layer_type=sparse_layer_type,
+                sparse_weights_type=sparse_weights_type,
                 stride=stride,
             ),
             nn.BatchNorm2d(planes),
@@ -175,7 +175,7 @@ class BasicBlock(nn.Module):
                 planes,
                 planes,
                 layer_params["conv3x3_2"].weights_density,
-                sparse_layer_type=sparse_layer_type,
+                sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(planes),
         )
@@ -188,7 +188,7 @@ class BasicBlock(nn.Module):
                     in_planes,
                     planes,
                     layer_params["shortcut"].weights_density,
-                    sparse_layer_type=sparse_layer_type,
+                    sparse_weights_type=sparse_weights_type,
                     stride=stride,
                 ),
                 nn.BatchNorm2d(planes),
@@ -208,7 +208,7 @@ class Bottleneck(nn.Module):
 
     expansion = 4
 
-    def __init__(self, in_planes, planes, sparse_layer_type, layer_params, stride=1):
+    def __init__(self, in_planes, planes, sparse_weights_type, layer_params, stride=1):
         super(Bottleneck, self).__init__()
         self.regular_path = nn.Sequential(
             # 1st layer
@@ -217,7 +217,7 @@ class Bottleneck(nn.Module):
                 in_planes,
                 planes,
                 layer_params["conv1x1_1"].weights_density,
-                sparse_layer_type=sparse_layer_type,
+                sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(planes),
             activation_layer(planes, *layer_params["conv1x1_1"]),
@@ -227,7 +227,7 @@ class Bottleneck(nn.Module):
                 planes,
                 planes,
                 layer_params["conv3x3_2"].weights_density,
-                sparse_layer_type=sparse_layer_type,
+                sparse_weights_type=sparse_weights_type,
                 stride=stride,
             ),
             nn.BatchNorm2d(planes),
@@ -238,7 +238,7 @@ class Bottleneck(nn.Module):
                 planes,
                 self.expansion * planes,
                 layer_params["conv1x1_3"].weights_density,
-                sparse_layer_type=sparse_layer_type,
+                sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(self.expansion * planes),
         )
@@ -251,7 +251,7 @@ class Bottleneck(nn.Module):
                     in_planes,
                     self.expansion * planes,
                     layer_params["shortcut"].weights_density,
-                    sparse_layer_type=sparse_layer_type,
+                    sparse_weights_type=sparse_weights_type,
                     stride=stride,
                 ),
                 nn.BatchNorm2d(self.expansion * planes),
@@ -298,8 +298,8 @@ class ResNet(nn.Module):
         defaults = dict(
             depth=50,
             num_classes=10,
-            sparse_linear_layer_type="SparseWeights",
-            sparse_conv_layer_type="SparseWeights2d",
+            linear_sparse_weights_type="SparseWeights",
+            conv_sparse_weights_type="SparseWeights2d",
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -318,7 +318,7 @@ class ResNet(nn.Module):
                 3,
                 64,
                 self.sparse_params["stem"].weights_density,
-                sparse_layer_type=self.sparse_conv_layer_type,
+                sparse_weights_type=self.conv_sparse_weights_type,
                 stride=2,
             ),
             nn.BatchNorm2d(64),
@@ -346,7 +346,7 @@ class ResNet(nn.Module):
             512 * block.expansion,
             self.num_classes,
             self.sparse_params["linear"].weights_density,
-            self.sparse_linear_layer_type,
+            self.linear_sparse_weights_type,
         )
 
     def _config_layers(self):
@@ -377,7 +377,7 @@ class ResNet(nn.Module):
                     self.in_planes,
                     planes,
                     layer_params=layer_params,
-                    sparse_layer_type=self.sparse_conv_layer_type,
+                    sparse_weights_type=self.conv_sparse_weights_type,
                     stride=stride,
                 )
             )
@@ -418,201 +418,3 @@ def resnet152(config=None):
     return build_resnet(152, config)
 
 
-# base tests
-if __name__ == "__main__":
-
-    from torch.autograd import Variable
-
-    # ----- Regular resnet, not customized
-
-    # regular resnet, not customized
-    net = ResNet(config=dict(depth=50, num_classes=10))
-    y = net(Variable(torch.randn(2, 3, 32, 32)))
-    print("ResNet50 with default parameters: ok")
-
-    # ----- Resnets customized per group
-
-    custom_sparse_params = dict(
-        stem=LayerParams(),
-        filters64=dict(
-            conv1x1_1=LayerParams(
-                percent_on=0.3,
-                boost_strength=1.2,
-                boost_strength_factor=1.0,
-                local=False,
-                weights_density=0.3,
-            ),
-            conv3x3_2=LayerParams(
-                percent_on=0.1,
-                boost_strength=1.2,
-                boost_strength_factor=1.0,
-                local=True,
-                weights_density=0.1,
-            ),
-            conv1x1_3=NoactLayerParams(weights_density=0.1),
-            shortcut=LayerParams(
-                percent_on=0.4,
-                weights_density=0.4,
-            ),
-        ),
-        filters128=dict(
-            conv1x1_1=LayerParams(),
-            conv3x3_2=LayerParams(),
-            conv1x1_3=NoactLayerParams(),
-            shortcut=LayerParams(),
-        ),
-        filters256=dict(
-            conv1x1_1=LayerParams(),
-            conv3x3_2=LayerParams(),
-            conv1x1_3=NoactLayerParams(),
-            shortcut=LayerParams(),
-        ),
-        filters512=dict(
-            conv1x1_1=LayerParams(),
-            conv3x3_2=LayerParams(),
-            conv1x1_3=NoactLayerParams(),
-            shortcut=LayerParams(),
-        ),
-        linear=NoactLayerParams(weights_density=0.5),
-    )
-
-    net = ResNet(
-        config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params)
-    )
-    y = net(Variable(torch.randn(2, 3, 32, 32)))
-    print("ResNet50 customized per group: ok")
-
-    # ----- Fully customized resnets
-
-    custom_sparse_params = dict(
-        stem=LayerParams(),
-        filters64=[  # 3 blocks
-            dict(
-                conv1x1_1=LayerParams(
-                    percent_on=0.3,
-                    boost_strength=1.2,
-                    boost_strength_factor=1.0,
-                    local=False,
-                    weights_density=0.3,
-                ),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-        ],
-        filters128=[  # 4 blocks
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-        ],
-        filters256=[  # 6 blocks
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-        ],
-        filters512=[  # 3 blocks
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-            dict(
-                conv1x1_1=LayerParams(),
-                conv3x3_2=LayerParams(),
-                conv1x1_3=NoactLayerParams(),
-                shortcut=LayerParams(),
-            ),
-        ],
-        linear=NoactLayerParams(),
-    )
-
-    net = ResNet(
-        config=dict(depth=50, num_classes=10, sparse_params=custom_sparse_params)
-    )
-    y = net(Variable(torch.randn(2, 3, 32, 32)))
-    print("ResNet50 fully customized: ok")
-
-    print(net)
-
-    # ----- Test different size resnets
-
-    # larger resnet
-    net = resnet101()
-    y = net(Variable(torch.randn(2, 3, 32, 32)))
-
-    # smaller resnet
-    net = resnet18()
-    y = net(Variable(torch.randn(2, 3, 32, 32)))
