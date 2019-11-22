@@ -36,20 +36,11 @@ tune.run(
     experiments.NoiseRay,
     name=os.path.basename(__file__).replace(".py", ""),
     config=dict(
-        use_tqdm=False,
-        noise_test_epochs=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99],
-
-        dataset_config=dict(
-            dataset_name="PreprocessedGSC",
-            data_dir=os.path.expanduser("~/nta/datasets/gsc"),
-            batch_size_train=16,
-            batch_size_test=1000,
-            test_noise=True,
-            noise_level=[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-        ),
-
         model_alg="gsc_lenet",
         model_params=dict(),
+
+        dataset_name="PreprocessedGSC",
+        dataset_params={},
 
         optim_alg="Adam",
         optim_params=dict(
@@ -61,6 +52,13 @@ tune.run(
             step_size=1,
             gamma=0.94,
         ),
+
+        use_tqdm=False,
+        batch_size_train=16,
+        batch_size_test=1000,
+
+        noise_test_epochs=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99],
+        noise_levels=[0.0, 0.5, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5],
     ),
     num_samples=1,
     checkpoint_freq=0,
