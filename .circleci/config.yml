@@ -32,8 +32,9 @@ jobs:
           name: Validate contributor license
           command: ci/validate-contributor.sh
       - persist_to_workspace:
-          root: ~/nta
-          paths: nupic.research
+          root: ~/
+          paths:
+            - nta/nupic.research
 
   install_dependencies:
     working_directory: ~/nta/nupic.research
@@ -41,7 +42,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - attach_workspace:
-          at: ~/nta
+          at: ~/
       - run:
           name: Get nupic.torch and nupic.tensorflow latest SHA
           command: |
@@ -60,8 +61,10 @@ jobs:
           paths:
             - ~/.local
       - persist_to_workspace:
-          root: ~/nta
-          paths: nupic.research
+          root: ~/
+          paths:
+            - nta/nupic.research
+            - .local
 
   check_style:
     working_directory: ~/nta/nupic.research
@@ -69,9 +72,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - attach_workspace:
-          at: ~/nta
-      - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          at: ~/
       - run:
           name: Check Style
           command: |
@@ -86,9 +87,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - attach_workspace:
-          at: ~/nta
-      - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          at: ~/
       - run:
           name: Run python tests
           environment:
@@ -105,9 +104,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - attach_workspace:
-          at: ~/nta
-      - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          at: ~/
       - run:
           name: Build wheel
           environment:
