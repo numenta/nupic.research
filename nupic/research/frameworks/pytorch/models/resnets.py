@@ -297,7 +297,7 @@ class ResNet(nn.Module):
         # update config
         defaults = dict(
             depth=50,
-            num_classes=10,
+            num_classes=1000,
             linear_sparse_weights_type="SparseWeights",
             conv_sparse_weights_type="SparseWeights2d",
         )
