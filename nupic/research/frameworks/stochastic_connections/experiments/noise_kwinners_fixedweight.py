@@ -19,6 +19,32 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .vanilla import VanillaRay
-from .noise import NoiseRay
-from .noise_kwinners_fixedweight import NoiseKWinnersFixedWeightRay
+from ray import tune
+
+from nupic.torch.modules import rezero_weights, update_boost_strength
+
+from .noise import Noise
+
+
+class NoiseKWinnersFixedWeight(Noise):
+    def _before_train_epoch(self):
+        super()._before_train_epoch()
+        self.model.apply(update_boost_strength)
+
+    def _after_train_epoch(self):
+        super()._after_train_epoch()
+        self.model.apply(rezero_weights)
+
+
+class NoiseKWinnersFixedWeightRay(tune.Trainable):
+    def _setup(self, config):
+        self.exp = NoiseKWinnersFixedWeight(**config)
+
+    def _train(self):
+        return self.exp.run_epoch(self.iteration)
+
+    def _save(self, checkpoint_dir):
+        return self.exp.save(checkpoint_dir)
+
+    def _restore(self, checkpoint):
+        self.exp.restore(checkpoint)

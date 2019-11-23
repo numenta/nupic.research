@@ -46,6 +46,7 @@ def add_sparse_cnn_layer(
     k_inference_factor,
     boost_strength,
     boost_strength_factor,
+    duty_cycle_period,
     activation_fct_before_max_pool,
     use_kwinners_local,
     consolidated_sparse_weights,
@@ -103,6 +104,7 @@ def add_sparse_cnn_layer(
             k_inference_factor=k_inference_factor,
             boost_strength=boost_strength,
             boost_strength_factor=boost_strength_factor,
+            duty_cycle_period=duty_cycle_period,
         )
         network.add_module("cnn{}_kwinner".format(suffix), kwinner)
 
@@ -123,6 +125,7 @@ def add_sparse_linear_layer(
     k_inference_factor,
     boost_strength,
     boost_strength_factor,
+    duty_cycle_period,
     consolidated_sparse_weights,
 ):
     """Add sparse linear layer to network.
@@ -167,6 +170,7 @@ def add_sparse_linear_layer(
                 k_inference_factor=k_inference_factor,
                 boost_strength=boost_strength,
                 boost_strength_factor=boost_strength_factor,
+                duty_cycle_period=duty_cycle_period,
             ),
         )
     else:
@@ -217,12 +221,14 @@ class LeSparseNet(nn.Sequential):
                  num_classes=10,
                  boost_strength=1.67,
                  boost_strength_factor=0.9,
+                 duty_cycle_period=1000,
                  k_inference_factor=1.5,
                  use_batch_norm=True,
                  dropout=0.0,
                  activation_fct_before_max_pool=False,
                  consolidated_sparse_weights=False,
                  use_kwinners_local=False,
+                 use_softmax=True,
                  ):
         super(LeSparseNet, self).__init__()
 
@@ -245,6 +251,7 @@ class LeSparseNet(nn.Sequential):
                 k_inference_factor=k_inference_factor,
                 boost_strength=boost_strength,
                 boost_strength_factor=boost_strength_factor,
+                duty_cycle_period=duty_cycle_period,
                 activation_fct_before_max_pool=activation_fct_before_max_pool,
                 use_kwinners_local=use_kwinners_local,
                 consolidated_sparse_weights=csw
@@ -273,10 +280,12 @@ class LeSparseNet(nn.Sequential):
                 k_inference_factor=k_inference_factor,
                 boost_strength=boost_strength,
                 boost_strength_factor=boost_strength_factor,
+                duty_cycle_period=duty_cycle_period,
                 consolidated_sparse_weights=consolidated_sparse_weights,
             )
             input_size = linear_n[i]
 
         # Classifier
         self.add_module("output", nn.Linear(input_size, num_classes))
-        self.add_module("softmax", nn.LogSoftmax(dim=1))
+        if use_softmax:
+            self.add_module("softmax", nn.LogSoftmax(dim=1))
