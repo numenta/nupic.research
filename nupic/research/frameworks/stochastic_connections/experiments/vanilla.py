@@ -100,6 +100,7 @@ class Vanilla(object):
 
     def run_epoch(self, iteration):
         self.model.train()
+        self._before_train_epoch()
 
         train_loader = torch.utils.data.DataLoader(
             self.dataset_manager.get_train_dataset(iteration),
@@ -134,6 +135,7 @@ class Vanilla(object):
                 num_train_batches += 1
 
         self.lr_scheduler.step()
+        self._after_train_epoch()
 
         result = {
             "mean_train_accuracy": train_correct / len(train_loader.dataset),
@@ -153,6 +155,12 @@ class Vanilla(object):
     def restore(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
         self.model.load_state_dict(torch.load(checkpoint_path))
+
+    def _before_train_epoch(self):
+        pass
+
+    def _after_train_epoch(self):
+        pass
 
 
 class VanillaRay(tune.Trainable):
