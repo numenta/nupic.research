@@ -33,37 +33,38 @@ from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
 ray.init()
 
 tune.run(
-    experiments.NoiseRay,
+    experiments.NoiseKWinnersFixedWeightRay,
     name=os.path.basename(__file__).replace(".py", ""),
     config=dict(
-        model_alg="gsc_lenet",
+        model_alg="gsc_lesparsenet",
         model_params=dict(),
 
         dataset_name="PreprocessedGSC",
         dataset_params={},
 
-        optim_alg="Adam",
+        optim_alg="SGD",
         optim_params=dict(
             lr=0.01,
+            weight_decay=0.01,
         ),
 
         lr_scheduler_alg="StepLR",
         lr_scheduler_params=dict(
             step_size=1,
-            gamma=0.94,
+            gamma=0.9,
         ),
 
         use_tqdm=False,
         batch_size_train=16,
         batch_size_test=1000,
 
-        noise_test_epochs=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99],
+        noise_test_epochs=[0, 10, 20, 29],
         noise_levels=[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5],
     ),
     num_samples=1,
     checkpoint_freq=0,
     checkpoint_at_end=True,
-    stop={"training_iteration": 100},
+    stop={"training_iteration": 30},
     resources_per_trial={
         "cpu": 1,
         "gpu": (1 if torch.cuda.is_available() else 0)},
