@@ -19,7 +19,7 @@
 #
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import torch
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.platform import test
