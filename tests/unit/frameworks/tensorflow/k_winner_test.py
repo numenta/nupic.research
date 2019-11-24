@@ -21,7 +21,7 @@
 import random
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.python.framework import test_util
 from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.models import Model
@@ -68,7 +68,7 @@ class KWinnersTest(tf.test.TestCase):
 
         batch_size = self.x.shape[0]
         input_shape = self.x.shape[1:]
-        n = np.prod(input_shape).value
+        n = np.prod(input_shape)
 
         k_winners = KWinners(percent_on=3 / n, boost_strength=0.0)
         inp = Input(batch_size=batch_size, shape=input_shape)
@@ -120,7 +120,7 @@ class KWinners2dTest(tf.test.TestCase):
         expected[0, 2, 1, 0] = 1.3
 
         input_shape = x.shape[1:]
-        n = np.prod(input_shape).value
+        n = np.prod(input_shape)
         k = 4
 
         with self.cached_session(config=CONFIG):
@@ -139,7 +139,7 @@ class KWinners2dTest(tf.test.TestCase):
         expected[0, 2, 1, 0] = 1.3
 
         input_shape = x.shape[1:]
-        n = np.prod(input_shape).value
+        n = np.prod(input_shape)
         k = 3
 
         with self.cached_session(config=CONFIG):
@@ -163,7 +163,7 @@ class KWinners2dTest(tf.test.TestCase):
         expected[1, 2, 1, 1] = 1.7
 
         input_shape = x.shape[1:]
-        n = np.prod(input_shape).value
+        n = np.prod(input_shape)
         k = 4
 
         with self.cached_session(config=CONFIG):
@@ -185,7 +185,7 @@ class KWinners2dTest(tf.test.TestCase):
         expected[1, 2, 1, 1] = 1.7
 
         input_shape = x.shape[1:]
-        n = np.prod(input_shape).value
+        n = np.prod(input_shape)
         k = 3
 
         with self.cached_session(config=CONFIG):
