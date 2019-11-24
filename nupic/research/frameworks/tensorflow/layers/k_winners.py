@@ -377,7 +377,7 @@ class KWinners(KWinnersBase):
 
     def build(self, input_shape):
         super(KWinners, self).build(input_shape=input_shape)
-        self.n = input_shape[-1].value
+        self.n = input_shape[-1]
         self.k = round(self.n * self.percent_on)
         self.k_inference = round(self.k * self.k_inference_factor)
 
@@ -395,7 +395,7 @@ class KWinners(KWinnersBase):
                         + newValue}{period}
 
         """
-        batch_size = inputs.shape[0].value
+        batch_size = inputs.shape[0]
         self.learning_iterations += batch_size
         period = tf.minimum(self.duty_cycle_period, self.learning_iterations)
         period = tf.cast(period, tf.float32)
