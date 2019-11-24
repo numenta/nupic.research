@@ -19,6 +19,37 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .vanilla import VanillaRay
-from .noise import NoiseRay
-from .noise_kwinners_fixedweight import NoiseKWinnersFixedWeightRay
+
+from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
+
+# experiment configurations
+base_exp_config = dict(
+    device="cuda",
+    dataset_name="ImageNet",
+    use_multiple_gpus=True,
+    model="BaseModel",
+    data_dir="~/nta/datasets",
+    num_classes=1000,
+    epochs=90,
+    batch_size_train=1024,
+    batch_size_test=1024,
+    # ---- network related
+    network="resnet50",
+    pretrained=False,
+    # ---- optimizer related
+    optim_alg="Adam",
+    learning_rate=2e-3,
+    weight_decay=2e-4,
+)
+
+# ray configurations
+tune_config = dict(
+    num_samples=1,
+    name=__file__.replace(".py", ""),
+    checkpoint_freq=0,
+    checkpoint_at_end=True,
+    resources_per_trial={"cpu": 60, "gpu": 8},
+    verbose=2,
+)
+
+run_ray(tune_config, base_exp_config)

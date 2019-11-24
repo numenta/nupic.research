@@ -26,3 +26,4 @@ from .main import *
 from .utils import *
 from .resnet import *
 from .wideresnet import *
+from nupic.research.frameworks.pytorch.models.resnets import resnet50

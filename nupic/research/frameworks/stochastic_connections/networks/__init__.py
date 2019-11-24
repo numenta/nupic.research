@@ -18,5 +18,5 @@
 #  http://numenta.org/licenses/
 #
 
-from .fixed_sparsenet import *
 from .lenet import *
+from .lesparsenet import *
