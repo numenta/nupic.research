@@ -49,11 +49,11 @@ LayerParams = namedtuple(
         "weights_density",
     ],
 )
-LayerParams.__new__.__defaults__ = (0.25, 1.4, 0.7, 1.0, True, 0.5)
+LayerParams.__new__.__defaults__ = (1.0, 1.4, 0.7, 1.0, True, 1.0)
 
 # Defines default sparse params for layers without activations
 NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"])
-NoactLayerParams.__new__.__defaults__ = (0.5,)
+NoactLayerParams.__new__.__defaults__ = (1.0,)
 
 
 def default_sparse_params(group_type, number_layers):
