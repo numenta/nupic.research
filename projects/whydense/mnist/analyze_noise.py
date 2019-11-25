@@ -20,7 +20,8 @@
 # ----------------------------------------------------------------------
 import json
 import logging
-import os
+from os.path import basename, dirname
+from pathlib import Path
 
 import click
 import matplotlib
@@ -65,8 +66,7 @@ def plot_noise_curve(configs, results, plot_path):
     ax.set_xlabel("Noise")
     ax.set_ylabel("Accuracy (percent)")
     for exp in configs:
-        df = pd.DataFrame.from_dict(results[exp], orient="index")
-        ax.plot(df["mean_accuracy"], **EXPERIMENTS[exp])
+        ax.plot(results[exp], **EXPERIMENTS[exp])
 
     # ax.xaxis.set_ticks(np.arange(0.0, 0.5 + 0.1, 0.1))
     plt.legend()
@@ -115,17 +115,8 @@ def plot_images_with_noise(datadir, noise_values, plot_path):
 )
 def main(config):
     # Use configuration file location as the project location.
-    project_dir = os.path.dirname(config.name)
-    project_dir = os.path.abspath(project_dir)
-
-    # Plot noisy images
-    data_dir = os.path.join(project_dir, "data")
-    plot_path = os.path.join(project_dir, "mnist_images_with_noise.pdf")
-    plot_images_with_noise(
-        datadir=data_dir,
-        noise_values=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
-        plot_path=plot_path,
-    )
+    project_dir = Path(dirname(config.name)).expanduser().resolve()
+    data_dir = Path(project_dir) / "data"
 
     # Load and parse experiment configurations
     configs = parse_config(
@@ -139,20 +130,35 @@ def main(config):
         config = configs[exp]
 
         # Load experiment data
-        experiment_path = os.path.join(project_dir, config["path"], exp)
+        data_dir = Path(config["data_dir"]).expanduser().resolve()
+        path = Path(config["path"]).expanduser().resolve()
+
+        experiment_path = path / exp
         experiment_state = load_ray_tune_experiment(
             experiment_path=experiment_path, load_results=True
         )
 
-        # Load noise score from the first checkpoint
-        checkpoint = experiment_state["checkpoints"][0]
-        logdir = os.path.join(experiment_path, os.path.basename(checkpoint["logdir"]))
-        filename = os.path.join(logdir, "noise.json")
-        with open(filename, "r") as f:
-            results[exp] = json.load(f)
+        # Load noise score and compute the mean_accuracy over all checkpoints
+        exp_df = pd.DataFrame()
+        for checkpoint in experiment_state["checkpoints"]:
+            logdir = experiment_path / basename(checkpoint["logdir"])
+            filename = logdir / "noise.json"
+            with open(filename, "r") as f:
+                df = pd.DataFrame(json.load(f)).transpose()
+                exp_df = exp_df.append(df["mean_accuracy"], ignore_index=True)
 
-    plot_path = os.path.join(project_dir, "accuracy_vs_noise.pdf")
+        results[exp] = exp_df.mean()
+
+    plot_path = project_dir / "accuracy_vs_noise.pdf"
     plot_noise_curve(configs=configs, results=results, plot_path=plot_path)
+
+    # Plot noisy images
+    plot_path = project_dir / "mnist_images_with_noise.pdf"
+    plot_images_with_noise(
+        datadir=data_dir,
+        noise_values=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
+        plot_path=plot_path,
+    )
 
 
 if __name__ == "__main__":
