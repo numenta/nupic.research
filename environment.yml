@@ -32,7 +32,7 @@ dependencies:
   - scikit-image
   - seaborn
   - tabulate
-  - torchvision
+  - torchvision==0.4.2
   - tqdm
 
   # ray[debug,dashboard]
