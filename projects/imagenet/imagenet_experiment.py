@@ -32,8 +32,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
-from nupic.research.frameworks.pytorch.model_utils import train_model, evaluate_model
-
+from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 
 __all__ = ["ImagenetExperiment"]
 

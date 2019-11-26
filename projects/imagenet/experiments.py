@@ -24,7 +24,6 @@ import torch
 
 import nupic.research.frameworks.pytorch.models.resnets
 
-
 """
 Imagenet Experiment configuration
 """
