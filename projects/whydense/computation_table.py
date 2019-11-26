@@ -77,11 +77,11 @@ def main(config, experiment, tablefmt, show_list):
 
     params_table = [
         [
-            " ",
-            "L1 non-zero multiplies",
-            "L2 non-zero multiplies",
-            "L3 non-zero multiplies",
-            "Output non-zero multiplies",
+            "Network",
+            "L1",
+            "L2",
+            "L3",
+            "Output",
             "Total"
         ]
     ]
