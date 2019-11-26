@@ -81,10 +81,11 @@ def main(config, experiment, tablefmt, show_list):
             "L1 non-zero multiplies",
             "L2 non-zero multiplies",
             "L3 non-zero multiplies",
-            "Output non-zero multiplies"
+            "Output non-zero multiplies",
+            "Total"
         ]
     ]
-    l1_ratio = l2_ratio = l3_ratio = output_ratio = 1.0
+    l1_ratio = l2_ratio = l3_ratio = output_ratio = total_ratio = 1.0
     for name, params in configs:
         input_shape = params["input_shape"]
         input_c, height, width = input_shape
@@ -99,44 +100,38 @@ def main(config, experiment, tablefmt, show_list):
         linear_percent_on = params["linear_percent_on"]
         weight_sparsity = params["weight_sparsity"]
 
-        # Compute L1 non-zero weights
+        # Compute total non-zero weights in L1
         l1_out_c = cnn_out_channels[0]
         l1_w = input_c * l1_out_c * KERNEL_SIZE * KERNEL_SIZE
         l1_w = l1_w * cnn_weight_sparsity[0]
 
-        # L1 multiplies = input * L1 weights
-        l1_mul = np.prod(input_shape) * l1_w
+        # Input density is 1, so L1 multiplies = output_shape * L1 weights
+        l1_out_width = (width - KERNEL_SIZE + 1)
+        l1_out_height = (height - KERNEL_SIZE + 1)
+        l1_mul = l1_out_width * l1_out_height * l1_w
 
-        # L1 Output after pool
-        l1_out_width = (width - KERNEL_SIZE + 1) / 2
-        l1_out_height = (height - KERNEL_SIZE + 1) / 2
-        l1_out = [l1_out_c, l1_out_height, l1_out_width]
+        # L1 Output after maxpool
+        l1_out = [l1_out_c, l1_out_height / 2, l1_out_width / 2]
 
-        # L1 activation after k-winner
-        l1_nnz_out = np.prod(l1_out) * cnn_percent_on[0]
-
-        # Compute L2 non-zero weights
+        # Compute total non-zero weights in L2
         l2_out_c = cnn_out_channels[1]
         l2_w = l1_out_c * l2_out_c * KERNEL_SIZE * KERNEL_SIZE
         l2_w = l2_w * cnn_weight_sparsity[1]
 
-        # L2 multiplies = L1 non-zero output * L2 weights
-        l2_mul = l1_nnz_out * l2_w
+        # L2 multiplies = input_sparsity * L2 weights * L2 output size
+        l2_out_height = (l1_out[1] - KERNEL_SIZE + 1)
+        l2_out_width = (l1_out[2] - KERNEL_SIZE + 1)
+        l2_mul = cnn_percent_on[0] * l2_out_height * l2_out_width * l2_w
 
         # L2 Output after pool
-        l2_out_height = (l1_out[1] - KERNEL_SIZE + 1) / 2
-        l2_out_width = (l1_out[2] - KERNEL_SIZE + 1) / 2
-        l2_out = [l2_out_c, l2_out_height, l2_out_width]
+        l2_out = [l2_out_c, l2_out_height / 2, l2_out_width / 2]
 
-        # L2 activation after k-winner
-        l2_nnz_out = np.prod(l2_out) * cnn_percent_on[1]
-
-        # Compute L3 non-zero weights
+        # Compute total non-zero weights in L3
         l3_w = np.prod(l2_out) * linear_n[0]
         l3_w = l3_w * weight_sparsity[0]
 
-        # L3 multiplies = l2 non-zero output * L3 weights
-        l3_mul = l2_nnz_out * l3_w
+        # L3 multiplies = l2 sparsity * L3 weights
+        l3_mul = cnn_percent_on[1] * l3_w
 
         # L3 Output
         l3_out = linear_n[0]
@@ -151,18 +146,24 @@ def main(config, experiment, tablefmt, show_list):
         l2_ratio = l2_mul / l2_ratio
         l3_ratio = l3_mul / l3_ratio
         output_ratio = output_mul / output_ratio
+        total_mul = l1_mul + l2_mul + l3_mul + output_mul
+        total_ratio = total_mul / total_ratio
 
         params_table.append([name,
                              "{:,.0f}".format(l1_mul),
                              "{:,.0f}".format(l2_mul),
                              "{:,.0f}".format(l3_mul),
-                             "{:,.0f}".format(output_mul)])
+                             "{:,.0f}".format(output_mul),
+                             "{:,.0f}".format(total_mul),
+                             ])
 
     params_table.append(["Computation Efficiency",
                          "{:.0f} x".format(1.0 / l1_ratio),
                          "{:.0f} x".format(1.0 / l2_ratio),
                          "{:.0f} x".format(1.0 / l3_ratio),
-                         "{:.0f} x".format(1 / output_ratio)])
+                         "{:.0f} x".format(1 / output_ratio),
+                         "{:.0f} x".format(1 / total_ratio),
+                         ])
 
     print(tabulate(params_table, headers="firstrow", tablefmt=tablefmt,
                    stralign="center", floatfmt=",.0f"))
