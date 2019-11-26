@@ -27,6 +27,7 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
+
 logging.basicConfig(level=logging.ERROR)
 
 
@@ -37,7 +38,8 @@ def train_model(
     device,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
-    batch_callback=None,
+    pre_batch_callback=None,
+    post_batch_callback=None,
     progress_bar=None,
 ):
     """Train the given model by iterating through mini batches. An epoch ends
@@ -56,9 +58,12 @@ def train_model(
     :type device: :class:`torch.device
     :param criterion: loss function to use
     :type criterion: function
-    :param batch_callback: Callback function to be called on every batch with the
-                           following parameters: model, batch_idx
-    :type batch_callback: function
+    :param post_batch_callback: Callback function to be called after every batch
+                                with the following parameters: model, batch_idx
+    :type post_batch_callback: function
+    :param pre_batch_callback: Callback function to be called before every batch
+                               with the following parameters: model, batch_idx
+    :type pre_batch_callback: function
     :param progress_bar: Optional :class:`tqdm` progress bar args.
                          None for no progress bar
     :type progress_bar: dict or None
@@ -76,6 +81,9 @@ def train_model(
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
+        if pre_batch_callback is not None:
+            pre_batch_callback(model=model, batch_idx=batch_idx)
+
         data = data.to(device, non_blocking=async_gpu)
         target = target.to(device, non_blocking=async_gpu)
         optimizer.zero_grad()
@@ -83,9 +91,11 @@ def train_model(
         loss = criterion(output, target)
         loss.backward()
         optimizer.step()
+        if progress_bar:
+            loader.set_postfix(dict(loss=loss.item()))
 
-        if batch_callback is not None:
-            batch_callback(model=model, batch_idx=batch_idx)
+        if post_batch_callback is not None:
+            post_batch_callback(model=model, batch_idx=batch_idx)
 
     if progress_bar is not None:
         loader.n = loader.total
@@ -121,7 +131,8 @@ def evaluate_model(
     model.eval()
     loss = 0
     correct = 0
-    dataset_len = len(loader.sampler)
+    total = 0
+    async_gpu = loader.pin_memory
 
     if progress is not None:
         loader = tqdm(loader, **progress)
@@ -130,19 +141,26 @@ def evaluate_model(
         for batch_idx, (data, target) in enumerate(loader):
             if batch_idx >= batches_in_epoch:
                 break
-            data, target = data.to(device), target.to(device)
+            data = data.to(device, non_blocking=async_gpu)
+            target = target.to(device, non_blocking=async_gpu)
+
             output = model(data)
             loss += criterion(output, target, reduction="sum").item()
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum().item()
+            total += len(data)
+            if progress:
+                loader.set_postfix(dict(
+                    acc=correct / total,
+                    loss=loss / total))
 
     if progress is not None:
         loader.close()
 
     return {
         "total_correct": correct,
-        "mean_loss": loss / dataset_len,
-        "mean_accuracy": correct / dataset_len,
+        "mean_loss": loss / total,
+        "mean_accuracy": correct / total,
     }
 
 
