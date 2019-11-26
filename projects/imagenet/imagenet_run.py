@@ -27,12 +27,11 @@ import pandas as pd
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from experiments import CONFIGS
 from torch.backends import cudnn
 
+from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from projects.imagenet.imagenet_experiment import ImagenetExperiment
-
 
 cudnn.benchmark = True
 
@@ -163,7 +162,7 @@ def main(args):
         main_worker(0, 1, config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
