@@ -1,1 +1,6 @@
+torch==1.1
 pytorch-nlp
+fasttext
+torchvision==0.3.0
+tensorboardX==1.8
+protobuf==3.9.1
