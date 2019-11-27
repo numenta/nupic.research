@@ -56,7 +56,7 @@ NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"])
 NoactLayerParams.__new__.__defaults__ = (1.0,)
 
 
-def default_sparse_params(group_type, number_layers):
+def default_sparse_params(group_type, number_layers, sparse=False):
     """Creates dictionary with default parameters.
     If sparse_params is passed to the model, default params are not used.
 
@@ -65,27 +65,32 @@ def default_sparse_params(group_type, number_layers):
 
     :returns dictionary with default parameters
     """
+    if sparse:
+        layer_params = LayerParams(0.25, 1.4, 0.7, 1.0, True, 0.5)
+        noact_layer_params = NoactLayerParams(0.5)
+    else:
+        layer_params = LayerParams()
+        noact_layer_params = NoactLayerParams()
+
     if group_type == BasicBlock:
         params = dict(
-            conv3x3_1=LayerParams(),
-            conv3x3_2=NoactLayerParams(),
-            shortcut=LayerParams(),
+            conv3x3_1=layer_params, conv3x3_2=noact_layer_params, shortcut=layer_params
         )
     elif group_type == Bottleneck:
         params = dict(
-            conv1x1_1=LayerParams(),
-            conv3x3_2=LayerParams(),
-            conv1x1_3=NoactLayerParams(),
-            shortcut=LayerParams(),
+            conv1x1_1=layer_params,
+            conv3x3_2=layer_params,
+            conv1x1_3=noact_layer_params,
+            shortcut=layer_params,
         )
 
     return dict(
-        stem=LayerParams(),
+        stem=layer_params,
         filters64=[params] * number_layers[0],
         filters128=[params] * number_layers[1],
         filters256=[params] * number_layers[2],
         filters512=[params] * number_layers[3],
-        linear=NoactLayerParams(),
+        linear=noact_layer_params,
     )
 
 
@@ -139,7 +144,7 @@ def activation_layer(
     """Basic activation layer.
     Defaults to ReLU if percent_on is < 0.5. Otherwise KWinners is used."""
     if percent_on >= 0.5:
-        return nn.ReLU()
+        return nn.ReLU(inplace=True)
     else:
         return KWinners2d(
             out,
@@ -147,7 +152,7 @@ def activation_layer(
             boost_strength=boost_strength,
             boost_strength_factor=boost_strength_factor,
             k_inference_factor=k_inference_factor,
-            local=local
+            local=local,
         )
 
 
@@ -300,12 +305,15 @@ class ResNet(nn.Module):
             num_classes=1000,
             linear_sparse_weights_type="SparseWeights",
             conv_sparse_weights_type="SparseWeights2d",
+            defaults_sparse=False,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
 
         if not hasattr(self, "sparse_params"):
-            self.sparse_params = default_sparse_params(*cf_dict[str(self.depth)])
+            self.sparse_params = default_sparse_params(
+                *cf_dict[str(self.depth)], sparse=self.defaults_sparse
+            )
 
         self.in_planes = 64
 
