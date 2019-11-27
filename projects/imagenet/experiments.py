@@ -108,10 +108,6 @@ FASTAI.update(dict(
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
     lr_scheduler_args=dict(
         max_lr=2.0,
-        # Total batches per epoch. This is required by the "OneCycleLR" LR Scheduler
-        # Total of 1,281,168 images in training dataset
-        steps_per_epoch=int(1281168 / BATCH_SIZE),
-        epochs=FASTAI_EPOCHS
     ),
 ))
 # Reduce weight decay when using super-convergence
@@ -122,8 +118,6 @@ FASTAI_SMALL = copy.deepcopy(FASTAI)
 FASTAI_SMALL.update(dict(
     data=os.path.expanduser("~/nta/data/imagenette/sz/160"),
     model_args=dict(config=dict(num_classes=10))))
-FASTAI_SMALL["lr_scheduler_args"].update(dict(
-    steps_per_epoch=int(12906 / BATCH_SIZE)))
 
 # Export configurations
 CONFIGS = dict()

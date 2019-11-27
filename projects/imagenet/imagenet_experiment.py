@@ -225,11 +225,8 @@ class ImagenetExperiment:
         lr_scheduler_class = self.config.lr_scheduler_class
         lr_scheduler_args = self.config.lr_scheduler_args
 
-        # OneCycleLR updates LR on every batch.
-        # When using DistributedDataParallel the batches are distributed across
-        # multiple processes. Therefore we need to divide the steps_per_epoch
-        # by the number of processes.
-        if self.config.distributed and lr_scheduler_class == OneCycleLR:
+        if lr_scheduler_class == OneCycleLR:
+            lr_scheduler_args["epochs"] = self.config.epochs
             lr_scheduler_args["steps_per_epoch"] = self.steps_per_epoch
 
         return lr_scheduler_class(optimizer, **lr_scheduler_args)
