@@ -54,7 +54,7 @@ def show_predictions(config):
 
         for i in range(n_batches):
             print("Batch %d ---" % i)
-            id_batch = data[batch_size * i:batch_size * (i + 1)]
+            id_batch = data[batch_size * i : batch_size * (i + 1)]
             input_ = id_batch.reshape((batch_size, 1))
             print("IN", corpus.read_out(input_))
             phi = psi = x_b = None
@@ -100,14 +100,14 @@ def parse_options():
         dest="experiments",
         help="run only selected experiments, by default run all experiments in "
         "config file.",
-        required=True
+        required=True,
     )
     optparser.add_argument(
         "-C",
         "--checkpoint",
         dest="checkpoint",
         help="resume from checkpoint if found",
-        required=True
+        required=True,
     )
     return optparser.parse_args()
 
