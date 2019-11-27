@@ -78,8 +78,8 @@ class ImagenetExperiment:
         self.optimizer = self._create_optimizer(self.model)
         self.lr_scheduler = self._create_lr_scheduler(self.optimizer)
         self.loss_function = self.config.loss_function
-
-        self.summary = SummaryWriter(log_dir=self.config.logdir)
+        if self.rank == 0:
+            self.summary = SummaryWriter(log_dir=self.config.logdir)
 
     def validate(self, loader=None):
         if loader is None:
@@ -97,8 +97,9 @@ class ImagenetExperiment:
             batches_in_epoch=self.config.batches_in_epoch,
             progress=progress_bar
         )
-        for k, v in results.items():
-            self.summary.add_scalar(k, v, self.epoch)
+        if self.summary is not None:
+            for k, v in results.items():
+                self.summary.add_scalar(k, v, self.epoch)
 
         return results
 
@@ -127,8 +128,9 @@ class ImagenetExperiment:
         pass
 
     def pre_batch(self, model, batch_idx):
-        global_step = self.epoch * self.config.batch_size + batch_idx
-        self.summary.add_scalar("lr", self.get_lr()[0], global_step)
+        if self.summary is not None:
+            global_step = self.epoch * self.steps_per_epoch + batch_idx
+            self.summary.add_scalar("lr", self.get_lr()[0], global_step)
 
     def post_batch(self, model, batch_idx):
         if isinstance(self.lr_scheduler, OneCycleLR):
