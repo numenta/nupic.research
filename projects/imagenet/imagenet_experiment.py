@@ -56,6 +56,7 @@ class ImagenetExperiment:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device_ids = None
         self.epoch = 0
+        self.steps_per_epoch = 0
 
     def setup(self, config):
         if isinstance(config, Mapping):
@@ -70,12 +71,13 @@ class ImagenetExperiment:
                 self.device = self.rank
                 self.device_ids = [self.device]
 
+        self.train_loader = self._create_train_dataloader()
+        self.steps_per_epoch = len(self.train_loader)
+        self.val_loader = self._create_validation_dataloader()
         self.model = self._create_model()
         self.optimizer = self._create_optimizer(self.model)
         self.lr_scheduler = self._create_lr_scheduler(self.optimizer)
         self.loss_function = self.config.loss_function
-        self.train_loader = self._create_train_dataloader()
-        self.val_loader = self._create_validation_dataloader()
 
         self.summary = SummaryWriter(log_dir=self.config.logdir)
 
@@ -152,7 +154,8 @@ class ImagenetExperiment:
         )
 
     def stop(self):
-        self.summary.close()
+        if self.summary is not None:
+            self.summary.close()
 
     def get_lr(self):
         """
@@ -224,10 +227,8 @@ class ImagenetExperiment:
         # When using DistributedDataParallel the batches are distributed across
         # multiple processes. Therefore we need to divide the steps_per_epoch
         # by the number of processes.
-        if self.config.distributed and isinstance(lr_scheduler_class, OneCycleLR):
-            world_size = dist.get_world_size()
-            steps_per_epoch = lr_scheduler_args["steps_per_epoch"]
-            lr_scheduler_args["steps_per_epoch"] = steps_per_epoch // world_size
+        if self.config.distributed and lr_scheduler_class == OneCycleLR:
+            lr_scheduler_args["steps_per_epoch"] = self.steps_per_epoch
 
         return lr_scheduler_class(optimizer, **lr_scheduler_args)
 
