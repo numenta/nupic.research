@@ -17,4 +17,6 @@
 #
 #  http://numenta.org/licenses/
 #
-from .k_winners import KWinners2dLocal, k_winners2d_local
+
+from .binary_cnn import *
+from .hard_concrete_cnn import *

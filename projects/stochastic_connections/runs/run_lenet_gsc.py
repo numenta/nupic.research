@@ -19,69 +19,54 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-
 import os
 
+import ray
 import torch
 from ray import tune
 
+import nupic.research.frameworks.stochastic_connections.experiments as experiments
 from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
-# experiment configurations
-cuda_device_count = torch.cuda.device_count()
-base_exp_config = dict(
+ray.init()
 
-    # ---- Torch ----
-    device="cuda" if cuda_device_count > 0 else "cpu",
-
-    # ---- Dataset ----
-    dataset_name="MNIST",
-    data_dir=os.path.expanduser("~/nta/datasets/"),
-    batch_size_train=(4, 16),
-    batch_size_test=1000,
-
-    # ---- Network ----
-    network=tune.grid_search([
-        "mnist_binary_cnn", "mnist_hard_concrete_cnn"
-    ]),
-    droprate_init=0.2,
-    l0_strength=1e-4,
-
-    # ---- Optimizer ----
-    optim_alg="Adam",
-    learning_rate=0.01,
-
-    # ---- LR Scheduler ----
-    lr_scheduler="StepLR",
-    lr_step_size=1,
-    lr_gamma=0.9825,
-
-    # ---- Model ----
-    model=tune.grid_search(["StochasticSynapsesModel"]),
-    # debug:
-    use_tqdm=True,
-    test_noise=False,
-    debug_weights=True,
-    debug_sparse=True,
-)
-
-# ray configurations
-tune_config = dict(
+tune.run(
+    experiments.NoiseRay,
     name=os.path.basename(__file__).replace(".py", ""),
+    config=dict(
+        model_alg="gsc_lenet",
+        model_params=dict(),
+
+        dataset_name="PreprocessedGSC",
+        dataset_params={},
+
+        optim_alg="Adam",
+        optim_params=dict(
+            lr=0.01,
+        ),
+
+        lr_scheduler_alg="StepLR",
+        lr_scheduler_params=dict(
+            step_size=1,
+            gamma=0.94,
+        ),
+
+        use_tqdm=False,
+        batch_size_train=16,
+        batch_size_test=1000,
+
+        noise_test_epochs=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99],
+        noise_levels=[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5],
+    ),
     num_samples=1,
-    local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
-    checkpoint_at_end=False,
+    checkpoint_at_end=True,
     stop={"training_iteration": 100},
     resources_per_trial={
-        # 1 GPU per trial
-        "cpu": os.cpu_count() / cuda_device_count,
-        "gpu": 1},
+        "cpu": 1,
+        "gpu": (1 if torch.cuda.is_available() else 0)},
     loggers=DEFAULT_LOGGERS,
-    verbose=0,
+    verbose=1,
 )
-
-run_ray(tune_config, base_exp_config)

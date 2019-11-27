@@ -81,7 +81,9 @@ class BaseModel:
         # init optimizer
         if self.optim_alg == "Adam":
             self.optimizer = optim.Adam(
-                self.network.parameters(), lr=self.learning_rate
+                self.network.parameters(),
+                lr=self.learning_rate,
+                weight_decay=self.weight_decay,
             )
         elif self.optim_alg == "SGD":
             # added weight decay
