@@ -17,6 +17,7 @@
 #
 #  http://numenta.org/licenses/
 #
+import copy
 import os
 import sys
 
@@ -98,7 +99,7 @@ DEFAULT = dict(
 
 # Configuration inspired by Fast.ai.
 # See https://github.com/fastai/imagenet-fast
-FASTAI = dict(DEFAULT)
+FASTAI = copy.deepcopy(DEFAULT)
 FASTAI_EPOCHS = 30
 FASTAI.update(dict(
     epochs=FASTAI_EPOCHS,
@@ -117,7 +118,7 @@ FASTAI.update(dict(
 FASTAI["optimizer_args"].update(dict(weight_decay=3e-6))
 
 # Use smaller "imagenette" dataset with same "fastai" configuration
-FASTAI_SMALL = dict(FASTAI)
+FASTAI_SMALL = copy.deepcopy(FASTAI)
 FASTAI_SMALL.update(dict(
     data=os.path.expanduser("~/nta/data/imagenette/sz/160"),
     model_args=dict(config=dict(num_classes=10))))
