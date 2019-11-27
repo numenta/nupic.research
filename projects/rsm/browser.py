@@ -16,9 +16,6 @@
 #  along with this program.  If not, see http://www.gnu.org/licenses.
 #
 #  http://numenta.org/licenses/
-#
-# Original Code here:
-# https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 """
 Module for browsing and manipulating experiment results directories created
@@ -36,7 +33,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from ray.tune.commands import flatten_dict
+from ray.tune.util import flatten_dict
 
 warnings.filterwarnings("ignore")
 
@@ -117,8 +114,13 @@ def _get_value(progress, params, exp_name, exp_substring="", which="max"):
     columns = ["Experiment Name"]
 
     # add the columns names for main tags
-    tags = ["val_pred_acc", "val_loss", "val_pred_ppl",
-            "train_pred_acc", "train_pred_ppl"]
+    tags = [
+        "val_pred_acc",
+        "val_loss",
+        "val_pred_ppl",
+        "train_pred_acc",
+        "train_pred_ppl",
+    ]
     for tag in tags:
         which = "min" if "ppl" in tag else "max"
         columns.append(tag)
