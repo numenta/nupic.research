@@ -16,9 +16,6 @@
 #  along with this program.  If not, see http://www.gnu.org/licenses.
 #
 #  http://numenta.org/licenses/
-#
-# Original Code here:
-# https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 from __future__ import print_function
 
@@ -46,10 +43,14 @@ class Dictionary(object):
 
 class Corpus(object):
     def __init__(self, path):
+        self.EOS_TOKEN = "</s>"  # "<eos>"
         self.dictionary = Dictionary()
         self.train = self.tokenize(os.path.join(path, "ptb.train.txt"))
         self.valid = self.tokenize(os.path.join(path, "ptb.valid.txt"))
         self.test = self.tokenize(os.path.join(path, "ptb.test.txt"))
+
+    def encode(self, words):
+        return [self.dictionary.word2idx[word] for word in words.split()]
 
     def read_out(self, ids):
         out = []
@@ -66,7 +67,7 @@ class Corpus(object):
         with open(path, "r", encoding="utf8") as f:
             tokens = 0
             for line in f:
-                words = line.split() + ["<eos>"]
+                words = line.split() + [self.EOS_TOKEN]
                 tokens += len(words)
                 for word in words:
                     self.dictionary.add_word(word)
@@ -76,7 +77,7 @@ class Corpus(object):
             ids = torch.zeros(tokens).long()
             token = 0
             for line in f:
-                words = line.split() + ["<eos>"]
+                words = line.split() + [self.EOS_TOKEN]
                 for word in words:
                     ids[token] = self.dictionary.word2idx[word]
                     token += 1
@@ -106,5 +107,6 @@ class BitwiseWordEmbedding(object):
 
 
 def perpl(nll):
+    """Perplexity is exp(negative_log_likelihood). Clips very large values."""
     # Avoid overflow
     return math.exp(nll) if nll < 50 else 1000000

@@ -1,4 +1,3 @@
-# ------------------------------------------------------------------------------
 #  Numenta Platform for Intelligent Computing (NuPIC)
 #  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
@@ -17,28 +16,34 @@
 #  along with this program.  If not, see http://www.gnu.org/licenses.
 #
 #  http://numenta.org/licenses/
-#
-# ------------------------------------------------------------------------------
-# Install nupic.torch and nupic.tensorflow directly from github master branch
-nupic.torch @ git+https://github.com/numenta/nupic.torch.git
-nupic.tensorflow @ git+https://github.com/numenta/nupic.tensorflow.git
 
-awscli
-boto3
-elasticsearch
-jupyter
-librosa==0.7.1
-matplotlib
-numpy
-pandas
-python-dateutil==2.8.0
-fastai
-pillow==6.0.0
-python-dotenv
-ray[dashboard,debug]==0.7.5
-requests
-scikit-image
-seaborn>=0.9.0
-tabulate
-torchvision==0.4.2
-tqdm
+import os
+import sys
+
+import fasttext
+from torchnlp.datasets import penn_treebank_dataset
+
+PATH = "/home/ubuntu"
+# PATH = "/Users/jgordon"
+
+print("Maybe download ptb...")
+penn_treebank_dataset(PATH + "/nta/datasets/PTB", train=True, test=True)
+
+
+PTB_TRAIN_PATH = PATH + "/nta/datasets/PTB/ptb.train.txt"
+
+if len(sys.argv) > 1:
+    epoch = int(sys.argv[1])
+else:
+    epoch = 5
+
+model = fasttext.train_unsupervised(
+    PTB_TRAIN_PATH, model="skipgram", minCount=1, epoch=epoch
+)
+embed_dir = PATH + "/nta/datasets/embeddings"
+filename = PATH + "/nta/datasets/embeddings/ptb_fasttext_e%d.bin" % epoch
+if not os.path.exists(embed_dir):
+    os.makedirs(embed_dir)
+
+print("Saved %s" % filename)
+model.save_model(filename)
