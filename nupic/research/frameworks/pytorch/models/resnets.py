@@ -68,15 +68,13 @@ def default_sparse_params(group_type, number_layers, sparse=False):
     if sparse:
         layer_params = LayerParams(0.25, 1.4, 0.7, 1.0, True, 0.5)
         noact_layer_params = NoactLayerParams(0.5)
-    else:   
+    else:
         layer_params = LayerParams()
         noact_layer_params = NoactLayerParams()
 
     if group_type == BasicBlock:
         params = dict(
-            conv3x3_1=layer_params,
-            conv3x3_2=noact_layer_params,
-            shortcut=layer_params,
+            conv3x3_1=layer_params, conv3x3_2=noact_layer_params, shortcut=layer_params
         )
     elif group_type == Bottleneck:
         params = dict(
@@ -154,7 +152,7 @@ def activation_layer(
             boost_strength=boost_strength,
             boost_strength_factor=boost_strength_factor,
             k_inference_factor=k_inference_factor,
-            local=local
+            local=local,
         )
 
 
@@ -307,13 +305,15 @@ class ResNet(nn.Module):
             num_classes=1000,
             linear_sparse_weights_type="SparseWeights",
             conv_sparse_weights_type="SparseWeights2d",
-            defaults_sparse=False,            
+            defaults_sparse=False,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
 
         if not hasattr(self, "sparse_params"):
-            self.sparse_params = default_sparse_params(*cf_dict[str(self.depth)], sparse=self.defaults_sparse)
+            self.sparse_params = default_sparse_params(
+                *cf_dict[str(self.depth)], sparse=self.defaults_sparse
+            )
 
         self.in_planes = 64
 
