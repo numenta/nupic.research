@@ -37,12 +37,14 @@ from torchvision import models, transforms
 # load the model
 from nupic.research.frameworks.dynamic_sparse.common.datasets import CustomDataset
 from nupic.research.frameworks.dynamic_sparse.models import BaseModel
+from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 
 SMALL_IMAGENET = False
 
 train_path = os.path.expanduser("~/nta/data/imagenet/train")
 val_path = os.path.expanduser("~/nta/data/imagenet/val")
+num_classes = 20
 
 # preprocessing: https://github.com/pytorch/vision/issues/39
 stats_mean = (0.485, 0.456, 0.406)
@@ -67,14 +69,14 @@ val_transform = transforms.Compose(
 
 # load train dataset
 t0 = time()
-train_dataset = CachedDatasetFolder(train_path, transform=train_transform)
+train_dataset = CachedDatasetFolder(train_path, transform=train_transform, num_classes=num_classes)
 print("Loaded train dataset")
 t1 = time()
 print("Time spent to load train dataset: {:.2f}".format(t1 - t0))
 
 # load test dataset
 t0 = time()
-test_dataset = CachedDatasetFolder(val_path, transform=val_transform)
+test_dataset = CachedDatasetFolder(val_path, transform=val_transform, num_classes=num_classes)
 print("Loaded test dataset")
 t1 = time()
 print("Time spent to load test dataset: {:.2f}".format(t1 - t0))
@@ -90,13 +92,12 @@ print("Time spent to load dataloaders: {:.2f}".format(t1 - t0))
 
 # load network
 t0 = time()
-network = models.resnet50(pretrained=True)
+network = resnet50(config=dict(num_classes=num_classes))
 print("Loaded network")
 t1 = time()
 print("Time spent to load network: {:.2f}".format(t1 - t0))
 
 # ------------------------- RUN MODEL
-
 
 # simple base model
 t0 = time()

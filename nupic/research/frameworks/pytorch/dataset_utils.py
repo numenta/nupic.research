@@ -176,7 +176,8 @@ class CachedDatasetFolder(DatasetFolder):
     """
 
     def __init__(self, root, loader=default_loader, extensions=IMG_EXTENSIONS,
-                 transform=None, target_transform=None, is_valid_file=None):
+                 transform=None, target_transform=None, is_valid_file=None,
+                 num_classes=1000):
         super(DatasetFolder, self).__init__(root, transform=transform,
                                             target_transform=target_transform)
 
@@ -198,6 +199,11 @@ class CachedDatasetFolder(DatasetFolder):
                         file=open(cache_filename, "wb"),
                         protocol=pickle.HIGHEST_PROTOCOL)
 
+        if num_classes < 1000:
+            classes, class_to_idx, samples = self.select_subset(classes, class_to_idx, samples, num_classes)
+        assert(len(classes) == num_classes)
+        assert(len(class_to_idx) == num_classes)
+
         self.loader = loader
         self.extensions = extensions
 
@@ -205,3 +211,34 @@ class CachedDatasetFolder(DatasetFolder):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+
+    @staticmethod
+    def select_subset(classes, class_to_idx, samples, num_classes):
+        """
+        Selects a subset of the classes based on a given number of classes
+        Fixed seed ensures the same classes are always chosen, in either train or val 
+        For example, num_classes=11 will select the same classes as num_classes=10 plus one extra
+        """ 
+        if num_classes > 1000 or num_classes < 1 or type(num_classes) != int:
+            raise ValueError("Num_classes has to be an integer between 1 and 1000")
+        # sets seed only locally, doesn't interfere with global numpy seed
+        selected_idxs = set(np.random.RandomState(seed=2019).choice(1000, num_classes, replace=False))
+
+        # filter classes and class to idx
+        subset_class_to_idx = {k:v for k,v in class_to_idx.items() if v in selected_idxs}
+        subset_classes = [c for c in classes if c in subset_class_to_idx.keys()]
+        
+        # select only the relevant samples
+        # required since the number of samples per class in the training set is not uniform
+        counter = collections.Counter()
+        for j, (_, idx) in enumerate(samples, 1):
+            counter[idx] = j
+        subset_samples = []
+        for _class in subset_classes:
+            idx = subset_class_to_idx[_class]
+            if idx == 0:
+                subset_samples.extend(samples[:counter[idx]])
+            else:
+                subset_samples.extend(samples[counter[idx-1]:counter[idx]])
+            
+        return subset_classes, subset_class_to_idx, subset_samples
