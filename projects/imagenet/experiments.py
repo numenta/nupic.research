@@ -17,6 +17,7 @@
 #
 #  http://numenta.org/licenses/
 #
+import copy
 import os
 import sys
 
@@ -98,7 +99,7 @@ DEFAULT = dict(
 
 # Configuration inspired by Fast.ai.
 # See https://github.com/fastai/imagenet-fast
-FASTAI = dict(DEFAULT)
+FASTAI = copy.deepcopy(DEFAULT)
 FASTAI_EPOCHS = 30
 FASTAI.update(dict(
     epochs=FASTAI_EPOCHS,
@@ -107,22 +108,16 @@ FASTAI.update(dict(
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
     lr_scheduler_args=dict(
         max_lr=2.0,
-        # Total batches per epoch. This is required by the "OneCycleLR" LR Scheduler
-        # Total of 1,281,168 images in training dataset
-        steps_per_epoch=int(1281168 / BATCH_SIZE),
-        epochs=FASTAI_EPOCHS
     ),
 ))
 # Reduce weight decay when using super-convergence
 FASTAI["optimizer_args"].update(dict(weight_decay=3e-6))
 
 # Use smaller "imagenette" dataset with same "fastai" configuration
-FASTAI_SMALL = dict(FASTAI)
+FASTAI_SMALL = copy.deepcopy(FASTAI)
 FASTAI_SMALL.update(dict(
     data=os.path.expanduser("~/nta/data/imagenette/sz/160"),
     model_args=dict(config=dict(num_classes=10))))
-FASTAI_SMALL["lr_scheduler_args"].update(dict(
-    steps_per_epoch=int(12906 / BATCH_SIZE)))
 
 # Export configurations
 CONFIGS = dict()
