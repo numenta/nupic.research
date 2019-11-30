@@ -31,7 +31,7 @@
 import os
 from time import time
 
-from torch import utils
+from torch import utils, nn
 from torchvision import models, transforms
 
 # load the model
@@ -83,9 +83,9 @@ print("Time spent to load test dataset: {:.2f}".format(t1 - t0))
 
 # load dataloaders
 t0 = time()
-train_dataloader = utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
+train_dataloader = utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4)
 print("Loaded train dataloader")
-test_dataloader = utils.data.DataLoader(test_dataset, batch_size=16, shuffle=True)
+test_dataloader = utils.data.DataLoader(test_dataset, batch_size=128, shuffle=True, num_workers=4)
 print("Loaded test dataloader")
 t1 = time()
 print("Time spent to load dataloaders: {:.2f}".format(t1 - t0))
@@ -93,6 +93,10 @@ print("Time spent to load dataloaders: {:.2f}".format(t1 - t0))
 # load network
 t0 = time()
 network = resnet50(config=dict(num_classes=num_classes))
+# network = models.resnet50(pretrained=False)
+# last_layer_shape = network.fc.weight.shape
+# network.fc = nn.Linear(last_layer_shape[1], num_classes)
+
 print("Loaded network")
 t1 = time()
 print("Time spent to load network: {:.2f}".format(t1 - t0))

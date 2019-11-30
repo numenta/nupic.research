@@ -225,20 +225,32 @@ class CachedDatasetFolder(DatasetFolder):
         selected_idxs = set(np.random.RandomState(seed=2019).choice(1000, num_classes, replace=False))
 
         # filter classes and class to idx
-        subset_class_to_idx = {k:v for k,v in class_to_idx.items() if v in selected_idxs}
+        subset_class_to_idx = {}
+        new_idx = 0
+        for key, original_idx in class_to_idx.items():
+            if original_idx in selected_idxs:
+                # renumber the classes from 0
+                subset_class_to_idx[key] = new_idx
+                new_idx += 1
         subset_classes = [c for c in classes if c in subset_class_to_idx.keys()]
         
         # select only the relevant samples
         # required since the number of samples per class in the training set is not uniform
         counter = collections.Counter()
-        for j, (_, idx) in enumerate(samples, 1):
-            counter[idx] = j
+        for j, (_, original_idx) in enumerate(samples, 1):
+            counter[original_idx] = j
         subset_samples = []
         for _class in subset_classes:
-            idx = subset_class_to_idx[_class]
-            if idx == 0:
-                subset_samples.extend(samples[:counter[idx]])
+            original_idx = class_to_idx[_class]
+            # select samples, based on original index
+            if original_idx == 0:
+                class_samples = samples[:counter[original_idx]]
             else:
-                subset_samples.extend(samples[counter[idx-1]:counter[idx]])
+                class_samples = samples[counter[original_idx-1]:counter[original_idx]]
+            # extend replacing the original index by the new index
+            subset_samples.extend(
+                [(s[0], subset_class_to_idx[_class]) for s in class_samples]
+            )
+
             
         return subset_classes, subset_class_to_idx, subset_samples
