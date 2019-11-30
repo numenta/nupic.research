@@ -180,7 +180,6 @@ class BaseDataset:
 
 
 class ImageNetDataset(BaseDataset):
-
     def load_dataset(self):
         """
         Overrides base dataset loading
@@ -212,8 +211,12 @@ class ImageNetDataset(BaseDataset):
         )
 
         # load datasets
-        train_dataset = CachedDatasetFolder(train_path, transform=train_transform, num_classes=self.num_classes)
-        test_dataset = CachedDatasetFolder(val_path, transform=val_transform, num_classes=self.num_classes)
+        train_dataset = CachedDatasetFolder(
+            train_path, transform=train_transform, num_classes=self.num_classes
+        )
+        test_dataset = CachedDatasetFolder(
+            val_path, transform=val_transform, num_classes=self.num_classes
+        )
 
         # load dataloaders
         # added pin_memory=True for faster data recovery
