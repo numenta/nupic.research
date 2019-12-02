@@ -259,8 +259,6 @@ class CachedDatasetFolder(DatasetFolder):
             classes, class_to_idx, samples = select_subset(
                 classes, class_to_idx, samples, num_classes
             )
-        assert len(classes) == num_classes
-        assert len(class_to_idx) == num_classes
 
         self.loader = loader
         self.extensions = extensions
