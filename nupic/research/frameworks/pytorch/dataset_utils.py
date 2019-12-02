@@ -46,6 +46,7 @@ def create_validation_data_sampler(dataset, ratio):
     validate = torch.utils.data.SubsetRandomSampler(indices=indices[training_count:])
     return (train, validate)
 
+
 def select_subset(classes, class_to_idx, samples, num_classes):
     """
     Selects a subset of the classes based on a given number of classes
@@ -81,15 +82,14 @@ def select_subset(classes, class_to_idx, samples, num_classes):
         if original_idx == 0:
             class_samples = samples[: counter[original_idx]]
         else:
-            class_samples = samples[
-                counter[original_idx - 1] : counter[original_idx]
-            ]
+            class_samples = samples[counter[original_idx - 1] : counter[original_idx]]
         # extend replacing the original index by the new index
         subset_samples.extend(
             [(s[0], subset_class_to_idx[_class]) for s in class_samples]
         )
 
     return subset_classes, subset_class_to_idx, subset_samples
+
 
 class UnionDataset(Dataset):
     """Dataset used to create unions of two or more datasets. The union is
@@ -267,5 +267,3 @@ class CachedDatasetFolder(DatasetFolder):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
-
-
