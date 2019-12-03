@@ -19,10 +19,13 @@
 #
 
 import unittest
+from collections import defaultdict
 
+import numpy as np
 import torch
 import torch.nn
 from torch.autograd import Variable
+from torchvision import models
 
 from nupic.research.frameworks.pytorch.models.resnets import (
     LayerParams,
@@ -234,6 +237,58 @@ class ResnetTest(unittest.TestCase):
         net(Variable(torch.randn(2, 3, 32, 32)))
 
         self.assertIsInstance(net, ResNet, "Loads ResNet18")
+
+    def test_version_15(self):
+        """Evaluates if dense resnet-50 is similar to torchvision resnet-50"""
+
+        nets = dict(torchvision=models.resnet50(), dense_nupic=resnet50())
+
+        # assert number of parameters is the same, looking at state dict
+        params_per_network = {}
+        for name, net in nets.items():
+            total_params = 0
+            for v in net.state_dict().values():
+                total_params += np.prod(v.shape)
+            params_per_network[name] = total_params
+
+        self.assertEqual(
+            params_per_network["torchvision"],
+            params_per_network["dense_nupic"],
+            "Dense resnet-50 should have the same number of parameters as torchvision"
+            " resnet-50, based on state dict",
+        )
+
+        # assert if 1-number of param, 2-param types and 3-layer name are the same
+        nets_params = defaultdict(list)
+        for name, network in nets.items():
+            total_params, param_types, layer_names = [], [], []
+            for m in network.modules():
+                if hasattr(m, "weight"):
+                    total_params.append(np.prod(m.weight.data.shape))
+                    param_types.append(m.weight.data.dtype)
+                    layer_names.append(m._get_name())
+            nets_params[name] = [total_params, param_types, layer_names]
+
+        # verify number of params is the same
+        self.assertEqual(
+            nets_params["torchvision"][0],
+            nets_params["dense_nupic"][0],
+            "Dense resnet-50 should have same number of parameters as torchvision"
+            " resnet-50, based on modules",
+        )
+        # verify types of params is the same
+        self.assertEqual(
+            nets_params["torchvision"][1],
+            nets_params["dense_nupic"][1],
+            "Dense resnet-50 should have the same type of params as torchvision"
+            " resnet-50",
+        )
+        # verify layer names are the same
+        self.assertEqual(
+            nets_params["torchvision"][2],
+            nets_params["dense_nupic"][2],
+            "Dense resnet-50 should have the same layer names as torchvision resnet-50",
+        )
 
 
 if __name__ == "__main__":
