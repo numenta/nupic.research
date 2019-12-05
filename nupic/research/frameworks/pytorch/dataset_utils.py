@@ -47,6 +47,50 @@ def create_validation_data_sampler(dataset, ratio):
     return (train, validate)
 
 
+def select_subset(classes, class_to_idx, samples, num_classes):
+    """
+    Selects a subset of the classes based on a given number of classes
+    Fixed seed ensures the same classes are always chosen, in either train or val
+    Example: num_classes=11 will select same classes as num_classes=10 plus 1 extra
+    """
+    if num_classes > 1000 or num_classes < 1 or type(num_classes) != int:
+        raise ValueError("Num_classes has to be an integer between 1 and 1000")
+    # sets seed only locally, doesn't interfere with global numpy seed
+    selected_idxs = set(
+        np.random.RandomState(seed=2019).choice(1000, num_classes, replace=False)
+    )
+
+    # filter classes and class to idx
+    subset_class_to_idx = {}
+    new_idx = 0
+    for key, original_idx in class_to_idx.items():
+        if original_idx in selected_idxs:
+            # renumber the classes from 0
+            subset_class_to_idx[key] = new_idx
+            new_idx += 1
+    subset_classes = [c for c in classes if c in subset_class_to_idx.keys()]
+
+    # select only the relevant samples
+    # required since number of samples per class in training set is not uniform
+    counter = collections.Counter()
+    for j, (_, original_idx) in enumerate(samples, 1):
+        counter[original_idx] = j
+    subset_samples = []
+    for _class in subset_classes:
+        original_idx = class_to_idx[_class]
+        # select samples, based on original index
+        if original_idx == 0:
+            class_samples = samples[: counter[original_idx]]
+        else:
+            class_samples = samples[counter[original_idx - 1] : counter[original_idx]]
+        # extend replacing the original index by the new index
+        subset_samples.extend(
+            [(s[0], subset_class_to_idx[_class]) for s in class_samples]
+        )
+
+    return subset_classes, subset_class_to_idx, subset_samples
+
+
 class UnionDataset(Dataset):
     """Dataset used to create unions of two or more datasets. The union is
     created by applying the given transformation to the items in the dataset.
@@ -163,8 +207,7 @@ class PreprocessedDataset(Dataset):
 
         :return: Name of the file that was actually loaded.
         """
-        file_name = os.path.join(self.path,
-                                 self.basename + "{}.npz".format(qualifier))
+        file_name = os.path.join(self.path, self.basename + "{}.npz".format(qualifier))
         self.tensors = list(np.load(file_name).values())
         return file_name
 
@@ -175,10 +218,19 @@ class CachedDatasetFolder(DatasetFolder):
     and `os.scandir` calls
     """
 
-    def __init__(self, root, loader=default_loader, extensions=IMG_EXTENSIONS,
-                 transform=None, target_transform=None, is_valid_file=None):
-        super(DatasetFolder, self).__init__(root, transform=transform,
-                                            target_transform=target_transform)
+    def __init__(
+        self,
+        root,
+        loader=default_loader,
+        extensions=IMG_EXTENSIONS,
+        transform=None,
+        target_transform=None,
+        is_valid_file=None,
+        num_classes=1000,
+    ):
+        super(DatasetFolder, self).__init__(
+            root, transform=transform, target_transform=target_transform
+        )
 
         # Check for cached files
         cache_filename = os.path.join(root, "__cached_dataset_folder__.p")
@@ -191,12 +243,22 @@ class CachedDatasetFolder(DatasetFolder):
             if len(samples) == 0:
                 raise (
                     RuntimeError(
-                        "Found 0 files in subfolders of: " + self.root
+                        "Found 0 files in subfolders of: "
+                        + self.root
                         + "\nSupported extensions are: "
-                        + ",".join(extensions)))
-            pickle.dump((classes, class_to_idx, samples),
-                        file=open(cache_filename, "wb"),
-                        protocol=pickle.HIGHEST_PROTOCOL)
+                        + ",".join(extensions)
+                    )
+                )
+            pickle.dump(
+                (classes, class_to_idx, samples),
+                file=open(cache_filename, "wb"),
+                protocol=pickle.HIGHEST_PROTOCOL,
+            )
+
+        if num_classes < 1000:
+            classes, class_to_idx, samples = select_subset(
+                classes, class_to_idx, samples, num_classes
+            )
 
         self.loader = loader
         self.extensions = extensions

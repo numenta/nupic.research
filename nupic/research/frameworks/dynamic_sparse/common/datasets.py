@@ -39,6 +39,7 @@ custom_datasets = {"TinyImageNet": TinyImageNet}
 datasets_numclasses = {"TinyImageNet": 200, "CIFAR10": 10, "CIFAR100": 100, "MNIST": 10}
 
 datasets_stats = {
+    "ImageNet": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     "TinyImageNet": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     "CIFAR10": ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     "CIFAR100": (
@@ -190,8 +191,7 @@ class ImageNetDataset(BaseDataset):
         train_path = os.path.expanduser("~/nta/data/imagenet/train")
         val_path = os.path.expanduser("~/nta/data/imagenet/val")
 
-        stats_mean = (0.485, 0.456, 0.406)
-        stats_std = (0.229, 0.224, 0.225)
+        stats_mean, stats_std = datasets_stats["ImageNet"]
         train_transform = transforms.Compose(
             [
                 transforms.RandomSizedCrop(224),
@@ -211,8 +211,12 @@ class ImageNetDataset(BaseDataset):
         )
 
         # load datasets
-        train_dataset = CachedDatasetFolder(train_path, transform=train_transform)
-        test_dataset = CachedDatasetFolder(val_path, transform=val_transform)
+        train_dataset = CachedDatasetFolder(
+            train_path, transform=train_transform, num_classes=self.num_classes
+        )
+        test_dataset = CachedDatasetFolder(
+            val_path, transform=val_transform, num_classes=self.num_classes
+        )
 
         # load dataloaders
         # added pin_memory=True for faster data recovery
