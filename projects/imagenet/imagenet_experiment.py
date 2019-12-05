@@ -56,6 +56,7 @@ class ImagenetExperiment:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device_ids = None
         self.epoch = 0
+        self.steps_per_epoch = 0
 
     def setup(self, config):
         if isinstance(config, Mapping):
@@ -70,14 +71,15 @@ class ImagenetExperiment:
                 self.device = self.rank
                 self.device_ids = [self.device]
 
+        self.train_loader = self._create_train_dataloader()
+        self.steps_per_epoch = len(self.train_loader)
+        self.val_loader = self._create_validation_dataloader()
         self.model = self._create_model()
         self.optimizer = self._create_optimizer(self.model)
         self.lr_scheduler = self._create_lr_scheduler(self.optimizer)
         self.loss_function = self.config.loss_function
-        self.train_loader = self._create_train_dataloader()
-        self.val_loader = self._create_validation_dataloader()
-
-        self.summary = SummaryWriter(log_dir=self.config.logdir)
+        if self.rank == 0:
+            self.summary = SummaryWriter(log_dir=self.config.logdir)
 
     def validate(self, loader=None):
         if loader is None:
@@ -95,8 +97,9 @@ class ImagenetExperiment:
             batches_in_epoch=self.config.batches_in_epoch,
             progress=progress_bar
         )
-        for k, v in results.items():
-            self.summary.add_scalar(k, v, self.epoch)
+        if self.summary is not None:
+            for k, v in results.items():
+                self.summary.add_scalar(k, v, self.epoch)
 
         return results
 
@@ -125,8 +128,9 @@ class ImagenetExperiment:
         pass
 
     def pre_batch(self, model, batch_idx):
-        global_step = self.epoch * self.config.batch_size + batch_idx
-        self.summary.add_scalar("lr", self.get_lr()[0], global_step)
+        if self.summary is not None:
+            global_step = self.epoch * self.steps_per_epoch + batch_idx
+            self.summary.add_scalar("lr", self.get_lr()[0], global_step)
 
     def post_batch(self, model, batch_idx):
         if isinstance(self.lr_scheduler, OneCycleLR):
@@ -152,7 +156,8 @@ class ImagenetExperiment:
         )
 
     def stop(self):
-        self.summary.close()
+        if self.summary is not None:
+            self.summary.close()
 
     def get_lr(self):
         """
@@ -220,14 +225,9 @@ class ImagenetExperiment:
         lr_scheduler_class = self.config.lr_scheduler_class
         lr_scheduler_args = self.config.lr_scheduler_args
 
-        # OneCycleLR updates LR on every batch.
-        # When using DistributedDataParallel the batches are distributed across
-        # multiple processes. Therefore we need to divide the steps_per_epoch
-        # by the number of processes.
-        if self.config.distributed and isinstance(lr_scheduler_class, OneCycleLR):
-            world_size = dist.get_world_size()
-            steps_per_epoch = lr_scheduler_args["steps_per_epoch"]
-            lr_scheduler_args["steps_per_epoch"] = steps_per_epoch // world_size
+        if lr_scheduler_class == OneCycleLR:
+            lr_scheduler_args["epochs"] = self.config.epochs
+            lr_scheduler_args["steps_per_epoch"] = self.steps_per_epoch
 
         return lr_scheduler_class(optimizer, **lr_scheduler_args)
 

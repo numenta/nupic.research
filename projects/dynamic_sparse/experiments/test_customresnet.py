@@ -29,17 +29,25 @@ base_exp_config = dict(
     use_multiple_gpus=True,
     model="BaseModel",
     data_dir="~/nta/datasets",
-    num_classes=1000,
-    epochs=90,
+    num_classes=100,
+    epochs=120,
     batch_size_train=1024,
     batch_size_test=1024,
     # ---- network related
     network="resnet50",
     pretrained=False,
     # ---- optimizer related
-    optim_alg="Adam",
-    learning_rate=2e-3,
-    weight_decay=2e-4,
+    optim_alg="SGD",
+    learning_rate=0.1,
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[55, 85, 105],
+    lr_gamma=0.1,
+    weight_decay=1e-5,
+    momentum=0.9,
+    nesterov_momentum=True,
+    # optim_alg="Adam",
+    # learning_rate=2e-3,
+    # weight_decay=2e-4,
 )
 
 # ray configurations
