@@ -238,34 +238,41 @@ class ImagenetExperiment:
         """
         Configure the experiment for training
         :param config: Dictionary containing the configuration parameters
-            - distributed : Whether or not to use  Pytorch Distributed training
-            - backend : Pytorch Distributed backend ("nccl", "gloo")
-            - world_size : Total number of processes participating
-            - rank : Rank of the current process
+            - distributed: Whether or not to use  Pytorch Distributed training
+            - backend: Pytorch Distributed backend ("nccl", "gloo")
+            - world_size: Total number of processes participating
+            - rank: Rank of the current process
 
-            - data : Dataset path
-            - train_dir : Dataset training data relative path
-            - batch_size : Training batch size
-            - val_dir : Dataset validation data relative path
-            - val_batch_size : Validation batch size
-            - workers : how many data loading processes to use
+            - data: Dataset path
+            - train_dir: Dataset training data relative path
+            - batch_size: Training batch size
+            - val_dir: Dataset validation data relative path
+            - val_batch_size: Validation batch size
+            - workers: how many data loading processes to use
             - num_classes: Limit the dataset size to the given number of classes
 
-            - model_class : Model class. Must inherit from "torch.nn.Module"
-            - model_args : model model class arguments passed to the constructor
-            - init_bn0:  Whether or not to Initialize running batch norm mean to 0.
+            - model_class: Model class. Must inherit from "torch.nn.Module"
+            - model_args: model model class arguments passed to the constructor
+            - init_bn0: Whether or not to Initialize running batch norm mean
+                        to 0.
 
-            - optimizer_class : Optimizer class. Must inherit from "torch.optim.Optimizer"
-            - optimizer_args : Optimizer class class arguments passed to the constructor
-            - optimizer_groups : Group optimizer parameters. {group_by, parameters}
+            - optimizer_class: Optimizer class.
+                               Must inherit from "torch.optim.Optimizer"
+            - optimizer_args: Optimizer class class arguments passed to the
+                              constructor
+            - optimizer_groups: Group optimizer parameters.
+                                {group_by, parameters}
 
-            - lr_scheduler_class : Learning rate scheduler class. Must inherit from "_LRScheduler"
-            - lr_scheduler_args : Learning rate scheduler class class arguments passed to the constructor
+            - lr_scheduler_class: Learning rate scheduler class.
+                                 Must inherit from "_LRScheduler"
+            - lr_scheduler_args: Learning rate scheduler class class arguments
+                                 passed to the constructor
 
-            - loss_function : Loss function. See "torch.nn.functional"
-            - local_dir : Results path
-            - epochs : Number of epochs to train
-            - batches_in_epoch : Number of batches per epoch. Useful for debugging
+            - loss_function: Loss function. See "torch.nn.functional"
+            - local_dir: Results path
+            - epochs: Number of epochs to train
+            - batches_in_epoch: Number of batches per epoch.
+                                Useful for debugging
         """
         # Configure distribute pytorch
         self.distributed = config.get("distributed", False)
