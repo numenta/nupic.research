@@ -29,7 +29,6 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.utils.data
-from nupic.torch.modules import update_boost_strength, rezero_weights
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
@@ -39,10 +38,8 @@ from torchvision import transforms
 from torchvision.models.resnet import BasicBlock, Bottleneck
 
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
-from nupic.research.frameworks.pytorch.model_utils import (
-    evaluate_model, train_model
-)
-
+from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
+from nupic.torch.modules import rezero_weights, update_boost_strength
 
 __all__ = ["ImagenetExperiment"]
 
@@ -50,8 +47,9 @@ __all__ = ["ImagenetExperiment"]
 cudnn.benchmark = True
 
 
-def _create_train_dataloader(data_dir, batch_size, workers, distributed,
-                             num_classes=1000):
+def _create_train_dataloader(
+    data_dir, batch_size, workers, distributed, num_classes=1000
+):
     """
     Configure Imagenet training dataloader
 
@@ -65,14 +63,17 @@ def _create_train_dataloader(data_dir, batch_size, workers, distributed,
     dataset = CachedDatasetFolder(
         root=data_dir,
         num_classes=num_classes,
-        transform=transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),
-        ]))
+        transform=transforms.Compose(
+            [
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        ),
+    )
     if distributed:
         train_sampler = DistributedSampler(dataset)
     else:
@@ -84,7 +85,8 @@ def _create_train_dataloader(data_dir, batch_size, workers, distributed,
         shuffle=train_sampler is None,
         num_workers=workers,
         sampler=train_sampler,
-        pin_memory=torch.cuda.is_available())
+        pin_memory=torch.cuda.is_available(),
+    )
 
 
 def _create_validation_dataloader(data_dir, batch_size, workers, num_classes=1000):
@@ -100,20 +102,24 @@ def _create_validation_dataloader(data_dir, batch_size, workers, num_classes=100
     dataset = CachedDatasetFolder(
         root=data_dir,
         num_classes=num_classes,
-        transform=transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),
-        ]))
+        transform=transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        ),
+    )
     return torch.utils.data.DataLoader(
         dataset=dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=workers,
-        pin_memory=False)
+        pin_memory=False,
+    )
 
 
 def _create_optimizer(model, optimizer_class, optimizer_args, optimizer_groups=None):
@@ -269,8 +275,11 @@ class ImagenetExperiment:
             backend = config.get("backend", "nccl")
             world_size = config.get("world_size", 1)
             dist.init_process_group(
-                backend=backend, init_method=dist_url, rank=self.rank,
-                world_size=world_size)
+                backend=backend,
+                init_method=dist_url,
+                rank=self.rank,
+                world_size=world_size,
+            )
 
         # Configure data loaders
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
@@ -279,33 +288,48 @@ class ImagenetExperiment:
         batch_size = config.get("batch_size", 1)
         num_classes = config.get("num_classes", 1000)
         self.train_loader = _create_train_dataloader(
-            data_dir=train_dir, batch_size=batch_size, workers=workers,
-            distributed=self.distributed, num_classes=num_classes)
+            data_dir=train_dir,
+            batch_size=batch_size,
+            workers=workers,
+            distributed=self.distributed,
+            num_classes=num_classes,
+        )
 
         val_dir = os.path.join(config["data"], config.get("val_dir", "val"))
         val_batch_size = config.get("val_batch_size", batch_size)
         self.val_loader = _create_validation_dataloader(
-            data_dir=val_dir, batch_size=val_batch_size, workers=workers,
-            num_classes=num_classes)
+            data_dir=val_dir,
+            batch_size=val_batch_size,
+            workers=workers,
+            num_classes=num_classes,
+        )
 
         # Configure model
         model_class = config["model_class"]
         model_args = config.get("model_args", {})
         init_bn0 = config.get("init_bn0", False)
         self.model = _create_model(
-            model_class=model_class, model_args=model_args, init_bn0=init_bn0,
-            distributed=self.distributed, device=self.device)
+            model_class=model_class,
+            model_args=model_args,
+            init_bn0=init_bn0,
+            distributed=self.distributed,
+            device=self.device,
+        )
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
         optimizer_groups = config.get("optimizer_groups", {})
         self.optimizer = _create_optimizer(
-            model=self.model, optimizer_class=optimizer_class,
-            optimizer_args=optimizer_args, optimizer_groups=optimizer_groups)
+            model=self.model,
+            optimizer_class=optimizer_class,
+            optimizer_args=optimizer_args,
+            optimizer_groups=optimizer_groups,
+        )
 
-        self.loss_function = config.get("loss_function",
-                                        torch.nn.functional.cross_entropy)
+        self.loss_function = config.get(
+            "loss_function", torch.nn.functional.cross_entropy
+        )
 
         # Configure leaning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
@@ -336,15 +360,16 @@ class ImagenetExperiment:
         if self.distributed:
             self.train_loader.sampler.set_epoch(epoch)
 
-        train_model(model=self.model,
-                    loader=self.train_loader,
-                    optimizer=self.optimizer,
-                    device=self.device,
-                    criterion=self.loss_function,
-                    batches_in_epoch=self.batches_in_epoch,
-                    pre_batch_callback=self.pre_batch,
-                    post_batch_callback=self.post_batch,
-                    )
+        train_model(
+            model=self.model,
+            loader=self.train_loader,
+            optimizer=self.optimizer,
+            device=self.device,
+            criterion=self.loss_function,
+            batches_in_epoch=self.batches_in_epoch,
+            pre_batch_callback=self.pre_batch,
+            post_batch_callback=self.post_batch,
+        )
 
     def run_epoch(self, epoch):
         self.pre_epoch(epoch)
@@ -377,18 +402,27 @@ class ImagenetExperiment:
         # See https://github.com/ray-project/ray/issues/5519
         state = {}
         with io.BytesIO() as buffer:
-            torch.save(self.model.module.state_dict(), buffer,
-                       pickle_protocol=pickle.HIGHEST_PROTOCOL)
+            torch.save(
+                self.model.module.state_dict(),
+                buffer,
+                pickle_protocol=pickle.HIGHEST_PROTOCOL,
+            )
             state["model"] = buffer.getvalue()
 
         with io.BytesIO() as buffer:
-            torch.save(self.optimizer.state_dict(), buffer,
-                       pickle_protocol=pickle.HIGHEST_PROTOCOL)
+            torch.save(
+                self.optimizer.state_dict(),
+                buffer,
+                pickle_protocol=pickle.HIGHEST_PROTOCOL,
+            )
             state["optimizer"] = buffer.getvalue()
 
         with io.BytesIO() as buffer:
-            torch.save(self.lr_scheduler.state_dict(), buffer,
-                       pickle_protocol=pickle.HIGHEST_PROTOCOL)
+            torch.save(
+                self.lr_scheduler.state_dict(),
+                buffer,
+                pickle_protocol=pickle.HIGHEST_PROTOCOL,
+            )
             state["lr_scheduler"] = buffer.getvalue()
 
         return state

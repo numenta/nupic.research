@@ -70,8 +70,9 @@ class ImagenetTrainable(Trainable):
             num_cpus = 1
 
         # Create one ray remote process for each experiment in the process group
-        experiment = ray.remote(num_cpus=num_cpus,
-                                num_gpus=num_gpus)(ImagenetExperiment)
+        experiment = ray.remote(num_cpus=num_cpus, num_gpus=num_gpus)(
+            ImagenetExperiment
+        )
         self.procs = [experiment.remote() for _ in range(world_size)]
 
         # Use first process as head of the group

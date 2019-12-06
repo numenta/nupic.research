@@ -26,7 +26,6 @@ from torch.nn.modules.batchnorm import _BatchNorm
 
 import nupic.research.frameworks.pytorch.models.resnets
 
-
 """
 Imagenet Experiment configurations
 """
