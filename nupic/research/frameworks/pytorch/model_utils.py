@@ -158,8 +158,8 @@ def evaluate_model(
 
     return {
         "total_correct": correct,
-        "mean_loss": loss / total,
-        "mean_accuracy": correct / total,
+        "mean_loss": loss / total if total > 0 else 0,
+        "mean_accuracy": correct / total if total > 0 else 0,
     }
 
 
