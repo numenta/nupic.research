@@ -20,6 +20,7 @@
 import argparse
 import copy
 import os
+import socket
 from pprint import pprint
 
 import ray
@@ -124,14 +125,8 @@ def main(args):
         parser.print_help()
         exit(1)
     else:
-        if "REDIS_ADDRESS" in os.environ:
-            ray.init(address=os.environ["REDIS_ADDRESS"], include_webui=True)
-        else:
-            ray.init(
-                num_cpus=args.num_cpus,
-                num_gpus=args.num_gpus,
-                local_mode=args.num_cpus == 1,
-            )
+        address = os.environ.get("REDIS_ADDRESS", args.redis_address)
+        ray.init(address=address)
 
     # Get configuration values
     config = copy.deepcopy(CONFIGS[args.name])
@@ -183,6 +178,10 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--port", type=int, default=54321,
                         help="tcp port to use for distributed pytorch training")
     parser.add_argument("-s", "--with-server", action="store_true",
-                        help="Starts Tune API server")
+                        help="Start Ray Tune API server")
+    parser.add_argument(
+        "-a", "--redis-address",
+        default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
+        help="Redis address of an existing Ray server")
 
     main(parser.parse_args())
