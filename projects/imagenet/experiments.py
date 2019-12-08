@@ -22,11 +22,12 @@ import os
 import sys
 
 import torch
+from torch.nn.modules.batchnorm import _BatchNorm
 
 import nupic.research.frameworks.pytorch.models.resnets
 
 """
-Imagenet Experiment configuration
+Imagenet Experiment configurations
 """
 __all__ = ["CONFIGS"]
 
@@ -37,17 +38,16 @@ BATCH_SIZE = 128
 # Default configuration based on Pytorch Imagenet training example.
 # See http://github.com/pytorch/examples/blob/master/imagenet/main.py
 DEFAULT = dict(
+    # Results path
+    local_dir=os.path.expanduser("~/nta/results/imagenet"),
     # Dataset path
     data=os.path.expanduser("~/nta/data/imagenet"),
     # Dataset training data relative path
     train_dir="train",
     # Dataset validation data relative path
     val_dir="val",
-
-    # Results path
-    results=os.path.expanduser("~/nta/results/imagenet"),
-    # Epoch to start checkpoint
-    checkpoint_start=0,
+    # Limit the dataset size to the given number of classes
+    num_classes=1000,
 
     # Training batch size
     batch_size=BATCH_SIZE,
@@ -57,7 +57,7 @@ DEFAULT = dict(
     batches_in_epoch=sys.maxsize,
 
     # Stop training when the validation metric reaches the metric value
-    stop=dict(mean_accuracy=0.757),
+    stop=dict(mean_accuracy=0.75),
     # Number of epochs
     epochs=90,
 
@@ -73,7 +73,11 @@ DEFAULT = dict(
         lr=0.1,
         weight_decay=1e-04,
         momentum=0.9,
+        dampening=0,
+        nesterov=True
     ),
+    # Optional optimizer parameters groups
+    optimizer_groups=None,
 
     # Learning rate scheduler class. Must inherit from "_LRScheduler"
     lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
@@ -84,43 +88,68 @@ DEFAULT = dict(
         step_size=30,
     ),
 
+    # Whether or not to Initialize running batch norm mean to 0.
+    # See https://arxiv.org/pdf/1706.02677.pdf
+    init_bn0=False,
+
     # Loss function. See "torch.nn.functional"
     loss_function=torch.nn.functional.cross_entropy,
 
-    # Whether or not to show progress bar during training
-    progress_bar=True,
-
-    # Whether or not to use torch.nn.parallel.distributed
-    distributed=False,
-
-    # Number of workers used by dataloaders
-    workers=0,
+    # How often to checkpoint (epochs)
+    checkpoint_freq=1,
+    # How many times to try to recover before stopping the trial
+    max_failures=-1,
 )
 
-# Configuration inspired by Fast.ai.
-# See https://github.com/fastai/imagenet-fast
-FASTAI = copy.deepcopy(DEFAULT)
-FASTAI_EPOCHS = 30
-FASTAI.update(dict(
-    epochs=FASTAI_EPOCHS,
+DEBUG = copy.deepcopy(DEFAULT)
+DEBUG.update(
+    data=os.path.expanduser("~/nta/data/imagenet"),
+    num_classes=10,
+    model_args=dict(
+        config={"num_classes": 10}
+    ),
+)
+
+# Configuration inspired by Super-Convergence paper. (Fig 6a)
+# See https://arxiv.org/pdf/1708.07120.pdf
+SUPER_CONVERGENCE = copy.deepcopy(DEFAULT)
+SUPER_CONVERGENCE.update(
+    epochs=20,
     # Super-Convergence 1cycle policy
     # See https://arxiv.org/pdf/1708.07120.pdf
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
     lr_scheduler_args=dict(
-        max_lr=2.0,
+        max_lr=1.0,
+        div_factor=20),
+    # Reduce weight decay to 3e-6 when using super-convergence
+    optimizer_args=dict(
+        lr=0.1,
+        weight_decay=3e-6,
+        momentum=0.9,
     ),
-))
-# Reduce weight decay when using super-convergence
-FASTAI["optimizer_args"].update(dict(weight_decay=3e-6))
+)
 
-# Use smaller "imagenette" dataset with same "fastai" configuration
-FASTAI_SMALL = copy.deepcopy(FASTAI)
-FASTAI_SMALL.update(dict(
-    data=os.path.expanduser("~/nta/data/imagenette/sz/160"),
-    model_args=dict(config=dict(num_classes=10))))
+# Configuration inspired by https://www.fast.ai/2018/08/10/fastai-diu-imagenet/
+# https://app.wandb.ai/yaroslavvb/imagenet18/runs/gxsdo6i0
+FASTAI18 = copy.deepcopy(SUPER_CONVERGENCE)
+FASTAI18.update(
+    epochs=35,
+    init_bn0=True,
 
-# Export configurations
-CONFIGS = dict()
-CONFIGS["default"] = DEFAULT
-CONFIGS["fastai"] = FASTAI
-CONFIGS["fastai_small"] = FASTAI_SMALL
+    # Remove weight decay from batch norm modules
+    optimizer_groups=dict(
+        group_by=lambda module: isinstance(module, _BatchNorm),
+        parameters={
+            "True": {"weight_decay": 0.},  # BatchNorm modules
+            "False": {},                   # All other modules
+        }
+    ),
+)
+
+# Export all configurations
+CONFIGS = dict(
+    default=DEFAULT,
+    debug=DEBUG,
+    super_convergence=SUPER_CONVERGENCE,
+    fastai18=FASTAI18,
+)
