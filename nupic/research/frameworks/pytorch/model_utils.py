@@ -94,7 +94,7 @@ def train_model(
             loader.set_postfix(dict(loss=loss.item()))
 
         if post_batch_callback is not None:
-            post_batch_callback(model=model, batch_idx=batch_idx)
+            post_batch_callback(model=model, loss=loss.item(), batch_idx=batch_idx)
 
     if progress_bar is not None:
         loader.n = loader.total
