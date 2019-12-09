@@ -31,7 +31,6 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.utils.data
-from nupic.torch.modules import rezero_weights, update_boost_strength
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.modules.batchnorm import _BatchNorm
@@ -43,7 +42,7 @@ from torchvision.models.resnet import BasicBlock, Bottleneck
 
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
-
+from nupic.torch.modules import rezero_weights, update_boost_strength
 
 __all__ = ["ImagenetExperiment"]
 
@@ -109,7 +108,7 @@ def _create_train_dataloader(
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),
-            ]
+            ],
         ),
     )
     if distributed:
@@ -383,10 +382,11 @@ class ImagenetExperiment:
                 group_by=lambda module: isinstance(module, _BatchNorm),
                 parameters={
                     # Remove 'weight_decay' from _BatchNorm parameters
-                    "True": dict(weight_decay=0.),
+                    "True": dict(weight_decay=0.0),
                     # Leave all other parameters alone
                     "False": {},
-                })
+                },
+            )
 
         self.optimizer = _create_optimizer(
             model=self.model,
@@ -454,8 +454,6 @@ class ImagenetExperiment:
         if isinstance(transform, ProgressiveRandomResizedCrop):
             transform.set_epoch(epoch)
 
-
-
     def pre_batch(self, model, batch_idx, epoch):
         pass
 
@@ -463,7 +461,6 @@ class ImagenetExperiment:
         if isinstance(self.lr_scheduler, OneCycleLR):
             step = epoch * self.steps_per_epoch + batch_idx + 1
             self.lr_scheduler.step(step)
-
 
     def post_epoch(self, epoch):
         self.model.apply(rezero_weights)
