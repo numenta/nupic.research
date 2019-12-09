@@ -17,7 +17,9 @@
 #
 #  http://numenta.org/licenses/
 #
+import bisect
 import copy
+import functools
 import io
 import itertools
 import os
@@ -31,6 +33,7 @@ import torch.nn as nn
 import torch.utils.data
 from torch.backends import cudnn
 from torch.nn import DataParallel
+from torch.nn.modules.batchnorm import _BatchNorm
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DistributedSampler
@@ -47,8 +50,41 @@ __all__ = ["ImagenetExperiment"]
 cudnn.benchmark = True
 
 
+class ProgressiveRandomResizedCrop(transforms.Compose):
+    """
+    Progressive resize and crop image transform. This transform will apply a
+    different size to `torchvision.transforms.RandomResizedCrop` based on the
+    epoch. The method `set_epoch` must be called on each epoch before using
+    this transform
+
+    :param epoch_resize: A dictionary mapping epoch to image size. Each key
+                         correspond to the start epoch and the value correspond
+                         to the image size. For example:
+                         epoch_resize={
+                             0: 128, # epoch  0-13,  resize to 128
+                            14: 224, # epoch 14-31,  resize to 224
+                            32: 288, # epoch 32-end, resize to 288
+                        },
+
+    :param transforms: List of transforms to apply after the image is resized
+    """
+
+    def __init__(self, epoch_resize, transforms):
+        super().__init__(transforms)
+        self.epoch_resize = epoch_resize
+        self.resize = None
+
+    def __call__(self, img):
+        img = self.resize(img)
+        return super().__call__(img)
+
+    def set_epoch(self, epoch):
+        key = bisect.bisect(sorted(self.epoch_resize.keys()), epoch) - 1
+        self.resize = transforms.RandomResizedCrop(self.epoch_resize[key])
+
+
 def _create_train_dataloader(
-    data_dir, batch_size, workers, distributed, num_classes=1000
+    data_dir, batch_size, workers, distributed, epoch_resize, num_classes=1000
 ):
     """
     Configure Imagenet training dataloader
@@ -57,21 +93,22 @@ def _create_train_dataloader(
     :param batch_size: Images per batch
     :param workers: how many data loading subprocesses to use
     :param distributed: Whether or not to use `DistributedSampler`
+    :param epoch_resize: Dictionary containing the progressive resize schedule
     :param num_classes: Limit the dataset size to the given number of classes
     :return: torch.utils.data.DataLoader
     """
     dataset = CachedDatasetFolder(
         root=data_dir,
         num_classes=num_classes,
-        transform=transforms.Compose(
-            [
-                transforms.RandomResizedCrop(224),
+        transform=ProgressiveRandomResizedCrop(
+            epoch_resize=epoch_resize,
+            transforms=[
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),
-            ]
+            ],
         ),
     )
     if distributed:
@@ -180,7 +217,7 @@ def _create_optimizer(model, optimizer_class, optimizer_args, optimizer_groups=N
     return optimizer_class(model_params, **optimizer_args)
 
 
-def _create_model(model_class, model_args, init_bn0, distributed, device):
+def _create_model(model_class, model_args, init_batch_norm, distributed, device):
     """
     Configure network model
 
@@ -188,7 +225,7 @@ def _create_model(model_class, model_args, init_bn0, distributed, device):
             The model class. Must inherit from torch.nn.Module
     :param model_args:
         The model constructor arguments
-    :param init_bn0:
+    :param init_batch_norm:
         Whether or not to initialize running batch norm mean to 0
         See https://arxiv.org/pdf/1706.02677.pdf
     :param distributed:
@@ -205,13 +242,17 @@ def _create_model(model_class, model_args, init_bn0, distributed, device):
     else:
         model = DataParallel(model)
 
-    if init_bn0:
+    # See https://arxiv.org/pdf/1706.02677.pdf
+    if init_batch_norm:
         for m in model.modules():
             if isinstance(m, BasicBlock):
+                # initialized the last BatchNorm in each BasicBlock to 0
                 m.bn2.weight = nn.Parameter(torch.zeros_like(m.bn2.weight))
             elif isinstance(m, Bottleneck):
+                # initialized the last BatchNorm in each Bottleneck to 0
                 m.bn3.weight = nn.Parameter(torch.zeros_like(m.bn3.weight))
             elif isinstance(m, nn.Linear):
+                # initialized linear layers weights from a gaussian distribution
                 m.weight.data.normal_(0, 0.01)
 
     return model
@@ -230,7 +271,9 @@ class ImagenetExperiment:
         self.train_loader = None
         self.val_loader = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.batches_in_epoch = 0
+        self.batches_in_epoch = sys.maxsize
+        self.steps_per_epoch = 0
+        self.epochs = 1
         self.distributed = False
         self.rank = 0
 
@@ -253,15 +296,15 @@ class ImagenetExperiment:
 
             - model_class: Model class. Must inherit from "torch.nn.Module"
             - model_args: model model class arguments passed to the constructor
-            - init_bn0: Whether or not to Initialize running batch norm mean
-                        to 0.
+            - init_batch_norm: Whether or not to Initialize running batch norm
+                               mean to 0.
 
             - optimizer_class: Optimizer class.
                                Must inherit from "torch.optim.Optimizer"
             - optimizer_args: Optimizer class class arguments passed to the
                               constructor
-            - optimizer_groups: Group optimizer parameters.
-                                {group_by, parameters}
+            - weight_decay_batch_norm: Whether or not to apply weight decay to
+                                       batch norm modules parameters
 
             - lr_scheduler_class: Learning rate scheduler class.
                                  Must inherit from "_LRScheduler"
@@ -289,18 +332,22 @@ class ImagenetExperiment:
             )
 
         # Configure data loaders
+        self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
         workers = config.get("workers", 0)
         train_dir = os.path.join(config["data"], config.get("train_dir", "train"))
         batch_size = config.get("batch_size", 1)
+        epoch_resize = config.get("epoch_resize", {0: 224})
         num_classes = config.get("num_classes", 1000)
         self.train_loader = _create_train_dataloader(
             data_dir=train_dir,
             batch_size=batch_size,
             workers=workers,
             distributed=self.distributed,
+            epoch_resize=epoch_resize,
             num_classes=num_classes,
         )
+        self.steps_per_epoch = len(self.train_loader)
 
         val_dir = os.path.join(config["data"], config.get("val_dir", "val"))
         val_batch_size = config.get("val_batch_size", batch_size)
@@ -314,11 +361,11 @@ class ImagenetExperiment:
         # Configure model
         model_class = config["model_class"]
         model_args = config.get("model_args", {})
-        init_bn0 = config.get("init_bn0", False)
+        init_batch_norm = config.get("init_batch_norm", False)
         self.model = _create_model(
             model_class=model_class,
             model_args=model_args,
-            init_bn0=init_bn0,
+            init_batch_norm=init_batch_norm,
             distributed=self.distributed,
             device=self.device,
         )
@@ -326,7 +373,21 @@ class ImagenetExperiment:
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
-        optimizer_groups = config.get("optimizer_groups", {})
+        optimizer_groups = None
+
+        # Remove weight decay from batch norm modules
+        if not config.get("weight_decay_batch_norm", True):
+            # Group parameters by "BatchNorm" and not "BatchNorm"
+            optimizer_groups = dict(
+                group_by=lambda module: isinstance(module, _BatchNorm),
+                parameters={
+                    # Remove 'weight_decay' from _BatchNorm parameters
+                    "True": dict(weight_decay=0.0),
+                    # Leave all other parameters alone
+                    "False": {},
+                },
+            )
+
         self.optimizer = _create_optimizer(
             model=self.model,
             optimizer_class=optimizer_class,
@@ -343,10 +404,10 @@ class ImagenetExperiment:
         if lr_scheduler_class is not None:
             lr_scheduler_args = config.get("lr_scheduler_args", {})
             if lr_scheduler_class == OneCycleLR:
-                # Update 1cycle policy arguments
-                epochs = config.get("epochs", 1)
-                lr_scheduler_args["epochs"] = epochs
-                lr_scheduler_args["steps_per_epoch"] = len(self.train_loader)
+                lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
+                lr_scheduler_args["epochs"] = self.epochs
+                lr_scheduler_args["steps_per_epoch"] = self.steps_per_epoch
+
             self.lr_scheduler = lr_scheduler_class(self.optimizer, **lr_scheduler_args)
 
     def validate(self, loader=None):
@@ -364,8 +425,6 @@ class ImagenetExperiment:
         return results
 
     def train_epoch(self, epoch):
-        if self.distributed:
-            self.train_loader.sampler.set_epoch(epoch)
 
         train_model(
             model=self.model,
@@ -374,8 +433,8 @@ class ImagenetExperiment:
             device=self.device,
             criterion=self.loss_function,
             batches_in_epoch=self.batches_in_epoch,
-            pre_batch_callback=self.pre_batch,
-            post_batch_callback=self.post_batch,
+            pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
+            post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
         )
 
     def run_epoch(self, epoch):
@@ -387,13 +446,21 @@ class ImagenetExperiment:
 
     def pre_epoch(self, epoch):
         self.model.apply(update_boost_strength)
+        if self.distributed:
+            self.train_loader.sampler.set_epoch(epoch)
 
-    def pre_batch(self, model, batch_idx):
+        # Update transform
+        transform = self.train_loader.dataset.transform
+        if isinstance(transform, ProgressiveRandomResizedCrop):
+            transform.set_epoch(epoch)
+
+    def pre_batch(self, model, batch_idx, epoch):
         pass
 
-    def post_batch(self, model, batch_idx):
+    def post_batch(self, model, loss, batch_idx, epoch):
         if isinstance(self.lr_scheduler, OneCycleLR):
-            self.lr_scheduler.step(batch_idx)
+            step = epoch * self.steps_per_epoch + batch_idx + 1
+            self.lr_scheduler.step(step)
 
     def post_epoch(self, epoch):
         self.model.apply(rezero_weights)
