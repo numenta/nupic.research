@@ -22,7 +22,6 @@ import os
 import sys
 
 import torch
-from torch.nn.modules.batchnorm import _BatchNorm
 
 import nupic.research.frameworks.pytorch.models.resnets
 
@@ -76,8 +75,9 @@ DEFAULT = dict(
         dampening=0,
         nesterov=True
     ),
-    # Optional optimizer parameters groups
-    optimizer_groups=None,
+    # Whether or not to apply weight decay to batch norm modules parameters
+    # See https://arxiv.org/abs/1807.11205
+    weight_decay_batch_norm=True,
 
     # Learning rate scheduler class. Must inherit from "_LRScheduler"
     lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
@@ -90,7 +90,11 @@ DEFAULT = dict(
 
     # Whether or not to Initialize running batch norm mean to 0.
     # See https://arxiv.org/pdf/1706.02677.pdf
-    init_bn0=False,
+    init_batch_norm=False,
+
+    # Progressive resize schedule - dict(start_epoch: image_size)
+    # See https://arxiv.org/pdf/1806.01427.pdf
+    epoch_resize={0: 224},
 
     # Loss function. See "torch.nn.functional"
     loss_function=torch.nn.functional.cross_entropy,
@@ -101,31 +105,26 @@ DEFAULT = dict(
     max_failures=-1,
 )
 
-DEBUG = copy.deepcopy(DEFAULT)
-DEBUG.update(
-    data=os.path.expanduser("~/nta/data/imagenet"),
-    num_classes=10,
-    model_args=dict(
-        config={"num_classes": 10}
-    ),
-)
-
 # Configuration inspired by Super-Convergence paper. (Fig 6a)
 # See https://arxiv.org/pdf/1708.07120.pdf
+# 1cycle learning rate policy with the learning rate varying from 0.05 to 1.0,
+# then down to 0.00005 in 20 epochs, using a weight decay of 3e−6
 SUPER_CONVERGENCE = copy.deepcopy(DEFAULT)
 SUPER_CONVERGENCE.update(
     epochs=20,
-    # Super-Convergence 1cycle policy
-    # See https://arxiv.org/pdf/1708.07120.pdf
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
     lr_scheduler_args=dict(
         max_lr=1.0,
-        div_factor=20),
+        div_factor=20,  # initial_lr = 0.05
+        final_div_factor=1000,  # min_lr = 0.00005
+        anneal_strategy="linear",
+    ),
     # Reduce weight decay to 3e-6 when using super-convergence
     optimizer_args=dict(
         lr=0.1,
         weight_decay=3e-6,
         momentum=0.9,
+        nesterov=False,
     ),
 )
 
@@ -134,16 +133,35 @@ SUPER_CONVERGENCE.update(
 FASTAI18 = copy.deepcopy(SUPER_CONVERGENCE)
 FASTAI18.update(
     epochs=35,
-    init_bn0=True,
+    init_batch_norm=True,
 
-    # Remove weight decay from batch norm modules
-    optimizer_groups=dict(
-        group_by=lambda module: isinstance(module, _BatchNorm),
-        parameters={
-            "True": {"weight_decay": 0.},  # BatchNorm modules
-            "False": {},                   # All other modules
-        }
+    # dict(start_epoch: image_size)
+    epoch_resize={
+        0: 128,
+        14: 224,
+        32: 288
+    },
+    lr_scheduler_args=dict(
+        # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 35 epochs
+        max_lr=2.0,
+        div_factor=2,  # initial_lr = 1.0
+        final_div_factor=4000,  # min_lr = 0.00025
+        pct_start=5.0 / 35.0,
+        anneal_strategy="linear",
     ),
+    optimizer_args=dict(
+        lr=0.1,
+        weight_decay=0.0001,
+        momentum=0.9,
+        nesterov=False,
+    ),
+    # No weigh decay from batch norm modules
+    weight_decay_batch_norm=False,
+)
+
+DEBUG = copy.deepcopy(FASTAI18)
+DEBUG.update(
+    model_args=dict(config=dict(num_classes=10)),
 )
 
 # Export all configurations

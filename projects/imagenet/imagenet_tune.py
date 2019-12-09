@@ -78,7 +78,7 @@ class ImagenetTrainable(Trainable):
 
         # Use first process as head of the group
         ip = ray.get(self.procs[0].get_node_ip.remote())
-        port = config.get("port", 54321)
+        port = config.get("dist_port", 54321)
         dist_url = "tcp://{}:{}".format(ip, port)
 
         # Configure each process in the group
@@ -163,10 +163,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("-e", "--experiment", dest="name", default="default",
                         help="Experiment to run", choices=CONFIGS.keys())
-    parser.add_argument("-g", "--num_gpus", dest="num_gpus", type=int,
+    parser.add_argument("-g", "--num-gpus", type=int,
                         default=torch.cuda.device_count(),
                         help="number of GPUs to use")
-    parser.add_argument("-n", "--num_cpus", dest="num_cpus", type=int,
+    parser.add_argument("-n", "--num-cpus", type=int,
                         default=torch.get_num_interop_threads() - 1,
                         help="number of CPUs to use when GPU is not available."),
     parser.add_argument("-r", "--resume", action="store_true",
@@ -175,13 +175,13 @@ if __name__ == "__main__":
                         help="Number of dataloaders workers")
     parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
                         help="Pytorch Distributed backend", default="nccl")
-    parser.add_argument("-p", "--port", type=int, default=54321,
+    parser.add_argument("-d", "--dist-port", type=int, default=54321,
                         help="tcp port to use for distributed pytorch training")
     parser.add_argument("-s", "--with-server", action="store_true",
                         help="Start Ray Tune API server")
     parser.add_argument(
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
-        help="Redis address of an existing Ray server")
+        help="redis address of an existing Ray server")
 
     main(parser.parse_args())
