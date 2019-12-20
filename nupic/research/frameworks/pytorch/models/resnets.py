@@ -26,6 +26,10 @@ from collections import namedtuple
 import torch.nn as nn
 
 import nupic.torch.modules as nupic_modules
+from nupic.research.frameworks.pytorch.sparse_layer_params import (
+    LayerParams,
+    auto_sparse_params,
+)
 from nupic.torch.modules import Flatten, KWinners2d
 
 # Defines default convolutional params for different size conv layers
@@ -37,40 +41,23 @@ conv_types = {
     "7x7": ConvParams(kernel_size=7, padding=3),
 }
 
-# Defines default sparse params for regular layers with activations
-LayerParams = namedtuple(
-    "LayerParams",
-    [
-        "percent_on",
-        "boost_strength",
-        "boost_strength_factor",
-        "k_inference_factor",
-        "local",
-        "weights_density",
-    ],
-)
-LayerParams.__new__.__defaults__ = (1.0, 1.4, 0.7, 1.0, True, 1.0)
-
-# Defines default sparse params for layers without activations
-NoactLayerParams = namedtuple("NoactLayerParams", ["weights_density"])
-NoactLayerParams.__new__.__defaults__ = (1.0,)
-
 
 def default_sparse_params(group_type, number_layers, sparse=False):
-    """Creates dictionary with default parameters.
-    If sparse_params is passed to the model, default params are not used.
+    """
+    Creates dictionary with default parameters. If sparse=True is passed to the model,
+    default params are created using auto_sparse_params.
 
-    :param group_type: defines whether group is BasicBlock or Bottleneck
-    :param number_layers: number of layers to be assigned to each group
+    :param group_type: defines whether group is BasicBlock or Bottleneck.
+    :param number_layers: number of layers to be assigned to each group.
+    :param sparse: bool indicating whether a default sparse network should be created.
 
     :returns dictionary with default parameters
     """
+    noact_layer_params = LayerParams()
     if sparse:
-        layer_params = LayerParams(0.25, 1.4, 0.7, 1.0, True, 0.5)
-        noact_layer_params = NoactLayerParams(0.5)
+        layer_params = LayerParams(params_function=auto_sparse_params)
     else:
         layer_params = LayerParams()
-        noact_layer_params = NoactLayerParams()
 
     if group_type == BasicBlock:
         params = dict(
@@ -80,7 +67,7 @@ def default_sparse_params(group_type, number_layers, sparse=False):
         params = dict(
             conv1x1_1=layer_params,
             conv3x3_2=layer_params,
-            conv1x1_3=noact_layer_params,
+            conv1x1_3=layer_params,
             shortcut=layer_params,
         )
 
@@ -110,7 +97,7 @@ def conv_layer(
     conv_type,
     in_planes,
     out_planes,
-    weights_density,
+    layer_params,
     sparse_weights_type,
     stride=1,
     bias=False,
@@ -125,6 +112,12 @@ def conv_layer(
         padding=padding,
         bias=bias,
     )
+
+    weights_density = layer_params.weights_density
+    if layer_params.params_function is not None:
+        weights_density = layer_params.params_function(in_planes,
+                                                       out_planes,
+                                                       kernel_size).weights_density
     if weights_density < 1.0:
         sparse_weights_type = getattr(nupic_modules, sparse_weights_type)
         return sparse_weights_type(layer, weights_density)
@@ -134,25 +127,23 @@ def conv_layer(
 
 def activation_layer(
     out,
-    percent_on,
-    boost_strength,
-    boost_strength_factor,
-    k_inference_factor,
-    local,
-    *args,
+    params,
 ):
     """Basic activation layer.
     Defaults to ReLU if percent_on is < 0.5. Otherwise KWinners is used."""
-    if percent_on >= 0.5:
+    if params.params_function is not None:
+        params = params.params_function(0, out, 0)
+
+    if params.percent_on >= 0.5:
         return nn.ReLU(inplace=True)
     else:
         return KWinners2d(
             out,
-            percent_on=percent_on,
-            boost_strength=boost_strength,
-            boost_strength_factor=boost_strength_factor,
-            k_inference_factor=k_inference_factor,
-            local=local,
+            percent_on=params.percent_on,
+            boost_strength=params.boost_strength,
+            boost_strength_factor=params.boost_strength_factor,
+            k_inference_factor=params.k_inference_factor,
+            local=params.local,
         )
 
 
@@ -169,17 +160,17 @@ class BasicBlock(nn.Module):
                 "3x3",
                 in_planes,
                 planes,
-                layer_params["conv3x3_1"].weights_density,
+                layer_params["conv3x3_1"],
                 sparse_weights_type=sparse_weights_type,
                 stride=stride,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, *layer_params["conv3x3_1"]),
+            activation_layer(planes, layer_params["conv3x3_1"]),
             conv_layer(
                 "3x3",
                 planes,
                 planes,
-                layer_params["conv3x3_2"].weights_density,
+                layer_params["conv3x3_2"],
                 sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(planes),
@@ -192,14 +183,14 @@ class BasicBlock(nn.Module):
                     "1x1",
                     in_planes,
                     planes,
-                    layer_params["shortcut"].weights_density,
+                    layer_params["shortcut"],
                     sparse_weights_type=sparse_weights_type,
                     stride=stride,
                 ),
                 nn.BatchNorm2d(planes),
             )
 
-        self.post_activation = activation_layer(planes, *layer_params["shortcut"])
+        self.post_activation = activation_layer(planes, layer_params["shortcut"])
 
     def forward(self, x):
         out = self.regular_path(x)
@@ -221,28 +212,28 @@ class Bottleneck(nn.Module):
                 "1x1",
                 in_planes,
                 planes,
-                layer_params["conv1x1_1"].weights_density,
+                layer_params["conv1x1_1"],
                 sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, *layer_params["conv1x1_1"]),
+            activation_layer(planes, layer_params["conv1x1_1"]),
             # 2nd layer
             conv_layer(
                 "3x3",
                 planes,
                 planes,
-                layer_params["conv3x3_2"].weights_density,
+                layer_params["conv3x3_2"],
                 sparse_weights_type=sparse_weights_type,
                 stride=stride,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, *layer_params["conv3x3_2"]),
+            activation_layer(planes, layer_params["conv3x3_2"]),
             # 3rd layer
             conv_layer(
                 "1x1",
                 planes,
                 self.expansion * planes,
-                layer_params["conv1x1_3"].weights_density,
+                layer_params["conv1x1_3"],
                 sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(self.expansion * planes),
@@ -255,7 +246,7 @@ class Bottleneck(nn.Module):
                     "1x1",
                     in_planes,
                     self.expansion * planes,
-                    layer_params["shortcut"].weights_density,
+                    layer_params["shortcut"],
                     sparse_weights_type=sparse_weights_type,
                     stride=stride,
                 ),
@@ -263,7 +254,7 @@ class Bottleneck(nn.Module):
             )
 
         self.post_activation = activation_layer(
-            self.expansion * planes, *layer_params["shortcut"]
+            self.expansion * planes, layer_params["shortcut"]
         )
 
     def forward(self, x):
@@ -325,12 +316,12 @@ class ResNet(nn.Module):
                 "7x7",
                 3,
                 64,
-                self.sparse_params["stem"].weights_density,
+                self.sparse_params["stem"],
                 sparse_weights_type=self.conv_sparse_weights_type,
                 stride=2,
             ),
             nn.BatchNorm2d(64),
-            activation_layer(64, *self.sparse_params["stem"]),
+            activation_layer(64, self.sparse_params["stem"]),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
             # groups 1 to 4
             self._make_group(
