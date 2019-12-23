@@ -17,6 +17,7 @@
 #
 #  http://numenta.org/licenses/
 #
+import unittest
 
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -28,6 +29,7 @@ from nupic.research.frameworks.tensorflow.utils import load_gsc_weights_from_pyt
 from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 
 
+@unittest.skip("FIXME: RES-982")
 @keras_parameterized.run_all_keras_modes
 class LoadPytorchWeightsTest(keras_parameterized.TestCase):
 
