@@ -160,9 +160,11 @@ def _create_validation_dataloader(data_dir, batch_size, workers, num_classes=100
     )
 
 
-def _create_optimizer(model, optimizer_class, optimizer_args, optimizer_groups=None):
+def _create_optimizer(model, optimizer_class, optimizer_args,
+                      batch_norm_weight_decay):
     """
-    Configure the optimizer with or without parameter groups
+    Configure the optimizer with the option to ignore `weight_decay` from all
+    batch norm module parameters
 
     :param model:
         The model to get the parameters from
@@ -173,47 +175,38 @@ def _create_optimizer(model, optimizer_class, optimizer_args, optimizer_groups=N
     :param optimizer_args:
         The optimizer constructor arguments passed in addition to the model parameters
 
-    :param optimizer_groups: Optional dictionary used to customize the optimizer
-        parameters (lr, wd, ...) for each model parameter group. This dictionary
-        contains the following fields:
-        - "group_by": key/func used to group the model submodules via itertools.groupby
-        - "parameters": dict of optimizer parameters to override for each group.
-
-      For example, use the following values to remove "weight_decay" from
-      "BatchNorm" module::
-
-        optimizer_groups = {
-            "group_by": lambda module: isinstance(module, BatchNorm),
-            "parameters": {
-                "True": {"weight_decay": 0.},  # BatchNorm modules
-                "False": {},                   # All other modules
-            }
-        }
+    :param batch_norm_weight_decay:
+        Whether or not to apply weight decay to batch norm modules parameters.
+        If False, remove 'weight_decay' from batch norm parameters
+        See https://arxiv.org/abs/1807.11205
 
     :return: Configured optimizer
     """
-    # Create custom parameter groups
-    if optimizer_groups is not None:
-        # Sort modules using "group_by" key
-        group_by = optimizer_groups["group_by"]
-        sorted_modules = sorted(model.modules(), key=group_by)
+    if batch_norm_weight_decay:
+        # No need to remove weight decay. Use same optimizer args for all parameters
+        model_params = model.parameters()
+    else:
+        # Group batch norm parameters
+        def group_by_batch_norm(module):
+            return isinstance(module, _BatchNorm)
 
-        # Group module parameters using "group_by" key
+        sorted_modules = sorted(model.modules(), key=group_by_batch_norm)
         grouped_parameters = {
-            str(k): list(itertools.chain.from_iterable(m.parameters(False) for m in g))
-            for k, g in itertools.groupby(sorted_modules, key=group_by)
+            k: list(itertools.chain.from_iterable(m.parameters(False) for m in g))
+            for k, g in itertools.groupby(sorted_modules, key=group_by_batch_norm)
         }
 
-        # Add custom optimizer parameters for each group
         model_params = []
-        parameters = optimizer_groups["parameters"]
-        for k, params in grouped_parameters.items():
-            group = copy.deepcopy(optimizer_args)
-            group.update(params=params)
-            group.update(**parameters[k])
-            model_params.append(group)
-    else:
-        model_params = model.parameters()
+        for is_bn, params in grouped_parameters.items():
+            # Group model_params
+            group_args = copy.deepcopy(optimizer_args)
+            group_args.update(params=params)
+
+            # Remove 'weight_decay' from batch norm parameters
+            if is_bn:
+                group_args.update(weight_decay=0.0)
+
+            model_params.append(group_args)
 
     return optimizer_class(model_params, **optimizer_args)
 
@@ -307,7 +300,7 @@ class ImagenetExperiment:
                                Must inherit from "torch.optim.Optimizer"
             - optimizer_args: Optimizer class class arguments passed to the
                               constructor
-            - weight_decay_batch_norm: Whether or not to apply weight decay to
+            - batch_norm_weight_decay: Whether or not to apply weight decay to
                                        batch norm modules parameters
 
             - lr_scheduler_class: Learning rate scheduler class.
@@ -391,26 +384,12 @@ class ImagenetExperiment:
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
-        optimizer_groups = None
-
-        # Remove weight decay from batch norm modules
-        if not config.get("weight_decay_batch_norm", True):
-            # Group parameters by "BatchNorm" and not "BatchNorm"
-            optimizer_groups = dict(
-                group_by=lambda module: isinstance(module, _BatchNorm),
-                parameters={
-                    # Remove 'weight_decay' from _BatchNorm parameters
-                    "True": dict(weight_decay=0.0),
-                    # Leave all other parameters alone
-                    "False": {},
-                },
-            )
-
+        batch_norm_weight_decay = config.get("batch_norm_weight_decay", True)
         self.optimizer = _create_optimizer(
             model=self.model,
             optimizer_class=optimizer_class,
             optimizer_args=optimizer_args,
-            optimizer_groups=optimizer_groups,
+            batch_norm_weight_decay=batch_norm_weight_decay,
         )
 
         self.loss_function = config.get(
