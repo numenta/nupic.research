@@ -18,7 +18,6 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-import logging
 import random
 import sys
 
@@ -26,8 +25,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-
-logging.basicConfig(level=logging.ERROR)
 
 
 def train_model(
