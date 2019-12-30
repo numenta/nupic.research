@@ -25,6 +25,7 @@ import torch
 
 import nupic.research.frameworks.pytorch.models.resnets
 
+
 """
 Imagenet Experiment configurations
 """
@@ -76,8 +77,9 @@ DEFAULT = dict(
         nesterov=True
     ),
     # Whether or not to apply weight decay to batch norm modules parameters
+    # If False, remove 'weight_decay' from batch norm parameters
     # See https://arxiv.org/abs/1807.11205
-    weight_decay_batch_norm=True,
+    batch_norm_weight_decay=True,
 
     # Learning rate scheduler class. Must inherit from "_LRScheduler"
     lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
@@ -153,8 +155,11 @@ FASTAI18.update(
         momentum=0.9,
         nesterov=False,
     ),
-    # No weigh decay from batch norm modules
-    weight_decay_batch_norm=False,
+
+    # Remove weight decay to batch norm modules parameters
+    # See https://arxiv.org/abs/1807.11205
+    batch_norm_weight_decay=False,
+
 )
 
 DEBUG = copy.deepcopy(FASTAI18)
