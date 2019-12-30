@@ -156,6 +156,10 @@ FASTAI18.update(
         nesterov=False,
     ),
 
+    # Initialize running batch norm mean to 0
+    # See https://arxiv.org/pdf/1706.02677.pdf
+    init_batch_norm=True,
+
     # Remove weight decay to batch norm modules parameters
     # See https://arxiv.org/abs/1807.11205
     batch_norm_weight_decay=False,
