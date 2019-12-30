@@ -179,6 +179,16 @@ if __name__ == "__main__":
                         help="tcp port to use for distributed pytorch training")
     parser.add_argument("-s", "--with-server", action="store_true",
                         help="Start Ray Tune API server")
+    parser.add_argument("-p", "--progress", action="store_true",
+                        help="Show progress during training")
+    parser.add_argument("-l", "--log-level", default="info",
+                        choices=["critical", "error", "warning", "info", "debug"],
+                        help="Python Logging level")
+    parser.add_argument("-f", "--log-format",
+                        default="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
+                        help="Python Logging Format")
+    parser.add_argument("--max-failures", type=int, default=-1,
+                        help="How many times to try to recover before stopping")
     parser.add_argument(
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
