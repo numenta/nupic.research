@@ -32,6 +32,7 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.utils.data
+import torchvision.models.resnet
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.modules.batchnorm import _BatchNorm
@@ -39,7 +40,6 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DistributedSampler
 from torchvision import transforms
-from torchvision.models.resnet import BasicBlock, Bottleneck
 
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
@@ -211,6 +211,33 @@ def _create_optimizer(model, optimizer_class, optimizer_args,
     return optimizer_class(model_params, **optimizer_args)
 
 
+def _init_batch_norm(model):
+    """
+    Initialize ResNet50 batch norm modules
+    See https://arxiv.org/pdf/1706.02677.pdf
+
+    :param model: Resnet 50 model
+    """
+    for m in model.modules():
+        if isinstance(m, torchvision.models.resnet.BasicBlock):
+            # initialized the last BatchNorm in each BasicBlock to 0
+            m.bn2.weight = nn.Parameter(torch.zeros_like(m.bn2.weight))
+        elif isinstance(m, torchvision.models.resnet.Bottleneck):
+            # initialized the last BatchNorm in each Bottleneck to 0
+            m.bn3.weight = nn.Parameter(torch.zeros_like(m.bn3.weight))
+        elif isinstance(m, (
+            nupic.research.frameworks.pytorch.models.resnets.BasicBlock,
+            nupic.research.frameworks.pytorch.models.resnets.Bottleneck
+        )):
+            # initialized the last BatchNorm in each BasicBlock to 0
+            *_, last_bn = filter(lambda x: isinstance(x, nn.BatchNorm2d),
+                                 m.regular_path)
+            last_bn.weight = nn.Parameter(torch.zeros_like(last_bn.weight))
+        elif isinstance(m, nn.Linear):
+            # initialized linear layers weights from a gaussian distribution
+            m.weight.data.normal_(0, 0.01)
+
+
 def _create_model(model_class, model_args, init_batch_norm, distributed, device):
     """
     Configure network model
@@ -220,8 +247,7 @@ def _create_model(model_class, model_args, init_batch_norm, distributed, device)
     :param model_args:
         The model constructor arguments
     :param init_batch_norm:
-        Whether or not to initialize running batch norm mean to 0
-        See https://arxiv.org/pdf/1706.02677.pdf
+        Whether or not to initialize batch norm modules
     :param distributed:
         Whether or not to use `DistributedDataParallel`
     :param device:
@@ -230,25 +256,13 @@ def _create_model(model_class, model_args, init_batch_norm, distributed, device)
     :return: Configured model
     """
     model = model_class(**model_args)
+    if init_batch_norm:
+        _init_batch_norm(model)
     model.to(device)
     if distributed:
         model = DistributedDataParallel(model)
     else:
         model = DataParallel(model)
-
-    # See https://arxiv.org/pdf/1706.02677.pdf
-    if init_batch_norm:
-        for m in model.modules():
-            if isinstance(m, BasicBlock):
-                # initialized the last BatchNorm in each BasicBlock to 0
-                m.bn2.weight = nn.Parameter(torch.zeros_like(m.bn2.weight))
-            elif isinstance(m, Bottleneck):
-                # initialized the last BatchNorm in each Bottleneck to 0
-                m.bn3.weight = nn.Parameter(torch.zeros_like(m.bn3.weight))
-            elif isinstance(m, nn.Linear):
-                # initialized linear layers weights from a gaussian distribution
-                m.weight.data.normal_(0, 0.01)
-
     return model
 
 
