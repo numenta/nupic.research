@@ -18,7 +18,6 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-import logging
 import random
 import sys
 

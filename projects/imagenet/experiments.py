@@ -25,7 +25,6 @@ import torch
 
 import nupic.research.frameworks.pytorch.models.resnets
 
-
 """
 Imagenet Experiment configurations
 """
@@ -133,7 +132,6 @@ SUPER_CONVERGENCE.update(
 FASTAI18 = copy.deepcopy(SUPER_CONVERGENCE)
 FASTAI18.update(
     epochs=35,
-    init_batch_norm=True,
 
     # dict(start_epoch: image_size)
     epoch_resize={
