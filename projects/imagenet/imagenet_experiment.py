@@ -41,6 +41,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DistributedSampler
 from torchvision import transforms
 
+import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from nupic.torch.modules import rezero_weights, update_boost_strength
