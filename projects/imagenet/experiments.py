@@ -101,8 +101,6 @@ DEFAULT = dict(
 
     # How often to checkpoint (epochs)
     checkpoint_freq=1,
-    # How many times to try to recover before stopping the trial
-    max_failures=-1,
 )
 
 # Configuration inspired by Super-Convergence paper. (Fig 6a)
