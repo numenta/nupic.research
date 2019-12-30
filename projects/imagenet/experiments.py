@@ -168,6 +168,7 @@ FASTAI18.update(
 
 DEBUG = copy.deepcopy(FASTAI18)
 DEBUG.update(
+    num_classes=10,
     model_args=dict(config=dict(num_classes=10)),
 )
 
