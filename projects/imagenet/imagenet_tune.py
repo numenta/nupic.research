@@ -187,6 +187,8 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--log-format",
                         default="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
                         help="Python Logging Format")
+    parser.add_argument("--max-failures", type=int, default=-1,
+                        help="How many times to try to recover before stopping")
     parser.add_argument(
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
