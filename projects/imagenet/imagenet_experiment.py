@@ -22,6 +22,7 @@ import copy
 import functools
 import io
 import itertools
+import logging
 import os
 import pickle
 import sys
@@ -31,6 +32,7 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.utils.data
+import torchvision.models.resnet
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.modules.batchnorm import _BatchNorm
@@ -38,8 +40,8 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DistributedSampler
 from torchvision import transforms
-from torchvision.models.resnet import BasicBlock, Bottleneck
 
+import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from nupic.torch.modules import rezero_weights, update_boost_strength
@@ -159,9 +161,11 @@ def _create_validation_dataloader(data_dir, batch_size, workers, num_classes=100
     )
 
 
-def _create_optimizer(model, optimizer_class, optimizer_args, optimizer_groups=None):
+def _create_optimizer(model, optimizer_class, optimizer_args,
+                      batch_norm_weight_decay):
     """
-    Configure the optimizer with or without parameter groups
+    Configure the optimizer with the option to ignore `weight_decay` from all
+    batch norm module parameters
 
     :param model:
         The model to get the parameters from
@@ -172,49 +176,67 @@ def _create_optimizer(model, optimizer_class, optimizer_args, optimizer_groups=N
     :param optimizer_args:
         The optimizer constructor arguments passed in addition to the model parameters
 
-    :param optimizer_groups: Optional dictionary used to customize the optimizer
-        parameters (lr, wd, ...) for each model parameter group. This dictionary
-        contains the following fields:
-        - "group_by": key/func used to group the model submodules via itertools.groupby
-        - "parameters": dict of optimizer parameters to override for each group.
-
-      For example, use the following values to remove "weight_decay" from
-      "BatchNorm" module::
-
-        optimizer_groups = {
-            "group_by": lambda module: isinstance(module, BatchNorm),
-            "parameters": {
-                "True": {"weight_decay": 0.},  # BatchNorm modules
-                "False": {},                   # All other modules
-            }
-        }
+    :param batch_norm_weight_decay:
+        Whether or not to apply weight decay to batch norm modules parameters.
+        If False, remove 'weight_decay' from batch norm parameters
+        See https://arxiv.org/abs/1807.11205
 
     :return: Configured optimizer
     """
-    # Create custom parameter groups
-    if optimizer_groups is not None:
-        # Sort modules using "group_by" key
-        group_by = optimizer_groups["group_by"]
-        sorted_modules = sorted(model.modules(), key=group_by)
+    if batch_norm_weight_decay:
+        # No need to remove weight decay. Use same optimizer args for all parameters
+        model_params = model.parameters()
+    else:
+        # Group batch norm parameters
+        def group_by_batch_norm(module):
+            return isinstance(module, _BatchNorm)
 
-        # Group module parameters using "group_by" key
+        sorted_modules = sorted(model.modules(), key=group_by_batch_norm)
         grouped_parameters = {
-            str(k): list(itertools.chain.from_iterable(m.parameters(False) for m in g))
-            for k, g in itertools.groupby(sorted_modules, key=group_by)
+            k: list(itertools.chain.from_iterable(m.parameters(False) for m in g))
+            for k, g in itertools.groupby(sorted_modules, key=group_by_batch_norm)
         }
 
-        # Add custom optimizer parameters for each group
         model_params = []
-        parameters = optimizer_groups["parameters"]
-        for k, params in grouped_parameters.items():
-            group = copy.deepcopy(optimizer_args)
-            group.update(params=params)
-            group.update(**parameters[k])
-            model_params.append(group)
-    else:
-        model_params = model.parameters()
+        for is_bn, params in grouped_parameters.items():
+            # Group model_params
+            group_args = copy.deepcopy(optimizer_args)
+            group_args.update(params=params)
+
+            # Remove 'weight_decay' from batch norm parameters
+            if is_bn:
+                group_args.update(weight_decay=0.0)
+
+            model_params.append(group_args)
 
     return optimizer_class(model_params, **optimizer_args)
+
+
+def _init_batch_norm(model):
+    """
+    Initialize ResNet50 batch norm modules
+    See https://arxiv.org/pdf/1706.02677.pdf
+
+    :param model: Resnet 50 model
+    """
+    for m in model.modules():
+        if isinstance(m, torchvision.models.resnet.BasicBlock):
+            # initialized the last BatchNorm in each BasicBlock to 0
+            m.bn2.weight = nn.Parameter(torch.zeros_like(m.bn2.weight))
+        elif isinstance(m, torchvision.models.resnet.Bottleneck):
+            # initialized the last BatchNorm in each Bottleneck to 0
+            m.bn3.weight = nn.Parameter(torch.zeros_like(m.bn3.weight))
+        elif isinstance(m, (
+            nupic.research.frameworks.pytorch.models.resnets.BasicBlock,
+            nupic.research.frameworks.pytorch.models.resnets.Bottleneck
+        )):
+            # initialized the last BatchNorm in each BasicBlock to 0
+            *_, last_bn = filter(lambda x: isinstance(x, nn.BatchNorm2d),
+                                 m.regular_path)
+            last_bn.weight = nn.Parameter(torch.zeros_like(last_bn.weight))
+        elif isinstance(m, nn.Linear):
+            # initialized linear layers weights from a gaussian distribution
+            m.weight.data.normal_(0, 0.01)
 
 
 def _create_model(model_class, model_args, init_batch_norm, distributed, device):
@@ -226,8 +248,7 @@ def _create_model(model_class, model_args, init_batch_norm, distributed, device)
     :param model_args:
         The model constructor arguments
     :param init_batch_norm:
-        Whether or not to initialize running batch norm mean to 0
-        See https://arxiv.org/pdf/1706.02677.pdf
+        Whether or not to initialize batch norm modules
     :param distributed:
         Whether or not to use `DistributedDataParallel`
     :param device:
@@ -236,25 +257,13 @@ def _create_model(model_class, model_args, init_batch_norm, distributed, device)
     :return: Configured model
     """
     model = model_class(**model_args)
+    if init_batch_norm:
+        _init_batch_norm(model)
     model.to(device)
     if distributed:
         model = DistributedDataParallel(model)
     else:
         model = DataParallel(model)
-
-    # See https://arxiv.org/pdf/1706.02677.pdf
-    if init_batch_norm:
-        for m in model.modules():
-            if isinstance(m, BasicBlock):
-                # initialized the last BatchNorm in each BasicBlock to 0
-                m.bn2.weight = nn.Parameter(torch.zeros_like(m.bn2.weight))
-            elif isinstance(m, Bottleneck):
-                # initialized the last BatchNorm in each Bottleneck to 0
-                m.bn3.weight = nn.Parameter(torch.zeros_like(m.bn3.weight))
-            elif isinstance(m, nn.Linear):
-                # initialized linear layers weights from a gaussian distribution
-                m.weight.data.normal_(0, 0.01)
-
     return model
 
 
@@ -276,6 +285,9 @@ class ImagenetExperiment:
         self.epochs = 1
         self.distributed = False
         self.rank = 0
+        self.total_batches = 0
+        self.progress = False
+        self.logger = None
 
     def setup_experiment(self, config):
         """
@@ -303,7 +315,7 @@ class ImagenetExperiment:
                                Must inherit from "torch.optim.Optimizer"
             - optimizer_args: Optimizer class class arguments passed to the
                               constructor
-            - weight_decay_batch_norm: Whether or not to apply weight decay to
+            - batch_norm_weight_decay: Whether or not to apply weight decay to
                                        batch norm modules parameters
 
             - lr_scheduler_class: Learning rate scheduler class.
@@ -316,7 +328,21 @@ class ImagenetExperiment:
             - epochs: Number of epochs to train
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
+            - progress: Show progress during training
+            - name: Experiment name. Used as logger name
+            - log_level: Python Logging level
+            - log_format: Python Logging format
         """
+        # Configure logger
+        log_format = config.get("log_format", logging.BASIC_FORMAT)
+        log_level = getattr(logging, config.get("log_level", "INFO").upper())
+        console = logging.StreamHandler()
+        console.setFormatter(logging.Formatter(log_format))
+        self.logger = logging.getLogger(config.get("name", type(self).__name__))
+        self.logger.setLevel(log_level)
+        self.logger.addHandler(console)
+        self.progress = config.get("progress", False)
+
         # Configure distribute pytorch
         self.distributed = config.get("distributed", False)
         self.rank = config.get("rank", 0)
@@ -373,32 +399,19 @@ class ImagenetExperiment:
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
-        optimizer_groups = None
-
-        # Remove weight decay from batch norm modules
-        if not config.get("weight_decay_batch_norm", True):
-            # Group parameters by "BatchNorm" and not "BatchNorm"
-            optimizer_groups = dict(
-                group_by=lambda module: isinstance(module, _BatchNorm),
-                parameters={
-                    # Remove 'weight_decay' from _BatchNorm parameters
-                    "True": dict(weight_decay=0.0),
-                    # Leave all other parameters alone
-                    "False": {},
-                },
-            )
-
+        batch_norm_weight_decay = config.get("batch_norm_weight_decay", True)
         self.optimizer = _create_optimizer(
             model=self.model,
             optimizer_class=optimizer_class,
             optimizer_args=optimizer_args,
-            optimizer_groups=optimizer_groups,
+            batch_norm_weight_decay=batch_norm_weight_decay,
         )
 
         self.loss_function = config.get(
             "loss_function", torch.nn.functional.cross_entropy
         )
 
+        self.total_batches = len(self.train_loader)
         # Configure leaning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
         if lr_scheduler_class is not None:
@@ -421,6 +434,10 @@ class ImagenetExperiment:
             criterion=self.loss_function,
             batches_in_epoch=self.batches_in_epoch,
         )
+        results.update(
+            learning_rate=self.get_lr()[0],
+        )
+        self.logger.info(results)
 
         return results
 
@@ -458,14 +475,24 @@ class ImagenetExperiment:
         pass
 
     def post_batch(self, model, loss, batch_idx, epoch):
+        if self.progress and self.rank == 0 and (batch_idx % 10) == 0:
+            total_batches = self.total_batches
+            current_batch = batch_idx
+            if self.distributed:
+                # Compute actual batch size from distributed sampler
+                total_batches *= self.train_loader.sampler.num_replicas
+                current_batch *= self.train_loader.sampler.num_replicas
+            self.logger.info("Epoch: %s, Batch: %s/%s, loss: %s",
+                             epoch, current_batch, total_batches, loss)
+
+        # Update 1cycle learning rate after every batch
         if isinstance(self.lr_scheduler, OneCycleLR):
-            step = epoch * self.steps_per_epoch + batch_idx + 1
-            self.lr_scheduler.step(step)
+            self.lr_scheduler.step()
 
     def post_epoch(self, epoch):
         self.model.apply(rezero_weights)
         if not isinstance(self.lr_scheduler, OneCycleLR):
-            self.lr_scheduler.step(epoch)
+            self.lr_scheduler.step()
 
     def get_state(self):
         """
