@@ -35,7 +35,7 @@ python-dateutil==2.8.0
 fastai
 pillow==6.0.0
 python-dotenv
-ray[dashboard,debug]==0.7.5
+ray[all]==0.8.0
 requests
 scikit-image
 seaborn>=0.9.0
