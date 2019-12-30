@@ -22,6 +22,7 @@ import copy
 import functools
 import io
 import itertools
+import logging
 import os
 import pickle
 import sys
@@ -276,6 +277,9 @@ class ImagenetExperiment:
         self.epochs = 1
         self.distributed = False
         self.rank = 0
+        self.total_batches = 0
+        self.progress = False
+        self.logger = None
 
     def setup_experiment(self, config):
         """
@@ -316,7 +320,21 @@ class ImagenetExperiment:
             - epochs: Number of epochs to train
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
+            - progress: Show progress during training
+            - name: Experiment name. Used as logger name
+            - log_level: Python Logging level
+            - log_format: Python Logging format
         """
+        # Configure logger
+        log_format = config.get("log_format", logging.BASIC_FORMAT)
+        log_level = getattr(logging, config.get("log_level", "INFO").upper())
+        console = logging.StreamHandler()
+        console.setFormatter(logging.Formatter(log_format))
+        self.logger = logging.getLogger(config.get("name", type(self).__name__))
+        self.logger.setLevel(log_level)
+        self.logger.addHandler(console)
+        self.progress = config.get("progress", False)
+
         # Configure distribute pytorch
         self.distributed = config.get("distributed", False)
         self.rank = config.get("rank", 0)
@@ -399,6 +417,7 @@ class ImagenetExperiment:
             "loss_function", torch.nn.functional.cross_entropy
         )
 
+        self.total_batches = len(self.train_loader)
         # Configure leaning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
         if lr_scheduler_class is not None:
@@ -421,6 +440,10 @@ class ImagenetExperiment:
             criterion=self.loss_function,
             batches_in_epoch=self.batches_in_epoch,
         )
+        results.update(
+            learning_rate=self.get_lr()[0],
+        )
+        self.logger.info(results)
 
         return results
 
@@ -458,6 +481,16 @@ class ImagenetExperiment:
         pass
 
     def post_batch(self, model, loss, batch_idx, epoch):
+        if self.progress and self.rank == 0 and (batch_idx % 10) == 0:
+            total_batches = self.total_batches
+            current_batch = batch_idx
+            if self.distributed:
+                # Compute actual batch size from distributed sampler
+                total_batches *= self.train_loader.sampler.num_replicas
+                current_batch *= self.train_loader.sampler.num_replicas
+            self.logger.info("Epoch: %s, Batch: %s/%s, loss: %s",
+                             epoch, current_batch, total_batches, loss)
+
         if isinstance(self.lr_scheduler, OneCycleLR):
             step = epoch * self.steps_per_epoch + batch_idx + 1
             self.lr_scheduler.step(step)

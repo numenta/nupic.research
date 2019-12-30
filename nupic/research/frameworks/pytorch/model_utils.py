@@ -27,8 +27,6 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-logging.basicConfig(level=logging.ERROR)
-
 
 def train_model(
     model,
