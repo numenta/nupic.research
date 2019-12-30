@@ -484,14 +484,14 @@ class ImagenetExperiment:
             self.logger.info("Epoch: %s, Batch: %s/%s, loss: %s",
                              epoch, current_batch, total_batches, loss)
 
+        # Update 1cycle learning rate after every batch
         if isinstance(self.lr_scheduler, OneCycleLR):
-            step = epoch * self.steps_per_epoch + batch_idx + 1
-            self.lr_scheduler.step(step)
+            self.lr_scheduler.step()
 
     def post_epoch(self, epoch):
         self.model.apply(rezero_weights)
         if not isinstance(self.lr_scheduler, OneCycleLR):
-            self.lr_scheduler.step(epoch)
+            self.lr_scheduler.step()
 
     def get_state(self):
         """
