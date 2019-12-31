@@ -51,7 +51,7 @@ class SetNonzerosToOne(nn.Module):
         return x
 
 
-    class AlexNetBinaryActivationKWinners(nn.Sequential):
+class AlexNetBinaryActivationKWinners(nn.Sequential):
 
     def __init__(self, input_size, num_classes,
                  boost_strength=1.5,
