@@ -21,13 +21,22 @@
 import collections
 import itertools
 import os
+from pathlib import Path
 import pickle
+import posixpath
+from io import BytesIO
+from functools import partial
 
+import h5py
 import numpy as np
 import torch
+from PIL import Image
 from torch.utils.data import Dataset, Subset
-from torchvision.datasets import DatasetFolder
-from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader, make_dataset
+from torchvision.datasets import DatasetFolder, VisionDataset
+from torchvision.datasets.folder import (
+    IMG_EXTENSIONS, default_loader, make_dataset,
+    is_image_file
+)
 
 
 def create_validation_data_sampler(dataset, ratio):
@@ -267,3 +276,118 @@ class CachedDatasetFolder(DatasetFolder):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+
+
+class HDF5Dataset(VisionDataset):
+    """
+    HDF5 image dataset where the images are arranged into class groups, similar
+    to :class:`torchvision.datasets.DatasetFolder`::
+
+        root/class_x/xxx.ext
+        root/class_x/xxy.ext
+        root/class_x/xxz.ext
+
+        root/class_y/123.ext
+        root/class_y/nsdf3.ext
+        root/class_y/asd932_.ext
+
+    .. note::
+        A cache with all the dataset names will be used to minimize the number
+        of file system calls at initialization
+
+    :param hdf5_file:
+        HDF5 file path
+    :param root:
+        Root group name (i.e. "train", "val", "test")
+    :param num_classes:
+        Number of classes used to Limit the dataset size. Not limited when None
+    :param kwargs:
+        Other argument passed to :class:`VisionDataset` constructor
+    """
+
+    def __init__(self, hdf5_file, root, num_classes=None, **kwargs):
+        assert h5py.is_hdf5(hdf5_file)
+        super(HDF5Dataset, self).__init__(root=root, **kwargs)
+
+        self._hdf5 = h5py.File(name=hdf5_file, mode="r")
+        hdf5_root = self._hdf5[root]
+
+        self._classes = {
+            str.encode(posixpath.join("/", root, g)): i
+            for i, g in enumerate(hdf5_root.keys())
+        }
+
+        # Load image file names from indices
+        self._images = None
+        index_file = Path(hdf5_file).with_suffix(".__hdf5_index__")
+        if index_file.exists():
+            hdf5_idx = h5py.File(name=index_file, mode="r")
+            if root in hdf5_idx:
+                self._images = hdf5_idx[root]["images"][()]
+            hdf5_idx.close()
+
+        if self._images is None:
+            # Create index with image file names. Depending on the size and
+            # location of the hdf5 this process may take a few minutes.
+            images = []
+            for class_name in self._classes:
+                group = hdf5_root[class_name]
+                files = filter(is_image_file, group)
+
+                # Construct the absolute path name within the HDF5 file
+                path_names = map(partial(posixpath.join, "/", root, class_name), files)
+                images.extend(path_names)
+
+            # Save cache
+            self._images = np.array(self._images, dtype="S")
+            hdf5_idx = h5py.File(name=index_file, mode="a")
+            hdf5_idx_root = hdf5_idx.require_group(root)
+            hdf5_idx_root.create_dataset("images", data=self._images)
+            hdf5_idx.close()
+
+        # Limit dataset size by num_classes
+        if num_classes is not None:
+            self._classes = dict(itertools.islice(self._classes.items(), num_classes))
+            self._images = list(filter(
+                lambda x: posixpath.dirname(x) in self._classes.keys(), self._images))
+
+    def __getitem__(self, index):
+        file_name = self._images[index]
+
+        class_name = posixpath.dirname(file_name)
+        group = self._hdf5[class_name]
+        image_file = group[file_name]
+
+        # If dataset is contiguous and uncompressed map it to memory
+        if image_file.chunks is None and image_file.compression is None:
+            image_data = np.memmap(
+                image_file.file.filename,
+                mode="r",
+                shape=image_file.shape,
+                offset=image_file.id.get_offset(),
+                dtype=image_file.dtype)
+        else:
+            # Load image from binary data stored in the dataset
+            image_data = image_file[()]
+
+        # Convert image to RGB
+        image = Image.open(BytesIO(image_data))
+        sample = image.convert("RGB")
+
+        # Parent group represents the image target class
+        target = self._classes[class_name]
+
+        # Apply transforms
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return sample, target
+
+    def __len__(self):
+        return len(self._images)
+
+    def extra_repr(self):
+        return "hdf5_file: {}\nnum_classes={}".format(
+            self._hdf5.filename, len(self._classes))
