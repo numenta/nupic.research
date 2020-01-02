@@ -56,7 +56,7 @@ DEFAULT = dict(
     batches_in_epoch=sys.maxsize,
 
     # Stop training when the validation metric reaches the metric value
-    stop=dict(mean_accuracy=0.75),
+    stop=dict(mean_accuracy=0.85),
     # Number of epochs
     epochs=90,
 
@@ -95,85 +95,71 @@ DEFAULT = dict(
 
     # Progressive resize schedule - dict(start_epoch: image_size)
     # See https://arxiv.org/pdf/1806.01427.pdf
-    epoch_resize={0: 224},
+    # epoch_resize={0: 224},
 
     # Loss function. See "torch.nn.functional"
     loss_function=torch.nn.functional.cross_entropy,
 
     # How often to checkpoint (epochs)
-    checkpoint_freq=1,
+    checkpoint_freq=0,
+    # How many times to try to recover before stopping the trial
+    max_failures=-1,
 )
 
-# Configuration inspired by Super-Convergence paper. (Fig 6a)
-# See https://arxiv.org/pdf/1708.07120.pdf
-# 1cycle learning rate policy with the learning rate varying from 0.05 to 1.0,
-# then down to 0.00005 in 20 epochs, using a weight decay of 3e−6
-SUPER_CONVERGENCE = copy.deepcopy(DEFAULT)
-SUPER_CONVERGENCE.update(
-    epochs=20,
-    lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
-    lr_scheduler_args=dict(
-        max_lr=1.0,
-        div_factor=20,  # initial_lr = 0.05
-        final_div_factor=1000,  # min_lr = 0.00005
-        anneal_strategy="linear",
-    ),
-    # Reduce weight decay to 3e-6 when using super-convergence
-    optimizer_args=dict(
-        lr=0.1,
-        weight_decay=3e-6,
-        momentum=0.9,
-        nesterov=False,
-    ),
-)
-
-# Configuration inspired by https://www.fast.ai/2018/08/10/fastai-diu-imagenet/
-# https://app.wandb.ai/yaroslavvb/imagenet18/runs/gxsdo6i0
-FASTAI18 = copy.deepcopy(SUPER_CONVERGENCE)
-FASTAI18.update(
-    epochs=35,
-
-    # dict(start_epoch: image_size)
-    epoch_resize={
-        0: 128,
-        14: 224,
-        32: 288
-    },
-    lr_scheduler_args=dict(
-        # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 35 epochs
-        max_lr=2.0,
-        div_factor=2,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=5.0 / 35.0,
-        anneal_strategy="linear",
-    ),
-    optimizer_args=dict(
-        lr=0.1,
-        weight_decay=0.0001,
-        momentum=0.9,
-        nesterov=False,
-    ),
-
-    # Initialize running batch norm mean to 0
-    # See https://arxiv.org/pdf/1706.02677.pdf
-    init_batch_norm=True,
-
-    # Remove weight decay to batch norm modules parameters
-    # See https://arxiv.org/abs/1807.11205
-    batch_norm_weight_decay=False,
-
-)
-
-DEBUG = copy.deepcopy(FASTAI18)
-DEBUG.update(
+DEFAULT10 = copy.deepcopy(DEFAULT)
+DEFAULT10.update(
+    epochs=100,
     num_classes=10,
-    model_args=dict(config=dict(num_classes=10)),
+    init_batch_norm=False,
+
+    # Create default sparse network
+    model_args=dict(config=dict(num_classes=10, defaults_sparse=False)),
 )
+
+# Use normal schedule
+SPARSE10 = copy.deepcopy(DEFAULT10)
+SPARSE10.update(
+    # Create default sparse network
+    model_args=dict(config=dict(num_classes=10, defaults_sparse=True)),
+)
+
+DEFAULT100 = copy.deepcopy(DEFAULT)
+DEFAULT100.update(
+    epochs=100,
+    num_classes=100,
+    init_batch_norm=False,
+
+    # Create default sparse network
+    model_args=dict(config=dict(num_classes=100, defaults_sparse=False)),
+)
+
+# Use normal schedule
+SPARSE100 = copy.deepcopy(DEFAULT100)
+SPARSE100.update(
+    # Create default sparse network
+    model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
+)
+
+# Use plain learning schedule, i.e. with no momentum
+SPARSE100_PLAIN_LEARNING = copy.deepcopy(SPARSE100)
+SPARSE100_PLAIN_LEARNING.update(
+    optimizer_args=dict(
+        lr=0.1,
+        weight_decay=1e-04,
+        momentum=0.0,
+        dampening=0,
+        nesterov=False
+    ),
+    # Create default sparse network
+    model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
+)
+
 
 # Export all configurations
 CONFIGS = dict(
-    default=DEFAULT,
-    debug=DEBUG,
-    super_convergence=SUPER_CONVERGENCE,
-    fastai18=FASTAI18,
+    default10=DEFAULT10,
+    default_sparse_10=SPARSE10,
+    default100=DEFAULT100,
+    sparse_100=SPARSE100,
+    sparse100_plain_learning=SPARSE100_PLAIN_LEARNING,
 )
