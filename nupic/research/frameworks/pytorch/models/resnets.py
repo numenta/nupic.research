@@ -150,6 +150,7 @@ def activation_layer(
             nn.ReLU(inplace=True)
         )
 
+
 class BasicBlock(nn.Module):
     """Default block for ResNets with < 50 layers."""
 
