@@ -128,24 +128,27 @@ def conv_layer(
 def activation_layer(
     out,
     params,
+    kernel_size=0
 ):
     """Basic activation layer.
     Defaults to ReLU if percent_on is < 0.5. Otherwise KWinners is used."""
     if params.params_function is not None:
-        params = params.params_function(0, out, 0)
+        params = params.params_function(0, out, kernel_size)
 
     if params.percent_on >= 0.5:
         return nn.ReLU(inplace=True)
     else:
-        return KWinners2d(
-            out,
-            percent_on=params.percent_on,
-            boost_strength=params.boost_strength,
-            boost_strength_factor=params.boost_strength_factor,
-            k_inference_factor=params.k_inference_factor,
-            local=params.local,
+        return nn.Sequential(
+            KWinners2d(
+                out,
+                percent_on=params.percent_on,
+                boost_strength=params.boost_strength,
+                boost_strength_factor=params.boost_strength_factor,
+                k_inference_factor=params.k_inference_factor,
+                local=params.local
+            ),
+            nn.ReLU(inplace=True)
         )
-
 
 class BasicBlock(nn.Module):
     """Default block for ResNets with < 50 layers."""
@@ -216,7 +219,7 @@ class Bottleneck(nn.Module):
                 sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, layer_params["conv1x1_1"]),
+            activation_layer(planes, layer_params["conv1x1_1"], kernel_size=1),
             # 2nd layer
             conv_layer(
                 "3x3",
@@ -227,7 +230,7 @@ class Bottleneck(nn.Module):
                 stride=stride,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, layer_params["conv3x3_2"]),
+            activation_layer(planes, layer_params["conv3x3_2"], kernel_size=3),
             # 3rd layer
             conv_layer(
                 "1x1",
@@ -254,7 +257,7 @@ class Bottleneck(nn.Module):
             )
 
         self.post_activation = activation_layer(
-            self.expansion * planes, layer_params["shortcut"]
+            self.expansion * planes, layer_params["shortcut"], kernel_size=1
         )
 
     def forward(self, x):
@@ -321,7 +324,7 @@ class ResNet(nn.Module):
                 stride=2,
             ),
             nn.BatchNorm2d(64),
-            activation_layer(64, self.sparse_params["stem"]),
+            activation_layer(64, self.sparse_params["stem"], kernel_size=7),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
             # groups 1 to 4
             self._make_group(
