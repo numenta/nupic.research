@@ -76,15 +76,18 @@ def auto_sparse_params(in_channels, out_channels, kernel_size):
     else:
         weights_density = 0.2
 
-    if out_channels > 64:
-        percent_on = 0.2
+    if kernel_size != 1:
+        if out_channels > 128:
+            percent_on = 0.3
+        else:
+            percent_on = 1.0
     else:
-        percent_on = 0.3
+        percent_on = 1.0
 
     return LayerParams(
         percent_on=percent_on,
-        boost_strength=1.5,
-        boost_strength_factor=0.95,
+        boost_strength=1.0,
+        boost_strength_factor=0.9,
         local=True,
         weights_density=weights_density,
         params_function=None
