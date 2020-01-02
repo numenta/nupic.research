@@ -26,6 +26,7 @@ import logging
 import os
 import pickle
 import sys
+from pprint import pprint
 
 import ray.services
 import torch
@@ -43,7 +44,11 @@ from torchvision import transforms
 
 import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
-from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
+from nupic.research.frameworks.pytorch.model_utils import (
+    count_nonzero_params,
+    evaluate_model,
+    train_model,
+)
 from nupic.torch.modules import rezero_weights, update_boost_strength
 
 __all__ = ["ImagenetExperiment"]
@@ -102,9 +107,10 @@ def _create_train_dataloader(
     dataset = CachedDatasetFolder(
         root=data_dir,
         num_classes=num_classes,
-        transform=ProgressiveRandomResizedCrop(
-            epoch_resize=epoch_resize,
+        transform=transforms.Compose(
+            # epoch_resize=epoch_resize,
             transforms=[
+                transforms.RandomResizedCrop(size=224),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize(
@@ -395,6 +401,8 @@ class ImagenetExperiment:
             distributed=self.distributed,
             device=self.device,
         )
+        if self.rank == 0:
+            print(self.model)
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
@@ -420,6 +428,9 @@ class ImagenetExperiment:
                 lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
                 lr_scheduler_args["epochs"] = self.epochs
                 lr_scheduler_args["steps_per_epoch"] = self.steps_per_epoch
+                if self.rank == 0:
+                    print("LR Scheduler args:")
+                    pprint(lr_scheduler_args)
 
             self.lr_scheduler = lr_scheduler_class(self.optimizer, **lr_scheduler_args)
 
@@ -437,7 +448,8 @@ class ImagenetExperiment:
         results.update(
             learning_rate=self.get_lr()[0],
         )
-        self.logger.info(results)
+        if self.rank == 0:
+            self.logger.info(results)
 
         return results
 
@@ -490,9 +502,15 @@ class ImagenetExperiment:
             self.lr_scheduler.step()
 
     def post_epoch(self, epoch):
+        params_sparse, nonzero_params_sparse1 = count_nonzero_params(self.model)
         self.model.apply(rezero_weights)
+        params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
         if not isinstance(self.lr_scheduler, OneCycleLR):
             self.lr_scheduler.step()
+        if self.rank == 0:
+            print("Params before/after non-zero", nonzero_params_sparse1,
+                  nonzero_params_sparse2)
+            print("LR Scheduler:", self.get_lr())
 
     def get_state(self):
         """
