@@ -27,9 +27,14 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
+TRAIN_DIR = "train"
+VAL_DIR = "val"
+# TRAIN_DIR = "sz/160/train"
+# VAL_DIR = "sz/160/val"
+
 DATA_PATH = Path("~/nta/data/imagenet").expanduser()
-TRAIN_PATH = DATA_PATH / "train"
-VAL_PATH = DATA_PATH / "val"
+TRAIN_PATH = DATA_PATH / TRAIN_DIR
+VAL_PATH = DATA_PATH / VAL_DIR
 TRAIN_FILES = TRAIN_PATH.glob("*/*.JPEG")
 VAL_FILES = VAL_PATH.glob("*/*.JPEG")
 HDF5_FILE = DATA_PATH / "imagenet.hdf5"
@@ -75,12 +80,12 @@ def main():
             multiprocessing.Manager() as manager:
 
         lock = manager.Lock()
-        hdf5_val = partial(hdf5_save, "val", lock)
+        hdf5_val = partial(hdf5_save, VAL_DIR, lock)
         results = executor.map(hdf5_val, VAL_FILES)
         for _ in tqdm(results, desc="Saving validation dataset"):
             pass
 
-        hdf5_train = partial(hdf5_save, "train", lock)
+        hdf5_train = partial(hdf5_save, TRAIN_DIR, lock)
         results = executor.map(hdf5_train, TRAIN_FILES)
         for _ in tqdm(results, desc="Saving training dataset"):
             pass

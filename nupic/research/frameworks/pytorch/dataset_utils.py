@@ -21,11 +21,11 @@
 import collections
 import itertools
 import os
-from pathlib import Path
 import pickle
 import posixpath
-from io import BytesIO
 from functools import partial
+from io import BytesIO
+from pathlib import Path
 
 import h5py
 import numpy as np
@@ -34,8 +34,10 @@ from PIL import Image
 from torch.utils.data import Dataset, Subset
 from torchvision.datasets import DatasetFolder, VisionDataset
 from torchvision.datasets.folder import (
-    IMG_EXTENSIONS, default_loader, make_dataset,
-    is_image_file
+    IMG_EXTENSIONS,
+    default_loader,
+    is_image_file,
+    make_dataset,
 )
 
 
