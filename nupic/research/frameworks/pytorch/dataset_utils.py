@@ -26,6 +26,7 @@ import pickle
 import posixpath
 from io import BytesIO
 from functools import partial
+from bisect import bisect
 
 import h5py
 import numpy as np
@@ -37,6 +38,7 @@ from torchvision.datasets.folder import (
     IMG_EXTENSIONS, default_loader, make_dataset,
     is_image_file
 )
+from torchvision.transforms import RandomResizedCrop
 
 
 def create_validation_data_sampler(dataset, ratio):
@@ -276,6 +278,42 @@ class CachedDatasetFolder(DatasetFolder):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+
+
+class ProgressiveRandomResizedCrop(object):
+    """
+    Progressive resize and crop image transform. This transform will apply a
+    different resize value to `torchvision.transforms.RandomResizedCrop` based
+    on the current epoch. The method `set_epoch` must be called on each epoch
+    before using this transform.
+
+    :param progressive_resize: A dictionary mapping epoch to image size. Each
+         key correspond to the start of the epoch and the value correspond to
+         the desired image size to use. For example:
+
+             progressive_resize={
+                 "0": 128, # epoch  0-13,  resize to 128
+                "14": 224, # epoch 14-31,  resize to 224
+                "32": 288, # epoch 32-end, resize to 288
+            },
+    """
+
+    def __init__(self, progressive_resize):
+        self.progressive_resize = progressive_resize
+        self.epochs = sorted(self.progressive_resize.keys())
+        self.resize = None
+        self.image_size = -1
+
+    def __call__(self, img):
+        return self.resize(img)
+
+    def set_epoch(self, epoch):
+        # Compute start epoch key from current epoch
+        start = self.epochs[bisect(self.epochs, epoch) - 1]
+        size = self.progressive_resize[start]
+        if size != self.image_size:
+            self.resize = RandomResizedCrop(size)
+            self.image_size = size
 
 
 class HDF5Dataset(VisionDataset):
