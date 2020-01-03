@@ -24,6 +24,7 @@ import torch
 import torch.nn
 from torch.autograd import Variable
 
+from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.pytorch.models.resnets import (
     LayerParams,
     ResNet,
@@ -52,6 +53,12 @@ class ResnetTest(unittest.TestCase):
         net(Variable(torch.randn(2, 3, 32, 32)))
         self.assertIsInstance(net, ResNet, "ResNet50 with default sparse parameters")
 
+        # Test on CUDA if available
+        if torch.cuda.is_available():
+            net.cuda()
+            x = Variable(torch.randn(16, 3, 224, 224))
+            net(x.cuda())
+
     def test_default_params(self):
         """Test default params."""
         params = default_sparse_params(*cf_dict["50"])
@@ -60,6 +67,25 @@ class ResnetTest(unittest.TestCase):
         # For sparse, the params_function should be set.
         params = default_sparse_params(*cf_dict["50"], sparse=True)
         self.assertIsNotNone(params["stem"].params_function)
+
+    def test_params_count(self):
+        """
+        Test the number of non-zero parameters for default dense and sparse networks
+        """
+        dense_net = resnet50(config=dict(num_classes=10))
+        dense_net(Variable(torch.randn(2, 3, 32, 32)))
+
+        sparse_net = resnet50(config=dict(num_classes=10, defaults_sparse=True))
+        sparse_net(Variable(torch.randn(2, 3, 32, 32)))
+
+        total_params_dense, total_nonzero_params_dense = count_nonzero_params(dense_net)
+        self.assertGreater(total_params_dense, 23500000)
+        self.assertGreaterEqual(total_params_dense, total_nonzero_params_dense)
+
+        params_sparse, nonzero_params_sparse = count_nonzero_params(sparse_net)
+
+        self.assertEqual(params_sparse, total_params_dense)
+        self.assertLess(nonzero_params_sparse, 10000000)
 
     def test_custom_per_group(self):
         """Evaluate ResNets customized per group"""
