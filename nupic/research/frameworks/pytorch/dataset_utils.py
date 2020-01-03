@@ -93,7 +93,7 @@ def select_subset(classes, class_to_idx, samples, num_classes):
         if original_idx == 0:
             class_samples = samples[: counter[original_idx]]
         else:
-            class_samples = samples[counter[original_idx - 1] : counter[original_idx]]
+            class_samples = samples[counter[original_idx - 1]: counter[original_idx]]
         # extend replacing the original index by the new index
         subset_samples.extend(
             [(s[0], subset_class_to_idx[_class]) for s in class_samples]
@@ -237,7 +237,7 @@ class CachedDatasetFolder(DatasetFolder):
         transform=None,
         target_transform=None,
         is_valid_file=None,
-        num_classes=1000,
+        num_classes=None,
     ):
         super(DatasetFolder, self).__init__(
             root, transform=transform, target_transform=target_transform
@@ -265,8 +265,8 @@ class CachedDatasetFolder(DatasetFolder):
                 file=open(cache_filename, "wb"),
                 protocol=pickle.HIGHEST_PROTOCOL,
             )
-
-        if num_classes < 1000:
+        num_classes = len(classes) if num_classes is None else num_classes
+        if num_classes < len(classes):
             classes, class_to_idx, samples = select_subset(
                 classes, class_to_idx, samples, num_classes
             )
