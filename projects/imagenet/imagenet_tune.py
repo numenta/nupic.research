@@ -31,6 +31,8 @@ from ray.tune.resources import Resources
 from projects.imagenet.experiments_superconvergence import CONFIGS
 from projects.imagenet.imagenet_experiment import ImagenetExperiment
 
+torch.multiprocessing.set_start_method("spawn")
+
 
 class ImagenetTrainable(Trainable):
     """

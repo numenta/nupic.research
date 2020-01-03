@@ -349,46 +349,44 @@ class HDF5Dataset(VisionDataset):
         assert h5py.is_hdf5(hdf5_file)
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
 
-        self._hdf5 = h5py.File(name=hdf5_file, mode="r")
-        hdf5_root = self._hdf5[root]
+        self._hdf5_file = hdf5_file
+        with h5py.File(name=self._hdf5_file, mode="r", swmr=True) as hdf5:
+            hdf5_root = hdf5[root]
+            self._classes = {
+                posixpath.join("/", root, g): i
+                for i, g in enumerate(hdf5_root.keys())
+            }
 
-        self._classes = {
-            posixpath.join("/", root, g): i
-            for i, g in enumerate(hdf5_root.keys())
-        }
+            # Load image file names from indices
+            self._images = None
+            index_file = Path(hdf5_file).with_suffix(".__hdf5_index__")
+            if index_file.exists():
+                with h5py.File(name=index_file, mode="r") as hdf5_idx:
+                    if root in hdf5_idx:
+                        images = hdf5_idx[root]["images"][()]
+                        # convert null terminated strings to unicode
+                        self._images = images.astype("U").tolist()
 
-        # Load image file names from indices
-        self._images = None
-        index_file = Path(hdf5_file).with_suffix(".__hdf5_index__")
-        if index_file.exists():
-            hdf5_idx = h5py.File(name=index_file, mode="r")
-            if root in hdf5_idx:
-                images = hdf5_idx[root]["images"][()]
-                # convert null terminated strings to unicode
-                self._images = images.astype("U").tolist()
-            hdf5_idx.close()
+            if self._images is None:
+                # Create index with image file names. Depending on the size and
+                # location of the hdf5 this process may take a few minutes.
+                self._images = []
+                for class_name in self._classes:
+                    group = hdf5_root[class_name]
+                    files = filter(is_image_file, group)
 
-        if self._images is None:
-            # Create index with image file names. Depending on the size and
-            # location of the hdf5 this process may take a few minutes.
-            self._images = []
-            for class_name in self._classes:
-                group = hdf5_root[class_name]
-                files = filter(is_image_file, group)
+                    # Construct the absolute path name within the HDF5 file
+                    path_names = map(
+                        partial(posixpath.join, "/", root, class_name), files)
+                    self._images.extend(path_names)
 
-                # Construct the absolute path name within the HDF5 file
-                path_names = map(
-                    partial(posixpath.join, "/", root, class_name), files)
-                self._images.extend(path_names)
+                # Convert from python string to null terminated string
+                index_data = np.array(self._images, dtype="S")
 
-            # Convert from python string to null terminated string
-            index_data = np.array(self._images, dtype="S")
-
-            # Save cache
-            hdf5_idx = h5py.File(name=index_file, mode="a")
-            hdf5_idx_root = hdf5_idx.require_group(root)
-            hdf5_idx_root.create_dataset("images", data=index_data)
-            hdf5_idx.close()
+                # Save cache
+                with h5py.File(name=index_file, mode="a") as hdf5_idx_root:
+                    hdf5_idx_root = hdf5_idx.require_group(root)
+                    hdf5_idx_root.create_dataset("images", data=index_data)
 
         # Limit dataset size by num_classes
         if num_classes is not None:
@@ -396,9 +394,16 @@ class HDF5Dataset(VisionDataset):
             self._images = list(filter(
                 lambda x: posixpath.dirname(x) in self._classes.keys(), self._images))
 
+        # Lazy open hdf5 file on __getitem__ of each dataloader worker.
+        # See https://github.com/pytorch/pytorch/issues/11887
+        self._hdf5 = None
+
     def __getitem__(self, index):
         file_name = self._images[index]
         class_name = posixpath.dirname(file_name)
+
+        if self._hdf5 is None:
+            self._hdf5 = h5py.File(name=self._hdf5_file, mode="r", swmr=True)
 
         group = self._hdf5[class_name]
         image_file = group[file_name]
@@ -435,4 +440,4 @@ class HDF5Dataset(VisionDataset):
 
     def extra_repr(self):
         return "hdf5_file: {}\nnum_classes={}".format(
-            self._hdf5.filename, len(self._classes))
+            self._hdf5_file, len(self._classes))
