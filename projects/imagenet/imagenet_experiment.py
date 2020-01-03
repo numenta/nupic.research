@@ -26,7 +26,7 @@ import os
 import pickle
 import sys
 from bisect import bisect
-from pprint import pprint
+from pprint import pformat
 
 import h5py
 import ray.services
@@ -407,7 +407,7 @@ class ImagenetExperiment:
             device=self.device,
         )
         if self.rank == 0:
-            print(self.model)
+            self.logger.info(self.model)
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
@@ -513,8 +513,8 @@ class ImagenetExperiment:
         if lr_scheduler_class is not None:
             lr_scheduler_args = config.get("lr_scheduler_args", {})
             if self.rank == 0:
-                print("LR Scheduler args:")
-                pprint(lr_scheduler_args)
+                self.logger.info("LR Scheduler args:")
+                self.logger.info(pformat(lr_scheduler_args))
             self.lr_scheduler = _create_lr_scheduler(
                 optimizer=self.optimizer,
                 lr_scheduler_class=lr_scheduler_class,
@@ -602,9 +602,9 @@ class ImagenetExperiment:
         if not isinstance(self.lr_scheduler, OneCycleLR):
             self.lr_scheduler.step()
         if self.rank == 0:
-            print("Params before/after non-zero", nonzero_params_sparse1,
-                  nonzero_params_sparse2)
-            print("LR Scheduler:", self.get_lr())
+            self.logger.info("Params before/after non-zero %s %s",
+                             nonzero_params_sparse1, nonzero_params_sparse2)
+            self.logger.info("LR Scheduler: %s", self.get_lr())
         if self.scaled_lr_scheduler is not None:
             self.scaled_lr_scheduler.step()
 
