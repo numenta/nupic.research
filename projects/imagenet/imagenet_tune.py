@@ -169,11 +169,11 @@ if __name__ == "__main__":
                         default=torch.cuda.device_count(),
                         help="number of GPUs to use")
     parser.add_argument("-n", "--num-cpus", type=int,
-                        default=torch.get_num_interop_threads() - 1,
+                        default=torch.get_num_interop_threads(),
                         help="number of CPUs to use when GPU is not available."),
     parser.add_argument("-r", "--resume", action="store_true",
                         help="Resume training from last known checkpoint")
-    parser.add_argument("-j", "--workers", type=int, default=4,
+    parser.add_argument("-j", "--workers", type=int, default=6,
                         help="Number of dataloaders workers")
     parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
                         help="Pytorch Distributed backend", default="nccl")
