@@ -27,15 +27,15 @@ from nupic.research.frameworks.pytorch.dataset_utils import ProgressiveRandomRes
 class ProgressiveRandomResizedCropTest(TestCase):
     def test_set_epoch(self):
         transform = ProgressiveRandomResizedCrop(progressive_resize={
-            "0": 1,
-            "2": 2,
-            "5": 3,
-        }, transforms=[])
+            0: 1,
+            2: 2,
+            5: 3,
+        })
         expected = [1] * 2 + [2] * 3 + [3] * 5
         actual = []
         for epoch in range(10):
             transform.set_epoch(epoch)
-            actual.append(transform.img_size)
+            actual.append(transform.image_size)
 
         self.assertEqual(expected, actual)
 
