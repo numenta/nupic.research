@@ -315,7 +315,7 @@ class HDF5Dataset(VisionDataset):
         hdf5_root = self._hdf5[root]
 
         self._classes = {
-            str.encode(posixpath.join("/", root, g)): i
+            posixpath.join("/", root, g): i
             for i, g in enumerate(hdf5_root.keys())
         }
 
@@ -325,26 +325,31 @@ class HDF5Dataset(VisionDataset):
         if index_file.exists():
             hdf5_idx = h5py.File(name=index_file, mode="r")
             if root in hdf5_idx:
-                self._images = hdf5_idx[root]["images"][()]
+                images = hdf5_idx[root]["images"][()]
+                # convert null terminated strings to unicode
+                self._images = images.astype("U").tolist()
             hdf5_idx.close()
 
         if self._images is None:
             # Create index with image file names. Depending on the size and
             # location of the hdf5 this process may take a few minutes.
-            images = []
+            self._images = []
             for class_name in self._classes:
                 group = hdf5_root[class_name]
                 files = filter(is_image_file, group)
 
                 # Construct the absolute path name within the HDF5 file
-                path_names = map(partial(posixpath.join, "/", root, class_name), files)
-                images.extend(path_names)
+                path_names = map(
+                    partial(posixpath.join, "/", root, class_name), files)
+                self._images.extend(path_names)
+
+            # Convert from python string to null terminated string
+            index_data = np.array(self._images, dtype="S")
 
             # Save cache
-            self._images = np.array(self._images, dtype="S")
             hdf5_idx = h5py.File(name=index_file, mode="a")
             hdf5_idx_root = hdf5_idx.require_group(root)
-            hdf5_idx_root.create_dataset("images", data=self._images)
+            hdf5_idx_root.create_dataset("images", data=index_data)
             hdf5_idx.close()
 
         # Limit dataset size by num_classes
@@ -355,12 +360,12 @@ class HDF5Dataset(VisionDataset):
 
     def __getitem__(self, index):
         file_name = self._images[index]
-
         class_name = posixpath.dirname(file_name)
+
         group = self._hdf5[class_name]
         image_file = group[file_name]
 
-        # If dataset is contiguous and uncompressed map it to memory
+        # If dataset is contiguous and uncompressed map it directly to memory
         if image_file.chunks is None and image_file.compression is None:
             image_data = np.memmap(
                 image_file.file.filename,
@@ -369,7 +374,7 @@ class HDF5Dataset(VisionDataset):
                 offset=image_file.id.get_offset(),
                 dtype=image_file.dtype)
         else:
-            # Load image from binary data stored in the dataset
+            # Load image data from dataset
             image_data = image_file[()]
 
         # Convert image to RGB
