@@ -34,6 +34,7 @@ dependencies:
   - tabulate
   - torchvision=0.4.2
   - tqdm
+  - h5py
 
   # ray[debug,dashboard]
   - aiohttp
@@ -67,5 +68,6 @@ dependencies:
       - -e ${HOME}/nta/nupic.tensorflow --no-binary :all
 
       # Install nupic.research in develop mode
+      - -r requirements-dev.txt
       - -e . --no-binary :all
 
