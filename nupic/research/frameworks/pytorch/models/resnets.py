@@ -23,12 +23,12 @@
 
 from collections import namedtuple
 
-import torch.nn as nn
-
 import nupic.torch.modules as nupic_modules
+import torch.nn as nn
 from nupic.research.frameworks.pytorch.sparse_layer_params import (
     LayerParams,
-    auto_sparse_params,
+    auto_sparse_activation_params,
+    auto_sparse_conv_params,
 )
 from nupic.torch.modules import Flatten, KWinners2d
 
@@ -55,7 +55,10 @@ def default_sparse_params(group_type, number_layers, sparse=False):
     """
     noact_layer_params = LayerParams()
     if sparse:
-        layer_params = LayerParams(params_function=auto_sparse_params)
+        layer_params = LayerParams(
+            conv_params_func=auto_sparse_conv_params,
+            activation_params_func=auto_sparse_activation_params,
+        )
     else:
         layer_params = LayerParams()
 
@@ -81,14 +84,22 @@ def default_sparse_params(group_type, number_layers, sparse=False):
     )
 
 
-def linear_layer(input_size, output_size, weights_density, sparse_weights_type):
+def linear_layer(input_size, output_size, layer_params, sparse_weights_type):
     """Basic linear layer, which accepts different sparse layer types."""
     layer = nn.Linear(input_size, output_size)
 
-    # adds sparsity to last linear layer
-    if weights_density < 1.0:
-        sparse_weights_type = getattr(nupic_modules, sparse_weights_type)
-        return sparse_weights_type(layer, weights_density)
+    # Compute params for sparse-weights module.
+    if layer_params:
+        weight_params = layer_params.get_linear_params(
+            input_size,
+            output_size,
+        )
+    else:
+        weight_params = None
+
+    # Initialize sparse-weights module as specified.
+    if weight_params:
+        return sparse_weights_type(layer, **weight_params)
     else:
         return layer
 
@@ -113,14 +124,19 @@ def conv_layer(
         bias=bias,
     )
 
-    weights_density = layer_params.weights_density
-    if layer_params.params_function is not None:
-        weights_density = layer_params.params_function(in_planes,
-                                                       out_planes,
-                                                       kernel_size).weights_density
-    if weights_density < 1.0:
-        sparse_weights_type = getattr(nupic_modules, sparse_weights_type)
-        return sparse_weights_type(layer, weights_density)
+    # Compute params for sparse-weights module.
+    if layer_params:
+        weight_params = layer_params.get_conv_params(
+            in_planes,
+            out_planes,
+            kernel_size
+        )
+    else:
+        weight_params = None
+
+    # Initialize sparse-weights module as specified.
+    if weight_params:
+        return sparse_weights_type(layer, **weight_params)
     else:
         return layer
 
@@ -130,21 +146,23 @@ def activation_layer(
     params,
 ):
     """Basic activation layer.
-    Defaults to ReLU if percent_on is < 0.5. Otherwise KWinners is used."""
-    if params.params_function is not None:
-        params = params.params_function(0, out, 0)
+    Defaults to ReLU if `activation_params` are evaulated from `params`.
+    Otherwise KWinners is used."""
 
-    if params.percent_on >= 0.5:
-        return nn.ReLU(inplace=True)
+    # Compute params for kwinners activation module.
+    if params:
+        activation_params = params.get_activation_params(0, out, 0)
     else:
+        activation_params = None
+
+    # Initialize kwinners module as specified.
+    if activation_params:
         return KWinners2d(
             out,
-            percent_on=params.percent_on,
-            boost_strength=params.boost_strength,
-            boost_strength_factor=params.boost_strength_factor,
-            k_inference_factor=params.k_inference_factor,
-            local=params.local,
+            **activation_params
         )
+    else:
+        return nn.ReLU(inplace=True)
 
 
 class BasicBlock(nn.Module):
@@ -301,6 +319,11 @@ class ResNet(nn.Module):
         defaults.update(config or {})
         self.__dict__.update(defaults)
 
+        self.linear_sparse_weights_type = getattr(
+            nupic_modules, self.linear_sparse_weights_type)
+        self.conv_sparse_weights_type = getattr(
+            nupic_modules, self.conv_sparse_weights_type)
+
         if not hasattr(self, "sparse_params"):
             self.sparse_params = default_sparse_params(
                 *cf_dict[str(self.depth)], sparse=self.defaults_sparse
@@ -344,7 +367,7 @@ class ResNet(nn.Module):
         self.classifier = linear_layer(
             512 * block.expansion,
             self.num_classes,
-            self.sparse_params["linear"].weights_density,
+            self.sparse_params["linear"],
             self.linear_sparse_weights_type,
         )
 
