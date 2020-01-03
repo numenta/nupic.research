@@ -25,8 +25,8 @@ import logging
 import os
 import pickle
 import sys
-from pprint import pprint
 from bisect import bisect
+from pprint import pprint
 
 import h5py
 import ray.services
