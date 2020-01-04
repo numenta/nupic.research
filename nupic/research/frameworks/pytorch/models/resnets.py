@@ -23,8 +23,9 @@
 
 from collections import namedtuple
 
-import nupic.torch.modules as nupic_modules
 import torch.nn as nn
+
+import nupic.torch.modules as nupic_modules
 from nupic.research.frameworks.pytorch.sparse_layer_params import (
     LayerParams,
     auto_sparse_activation_params,
