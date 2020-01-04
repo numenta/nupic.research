@@ -24,8 +24,6 @@ import torch
 import torch.nn
 from nupic.research.frameworks.pytorch.models.resnets import (
     ResNet,
-    cf_dict,
-    default_sparse_params,
     resnet18,
     resnet50,
     resnet101,
@@ -52,15 +50,6 @@ class ResnetTest(unittest.TestCase):
         net = resnet50(config=dict(num_classes=10, defaults_sparse=True))
         net(Variable(torch.randn(2, 3, 32, 32)))
         self.assertIsInstance(net, ResNet, "ResNet50 with default sparse parameters")
-
-    def test_default_params(self):
-        """Test default params."""
-        params = default_sparse_params(*cf_dict["50"])
-        # self.assertEqual(params["stem"].percent_on, 1.0)
-
-        # For sparse, the params_function should be set.
-        params = default_sparse_params(*cf_dict["50"], sparse=True)
-        # self.assertIsNotNone(params["stem"].params_function)
 
     def test_custom_per_group(self):
         """Evaluate ResNets customized per group"""
