@@ -109,8 +109,15 @@ DEFAULT = dict(
 
     # How often to checkpoint (epochs)
     checkpoint_freq=0,
+
     # How many times to try to recover before stopping the trial
     max_failures=-1,
+
+    # Python Logging level : "critical", "error", "warning", "info", "debug"
+    log_level="info",
+
+    # Python Logging Format
+    log_format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
 )
 
 DEFAULT10 = copy.deepcopy(DEFAULT)
@@ -164,6 +171,7 @@ SPARSE100_PLAIN_LEARNING.update(
 
 # Export all configurations
 CONFIGS = dict(
+    default=DEFAULT,
     default10=DEFAULT10,
     default_sparse_10=SPARSE10,
     default100=DEFAULT100,
