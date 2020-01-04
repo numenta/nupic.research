@@ -145,9 +145,10 @@ def conv_layer(
 def activation_layer(
     out,
     params,
+    kernel_size=0
 ):
     """Basic activation layer.
-    Defaults to ReLU if `activation_params` are evaulated from `params`.
+    Defaults to ReLU if `activation_params` are evaluated from `params`.
     Otherwise KWinners is used."""
 
     # Compute params for kwinners activation module.
@@ -158,9 +159,12 @@ def activation_layer(
 
     # Initialize kwinners module as specified.
     if activation_params:
-        return KWinners2d(
-            out,
-            **activation_params
+        return nn.Sequential(
+            KWinners2d(
+                out,
+                **activation_params
+            ),
+            nn.ReLU(inplace=True)
         )
     else:
         return nn.ReLU(inplace=True)
@@ -235,7 +239,7 @@ class Bottleneck(nn.Module):
                 sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, layer_params["conv1x1_1"]),
+            activation_layer(planes, layer_params["conv1x1_1"], kernel_size=1),
             # 2nd layer
             conv_layer(
                 "3x3",
@@ -246,7 +250,7 @@ class Bottleneck(nn.Module):
                 stride=stride,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, layer_params["conv3x3_2"]),
+            activation_layer(planes, layer_params["conv3x3_2"], kernel_size=3),
             # 3rd layer
             conv_layer(
                 "1x1",
@@ -273,7 +277,7 @@ class Bottleneck(nn.Module):
             )
 
         self.post_activation = activation_layer(
-            self.expansion * planes, layer_params["shortcut"]
+            self.expansion * planes, layer_params["shortcut"], kernel_size=1
         )
 
     def forward(self, x):
@@ -345,7 +349,7 @@ class ResNet(nn.Module):
                 stride=2,
             ),
             nn.BatchNorm2d(64),
-            activation_layer(64, self.sparse_params["stem"]),
+            activation_layer(64, self.sparse_params["stem"], kernel_size=7),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
             # groups 1 to 4
             self._make_group(

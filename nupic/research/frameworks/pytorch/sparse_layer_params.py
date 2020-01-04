@@ -68,17 +68,20 @@ def auto_sparse_activation_params(in_channels, out_channels, kernel_size):
     :return: a dict to pass to `KWinners2d` as params.
     """
 
-    if out_channels > 64:
-        percent_on = 0.2
-    else:
+    if kernel_size != 1 and out_channels > 128:
         percent_on = 0.3
+    else:
+        percent_on = 1.0
 
-    return dict(
-        percent_on=percent_on,
-        boost_strength=1.5,
-        boost_strength_factor=0.95,
-        local=True,
-    )
+    if percent_on >= 1.0:
+        return {}
+    else:
+        return dict(
+            percent_on=percent_on,
+            boost_strength=1.0,
+            boost_strength_factor=0.9,
+            local=True,
+        )
 
 
 class LayerParams(object):
