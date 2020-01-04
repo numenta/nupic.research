@@ -407,7 +407,7 @@ class ImagenetExperiment:
             device=self.device,
         )
         if self.rank == 0:
-            self.logger.info(self.model)
+            self.logger.debug(self.model)
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
@@ -513,8 +513,8 @@ class ImagenetExperiment:
         if lr_scheduler_class is not None:
             lr_scheduler_args = config.get("lr_scheduler_args", {})
             if self.rank == 0:
-                self.logger.info("LR Scheduler args:")
-                self.logger.info(pformat(lr_scheduler_args))
+                self.logger.debug("LR Scheduler args:")
+                self.logger.debug(pformat(lr_scheduler_args))
             self.lr_scheduler = _create_lr_scheduler(
                 optimizer=self.optimizer,
                 lr_scheduler_class=lr_scheduler_class,
@@ -594,16 +594,22 @@ class ImagenetExperiment:
                 self.scaled_lr_scheduler.step()
 
     def post_epoch(self, epoch):
-        params_sparse, nonzero_params_sparse1 = count_nonzero_params(self.model)
+        count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0
+        if count_nnz:
+            params_sparse, nonzero_params_sparse1 = count_nonzero_params(self.model)
+
         self.model.apply(rezero_weights)
-        params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
+
+        if count_nnz:
+            params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
 
         # Update learning rate
         if not isinstance(self.lr_scheduler, OneCycleLR):
             self.lr_scheduler.step()
-        if self.rank == 0:
+        if count_nnz:
             self.logger.info("Params before/after non-zero %s %s",
                              nonzero_params_sparse1, nonzero_params_sparse2)
+        if self.rank == 0:
             self.logger.info("LR Scheduler: %s", self.get_lr())
         if self.scaled_lr_scheduler is not None:
             self.scaled_lr_scheduler.step()
