@@ -22,6 +22,8 @@ import unittest
 
 import torch
 import torch.nn
+from torch.autograd import Variable
+
 from nupic.research.frameworks.pytorch.models.resnets import (
     ResNet,
     resnet18,
@@ -32,7 +34,6 @@ from nupic.research.frameworks.pytorch.sparse_layer_params import (
     LayerParams,
     SpareWeightsLayerParams,
 )
-from torch.autograd import Variable
 
 
 class ResnetTest(unittest.TestCase):
