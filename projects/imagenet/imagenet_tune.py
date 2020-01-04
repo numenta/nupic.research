@@ -28,8 +28,10 @@ import torch
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 
-from projects.imagenet.experiments import CONFIGS
+from projects.imagenet.experiments_superconvergence import CONFIGS
 from projects.imagenet.imagenet_experiment import ImagenetExperiment
+
+torch.multiprocessing.set_start_method("spawn")
 
 
 class ImagenetTrainable(Trainable):
@@ -101,6 +103,8 @@ class ImagenetTrainable(Trainable):
 
         # Wait for remote functions to complete
         results = ray.get(status)
+
+        print(results[0])
 
         # Return the results from the first remote function
         return copy.deepcopy(results[0])
