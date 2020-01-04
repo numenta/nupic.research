@@ -280,7 +280,7 @@ class LayerParamsByKeys(LayerParams):
                 key, default_value, target_name = (key + (None, ) * 3)[:3]
             else:
                 target_name = None
-                default_value = None
+                default_value = ...
 
             target_name = target_name or key
             if key in d:
