@@ -17,7 +17,6 @@
 #
 #  http://numenta.org/licenses/
 #
-import bisect
 import copy
 import functools
 import io
@@ -26,8 +25,10 @@ import logging
 import os
 import pickle
 import sys
-from pprint import pprint
+from bisect import bisect
+from pprint import pformat
 
+import h5py
 import ray.services
 import torch
 import torch.distributed as dist
@@ -41,9 +42,15 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DistributedSampler
 from torchvision import transforms
+from torchvision.transforms import RandomResizedCrop
 
 import nupic.research.frameworks.pytorch.models.resnets
-from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
+from nupic.research.frameworks.pytorch.dataset_utils import (
+    CachedDatasetFolder,
+    HDF5Dataset,
+    ProgressiveRandomResizedCrop,
+)
+from nupic.research.frameworks.pytorch.lr_scheduler import ScaledLR
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
@@ -57,68 +64,54 @@ __all__ = ["ImagenetExperiment"]
 cudnn.benchmark = True
 
 
-class ProgressiveRandomResizedCrop(transforms.Compose):
-    """
-    Progressive resize and crop image transform. This transform will apply a
-    different size to `torchvision.transforms.RandomResizedCrop` based on the
-    epoch. The method `set_epoch` must be called on each epoch before using
-    this transform
-
-    :param epoch_resize: A dictionary mapping epoch to image size. Each key
-                         correspond to the start epoch and the value correspond
-                         to the image size. For example:
-                         epoch_resize={
-                             0: 128, # epoch  0-13,  resize to 128
-                            14: 224, # epoch 14-31,  resize to 224
-                            32: 288, # epoch 32-end, resize to 288
-                        },
-
-    :param transforms: List of transforms to apply after the image is resized
-    """
-
-    def __init__(self, epoch_resize, transforms):
-        super().__init__(transforms)
-        self.epoch_resize = epoch_resize
-        self.resize = None
-
-    def __call__(self, img):
-        img = self.resize(img)
-        return super().__call__(img)
-
-    def set_epoch(self, epoch):
-        key = bisect.bisect(sorted(self.epoch_resize.keys()), epoch) - 1
-        self.resize = transforms.RandomResizedCrop(self.epoch_resize[key])
-
-
 def _create_train_dataloader(
-    data_dir, batch_size, workers, distributed, epoch_resize, num_classes=1000
+    data_dir, train_dir, batch_size, workers, distributed, progressive_resize,
+    num_classes=1000
 ):
     """
     Configure Imagenet training dataloader
 
-    :param data_dir: The directory containing the training data
+    Creates :class:`torch.utils.data.DataLoader` using :class:`CachedDatasetFolder`
+    or or :class:`HDF5Dataset` pre-configured for the training cycle with an
+    optional :class:`ProgressiveRandomResizedCrop` schedule where the images
+    sizes can vary at different epochs during the cycle.
+
+    :param data_dir: The directory or hdf5 file containing the dataset
+    :param train_dir: The directory or hdf5 group containing the training data
     :param batch_size: Images per batch
     :param workers: how many data loading subprocesses to use
     :param distributed: Whether or not to use `DistributedSampler`
-    :param epoch_resize: Dictionary containing the progressive resize schedule
+    :param progressive_resize: Dictionary containing the progressive resize schedule
     :param num_classes: Limit the dataset size to the given number of classes
     :return: torch.utils.data.DataLoader
     """
-    dataset = CachedDatasetFolder(
-        root=data_dir,
-        num_classes=num_classes,
-        transform=transforms.Compose(
-            # epoch_resize=epoch_resize,
-            transforms=[
-                transforms.RandomResizedCrop(size=224),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),
-            ],
-        ),
+    if progressive_resize is None:
+        # Standard size for all epochs
+        resize_transform = RandomResizedCrop(224)
+    else:
+        # Convert progressive_resize dict from {str:int} to {int:int}
+        progressive_resize = {
+            int(k): v for k, v in progressive_resize.items()
+        }
+        resize_transform = ProgressiveRandomResizedCrop(
+            progressive_resize=progressive_resize)
+
+    transform = transforms.Compose(
+        transforms=[
+            resize_transform,
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+            ),
+        ],
     )
+    if h5py.is_hdf5(data_dir):
+        dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
+                              num_classes=num_classes, transform=transform)
+    else:
+        dataset = CachedDatasetFolder(root=os.path.join(data_dir, train_dir),
+                                      num_classes=num_classes, transform=transform)
     if distributed:
         train_sampler = DistributedSampler(dataset)
     else:
@@ -134,30 +127,38 @@ def _create_train_dataloader(
     )
 
 
-def _create_validation_dataloader(data_dir, batch_size, workers, num_classes=1000):
+def _create_validation_dataloader(data_dir, val_dir, batch_size, workers,
+                                  num_classes=1000):
     """
     Configure Imagenet validation dataloader
 
-    :param data_dir: The directory containing the validation data
+    Creates :class:`torch.utils.data.DataLoader` using :class:`CachedDatasetFolder`
+    or :class:`HDF5Dataset` pre-configured for the validation cycle.
+
+    :param data_dir: The directory or hdf5 file containing the dataset
+    :param val_dir: The directory containing or hdf5 group the validation data
     :param batch_size: Images per batch
     :param workers: how many data loading subprocesses to use
     :param num_classes: Limit the dataset size to the given number of classes
     :return: torch.utils.data.DataLoader
     """
-    dataset = CachedDatasetFolder(
-        root=data_dir,
-        num_classes=num_classes,
-        transform=transforms.Compose(
-            [
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),
-            ]
-        ),
+
+    transform = transforms.Compose(
+        [
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+            ),
+        ]
     )
+    if h5py.is_hdf5(data_dir):
+        dataset = HDF5Dataset(hdf5_file=data_dir, root=val_dir,
+                              num_classes=num_classes, transform=transform)
+    else:
+        dataset = CachedDatasetFolder(root=os.path.join(data_dir, val_dir),
+                                      num_classes=num_classes, transform=transform)
     return torch.utils.data.DataLoader(
         dataset=dataset,
         batch_size=batch_size,
@@ -218,6 +219,28 @@ def _create_optimizer(model, optimizer_class, optimizer_args,
     return optimizer_class(model_params, **optimizer_args)
 
 
+def _create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args, total_steps):
+    """
+    Configure learning rate scheduler
+
+    :param optimizer:
+        Wrapped optimizer
+    :param lr_scheduler_class:
+        LR scheduler class to use. Must inherit from _LRScheduler
+    :param lr_scheduler_args:
+        LR scheduler class constructor arguments
+    :param total_steps:
+        The total number of steps in the cycle.
+        Only used if lr_scheduler_class is :class:`OneCycleLR`
+    """
+    if issubclass(lr_scheduler_class, OneCycleLR):
+        # Update OneCycleLR parameters
+        lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
+        lr_scheduler_args["total_steps"] = total_steps
+
+    return lr_scheduler_class(optimizer, **lr_scheduler_args)
+
+
 def _init_batch_norm(model):
     """
     Initialize ResNet50 batch norm modules
@@ -275,7 +298,8 @@ def _create_model(model_class, model_args, init_batch_norm, distributed, device)
 
 class ImagenetExperiment:
     """
-    Experiment class used to train different models on Imagenet
+    Experiment class used to train Sparse and dense versions of Resnet50 v1.5
+    models on Imagenet dataset
     """
 
     def __init__(self):
@@ -283,27 +307,32 @@ class ImagenetExperiment:
         self.optimizer = None
         self.loss_function = None
         self.lr_scheduler = None
+        self.scaled_lr_scheduler = None
         self.train_loader = None
         self.val_loader = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batches_in_epoch = sys.maxsize
-        self.steps_per_epoch = 0
+        self.batch_size = 1
+        self.image_size = 224
+        self.total_steps = 0
         self.epochs = 1
         self.distributed = False
         self.rank = 0
         self.total_batches = 0
+        self.dynamic_batch_size = None
         self.progress = False
         self.logger = None
 
     def setup_experiment(self, config):
         """
         Configure the experiment for training
+
         :param config: Dictionary containing the configuration parameters
+
             - distributed: Whether or not to use  Pytorch Distributed training
             - backend: Pytorch Distributed backend ("nccl", "gloo")
             - world_size: Total number of processes participating
             - rank: Rank of the current process
-
             - data: Dataset path
             - train_dir: Dataset training data relative path
             - batch_size: Training batch size
@@ -311,24 +340,27 @@ class ImagenetExperiment:
             - val_batch_size: Validation batch size
             - workers: how many data loading processes to use
             - num_classes: Limit the dataset size to the given number of classes
-
             - model_class: Model class. Must inherit from "torch.nn.Module"
             - model_args: model model class arguments passed to the constructor
             - init_batch_norm: Whether or not to Initialize running batch norm
                                mean to 0.
-
+            - progressive_resize: Progressive resize schedule
+                                  dict(start_epoch: image_size)
+            - dynamic_batch_size: dynamic batch size schedule.
+                                  dict(start_epoch: batch_size)
+                                  Works with progressive_resize and the
+                                  available GPU memory to fit as many images as
+                                  possible in each batch
             - optimizer_class: Optimizer class.
                                Must inherit from "torch.optim.Optimizer"
             - optimizer_args: Optimizer class class arguments passed to the
                               constructor
             - batch_norm_weight_decay: Whether or not to apply weight decay to
                                        batch norm modules parameters
-
             - lr_scheduler_class: Learning rate scheduler class.
                                  Must inherit from "_LRScheduler"
             - lr_scheduler_args: Learning rate scheduler class class arguments
                                  passed to the constructor
-
             - loss_function: Loss function. See "torch.nn.functional"
             - local_dir: Results path
             - epochs: Number of epochs to train
@@ -363,33 +395,6 @@ class ImagenetExperiment:
                 world_size=world_size,
             )
 
-        # Configure data loaders
-        self.epochs = config.get("epochs", 1)
-        self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
-        workers = config.get("workers", 0)
-        train_dir = os.path.join(config["data"], config.get("train_dir", "train"))
-        batch_size = config.get("batch_size", 1)
-        epoch_resize = config.get("epoch_resize", {0: 224})
-        num_classes = config.get("num_classes", 1000)
-        self.train_loader = _create_train_dataloader(
-            data_dir=train_dir,
-            batch_size=batch_size,
-            workers=workers,
-            distributed=self.distributed,
-            epoch_resize=epoch_resize,
-            num_classes=num_classes,
-        )
-        self.steps_per_epoch = len(self.train_loader)
-
-        val_dir = os.path.join(config["data"], config.get("val_dir", "val"))
-        val_batch_size = config.get("val_batch_size", batch_size)
-        self.val_loader = _create_validation_dataloader(
-            data_dir=val_dir,
-            batch_size=val_batch_size,
-            workers=workers,
-            num_classes=num_classes,
-        )
-
         # Configure model
         model_class = config["model_class"]
         model_args = config.get("model_args", {})
@@ -402,7 +407,7 @@ class ImagenetExperiment:
             device=self.device,
         )
         if self.rank == 0:
-            print(self.model)
+            self.logger.debug(self.model)
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
@@ -419,20 +424,102 @@ class ImagenetExperiment:
             "loss_function", torch.nn.functional.cross_entropy
         )
 
+        # Configure data loaders
+        self.epochs = config.get("epochs", 1)
+        self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
+        workers = config.get("workers", 0)
+        data_dir = config["data"]
+        train_dir = config.get("train_dir", "train")
+        progressive_resize = config.get("progressive_resize", None)
+        num_classes = config.get("num_classes", 1000)
+
+        # Get initial batch size
+        self.batch_size = config.get("batch_size", 1)
+
+        # Configure dynamic training batch size
+        dynamic_batch_size = config.get("dynamic_batch_size", None)
+        if dynamic_batch_size is not None:
+            # Convert dynamic_batch_size dict from {str:int} to {int:int}
+            self.dynamic_batch_size = {
+                int(k): v for k, v in dynamic_batch_size.items()
+            }
+
+            # Override initial batch size from dynamic_batch_size schedule
+            milestones = sorted(self.dynamic_batch_size.keys())
+            self.batch_size = self.dynamic_batch_size[milestones[0]]
+
+            # Scale LR proportionally to initial batch size for each epoch milestone
+            # See https://arxiv.org/pdf/1706.02677.pdf
+            lr_scale = {
+                milestones[0]: 1.0
+            }
+            lr_scale.update({
+                k: self.dynamic_batch_size[k] / self.batch_size for k in milestones[1:]
+            })
+
+            # Create chained scaled LR scheduler to be called after the main scheduler
+            self.scaled_lr_scheduler = ScaledLR(
+                optimizer=self.optimizer,
+                lr_scale=lr_scale,
+            )
+
+        # Configure Training data loader
+        self.train_loader = _create_train_dataloader(
+            data_dir=data_dir,
+            train_dir=train_dir,
+            batch_size=self.batch_size,
+            workers=workers,
+            distributed=self.distributed,
+            progressive_resize=progressive_resize,
+            num_classes=num_classes,
+        )
         self.total_batches = len(self.train_loader)
+
+        # Compute total steps required by the OneCycleLR
+        if self.dynamic_batch_size is None:
+            self.total_steps = len(self.train_loader) * self.epochs
+        else:
+            total_images = len(self.train_loader.dataset)
+
+            # Initial batch size
+            from_epoch = 0
+            batch_size = self.batch_size
+            steps_per_epoch = -(-total_images // batch_size)
+            self.total_steps = 0
+
+            milestones = sorted(self.dynamic_batch_size.keys())
+            for epoch in milestones[1:]:
+                self.total_steps += steps_per_epoch * (epoch - from_epoch)
+                batch_size = self.dynamic_batch_size[epoch]
+                steps_per_epoch = -(-total_images // batch_size)
+                from_epoch = epoch
+
+            # Add last epochs
+            self.total_steps += steps_per_epoch * (self.epochs - from_epoch)
+
+        # Configure Validation data loader
+        val_dir = config.get("val_dir", "val")
+        val_batch_size = config.get("val_batch_size", self.batch_size)
+        self.val_loader = _create_validation_dataloader(
+            data_dir=data_dir,
+            val_dir=val_dir,
+            batch_size=val_batch_size,
+            workers=workers,
+            num_classes=num_classes,
+        )
+
         # Configure leaning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
         if lr_scheduler_class is not None:
             lr_scheduler_args = config.get("lr_scheduler_args", {})
-            if lr_scheduler_class == OneCycleLR:
-                lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
-                lr_scheduler_args["epochs"] = self.epochs
-                lr_scheduler_args["steps_per_epoch"] = self.steps_per_epoch
-                if self.rank == 0:
-                    print("LR Scheduler args:")
-                    pprint(lr_scheduler_args)
-
-            self.lr_scheduler = lr_scheduler_class(self.optimizer, **lr_scheduler_args)
+            if self.rank == 0:
+                self.logger.debug("LR Scheduler args:")
+                self.logger.debug(pformat(lr_scheduler_args))
+            self.lr_scheduler = _create_lr_scheduler(
+                optimizer=self.optimizer,
+                lr_scheduler_class=lr_scheduler_class,
+                lr_scheduler_args=lr_scheduler_args,
+                total_steps=self.total_steps)
 
     def validate(self, loader=None):
         if loader is None:
@@ -446,6 +533,8 @@ class ImagenetExperiment:
             batches_in_epoch=self.batches_in_epoch,
         )
         results.update(
+            batch_size=self.batch_size,
+            image_size=self.image_size,
             learning_rate=self.get_lr()[0],
         )
         if self.rank == 0:
@@ -454,8 +543,7 @@ class ImagenetExperiment:
         return results
 
     def train_epoch(self, epoch):
-
-        train_model(
+        mean_loss = train_model(
             model=self.model,
             loader=self.train_loader,
             optimizer=self.optimizer,
@@ -465,6 +553,7 @@ class ImagenetExperiment:
             pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
             post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
         )
+        self.logger.info("Epoch: %s, mean_loss: %s", epoch, mean_loss)
 
     def run_epoch(self, epoch):
         self.pre_epoch(epoch)
@@ -478,10 +567,11 @@ class ImagenetExperiment:
         if self.distributed:
             self.train_loader.sampler.set_epoch(epoch)
 
-        # Update transform
-        transform = self.train_loader.dataset.transform
-        if isinstance(transform, ProgressiveRandomResizedCrop):
-            transform.set_epoch(epoch)
+        # Update image size for epoch
+        self.update_image_size(epoch)
+
+        # Update batch size
+        self.update_batch_size(epoch)
 
     def pre_batch(self, model, batch_idx, epoch):
         pass
@@ -500,17 +590,69 @@ class ImagenetExperiment:
         # Update 1cycle learning rate after every batch
         if isinstance(self.lr_scheduler, OneCycleLR):
             self.lr_scheduler.step()
+            if self.scaled_lr_scheduler is not None:
+                self.scaled_lr_scheduler.step()
 
     def post_epoch(self, epoch):
-        params_sparse, nonzero_params_sparse1 = count_nonzero_params(self.model)
+        count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0
+        if count_nnz:
+            params_sparse, nonzero_params_sparse1 = count_nonzero_params(self.model)
+
         self.model.apply(rezero_weights)
-        params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
+
+        if count_nnz:
+            params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
+
+        # Update learning rate
         if not isinstance(self.lr_scheduler, OneCycleLR):
             self.lr_scheduler.step()
+        if count_nnz:
+            self.logger.info("Params before/after non-zero %s %s",
+                             nonzero_params_sparse1, nonzero_params_sparse2)
         if self.rank == 0:
-            print("Params before/after non-zero", nonzero_params_sparse1,
-                  nonzero_params_sparse2)
-            print("LR Scheduler:", self.get_lr())
+            self.logger.info("LR Scheduler: %s", self.get_lr())
+        if self.scaled_lr_scheduler is not None:
+            self.scaled_lr_scheduler.step()
+
+    def update_batch_size(self, epoch):
+        """
+        Update batch size for epoch
+        """
+        if self.dynamic_batch_size is not None:
+            keys = sorted(self.dynamic_batch_size.keys())
+            start = keys[bisect(keys, epoch) - 1]
+            batch_size = self.dynamic_batch_size[start]
+            if batch_size != self.batch_size:
+                self.logger.info("Epoch: %s: Updated batch size from %s to %s",
+                                 epoch, self.batch_size, batch_size)
+                self.batch_size = batch_size
+                self.train_loader.batch_sampler.batch_size = self.batch_size
+                self.total_batches = len(self.train_loader)
+
+    def update_image_size(self, epoch):
+        """
+        Update image size for epoch
+        """
+        transform = self.train_loader.dataset.transform
+        if isinstance(transform, ProgressiveRandomResizedCrop):
+            transform.set_epoch(epoch)
+            if self.image_size != transform.image_size:
+                self.logger.info("Epoch: %s: Updated image size from %s to %s",
+                                 epoch, self.image_size, transform.image_size)
+            self.image_size = transform.image_size
+        elif isinstance(transform, transforms.Compose):
+            # Find ProgressiveRandomResizedCrop inside composed transforms
+            def is_progressive_size(t):
+                return isinstance(t, ProgressiveRandomResizedCrop)
+
+            # Assume only one 'ProgressiveRandomResizedCrop' transform
+            transform = next(filter(is_progressive_size, transform.transforms), None)
+            if transform is not None:
+                transform.set_epoch(epoch)
+                if self.image_size != transform.image_size:
+                    self.logger.info("Epoch: %s: Updated image size from %s to %s",
+                                     epoch, self.image_size, transform.image_size)
+                self.image_size = transform.image_size
 
     def get_state(self):
         """

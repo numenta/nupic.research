@@ -63,6 +63,9 @@ def train_model(
     :param progress_bar: Optional :class:`tqdm` progress bar args.
                          None for no progress bar
     :type progress_bar: dict or None
+
+    :return: mean loss for epoch
+    :rtype: float
     """
     model.train()
     # Use asynchronous GPU copies when the memory is pinned
@@ -73,7 +76,7 @@ def train_model(
         # update progress bar total based on batches_in_epoch
         if batches_in_epoch < len(loader):
             loader.total = batches_in_epoch
-
+    total_loss = 0
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
@@ -87,6 +90,7 @@ def train_model(
         loss = criterion(output, target)
         loss.backward()
         optimizer.step()
+        total_loss += loss.item()
         if progress_bar:
             loader.set_postfix(dict(loss=loss.item()))
 
@@ -96,6 +100,8 @@ def train_model(
     if progress_bar is not None:
         loader.n = loader.total
         loader.close()
+
+    return total_loss / len(loader)
 
 
 def evaluate_model(
