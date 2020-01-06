@@ -127,30 +127,30 @@ class LayerParams(object):
 
     def get_linear_params(self, *args, **params):
 
-        if self.linear_params_func:
+        if self.linear_params_func is not None:
             return self.linear_params_func(*args, **params)
-        elif self.default_linear_params:
+        elif self.default_linear_params is not None:
             return self.default_linear_params
         else:
-            return {}
+            return None
 
     def get_conv_params(self, *args, **params):
 
-        if self.conv_params_func:
+        if self.conv_params_func is not None:
             return self.conv_params_func(*args, **params)
-        elif self.default_conv_params:
+        elif self.default_conv_params is not None:
             return self.default_conv_params
         else:
-            return {}
+            return None
 
     def get_activation_params(self, *args, **params):
 
-        if self.activation_params_func:
+        if self.activation_params_func is not None:
             return self.activation_params_func(*args, **params)
-        elif self.default_activation_params:
+        elif self.default_activation_params is not None:
             return self.default_activation_params
         else:
-            return {}
+            return None
 
 
 class LayerParamsByKeys(LayerParams):
@@ -291,7 +291,7 @@ class LayerParamsByKeys(LayerParams):
             elif default_value is not ...:
                 key_values[target_name] = default_value
 
-        return key_values
+        return key_values or None
 
 
 class SpareWeightsLayerParams(LayerParamsByKeys):
