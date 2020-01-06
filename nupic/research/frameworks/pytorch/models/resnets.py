@@ -90,7 +90,7 @@ def linear_layer(input_size, output_size, layer_params, sparse_weights_type):
     layer = nn.Linear(input_size, output_size)
 
     # Compute params for sparse-weights module.
-    if layer_params:
+    if layer_params is not None:
         weight_params = layer_params.get_linear_params(
             input_size,
             output_size,
@@ -99,7 +99,7 @@ def linear_layer(input_size, output_size, layer_params, sparse_weights_type):
         weight_params = None
 
     # Initialize sparse-weights module as specified.
-    if weight_params:
+    if weight_params is not None:
         return sparse_weights_type(layer, **weight_params)
     else:
         return layer
@@ -126,7 +126,7 @@ def conv_layer(
     )
 
     # Compute params for sparse-weights module.
-    if layer_params:
+    if layer_params is not None:
         weight_params = layer_params.get_conv_params(
             in_planes,
             out_planes,
@@ -136,7 +136,7 @@ def conv_layer(
         weight_params = None
 
     # Initialize sparse-weights module as specified.
-    if weight_params:
+    if weight_params is not None:
         return sparse_weights_type(layer, **weight_params)
     else:
         return layer
@@ -152,13 +152,13 @@ def activation_layer(
     Otherwise KWinners is used."""
 
     # Compute params for kwinners activation module.
-    if params:
+    if params is not None:
         activation_params = params.get_activation_params(0, out, 0)
     else:
         activation_params = None
 
     # Initialize kwinners module as specified.
-    if activation_params:
+    if activation_params is not None:
         return nn.Sequential(
             KWinners2d(
                 out,
