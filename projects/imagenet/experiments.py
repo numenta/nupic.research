@@ -93,17 +93,31 @@ DEFAULT = dict(
     # See https://arxiv.org/pdf/1706.02677.pdf
     init_batch_norm=False,
 
-    # Progressive resize schedule - dict(start_epoch: image_size)
-    # See https://arxiv.org/pdf/1806.01427.pdf
-    # epoch_resize={0: 224},
+    # Progressive image resize schedule - dict(start_epoch: image_size)
+    # See:
+    # - https://arxiv.org/pdf/1806.01427.pdf
+    # - https://arxiv.org/abs/1707.02921
+    # - https://arxiv.org/abs/1710.10196
+    progressive_resize=None,
+
+    # Works with progressive_resize and the available GPU memory fitting as many
+    # images as possible in each batch - dict(start_epoch: batch_size)
+    dynamic_batch_size=None,
 
     # Loss function. See "torch.nn.functional"
     loss_function=torch.nn.functional.cross_entropy,
 
     # How often to checkpoint (epochs)
     checkpoint_freq=0,
+
     # How many times to try to recover before stopping the trial
     max_failures=-1,
+
+    # Python Logging level : "critical", "error", "warning", "info", "debug"
+    log_level="info",
+
+    # Python Logging Format
+    log_format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
 )
 
 DEFAULT10 = copy.deepcopy(DEFAULT)
@@ -190,6 +204,7 @@ SPARSE100_PLAIN_LEARNING.update(
 
 # Export all configurations
 CONFIGS = dict(
+    default=DEFAULT,
     default10=DEFAULT10,
     default_sparse_10=SPARSE10,
     default100=DEFAULT100,

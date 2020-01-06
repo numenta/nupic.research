@@ -63,13 +63,6 @@ SUPER_CONVERGENCE.update(
 FASTAI18 = copy.deepcopy(SUPER_CONVERGENCE)
 FASTAI18.update(
     epochs=35,
-
-    # dict(start_epoch: image_size)
-    # epoch_resize={
-    #     0: 128,
-    #     14: 224,
-    #     32: 288
-    # },
     lr_scheduler_args=dict(
         # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 35 epochs
         max_lr=2.0,
@@ -87,6 +80,37 @@ FASTAI18.update(
     # No weigh decay from batch norm modules
     batch_norm_weight_decay=False,
     init_batch_norm=True,
+)
+
+PROGRESSIVE_RESIZE = copy.deepcopy(FASTAI18)
+PROGRESSIVE_RESIZE.update(
+    # Progressive image resize schedule - dict(start_epoch: image_size)
+    # See:
+    # - https://arxiv.org/pdf/1806.01427.pdf
+    # - https://arxiv.org/abs/1707.02921
+    # - https://arxiv.org/abs/1710.10196
+    train_dir="sz/160/train",
+    progressive_resize={
+        "0": 128,
+        "20": 224,
+        "35": 288,
+    },
+    # Works with progressive_resize and the available GPU memory to fit as many
+    # images as possible in each batch - dict(start_epoch: batch_size)
+    dynamic_batch_size={
+        "0": 512,
+        "20": 160,
+        "35": 96,
+    },
+    lr_scheduler_args=dict(
+        # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 35 epochs
+        max_lr=2.0,
+        div_factor=2,  # initial_lr = 1.0
+        # Scale final LR by final batch_size to initial batch_size ratio
+        final_div_factor=96 / 512 / 0.00025,  # min_lr = 0.00005
+        pct_start=5.0 / 35.0,
+        anneal_strategy="linear",
+    ),
 )
 
 FASTAI100 = copy.deepcopy(FASTAI18)
@@ -252,6 +276,7 @@ CONFIGS.update(
         debug=DEBUG,
         super_convergence=SUPER_CONVERGENCE,
         fastai18=FASTAI18,
+        progressive_resize=PROGRESSIVE_RESIZE,
         fastai100=FASTAI100,
         fastai10=FASTAI10,
         fastai100_no_momentum=FASTAI100NoMomentum,

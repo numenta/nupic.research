@@ -22,12 +22,25 @@ import collections
 import itertools
 import os
 import pickle
+import posixpath
+from bisect import bisect
+from functools import partial
+from io import BytesIO
+from pathlib import Path
 
+import h5py
 import numpy as np
 import torch
+from PIL import Image
 from torch.utils.data import Dataset, Subset
-from torchvision.datasets import DatasetFolder
-from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader, make_dataset
+from torchvision.datasets import DatasetFolder, VisionDataset
+from torchvision.datasets.folder import (
+    IMG_EXTENSIONS,
+    default_loader,
+    is_image_file,
+    make_dataset,
+)
+from torchvision.transforms import RandomResizedCrop
 
 
 def create_validation_data_sampler(dataset, ratio):
@@ -226,7 +239,7 @@ class CachedDatasetFolder(DatasetFolder):
         transform=None,
         target_transform=None,
         is_valid_file=None,
-        num_classes=1000,
+        num_classes=None,
     ):
         super(DatasetFolder, self).__init__(
             root, transform=transform, target_transform=target_transform
@@ -254,8 +267,8 @@ class CachedDatasetFolder(DatasetFolder):
                 file=open(cache_filename, "wb"),
                 protocol=pickle.HIGHEST_PROTOCOL,
             )
-
-        if num_classes < 1000:
+        num_classes = len(classes) if num_classes is None else num_classes
+        if num_classes < len(classes):
             classes, class_to_idx, samples = select_subset(
                 classes, class_to_idx, samples, num_classes
             )
@@ -267,3 +280,164 @@ class CachedDatasetFolder(DatasetFolder):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+
+
+class ProgressiveRandomResizedCrop(object):
+    """
+    Progressive resize and crop image transform. This transform will apply a
+    different resize value to `torchvision.transforms.RandomResizedCrop` based
+    on the current epoch. The method `set_epoch` must be called on each epoch
+    before using this transform.
+
+    :param progressive_resize: A dictionary mapping epoch to image size. Each
+         key correspond to the start of the epoch and the value correspond to
+         the desired image size to use. For example:
+
+             progressive_resize={
+                 "0": 128, # epoch  0-13,  resize to 128
+                "14": 224, # epoch 14-31,  resize to 224
+                "32": 288, # epoch 32-end, resize to 288
+            },
+    """
+
+    def __init__(self, progressive_resize):
+        self.progressive_resize = progressive_resize
+        self.epochs = sorted(self.progressive_resize.keys())
+        self.resize = None
+        self.image_size = -1
+
+    def __call__(self, img):
+        return self.resize(img)
+
+    def set_epoch(self, epoch):
+        # Compute start epoch key from current epoch
+        start = self.epochs[bisect(self.epochs, epoch) - 1]
+        size = self.progressive_resize[start]
+        if size != self.image_size:
+            self.resize = RandomResizedCrop(size)
+            self.image_size = size
+
+
+class HDF5Dataset(VisionDataset):
+    """
+    HDF5 image dataset where the images are arranged into class groups, similar
+    to :class:`torchvision.datasets.DatasetFolder`::
+
+        root/class_x/xxx.ext
+        root/class_x/xxy.ext
+        root/class_x/xxz.ext
+
+        root/class_y/123.ext
+        root/class_y/nsdf3.ext
+        root/class_y/asd932_.ext
+
+    .. note::
+        A cache with all the dataset names will be used to minimize the number
+        of file system calls at initialization
+
+    :param hdf5_file:
+        HDF5 file path
+    :param root:
+        Root group name (i.e. "train", "val", "test")
+    :param num_classes:
+        Number of classes used to Limit the dataset size. Not limited when None
+    :param kwargs:
+        Other argument passed to :class:`VisionDataset` constructor
+    """
+
+    def __init__(self, hdf5_file, root, num_classes=None, **kwargs):
+        assert h5py.is_hdf5(hdf5_file)
+        super(HDF5Dataset, self).__init__(root=root, **kwargs)
+
+        self._hdf5_file = hdf5_file
+        with h5py.File(name=self._hdf5_file, mode="r") as hdf5:
+            hdf5_root = hdf5[root]
+            self._classes = {
+                posixpath.join("/", root, g): i
+                for i, g in enumerate(hdf5_root.keys())
+            }
+
+            # Load image file names from indices
+            self._images = None
+            index_file = Path(hdf5_file).with_suffix(".__hdf5_index__")
+            if index_file.exists():
+                with h5py.File(name=index_file, mode="r") as hdf5_idx:
+                    if root in hdf5_idx:
+                        images = hdf5_idx[root]["images"][()]
+                        # convert null terminated strings to unicode
+                        self._images = images.astype("U").tolist()
+
+            if self._images is None:
+                # Create index with image file names. Depending on the size and
+                # location of the hdf5 this process may take a few minutes.
+                self._images = []
+                for class_name in self._classes:
+                    group = hdf5_root[class_name]
+                    files = filter(is_image_file, group)
+
+                    # Construct the absolute path name within the HDF5 file
+                    path_names = map(
+                        partial(posixpath.join, "/", root, class_name), files)
+                    self._images.extend(path_names)
+
+                # Convert from python string to null terminated string
+                index_data = np.array(self._images, dtype="S")
+
+                # Save cache
+                with h5py.File(name=index_file, mode="a") as hdf5_idx_root:
+                    hdf5_idx_root = hdf5_idx.require_group(root)
+                    hdf5_idx_root.create_dataset("images", data=index_data)
+
+        # Limit dataset size by num_classes
+        if num_classes is not None:
+            self._classes = dict(itertools.islice(self._classes.items(), num_classes))
+            self._images = list(filter(
+                lambda x: posixpath.dirname(x) in self._classes.keys(), self._images))
+
+        # Lazy open hdf5 file on __getitem__ of each dataloader worker.
+        # See https://github.com/pytorch/pytorch/issues/11887
+        self._hdf5 = None
+
+    def __getitem__(self, index):
+        file_name = self._images[index]
+
+        # Parent group represents the image target class
+        class_name = posixpath.dirname(file_name)
+        target = self._classes[class_name]
+
+        if self._hdf5 is None:
+            self._hdf5 = h5py.File(name=self._hdf5_file, mode="r")
+
+        group = self._hdf5[class_name]
+        image_file = group[file_name]
+
+        # If dataset is contiguous and uncompressed map it directly to memory
+        if image_file.chunks is None and image_file.compression is None:
+            image_data = np.memmap(
+                image_file.file.filename,
+                mode="r",
+                shape=image_file.shape,
+                offset=image_file.id.get_offset(),
+                dtype=image_file.dtype)
+        else:
+            # Load image data from dataset
+            image_data = image_file[()]
+
+        # Convert image to RGB
+        image = Image.open(BytesIO(image_data))
+        sample = image.convert("RGB")
+
+        # Apply transforms
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return sample, target
+
+    def __len__(self):
+        return len(self._images)
+
+    def extra_repr(self):
+        return "hdf5_file: {}\nnum_classes={}".format(
+            self._hdf5_file, len(self._classes))
