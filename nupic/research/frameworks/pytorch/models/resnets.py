@@ -337,11 +337,12 @@ class ResNet(nn.Module):
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
-
-        self.linear_sparse_weights_type = getattr(
-            nupic_modules, self.linear_sparse_weights_type)
-        self.conv_sparse_weights_type = getattr(
-            nupic_modules, self.conv_sparse_weights_type)
+        if isinstance(self.linear_sparse_weights_type, str):
+            self.linear_sparse_weights_type = getattr(
+                nupic_modules, self.linear_sparse_weights_type)
+        if isinstance(self.conv_sparse_weights_type, str):
+            self.conv_sparse_weights_type = getattr(
+                nupic_modules, self.conv_sparse_weights_type)
 
         if not hasattr(self, "sparse_params"):
             self.sparse_params = default_sparse_params(
