@@ -116,6 +116,58 @@ FASTAI10.update(
     model_args=dict(config=dict(num_classes=10, defaults_sparse=False)),
 )
 
+# Default sparse ResNet-50 for 100 classes
+SPARSE100_SUPER = copy.deepcopy(FASTAI100)
+SPARSE100_SUPER.update(dict(
+    epochs=35,
+
+    # Create default sparse network
+    model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
+
+))
+
+
+# LR EXPERIMENTS (no momentum)
+
+FASTAI100_HIGHLR = copy.deepcopy(FASTAI100)
+FASTAI100_HIGHLR.update(
+    lr_scheduler_args=dict(
+        # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 40 epochs
+        max_lr=6.0,
+        div_factor=6,  # initial_lr = 1.0
+        final_div_factor=4000,  # min_lr = 0.00025
+        pct_start=4.0 / 35.0,
+        epochs=35,
+        anneal_strategy="linear",
+    ),
+)
+
+SPARSE100_SUPER_HIGHLR = copy.deepcopy(SPARSE100_SUPER)
+SPARSE100_SUPER_HIGHLR.update(dict(
+    lr_scheduler_args=dict(
+        max_lr=6.0,
+        div_factor=6,  # initial_lr = 1.0
+        final_div_factor=4000,  # min_lr = 0.00025
+        pct_start=4.0 / 35.0,
+        epochs=35,
+        anneal_strategy="linear",
+        base_momentum=0.0,
+        max_momentum=0.5,
+        cycle_momentum=True,
+    ),
+
+    optimizer_args=dict(
+        lr=0.1,
+        weight_decay=0.0001,
+        momentum=0.5,
+        nesterov=True,
+    ),
+
+))
+
+
+# NO MOMENTUM EXPERIMENTS
+
 FASTAI100NoMomentum = copy.deepcopy(FASTAI100)
 FASTAI100NoMomentum.update(
     lr_scheduler_args=dict(
@@ -129,7 +181,6 @@ FASTAI100NoMomentum.update(
         max_momentum=0.01,
         cycle_momentum=False,
     ),
-    init_batch_norm=True,
 
     optimizer_args=dict(
         lr=0.1,
@@ -142,37 +193,35 @@ FASTAI100NoMomentum.update(
 )
 
 # Default sparse ResNet-50 for 100 classes
-SPARSE100 = copy.deepcopy(FASTAI100)
-SPARSE100.update(dict(
-    epochs=50,
-
+SPARSE100_SUPER_SomeMomentum = copy.deepcopy(SPARSE100_SUPER)
+SPARSE100_SUPER_SomeMomentum.update(dict(
     lr_scheduler_args=dict(
-        # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 40 epochs
         max_lr=2.0,
         div_factor=2,  # initial_lr = 1.0
         final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=5.0 / 35.0,
+        pct_start=6.0 / 35.0,
+        epochs=35,
         anneal_strategy="linear",
+        base_momentum=0.0,
+        max_momentum=0.5,
     ),
 
-    # Create default sparse network
-    model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
-
+    optimizer_args=dict(
+        lr=0.1,
+        weight_decay=0.0001,
+        momentum=0.5,
+        nesterov=False,
+    ),
 ))
 
 # Default sparse ResNet-50 for 100 classes
-SPARSE100NoMomentum = copy.deepcopy(SPARSE100)
-SPARSE100NoMomentum.update(dict(
-    epochs=50,
-
-    # Create default sparse network
-    model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
-
+SPARSE100_SUPER_NoMomentum = copy.deepcopy(SPARSE100_SUPER)
+SPARSE100_SUPER_NoMomentum.update(dict(
     lr_scheduler_args=dict(
         max_lr=2.0,
-        div_factor=4,  # initial_lr = 0.25
+        div_factor=2,  # initial_lr = 1.0
         final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=5.0 / 35.0,
+        pct_start=6.0 / 35.0,
         epochs=35,
         anneal_strategy="linear",
         base_momentum=0.0,
@@ -206,7 +255,11 @@ CONFIGS.update(
         fastai100=FASTAI100,
         fastai10=FASTAI10,
         fastai100_no_momentum=FASTAI100NoMomentum,
-        sparse100=SPARSE100,
-        sparse100_no_momentum=SPARSE100NoMomentum,
+        fastai100_highlr=FASTAI100_HIGHLR,
+
+        sparse100_super=SPARSE100_SUPER,
+        sparse100_super_no_momentum=SPARSE100_SUPER_NoMomentum,
+        sparse100_super_some_momentum=SPARSE100_SUPER_SomeMomentum,
+        sparse100_super_high_lr=SPARSE100_SUPER_HIGHLR,
     )
 )
