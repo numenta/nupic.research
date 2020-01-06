@@ -188,7 +188,7 @@ class LayerParamsByKeys(LayerParams):
 
         linear_params_keys = [
             (
-                "linear_sparisty",  # <key name to pass to OtherParams.__init__>
+                "linear_sparsity",  # <key name to pass to OtherParams.__init__>
                 0.5                 # <default_value>
             )
         ]
@@ -210,13 +210,13 @@ class LayerParamsByKeys(LayerParams):
     p = OtherParams(conv_sparsity=0.7)
     print(p)
     >>> OtherParams(
-        linear_params={"linear_sparisty": 0.5},
+        linear_params={"linear_sparsity": 0.5},
         conv_params={"weight_sparsity": 0.7},
         activation_params={}
     )
     ```
 
-    In the above example, notice how "linear_sparisty" gets a default value despite not
+    In the above example, notice how "linear_sparsity" gets a default value despite not
     being passed to `OtherParams.__init__`. Also, notice how "weight_sparsity" gets
     saved for the `conv_params` but it's passed to `OtherParams.__init__` as
     `conv_sparsity`.
