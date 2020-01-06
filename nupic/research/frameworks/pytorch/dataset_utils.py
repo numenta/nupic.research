@@ -23,6 +23,7 @@ import itertools
 import os
 import pickle
 import posixpath
+from bisect import bisect
 from functools import partial
 from io import BytesIO
 from pathlib import Path
@@ -39,6 +40,7 @@ from torchvision.datasets.folder import (
     is_image_file,
     make_dataset,
 )
+from torchvision.transforms import RandomResizedCrop
 
 
 def create_validation_data_sampler(dataset, ratio):
@@ -237,7 +239,7 @@ class CachedDatasetFolder(DatasetFolder):
         transform=None,
         target_transform=None,
         is_valid_file=None,
-        num_classes=1000,
+        num_classes=None,
     ):
         super(DatasetFolder, self).__init__(
             root, transform=transform, target_transform=target_transform
@@ -265,8 +267,8 @@ class CachedDatasetFolder(DatasetFolder):
                 file=open(cache_filename, "wb"),
                 protocol=pickle.HIGHEST_PROTOCOL,
             )
-
-        if num_classes < 1000:
+        num_classes = len(classes) if num_classes is None else num_classes
+        if num_classes < len(classes):
             classes, class_to_idx, samples = select_subset(
                 classes, class_to_idx, samples, num_classes
             )
@@ -278,6 +280,42 @@ class CachedDatasetFolder(DatasetFolder):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+
+
+class ProgressiveRandomResizedCrop(object):
+    """
+    Progressive resize and crop image transform. This transform will apply a
+    different resize value to `torchvision.transforms.RandomResizedCrop` based
+    on the current epoch. The method `set_epoch` must be called on each epoch
+    before using this transform.
+
+    :param progressive_resize: A dictionary mapping epoch to image size. Each
+         key correspond to the start of the epoch and the value correspond to
+         the desired image size to use. For example:
+
+             progressive_resize={
+                 "0": 128, # epoch  0-13,  resize to 128
+                "14": 224, # epoch 14-31,  resize to 224
+                "32": 288, # epoch 32-end, resize to 288
+            },
+    """
+
+    def __init__(self, progressive_resize):
+        self.progressive_resize = progressive_resize
+        self.epochs = sorted(self.progressive_resize.keys())
+        self.resize = None
+        self.image_size = -1
+
+    def __call__(self, img):
+        return self.resize(img)
+
+    def set_epoch(self, epoch):
+        # Compute start epoch key from current epoch
+        start = self.epochs[bisect(self.epochs, epoch) - 1]
+        size = self.progressive_resize[start]
+        if size != self.image_size:
+            self.resize = RandomResizedCrop(size)
+            self.image_size = size
 
 
 class HDF5Dataset(VisionDataset):
@@ -312,7 +350,7 @@ class HDF5Dataset(VisionDataset):
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
 
         self._hdf5_file = hdf5_file
-        with h5py.File(name=self._hdf5_file, mode="r", swmr=True) as hdf5:
+        with h5py.File(name=self._hdf5_file, mode="r") as hdf5:
             hdf5_root = hdf5[root]
             self._classes = {
                 posixpath.join("/", root, g): i
@@ -362,10 +400,13 @@ class HDF5Dataset(VisionDataset):
 
     def __getitem__(self, index):
         file_name = self._images[index]
+
+        # Parent group represents the image target class
         class_name = posixpath.dirname(file_name)
+        target = self._classes[class_name]
 
         if self._hdf5 is None:
-            self._hdf5 = h5py.File(name=self._hdf5_file, mode="r", swmr=True)
+            self._hdf5 = h5py.File(name=self._hdf5_file, mode="r")
 
         group = self._hdf5[class_name]
         image_file = group[file_name]
@@ -385,9 +426,6 @@ class HDF5Dataset(VisionDataset):
         # Convert image to RGB
         image = Image.open(BytesIO(image_data))
         sample = image.convert("RGB")
-
-        # Parent group represents the image target class
-        target = self._classes[class_name]
 
         # Apply transforms
         if self.transform is not None:
