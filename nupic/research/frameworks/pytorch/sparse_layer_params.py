@@ -28,7 +28,7 @@ def auto_sparse_conv_params(in_channels, out_channels, kernel_size):
     Note:
     This is highly experimental and likely to change.
 
-    :return: an instance of LayerParams
+    :return: a dict to pass to `SparseWeights2d`
     """
     weights_per_channel = kernel_size * kernel_size * in_channels
     if weights_per_channel < 100:
