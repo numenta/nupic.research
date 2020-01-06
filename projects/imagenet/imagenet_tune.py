@@ -31,7 +31,7 @@ from ray.tune.resources import Resources
 from projects.imagenet.experiments_superconvergence import CONFIGS
 from projects.imagenet.imagenet_experiment import ImagenetExperiment
 
-torch.multiprocessing.set_start_method("spawn")
+os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
 class ImagenetTrainable(Trainable):
@@ -163,7 +163,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        argument_default=argparse.SUPPRESS
     )
     parser.add_argument("-e", "--experiment", dest="name", default="default",
                         help="Experiment to run", choices=CONFIGS.keys())
@@ -171,11 +172,11 @@ if __name__ == "__main__":
                         default=torch.cuda.device_count(),
                         help="number of GPUs to use")
     parser.add_argument("-n", "--num-cpus", type=int,
-                        default=torch.get_num_interop_threads() - 1,
+                        default=torch.get_num_interop_threads(),
                         help="number of CPUs to use when GPU is not available."),
     parser.add_argument("-r", "--resume", action="store_true",
                         help="Resume training from last known checkpoint")
-    parser.add_argument("-j", "--workers", type=int, default=4,
+    parser.add_argument("-j", "--workers", type=int, default=6,
                         help="Number of dataloaders workers")
     parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
                         help="Pytorch Distributed backend", default="nccl")
@@ -185,14 +186,15 @@ if __name__ == "__main__":
                         help="Start Ray Tune API server")
     parser.add_argument("-p", "--progress", action="store_true",
                         help="Show progress during training")
-    parser.add_argument("-l", "--log-level", default="info",
+    parser.add_argument("-l", "--log-level",
                         choices=["critical", "error", "warning", "info", "debug"],
                         help="Python Logging level")
     parser.add_argument("-f", "--log-format",
-                        default="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
                         help="Python Logging Format")
-    parser.add_argument("--max-failures", type=int, default=-1,
+    parser.add_argument("-x", "--max-failures", type=int, default=-1,
                         help="How many times to try to recover before stopping")
+    parser.add_argument("-c", "--checkpoint-freq", type=int,
+                        help="How often to checkpoint (epochs)")
     parser.add_argument(
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
