@@ -144,16 +144,16 @@ def conv_layer(
 
 def activation_layer(
     out,
-    params,
+    layer_params,
     kernel_size=0
 ):
     """Basic activation layer.
-    Defaults to ReLU if `activation_params` are evaluated from `params`.
+    Defaults to ReLU if `activation_params` are evaluated from `layer_params`.
     Otherwise KWinners is used."""
 
-    # Compute params for kwinners activation module.
-    if params is not None:
-        activation_params = params.get_activation_params(0, out, 0)
+    # Compute layer_params for kwinners activation module.
+    if layer_params is not None:
+        activation_params = layer_params.get_activation_params(0, out, 0)
     else:
         activation_params = None
 
