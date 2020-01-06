@@ -43,7 +43,14 @@ conv_types = {
 }
 
 
-def default_sparse_params(group_type, number_layers, sparse=False):
+def default_sparse_params(
+    group_type,
+    number_layers,
+    sparse=False,
+    layer_params=None,
+    conv_params_func=None,
+    activation_params_func=None,
+):
     """
     Creates dictionary with default parameters. If sparse=True is passed to the model,
     default params are created using auto_sparse_params.
@@ -54,14 +61,18 @@ def default_sparse_params(group_type, number_layers, sparse=False):
 
     :returns dictionary with default parameters
     """
-    noact_layer_params = LayerParams()
+    layer_params = layer_params or LayerParams
+    noact_layer_params = layer_params()
+    assert isinstance(noact_layer_params, LayerParams), \
+        "Expected {} to sub-classed from LayerParams".format(layer_params)
+
     if sparse:
-        layer_params = LayerParams(
-            conv_params_func=auto_sparse_conv_params,
-            activation_params_func=auto_sparse_activation_params,
+        layer_params = layer_params(
+            conv_params_func=conv_params_func,
+            activation_params_func=activation_params_func,
         )
     else:
-        layer_params = LayerParams()
+        layer_params = layer_params()
 
     if group_type == BasicBlock:
         params = dict(
@@ -320,6 +331,9 @@ class ResNet(nn.Module):
             linear_sparse_weights_type="SparseWeights",
             conv_sparse_weights_type="SparseWeights2d",
             defaults_sparse=False,
+            layer_params=None,  # Sub-classed from `LayerParams`.
+            conv_params_func=auto_sparse_conv_params,
+            activation_params_func=auto_sparse_activation_params,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -331,7 +345,11 @@ class ResNet(nn.Module):
 
         if not hasattr(self, "sparse_params"):
             self.sparse_params = default_sparse_params(
-                *cf_dict[str(self.depth)], sparse=self.defaults_sparse
+                *cf_dict[str(self.depth)],
+                sparse=self.defaults_sparse,
+                layer_params=self.layer_params,
+                conv_params_func=self.conv_params_func,
+                activation_params_func=self.activation_params_func,
             )
 
         self.in_planes = 64
