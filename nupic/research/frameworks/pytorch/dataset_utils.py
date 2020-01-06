@@ -350,7 +350,7 @@ class HDF5Dataset(VisionDataset):
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
 
         self._hdf5_file = hdf5_file
-        with h5py.File(name=self._hdf5_file, mode="r", swmr=True) as hdf5:
+        with h5py.File(name=self._hdf5_file, mode="r") as hdf5:
             hdf5_root = hdf5[root]
             self._classes = {
                 posixpath.join("/", root, g): i
@@ -400,10 +400,13 @@ class HDF5Dataset(VisionDataset):
 
     def __getitem__(self, index):
         file_name = self._images[index]
+
+        # Parent group represents the image target class
         class_name = posixpath.dirname(file_name)
+        target = self._classes[class_name]
 
         if self._hdf5 is None:
-            self._hdf5 = h5py.File(name=self._hdf5_file, mode="r", swmr=True)
+            self._hdf5 = h5py.File(name=self._hdf5_file, mode="r")
 
         group = self._hdf5[class_name]
         image_file = group[file_name]
@@ -423,9 +426,6 @@ class HDF5Dataset(VisionDataset):
         # Convert image to RGB
         image = Image.open(BytesIO(image_data))
         sample = image.convert("RGB")
-
-        # Parent group represents the image target class
-        target = self._classes[class_name]
 
         # Apply transforms
         if self.transform is not None:
