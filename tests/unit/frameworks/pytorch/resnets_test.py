@@ -33,7 +33,7 @@ from nupic.research.frameworks.pytorch.models.resnets import (
 )
 from nupic.research.frameworks.pytorch.sparse_layer_params import (
     LayerParams,
-    SpareWeightsLayerParams,
+    SparseWeightsLayerParams,
 )
 
 
@@ -82,24 +82,24 @@ class ResnetTest(unittest.TestCase):
         """Evaluate ResNets customized per group"""
 
         custom_sparse_params = dict(
-            stem=SpareWeightsLayerParams(),
+            stem=SparseWeightsLayerParams(),
             filters64=dict(
-                conv1x1_1=SpareWeightsLayerParams(
+                conv1x1_1=SparseWeightsLayerParams(
                     percent_on=0.3,
                     boost_strength=1.2,
                     boost_strength_factor=1.0,
                     local=False,
                     weight_sparsity=0.3,
                 ),
-                conv3x3_2=SpareWeightsLayerParams(
+                conv3x3_2=SparseWeightsLayerParams(
                     percent_on=0.1,
                     boost_strength=1.2,
                     boost_strength_factor=1.0,
                     local=True,
                     weight_sparsity=0.1,
                 ),
-                conv1x1_3=SpareWeightsLayerParams(weight_sparsity=0.1),
-                shortcut=SpareWeightsLayerParams(percent_on=0.4, weight_sparsity=0.4),
+                conv1x1_3=SparseWeightsLayerParams(weight_sparsity=0.1),
+                shortcut=SparseWeightsLayerParams(percent_on=0.4, weight_sparsity=0.4),
             ),
             filters128=dict(
                 conv1x1_1=LayerParams(),
@@ -119,7 +119,7 @@ class ResnetTest(unittest.TestCase):
                 conv1x1_3=LayerParams(),
                 shortcut=LayerParams(),
             ),
-            linear=SpareWeightsLayerParams(weight_sparsity=0.5),
+            linear=SparseWeightsLayerParams(weight_sparsity=0.5),
         )
 
         net = ResNet(
@@ -136,7 +136,7 @@ class ResnetTest(unittest.TestCase):
             stem=LayerParams(),
             filters64=[  # 3 blocks
                 dict(
-                    conv1x1_1=SpareWeightsLayerParams(
+                    conv1x1_1=SparseWeightsLayerParams(
                         percent_on=0.3,
                         boost_strength=1.2,
                         boost_strength_factor=1.0,

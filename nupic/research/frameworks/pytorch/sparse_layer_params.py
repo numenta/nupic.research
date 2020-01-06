@@ -294,7 +294,7 @@ class LayerParamsByKeys(LayerParams):
         return key_values or None
 
 
-class SpareWeightsLayerParams(LayerParamsByKeys):
+class SparseWeightsLayerParams(LayerParamsByKeys):
     """
     LayerParams class for specifying parameters to
     `SparseWeights` (linear params), `SparseWeights2d` (conv params)
@@ -302,7 +302,7 @@ class SpareWeightsLayerParams(LayerParamsByKeys):
 
     Example:
     ```
-        sw = SpareWeightsLayerParams(
+        sw = SparseWeightsLayerParams(
         percent_on=0.3,
         boost_strength=1.2,
         boost_strength_factor=1.0,
@@ -312,7 +312,7 @@ class SpareWeightsLayerParams(LayerParamsByKeys):
     )
 
     print(sw)
-    >>> SpareWeightsLayerParams(
+    >>> SparseWeightsLayerParams(
             linear_params={'weight_sparsity': 0.3},
             conv_params=<function auto_sparse_conv_params at 0x10b4a1830>,
             activation_params={
