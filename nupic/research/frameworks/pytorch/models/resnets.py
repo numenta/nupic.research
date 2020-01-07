@@ -43,7 +43,7 @@ conv_types = {
 }
 
 
-def default_sparse_params(
+def default_resnet_params(
     group_type,
     number_layers,
     layer_params=None,
@@ -350,7 +350,7 @@ class ResNet(nn.Module):
             self.activation_params_func = auto_sparse_activation_params
 
         if not hasattr(self, "sparse_params"):
-            self.sparse_params = default_sparse_params(
+            self.sparse_params = default_resnet_params(
                 *cf_dict[str(self.depth)],
                 layer_params=self.layer_params,
                 conv_params_func=self.conv_params_func,
