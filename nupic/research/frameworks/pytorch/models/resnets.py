@@ -46,7 +46,7 @@ conv_types = {
 def default_resnet_params(
     group_type,
     number_layers,
-    layer_params=None,
+    layer_params_type=None,
     conv_params_func=None,
     activation_params_func=None,
 ):
@@ -58,7 +58,7 @@ def default_resnet_params(
 
     :returns dictionary with default parameters
     """
-    layer_params_type = layer_params or LayerParams
+    layer_params_type = layer_params_type or LayerParams
 
     # Set layer params for activation and non-activation layers.
     layer_params = layer_params_type(
@@ -331,7 +331,7 @@ class ResNet(nn.Module):
             linear_sparse_weights_type="SparseWeights",
             conv_sparse_weights_type="SparseWeights2d",
             defaults_sparse=False,
-            layer_params=None,  # Sub-classed from `LayerParams`.
+            layer_params_type=None,  # Sub-classed from `LayerParams`.
             conv_params_func=None,
             activation_params_func=None,
         )
@@ -352,7 +352,7 @@ class ResNet(nn.Module):
         if not hasattr(self, "sparse_params"):
             self.sparse_params = default_resnet_params(
                 *cf_dict[str(self.depth)],
-                layer_params=self.layer_params,
+                layer_params_type=self.layer_params_type,
                 conv_params_func=self.conv_params_func,
                 activation_params_func=self.activation_params_func,
             )
