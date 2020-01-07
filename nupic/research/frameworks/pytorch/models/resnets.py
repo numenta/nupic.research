@@ -332,8 +332,8 @@ class ResNet(nn.Module):
             conv_sparse_weights_type="SparseWeights2d",
             defaults_sparse=False,
             layer_params=None,  # Sub-classed from `LayerParams`.
-            conv_params_func=auto_sparse_conv_params,
-            activation_params_func=auto_sparse_activation_params,
+            conv_params_func=None,
+            activation_params_func=None,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -343,6 +343,11 @@ class ResNet(nn.Module):
         if isinstance(self.conv_sparse_weights_type, str):
             self.conv_sparse_weights_type = getattr(
                 nupic_modules, self.conv_sparse_weights_type)
+
+        if self.conv_params_func is None and self.defaults_sparse:
+            self.conv_params_func = auto_sparse_conv_params
+        if self.activation_params_func is None and self.defaults_sparse:
+            self.activation_params_func = auto_sparse_activation_params
 
         if not hasattr(self, "sparse_params"):
             self.sparse_params = default_sparse_params(
