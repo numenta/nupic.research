@@ -78,7 +78,7 @@ FASTAI18.update(
         momentum=0.9,
         nesterov=False,
     ),
-    # No weigh decay from batch norm modules
+    # No weight decay from batch norm modules
     batch_norm_weight_decay=False,
     init_batch_norm=True,
 )
@@ -117,6 +117,7 @@ PROGRESSIVE_RESIZE.update(
 FASTAI100 = copy.deepcopy(FASTAI18)
 FASTAI100.update(
     epochs=35,
+    log_level="debug",
     lr_scheduler_args=dict(
         # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 40 epochs
         max_lr=2.0,
@@ -127,8 +128,6 @@ FASTAI100.update(
         anneal_strategy="linear",
     ),
     num_classes=100,
-
-    # Create default sparse network
     model_args=dict(config=dict(num_classes=100, defaults_sparse=False)),
 )
 
@@ -137,29 +136,16 @@ FASTAI1000.update(
     epochs=35,
     num_classes=1000,
 
-    # Dataset path
     data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
-
-    # Create default sparse network
     model_args=dict(config=dict(num_classes=1000, defaults_sparse=False)),
 )
 
-FASTAI10 = copy.deepcopy(DEFAULT)
-FASTAI10.update(
-    epochs=50,
-    num_classes=10,
-
-    # Create default sparse network
-    model_args=dict(config=dict(num_classes=10, defaults_sparse=False)),
-)
-
-# Default sparse ResNet-50 for 100 classes
+# This gets to about 78.6% after 35 epochs
 SPARSE100_SUPER = copy.deepcopy(FASTAI100)
 SPARSE100_SUPER.update(dict(
     epochs=35,
     log_level="debug",
 
-    # Create default sparse network
     model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
 
     # Use a higher learning rate and no momentum for sparse superconvergence
@@ -193,8 +179,6 @@ SPARSE1000_SUPER.update(dict(
 
     # Dataset path
     data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
-
-    # Create default sparse network
     model_args=dict(config=dict(num_classes=1000, defaults_sparse=True)),
 
 ))
@@ -216,8 +200,6 @@ CONFIGS.update(
         progressive_resize=PROGRESSIVE_RESIZE,
         fastai100=FASTAI100,
         fastai1000=FASTAI1000,
-        fastai10=FASTAI10,
-
 
         sparse100_super=SPARSE100_SUPER,
         sparse1000_super=SPARSE1000_SUPER,
