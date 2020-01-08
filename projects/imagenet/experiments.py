@@ -139,7 +139,7 @@ SPARSE10.update(
 # 35 epochs is good enough for hyper parameter tuning.
 DEFAULT100 = copy.deepcopy(DEFAULT)
 DEFAULT100.update(
-    epochs=35,
+    epochs=70,
     num_classes=100,
 
     # Create default sparse network
@@ -149,7 +149,7 @@ DEFAULT100.update(
 # 35 epochs is good enough for hyper parameter tuning.
 DEFAULT1000 = copy.deepcopy(DEFAULT100)
 DEFAULT1000.update(
-    epochs=40,
+    epochs=70,
     num_classes=1000,
 
     # Create default sparse network

@@ -507,6 +507,11 @@ class ImagenetExperiment:
             workers=workers,
             num_classes=num_classes,
         )
+        if self.rank == 0  and num_classes < 1000:
+            self.logger.debug("Training classes:")
+            self.logger.debug(self.train_loader.dataset.get_classes())
+            self.logger.debug("Validation classes:")
+            self.logger.debug(self.val_loader.dataset.get_classes())
 
         # Configure leaning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
@@ -553,7 +558,6 @@ class ImagenetExperiment:
             pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
             post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
         )
-        self.logger.info("Epoch: %s, mean_loss: %s", epoch, mean_loss)
 
     def run_epoch(self, epoch):
         self.pre_epoch(epoch)
@@ -607,7 +611,7 @@ class ImagenetExperiment:
         if not isinstance(self.lr_scheduler, OneCycleLR):
             self.lr_scheduler.step()
         if count_nnz:
-            self.logger.info("Params before/after non-zero %s %s",
+            self.logger.debug("Params before/after non-zero %s %s",
                              nonzero_params_sparse1, nonzero_params_sparse2)
         if self.rank == 0:
             self.logger.info("LR Scheduler: %s", self.get_lr())
