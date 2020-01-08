@@ -281,6 +281,9 @@ class CachedDatasetFolder(DatasetFolder):
         self.samples = samples
         self.targets = [s[1] for s in samples]
 
+    def get_classes(self):
+        return self.classes
+
 
 class ProgressiveRandomResizedCrop(object):
     """
@@ -441,3 +444,6 @@ class HDF5Dataset(VisionDataset):
     def extra_repr(self):
         return "hdf5_file: {}\nnum_classes={}".format(
             self._hdf5_file, len(self._classes))
+
+    def get_classes(self):
+        return self._classes
