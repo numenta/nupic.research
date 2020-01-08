@@ -507,7 +507,7 @@ class ImagenetExperiment:
             workers=workers,
             num_classes=num_classes,
         )
-        if self.rank == 0  and num_classes < 1000:
+        if self.rank == 0 and num_classes < 1000:
             self.logger.debug("Training classes:")
             self.logger.debug(self.train_loader.dataset.get_classes())
             self.logger.debug("Validation classes:")
@@ -548,7 +548,7 @@ class ImagenetExperiment:
         return results
 
     def train_epoch(self, epoch):
-        mean_loss = train_model(
+        train_model(
             model=self.model,
             loader=self.train_loader,
             optimizer=self.optimizer,
@@ -612,7 +612,7 @@ class ImagenetExperiment:
             self.lr_scheduler.step()
         if count_nnz:
             self.logger.debug("Params before/after non-zero %s %s",
-                             nonzero_params_sparse1, nonzero_params_sparse2)
+                              nonzero_params_sparse1, nonzero_params_sparse2)
         if self.rank == 0:
             self.logger.info("LR Scheduler: %s", self.get_lr())
         if self.scaled_lr_scheduler is not None:
