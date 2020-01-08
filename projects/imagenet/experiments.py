@@ -124,13 +124,9 @@ DEFAULT10 = copy.deepcopy(DEFAULT)
 DEFAULT10.update(
     epochs=100,
     num_classes=10,
-    init_batch_norm=False,
-
-    # Create default sparse network
     model_args=dict(config=dict(num_classes=10, defaults_sparse=False)),
 )
 
-# Use normal schedule
 SPARSE10 = copy.deepcopy(DEFAULT10)
 SPARSE10.update(
     # Create default sparse network
@@ -139,35 +135,44 @@ SPARSE10.update(
 
 DEFAULT100 = copy.deepcopy(DEFAULT)
 DEFAULT100.update(
-    epochs=100,
+    epochs=70,
     num_classes=100,
-    init_batch_norm=False,
-
-    # Create default sparse network
     model_args=dict(config=dict(num_classes=100, defaults_sparse=False)),
 )
 
-# Use normal schedule
+DEFAULT1000 = copy.deepcopy(DEFAULT100)
+DEFAULT1000.update(
+    epochs=70,
+    num_classes=1000,
+    model_args=dict(config=dict(num_classes=1000, defaults_sparse=False)),
+)
+
+# Use normal schedule. This currently gets to about 80.1% in 70 epochs.
 SPARSE100 = copy.deepcopy(DEFAULT100)
 SPARSE100.update(
-    # Create default sparse network
     model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
 )
 
-# Use plain learning schedule, i.e. with no momentum
-SPARSE100_PLAIN_LEARNING = copy.deepcopy(SPARSE100)
-SPARSE100_PLAIN_LEARNING.update(
+SPARSE1000 = copy.deepcopy(DEFAULT100)
+SPARSE1000.update(
+    epochs=70,
+    num_classes=1000,
+
     optimizer_args=dict(
-        lr=0.1,
+        lr=0.15,
         weight_decay=1e-04,
-        momentum=0.0,
+        momentum=0.9,
         dampening=0,
-        nesterov=False
+        nesterov=True
     ),
-    # Create default sparse network
-    model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
-)
+    lr_scheduler_args=dict(
+        gamma=0.25,
+        step_size=20,
+    ),
 
+
+    model_args=dict(config=dict(num_classes=1000, defaults_sparse=True)),
+)
 
 # Export all configurations
 CONFIGS = dict(
@@ -175,6 +180,7 @@ CONFIGS = dict(
     default10=DEFAULT10,
     default_sparse_10=SPARSE10,
     default100=DEFAULT100,
+    default1000=DEFAULT1000,
     sparse_100=SPARSE100,
-    sparse100_plain_learning=SPARSE100_PLAIN_LEARNING,
+    sparse_1000=SPARSE1000,
 )
