@@ -157,7 +157,6 @@ SPARSE1000 = copy.deepcopy(DEFAULT100)
 SPARSE1000.update(
     epochs=70,
     num_classes=1000,
-    progress=True,
 
     optimizer_args=dict(
         lr=0.15,
