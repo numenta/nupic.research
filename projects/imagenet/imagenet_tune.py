@@ -28,8 +28,8 @@ import torch
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 
+from nupic.research.frameworks.pytorch.imagenet_experiment import ImagenetExperiment
 from projects.imagenet.experiments_superconvergence import CONFIGS
-from projects.imagenet.imagenet_experiment import ImagenetExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
