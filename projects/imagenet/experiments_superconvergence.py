@@ -18,7 +18,7 @@
 #  http://numenta.org/licenses/
 #
 import copy
-
+import os
 import torch
 
 from projects.imagenet.experiments import CONFIGS, DEFAULT
@@ -131,6 +131,18 @@ FASTAI100.update(
     model_args=dict(config=dict(num_classes=100, defaults_sparse=False)),
 )
 
+FASTAI1000 = copy.deepcopy(FASTAI100)
+FASTAI1000.update(
+    epochs=35,
+    num_classes=1000,
+
+    # Dataset path
+    data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
+
+    # Create default sparse network
+    model_args=dict(config=dict(num_classes=1000, defaults_sparse=False)),
+)
+
 FASTAI10 = copy.deepcopy(DEFAULT)
 FASTAI10.update(
     epochs=50,
@@ -144,30 +156,12 @@ FASTAI10.update(
 SPARSE100_SUPER = copy.deepcopy(FASTAI100)
 SPARSE100_SUPER.update(dict(
     epochs=35,
+    log_level="debug",
 
     # Create default sparse network
     model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
 
-))
-
-
-# LR EXPERIMENTS (no momentum)
-
-FASTAI100_HIGHLR = copy.deepcopy(FASTAI100)
-FASTAI100_HIGHLR.update(
-    lr_scheduler_args=dict(
-        # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 40 epochs
-        max_lr=6.0,
-        div_factor=6,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=4.0 / 35.0,
-        epochs=35,
-        anneal_strategy="linear",
-    ),
-)
-
-SPARSE100_SUPER_HIGHLR = copy.deepcopy(SPARSE100_SUPER)
-SPARSE100_SUPER_HIGHLR.update(dict(
+    # Use a higher learning rate and no momentum for sparse superconvergence
     lr_scheduler_args=dict(
         max_lr=6.0,
         div_factor=6,  # initial_lr = 1.0
@@ -175,33 +169,6 @@ SPARSE100_SUPER_HIGHLR.update(dict(
         pct_start=4.0 / 35.0,
         epochs=35,
         anneal_strategy="linear",
-        base_momentum=0.0,
-        max_momentum=0.5,
-        cycle_momentum=True,
-    ),
-
-    optimizer_args=dict(
-        lr=0.1,
-        weight_decay=0.0001,
-        momentum=0.5,
-        nesterov=True,
-    ),
-
-))
-
-
-# NO MOMENTUM EXPERIMENTS
-
-FASTAI100NoMomentum = copy.deepcopy(FASTAI100)
-FASTAI100NoMomentum.update(
-    lr_scheduler_args=dict(
-        max_lr=2.0,
-        div_factor=2,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=6.0 / 35.0,
-        epochs=35,
-        anneal_strategy="linear",
-        base_momentum=0.0,
         max_momentum=0.01,
         cycle_momentum=False,
     ),
@@ -212,55 +179,24 @@ FASTAI100NoMomentum.update(
         momentum=0.0,
         nesterov=False,
     ),
-    num_classes=100,
 
-)
-
-# Default sparse ResNet-50 for 100 classes
-SPARSE100_SUPER_SomeMomentum = copy.deepcopy(SPARSE100_SUPER)
-SPARSE100_SUPER_SomeMomentum.update(dict(
-    lr_scheduler_args=dict(
-        max_lr=2.0,
-        div_factor=2,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=6.0 / 35.0,
-        epochs=35,
-        anneal_strategy="linear",
-        base_momentum=0.0,
-        max_momentum=0.5,
-    ),
-
-    optimizer_args=dict(
-        lr=0.1,
-        weight_decay=0.0001,
-        momentum=0.5,
-        nesterov=False,
-    ),
 ))
 
-# Default sparse ResNet-50 for 100 classes
-SPARSE100_SUPER_NoMomentum = copy.deepcopy(SPARSE100_SUPER)
-SPARSE100_SUPER_NoMomentum.update(dict(
-    lr_scheduler_args=dict(
-        max_lr=2.0,
-        div_factor=2,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=6.0 / 35.0,
-        epochs=35,
-        anneal_strategy="linear",
-        base_momentum=0.0,
-        max_momentum=0.01,
-        cycle_momentum=False,
-    ),
 
-    optimizer_args=dict(
-        lr=0.1,
-        weight_decay=0.0001,
-        momentum=0.0,
-        nesterov=False,
-    ),
+# Default sparse ResNet-50 for 100 classes
+SPARSE1000_SUPER = copy.deepcopy(SPARSE100_SUPER)
+SPARSE1000_SUPER.update(dict(
+    epochs=35,
+    log_level="debug",
+    num_classes=1000,
+
+    # Dataset path
+    data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
+
+    # Create default sparse network
+    model_args=dict(config=dict(num_classes=1000, defaults_sparse=True)),
+
 ))
-# Default sparse ResNet-50 for 10 classes
 
 DEBUG = copy.deepcopy(FASTAI18)
 DEBUG.update(
@@ -278,13 +214,11 @@ CONFIGS.update(
         fastai18=FASTAI18,
         progressive_resize=PROGRESSIVE_RESIZE,
         fastai100=FASTAI100,
+        fastai1000=FASTAI1000,
         fastai10=FASTAI10,
-        fastai100_no_momentum=FASTAI100NoMomentum,
-        fastai100_highlr=FASTAI100_HIGHLR,
+
 
         sparse100_super=SPARSE100_SUPER,
-        sparse100_super_no_momentum=SPARSE100_SUPER_NoMomentum,
-        sparse100_super_some_momentum=SPARSE100_SUPER_SomeMomentum,
-        sparse100_super_high_lr=SPARSE100_SUPER_HIGHLR,
+        sparse1000_super=SPARSE1000_SUPER,
     )
 )
