@@ -341,11 +341,13 @@ class HDF5Dataset(VisionDataset):
         Root group name (i.e. "train", "val", "test")
     :param num_classes:
         Number of classes used to Limit the dataset size. Not limited when None
+    :param classes:
+        Limit the dataset to images from the given classes.
     :param kwargs:
         Other argument passed to :class:`VisionDataset` constructor
     """
 
-    def __init__(self, hdf5_file, root, num_classes=None, **kwargs):
+    def __init__(self, hdf5_file, root, num_classes=None, classes=None, **kwargs):
         assert h5py.is_hdf5(hdf5_file)
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
 
@@ -388,9 +390,20 @@ class HDF5Dataset(VisionDataset):
                     hdf5_idx_root = hdf5_idx.require_group(root)
                     hdf5_idx_root.create_dataset("images", data=index_data)
 
+        total_classes = len(self._classes)
+
+        # Select subset of the dataset filtering only images from the given classes
+        if classes is not None:
+            self._classes = {
+                posixpath.join("/", root, g): i
+                for i, g in enumerate(classes)
+            }
+
         # Limit dataset size by num_classes
         if num_classes is not None:
             self._classes = dict(itertools.islice(self._classes.items(), num_classes))
+
+        if len(self._classes) != total_classes:
             self._images = list(filter(
                 lambda x: posixpath.dirname(x) in self._classes.keys(), self._images))
 
