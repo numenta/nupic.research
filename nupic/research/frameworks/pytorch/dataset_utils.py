@@ -384,7 +384,7 @@ class HDF5Dataset(VisionDataset):
                 index_data = np.array(self._images, dtype="S")
 
                 # Save cache
-                with h5py.File(name=index_file, mode="a") as hdf5_idx_root:
+                with h5py.File(name=index_file, mode="a") as hdf5_idx:
                     hdf5_idx_root = hdf5_idx.require_group(root)
                     hdf5_idx_root.create_dataset("images", data=index_data)
 
