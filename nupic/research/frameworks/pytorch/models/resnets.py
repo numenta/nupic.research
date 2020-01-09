@@ -164,7 +164,7 @@ def activation_layer(
 
     # Compute layer_params for kwinners activation module.
     if layer_params is not None:
-        activation_params = layer_params.get_activation_params(0, out, 0)
+        activation_params = layer_params.get_activation_params(0, out, kernel_size)
     else:
         activation_params = None
 
