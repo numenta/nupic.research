@@ -196,14 +196,14 @@ class LayerParamsByKeys(LayerParams):
             (
                 "conv_sparsity",   # <key name to pass to OtherParams.__init__>
                 0.1,               # <default_value>
-                "weight_sparsity"  # "<target name for saving to `default_conv_params`>"
+                "weight_sparsity"  # <target name for saving to `default_conv_params`>
             )
         ]
         activation_params_keys = [
             (
                 "activation_sparsity",  # <key name to pass to OtherParams.__init__>
                 ...,                    # `...` => No Default
-                "percent_on"            # "<target name for saving>"
+                "percent_on"            # <target name for saving>
             )
         ]
 
