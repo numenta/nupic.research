@@ -74,7 +74,7 @@ def auto_sparse_activation_params(in_channels, out_channels, kernel_size):
         percent_on = 1.0
 
     if percent_on >= 1.0:
-        return {}
+        return None
     else:
         return dict(
             percent_on=percent_on,
