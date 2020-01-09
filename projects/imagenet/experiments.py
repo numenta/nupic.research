@@ -1,5 +1,5 @@
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions appl":
 #
@@ -40,7 +40,7 @@ DEFAULT = dict(
     # Results path
     local_dir=os.path.expanduser("~/nta/results/imagenet"),
     # Dataset path
-    data=os.path.expanduser("~/nta/data/imagenet"),
+    data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
     # Dataset training data relative path
     train_dir="train",
     # Dataset validation data relative path
