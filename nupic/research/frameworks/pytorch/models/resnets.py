@@ -43,37 +43,37 @@ conv_types = {
 }
 
 
-def default_sparse_params(
+def default_resnet_params(
     group_type,
     number_layers,
-    sparse=False,
-    layer_params=None,
+    layer_params_type=None,
     conv_params_func=None,
     activation_params_func=None,
 ):
     """
-    Creates dictionary with default parameters. If sparse=True is passed to the model,
-    default params are created using auto_sparse_params.
+    Creates dictionary with default parameters.
 
     :param group_type: defines whether group is BasicBlock or Bottleneck.
     :param number_layers: number of layers to be assigned to each group.
-    :param sparse: bool indicating whether a default sparse network should be created.
 
     :returns dictionary with default parameters
     """
-    layer_params = layer_params or LayerParams
-    noact_layer_params = layer_params()
-    assert isinstance(noact_layer_params, LayerParams), \
+    layer_params_type = layer_params_type or LayerParams
+
+    # Set layer params for activation and non-activation layers.
+    layer_params = layer_params_type(
+        conv_params_func=conv_params_func,
+        activation_params_func=activation_params_func,
+    )
+    noact_layer_params = layer_params_type(
+        conv_params_func=conv_params_func,
+    )
+
+    # Validate layer_params
+    assert isinstance(layer_params, LayerParams), \
         "Expected {} to sub-classed from LayerParams".format(layer_params)
 
-    if sparse:
-        layer_params = layer_params(
-            conv_params_func=conv_params_func,
-            activation_params_func=activation_params_func,
-        )
-    else:
-        layer_params = layer_params()
-
+    # Set layers params by group type.
     if group_type == BasicBlock:
         params = dict(
             conv3x3_1=layer_params, conv3x3_2=noact_layer_params, shortcut=layer_params
@@ -331,9 +331,9 @@ class ResNet(nn.Module):
             linear_sparse_weights_type="SparseWeights",
             conv_sparse_weights_type="SparseWeights2d",
             defaults_sparse=False,
-            layer_params=None,  # Sub-classed from `LayerParams`.
-            conv_params_func=auto_sparse_conv_params,
-            activation_params_func=auto_sparse_activation_params,
+            layer_params_type=None,  # Sub-classed from `LayerParams`.
+            conv_params_func=None,
+            activation_params_func=None,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -344,11 +344,15 @@ class ResNet(nn.Module):
             self.conv_sparse_weights_type = getattr(
                 nupic_modules, self.conv_sparse_weights_type)
 
+        if self.conv_params_func is None and self.defaults_sparse:
+            self.conv_params_func = auto_sparse_conv_params
+        if self.activation_params_func is None and self.defaults_sparse:
+            self.activation_params_func = auto_sparse_activation_params
+
         if not hasattr(self, "sparse_params"):
-            self.sparse_params = default_sparse_params(
+            self.sparse_params = default_resnet_params(
                 *cf_dict[str(self.depth)],
-                sparse=self.defaults_sparse,
-                layer_params=self.layer_params,
+                layer_params_type=self.layer_params_type,
                 conv_params_func=self.conv_params_func,
                 activation_params_func=self.activation_params_func,
             )
