@@ -60,6 +60,35 @@ from nupic.torch.modules import rezero_weights, update_boost_strength
 
 __all__ = ["ImagenetExperiment"]
 
+IMAGENET_NUM_CLASSES = {
+    10: [
+        "n02091244", "n02112350", "n02454379", "n02979186", "n03372029",
+        "n03791053", "n03891332", "n04065272", "n04462240", "n15075141"
+    ],
+    100: [
+        "n01440764", "n01592084", "n01601694", "n01630670", "n01631663",
+        "n01664065", "n01677366", "n01693334", "n01734418", "n01751748",
+        "n01755581", "n01855672", "n01877812", "n01978287", "n01981276",
+        "n02025239", "n02027492", "n02033041", "n02056570", "n02089867",
+        "n02091244", "n02091635", "n02093428", "n02094258", "n02104365",
+        "n02105251", "n02106662", "n02107312", "n02108422", "n02112350",
+        "n02129165", "n02174001", "n02268443", "n02317335", "n02410509",
+        "n02423022", "n02454379", "n02457408", "n02488291", "n02497673",
+        "n02536864", "n02640242", "n02655020", "n02727426", "n02783161",
+        "n02808304", "n02841315", "n02871525", "n02892201", "n02971356",
+        "n02979186", "n02981792", "n03018349", "n03125729", "n03133878",
+        "n03207941", "n03250847", "n03272010", "n03372029", "n03400231",
+        "n03457902", "n03481172", "n03482405", "n03602883", "n03680355",
+        "n03697007", "n03763968", "n03791053", "n03804744", "n03837869",
+        "n03854065", "n03891332", "n03954731", "n03956157", "n03970156",
+        "n03976657", "n04004767", "n04065272", "n04120489", "n04149813",
+        "n04192698", "n04200800", "n04252225", "n04259630", "n04332243",
+        "n04335435", "n04346328", "n04350905", "n04404412", "n04461696",
+        "n04462240", "n04509417", "n04550184", "n04606251", "n07716358",
+        "n07718472", "n07836838", "n09428293", "n13040303", "n15075141"
+    ],
+}
+
 # Improves performance when using fixed size images (224) and CNN
 cudnn.benchmark = True
 
@@ -107,8 +136,13 @@ def _create_train_dataloader(
         ],
     )
     if h5py.is_hdf5(data_dir):
-        dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
-                              num_classes=num_classes, transform=transform)
+        if num_classes in IMAGENET_NUM_CLASSES:
+            classes = IMAGENET_NUM_CLASSES[num_classes]
+            dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
+                                  classes=classes, transform=transform)
+        else:
+            dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
+                                  num_classes=num_classes, transform=transform)
     else:
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, train_dir),
                                       num_classes=num_classes, transform=transform)
@@ -154,8 +188,13 @@ def _create_validation_dataloader(data_dir, val_dir, batch_size, workers,
         ]
     )
     if h5py.is_hdf5(data_dir):
-        dataset = HDF5Dataset(hdf5_file=data_dir, root=val_dir,
-                              num_classes=num_classes, transform=transform)
+        if num_classes in IMAGENET_NUM_CLASSES:
+            classes = IMAGENET_NUM_CLASSES[num_classes]
+            dataset = HDF5Dataset(hdf5_file=data_dir, root=val_dir,
+                                  classes=classes, transform=transform)
+        else:
+            dataset = HDF5Dataset(hdf5_file=data_dir, root=val_dir,
+                                  num_classes=num_classes, transform=transform)
     else:
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, val_dir),
                                       num_classes=num_classes, transform=transform)
