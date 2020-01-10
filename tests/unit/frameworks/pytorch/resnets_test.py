@@ -112,7 +112,7 @@ class ResnetTest(unittest.TestCase):
         net(Variable(torch.randn(2, 3, 32, 32)))
 
         params_sparse, nonzero_params_sparse = count_nonzero_params(net)
-        self.assertAlmostEqual(float(params_sparse) / nonzero_params_sparse,
+        self.assertAlmostEqual(float(nonzero_params_sparse) / params_sparse,
                                0.42, delta=0.01)
 
         self.assertIsInstance(net, ResNet, "Loads ResNet50 with custom auto params")
