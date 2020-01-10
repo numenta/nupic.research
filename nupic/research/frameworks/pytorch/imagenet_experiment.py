@@ -89,6 +89,7 @@ IMAGENET_NUM_CLASSES = {
     ],
 }
 
+
 # Improves performance when using fixed size images (224) and CNN
 cudnn.benchmark = True
 
@@ -645,13 +646,14 @@ class ImagenetExperiment:
 
         if count_nnz:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
+            self.logger.debug("Params total/nnz before/nnz after %s %s %s",
+                              params_sparse, nonzero_params_sparse1,
+                              nonzero_params_sparse2)
 
         # Update learning rate
         if not isinstance(self.lr_scheduler, OneCycleLR):
             self.lr_scheduler.step()
-        if count_nnz:
-            self.logger.debug("Params before/after non-zero %s %s",
-                              nonzero_params_sparse1, nonzero_params_sparse2)
+
         if self.rank == 0:
             self.logger.info("LR Scheduler: %s", self.get_lr())
         if self.scaled_lr_scheduler is not None:
