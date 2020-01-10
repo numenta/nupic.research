@@ -547,11 +547,6 @@ class ImagenetExperiment:
             workers=workers,
             num_classes=num_classes,
         )
-        if self.rank == 0 and num_classes < 1000:
-            self.logger.debug("Training classes:")
-            self.logger.debug(self.train_loader.dataset.get_classes())
-            self.logger.debug("Validation classes:")
-            self.logger.debug(self.val_loader.dataset.get_classes())
 
         # Configure leaning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
