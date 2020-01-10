@@ -18,7 +18,6 @@
 #  http://numenta.org/licenses/
 #
 import copy
-import os
 
 import torch
 
