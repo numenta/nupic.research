@@ -37,6 +37,29 @@ from nupic.research.frameworks.pytorch.sparse_layer_params import (
 )
 
 
+def my_auto_sparse_activation_params(in_channels, out_channels, kernel_size):
+    """
+    A custom auto sparse params function.
+    :return: a dict to pass to `KWinners2d` as params.
+    """
+    return dict(
+        percent_on=0.25,
+        boost_strength=10.0,
+        boost_strength_factor=0.9,
+        k_inference_factor=1.0,
+    )
+
+
+def my_auto_sparse_conv_params(in_channels, out_channels, kernel_size):
+    """
+    Custom weight params.
+    :return: a dict to pass to `SparseWeights2d`
+    """
+    return dict(
+        weight_sparsity=0.42,
+    )
+
+
 class ResnetTest(unittest.TestCase):
     """Simple execution tests, not assertions"""
 
@@ -77,6 +100,23 @@ class ResnetTest(unittest.TestCase):
 
         self.assertEqual(params_sparse, total_params_dense)
         self.assertLess(nonzero_params_sparse, 10000000)
+
+    def test_custom_auto_params(self):
+        """Create sparse ResNets with custom auto params."""
+
+        net = ResNet(
+            config=dict(num_classes=10,
+                        defaults_sparse=True,
+                        activation_params_func=my_auto_sparse_activation_params,
+                        conv_params_func=my_auto_sparse_conv_params)
+        )
+        net(Variable(torch.randn(2, 3, 32, 32)))
+
+        params_sparse, nonzero_params_sparse = count_nonzero_params(net)
+        self.assertAlmostEqual(float(nonzero_params_sparse) / params_sparse,
+                               0.42, delta=0.01)
+
+        self.assertIsInstance(net, ResNet, "Loads ResNet50 with custom auto params")
 
     def test_custom_per_group(self):
         """Evaluate ResNets customized per group"""
