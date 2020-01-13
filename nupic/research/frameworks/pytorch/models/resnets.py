@@ -22,6 +22,7 @@
 # adapted from https://github.com/meliketoy/wide-resnet.pytorch/
 
 from collections import namedtuple
+from copy import deepcopy
 
 import torch.nn as nn
 
@@ -47,8 +48,7 @@ def default_resnet_params(
     group_type,
     number_layers,
     layer_params_type=None,
-    conv_params_func=None,
-    activation_params_func=None,
+    layer_params_kwargs=None,
 ):
     """
     Creates dictionary with default parameters.
@@ -59,15 +59,16 @@ def default_resnet_params(
     :returns dictionary with default parameters
     """
     layer_params_type = layer_params_type or LayerParams
+    layer_params_kwargs = layer_params_kwargs or {}
 
-    # Set layer params for activation and non-activation layers.
-    layer_params = layer_params_type(
-        conv_params_func=conv_params_func,
-        activation_params_func=activation_params_func,
-    )
-    noact_layer_params = layer_params_type(
-        conv_params_func=conv_params_func,
-    )
+    # Set layer params w/ activation.
+    layer_params = layer_params_type(**layer_params_kwargs)
+
+    # Set layer params w/o activation.
+    noact_params_kwargs = deepcopy(layer_params_kwargs)
+    noact_params_kwargs.pop("default_activation_params", None)
+    noact_params_kwargs.pop("no_activation_params", None)
+    noact_layer_params = layer_params_type(**noact_params_kwargs)
 
     # Validate layer_params
     assert isinstance(layer_params, LayerParams), \
@@ -332,8 +333,7 @@ class ResNet(nn.Module):
             conv_sparse_weights_type="SparseWeights2d",
             defaults_sparse=False,
             layer_params_type=None,  # Sub-classed from `LayerParams`.
-            conv_params_func=None,
-            activation_params_func=None,
+            layer_params_kwargs=None,  # to be passed to layer_params_type.
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -344,17 +344,18 @@ class ResNet(nn.Module):
             self.conv_sparse_weights_type = getattr(
                 nupic_modules, self.conv_sparse_weights_type)
 
-        if self.conv_params_func is None and self.defaults_sparse:
-            self.conv_params_func = auto_sparse_conv_params
-        if self.activation_params_func is None and self.defaults_sparse:
-            self.activation_params_func = auto_sparse_activation_params
+        if self.defaults_sparse:
+            self.layer_params_kwargs = self.layer_params_kwargs or {}
+            self.layer_params_kwargs.setdefault(
+                "conv_params_func", auto_sparse_conv_params)
+            self.layer_params_kwargs.setdefault(
+                "activation_params_func", auto_sparse_activation_params)
 
         if not hasattr(self, "sparse_params"):
             self.sparse_params = default_resnet_params(
                 *cf_dict[str(self.depth)],
                 layer_params_type=self.layer_params_type,
-                conv_params_func=self.conv_params_func,
-                activation_params_func=self.activation_params_func,
+                layer_params_kwargs=self.layer_params_kwargs,
             )
 
         self.in_planes = 64
