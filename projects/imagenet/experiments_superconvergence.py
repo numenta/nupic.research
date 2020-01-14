@@ -1,5 +1,5 @@
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions appl":
 #
@@ -18,11 +18,11 @@
 #  http://numenta.org/licenses/
 #
 import copy
-import os
 
 import torch
 
 from projects.imagenet.experiments import CONFIGS, DEFAULT
+from projects.imagenet.experiments_custom_super import CUSTOM_CONFIG
 
 """
 Imagenet Experiment configurations
@@ -136,7 +136,6 @@ FASTAI1000.update(
     epochs=35,
     num_classes=1000,
 
-    data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
     model_args=dict(config=dict(num_classes=1000, defaults_sparse=False)),
 )
 
@@ -177,8 +176,6 @@ SPARSE1000_SUPER.update(dict(
     log_level="debug",
     num_classes=1000,
 
-    # Dataset path
-    data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
     model_args=dict(config=dict(num_classes=1000, defaults_sparse=True)),
 
 ))
@@ -190,6 +187,7 @@ DEBUG.update(
 )
 
 # Export all configurations
+CONFIGS.update(CUSTOM_CONFIG)
 CONFIGS.update(
     dict(
 
