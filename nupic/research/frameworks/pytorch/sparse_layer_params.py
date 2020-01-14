@@ -81,6 +81,7 @@ def auto_sparse_activation_params(in_channels, out_channels, kernel_size):
             boost_strength=1.0,
             boost_strength_factor=0.9,
             local=True,
+            k_inference_factor=1.0,
         )
 
 
