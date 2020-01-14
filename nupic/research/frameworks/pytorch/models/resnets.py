@@ -22,7 +22,6 @@
 # adapted from https://github.com/meliketoy/wide-resnet.pytorch/
 
 from collections import namedtuple
-from copy import deepcopy
 
 import torch.nn as nn
 
