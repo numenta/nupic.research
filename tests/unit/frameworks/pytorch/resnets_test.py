@@ -60,6 +60,16 @@ def my_auto_sparse_conv_params(in_channels, out_channels, kernel_size):
     )
 
 
+def my_auto_sparse_linear_params(input_size, output_size):
+    """
+    Custom weight params.
+    :return: a dict to pass to `SparseWeights`
+    """
+    return dict(
+        weight_sparsity=0.42,
+    )
+
+
 class ResnetTest(unittest.TestCase):
     """Simple execution tests, not assertions"""
 
@@ -117,6 +127,39 @@ class ResnetTest(unittest.TestCase):
                                0.42, delta=0.01)
 
         self.assertIsInstance(net, ResNet, "Loads ResNet50 with custom auto params")
+
+    def test_custom_auto_linear_params(self):
+
+        # Using the default `layer_params_type`.
+        net = ResNet(
+            config=dict(num_classes=10,
+                        defaults_sparse=False,  # -> dense convolutions
+                        linear_params_func=my_auto_sparse_linear_params)
+        )
+        net(Variable(torch.randn(2, 3, 32, 32)))
+
+        for name, param in net.named_parameters():
+            if "classifier.module.weight" in name:
+                total_params = param.data.numel()
+                nonzero_params = param.data.nonzero().size(0)
+                self.assertAlmostEqual(
+                    nonzero_params / total_params, 0.42, places=3)
+
+        # Using a custom `layer_params_type` (but otherwise the same test).
+        net = ResNet(
+            config=dict(num_classes=10,
+                        defaults_sparse=False,  # -> dense convolutions
+                        layer_params_type=SparseWeightsLayerParams,
+                        layer_params_kwargs=dict(linear_weight_sparsity=0.42))
+        )
+        net(Variable(torch.randn(2, 3, 32, 32)))
+
+        for name, param in net.named_parameters():
+            if "classifier.module.weight" in name:
+                total_params = param.data.numel()
+                nonzero_params = param.data.nonzero().size(0)
+                self.assertAlmostEqual(
+                    nonzero_params / total_params, 0.42, places=3)
 
     def test_custom_per_group(self):
         """Evaluate ResNets customized per group"""
