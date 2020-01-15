@@ -50,7 +50,7 @@ from nupic.research.frameworks.pytorch.dataset_utils import (
     HDF5Dataset,
     ProgressiveRandomResizedCrop,
 )
-from nupic.research.frameworks.pytorch.lr_scheduler import ScaledLR
+from nupic.research.frameworks.pytorch.lr_scheduler import ScaledLR, ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
@@ -260,7 +260,8 @@ def _create_optimizer(model, optimizer_class, optimizer_args,
     return optimizer_class(model_params, **optimizer_args)
 
 
-def _create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args, total_steps):
+def _create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
+                         total_steps, steps_per_epoch):
     """
     Configure learning rate scheduler
 
@@ -273,11 +274,18 @@ def _create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args, total
     :param total_steps:
         The total number of steps in the cycle.
         Only used if lr_scheduler_class is :class:`OneCycleLR`
+    :param steps_per_epoch:
+        The total number of batches in the epoch.
+        Only used if lr_scheduler_class is :class:`ComposedLRScheduler`
     """
     if issubclass(lr_scheduler_class, OneCycleLR):
         # Update OneCycleLR parameters
         lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
         lr_scheduler_args["total_steps"] = total_steps
+    elif issubclass(lr_scheduler_class, ComposedLRScheduler):
+        # Update ComposedLRScheduler parameters
+        lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
+        lr_scheduler_args["steps_per_epoch"] = steps_per_epoch
 
     return lr_scheduler_class(optimizer, **lr_scheduler_args)
 
@@ -566,7 +574,8 @@ class ImagenetExperiment:
                 optimizer=self.optimizer,
                 lr_scheduler_class=lr_scheduler_class,
                 lr_scheduler_args=lr_scheduler_args,
-                total_steps=self.total_steps)
+                total_steps=self.total_steps,
+                steps_per_epoch=self.total_batches)
 
     def validate(self, loader=None):
         if loader is None:
@@ -634,7 +643,7 @@ class ImagenetExperiment:
                              epoch, current_batch, total_batches, loss)
 
         # Update 1cycle learning rate after every batch
-        if isinstance(self.lr_scheduler, OneCycleLR):
+        if isinstance(self.lr_scheduler, [OneCycleLR, ComposedLRScheduler]):
             self.lr_scheduler.step()
             if self.scaled_lr_scheduler is not None:
                 self.scaled_lr_scheduler.step()
@@ -653,7 +662,7 @@ class ImagenetExperiment:
                               nonzero_params_sparse2)
 
         # Update learning rate
-        if not isinstance(self.lr_scheduler, OneCycleLR):
+        if not isinstance(self.lr_scheduler, [OneCycleLR, ComposedLRScheduler]):
             self.lr_scheduler.step()
 
         if self.rank == 0:
