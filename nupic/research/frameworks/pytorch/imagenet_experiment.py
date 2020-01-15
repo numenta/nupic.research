@@ -50,7 +50,7 @@ from nupic.research.frameworks.pytorch.dataset_utils import (
     HDF5Dataset,
     ProgressiveRandomResizedCrop,
 )
-from nupic.research.frameworks.pytorch.lr_scheduler import ScaledLR, ComposedLRScheduler
+from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler, ScaledLR
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
