@@ -77,11 +77,11 @@ class ComposedLRSchedulerTest(unittest.TestCase):
             },
         )
         actual = []
-        for epoch in range(len(expected)):
+        for _ in range(len(expected)):
             lr = optimizer.param_groups[0]["lr"]
             actual.append(round(lr, 4))
             # 10 batches
-            for batch in range(10):
+            for _ in range(10):
                 optimizer.step()
             # Called once per epoch
             scheduler.step()
@@ -148,11 +148,11 @@ class ComposedLRSchedulerTest(unittest.TestCase):
         )
         actual = []
 
-        for epoch in range(len(expected)):
+        for _ in range(len(expected)):
             lr = optimizer.param_groups[0]["lr"]
             actual.append(round(lr, 4))
             # 10 batches
-            for batch in range(batch_size):
+            for _ in range(batch_size):
                 optimizer.step()
                 # Called once per batch
                 scheduler.step()
@@ -189,11 +189,11 @@ class ComposedLRSchedulerTest(unittest.TestCase):
         )
 
         actual = []
-        for epoch in range(len(expected)):
+        for _ in range(len(expected)):
             params = optimizer.param_groups[0]
             actual.append({k: params[k] for k in ["weight_decay", "momentum"]})
             # 10 batches
-            for batch in range(batch_size):
+            for _ in range(batch_size):
                 optimizer.step()
                 # Called once per batch
                 scheduler.step()
