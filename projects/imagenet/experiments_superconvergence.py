@@ -180,8 +180,8 @@ SPARSE1000_SUPER.update(dict(
 
 ))
 
-DEBUG = copy.deepcopy(FASTAI18)
-DEBUG.update(
+DEBUG18 = copy.deepcopy(FASTAI18)
+DEBUG18.update(
     num_classes=10,
     model_args=dict(config=dict(num_classes=10)),
 )
@@ -192,7 +192,7 @@ CONFIGS.update(
     dict(
 
         # Super convergence experiments
-        debug=DEBUG,
+        debug_fastai18=DEBUG18,
         super_convergence=SUPER_CONVERGENCE,
         fastai18=FASTAI18,
         progressive_resize=PROGRESSIVE_RESIZE,
