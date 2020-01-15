@@ -54,6 +54,7 @@ from nupic.research.frameworks.pytorch.lr_scheduler import ScaledLR
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
+    set_random_seed,
     train_model,
 )
 from nupic.torch.modules import rezero_weights, update_boost_strength
@@ -362,6 +363,7 @@ class ImagenetExperiment:
         self.dynamic_batch_size = None
         self.progress = False
         self.logger = None
+        self.seed = 42
 
     def setup_experiment(self, config):
         """
@@ -410,6 +412,7 @@ class ImagenetExperiment:
             - name: Experiment name. Used as logger name
             - log_level: Python Logging level
             - log_format: Python Logging format
+            - seed: the seed to be used for pytorch, python, and numpy
         """
         # Configure logger
         log_format = config.get("log_format", logging.BASIC_FORMAT)
@@ -420,6 +423,10 @@ class ImagenetExperiment:
         self.logger.setLevel(log_level)
         self.logger.addHandler(console)
         self.progress = config.get("progress", False)
+
+        # Configure seed
+        self.seed = config.get("seed", self.seed)
+        set_random_seed(self.seed, False)
 
         # Configure distribute pytorch
         self.distributed = config.get("distributed", False)
