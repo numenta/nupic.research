@@ -21,6 +21,7 @@ import copy
 import os
 import sys
 
+import ray.tune as tune
 import torch
 
 import nupic.research.frameworks.pytorch.models.resnets
@@ -47,6 +48,13 @@ DEFAULT = dict(
     val_dir="val",
     # Limit the dataset size to the given number of classes
     num_classes=1000,
+
+    # Seed
+    seed=20,
+
+    # Number of times to sample from the hyperparameter space. If `grid_search` is
+    # provided the grid will be repeated `num_samples` of times.
+    num_samples=1,
 
     # Training batch size
     batch_size=BATCH_SIZE,
@@ -114,10 +122,20 @@ DEFAULT = dict(
     max_failures=-1,
 
     # Python Logging level : "critical", "error", "warning", "info", "debug"
-    log_level="info",
+    log_level="debug",
 
     # Python Logging Format
     log_format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
+)
+
+DEBUG = copy.deepcopy(DEFAULT)
+DEBUG.update(
+    epochs=5,
+    num_classes=3,
+    model_args=dict(config=dict(num_classes=3, defaults_sparse=False)),
+
+    seed=tune.grid_search([42, 43])
+
 )
 
 DEFAULT10 = copy.deepcopy(DEFAULT)
@@ -125,6 +143,7 @@ DEFAULT10.update(
     epochs=100,
     num_classes=10,
     model_args=dict(config=dict(num_classes=10, defaults_sparse=False)),
+
 )
 
 SPARSE10 = copy.deepcopy(DEFAULT10)
@@ -159,7 +178,7 @@ SPARSE1000.update(
     num_classes=1000,
 
     optimizer_args=dict(
-        lr=0.15,
+        lr=0.5,
         weight_decay=1e-04,
         momentum=0.9,
         dampening=0,
@@ -167,7 +186,7 @@ SPARSE1000.update(
     ),
     lr_scheduler_args=dict(
         gamma=0.25,
-        step_size=20,
+        step_size=15,
     ),
 
 
@@ -176,6 +195,7 @@ SPARSE1000.update(
 
 # Export all configurations
 CONFIGS = dict(
+    debug=DEBUG,
     default=DEFAULT,
     default10=DEFAULT10,
     default_sparse_10=SPARSE10,
