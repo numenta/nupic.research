@@ -55,6 +55,7 @@ class ScaledLRTest(unittest.TestCase):
 
 class ComposedLRSchedulerTest(unittest.TestCase):
     def test_epoch_update(self):
+        num_batches = 15
         optimizer = torch.optim.SGD([torch.zeros(1)], lr=1.0)
 
         # StepLR(optimizer, step_size=2, gamma=0.1) for first 10 epochs
@@ -65,6 +66,7 @@ class ComposedLRSchedulerTest(unittest.TestCase):
 
         scheduler = ComposedLRScheduler(
             optimizer,
+            steps_per_epoch=1,
             schedulers={
                 0: dict(
                     lr_scheduler_class=StepLR,
@@ -77,11 +79,10 @@ class ComposedLRSchedulerTest(unittest.TestCase):
             },
         )
         actual = []
-        for _ in range(len(expected)):
+        for _ in expected:
             lr = optimizer.param_groups[0]["lr"]
             actual.append(round(lr, 4))
-            # 10 batches
-            for _ in range(10):
+            for _ in range(num_batches):
                 optimizer.step()
             # Called once per epoch
             scheduler.step()
@@ -89,49 +90,49 @@ class ComposedLRSchedulerTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     def test_batch_update(self):
+        num_batches = 15
 
         # OneCycleLR(optimizer, epochs=10, max_lr=2.0, steps_per_epoch=10)
-        # for first 10 epochs
+        # for first 10 epochs, 15 batches per epoch
         expected = [
             0.08,
-            0.5903,
-            1.5787,
-            1.999,
-            1.8806,
-            1.5878,
-            1.1786,
-            0.734,
-            0.3421,
-            0.0805,
+            0.5799,
+            1.559,
+            1.9996,
+            1.8876,
+            1.5998,
+            1.1933,
+            0.7484,
+            0.3534,
+            0.0865,
         ]
         # StepLR(optimizer, step_size=3, gamma=0.1) for next 10 epochs
         expected += np.repeat([1.0, 0.1, 0.01, 0.001, 0.0001], 2).tolist()
 
         # OneCycleLR(optimizer, epochs=10, max_lr=2.0, steps_per_epoch=10)
-        # for last 10 epochs
+        # for last 10 epochs, 15 batches per epoch
         expected += [
             0.08,
-            0.5903,
-            1.5787,
-            1.999,
-            1.8806,
-            1.5878,
-            1.1786,
-            0.734,
-            0.3421,
-            0.0805,
+            0.5799,
+            1.559,
+            1.9996,
+            1.8876,
+            1.5998,
+            1.1933,
+            0.7484,
+            0.3534,
+            0.0865,
         ]
 
         optimizer = torch.optim.SGD([torch.zeros(1)], lr=1.0)
-        batch_size = 10
         scheduler = ComposedLRScheduler(
             optimizer,
-            steps_per_epoch=batch_size,
+            steps_per_epoch=num_batches,
             schedulers={
                 0: dict(
                     lr_scheduler_class=OneCycleLR,
                     lr_scheduler_args=dict(
-                        epochs=10, max_lr=2.0, steps_per_epoch=batch_size
+                        epochs=10, max_lr=2.0, steps_per_epoch=num_batches
                     ),
                 ),
                 10: dict(
@@ -141,18 +142,17 @@ class ComposedLRSchedulerTest(unittest.TestCase):
                 20: dict(
                     lr_scheduler_class=OneCycleLR,
                     lr_scheduler_args=dict(
-                        epochs=10, max_lr=2.0, steps_per_epoch=batch_size
+                        epochs=10, max_lr=2.0, steps_per_epoch=num_batches
                     ),
                 ),
             },
         )
         actual = []
 
-        for _ in range(len(expected)):
+        for _ in expected:
             lr = optimizer.param_groups[0]["lr"]
             actual.append(round(lr, 4))
-            # 10 batches
-            for _ in range(batch_size):
+            for _ in range(num_batches):
                 optimizer.step()
                 # Called once per batch
                 scheduler.step()
@@ -163,12 +163,12 @@ class ComposedLRSchedulerTest(unittest.TestCase):
         optimizer = torch.optim.SGD(
             [torch.zeros(1)], lr=1.0, weight_decay=0.0001, momentum=0.0
         )
-        batch_size = 10
+        num_batches = 15
         expected = [dict(weight_decay=1e-04, momentum=0.0)] * 10
         expected += [dict(weight_decay=1e-05, momentum=0.9)] * 15
         scheduler = ComposedLRScheduler(
             optimizer,
-            steps_per_epoch=batch_size,
+            steps_per_epoch=num_batches,
             schedulers={
                 0: dict(
                     lr_scheduler_class=OneCycleLR,
@@ -176,7 +176,7 @@ class ComposedLRSchedulerTest(unittest.TestCase):
                         epochs=10,
                         max_lr=2.0,
                         cycle_momentum=False,
-                        steps_per_epoch=batch_size,
+                        steps_per_epoch=num_batches,
                     ),
                     optimizer_args=dict(weight_decay=1e-04, momentum=0.0),
                 ),
@@ -192,8 +192,7 @@ class ComposedLRSchedulerTest(unittest.TestCase):
         for _ in range(len(expected)):
             params = optimizer.param_groups[0]
             actual.append({k: params[k] for k in ["weight_decay", "momentum"]})
-            # 10 batches
-            for _ in range(batch_size):
+            for _ in range(num_batches):
                 optimizer.step()
                 # Called once per batch
                 scheduler.step()
