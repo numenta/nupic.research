@@ -455,6 +455,9 @@ class ImagenetExperiment:
         )
         if self.rank == 0:
             self.logger.debug(self.model)
+            params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
+            self.logger.debug("Params total/nnz %s / %s",
+                              params_sparse, nonzero_params_sparse2)
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
@@ -648,7 +651,7 @@ class ImagenetExperiment:
 
         if count_nnz:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
-            self.logger.debug("Params total/nnz before/nnz after %s %s %s",
+            self.logger.debug("Params total/nnz before/nnz after %s %s / %s",
                               params_sparse, nonzero_params_sparse1,
                               nonzero_params_sparse2)
 
