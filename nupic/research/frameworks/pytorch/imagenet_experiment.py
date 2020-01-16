@@ -646,7 +646,7 @@ class ImagenetExperiment:
                              epoch, current_batch, total_batches, loss)
 
         # Update 1cycle learning rate after every batch
-        if isinstance(self.lr_scheduler, [OneCycleLR, ComposedLRScheduler]):
+        if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
             if self.scaled_lr_scheduler is not None:
                 self.scaled_lr_scheduler.step()
@@ -665,7 +665,7 @@ class ImagenetExperiment:
                               nonzero_params_sparse2)
 
         # Update learning rate
-        if not isinstance(self.lr_scheduler, [OneCycleLR, ComposedLRScheduler]):
+        if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
         if self.rank == 0:
