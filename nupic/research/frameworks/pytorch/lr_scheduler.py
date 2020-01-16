@@ -138,16 +138,17 @@ class ComposedLRScheduler(_LRScheduler):
         current_milestone = self.milestones[bisect(self.milestones, current_epoch) - 1]
 
         # Update LR scheduler and optimizer once the milestone changes
-        if current_batch == 0 and self.active_milestone != current_milestone:
+        if self.active_milestone != current_milestone:
             self.active_milestone = current_milestone
             self._update_optimizer()
             self._update_lr_scheduler()
         elif isinstance(self.lr_scheduler, OneCycleLR):
             # Step every batch
             self.lr_scheduler.step()
-        elif current_batch == 0 and self.lr_scheduler is not None:
+        elif current_batch == 0:
             # Step once per epoch
-            self.lr_scheduler.step()
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.step()
 
         super().step(epoch)
 
