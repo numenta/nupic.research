@@ -463,6 +463,9 @@ class ImagenetExperiment:
         )
         if self.rank == 0:
             self.logger.debug(self.model)
+            params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
+            self.logger.debug("Params total/nnz %s / %s",
+                              params_sparse, nonzero_params_sparse2)
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
@@ -643,7 +646,7 @@ class ImagenetExperiment:
                              epoch, current_batch, total_batches, loss)
 
         # Update 1cycle learning rate after every batch
-        if isinstance(self.lr_scheduler, [OneCycleLR, ComposedLRScheduler]):
+        if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
             if self.scaled_lr_scheduler is not None:
                 self.scaled_lr_scheduler.step()
@@ -657,12 +660,12 @@ class ImagenetExperiment:
 
         if count_nnz:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
-            self.logger.debug("Params total/nnz before/nnz after %s %s %s",
+            self.logger.debug("Params total/nnz before/nnz after %s %s / %s",
                               params_sparse, nonzero_params_sparse1,
                               nonzero_params_sparse2)
 
         # Update learning rate
-        if not isinstance(self.lr_scheduler, [OneCycleLR, ComposedLRScheduler]):
+        if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
         if self.rank == 0:
