@@ -126,7 +126,7 @@ class ComposedLRScheduler(_LRScheduler):
 
     def step(self, epoch=None):
         """
-        Step should be called after every batch update is OneCycleLR is one of
+        Step should be called after every batch update if OneCycleLR is one of
         the mapped LR Schedulers. Make sure to specify "steps_per_epoch" when
         """
         # Get milestone for current step
