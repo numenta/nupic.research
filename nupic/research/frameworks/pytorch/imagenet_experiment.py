@@ -245,7 +245,7 @@ def _create_optimizer(model, optimizer_class, optimizer_args,
 
 
 def _create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
-                         total_steps, steps_per_epoch):
+                         steps_per_epoch):
     """
     Configure learning rate scheduler
 
@@ -255,20 +255,30 @@ def _create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
         LR scheduler class to use. Must inherit from _LRScheduler
     :param lr_scheduler_args:
         LR scheduler class constructor arguments
-    :param total_steps:
-        The total number of steps in the cycle.
-        Only used if lr_scheduler_class is :class:`OneCycleLR`
     :param steps_per_epoch:
         The total number of batches in the epoch.
-        Only used if lr_scheduler_class is :class:`ComposedLRScheduler`
+        Only used if lr_scheduler_class is :class:`ComposedLRScheduler` or
+        :class:`OneCycleLR`
     """
     if issubclass(lr_scheduler_class, OneCycleLR):
         # Update OneCycleLR parameters
         lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
-        lr_scheduler_args["total_steps"] = total_steps
+        lr_scheduler_args.update(steps_per_epoch=steps_per_epoch)
     elif issubclass(lr_scheduler_class, ComposedLRScheduler):
         # Update ComposedLRScheduler parameters
         lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
+        schedulers = lr_scheduler_args.get("schedulers", None)
+        if schedulers is not None:
+            # Convert dict from ray/json {str:dict} style to {int:dict}
+            schedulers = {int(k): v for k, v in schedulers.items()}
+
+            # Update OneCycleLR "steps_per_epoch" parameter
+            for _, item in schedulers.items():
+                lr_class = item.get("lr_scheduler_class", None)
+                if lr_class is not None and issubclass(lr_class, OneCycleLR):
+                    lr_args = item.get("lr_scheduler_args", {})
+                    lr_args.update(steps_per_epoch=steps_per_epoch)
+            lr_scheduler_args["schedulers"] = schedulers
         lr_scheduler_args["steps_per_epoch"] = steps_per_epoch
 
     return lr_scheduler_class(optimizer, **lr_scheduler_args)
@@ -345,7 +355,6 @@ class ImagenetExperiment:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batches_in_epoch = sys.maxsize
         self.batch_size = 1
-        self.total_steps = 0
         self.epochs = 1
         self.distributed = False
         self.rank = 0
@@ -481,9 +490,6 @@ class ImagenetExperiment:
         )
         self.total_batches = len(self.train_loader)
 
-        # Compute total steps required by the OneCycleLR
-        self.total_steps = len(self.train_loader) * self.epochs
-
         # Configure Validation data loader
         val_dir = config.get("val_dir", "val")
         val_batch_size = config.get("val_batch_size", self.batch_size)
@@ -505,7 +511,6 @@ class ImagenetExperiment:
                 optimizer=self.optimizer,
                 lr_scheduler_class=lr_scheduler_class,
                 lr_scheduler_args=lr_scheduler_args,
-                total_steps=self.total_steps,
                 steps_per_epoch=self.total_batches)
 
     def validate(self, loader=None):
