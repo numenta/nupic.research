@@ -465,7 +465,6 @@ class ImagenetExperiment:
         workers = config.get("workers", 0)
         data_dir = config["data"]
         train_dir = config.get("train_dir", "train")
-        progressive_resize = config.get("progressive_resize", None)
         num_classes = config.get("num_classes", 1000)
 
         # Get initial batch size
