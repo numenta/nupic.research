@@ -21,6 +21,7 @@ import copy
 
 import torch
 
+from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from projects.imagenet.experiments import DEFAULT
 
 """
@@ -123,7 +124,49 @@ SPARSE100_SUPER1.update(dict(
 
 ))
 
+DEBUG_COMPOSED_LR = copy.deepcopy(DEFAULT)
+DEBUG_COMPOSED_LR.update(
+    epochs=20,
+    log_level="debug",
+    num_classes=3,
+    lr_scheduler_class=ComposedLRScheduler,
+    lr_scheduler_args=dict(
+        schedulers={
+            "0": dict(
+                lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
+                lr_scheduler_args=dict(
+                    max_lr=6.0,
+                    div_factor=6,  # initial_lr = 1.0
+                    final_div_factor=4000,  # min_lr = 0.00025
+                    pct_start=3.0 / 10.0,
+                    epochs=10,
+                    anneal_strategy="linear",
+                    max_momentum=0.01,
+                    cycle_momentum=False,
+                ),
+                optimizer_args=dict(
+                    lr=0.1,
+                    weight_decay=0.0001,
+                    momentum=0.0,
+                    nesterov=False,
+                ),
+            ),
+            "10": dict(
+                lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+                lr_scheduler_args=dict(step_size=2, gamma=0.5),
+                optimizer_args=dict(
+                    lr=2.3,
+                    weight_decay=0.0001,
+                    momentum=0.0,
+                    nesterov=False,
+                ),
+            ),
+        }
+    )
+)
+
 # Export all configurations
 CUSTOM_CONFIG = dict(
     sparse100_super1=SPARSE100_SUPER1,
+    debug_composed_lr=DEBUG_COMPOSED_LR,
 )
