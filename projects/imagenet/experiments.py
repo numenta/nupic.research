@@ -1,9 +1,9 @@
 #  Numenta Platform for Intelligent Computing (NuPIC)
 #  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
-#  following terms and conditions appl":
+#  following terms and conditions apply:
 #
-#  This program is free softwar": you can redistribute it and/or modify
+#  This program is free software you can redistribute it and/or modify
 #  it under the terms of the GNU Affero Public License version 3 as
 #  published by the Free Software Foundation.
 #
@@ -33,7 +33,7 @@ __all__ = ["CONFIGS"]
 
 # Batch size depends on the GPU memory.
 # On AWS P3 (Tesla V100) each GPU can hold 128 batches
-BATCH_SIZE = 128
+BATCH_SIZE = 160
 
 # Default configuration based on Pytorch Imagenet training example.
 # See http://github.com/pytorch/examples/blob/master/imagenet/main.py
@@ -106,6 +106,8 @@ DEFAULT = dict(
 
     # How often to checkpoint (epochs)
     checkpoint_freq=0,
+    keep_checkpoints_num=1,
+    checkpoint_score_attr="training_iteration",
 
     # How many times to try to recover before stopping the trial
     max_failures=-1,
