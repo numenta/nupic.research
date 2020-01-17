@@ -1,9 +1,9 @@
 #  Numenta Platform for Intelligent Computing (NuPIC)
 #  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
-#  following terms and conditions appl":
+#  following terms and conditions apply:
 #
-#  This program is free softwar": you can redistribute it and/or modify
+#  This program is free software you can redistribute it and/or modify
 #  it under the terms of the GNU Affero Public License version 3 as
 #  published by the Free Software Foundation.
 #
