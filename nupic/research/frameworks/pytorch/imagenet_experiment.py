@@ -269,6 +269,11 @@ def _create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
     elif issubclass(lr_scheduler_class, ComposedLRScheduler):
         # Update ComposedLRScheduler parameters
         lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
+        # Convert dict from ray/json {str:dict} style to {int:dict}
+        schedulers = lr_scheduler_args.get("schedulers", None)
+        if schedulers is not None:
+            schedulers = {int(k): v for k, v in schedulers.items()}
+            lr_scheduler_args["schedulers"] = schedulers
         lr_scheduler_args["steps_per_epoch"] = steps_per_epoch
 
     return lr_scheduler_class(optimizer, **lr_scheduler_args)
