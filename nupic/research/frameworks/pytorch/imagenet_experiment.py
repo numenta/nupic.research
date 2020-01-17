@@ -586,7 +586,7 @@ class ImagenetExperiment:
             self.logger.debug("Params total/nnz before/nnz after %s %s / %s = %s",
                               params_sparse, nonzero_params_sparse1,
                               nonzero_params_sparse2,
-                               float(nonzero_params_sparse2) / params_sparse)
+                              float(nonzero_params_sparse2) / params_sparse)
 
         # Update learning rate
         if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
