@@ -40,7 +40,7 @@ BATCH_SIZE = 128
 DEFAULT = dict(
     # Results path
     local_dir=os.path.expanduser("~/nta/results/imagenet"),
-    # Dataset path
+    # Dataset location (directory path or HDF5 file with the raw images)
     data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
     # Dataset training data relative path
     train_dir="train",
@@ -100,17 +100,6 @@ DEFAULT = dict(
     # Whether or not to Initialize running batch norm mean to 0.
     # See https://arxiv.org/pdf/1706.02677.pdf
     init_batch_norm=False,
-
-    # Progressive image resize schedule - dict(start_epoch: image_size)
-    # See:
-    # - https://arxiv.org/pdf/1806.01427.pdf
-    # - https://arxiv.org/abs/1707.02921
-    # - https://arxiv.org/abs/1710.10196
-    progressive_resize=None,
-
-    # Works with progressive_resize and the available GPU memory fitting as many
-    # images as possible in each batch - dict(start_epoch: batch_size)
-    dynamic_batch_size=None,
 
     # Loss function. See "torch.nn.functional"
     loss_function=torch.nn.functional.cross_entropy,
