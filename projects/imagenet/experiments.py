@@ -63,8 +63,8 @@ DEFAULT = dict(
     # Number of batches per epoch. Useful for debugging
     batches_in_epoch=sys.maxsize,
 
-    # Stop training when the validation metric reaches the metric value
-    stop=dict(mean_accuracy=0.85),
+    # Update this to stop training when accuracy reaches the metric value
+    stop=dict(mean_accuracy=0.9999),
     # Number of epochs
     epochs=90,
 
