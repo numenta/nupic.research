@@ -3,7 +3,7 @@
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions appl":
 #
-#  This program is free softwar": you can redistribute it and/or modify
+#  This program is free software you can redistribute it and/or modify
 #  it under the terms of the GNU Affero Public License version 3 as
 #  published by the Free Software Foundation.
 #

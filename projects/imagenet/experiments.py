@@ -3,7 +3,7 @@
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions appl":
 #
-#  This program is free softwar": you can redistribute it and/or modify
+#  This program is free software you can redistribute it and/or modify
 #  it under the terms of the GNU Affero Public License version 3 as
 #  published by the Free Software Foundation.
 #
@@ -117,6 +117,8 @@ DEFAULT = dict(
 
     # How often to checkpoint (epochs)
     checkpoint_freq=0,
+    keep_checkpoints_num=1,
+    checkpoint_score_attr="training_iteration",
 
     # How many times to try to recover before stopping the trial
     max_failures=-1,
