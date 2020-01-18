@@ -33,7 +33,7 @@ __all__ = ["CONFIGS"]
 
 # Batch size depends on the GPU memory.
 # On AWS P3 (Tesla V100) each GPU can hold 128 batches
-BATCH_SIZE = 160
+BATCH_SIZE = 128
 
 # Default configuration based on Pytorch Imagenet training example.
 # See http://github.com/pytorch/examples/blob/master/imagenet/main.py
@@ -64,7 +64,9 @@ DEFAULT = dict(
     batches_in_epoch=sys.maxsize,
 
     # Update this to stop training when accuracy reaches the metric value
-    stop=dict(mean_accuracy=0.9999),
+    # For example, stop=dict(mean_accuracy=0.75),
+    stop=dict(),
+
     # Number of epochs
     epochs=90,
 
