@@ -548,8 +548,12 @@ class ImagenetExperiment:
         self.pre_epoch(epoch)
         self.train_epoch(epoch)
         self.post_epoch(epoch)
+        ret = self.validate()
 
-        return self.validate()
+        self.logger.debug("---------- End of run epoch ------------")
+        self.logger.debug("")
+
+        return ret
 
     def pre_epoch(self, epoch):
         self.model.apply(update_boost_strength)
@@ -560,6 +564,10 @@ class ImagenetExperiment:
         pass
 
     def post_batch(self, model, loss, batch_idx, epoch):
+        # Update 1cycle learning rate after every batch
+        if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
+            self.lr_scheduler.step()
+
         if self.progress and (batch_idx % 10) == 0:
             total_batches = self.total_batches
             current_batch = batch_idx
@@ -567,12 +575,10 @@ class ImagenetExperiment:
                 # Compute actual batch size from distributed sampler
                 total_batches *= self.train_loader.sampler.num_replicas
                 current_batch *= self.train_loader.sampler.num_replicas
-            self.logger.info("Epoch: %s, Batch: %s/%s, loss: %s",
-                             epoch, current_batch, total_batches, loss)
-
-        # Update 1cycle learning rate after every batch
-        if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
-            self.lr_scheduler.step()
+            self.logger.debug("End of epoch: %s, Batch: %s/%s, loss: %s, "
+                              "Learning rate: %s",
+                              epoch, current_batch, total_batches, loss,
+                              self.get_lr())
 
     def post_epoch(self, epoch):
         count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0
@@ -588,11 +594,15 @@ class ImagenetExperiment:
                               nonzero_params_sparse2,
                               float(nonzero_params_sparse2) / params_sparse)
 
+        self.logger.debug("End of epoch %s LR Scheduler before step: %s", epoch,
+                          self.get_lr())
+
         # Update learning rate
         if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
-        self.logger.info("LR Scheduler: %s", self.get_lr())
+        self.logger.info("End of epoch %s LR Scheduler after step: %s",
+                         epoch, self.get_lr())
 
     def get_state(self):
         """
