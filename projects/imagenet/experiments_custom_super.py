@@ -102,10 +102,10 @@ DEBUG_CUSTOM = copy.deepcopy(DEFAULT)
 DEBUG_CUSTOM.update(dict(
     epochs=3,
     log_level="debug",
-    num_classes=3,
+    num_classes=2,
 
     model_args=dict(config=dict(
-        num_classes=3,
+        num_classes=2,
         defaults_sparse=True,
         activation_params_func=my_auto_sparse_activation_params,
         conv_params_func=my_auto_sparse_conv_params,
@@ -120,7 +120,8 @@ DEBUG_CUSTOM.update(dict(
 
 DEBUG_COMPOSED_LR = copy.deepcopy(DEBUG_CUSTOM)
 DEBUG_COMPOSED_LR.update(
-    epochs=20,
+    epochs=60,
+    progress=True,
     lr_scheduler_class=ComposedLRScheduler,
     lr_scheduler_args=dict(
         schedulers={
@@ -130,8 +131,8 @@ DEBUG_COMPOSED_LR.update(
                     max_lr=6.0,
                     div_factor=6,  # initial_lr = 1.0
                     final_div_factor=4000,  # min_lr = 0.00025
-                    pct_start=3.0 / 10.0,
-                    epochs=10,
+                    pct_start=4.0 / 40.0,
+                    epochs=40,
                     anneal_strategy="linear",
                     max_momentum=0.01,
                     cycle_momentum=False,
@@ -143,7 +144,7 @@ DEBUG_COMPOSED_LR.update(
                     nesterov=False,
                 ),
             ),
-            "10": dict(
+            "40": dict(
                 lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
                 lr_scheduler_args=dict(step_size=2, gamma=0.5),
                 optimizer_args=dict(
