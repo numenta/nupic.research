@@ -575,7 +575,7 @@ class ImagenetExperiment:
                 # Compute actual batch size from distributed sampler
                 total_batches *= self.train_loader.sampler.num_replicas
                 current_batch *= self.train_loader.sampler.num_replicas
-            self.logger.debug("End of epoch: %s, Batch: %s/%s, loss: %s, "
+            self.logger.debug("End of batch. Epoch: %s, Batch: %s/%s, loss: %s, "
                               "Learning rate: %s",
                               epoch, current_batch, total_batches, loss,
                               self.get_lr())
