@@ -594,15 +594,15 @@ class ImagenetExperiment:
                               nonzero_params_sparse2,
                               float(nonzero_params_sparse2) / params_sparse)
 
-        self.logger.debug("End of epoch %s LR Scheduler before step: %s", epoch,
-                          self.get_lr())
+        self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s", epoch,
+                          self.get_lr(), self.get_weight_decay())
 
         # Update learning rate
         if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
-        self.logger.info("End of epoch %s LR Scheduler after step: %s",
-                         epoch, self.get_lr())
+        self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s", epoch,
+                          self.get_lr(), self.get_weight_decay())
 
     def get_state(self):
         """
@@ -668,6 +668,13 @@ class ImagenetExperiment:
         :return: list of learning rates used by the optimizer
         """
         return [p["lr"] for p in self.optimizer.param_groups]
+
+    def get_weight_decay(self):
+        """
+        Returns the current weight decay
+        :return: list of weight decays used by the optimizer
+        """
+        return [p["weight_decay"] for p in self.optimizer.param_groups]
 
     def get_node_ip(self):
         """Returns the IP address of the current ray node."""
