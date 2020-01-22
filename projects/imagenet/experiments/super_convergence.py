@@ -21,7 +21,7 @@ import copy
 
 import torch
 
-from projects.imagenet.experiments_base import DEFAULT
+from .base import DEFAULT
 
 """
 Imagenet Experiment configurations for Super convergence and OneCycleLR.
