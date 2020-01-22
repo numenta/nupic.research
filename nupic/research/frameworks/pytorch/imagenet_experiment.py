@@ -460,8 +460,9 @@ class ImagenetExperiment:
         if self.rank == 0:
             self.logger.debug(self.model)
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
-            self.logger.debug("Params total/nnz %s / %s",
-                              params_sparse, nonzero_params_sparse2)
+            self.logger.debug("Params total/nnz %s / %s = %s ",
+                              params_sparse, nonzero_params_sparse2,
+                              float(nonzero_params_sparse2) / params_sparse)
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
@@ -570,8 +571,12 @@ class ImagenetExperiment:
         self.pre_epoch(epoch)
         self.train_epoch(epoch)
         self.post_epoch(epoch)
+        ret = self.validate()
 
-        return self.validate()
+        self.logger.debug("---------- End of run epoch ------------")
+        self.logger.debug("")
+
+        return ret
 
     def pre_epoch(self, epoch):
         self.model.apply(update_boost_strength)
@@ -582,6 +587,10 @@ class ImagenetExperiment:
         pass
 
     def post_batch(self, model, loss, batch_idx, epoch):
+        # Update 1cycle learning rate after every batch
+        if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
+            self.lr_scheduler.step()
+
         if self.progress and (batch_idx % 10) == 0:
             total_batches = self.total_batches
             current_batch = batch_idx
@@ -589,12 +598,10 @@ class ImagenetExperiment:
                 # Compute actual batch size from distributed sampler
                 total_batches *= self.train_loader.sampler.num_replicas
                 current_batch *= self.train_loader.sampler.num_replicas
-            self.logger.info("Epoch: %s, Batch: %s/%s, loss: %s",
-                             epoch, current_batch, total_batches, loss)
-
-        # Update 1cycle learning rate after every batch
-        if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
-            self.lr_scheduler.step()
+            self.logger.debug("End of batch. Epoch: %s, Batch: %s/%s, loss: %s, "
+                              "Learning rate: %s",
+                              epoch, current_batch, total_batches, loss,
+                              self.get_lr())
 
     def post_epoch(self, epoch):
         count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0
@@ -605,15 +612,20 @@ class ImagenetExperiment:
 
         if count_nnz:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
-            self.logger.debug("Params total/nnz before/nnz after %s %s / %s",
+            self.logger.debug("Params total/nnz before/nnz after %s %s / %s = %s",
                               params_sparse, nonzero_params_sparse1,
-                              nonzero_params_sparse2)
+                              nonzero_params_sparse2,
+                              float(nonzero_params_sparse2) / params_sparse)
+
+        self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s", epoch,
+                          self.get_lr(), self.get_weight_decay())
 
         # Update learning rate
         if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
-        self.logger.info("LR Scheduler: %s", self.get_lr())
+        self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s", epoch,
+                          self.get_lr(), self.get_weight_decay())
 
     def get_state(self):
         """
@@ -693,6 +705,13 @@ class ImagenetExperiment:
         :return: list of learning rates used by the optimizer
         """
         return [p["lr"] for p in self.optimizer.param_groups]
+
+    def get_weight_decay(self):
+        """
+        Returns the current weight decay
+        :return: list of weight decays used by the optimizer
+        """
+        return [p["weight_decay"] for p in self.optimizer.param_groups]
 
     def get_node_ip(self):
         """Returns the IP address of the current ray node."""
