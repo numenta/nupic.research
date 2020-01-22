@@ -20,15 +20,15 @@
 import copy
 import inspect
 
-import numpy as np
-import ray.tune as tune
 import torch
 
-from projects.imagenet.experiments_default import DEFAULT
+from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
+
+from .base import DEFAULT
 
 
 """
-Imagenet superconvergence where we set custom sparse params
+Imagenet superconvergence with compositions of learning schedules
 """
 
 
@@ -97,8 +97,8 @@ def my_auto_sparse_linear_params(input_size, output_size):
     )
 
 
-DEBUG_CUSTOM = copy.deepcopy(DEFAULT)
-DEBUG_CUSTOM.update(dict(
+DEBUG_COMPOSED_LR = copy.deepcopy(DEFAULT)
+DEBUG_COMPOSED_LR.update(
     epochs=3,
     log_level="debug",
     num_classes=2,
@@ -115,17 +115,57 @@ DEBUG_CUSTOM.update(dict(
     activation_params=inspect.getsource(my_auto_sparse_activation_params),
     linear_params=inspect.getsource(my_auto_sparse_linear_params),
 
-))
+    progress=True,
+    lr_scheduler_class=ComposedLRScheduler,
+    lr_scheduler_args=dict(
+        schedulers={
+            "0": dict(
+                lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
+                lr_scheduler_args=dict(
+                    max_lr=6.0,
+                    div_factor=6,  # initial_lr = 1.0
+                    final_div_factor=4000,  # min_lr = 0.00025
+                    pct_start=4.0 / 40.0,
+                    epochs=40,
+                    anneal_strategy="linear",
+                    max_momentum=0.01,
+                    cycle_momentum=False,
+                ),
+                optimizer_args=dict(
+                    lr=0.1,
+                    weight_decay=0.00005,
+                    momentum=0.0,
+                    nesterov=False,
+                ),
+            ),
+            "30": dict(
+                optimizer_args=dict(
+                    weight_decay=0.0001,
+                ),
+            ),
+            "40": dict(
+                lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+                lr_scheduler_args=dict(step_size=2, gamma=0.5),
+                optimizer_args=dict(
+                    lr=2.3,
+                    weight_decay=0.0001,
+                    momentum=0.0,
+                    nesterov=False,
+                ),
+            ),
+        }
+    )
+)
 
 
-# This gets to about 78.6% after 35 epochs, 81% after 60 epochs
-SUPER_SPARSE100 = copy.deepcopy(DEFAULT)
-SUPER_SPARSE100.update(dict(
-    # No weight decay from batch norm modules
+# Two different random seeds and decreasing weight decay,
+# as in http://arxiv.org/abs/1711.04291
+SPARSE100_WEIGHT_DECAY = copy.deepcopy(DEFAULT)
+SPARSE100_WEIGHT_DECAY.update(dict(
     batch_norm_weight_decay=False,
     init_batch_norm=True,
+    epochs=60,
 
-    epochs=40,
     num_classes=100,
 
     model_args=dict(config=dict(
@@ -136,99 +176,55 @@ SUPER_SPARSE100.update(dict(
         linear_params_func=my_auto_sparse_linear_params
     )),
 
-    # Use a higher learning rate and no momentum for sparse superconvergence
-    lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
+    lr_scheduler_class=ComposedLRScheduler,
     lr_scheduler_args=dict(
-        max_lr=6.0,
-        div_factor=6,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=4.0 / 40.0,
-        epochs=40,
-        anneal_strategy="linear",
-        max_momentum=0.01,
-        cycle_momentum=False,
-    ),
-
-    optimizer_args=dict(
-        lr=0.1,
-        weight_decay=0.0001,
-        momentum=0.0,
-        nesterov=False,
-    ),
-
-    weight_params=inspect.getsource(my_auto_sparse_conv_params),
-    activation_params=inspect.getsource(my_auto_sparse_activation_params),
-    linear_params=inspect.getsource(my_auto_sparse_linear_params),
-
+        schedulers={
+            "0": dict(
+                lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
+                lr_scheduler_args=dict(
+                    max_lr=6.0,
+                    div_factor=6,  # initial_lr = 1.0
+                    final_div_factor=4000,  # min_lr = 0.00025
+                    pct_start=4.0 / 40.0,
+                    epochs=40,
+                    anneal_strategy="linear",
+                    max_momentum=0.01,
+                    cycle_momentum=False,
+                ),
+                optimizer_args=dict(
+                    lr=0.1,
+                    weight_decay=0.00005,
+                    momentum=0.0,
+                    nesterov=False,
+                ),
+            ),
+            "15": dict(
+                optimizer_args=dict(
+                    weight_decay=0.0001,
+                ),
+            ),
+            "30": dict(
+                optimizer_args=dict(
+                    weight_decay=0.0002,
+                ),
+            ),
+            "39": dict(
+                lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+                lr_scheduler_args=dict(step_size=1, gamma=0.75),
+                optimizer_args=dict(
+                    lr=0.3,
+                    weight_decay=0.0004,
+                    momentum=0.0,
+                    nesterov=False,
+                ),
+            ),
+        }
+    )
 ))
 
-# Try different random seeds of the above
-SUPER_SPARSE100_SEEDS = copy.deepcopy(SUPER_SPARSE100)
-SUPER_SPARSE100_SEEDS.update(dict(
-    # Seed
-    seed=tune.sample_from(lambda spec: np.random.randint(1, 10000)),
-
-    # Number of times to sample from the hyperparameter space.
-    num_samples=2,
-))
-
-
-# Try much longer number of epochs (with random seeds) - does do better.
-SUPER_SPARSE100_LONG = copy.deepcopy(SUPER_SPARSE100)
-SUPER_SPARSE100_LONG.update(dict(
-    epochs=80,
-
-    lr_scheduler_args=dict(
-        max_lr=6.0,
-        div_factor=6,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=5.0 / 80.0,
-        epochs=80,
-        anneal_strategy="linear",
-        max_momentum=0.01,
-        cycle_momentum=False,
-    ),
-))
-
-# Try much longer number of epochs.
-# This is one of the tricks that helps, see https://arxiv.org/abs/1711.04291
-# Did well with 200 epochs (> 73%).
-SUPER_SPARSE1000_LONG = copy.deepcopy(SUPER_SPARSE100_LONG)
-SUPER_SPARSE1000_LONG.update(dict(
-    num_classes=1000,
-    epochs=120,
-    model_args=dict(config=dict(
-        num_classes=1000,
-        defaults_sparse=True,
-        activation_params_func=my_auto_sparse_activation_params,
-        conv_params_func=my_auto_sparse_conv_params,
-        linear_params_func=my_auto_sparse_linear_params
-    )),
-
-    lr_scheduler_args=dict(
-        max_lr=6.0,
-        div_factor=6,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=5.0 / 120.0,
-        epochs=120,
-        anneal_strategy="linear",
-        max_momentum=0.01,
-        cycle_momentum=False,
-    ),
-
-    optimizer_args=dict(
-        lr=0.1,
-        weight_decay=0.00005,
-        momentum=0.0,
-        nesterov=False,
-    ),
-))
 
 # Export all configurations
 CONFIGS = dict(
-    debug_custom=DEBUG_CUSTOM,
-    super_sparse_100=SUPER_SPARSE100,
-    super_sparse_100_seeds=SUPER_SPARSE100_SEEDS,
-    super_sparse_100_long=SUPER_SPARSE100_LONG,
-    super_sparse_1000_long=SUPER_SPARSE1000_LONG,
+    debug_composed_lr=DEBUG_COMPOSED_LR,
+    sparse_100_weight_decay=SPARSE100_WEIGHT_DECAY,
 )

@@ -19,7 +19,7 @@
 #
 import copy
 
-from projects.imagenet.experiments_base import DEFAULT
+from .base import DEFAULT
 
 """
 Imagenet Experiment configurations using the normal PyTorch learning schedule
