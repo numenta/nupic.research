@@ -182,6 +182,29 @@ SPARSE1000.update(
     model_args=dict(config=dict(num_classes=1000, defaults_sparse=True)),
 )
 
+MIXED_PRECISION_100 = copy.deepcopy(DEFAULT100)
+MIXED_PRECISION_100.update(
+    batch_size=288,
+    val_batch_size=288,
+    mixed_precision=True,
+    mixed_precision_args=dict(
+        # See https://nvidia.github.io/apex/amp.html#opt-levels
+        opt_level="O1",
+        loss_scale=128.0,
+    )
+)
+
+MIXED_PRECISION_SPARSE_100 = copy.deepcopy(SPARSE100)
+MIXED_PRECISION_SPARSE_100.update(
+    batch_size=288,
+    val_batch_size=288,
+    mixed_precision=True,
+    mixed_precision_args=dict(
+        # See https://nvidia.github.io/apex/amp.html#opt-levels
+        opt_level="O1",
+    )
+)
+
 # Export all configurations
 CONFIGS = dict(
     debug=DEBUG,
@@ -192,4 +215,6 @@ CONFIGS = dict(
     default1000=DEFAULT1000,
     sparse_100=SPARSE100,
     sparse_1000=SPARSE1000,
+    mixed_precision_100=MIXED_PRECISION_100,
+    mixed_precision_sparse_100=MIXED_PRECISION_SPARSE_100,
 )
