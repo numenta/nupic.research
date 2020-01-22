@@ -25,6 +25,7 @@ import torch
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from projects.imagenet.experiments_default import DEFAULT
 
+
 """
 Imagenet superconvergence with compositions of learning schedules
 """
