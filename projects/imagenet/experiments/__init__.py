@@ -18,20 +18,23 @@
 #  http://numenta.org/licenses/
 #
 
-from projects.imagenet.experiments_base import CONFIGS as C1
-from projects.imagenet.experiments_composed_lr import CONFIGS as C5
-from projects.imagenet.experiments_custom_super import CONFIGS as C4
-from projects.imagenet.experiments_default import CONFIGS as C2
-from projects.imagenet.experiments_superconvergence import CONFIGS as C3
+from .base import CONFIGS as BASE
+from .composed_lr import CONFIGS as COMPOSED_LR
+from .custom_super import CONFIGS as CUSTOM_SUPER
+from .default import CONFIGS as DEFAULT
+from .mixed_precision import CONFIGS as MIXED_PRECISION
+from .super_convergence import CONFIGS as SUPER_CONVERGENCE
 
 """
 Import and collect all Imagenet experiment configurations into one CONFIG
 """
+__all__ = ["CONFIGS"]
 
 # Collect all configurations
 CONFIGS = dict()
-CONFIGS.update(C1)
-CONFIGS.update(C2)
-CONFIGS.update(C3)
-CONFIGS.update(C4)
-CONFIGS.update(C5)
+CONFIGS.update(BASE)
+CONFIGS.update(COMPOSED_LR)
+CONFIGS.update(CUSTOM_SUPER)
+CONFIGS.update(DEFAULT)
+CONFIGS.update(MIXED_PRECISION)
+CONFIGS.update(SUPER_CONVERGENCE)

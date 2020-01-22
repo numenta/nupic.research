@@ -143,6 +143,7 @@ DEBUG_SPARSE.update(
 
 # Export configurations in this file
 CONFIGS = dict(
+    default_base=DEFAULT,
     debug_base=DEBUG,
     debug_base_sparse=DEBUG_SPARSE,
 )
