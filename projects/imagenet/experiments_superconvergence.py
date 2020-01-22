@@ -21,16 +21,11 @@ import copy
 
 import torch
 
-from projects.imagenet.experiments import CONFIGS, DEFAULT
-from projects.imagenet.experiments_custom_super import CUSTOM_CONFIG
+from projects.imagenet.experiments_base import DEFAULT
 
 """
-Imagenet Experiment configurations
+Imagenet Experiment configurations for Super convergence and OneCycleLR.
 """
-__all__ = ["CONFIGS"]
-
-
-# SUPER CONVERGENCE EXPERIMENTS
 
 # Configuration inspired by Super-Convergence paper. (Fig 6a)
 # See https://arxiv.org/pdf/1708.07120.pdf
@@ -61,9 +56,10 @@ SUPER_CONVERGENCE.update(
 
 # Configuration inspired by https://www.fast.ai/2018/08/10/fastai-diu-imagenet/
 # https://app.wandb.ai/yaroslavvb/imagenet18/runs/gxsdo6i0
-FASTAI18 = copy.deepcopy(SUPER_CONVERGENCE)
-FASTAI18.update(
+FASTAI1000 = copy.deepcopy(DEFAULT)
+FASTAI1000.update(
     epochs=35,
+    lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
     lr_scheduler_args=dict(
         # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 35 epochs
         max_lr=2.0,
@@ -81,42 +77,26 @@ FASTAI18.update(
     # No weight decay from batch norm modules
     batch_norm_weight_decay=False,
     init_batch_norm=True,
+
+    num_classes=1000,
+    model_args=dict(config=dict(num_classes=1000, defaults_sparse=False)),
 )
 
-FASTAI100 = copy.deepcopy(FASTAI18)
+FASTAI100 = copy.deepcopy(FASTAI1000)
 FASTAI100.update(
-    epochs=35,
-    log_level="debug",
-    lr_scheduler_args=dict(
-        # warm-up LR from 1 to 2 for 5 epochs with final LR 0.00025 after 40 epochs
-        max_lr=2.0,
-        div_factor=2,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=6.0 / 35.0,
-        epochs=35,
-        anneal_strategy="linear",
-    ),
     num_classes=100,
     model_args=dict(config=dict(num_classes=100, defaults_sparse=False)),
 )
 
-FASTAI1000 = copy.deepcopy(FASTAI100)
-FASTAI1000.update(
-    epochs=35,
-    num_classes=1000,
-
-    model_args=dict(config=dict(num_classes=1000, defaults_sparse=False)),
-)
 
 # This gets to about 78.6% after 35 epochs
 SPARSE100_SUPER = copy.deepcopy(FASTAI100)
 SPARSE100_SUPER.update(dict(
     epochs=35,
-    log_level="debug",
 
     model_args=dict(config=dict(num_classes=100, defaults_sparse=True)),
 
-    # Use a higher learning rate and no momentum for sparse superconvergence
+    # Use a higher learning rate and no momentum for sparse nets
     lr_scheduler_args=dict(
         max_lr=6.0,
         div_factor=6,  # initial_lr = 1.0
@@ -138,36 +118,19 @@ SPARSE100_SUPER.update(dict(
 ))
 
 
-# Default sparse ResNet-50 for 100 classes
 SPARSE1000_SUPER = copy.deepcopy(SPARSE100_SUPER)
 SPARSE1000_SUPER.update(dict(
     epochs=35,
-    log_level="debug",
     num_classes=1000,
-
     model_args=dict(config=dict(num_classes=1000, defaults_sparse=True)),
 
 ))
 
-DEBUG18 = copy.deepcopy(FASTAI18)
-DEBUG18.update(
-    num_classes=10,
-    model_args=dict(config=dict(num_classes=10)),
-)
-
 # Export all configurations
-CONFIGS.update(CUSTOM_CONFIG)
-CONFIGS.update(
-    dict(
-
-        # Super convergence experiments
-        debug_fastai18=DEBUG18,
-        super_convergence=SUPER_CONVERGENCE,
-        fastai18=FASTAI18,
-        fastai100=FASTAI100,
-        fastai1000=FASTAI1000,
-
-        sparse100_super=SPARSE100_SUPER,
-        sparse1000_super=SPARSE1000_SUPER,
-    )
+CONFIGS = dict(
+    super_convergence=SUPER_CONVERGENCE,
+    fastai_100=FASTAI100,
+    fastai_1000=FASTAI1000,
+    super_sparse_100=SPARSE100_SUPER,
+    super_sparse_1000=SPARSE1000_SUPER,
 )
