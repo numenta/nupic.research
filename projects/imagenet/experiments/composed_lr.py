@@ -23,6 +23,7 @@ import inspect
 import torch
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
+
 from .base import DEFAULT
 
 
