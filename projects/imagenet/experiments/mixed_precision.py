@@ -18,6 +18,7 @@
 #  http://numenta.org/licenses/
 #
 import copy
+
 from .default import DEFAULT100, DEFAULT1000
 
 MIXED_PRECISION_1000 = copy.deepcopy(DEFAULT1000)
