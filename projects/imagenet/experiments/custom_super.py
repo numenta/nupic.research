@@ -24,7 +24,7 @@ import numpy as np
 import ray.tune as tune
 import torch
 
-from projects.imagenet.experiments_default import DEFAULT
+from .base import DEFAULT
 
 
 """

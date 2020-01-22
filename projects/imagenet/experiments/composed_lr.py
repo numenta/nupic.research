@@ -23,7 +23,7 @@ import inspect
 import torch
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
-from projects.imagenet.experiments_default import DEFAULT
+from .base import DEFAULT
 
 
 """
