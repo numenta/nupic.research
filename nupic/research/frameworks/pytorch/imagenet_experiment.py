@@ -57,6 +57,11 @@ from nupic.research.frameworks.pytorch.model_utils import (
 )
 from nupic.torch.modules import rezero_weights, update_boost_strength
 
+try:
+    from apex import amp
+except ImportError:
+    amp = None
+
 __all__ = ["ImagenetExperiment"]
 
 IMAGENET_NUM_CLASSES = {
@@ -311,7 +316,7 @@ def _init_batch_norm(model):
             m.weight.data.normal_(0, 0.01)
 
 
-def _create_model(model_class, model_args, init_batch_norm, distributed, device):
+def _create_model(model_class, model_args, init_batch_norm, device):
     """
     Configure network model
 
@@ -321,8 +326,6 @@ def _create_model(model_class, model_args, init_batch_norm, distributed, device)
         The model constructor arguments
     :param init_batch_norm:
         Whether or not to initialize batch norm modules
-    :param distributed:
-        Whether or not to use `DistributedDataParallel`
     :param device:
         Model device
 
@@ -332,10 +335,6 @@ def _create_model(model_class, model_args, init_batch_norm, distributed, device)
     if init_batch_norm:
         _init_batch_norm(model)
     model.to(device)
-    if distributed:
-        model = DistributedDataParallel(model)
-    else:
-        model = DataParallel(model)
     return model
 
 
@@ -357,6 +356,7 @@ class ImagenetExperiment:
         self.batch_size = 1
         self.epochs = 1
         self.distributed = False
+        self.mixed_precision = False
         self.rank = 0
         self.total_batches = 0
         self.progress = False
@@ -404,6 +404,9 @@ class ImagenetExperiment:
             - log_level: Python Logging level
             - log_format: Python Logging format
             - seed: the seed to be used for pytorch, python, and numpy
+            - mixed_precision: Whether or not to enable apex mixed precision
+            - mixed_precision_args: apex mixed precision arguments.
+                                    See "amp.initialize"
         """
         # Configure logger
         log_format = config.get("log_format", logging.BASIC_FORMAT)
@@ -414,6 +417,14 @@ class ImagenetExperiment:
         self.logger.setLevel(log_level)
         self.logger.addHandler(console)
         self.progress = config.get("progress", False)
+        self.mixed_precision = config.get("mixed_precision", False)
+        if self.mixed_precision and amp is None:
+            self.mixed_precision = False
+            self.logger.error(
+                "Mixed precision requires NVIDA APEX."
+                "Please install apex from https://www.github.com/nvidia/apex"
+                "Disabling mixed precision training."
+            )
 
         # Configure seed
         self.seed = config.get("seed", self.seed)
@@ -444,7 +455,6 @@ class ImagenetExperiment:
             model_class=model_class,
             model_args=model_args,
             init_batch_norm=init_batch_norm,
-            distributed=self.distributed,
             device=self.device,
         )
         if self.rank == 0:
@@ -463,6 +473,19 @@ class ImagenetExperiment:
             optimizer_args=optimizer_args,
             batch_norm_weight_decay=batch_norm_weight_decay,
         )
+
+        # Configure mixed precision training
+        if self.mixed_precision:
+            amp_args = config.get("mixed_precision_args", {})
+            self.model, self.optimizer = amp.initialize(
+                self.model, self.optimizer, **amp_args)
+            self.logger.info("Using mixed precision")
+
+        # Apply DistributedDataParallel after all other model mutations
+        if self.distributed:
+            self.model = DistributedDataParallel(self.model)
+        else:
+            self.model = DataParallel(self.model)
 
         self.loss_function = config.get(
             "loss_function", torch.nn.functional.cross_entropy
@@ -624,6 +647,15 @@ class ImagenetExperiment:
             )
             state["lr_scheduler"] = buffer.getvalue()
 
+        if self.mixed_precision and amp is not None:
+            with io.BytesIO() as buffer:
+                torch.save(
+                    amp.state_dict(),
+                    buffer,
+                    pickle_protocol=pickle.HIGHEST_PROTOCOL,
+                )
+                state["amp"] = buffer.getvalue()
+
         return state
 
     def set_state(self, state):
@@ -645,6 +677,11 @@ class ImagenetExperiment:
             with io.BytesIO(state["lr_scheduler"]) as buffer:
                 state_dict = torch.load(buffer, map_location=self.device)
                 self.lr_scheduler.load_state_dict(state_dict)
+
+        if "amp" in state and amp is not None:
+            with io.BytesIO(state["amp"]) as buffer:
+                state_dict = torch.load(buffer)
+                amp.load_state_dict(state_dict)
 
     def stop_experiment(self):
         if self.distributed:

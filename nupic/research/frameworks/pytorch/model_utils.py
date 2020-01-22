@@ -76,6 +76,18 @@ def train_model(
         # update progress bar total based on batches_in_epoch
         if batches_in_epoch < len(loader):
             loader.total = batches_in_epoch
+
+    # Check if training with Apex Mixed Precision
+    # FIXME: There should be another way to check if 'amp' is enabled
+    use_amp = hasattr(optimizer, "_amp_stash")
+    try:
+        from apex import amp
+    except ImportError:
+        if use_amp:
+            raise ImportError(
+                "Mixed precision requires NVIDA APEX."
+                "Please install apex from https://www.github.com/nvidia/apex")
+
     total_loss = 0
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
@@ -88,7 +100,13 @@ def train_model(
         optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)
-        loss.backward()
+
+        if use_amp:
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss.backward()
+
         optimizer.step()
         total_loss += loss.item()
         if progress_bar:
