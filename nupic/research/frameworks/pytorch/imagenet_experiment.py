@@ -22,6 +22,7 @@ import functools
 import io
 import itertools
 import logging
+import multiprocessing
 import os
 import pickle
 import sys
@@ -121,7 +122,8 @@ def _create_train_dataloader(
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
+                inplace=True
             ),
         ],
     )
@@ -174,7 +176,8 @@ def _create_validation_dataloader(data_dir, val_dir, batch_size, workers,
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
+                inplace=True
             ),
         ]
     )
@@ -362,6 +365,7 @@ class ImagenetExperiment:
         self.progress = False
         self.logger = None
         self.seed = 42
+        self.profile = False
 
     def setup_experiment(self, config):
         """
@@ -400,6 +404,8 @@ class ImagenetExperiment:
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
             - progress: Show progress during training
+            - profile: Whether or not to enable torch.autograd.profiler.profile
+                       during training
             - name: Experiment name. Used as logger name
             - log_level: Python Logging level
             - log_format: Python Logging format
@@ -503,6 +509,11 @@ class ImagenetExperiment:
         # Get initial batch size
         self.batch_size = config.get("batch_size", 1)
 
+        # CUDA runtime does not support the fork start method.
+        # See https://pytorch.org/docs/stable/notes/multiprocessing.html
+        if torch.cuda.is_available():
+            multiprocessing.set_start_method("spawn")
+
         # Configure Training data loader
         self.train_loader = _create_train_dataloader(
             data_dir=data_dir,
@@ -537,6 +548,9 @@ class ImagenetExperiment:
                 lr_scheduler_args=lr_scheduler_args,
                 steps_per_epoch=self.total_batches)
 
+        # Only profile from rank 0
+        self.profile = config.get("profile", False) and self.rank == 0
+
     def validate(self, loader=None):
         if loader is None:
             loader = self.val_loader
@@ -556,16 +570,20 @@ class ImagenetExperiment:
         return results
 
     def train_epoch(self, epoch):
-        train_model(
-            model=self.model,
-            loader=self.train_loader,
-            optimizer=self.optimizer,
-            device=self.device,
-            criterion=self.loss_function,
-            batches_in_epoch=self.batches_in_epoch,
-            pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
-            post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
-        )
+        with torch.autograd.profiler.profile(use_cuda=torch.cuda.is_available(),
+                                             enabled=self.profile) as prof:
+            train_model(
+                model=self.model,
+                loader=self.train_loader,
+                optimizer=self.optimizer,
+                device=self.device,
+                criterion=self.loss_function,
+                batches_in_epoch=self.batches_in_epoch,
+                pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
+                post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
+            )
+        if self.profile and prof is not None:
+            self.logger.info(prof.key_averages().table(sort_by="self_cpu_time_total"))
 
     def run_epoch(self, epoch):
         self.pre_epoch(epoch)

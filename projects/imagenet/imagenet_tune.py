@@ -195,6 +195,8 @@ if __name__ == "__main__":
                         help="How many times to try to recover before stopping")
     parser.add_argument("-c", "--checkpoint-freq", type=int,
                         help="How often to checkpoint (epochs)")
+    parser.add_argument("--profile", action="store_true",
+                        help="Enable torch.autograd.profiler.profile during training")
     parser.add_argument(
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
