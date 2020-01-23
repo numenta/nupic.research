@@ -88,7 +88,6 @@ def train_model(
                 "Mixed precision requires NVIDA APEX."
                 "Please install apex from https://www.github.com/nvidia/apex")
 
-    total_loss = 0
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
@@ -108,19 +107,13 @@ def train_model(
             loss.backward()
 
         optimizer.step()
-        total_loss += loss.item()
-        if progress_bar:
-            loader.set_postfix(dict(loss=loss.item()))
 
         if post_batch_callback is not None:
-            post_batch_callback(model=model, loss=loss.item(), batch_idx=batch_idx)
+            post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx)
 
     if progress_bar is not None:
         loader.n = loader.total
         loader.close()
-
-    return total_loss / len(loader)
-
 
 def evaluate_model(
     model,
@@ -169,10 +162,6 @@ def evaluate_model(
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum().item()
             total += len(data)
-            if progress:
-                loader.set_postfix(dict(
-                    acc=correct / total,
-                    loss=loss / total))
 
     if progress is not None:
         loader.close()
