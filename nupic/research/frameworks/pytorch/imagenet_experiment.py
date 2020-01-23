@@ -362,6 +362,7 @@ class ImagenetExperiment:
         self.progress = False
         self.logger = None
         self.seed = 42
+        self.profile = False
 
     def setup_experiment(self, config):
         """
@@ -400,6 +401,8 @@ class ImagenetExperiment:
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
             - progress: Show progress during training
+            - profile: Whether or not to enable torch.autograd.profiler.profile
+                       during training
             - name: Experiment name. Used as logger name
             - log_level: Python Logging level
             - log_format: Python Logging format
@@ -537,6 +540,9 @@ class ImagenetExperiment:
                 lr_scheduler_args=lr_scheduler_args,
                 steps_per_epoch=self.total_batches)
 
+        # Only profile from rank 0
+        self.profile = config.get("profile", False) and self.rank == 0
+
     def validate(self, loader=None):
         if loader is None:
             loader = self.val_loader
@@ -556,16 +562,20 @@ class ImagenetExperiment:
         return results
 
     def train_epoch(self, epoch):
-        train_model(
-            model=self.model,
-            loader=self.train_loader,
-            optimizer=self.optimizer,
-            device=self.device,
-            criterion=self.loss_function,
-            batches_in_epoch=self.batches_in_epoch,
-            pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
-            post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
-        )
+        with torch.autograd.profiler.profile(use_cuda=torch.cuda.is_available(),
+                                             enabled=self.profile) as prof:
+            train_model(
+                model=self.model,
+                loader=self.train_loader,
+                optimizer=self.optimizer,
+                device=self.device,
+                criterion=self.loss_function,
+                batches_in_epoch=self.batches_in_epoch,
+                pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
+                post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
+            )
+        if self.profile and prof is not None:
+            self.logger.info(prof.key_averages().table(sort_by="self_cpu_time_total"))
 
     def run_epoch(self, epoch):
         self.pre_epoch(epoch)
