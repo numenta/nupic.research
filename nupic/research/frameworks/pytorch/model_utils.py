@@ -99,6 +99,7 @@ def train_model(
         optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)
+        del data, target, output
 
         if use_amp:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -110,6 +111,7 @@ def train_model(
 
         if post_batch_callback is not None:
             post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx)
+        del loss
 
     if progress_bar is not None:
         loader.n = loader.total
