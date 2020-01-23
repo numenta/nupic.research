@@ -22,6 +22,7 @@ import functools
 import io
 import itertools
 import logging
+import multiprocessing
 import os
 import pickle
 import sys
@@ -505,6 +506,11 @@ class ImagenetExperiment:
 
         # Get initial batch size
         self.batch_size = config.get("batch_size", 1)
+
+        # CUDA runtime does not support the fork start method.
+        # See https://pytorch.org/docs/stable/notes/multiprocessing.html
+        if torch.cuda.is_available():
+            multiprocessing.set_start_method("spawn")
 
         # Configure Training data loader
         self.train_loader = _create_train_dataloader(
