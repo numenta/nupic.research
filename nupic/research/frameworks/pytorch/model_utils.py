@@ -117,6 +117,7 @@ def train_model(
         loader.n = loader.total
         loader.close()
 
+
 def evaluate_model(
     model,
     loader,
