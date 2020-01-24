@@ -76,7 +76,18 @@ def train_model(
         # update progress bar total based on batches_in_epoch
         if batches_in_epoch < len(loader):
             loader.total = batches_in_epoch
-    total_loss = 0
+
+    # Check if training with Apex Mixed Precision
+    # FIXME: There should be another way to check if 'amp' is enabled
+    use_amp = hasattr(optimizer, "_amp_stash")
+    try:
+        from apex import amp
+    except ImportError:
+        if use_amp:
+            raise ImportError(
+                "Mixed precision requires NVIDA APEX."
+                "Please install apex from https://www.github.com/nvidia/apex")
+
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
@@ -88,20 +99,23 @@ def train_model(
         optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)
-        loss.backward()
+        del data, target, output
+
+        if use_amp:
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss.backward()
+
         optimizer.step()
-        total_loss += loss.item()
-        if progress_bar:
-            loader.set_postfix(dict(loss=loss.item()))
 
         if post_batch_callback is not None:
-            post_batch_callback(model=model, loss=loss.item(), batch_idx=batch_idx)
+            post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx)
+        del loss
 
     if progress_bar is not None:
         loader.n = loader.total
         loader.close()
-
-    return total_loss / len(loader)
 
 
 def evaluate_model(
@@ -151,10 +165,6 @@ def evaluate_model(
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum().item()
             total += len(data)
-            if progress:
-                loader.set_postfix(dict(
-                    acc=correct / total,
-                    loss=loss / total))
 
     if progress is not None:
         loader.close()

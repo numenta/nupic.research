@@ -28,8 +28,8 @@ import torch
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 
+from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.imagenet_experiment import ImagenetExperiment
-from projects.imagenet.experiments_superconvergence import CONFIGS
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -195,6 +195,8 @@ if __name__ == "__main__":
                         help="How many times to try to recover before stopping")
     parser.add_argument("-c", "--checkpoint-freq", type=int,
                         help="How often to checkpoint (epochs)")
+    parser.add_argument("--profile", action="store_true",
+                        help="Enable torch.autograd.profiler.profile during training")
     parser.add_argument(
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
