@@ -470,6 +470,11 @@ class ImagenetExperiment:
                               params_sparse, nonzero_params_sparse2,
                               float(nonzero_params_sparse2) / params_sparse)
 
+        modify_init_hook = config.get("modify_init_hook", None)
+        if modify_init_hook:
+            modified_model = modify_init_hook(self.model, config=config)
+            self.model = modified_model or self.model
+
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
