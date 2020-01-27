@@ -30,7 +30,7 @@ import ray
 import torch
 from ray import tune
 
-from nupic.research.frameworks.backprop_structure.ray_ax_utils import (
+from nupic.research.frameworks.backprop_structure.ray_ax.ray_ax_utils import (
     AxSearch,
     ax_client_with_explicit_strategy,
     get_ray_trials,
@@ -117,6 +117,10 @@ def ax_optimize_accuracy(exploring_trainable, followup_trainable,
                 best_trial = json.load(f)
 
             best_config, _ = best_trial
+            best_config = dict(best_config)
+            # Only include parameters specified in the parameters list.
+            best_config = {parameter["name"]: best_config[parameter["name"]]
+                           for parameter in parameters}
 
             tune.run(
                 exploring_trainable,
