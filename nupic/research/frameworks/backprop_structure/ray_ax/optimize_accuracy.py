@@ -98,6 +98,8 @@ def ax_optimize_accuracy(exploring_trainable, followup_trainable,
     Optimize a Ray Trainable's "mean_accuracy", using Ax to select
     hyperparameters. This method will pick up any existing results for this
     experiment and plug them into the Ax model, then will generate new results.
+    Finally, this procedure finds the best configuration and collects additional
+    results for the configuration to ensure that it is well-sampled.
     """
 
     experiment_dir = os.path.expanduser(f"~/ray_results/{experiment_name}")

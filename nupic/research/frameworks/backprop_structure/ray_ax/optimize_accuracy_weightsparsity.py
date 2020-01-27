@@ -111,7 +111,9 @@ def ax_optimize_accuracy_weightsparsity(
     The procedure loops over the different alphas and rebuilds the Ax model and
     generates new results for each. All results go into the same Ray experiment
     folder, so each search (i.e. each alpha) benefits from all of the other
-    searches.
+    searches. Finally, this procedure finds all configurations at the Pareto
+    frontier of the two objectives and gathers additional results for each until
+    every configuration at the frontier is well-sampled.
     """
 
     experiment_dir = os.path.expanduser(f"~/ray_results/{experiment_name}")
