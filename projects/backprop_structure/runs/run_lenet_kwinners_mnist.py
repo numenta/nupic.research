@@ -33,9 +33,10 @@ from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
 )
 
 
-class SupervisedNoiseBoosting(mixins.UpdateBoostStrength,
-                              mixins.TestNoise,
-                              experiments.Supervised):
+class SupervisedNoiseBoostingCovariance(mixins.UpdateBoostStrength,
+                                        mixins.TestNoise,
+                                        mixins.LogCovariance,
+                                        experiments.Supervised):
     pass
 
 
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     ray.init()
 
     tune.run(
-        experiments.as_ray_trainable(SupervisedNoiseBoosting),
+        experiments.as_ray_trainable(SupervisedNoiseBoostingCovariance),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
             model_alg="mnist_lesparsenet",
@@ -75,8 +76,10 @@ if __name__ == "__main__":
             noise_test_at_end=True,
             noise_test_freq=0,
             noise_levels=list(np.arange(0.0, 1.0, 0.05)),
+
+            log_covariance_layernames=["linear1_kwinners"],
         ),
-        num_samples=1,
+        num_samples=4,
         checkpoint_freq=0,
         checkpoint_at_end=True,
         resources_per_trial={
