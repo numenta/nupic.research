@@ -20,5 +20,4 @@
 # ----------------------------------------------------------------------
 
 from .supervised import Supervised
-from .ray_ax_accuracy
 from .ray_trainable import as_ray_trainable

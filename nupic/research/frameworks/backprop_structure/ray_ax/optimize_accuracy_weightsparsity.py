@@ -30,7 +30,7 @@ import ray
 import torch
 from ray import tune
 
-from nupic.research.frameworks.backprop_structure.ray_ax_utils import (
+from nupic.research.frameworks.backprop_structure.ray_ax.ray_ax_utils import (
     AxSearch,
     ax_client_with_explicit_strategy,
     filter_to_pareto,
@@ -121,11 +121,17 @@ def ax_optimize_accuracy_weightsparsity(
             with open(input_file, "r") as f:
                 frontier_trials = json.load(f)
 
+            configs = [dict(config)
+                       for config, _, _ in frontier_trials]
+            # Only include parameters specified in the parameters list.
+            configs = [{parameter["name"]: config[parameter["name"]]
+                        for parameter in parameters}
+                       for config in configs]
+
             tune.run(
                 exploring_trainable,
                 name=experiment_name,
-                config=tune.grid_search([dict(config)
-                                         for config, _, _ in frontier_trials]),
+                config=tune.grid_search(configs),
                 num_samples=1,
                 resources_per_trial={
                     "cpu": 1,

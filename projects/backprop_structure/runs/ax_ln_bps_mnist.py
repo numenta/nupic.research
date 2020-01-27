@@ -80,7 +80,7 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
                 gamma=gamma,
             ),
 
-            training_iterations=50,
+            training_iterations=NUM_TRAINING_ITERATIONS,
 
             use_tqdm=False,
             batch_size_test=1000,
