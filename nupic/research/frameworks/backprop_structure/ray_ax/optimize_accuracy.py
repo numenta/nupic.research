@@ -94,6 +94,11 @@ def insert_hyperparameter_loss(trainable):
 def ax_optimize_accuracy(exploring_trainable, followup_trainable,
                          experiment_name, script_dir, parameters,
                          num_training_iterations, num_best_config_samples):
+    """
+    Optimize a Ray Trainable's "mean_accuracy", using Ax to select
+    hyperparameters. This method will pick up any existing results for this
+    experiment and plug them into the Ax model, then will generate new results.
+    """
 
     experiment_dir = os.path.expanduser(f"~/ray_results/{experiment_name}")
 

@@ -101,6 +101,18 @@ def ax_optimize_accuracy_weightsparsity(
         exploring_trainable, followup_trainable, experiment_name, script_dir,
         alphas, parameters, num_training_iterations,
         samples_per_frontier_config):
+    """
+    Optimize a Ray Trainable's "mean_accuracy" and "inference_nz", using Ax to
+    select hyperparameters. This procedure will pick up any existing results for
+    this experiment and plug them into the Ax model, then will generate new
+    results. To optimize two objectives, this procedure chooses a set of
+    projections from two scalar objectives to a single scalar objective. These
+    projections are defined by alpha*log(error) + (1 - alpha)*log(inference_nz).
+    The procedure loops over the different alphas and rebuilds the Ax model and
+    generates new results for each. All results go into the same Ray experiment
+    folder, so each search (i.e. each alpha) benefits from all of the other
+    searches.
+    """
 
     experiment_dir = os.path.expanduser(f"~/ray_results/{experiment_name}")
 
