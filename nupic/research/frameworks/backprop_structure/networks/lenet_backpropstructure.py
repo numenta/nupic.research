@@ -44,6 +44,9 @@ class LeNetBackpropStructure(nn.Sequential):
                  droprate_init=0.5,
                  learn_weight=True,
                  random_weight=True,
+                 decay_mean=False,
+                 deterministic=False,
+                 use_batch_norm=True,
                  cnn_out_channels=(64, 64),
                  kernel_size=5,
                  linear_units=1000,
@@ -61,11 +64,12 @@ class LeNetBackpropStructure(nn.Sequential):
             l2_strength=l2_strength,
             l0_strength=l0_strength,
             learn_weight=learn_weight,
-            random_weight=random_weight
+            random_weight=random_weight,
+            decay_mean=decay_mean,
+            deterministic=deterministic,
         )
 
-        super().__init__(OrderedDict([
-
+        modules = [
             # -------------
             # Conv Block
             # -------------
@@ -75,10 +79,16 @@ class LeNetBackpropStructure(nn.Sequential):
                                        kernel_size,
                                        **common_params)),
             ("cnn1_maxpool", nn.MaxPool2d(maxpool_stride)),
-            ("cnn1_bn", nn.BatchNorm2d(
-                cnn_out_channels[0],
-                affine=False,
-                track_running_stats=bn_track_running_stats)),
+        ]
+
+        if use_batch_norm:
+            modules.append(
+                ("cnn1_bn", nn.BatchNorm2d(
+                    cnn_out_channels[0],
+                    affine=False,
+                    track_running_stats=bn_track_running_stats)))
+
+        modules += [
             ("cnn1_relu", nn.ReLU(inplace=True)),
 
             # -------------
@@ -90,10 +100,16 @@ class LeNetBackpropStructure(nn.Sequential):
                                        kernel_size,
                                        **common_params)),
             ("cnn2_maxpool", nn.MaxPool2d(maxpool_stride)),
-            ("cnn2_bn", nn.BatchNorm2d(
-                cnn_out_channels[1],
-                affine=False,
-                track_running_stats=bn_track_running_stats)),
+        ]
+
+        if use_batch_norm:
+            modules.append(
+                ("cnn2_bn", nn.BatchNorm2d(
+                    cnn_out_channels[1],
+                    affine=False,
+                    track_running_stats=bn_track_running_stats)))
+
+        modules += [
             ("cnn2_relu", nn.ReLU(inplace=True)),
             ("flatten", nn.Flatten()),
 
@@ -105,10 +121,16 @@ class LeNetBackpropStructure(nn.Sequential):
                 (feature_map_sidelength**2) * cnn_out_channels[1],
                 linear_units,
                 **common_params)),
-            ("fc1_bn", nn.BatchNorm1d(
-                linear_units,
-                affine=False,
-                track_running_stats=bn_track_running_stats)),
+        ]
+
+        if use_batch_norm:
+            modules.append(
+                ("fc1_bn", nn.BatchNorm1d(
+                    linear_units,
+                    affine=False,
+                    track_running_stats=bn_track_running_stats)))
+
+        modules += [
             ("fc1_relu", nn.ReLU(inplace=True)),
 
             # -------------
@@ -118,8 +140,9 @@ class LeNetBackpropStructure(nn.Sequential):
             ("fc2", BinaryGatedLinear(linear_units,
                                       num_classes,
                                       **common_params)),
+        ]
 
-        ]))
+        super().__init__(OrderedDict(modules))
 
 
 gsc_lenet_backpropstructure = partial(
@@ -131,5 +154,6 @@ mnist_lenet_backpropstructure = partial(
     LeNetBackpropStructure,
     input_size=(1, 28, 28),
     num_classes=10,
+    use_batch_norm=False,
     cnn_out_channels=(32, 64),
     linear_units=700)

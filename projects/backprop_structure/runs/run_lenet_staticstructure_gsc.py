@@ -32,8 +32,12 @@ from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
 
+NUM_TRAINING_ITERATIONS = 30
 
-class SupervisedNoise(mixins.TestNoise, experiments.Supervised):
+
+class SupervisedNoiseRezero(mixins.RezeroWeights,
+                            mixins.TestNoise,
+                            experiments.Supervised):
     pass
 
 
@@ -41,45 +45,43 @@ if __name__ == "__main__":
     ray.init()
 
     tune.run(
-        experiments.as_ray_trainable(SupervisedNoise),
+        experiments.as_ray_trainable(SupervisedNoiseRezero),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            model_alg="mnist_lesparsenet",
+            model_alg="gsc_lesparsenet",
             model_params=dict(
                 cnn_activity_percent_on=(1.0, 1.0),
-                cnn_weight_percent_on=(1.0, 1.0),
                 linear_activity_percent_on=(1.0,),
-                linear_weight_percent_on=(1.0,),
-                use_batch_norm=False,
             ),
 
-            dataset_name="MNIST",
+            dataset_name="PreprocessedGSC",
             dataset_params={},
 
             optim_alg="SGD",
             optim_params=dict(
-                lr=0.02,
+                lr=0.01,
+                weight_decay=0.01,
             ),
 
             lr_scheduler_alg="StepLR",
             lr_scheduler_params=dict(
                 step_size=1,
-                gamma=0.8,
+                gamma=0.9,
             ),
 
-            training_iterations=15,
+            training_iterations=NUM_TRAINING_ITERATIONS,
 
             use_tqdm=False,
-            batch_size_train=(4, 64),
+            batch_size_train=(16, 16),
             batch_size_test=1000,
 
             noise_test_at_end=True,
             noise_test_freq=0,
-            noise_levels=list(np.arange(0.0, 1.0, 0.05)),
+            noise_levels=list(np.arange(0.0, 0.51, 0.05)),
         ),
-        num_samples=1,
+        num_samples=8,
         checkpoint_freq=0,
-        checkpoint_at_end=True,
+        checkpoint_at_end=False,
         resources_per_trial={
             "cpu": 1,
             "gpu": (1 if torch.cuda.is_available() else 0)},
