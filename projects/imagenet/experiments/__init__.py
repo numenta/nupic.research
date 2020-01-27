@@ -23,6 +23,7 @@ from .composed_lr import CONFIGS as COMPOSED_LR
 from .custom_super import CONFIGS as CUSTOM_SUPER
 from .default import CONFIGS as DEFAULT
 from .mixed_precision import CONFIGS as MIXED_PRECISION
+from .retrained_output_layer import CONFIGS as RETRAINED_OUTPUT_LAYER
 from .super_convergence import CONFIGS as SUPER_CONVERGENCE
 
 """
@@ -38,3 +39,4 @@ CONFIGS.update(CUSTOM_SUPER)
 CONFIGS.update(DEFAULT)
 CONFIGS.update(MIXED_PRECISION)
 CONFIGS.update(SUPER_CONVERGENCE)
+CONFIGS.update(RETRAINED_OUTPUT_LAYER)
