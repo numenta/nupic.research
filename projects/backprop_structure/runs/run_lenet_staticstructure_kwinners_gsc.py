@@ -32,6 +32,8 @@ from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
 
+NUM_TRAINING_ITERATIONS = 30
+
 
 class SupervisedNoiseBoostingRezero(mixins.UpdateBoostStrength,
                                     mixins.RezeroWeights,
@@ -65,7 +67,7 @@ if __name__ == "__main__":
                 gamma=0.9,
             ),
 
-            training_iterations=30,
+            training_iterations=NUM_TRAINING_ITERATIONS,
 
             use_tqdm=False,
             batch_size_train=(16, 16),
@@ -75,9 +77,9 @@ if __name__ == "__main__":
             noise_test_freq=0,
             noise_levels=list(np.arange(0.0, 0.51, 0.05)),
         ),
-        num_samples=1,
+        num_samples=8,
         checkpoint_freq=0,
-        checkpoint_at_end=True,
+        checkpoint_at_end=False,
         resources_per_trial={
             "cpu": 1,
             "gpu": (1 if torch.cuda.is_available() else 0)},

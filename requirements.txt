@@ -24,6 +24,7 @@ nupic.torch @ git+https://github.com/numenta/nupic.torch.git
 nupic.tensorflow @ git+https://github.com/numenta/nupic.tensorflow.git
 
 awscli
+ax-platform
 boto3
 elasticsearch
 jupyter

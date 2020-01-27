@@ -85,7 +85,7 @@ class BinaryGatedLinear(Module):
                  l2_strength=1., learn_weight=True, bias=True,
                  droprate_init=0.5, random_weight=True, deterministic=False,
                  use_baseline_bias=False, optimize_inference=False,
-                 one_sample_per_item=False, **kwargs):
+                 one_sample_per_item=False, decay_mean=False, **kwargs):
         """
         :param in_features: Input dimensionality
         :param out_features: Output dimensionality
@@ -103,6 +103,7 @@ class BinaryGatedLinear(Module):
         self.use_baseline_bias = use_baseline_bias
         self.optimize_inference = optimize_inference
         self.one_sample_per_item = one_sample_per_item
+        self.decay_mean = decay_mean
 
         self.random_weight = random_weight
         if random_weight:
@@ -165,7 +166,14 @@ class BinaryGatedLinear(Module):
             torch.clamp(inh_p1.data, min=0, max=1, out=inh_p1.data)
 
             if self.l2_strength == 0:
-                return self.l0_strength * (exc_p1 + inh_p1).sum()
+                if self.decay_mean:
+                    connections_per_unit = (exc_p1 + inh_p1).sum(dim=1)
+                    mean = torch.mean(connections_per_unit.data)
+
+                    return self.l0_strength * torch.abs(connections_per_unit
+                                                        - (mean / 2)).sum()
+                else:
+                    return self.l0_strength * (exc_p1 + inh_p1).sum()
             else:
                 exc_weight_decay_ungated = (
                     .5 * self.l2_strength * self.exc_weight.pow(2))
@@ -271,7 +279,7 @@ class BinaryGatedConv2d(Module):
                  droprate_init=0.5, l2_strength=1., l0_strength=1.,
                  random_weight=True, deterministic=False,
                  use_baseline_bias=False, optimize_inference=True,
-                 one_sample_per_item=False, **kwargs):
+                 one_sample_per_item=False, decay_mean=False, **kwargs):
         """
         :param in_channels: Number of input channels
         :param out_channels: Number of output channels
@@ -305,6 +313,7 @@ class BinaryGatedConv2d(Module):
         self.use_baseline_bias = use_baseline_bias
         self.optimize_inference = optimize_inference
         self.one_sample_per_item = one_sample_per_item
+        self.decay_mean = decay_mean
 
         self.random_weight = random_weight
         if random_weight:
@@ -371,7 +380,15 @@ class BinaryGatedConv2d(Module):
             torch.clamp(inh_p1.data, min=0, max=1, out=inh_p1.data)
 
             if self.l2_strength == 0:
-                return self.l0_strength * (exc_p1 + inh_p1).sum()
+                if self.decay_mean:
+                    connections_per_unit = (exc_p1 + inh_p1).sum(
+                        dim=tuple(range(1, len(exc_p1.shape))))
+                    mean = torch.mean(connections_per_unit.data)
+
+                    return self.l0_strength * torch.abs(connections_per_unit
+                                                        - (mean / 2)).sum()
+                else:
+                    return self.l0_strength * (exc_p1 + inh_p1).sum()
             else:
                 exc_weight_decay_ungated = (
                     .5 * self.l2_strength * self.exc_weight.pow(2))
