@@ -20,6 +20,8 @@
 # ----------------------------------------------------------------------
 
 from .constrain_parameters import ConstrainParameters
+from .custom_structure_optim import CustomStructureOptim
+from .log_covariance import LogCovariance
 from .log_structure import LogStructure
 from .regularize import Regularize
 from .rezero_weights import RezeroWeights

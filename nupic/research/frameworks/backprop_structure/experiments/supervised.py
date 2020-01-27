@@ -58,7 +58,7 @@ class Supervised(object):
         self.training_iterations = training_iterations
 
         optim_constructor = getattr(torch.optim, optim_alg)
-        self.optimizer = optim_constructor(self.model.parameters(),
+        self.optimizer = optim_constructor(self._get_parameters(),
                                            **optim_params)
 
         sched_constructor = getattr(torch.optim.lr_scheduler, lr_scheduler_alg)
@@ -164,6 +164,9 @@ class Supervised(object):
     def restore(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
         self.model.load_state_dict(torch.load(checkpoint_path))
+
+    def _get_parameters(self):
+        return self.model.parameters()
 
     def _regularization(self):
         return 0
