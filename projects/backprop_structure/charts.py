@@ -28,15 +28,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from ray import tune
 
-from nupic.research.frameworks.backprop_structure.experiments.ax_pareto import (
-    get_frontier_trials,
-)
-from nupic.research.frameworks.backprop_structure.experiments.ax_single import (
-    get_best_config,
-)
 from nupic.research.frameworks.backprop_structure.networks import (
     gsc_lesparsenet,
     mnist_lesparsenet,
+)
+from nupic.research.frameworks.backprop_structure.ray_ax import (
+    get_best_config,
+    get_frontier_trials,
 )
 
 NOISE_LEVELS = np.arange(0.0, 0.51, 0.05)
