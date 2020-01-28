@@ -17,13 +17,18 @@
 #
 #  http://numenta.org/licenses/
 #
-
+import io
 import unittest
 
 import torch
 import torch.nn
 
-from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
+from nupic.research.frameworks.pytorch.model_compare import compare_models
+from nupic.research.frameworks.pytorch.model_utils import (
+    count_nonzero_params,
+    deserialize_state_dict,
+    serialize_state_dict,
+)
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.torch.modules import Flatten
 
@@ -112,6 +117,27 @@ class ModelCompareTest(unittest.TestCase):
         total_params, total_nonzero_params = count_nonzero_params(model)
         self.assertEqual(total_nonzero_params, expected_nonzero_params)
         self.assertEqual(total_params, expected_params)
+
+
+class ModelSerializationTest(unittest.TestCase):
+
+    def test_serialization(self):
+        model1 = simple_linear_net()
+        model2 = simple_linear_net()
+
+        def init(m):
+            if hasattr(m, "weight") and m.weight is not None:
+                m.weight.data.fill_(42.0)
+        model2.apply(init)
+
+        with io.BytesIO() as buffer:
+            serialize_state_dict(buffer, model1.state_dict())
+
+            buffer.seek(0)
+            state_dict = deserialize_state_dict(buffer)
+            model2.load_state_dict(state_dict)
+
+        self.assertTrue(compare_models(model1, model2, (32,)))
 
 
 if __name__ == "__main__":
