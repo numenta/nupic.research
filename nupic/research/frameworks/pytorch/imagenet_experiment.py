@@ -24,7 +24,6 @@ import itertools
 import logging
 import multiprocessing
 import os
-import pickle
 import sys
 from pprint import pformat
 
@@ -52,7 +51,9 @@ from nupic.research.frameworks.pytorch.dataset_utils import (
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
+    deserialize_state_dict,
     evaluate_model,
+    serialize_state_dict,
     set_random_seed,
     train_model,
 )
@@ -654,36 +655,20 @@ class ImagenetExperiment:
         # See https://github.com/ray-project/ray/issues/5519
         state = {}
         with io.BytesIO() as buffer:
-            torch.save(
-                self.model.module.state_dict(),
-                buffer,
-                pickle_protocol=pickle.HIGHEST_PROTOCOL,
-            )
+            serialize_state_dict(buffer, self.model.module.state_dict())
             state["model"] = buffer.getvalue()
 
         with io.BytesIO() as buffer:
-            torch.save(
-                self.optimizer.state_dict(),
-                buffer,
-                pickle_protocol=pickle.HIGHEST_PROTOCOL,
-            )
+            serialize_state_dict(buffer, self.optimizer.state_dict())
             state["optimizer"] = buffer.getvalue()
 
         with io.BytesIO() as buffer:
-            torch.save(
-                self.lr_scheduler.state_dict(),
-                buffer,
-                pickle_protocol=pickle.HIGHEST_PROTOCOL,
-            )
+            serialize_state_dict(buffer, self.lr_scheduler.state_dict())
             state["lr_scheduler"] = buffer.getvalue()
 
         if self.mixed_precision and amp is not None:
             with io.BytesIO() as buffer:
-                torch.save(
-                    amp.state_dict(),
-                    buffer,
-                    pickle_protocol=pickle.HIGHEST_PROTOCOL,
-                )
+                serialize_state_dict(buffer, amp.state_dict())
                 state["amp"] = buffer.getvalue()
 
         return state
@@ -695,23 +680,23 @@ class ImagenetExperiment:
         """
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
-                state_dict = torch.load(buffer, map_location=self.device)
+                state_dict = deserialize_state_dict(buffer, self.device)
                 self.model.module.load_state_dict(state_dict)
 
         if "optimizer" in state:
             with io.BytesIO(state["optimizer"]) as buffer:
-                state_dict = torch.load(buffer, map_location=self.device)
+                state_dict = deserialize_state_dict(buffer, self.device)
                 self.optimizer.load_state_dict(state_dict)
 
         if "lr_scheduler" in state:
             with io.BytesIO(state["lr_scheduler"]) as buffer:
-                state_dict = torch.load(buffer, map_location=self.device)
+                state_dict = deserialize_state_dict(buffer, self.device)
                 self.lr_scheduler.load_state_dict(state_dict)
 
         if "amp" in state and amp is not None:
             with io.BytesIO(state["amp"]) as buffer:
-                state_dict = torch.load(buffer)
-                amp.load_state_dict(state_dict)
+                state_dict = deserialize_state_dict(buffer, self.device)
+            amp.load_state_dict(state_dict)
 
     def stop_experiment(self):
         if self.distributed:
