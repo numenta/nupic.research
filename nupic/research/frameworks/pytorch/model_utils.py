@@ -18,6 +18,8 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+import gzip
+import pickle
 import random
 import sys
 
@@ -207,3 +209,31 @@ def count_nonzero_params(model):
         total_params += param.data.numel()
 
     return total_params, total_nonzero_params
+
+
+def serialize_state_dict(fileobj, state_dict):
+    """
+    Serialize the state dict to file object
+    :param fileobj: file-like object such as :class:`io.BytesIO`
+    :param state_dict: state dict to serialize. Usually the dict returned by
+                       module.state_dict() but it can be any state dict.
+   """
+    with gzip.GzipFile(fileobj=fileobj, mode="wb") as fout:
+        torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def deserialize_state_dict(fileobj, device=None):
+    """
+    Deserialize state dict saved via :func:`_serialize_state_dict` from
+    the given file object
+    :param fileobj: file-like object such as :class:`io.BytesIO`
+    :param device: Device to map tensors to
+    :return: the state dict stored in the file object
+    """
+    try:
+        with gzip.GzipFile(fileobj=fileobj, mode="rb") as fin:
+            state_dict = torch.load(fin, map_location=device)
+    except OSError:
+        # FIXME: Backward compatibility with old uncompressed checkpoints
+        state_dict = torch.load(fileobj, map_location=device)
+    return state_dict

@@ -19,13 +19,11 @@
 #
 import copy
 import functools
-import gzip
 import io
 import itertools
 import logging
 import multiprocessing
 import os
-import pickle
 import sys
 from pprint import pformat
 
@@ -53,7 +51,9 @@ from nupic.research.frameworks.pytorch.dataset_utils import (
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
+    deserialize_state_dict,
     evaluate_model,
+    serialize_state_dict,
     set_random_seed,
     train_model,
 )
@@ -340,34 +340,6 @@ def _create_model(model_class, model_args, init_batch_norm, device):
         _init_batch_norm(model)
     model.to(device)
     return model
-
-
-def _serialize_state_dict(fileobj, state_dict):
-    """
-    Serialize the state dict to file object
-    :param fileobj: file-like object such as :class:`io.BytesIO`
-    :param state_dict: state dict to serialize. Usually the dict returned by
-                       module.state_dict() but it can be any state dict.
-   """
-    with gzip.GzipFile(fileobj=fileobj, mode="wb") as fout:
-        torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
-
-
-def _deserialize_state_dict(fileobj, device):
-    """
-    Deserialize state dict saved via :func:`_serialize_state_dict` from
-    the given file object
-    :param fileobj: file-like object such as :class:`io.BytesIO`
-    :param device: Device to map tensors to
-    :return: the state dict stored in the file object
-    """
-    try:
-        with gzip.GzipFile(fileobj=fileobj, mode="rb") as fin:
-            state_dict = torch.load(fin, map_location=device)
-    except OSError:
-        # FIXME: Backward compatibility with old uncompressed checkpoints
-        state_dict = torch.load(fileobj, map_location=device)
-    return state_dict
 
 
 class ImagenetExperiment:
@@ -683,20 +655,20 @@ class ImagenetExperiment:
         # See https://github.com/ray-project/ray/issues/5519
         state = {}
         with io.BytesIO() as buffer:
-            _serialize_state_dict(buffer, self.model.module.state_dict())
+            serialize_state_dict(buffer, self.model.module.state_dict())
             state["model"] = buffer.getvalue()
 
         with io.BytesIO() as buffer:
-            _serialize_state_dict(buffer, self.optimizer.state_dict())
+            serialize_state_dict(buffer, self.optimizer.state_dict())
             state["optimizer"] = buffer.getvalue()
 
         with io.BytesIO() as buffer:
-            _serialize_state_dict(buffer, self.lr_scheduler.state_dict())
+            serialize_state_dict(buffer, self.lr_scheduler.state_dict())
             state["lr_scheduler"] = buffer.getvalue()
 
         if self.mixed_precision and amp is not None:
             with io.BytesIO() as buffer:
-                _serialize_state_dict(buffer, amp.state_dict())
+                serialize_state_dict(buffer, amp.state_dict())
                 state["amp"] = buffer.getvalue()
 
         return state
@@ -708,22 +680,22 @@ class ImagenetExperiment:
         """
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
-                state_dict = _deserialize_state_dict(buffer, self.device)
+                state_dict = deserialize_state_dict(buffer, self.device)
                 self.model.module.load_state_dict(state_dict)
 
         if "optimizer" in state:
             with io.BytesIO(state["optimizer"]) as buffer:
-                state_dict = _deserialize_state_dict(buffer, self.device)
+                state_dict = deserialize_state_dict(buffer, self.device)
                 self.optimizer.load_state_dict(state_dict)
 
         if "lr_scheduler" in state:
             with io.BytesIO(state["lr_scheduler"]) as buffer:
-                state_dict = _deserialize_state_dict(buffer, self.device)
+                state_dict = deserialize_state_dict(buffer, self.device)
                 self.lr_scheduler.load_state_dict(state_dict)
 
         if "amp" in state and amp is not None:
             with io.BytesIO(state["amp"]) as buffer:
-                state_dict = _deserialize_state_dict(buffer, self.device)
+                state_dict = deserialize_state_dict(buffer, self.device)
             amp.load_state_dict(state_dict)
 
     def stop_experiment(self):
