@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,11 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .constrain_parameters import ConstrainParameters
-from .custom_structure_optim import CustomStructureOptim
-from .log_covariance import LogCovariance
-from .log_structure import LogStructure
-from .regularize import Regularize
-from .rezero_weights import RezeroWeights
-from .test_noise import TestNoise
-from .update_boost_strength import UpdateBoostStrength
+from .optimize_accuracy import ax_optimize_accuracy, get_best_config
+from .optimize_accuracy_weightsparsity import (
+    ax_optimize_accuracy_weightsparsity,
+    get_frontier_trials,
+)

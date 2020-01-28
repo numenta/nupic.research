@@ -29,7 +29,7 @@ from nupic.research.frameworks.backprop_structure.modules import (
 )
 
 
-def nonzero_counts(model):
+def nonzero_counts(model, verbose):
     result = {}
 
     for layername, layer in model.named_modules():
@@ -46,12 +46,15 @@ def nonzero_counts(model):
             multiplies, adds = layer.count_inference_flops()
 
             result[layername] = {
-                "hist_inference_nz_by_unit": i_nz_by_unit.tolist(),
                 "inference_nz": torch.sum(i_nz_by_unit).item(),
                 "num_input_units": num_inputs,
                 "multiplies": multiplies,
                 "flops": multiplies + adds,
             }
+
+            if verbose:
+                result[layername]["hist_inference_nz_by_unit"] = (
+                    i_nz_by_unit.tolist())
 
     inference_nz = 0
     flops = 0
@@ -69,7 +72,12 @@ def nonzero_counts(model):
 
 
 class LogStructure(object):
+    def __init__(self, log_verbose_structure=True, **kwargs):
+        super().__init__(**kwargs)
+
+        self.log_verbose_structure = log_verbose_structure
+
     def run_epoch(self, iteration):
         result = super().run_epoch(iteration)
-        result.update(nonzero_counts(self.model))
+        result.update(nonzero_counts(self.model, self.log_verbose_structure))
         return result
