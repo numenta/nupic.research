@@ -403,17 +403,17 @@ class ImagenetExperiment:
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-                self.model.module.load_state_dict(state_dict)
+            self.model.module.load_state_dict(state_dict)
 
         if "optimizer" in state:
             with io.BytesIO(state["optimizer"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-                self.optimizer.load_state_dict(state_dict)
+            self.optimizer.load_state_dict(state_dict)
 
         if "lr_scheduler" in state:
             with io.BytesIO(state["lr_scheduler"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-                self.lr_scheduler.load_state_dict(state_dict)
+            self.lr_scheduler.load_state_dict(state_dict)
 
         if "amp" in state and amp is not None:
             with io.BytesIO(state["amp"]) as buffer:

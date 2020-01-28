@@ -21,6 +21,7 @@ import copy
 import io
 import itertools
 import os
+import pickle
 
 import h5py
 import torch
@@ -315,7 +316,7 @@ def create_model(model_class, model_args, init_batch_norm, device,
 
     # Load model parameters from checkpoint
     if checkpoint_file is not None:
-        state = torch.load(checkpoint_file)
+        state = pickle.load(checkpoint_file)
         with io.BytesIO(state["model"]) as buffer:
             state_dict = deserialize_state_dict(buffer, device)
         model.load_state_dict(state_dict)
