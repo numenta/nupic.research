@@ -29,7 +29,7 @@ from nupic.research.frameworks.backprop_structure.ray_ax import (
     ax_optimize_accuracy_weightsparsity,
 )
 
-NUM_TRAINING_ITERATIONS = 50
+NUM_TRAINING_ITERATIONS = 100
 
 PARAMETERS = [
     {"name": "lr", "type": "range", "bounds": [0.00001, 0.3],
@@ -42,8 +42,6 @@ PARAMETERS = [
      "value_type": "float"},
     {"name": "step_size", "type": "range", "bounds": [1, 10],
      "value_type": "int"},
-    {"name": "first_batch_size", "type": "range", "bounds": [4, 64],
-     "value_type": "int", "log_scale": True},
 ]
 
 
@@ -51,11 +49,9 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
                             mixins.LogStructure,
                             mixins.Regularize,
                             experiments.Supervised):
-    def __init__(self, lr, l0_strength, droprate_init, gamma, step_size,
-                 first_batch_size):
+    def __init__(self, lr, l0_strength, droprate_init, gamma, step_size):
 
         step_size = int(step_size)
-        first_batch_size = int(first_batch_size)
 
         super().__init__(
             model_alg="gsc_lenet_backpropstructure",
@@ -84,10 +80,22 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
 
             use_tqdm=False,
             batch_size_test=1000,
-            batch_size_train=(first_batch_size, 16),
+            batch_size_train=(16, 16),
 
             log_verbose_structure=False,
         )
+
+    # def run_epoch(self, iteration):
+    #     # with torch.autograd.profiler.profile(use_cuda=True) as prof:
+    #     pr = cProfile.Profile()
+    #     pr.enable()
+    #     result = super().run_epoch(iteration)
+    #     pr.disable()
+    #     # prof.export_chrome_trace(os.path.expanduser(
+    #     #     "~/chrome-trace{}.trace".format(iteration)))
+    #     pstats.Stats(pr).dump_stats(os.path.expanduser(
+    #         f"~/now-justloss-{iteration}.profile"))
+    #     return result
 
 
 class FollowupExperiment(mixins.TestNoise, ExploratoryExperiment):
