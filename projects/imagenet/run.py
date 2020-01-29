@@ -19,14 +19,12 @@
 #
 import argparse
 import copy
-import os
 import socket
+
 import torch
 
 from experiments import CONFIGS
-
 from nupic.research.frameworks.pytorch.imagenet import imagenet_tune
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

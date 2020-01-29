@@ -25,7 +25,6 @@ import ray
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 
-from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
