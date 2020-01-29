@@ -28,7 +28,7 @@ from .base import DEFAULT
 
 
 """
-An initial set of good parameters for sparse networks.
+An initial set of good parameters for sparse networks, i.e. Release 1.
 
 The sparse 100 configuration here gets between 80.5 to 82% in top-1 accuracy, after 60
 epochs and has about 77.5% average weight sparsity.
