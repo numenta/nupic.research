@@ -17,18 +17,14 @@
 #
 #  http://numenta.org/licenses/
 #
-import argparse
 import copy
 import os
-import socket
 from pprint import pprint
 
 import ray
-import torch
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 
-from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
@@ -104,8 +100,6 @@ class ImagenetTrainable(Trainable):
         # Wait for remote functions to complete
         results = ray.get(status)
 
-        print(results[0])
-
         # Return the results from the first remote function
         return copy.deepcopy(results[0])
 
@@ -124,19 +118,10 @@ class ImagenetTrainable(Trainable):
             w.__ray_terminate__.remote()
 
 
-def main(args):
-    if args.name is None:
-        parser.print_help()
-        exit(1)
-    else:
-        address = os.environ.get("REDIS_ADDRESS", args.redis_address)
-        ray.init(address=address)
-
-    # Get configuration values
-    config = copy.deepcopy(CONFIGS[args.name])
-
-    # Merge configuration with command line arguments
-    config.update(vars(args))
+def run(config):
+    # Connect to ray
+    address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
+    ray.init(address=address)
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
@@ -147,8 +132,10 @@ def main(args):
     kwargs["config"] = config
 
     # Update tune stop criteria with config epochs
+    stop = kwargs.get("stop", {}) or dict()
     epochs = config.get("epochs", 1)
-    kwargs["stop"].update(training_iteration=epochs)
+    stop.update(training_iteration=epochs)
+    kwargs["stop"] = stop
 
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
@@ -159,47 +146,3 @@ def main(args):
     pprint(kwargs)
     tune.run(**kwargs)
     ray.shutdown()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        argument_default=argparse.SUPPRESS
-    )
-    parser.add_argument("-e", "--experiment", dest="name", default="default",
-                        help="Experiment to run", choices=CONFIGS.keys())
-    parser.add_argument("-g", "--num-gpus", type=int,
-                        default=torch.cuda.device_count(),
-                        help="number of GPUs to use")
-    parser.add_argument("-n", "--num-cpus", type=int,
-                        default=torch.get_num_interop_threads(),
-                        help="number of CPUs to use when GPU is not available."),
-    parser.add_argument("-r", "--resume", action="store_true",
-                        help="Resume training from last known checkpoint")
-    parser.add_argument("-j", "--workers", type=int, default=6,
-                        help="Number of dataloaders workers")
-    parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
-                        help="Pytorch Distributed backend", default="nccl")
-    parser.add_argument("-d", "--dist-port", type=int, default=54321,
-                        help="tcp port to use for distributed pytorch training")
-    parser.add_argument("-s", "--with-server", action="store_true",
-                        help="Start Ray Tune API server")
-    parser.add_argument("-p", "--progress", action="store_true",
-                        help="Show progress during training")
-    parser.add_argument("-l", "--log-level",
-                        choices=["critical", "error", "warning", "info", "debug"],
-                        help="Python Logging level")
-    parser.add_argument("-f", "--log-format",
-                        help="Python Logging Format")
-    parser.add_argument("-x", "--max-failures", type=int, default=1,
-                        help="How many times to try to recover before stopping")
-    parser.add_argument("-c", "--checkpoint-freq", type=int,
-                        help="How often to checkpoint (epochs)")
-    parser.add_argument("--profile", action="store_true",
-                        help="Enable torch.autograd.profiler.profile during training")
-    parser.add_argument(
-        "-a", "--redis-address",
-        default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
-        help="redis address of an existing Ray server")
-
-    main(parser.parse_args())
