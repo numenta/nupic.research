@@ -37,6 +37,9 @@ def my_auto_sparse_conv_params(in_channels, out_channels, kernel_size):
     Custom weight params.
     :return: a dict to pass to `SparseWeights2d`
     """
+    if kernel_size == 7:
+        return None
+
     weights_per_channel = kernel_size * kernel_size * in_channels
     if weights_per_channel < 100:
         weights_density = 0.7
@@ -176,14 +179,21 @@ SUPER_SPARSE100_SEEDS.update(dict(
 # Try much longer number of epochs (with random seeds) - does do better.
 SUPER_SPARSE100_LONG = copy.deepcopy(SUPER_SPARSE100)
 SUPER_SPARSE100_LONG.update(dict(
-    epochs=80,
+    epochs=60,
+    checkpoint_freq=1,
+    keep_checkpoints_num=2,
+    checkpoint_score_attr="training_iteration",
+    checkpoint_at_end=True,
+
+    # Seed
+    seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
 
     lr_scheduler_args=dict(
         max_lr=6.0,
         div_factor=6,  # initial_lr = 1.0
         final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=5.0 / 80.0,
-        epochs=80,
+        pct_start=5.0 / 60.0,
+        epochs=60,
         anneal_strategy="linear",
         max_momentum=0.01,
         cycle_momentum=False,
@@ -195,6 +205,12 @@ SUPER_SPARSE100_LONG.update(dict(
 # Did well with 200 epochs (> 73%).
 SUPER_SPARSE1000_LONG = copy.deepcopy(SUPER_SPARSE100_LONG)
 SUPER_SPARSE1000_LONG.update(dict(
+    # How often to checkpoint (epochs)
+    checkpoint_freq=0,
+    keep_checkpoints_num=0,
+    checkpoint_score_attr="training_iteration",
+    checkpoint_at_end=True,
+
     num_classes=1000,
     epochs=120,
     model_args=dict(config=dict(
