@@ -24,7 +24,6 @@ from .custom_super import CONFIGS as CUSTOM_SUPER
 from .default import CONFIGS as DEFAULT
 from .mixed_precision import CONFIGS as MIXED_PRECISION
 from .super_convergence import CONFIGS as SUPER_CONVERGENCE
-from .custom_25 import CONFIGS as CUSTOM_25
 from .sparse_r1 import CONFIGS as SPARSE_R1
 
 """
@@ -40,5 +39,4 @@ CONFIGS.update(CUSTOM_SUPER)
 CONFIGS.update(DEFAULT)
 CONFIGS.update(MIXED_PRECISION)
 CONFIGS.update(SUPER_CONVERGENCE)
-CONFIGS.update(CUSTOM_25)
 CONFIGS.update(SPARSE_R1)
