@@ -58,9 +58,22 @@ def get_noise_score(results, custom_noise_levels=None):
     return np.mean(scores)
 
 
-def save_charts(chart_prefix, experiments, dense_exp, densenet_constructor,
-                hsd_exp, hsd_kw_exp, hsd_constructor, error_xlim, error_ylim,
-                acc_xlim, acc_ylim, acc_noise_xlim):
+def get_hsd_weights_by_layer(hsd_constructor):
+    lesparsenet = hsd_constructor()
+    hsd_weights_by_layer = {
+        "output": lesparsenet.output.weight.detach().numpy().size,
+    }
+    for name in ["cnn1_cnn", "cnn2_cnn", "linear1"]:
+        m = getattr(lesparsenet, name)
+        hsd_weights_by_layer[name] = (m.weight_sparsity
+                                      * m.module.weight.detach().numpy().size)
+    return hsd_weights_by_layer
+
+
+def save_charts(  # NOQA: C901
+        chart_prefix, experiments, dense_exp, densenet_constructor,
+        hsd_exp, hsd_kw_exp, hsd_constructor, error_xlim, error_ylim,
+        acc_xlim, acc_ylim, acc_noise_xlim):
     script_dir = os.path.dirname(os.path.realpath(__file__))
     output_dir = Path(script_dir) / "output"
     os.makedirs(output_dir, exist_ok=True)
@@ -95,54 +108,57 @@ def save_charts(chart_prefix, experiments, dense_exp, densenet_constructor,
         order = np.argsort(acc)
         noise_plot2_results.append((acc[order], noise_score[order]))
 
-    m = import_module(f"runs.{dense_exp}")
-    _, results = get_best_config(os.path.expanduser(f"~/ray_results/{dense_exp}"),
-                                 m.PARAMETERS,
-                                 m.NUM_TRAINING_ITERATIONS)
-    densenet_accuracy = np.mean([result["mean_accuracy"] for result in results])
-    densenet_noisescore = get_noise_score(results, NOISE_LEVELS)
+    if dense_exp is not None:
+        m = import_module(f"runs.{dense_exp}")
+        _, results = get_best_config(os.path.expanduser(f"~/ray_results/{dense_exp}"),
+                                     m.PARAMETERS,
+                                     m.NUM_TRAINING_ITERATIONS)
+        densenet_accuracy = np.mean([result["mean_accuracy"] for result in results])
+        densenet_noisescore = get_noise_score(results, NOISE_LEVELS)
 
-    densenet = densenet_constructor(
-        cnn_activity_percent_on=(1.0, 1.0),
-        cnn_weight_percent_on=(1.0, 1.0),
-        linear_activity_percent_on=(1.0,),
-        linear_weight_percent_on=(1.0,),)
-    densenet_num_weights = sum(
-        getattr(densenet, name).weight.detach().numpy().size
-        for name in ["cnn1_cnn", "cnn2_cnn", "linear1_linear", "output"])
+        densenet = densenet_constructor(
+            cnn_activity_percent_on=(1.0, 1.0),
+            cnn_weight_percent_on=(1.0, 1.0),
+            linear_activity_percent_on=(1.0,),
+            linear_weight_percent_on=(1.0,),)
+        densenet_num_weights = sum(
+            getattr(densenet, name).weight.detach().numpy().size
+            for name in ["cnn1_cnn", "cnn2_cnn", "linear1_linear", "output"])
 
-    m = import_module(f"runs.{hsd_exp}")
-    df = tune.Analysis(os.path.expanduser(f"~/ray_results/{hsd_exp}")).dataframe()
-    df = df[df["training_iteration"] == m.NUM_TRAINING_ITERATIONS]
-    hsd_accuracy = np.mean(df["mean_accuracy"])
-    hsd_noisescore = np.mean(get_noise_score(
-        [result for _, result in df.iterrows()],
-        NOISE_LEVELS))
+    if hsd_exp is not None:
+        m = import_module(f"runs.{hsd_exp}")
+        df = tune.Analysis(
+            os.path.expanduser(f"~/ray_results/{hsd_exp}")).dataframe()
+        df = df[df["training_iteration"] == m.NUM_TRAINING_ITERATIONS]
+        hsd_accuracy = np.mean(df["mean_accuracy"])
+        hsd_noisescore = np.mean(get_noise_score(
+            [result for _, result in df.iterrows()],
+            NOISE_LEVELS))
 
-    m = import_module(f"runs.{hsd_kw_exp}")
-    df = tune.Analysis(os.path.expanduser(f"~/ray_results/{hsd_kw_exp}")).dataframe()
-    df = df[df["training_iteration"] == m.NUM_TRAINING_ITERATIONS]
-    hsd_kw_accuracy = np.mean(df["mean_accuracy"])
-    hsd_kw_noisescore = np.mean(get_noise_score(
-        [result for _, result in df.iterrows()],
-        NOISE_LEVELS))
+    if hsd_kw_exp is not None:
+        m = import_module(f"runs.{hsd_kw_exp}")
+        df = tune.Analysis(
+            os.path.expanduser(f"~/ray_results/{hsd_kw_exp}")).dataframe()
+        df = df[df["training_iteration"] == m.NUM_TRAINING_ITERATIONS]
+        hsd_kw_accuracy = np.mean(df["mean_accuracy"])
+        hsd_kw_noisescore = np.mean(get_noise_score(
+            [result for _, result in df.iterrows()],
+            NOISE_LEVELS))
 
-    lesparsenet = hsd_constructor()
-    hsd_num_weights = 0
-    for name in ["cnn1_cnn", "cnn2_cnn", "linear1"]:
-        m = getattr(lesparsenet, name)
-        hsd_num_weights += (m.weight_sparsity
-                            * m.module.weight.detach().numpy().size)
-    hsd_num_weights += lesparsenet.output.weight.detach().numpy().size
+        hsd_weights_by_layer = get_hsd_weights_by_layer(hsd_constructor)
+        hsd_num_weights = sum(hsd_weights_by_layer.values())
 
     fig = plt.figure(figsize=(4, 4))
 
     for nz, err in plot1_results:
         plt.plot(nz, err, "-o")
 
-    plt.plot(hsd_num_weights, 1 - hsd_accuracy, "x", color="C1")
-    plt.plot(hsd_num_weights, 1 - hsd_kw_accuracy, "x", color="C1")
-    plt.plot(densenet_num_weights, 1 - densenet_accuracy, "d", color="C3")
+    if hsd_exp is not None:
+        plt.plot(hsd_num_weights, 1 - hsd_accuracy, "x", color="C1")
+    if hsd_kw_exp is not None:
+        plt.plot(hsd_num_weights, 1 - hsd_kw_accuracy, "x", color="C1")
+    if dense_exp is not None:
+        plt.plot(densenet_num_weights, 1 - densenet_accuracy, "d", color="C3")
 
     plt.xlabel("# of weights")
     plt.xscale("log")
@@ -161,9 +177,12 @@ def save_charts(chart_prefix, experiments, dense_exp, densenet_constructor,
     for nz, acc in plot2_results:
         plt.plot(nz, acc, "-o")
 
-    plt.plot(hsd_num_weights, hsd_accuracy, "x", color="C1")
-    plt.plot(hsd_num_weights, hsd_kw_accuracy, "x", color="C1")
-    plt.plot(densenet_num_weights, densenet_accuracy, "d", color="C3")
+    if hsd_exp is not None:
+        plt.plot(hsd_num_weights, hsd_accuracy, "x", color="C1")
+    if hsd_kw_exp is not None:
+        plt.plot(hsd_num_weights, hsd_kw_accuracy, "x", color="C1")
+    if dense_exp is not None:
+        plt.plot(densenet_num_weights, densenet_accuracy, "d", color="C3")
 
     plt.xlabel("# of weights")
     plt.xscale("log")
@@ -180,9 +199,12 @@ def save_charts(chart_prefix, experiments, dense_exp, densenet_constructor,
     for nz, noise_score in noise_plot1_results:
         plt.plot(nz, noise_score, "-o")
 
-    plt.plot(hsd_num_weights, hsd_noisescore, "x", color="C1")
-    plt.plot(hsd_num_weights, hsd_kw_noisescore, "x", color="C1")
-    plt.plot(densenet_num_weights, densenet_noisescore, "d", color="C3")
+    if hsd_exp is not None:
+        plt.plot(hsd_num_weights, hsd_noisescore, "x", color="C1")
+    if hsd_kw_exp is not None:
+        plt.plot(hsd_num_weights, hsd_kw_noisescore, "x", color="C1")
+    if dense_exp is not None:
+        plt.plot(densenet_num_weights, densenet_noisescore, "d", color="C3")
 
     plt.xlabel("# of weights")
     plt.xscale("log")
@@ -200,9 +222,12 @@ def save_charts(chart_prefix, experiments, dense_exp, densenet_constructor,
     for acc, noise_score in noise_plot2_results:
         plt.plot(acc, noise_score, "-o")
 
-    plt.plot(hsd_accuracy, hsd_noisescore, "x", color="C1")
-    plt.plot(hsd_accuracy, hsd_kw_noisescore, "x", color="C1")
-    plt.plot(densenet_accuracy, densenet_noisescore, "d", color="C3")
+    if hsd_exp is not None:
+        plt.plot(hsd_accuracy, hsd_noisescore, "x", color="C1")
+    if hsd_kw_exp is not None:
+        plt.plot(hsd_accuracy, hsd_kw_noisescore, "x", color="C1")
+    if dense_exp is not None:
+        plt.plot(densenet_accuracy, densenet_noisescore, "d", color="C3")
 
     plt.xlabel("accuracy")
     plt.xlim(acc_noise_xlim)
@@ -252,8 +277,8 @@ if __name__ == "__main__":
         experiments=["ax_ln_bps_mnist", "ax_ln_bps_batchnorm_mnist"],
         dense_exp="ax_ln_mnist",
         densenet_constructor=mnist_lesparsenet,
-        hsd_exp="run_lenet_staticstructure_mnist",
-        hsd_kw_exp="run_lenet_staticstructure_kwinners_mnist",
+        hsd_exp=None,
+        hsd_kw_exp=None,
         hsd_constructor=mnist_lesparsenet,
         error_xlim=(1e1, 2e6),
         error_ylim=(1e-3, 1e0),
