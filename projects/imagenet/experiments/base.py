@@ -38,7 +38,7 @@ BATCH_SIZE = 128
 # See http://github.com/pytorch/examples/blob/master/imagenet/main.py
 DEFAULT = dict(
     # Results path
-    local_dir=os.path.expanduser("~/nta/results/imagenet"),
+    local_dir=os.path.expanduser("~/nta/results/experiments/imagenet"),
     # Dataset location (directory path or HDF5 file with the raw images)
     data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
     # Dataset training data relative path

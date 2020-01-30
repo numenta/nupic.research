@@ -28,7 +28,14 @@ from .base import DEFAULT
 
 
 """
-Imagenet superconvergence where we set custom sparse params
+An initial set of good parameters for sparse networks, i.e. Release 1.
+
+The sparse 100 configuration here gets between 80.5 to 82% in top-1 accuracy, after 60
+epochs and has about 77.5% average weight sparsity.
+
+The sparse 1000 configuration, with the same weight sparsities, gets about 72.23% in
+top-1 accuracy after 120 epochs.
+
 """
 
 
@@ -37,9 +44,6 @@ def my_auto_sparse_conv_params(in_channels, out_channels, kernel_size):
     Custom weight params.
     :return: a dict to pass to `SparseWeights2d`
     """
-    if kernel_size == 7:
-        return None
-
     weights_per_channel = kernel_size * kernel_size * in_channels
     if weights_per_channel < 100:
         weights_density = 0.7
@@ -100,35 +104,20 @@ def my_auto_sparse_linear_params(input_size, output_size):
     )
 
 
-DEBUG_CUSTOM = copy.deepcopy(DEFAULT)
-DEBUG_CUSTOM.update(dict(
-    epochs=3,
-    log_level="debug",
-    num_classes=2,
-
-    model_args=dict(config=dict(
-        num_classes=2,
-        defaults_sparse=True,
-        activation_params_func=my_auto_sparse_activation_params,
-        conv_params_func=my_auto_sparse_conv_params,
-        linear_params_func=my_auto_sparse_linear_params
-    )),
-
-    weight_params=inspect.getsource(my_auto_sparse_conv_params),
-    activation_params=inspect.getsource(my_auto_sparse_activation_params),
-    linear_params=inspect.getsource(my_auto_sparse_linear_params),
-
-))
-
-
-# This gets to about 78.6% after 35 epochs, 81% after 60 epochs
-SUPER_SPARSE100 = copy.deepcopy(DEFAULT)
-SUPER_SPARSE100.update(dict(
+# This configuration gets between 80.5 to 82% after 60 epochs
+SPARSE100_R1 = copy.deepcopy(DEFAULT)
+SPARSE100_R1.update(dict(
     # No weight decay from batch norm modules
     batch_norm_weight_decay=False,
     init_batch_norm=True,
 
-    epochs=40,
+    epochs=60,
+    checkpoint_freq=1,
+    keep_checkpoints_num=2,
+    checkpoint_score_attr="training_iteration",
+    checkpoint_at_end=True,
+    seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
+
     num_classes=100,
 
     model_args=dict(config=dict(
@@ -145,8 +134,8 @@ SUPER_SPARSE100.update(dict(
         max_lr=6.0,
         div_factor=6,  # initial_lr = 1.0
         final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=4.0 / 40.0,
-        epochs=40,
+        pct_start=5.0 / 60.0,
+        epochs=60,
         anneal_strategy="linear",
         max_momentum=0.01,
         cycle_momentum=False,
@@ -165,51 +154,12 @@ SUPER_SPARSE100.update(dict(
 
 ))
 
-# Try different random seeds of the above
-SUPER_SPARSE100_SEEDS = copy.deepcopy(SUPER_SPARSE100)
-SUPER_SPARSE100_SEEDS.update(dict(
-    # Seed
-    seed=tune.sample_from(lambda spec: np.random.randint(1, 10000)),
-
-    # Number of times to sample from the hyperparameter space.
-    num_samples=2,
-))
-
-
-# Try much longer number of epochs (with random seeds) - does do better.
-SUPER_SPARSE100_LONG = copy.deepcopy(SUPER_SPARSE100)
-SUPER_SPARSE100_LONG.update(dict(
-    epochs=60,
-    checkpoint_freq=1,
-    keep_checkpoints_num=2,
-    checkpoint_score_attr="training_iteration",
-    checkpoint_at_end=True,
-
-    # Seed
-    seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
-
-    lr_scheduler_args=dict(
-        max_lr=6.0,
-        div_factor=6,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=5.0 / 60.0,
-        epochs=60,
-        anneal_strategy="linear",
-        max_momentum=0.01,
-        cycle_momentum=False,
-    ),
-))
-
-# Try much longer number of epochs.
-# This is one of the tricks that helps, see https://arxiv.org/abs/1711.04291
-# Did well with 200 epochs (> 73%).
-SUPER_SPARSE1000_LONG = copy.deepcopy(SUPER_SPARSE100_LONG)
-SUPER_SPARSE1000_LONG.update(dict(
-    # How often to checkpoint (epochs)
-    checkpoint_freq=0,
-    keep_checkpoints_num=0,
-    checkpoint_score_attr="training_iteration",
-    checkpoint_at_end=True,
+# Try much longer number of epochs that 100 category version and a lower
+# weight decay. (see https://arxiv.org/abs/1711.04291)
+# With 120 epochs this gets 72.23% top-1 accuracy. Earlier version got
+# about 73% with 200 epochs.
+SPARSE1000_R1 = copy.deepcopy(SPARSE100_R1)
+SPARSE1000_R1.update(dict(
 
     num_classes=1000,
     epochs=120,
@@ -240,11 +190,7 @@ SUPER_SPARSE1000_LONG.update(dict(
     ),
 ))
 
-# Export all configurations
 CONFIGS = dict(
-    debug_custom=DEBUG_CUSTOM,
-    super_sparse_100=SUPER_SPARSE100,
-    super_sparse_100_seeds=SUPER_SPARSE100_SEEDS,
-    super_sparse_100_long=SUPER_SPARSE100_LONG,
-    super_sparse_1000_long=SUPER_SPARSE1000_LONG,
+    sparse_100_r1=SPARSE100_R1,
+    sparse_1000_r1=SPARSE1000_R1,
 )
