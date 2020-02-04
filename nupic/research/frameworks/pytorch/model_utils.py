@@ -218,7 +218,7 @@ def serialize_state_dict(fileobj, state_dict):
     :param state_dict: state dict to serialize. Usually the dict returned by
                        module.state_dict() but it can be any state dict.
    """
-    with gzip.GzipFile(fileobj=fileobj, mode="wb") as fout:
+    with gzip.GzipFile(fileobj=fileobj, mode="wb", compresslevel=3) as fout:
         torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
 
