@@ -217,6 +217,8 @@ def serialize_state_dict(fileobj, state_dict, compresslevel=3):
     :param fileobj: file-like object such as :class:`io.BytesIO`
     :param state_dict: state dict to serialize. Usually the dict returned by
                        module.state_dict() but it can be any state dict.
+    :param compresslevel: compression level for gzip (lower equals faster but
+                          less compression).
    """
     with gzip.GzipFile(fileobj=fileobj, mode="wb", compresslevel=compresslevel) as fout:
         torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
