@@ -211,14 +211,14 @@ def count_nonzero_params(model):
     return total_params, total_nonzero_params
 
 
-def serialize_state_dict(fileobj, state_dict):
+def serialize_state_dict(fileobj, state_dict, compresslevel=3):
     """
     Serialize the state dict to file object
     :param fileobj: file-like object such as :class:`io.BytesIO`
     :param state_dict: state dict to serialize. Usually the dict returned by
                        module.state_dict() but it can be any state dict.
    """
-    with gzip.GzipFile(fileobj=fileobj, mode="wb", compresslevel=3) as fout:
+    with gzip.GzipFile(fileobj=fileobj, mode="wb", compresslevel=compresslevel) as fout:
         torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
 
