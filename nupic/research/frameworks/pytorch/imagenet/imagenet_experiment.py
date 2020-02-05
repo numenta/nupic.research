@@ -136,6 +136,10 @@ class ImagenetExperiment:
             - mixed_precision: Whether or not to enable apex mixed precision
             - mixed_precision_args: apex mixed precision arguments.
                                     See "amp.initialize"
+            - modify_init_hooks: list of hooks (functions) to call on the model
+                                 just following its initialization
+            - post_epoch_hooks: list of hooks (functions) to call on the model
+                                following each epoch of training
         """
         # Configure logger
         log_format = config.get("log_format", logging.BASIC_FORMAT)
