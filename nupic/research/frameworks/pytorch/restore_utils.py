@@ -126,8 +126,9 @@ def load_multi_state(model, config):
 
     # Validate results / quick sanity-check.
     assert set(linear_state.keys()).isdisjoint(nonlinear_state.keys())
-    if linear_params and not set(linear_state.keys()) == set(linear_params):
-        print("Warning: Unable to load all linear params [{}] from {}".format(
-            linear_params, linear_source))
+    if linear_params and linear_source:
+        if not set(linear_state.keys()) == set(linear_params):
+            print("Warning: Unable to load all linear params [{}] from {}".format(
+                linear_params, linear_source))
 
     return model
