@@ -19,8 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import io
-import os
 import logging
+import os
 import pickle
 
 import torch
