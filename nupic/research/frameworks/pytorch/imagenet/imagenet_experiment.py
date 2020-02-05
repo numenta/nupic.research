@@ -282,6 +282,9 @@ class ImagenetExperiment:
         # Only profile from rank 0
         self.profile = config.get("profile", False) and self.rank == 0
 
+        # Register post-epoch hooks. To be used as `self.model.apply(post_epoch_hook)`
+        self.post_epoch_hooks = config.get("post_epoch_hooks", [])
+
     def validate(self, loader=None):
         if loader is None:
             loader = self.val_loader
@@ -358,6 +361,9 @@ class ImagenetExperiment:
             params_sparse, nonzero_params_sparse1 = count_nonzero_params(self.model)
 
         self.model.apply(rezero_weights)
+        if self.post_epoch_hooks:
+            for hook in self.post_epoch_hooks:
+                self.model.apply(hook)
 
         if count_nnz:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
