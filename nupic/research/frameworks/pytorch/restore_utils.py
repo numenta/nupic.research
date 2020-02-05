@@ -52,43 +52,38 @@ def get_linear_param_names(model):
     return linear_params
 
 
-def load_multi_state(model, config):
+def load_multi_state(model, restore_full_model, restore_linear, restore_nonlinear):
     """
     Example 1:
     ```
     checkpoint_linear = "~/.../checkpoint_20/checkpoint"
     checkpoint_nonlinear = "~/.../checkpoint_1/checkpoint""
 
-    config = {
+    kwargs = {
         "restore_linear": checkpoint_linear,
         "restore_nonlinear": checkpoint_nonlinear,
     }
 
     model = ResNet()
-    model = load_multi_state(model, config)
+    model = load_multi_state(model, **kwargs)
     ```
 
     Example 2:
     ```
     checkpoint_model = "~/.../checkpoint_1/checkpoint""
 
-    config = {
+    kwargs = {
         "restore_full_model": checkpoint_model,
     }
 
     model = ResNet()
-    model = load_multi_state(model, config)
+    model = load_multi_state(model, **kwargs)
     ```
     """
 
-    # Identify checkpoints for the model and it's sub-components.
-    model_source = config.get("restore_full_model", None)
-    linear_source = config.get("restore_linear", None)
-    nonlinear_source = config.get("restore_nonlinear", None)
-
     # Case 1: Full model state specified.
-    if model_source:
-        state_dict = get_state_dict(model_source)
+    if restore_full_model:
+        state_dict = get_state_dict(restore_full_model)
 
         if state_dict:
             model.load_state_dict(state_dict, strict=False)
@@ -100,8 +95,8 @@ def load_multi_state(model, config):
 
     # Case 2a:  Linear param states
     linear_state = dict()
-    if linear_source:
-        state_dict = get_state_dict(linear_source)
+    if restore_linear:
+        state_dict = get_state_dict(restore_linear)
 
         if state_dict:
 
@@ -114,8 +109,8 @@ def load_multi_state(model, config):
 
     # Case 2b:  Non-Linear param states
     nonlinear_state = dict()
-    if nonlinear_source:
-        state_dict = get_state_dict(nonlinear_source)
+    if restore_nonlinear:
+        state_dict = get_state_dict(restore_nonlinear)
 
         if state_dict:
 
@@ -128,10 +123,10 @@ def load_multi_state(model, config):
 
     # Validate results / quick sanity-check.
     assert set(linear_state.keys()).isdisjoint(nonlinear_state.keys())
-    if linear_params and linear_source:
+    if linear_params and restore_linear:
         if not set(linear_state.keys()) == set(linear_params):
             print("Warning: Unable to load all linear params [{}] from {}".format(
-                linear_params, linear_source))
+                linear_params, restore_linear))
 
     return model
 
