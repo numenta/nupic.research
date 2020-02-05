@@ -24,6 +24,8 @@ import pickle
 
 import torch
 
+from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
+
 
 def get_state_dict(checkpoint_path):
 
@@ -33,7 +35,7 @@ def get_state_dict(checkpoint_path):
 
     if "model" in checkpoint_dict:
         with io.BytesIO(checkpoint_dict["model"]) as buffer:
-            state_dict = torch.load(buffer)
+            state_dict = deserialize_state_dict(buffer)
         return state_dict
     else:
         return None
