@@ -53,7 +53,12 @@ def get_linear_param_names(model):
     return linear_params
 
 
-def load_multi_state(model, restore_full_model, restore_linear, restore_nonlinear):
+def load_multi_state(
+    model,
+    restore_full_model=None,
+    restore_linear=None,
+    restore_nonlinear=None,
+):
     """
     Example 1:
     ```
