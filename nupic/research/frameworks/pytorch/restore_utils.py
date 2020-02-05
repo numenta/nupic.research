@@ -132,3 +132,16 @@ def load_multi_state(model, config):
                 linear_params, linear_source))
 
     return model
+
+
+def freeze_all_params(net, config):
+    for p in net.parameters():
+        p.requires_grad = False
+
+
+def unfreeze_linear_params(net, config):
+    for m in net.modules():
+        if isinstance(m, torch.nn.Linear):
+            print(m.__class__.__name__)
+            for p in m.parameters():
+                p.requires_grad = True
