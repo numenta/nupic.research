@@ -202,7 +202,7 @@ class ImagenetExperiment:
             modify_init_hooks = [modify_init_hooks]
         if modify_init_hooks:
             for modify_init in modify_init_hooks:
-                modified_model = modify_init(self.model, config=config)
+                modified_model = modify_init(self.model)
                 self.model = modified_model or self.model
 
         # Configure optimizer
