@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 import io
 import os
+import logging
 import pickle
 
 import torch
@@ -125,8 +126,10 @@ def load_multi_state(model, restore_full_model, restore_linear, restore_nonlinea
     assert set(linear_state.keys()).isdisjoint(nonlinear_state.keys())
     if linear_params and restore_linear:
         if not set(linear_state.keys()) == set(linear_params):
-            print("Warning: Unable to load all linear params [{}] from {}".format(
-                linear_params, restore_linear))
+            logging.warning(
+                "Warning: Unable to load all linear params [{}] from {}".format(
+                    linear_params, restore_linear)
+            )
 
     return model
 
