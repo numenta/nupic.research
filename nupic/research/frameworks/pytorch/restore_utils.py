@@ -142,6 +142,5 @@ def freeze_all_params(net, config):
 def unfreeze_linear_params(net, config):
     for m in net.modules():
         if isinstance(m, torch.nn.Linear):
-            print(m.__class__.__name__)
             for p in m.parameters():
                 p.requires_grad = True
