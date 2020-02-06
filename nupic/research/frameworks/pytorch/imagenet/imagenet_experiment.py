@@ -136,8 +136,8 @@ class ImagenetExperiment:
             - mixed_precision: Whether or not to enable apex mixed precision
             - mixed_precision_args: apex mixed precision arguments.
                                     See "amp.initialize"
-            - modify_init_hooks: list of hooks (functions) to call on the model
-                                 just following its initialization
+            - init_hooks: list of hooks (functions) to call on the model
+                          just following its initialization
             - post_epoch_hooks: list of hooks (functions) to call on the model
                                 following each epoch of training
         """
@@ -184,11 +184,13 @@ class ImagenetExperiment:
         model_class = config["model_class"]
         model_args = config.get("model_args", {})
         init_batch_norm = config.get("init_batch_norm", False)
+        init_hooks = config.get("init_hooks", None)
         self.model = create_model(
             model_class=model_class,
             model_args=model_args,
             init_batch_norm=init_batch_norm,
             device=self.device,
+            init_hooks=init_hooks,
         )
         if self.rank == 0:
             self.logger.debug(self.model)
@@ -196,14 +198,6 @@ class ImagenetExperiment:
             self.logger.debug("Params total/nnz %s / %s = %s ",
                               params_sparse, nonzero_params_sparse2,
                               float(nonzero_params_sparse2) / params_sparse)
-
-        modify_init_hooks = config.get("modify_init_hooks", [])
-        if not isinstance(modify_init_hooks, list):
-            modify_init_hooks = [modify_init_hooks]
-        if modify_init_hooks:
-            for modify_init in modify_init_hooks:
-                modified_model = modify_init(self.model)
-                self.model = modified_model or self.model
 
         # Configure optimizer
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
