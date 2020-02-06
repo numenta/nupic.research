@@ -292,7 +292,7 @@ def init_resnet50_batch_norm(model):
 
 
 def create_model(model_class, model_args, init_batch_norm, device,
-                 checkpoint_file=None):
+                 checkpoint_file=None, init_hooks=None):
     """
     Create imagenet experiment model with option to load state from checkpoint
 
@@ -320,5 +320,10 @@ def create_model(model_class, model_args, init_batch_norm, device,
         with io.BytesIO(state["model"]) as buffer:
             state_dict = deserialize_state_dict(buffer, device)
         model.load_state_dict(state_dict)
+
+    # Modify init via hooks.
+    elif init_hooks:
+        for hook, kwargs in init_hooks:
+            model = hook(model, **kwargs) or model
 
     return model

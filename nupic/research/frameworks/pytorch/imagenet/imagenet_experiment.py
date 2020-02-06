@@ -136,6 +136,10 @@ class ImagenetExperiment:
             - mixed_precision: Whether or not to enable apex mixed precision
             - mixed_precision_args: apex mixed precision arguments.
                                     See "amp.initialize"
+            - init_hooks: list of hooks (functions) to call on the model
+                          just following its initialization
+            - post_epoch_hooks: list of hooks (functions) to call on the model
+                                following each epoch of training
         """
         # Configure logger
         log_format = config.get("log_format", logging.BASIC_FORMAT)
@@ -180,11 +184,13 @@ class ImagenetExperiment:
         model_class = config["model_class"]
         model_args = config.get("model_args", {})
         init_batch_norm = config.get("init_batch_norm", False)
+        init_hooks = config.get("init_hooks", None)
         self.model = create_model(
             model_class=model_class,
             model_args=model_args,
             init_batch_norm=init_batch_norm,
             device=self.device,
+            init_hooks=init_hooks,
         )
         if self.rank == 0:
             self.logger.debug(self.model)
@@ -274,6 +280,9 @@ class ImagenetExperiment:
         # Only profile from rank 0
         self.profile = config.get("profile", False) and self.rank == 0
 
+        # Register post-epoch hooks. To be used as `self.model.apply(post_epoch_hook)`
+        self.post_epoch_hooks = config.get("post_epoch_hooks", [])
+
     def validate(self, loader=None):
         if loader is None:
             loader = self.val_loader
@@ -350,6 +359,9 @@ class ImagenetExperiment:
             params_sparse, nonzero_params_sparse1 = count_nonzero_params(self.model)
 
         self.model.apply(rezero_weights)
+        if self.post_epoch_hooks:
+            for hook in self.post_epoch_hooks:
+                self.model.apply(hook)
 
         if count_nnz:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
