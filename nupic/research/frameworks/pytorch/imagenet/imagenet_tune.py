@@ -83,8 +83,10 @@ class AffinityExecutor(RayTrialExecutor):
 
     def _commit_resources(self, resources):
         resources = copy.deepcopy(resources)
-        # FIXME: _commit_resources ignores extra_custom_resources
-        # if key is missing from custom_resources
+        # Make sure "custom_resources" keys match "extra_custom_resources" keys
+        # because `RayTrialExecutor._commit_resources` will only commit
+        # resources from "extra_custom_resources" if the same resource key
+        # is present in the "custom_resources" dict
         for k in resources.extra_custom_resources:
             if k not in resources.custom_resources:
                 resources.custom_resources[k] = 0.0
