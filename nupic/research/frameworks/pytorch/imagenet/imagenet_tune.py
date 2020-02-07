@@ -22,10 +22,10 @@ import os
 from pprint import pprint
 
 import ray
+import ray.resource_spec
 from ray import ray_constants
-from ray.resource_spec import ResourceSpec
-from ray.tune import Trainable, tune, TuneError
-from ray.tune.ray_trial_executor import RayTrialExecutor, RESOURCE_REFRESH_PERIOD
+from ray.tune import Trainable, TuneError, tune
+from ray.tune.ray_trial_executor import RESOURCE_REFRESH_PERIOD, RayTrialExecutor
 from ray.tune.resources import Resources
 
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
@@ -85,7 +85,7 @@ class AffinityExecutor(RayTrialExecutor):
         resources = copy.deepcopy(resources)
         # FIXME: _commit_resources ignores extra_custom_resources
         # if key is missing from custom_resources
-        for k, v in resources.extra_custom_resources.items():
+        for k in resources.extra_custom_resources:
             if k not in resources.custom_resources:
                 resources.custom_resources[k] = 0.0
 
@@ -130,9 +130,11 @@ class AffinityExecutor(RayTrialExecutor):
                 required -= available
 
         if required > 0:
-            raise TuneError(f"Unable to start trial {trial.trial_id}. Not enough nodes")
+            raise TuneError(f"Unable to start trial {trial.trial_id}. "
+                            f"Not enough nodes")
 
-        # Update trial node affinity configuration and extra_custom_resources requirement
+        # Update trial node affinity configuration and
+        # extra_custom_resources requirement
         trial.config.update(__ray_node_affinity__=custom_resources)
         trial.resources.extra_custom_resources.update(custom_resources)
         super().start_trial(trial, checkpoint)
@@ -213,7 +215,7 @@ class ImagenetTrainable(Trainable):
 
         # Create one ray remote process for each experiment in the process group
         self.procs = []
-        for i in range(world_size):
+        for _ in range(world_size):
             if ray_node_affinity and node_resource <= 0:
                 node_id, node_resource = ray_node_affinity.popitem()
                 proc_per_node = getattr(resources_by_node[node_id], resource_attr, 0)
