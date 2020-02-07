@@ -128,7 +128,7 @@ class AffinityExecutor(RayTrialExecutor):
                 required = 0
                 break
             else:
-                custom_resources[node_id] = node_capacity
+                custom_resources[node_id] = remaining_capacity
                 required -= available
 
         if required > 0:
