@@ -22,6 +22,7 @@ import io
 import logging
 import multiprocessing
 import sys
+import time
 from pprint import pformat
 
 import ray.services
@@ -89,6 +90,7 @@ class ImagenetExperiment:
         self.logger = None
         self.seed = 42
         self.profile = False
+        self.validate_after_epoch = 0
 
     def setup_experiment(self, config):
         """
@@ -230,6 +232,7 @@ class ImagenetExperiment:
         # Configure data loaders
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
+        self.validate_after_epoch = config.get("validate_after_epoch", self.epochs-3)
         workers = config.get("workers", 0)
         data_dir = config["data"]
         train_dir = config.get("train_dir", "train")
@@ -251,6 +254,7 @@ class ImagenetExperiment:
             workers=workers,
             distributed=self.distributed,
             num_classes=num_classes,
+            use_auto_augment=config.get("use_auto_augment", False),
         )
         self.total_batches = len(self.train_loader)
 
@@ -283,17 +287,25 @@ class ImagenetExperiment:
         # Register post-epoch hooks. To be used as `self.model.apply(post_epoch_hook)`
         self.post_epoch_hooks = config.get("post_epoch_hooks", [])
 
-    def validate(self, loader=None):
+    def validate(self, epoch, loader=None):
         if loader is None:
             loader = self.val_loader
 
-        results = evaluate_model(
-            model=self.model,
-            loader=loader,
-            device=self.device,
-            criterion=self.loss_function,
-            batches_in_epoch=self.batches_in_epoch,
-        )
+        if epoch >= self.validate_after_epoch:
+            results = evaluate_model(
+                model=self.model,
+                loader=loader,
+                device=self.device,
+                criterion=self.loss_function,
+                batches_in_epoch=self.batches_in_epoch,
+            )
+        else:
+            results = {
+                "total_correct": 0,
+                "mean_loss": 0.0,
+                "mean_accuracy": 0.0,
+            }
+
         results.update(
             learning_rate=self.get_lr()[0],
         )
@@ -321,10 +333,13 @@ class ImagenetExperiment:
         self.pre_epoch(epoch)
         self.train_epoch(epoch)
         self.post_epoch(epoch)
-        ret = self.validate()
+        t1 = time.time()
+        ret = self.validate(epoch)
 
-        self.logger.debug("---------- End of run epoch ------------")
-        self.logger.debug("")
+        if self.rank == 0:
+            self.logger.debug("validate time: %s", time.time()-t1)
+            self.logger.debug("---------- End of run epoch ------------")
+            self.logger.debug("")
 
         return ret
 
@@ -336,12 +351,12 @@ class ImagenetExperiment:
     def pre_batch(self, model, batch_idx, epoch):
         pass
 
-    def post_batch(self, model, loss, batch_idx, epoch):
+    def post_batch(self, model, loss, batch_idx, epoch, num_images, times):
         # Update 1cycle learning rate after every batch
         if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
-        if self.progress and (batch_idx % 10) == 0:
+        if self.progress and (batch_idx % 40) == 0:
             total_batches = self.total_batches
             current_batch = batch_idx
             if self.distributed:
@@ -350,8 +365,9 @@ class ImagenetExperiment:
                 current_batch *= self.train_loader.sampler.num_replicas
             self.logger.debug("End of batch. Epoch: %s, Batch: %s/%s, loss: %s, "
                               "Learning rate: %s",
-                              epoch, current_batch, total_batches, loss,
-                              self.get_lr())
+                              epoch, current_batch, total_batches, loss, self.get_lr())
+            self.logger.debug("    num_images: %s, rank: %s, times: %s",
+                              num_images, self.rank, times)
 
     def post_epoch(self, epoch):
         count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0

@@ -41,6 +41,8 @@ from nupic.research.frameworks.pytorch.dataset_utils import (
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
 
+from .auto_augment import ImageNetPolicy
+
 IMAGENET_NUM_CLASSES = {
     10: [
         "n02091244", "n02112350", "n02454379", "n02979186", "n03372029",
@@ -72,7 +74,8 @@ IMAGENET_NUM_CLASSES = {
 
 
 def create_train_dataloader(
-    data_dir, train_dir, batch_size, workers, distributed, num_classes=1000
+    data_dir, train_dir, batch_size, workers, distributed, num_classes=1000,
+    use_auto_augment=False,
 ):
     """
     Configure Imagenet training dataloader
@@ -88,17 +91,31 @@ def create_train_dataloader(
     :param num_classes: Limit the dataset size to the given number of classes
     :return: torch.utils.data.DataLoader
     """
-    transform = transforms.Compose(
-        transforms=[
-            RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
-                inplace=True
-            ),
-        ],
-    )
+    if use_auto_augment:
+        transform = transforms.Compose(
+            transforms=[
+                RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                ImageNetPolicy(),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
+                    inplace=True
+                ),
+            ],
+        )
+    else:
+        transform = transforms.Compose(
+            transforms=[
+                RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
+                    inplace=True
+                ),
+            ],
+        )
     if h5py.is_hdf5(data_dir):
         # Use fixed Imagenet classes if mapping is available
         if num_classes in IMAGENET_NUM_CLASSES:
