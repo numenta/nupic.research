@@ -22,6 +22,7 @@ import gzip
 import pickle
 import random
 import sys
+import time
 
 import numpy as np
 import torch
@@ -91,6 +92,8 @@ def train_model(
                 "Please install apex from https://www.github.com/nvidia/apex")
 
     for batch_idx, (data, target) in enumerate(loader):
+        num_images = len(target)
+        t1 = time.time()
         if batch_idx >= batches_in_epoch:
             break
         if pre_batch_callback is not None:
@@ -103,16 +106,20 @@ def train_model(
         loss = criterion(output, target)
         del data, target, output
 
+        t2 = time.time()
         if use_amp:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
                 scaled_loss.backward()
         else:
             loss.backward()
 
+        t3 = time.time()
         optimizer.step()
+        t4 = time.time()
 
         if post_batch_callback is not None:
-            post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx)
+            post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
+                                num_images=num_images, times=[t2-t1, t3-t2, t4-t3])
         del loss
 
     if progress_bar is not None:
