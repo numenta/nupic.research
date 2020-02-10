@@ -180,11 +180,11 @@ def activation_layer(
     # Initialize kwinners module as specified.
     if activation_params is not None:
         return nn.Sequential(
+            nn.ReLU(inplace=True),
             KWinners2d(
                 out,
                 **activation_params
             ),
-            nn.ReLU(inplace=True)
         )
     else:
         return nn.ReLU(inplace=True)
