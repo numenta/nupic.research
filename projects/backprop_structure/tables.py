@@ -164,7 +164,7 @@ def save_weight_table(all_bps_results, bps_constructor,
 \\begin{{table}}
 \\begin{{adjustwidth}}{{-1in}}{{-1in}}
 \\begin{{tabular}}{{cc|ccccc}}
-\textit{\textbf{Weights}} & & Conv1 & Conv2 & FC1 & FC2 & \\textbf{{Total}} \\\\
+\textit{{\textbf{{Weights}}}} & & Conv1 & Conv2 & FC1 & FC2 & \\textbf{{Total}} \\\\
 \\hline
 {}
 \\end{{tabular}}
@@ -251,7 +251,7 @@ def save_multiplies_table(all_bps_results,
 \\begin{{table}}
 \\begin{{adjustwidth}}{{-1in}}{{-1in}}
 \\begin{{tabular}}{{c|ccccc}}
-\textit{\textbf{Multiplies}} & Conv1 & Conv2 & FC1 & FC2 & \\textbf{{Total}} \\\\
+\textit{{\textbf{{Multiplies}}}} & Conv1 & Conv2 & FC1 & FC2 & \\textbf{{Total}} \\\\
 \\hline
 {}
 \\end{{tabular}}
@@ -287,7 +287,7 @@ def save_tables():
         m.PARAMETERS,
         m.NUM_TRAINING_ITERATIONS)
 
-    exp_name = "ax_ln_bps_alt_gsc"
+    exp_name = "ax_ln_bps_gsc"
     m = import_module(f"runs.{exp_name}")
 
     frontier_trials = get_frontier_trials(
