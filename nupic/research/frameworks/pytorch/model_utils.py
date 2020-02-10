@@ -119,7 +119,8 @@ def train_model(
 
         if post_batch_callback is not None:
             post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
-                                num_images=num_images, times=[t2-t1, t3-t2, t4-t3])
+                                num_images=num_images,
+                                times=[t2 - t1, t3 - t2, t4 - t3])
         del loss
 
     if progress_bar is not None:
