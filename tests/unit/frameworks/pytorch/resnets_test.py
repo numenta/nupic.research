@@ -59,7 +59,6 @@ def my_auto_sparse_activation_params(in_channels, out_channels, kernel_size):
     )
 
 
-
 def my_auto_sparse_custom_activation_params(in_channels, out_channels, kernel_size):
     """
     A custom auto sparse params function.
