@@ -232,7 +232,7 @@ class ImagenetExperiment:
         # Configure data loaders
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
-        self.validate_after_epoch = config.get("validate_after_epoch", self.epochs-3)
+        self.validate_after_epoch = config.get("validate_after_epoch", self.epochs - 3)
         workers = config.get("workers", 0)
         data_dir = config["data"]
         train_dir = config.get("train_dir", "train")
@@ -337,7 +337,7 @@ class ImagenetExperiment:
         ret = self.validate(epoch)
 
         if self.rank == 0:
-            self.logger.debug("validate time: %s", time.time()-t1)
+            self.logger.debug("validate time: %s", time.time() - t1)
             self.logger.debug("---------- End of run epoch ------------")
             self.logger.debug("")
 
