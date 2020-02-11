@@ -150,14 +150,6 @@ class ImagenetExperiment:
         self.logger.setLevel(log_level)
         self.logger.addHandler(console)
         self.progress = config.get("progress", False)
-        self.mixed_precision = config.get("mixed_precision", False)
-        if self.mixed_precision and amp is None:
-            self.mixed_precision = False
-            self.logger.error(
-                "Mixed precision requires NVIDA APEX."
-                "Please install apex from https://www.github.com/nvidia/apex"
-                "Disabling mixed precision training."
-            )
 
         # Configure seed
         self.seed = config.get("seed", self.seed)
@@ -209,6 +201,15 @@ class ImagenetExperiment:
             optimizer_args=optimizer_args,
             batch_norm_weight_decay=batch_norm_weight_decay,
         )
+
+        # Validate mixed precision requirements
+        self.mixed_precision = config.get("mixed_precision", False)
+        if self.mixed_precision and amp is None:
+            self.mixed_precision = False
+            self.logger.error(
+                "Mixed precision requires NVIDA APEX."
+                "Please install apex from https://www.github.com/nvidia/apex"
+                "Disabling mixed precision training.")
 
         # Configure mixed precision training
         if self.mixed_precision:
@@ -400,7 +401,7 @@ class ImagenetExperiment:
             serialize_state_dict(buffer, self.lr_scheduler.state_dict())
             state["lr_scheduler"] = buffer.getvalue()
 
-        if self.mixed_precision and amp is not None:
+        if self.mixed_precision:
             with io.BytesIO() as buffer:
                 serialize_state_dict(buffer, amp.state_dict())
                 state["amp"] = buffer.getvalue()
