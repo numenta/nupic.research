@@ -19,4 +19,6 @@
 #
 
 from .imagenet_experiment import ImagenetExperiment
+from .auto_augment import ImageNetPolicy
 from .temp_fake_data import *
+

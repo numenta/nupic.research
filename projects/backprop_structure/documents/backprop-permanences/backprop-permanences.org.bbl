@@ -1,0 +1,33 @@
+\begin{thebibliography}{1}
+
+\bibitem{courbariaux2015binaryconnect}
+Matthieu Courbariaux, Yoshua Bengio, and Jean-Pierre David.
+\newblock Binaryconnect: Training deep neural networks with binary weights
+  during propagations.
+\newblock In {\em Advances in Neural Information Processing Systems 28}. 2015.
+
+\bibitem{courbariaux2016binarized}
+Matthieu Courbariaux, Itay Hubara, Daniel Soudry, Ran El-Yaniv, and Yoshua
+  Bengio.
+\newblock Binarized neural networks: Training deep neural networks with weights
+  and activations constrained to +1 or -1.
+\newblock In {\em arXiv 1602.02830}. 2016.
+
+\bibitem{ahmad2019dense}
+Subutai Ahmad and Luiz Scheinkman.
+\newblock How can we be so dense? the benefits of using highly sparse
+  representations.
+\newblock In {\em arXiv 1903.11257}. 2019.
+
+\bibitem{bengio2013estimating}
+Yoshua Bengio, Nicholas Léonard, and Aaron Courville.
+\newblock Estimating or propagating gradients through stochastic neurons for
+  conditional computation.
+\newblock In {\em arXiv 1308.3432}. 2013.
+
+\bibitem{louizos2018learning}
+Christos Louizos, Max Welling, and Diederik~P. Kingma.
+\newblock Learning sparse neural networks through l0 regularization.
+\newblock In {\em International Conference on Learning Representations}. 2018.
+
+\end{thebibliography}
