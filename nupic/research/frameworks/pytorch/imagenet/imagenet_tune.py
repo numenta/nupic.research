@@ -299,7 +299,11 @@ def run(config):
     kwargs.update(queue_trials=True)
 
     # Group trial into nodes as much as possible
-    kwargs.update(trial_executor=AffinityExecutor(queue_trials=True))
+    kwargs.update(trial_executor=AffinityExecutor(
+        queue_trials=kwargs.get("queue_trials", True),
+        reuse_actors=kwargs.get("reuse_actors", False),
+        ray_auto_init=kwargs.get("ray_auto_init", True)
+    ))
 
     pprint(kwargs)
     tune.run(**kwargs)
