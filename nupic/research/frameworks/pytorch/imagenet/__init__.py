@@ -19,3 +19,4 @@
 #
 
 from .imagenet_experiment import ImagenetExperiment
+from .temp_fake_data import *
