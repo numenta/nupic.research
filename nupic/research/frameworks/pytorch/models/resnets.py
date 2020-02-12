@@ -179,12 +179,14 @@ def activation_layer(
 
     # Initialize kwinners module as specified.
     if activation_params is not None:
+        # Check if overriding default kwinner class
+        kwinner_class = activation_params.pop("kwinner_class", KWinners2d)
         return nn.Sequential(
-            KWinners2d(
+            nn.ReLU(inplace=True),
+            kwinner_class(
                 out,
                 **activation_params
             ),
-            nn.ReLU(inplace=True)
         )
     else:
         return nn.ReLU(inplace=True)
