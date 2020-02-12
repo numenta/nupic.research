@@ -19,4 +19,5 @@
 #
 
 from .dataset_utils import *
+from .fake_data import *
 from .hdf5_utils import *
