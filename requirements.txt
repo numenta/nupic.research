@@ -33,6 +33,7 @@ matplotlib
 numpy
 pandas
 python-dateutil==2.8.0
+cloudpickle==1.2.0
 fastai
 pillow==6.0.0
 python-dotenv
