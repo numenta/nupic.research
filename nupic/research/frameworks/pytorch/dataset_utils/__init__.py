@@ -19,3 +19,4 @@
 #
 
 from .dataset_utils import *
+from .hdf5_utils import *
