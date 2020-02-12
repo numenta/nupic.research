@@ -21,7 +21,12 @@
 import unittest
 from unittest import TestCase
 
-from nupic.research.frameworks.pytorch.dataset_utils import ProgressiveRandomResizedCrop
+import torch
+
+from nupic.research.frameworks.pytorch.dataset_utils import (
+    FakeDataLoader,
+    ProgressiveRandomResizedCrop,
+)
 
 
 class ProgressiveRandomResizedCropTest(TestCase):
@@ -38,6 +43,22 @@ class ProgressiveRandomResizedCropTest(TestCase):
             actual.append(transform.image_size)
 
         self.assertEqual(expected, actual)
+
+    def test_fake_data_loader(self):
+
+        dataloader = FakeDataLoader(
+            dataset_size=12,
+            batch_size=3,
+            image_size=(1, 28, 28)
+        )
+
+        batches = 0
+        for image, target in dataloader:
+            batches += 1
+            self.assertTrue(image.shape == torch.Size([3, 1, 28, 28]))
+            self.assertTrue(target.shape == torch.Size([3]))
+
+        self.assertTrue(batches == 4)
 
 
 if __name__ == "__main__":
