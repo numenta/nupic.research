@@ -19,3 +19,5 @@
 #
 
 from .imagenet_experiment import ImagenetExperiment
+from .auto_augment import ImageNetPolicy
+
