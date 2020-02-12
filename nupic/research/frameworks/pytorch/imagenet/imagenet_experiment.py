@@ -142,6 +142,11 @@ class ImagenetExperiment:
                           just following its initialization
             - post_epoch_hooks: list of hooks (functions) to call on the model
                                 following each epoch of training
+            - checkpoint_file: if not None, will start from this model. The model
+                               must have the same model_args and model_class as the
+                               current experiment.
+            - validate_after_epoch: will only run validate after this epoch.
+                                    Default: epochs - 3
         """
         # Configure logger
         log_format = config.get("log_format", logging.BASIC_FORMAT)
@@ -185,6 +190,7 @@ class ImagenetExperiment:
             init_batch_norm=init_batch_norm,
             device=self.device,
             init_hooks=init_hooks,
+            checkpoint_file=config.get("checkpoint_file", None)
         )
         if self.rank == 0:
             self.logger.debug(self.model)
