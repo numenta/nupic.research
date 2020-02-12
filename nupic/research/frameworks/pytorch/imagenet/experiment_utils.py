@@ -333,7 +333,8 @@ def create_model(model_class, model_args, init_batch_norm, device,
 
     # Load model parameters from checkpoint
     if checkpoint_file is not None:
-        state = pickle.load(checkpoint_file)
+        with open(checkpoint_file, 'rb') as pickle_file:
+            state = pickle.load(pickle_file)
         with io.BytesIO(state["model"]) as buffer:
             state_dict = deserialize_state_dict(buffer, device)
         model.load_state_dict(state_dict)
