@@ -44,7 +44,8 @@ class TempFakeSavedData(object):
     def __init__(
         self,
         dataset_name=None,
-        batch_size=2, train_size=10, val_size=10, image_size=(3, 224, 224), num_classes=10,
+        batch_size=2, train_size=10, val_size=10,
+        image_size=(3, 224, 224), num_classes=10,
         transform=None, target_transform=None, random_offset=0, num_workers=0
     ):
 
