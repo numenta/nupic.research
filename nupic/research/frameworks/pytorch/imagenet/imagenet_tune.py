@@ -18,19 +18,25 @@
 #  http://numenta.org/licenses/
 #
 import copy
+import logging
 import os
+import traceback
 from pprint import pprint
 
 import ray
 import ray.resource_spec
 from ray import ray_constants
-from ray.tune import Trainable, TuneError, tune
+from ray.exceptions import RayTimeoutError
+from ray.tune import Trainable, tune
 from ray.tune.ray_trial_executor import RESOURCE_REFRESH_PERIOD, RayTrialExecutor
 from ray.tune.resources import Resources
 
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
+logger = logging.getLogger(__name__)
+TRIAL_START_ATTEMPTS = 3
+NODE_CREATION_TIMEOUT = 10 * 60
 
 
 def _get_resources_per_node():
@@ -97,9 +103,8 @@ class AffinityExecutor(RayTrialExecutor):
         super()._update_avail_resources(num_retries)
         self._resources_by_node = _get_resources_per_node()
 
-    def start_trial(self, trial, checkpoint=None):
-        # Reserve node before starting trial
-        resources = trial.resources
+    def _get_node_resources(self, resources):
+        self._update_avail_resources()
 
         # Check for required GPUs first
         required = resources.gpu_total()
@@ -132,8 +137,45 @@ class AffinityExecutor(RayTrialExecutor):
                 required -= available
 
         if required > 0:
-            raise TuneError(f"Unable to start trial {trial.trial_id}. "
-                            f"Not enough nodes")
+            # Not enough nodes
+            return None
+
+        return custom_resources
+
+    def start_trial(self, trial, checkpoint=None):
+        # Reserve node before starting trial
+        resources = trial.resources
+
+        # Use no-op remote with same resource requirements as trial to trick
+        # ray into scale up the cluster before we allocate the node resources
+        # for the trial
+        wait_for_resources = ray.remote(
+            num_cpus=resources.cpu_total(),
+            num_gpus=resources.gpu_total())(lambda: None)
+
+        error_msg = None
+        for _ in range(TRIAL_START_ATTEMPTS):
+            try:
+                # Wait for ray to scale up the cluster
+                wait_status = wait_for_resources.remote()
+                ray.get(wait_status, NODE_CREATION_TIMEOUT)
+
+                custom_resources = self._get_node_resources(resources)
+                if custom_resources is not None:
+                    break
+                logger.warning("Trial %s: Not enough nodes, retrying...", trial)
+            except RayTimeoutError:
+                logger.warning("Trial %s: Timed out, retrying...", trial)
+            except Exception as ex:
+                logger.exception("Trial %s: Error starting trial, aborting!", trial)
+                error_msg = traceback.format_exception(ex)
+                break
+        else:
+            logger.exception(
+                "Trial %s: Aborting trial after %s start "
+                "attempts!", trial, TRIAL_START_ATTEMPTS)
+            self._stop_trial(trial, error=True, error_msg=error_msg)
+            return
 
         # Update trial node affinity configuration and
         # extra_custom_resources requirement
@@ -144,27 +186,25 @@ class AffinityExecutor(RayTrialExecutor):
     def has_resources(self, resources):
         if not super().has_resources(resources):
             return False
+        elif self._trial_queued:
+            # Allowing trial to start even though the cluster does not have
+            # enough free resources
+            return True
 
-        # Check for required GPUs first
-        required = resources.gpu_total()
-        if required > 0:
-            resource_attr = "gpu"
-        else:
-            # No GPU, just use CPU
-            resource_attr = "cpu"
-            required = resources.cpu_total()
+        node_resources = self._get_node_resources(resources)
+        if node_resources is not None:
+            return True
 
-        # Compute nodes required to fulfill trial resources request
-        for node_id, node_resource in self._resources_by_node.items():
-            node_capacity = node_resource.get_res_total(node_id)
-            committed_capacity = self._committed_resources.get_res_total(node_id)
-            remaining_capacity = node_capacity - committed_capacity
-            node_procs = getattr(node_resource, resource_attr, 0)
-            available = node_procs * remaining_capacity
-            required -= available
-            if required <= 0:
-                return True
-
+        if self._queue_trials:
+            self._trial_queued = True
+            logger.warning(
+                "Allowing trial to start even though the "
+                "cluster does not have enough free resources. Trial actors "
+                "may appear to hang until enough resources are added to the "
+                "cluster (e.g., via autoscaling). You can disable this "
+                "behavior by specifying `queue_trials=False` in "
+                "ray.tune.run().")
+            return True
         return False
 
 
