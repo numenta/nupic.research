@@ -70,9 +70,7 @@ class HDF5DataSaver(object):
 
         wnid = class_name
         if lock is not None:
-            # print(" " * 10, "before lock acquire")
             lock.acquire()
-            # print(" " * 10, "after lock acquire")
         hdf5_file = h5py.File(name=data_path, mode="a")
         try:
             main_group = hdf5_file.require_group(group_name)
@@ -81,9 +79,7 @@ class HDF5DataSaver(object):
         finally:
             hdf5_file.close()
             if lock is not None:
-                # print(" " * 10, "before lock release")
                 lock.release()
-                # print(" " * 10, "after lock release")
 
         return image_name
 
