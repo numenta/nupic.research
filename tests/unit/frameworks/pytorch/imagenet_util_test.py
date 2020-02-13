@@ -19,6 +19,7 @@
 #
 import io
 import pickle
+import tempfile
 import unittest
 
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import create_model
@@ -46,16 +47,15 @@ class ImagenetExperimentUtilsTest(unittest.TestCase):
             serialize_state_dict(buffer, model1.state_dict())
             state["model"] = buffer.getvalue()
 
-        # Ray save checkpoints as pickled dicts
-        with io.BytesIO() as buffer:
-            pickle.dump(state, buffer)
-            checkpoint_bytes = buffer.getvalue()
+        with tempfile.NamedTemporaryFile() as checkpoint_file:
+            # Ray save checkpoints as pickled dicts
+            pickle.dump(state, checkpoint_file)
+            checkpoint_file.file.flush()
 
-        # Load model from checkpoint
-        checkpoint_file = io.BytesIO(checkpoint_bytes)
-        model2 = create_model(
-            model_class=resnet50, model_args={},
-            init_batch_norm=False, device="cpu",
-            checkpoint_file=checkpoint_file)
+            # Load model from checkpoint
+            model2 = create_model(
+                model_class=resnet50, model_args={},
+                init_batch_norm=False, device="cpu",
+                checkpoint_file=checkpoint_file.name)
 
         self.assertTrue(compare_models(model1, model2, (3, 32, 32)))
