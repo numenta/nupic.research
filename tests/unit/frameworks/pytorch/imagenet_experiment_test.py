@@ -97,7 +97,7 @@ class ImagenetExperimentTest(unittest.TestCase):
         data_exists = os.path.exists(temp_data_path)
         self.assertFalse(data_exists)
 
-    def test_experiment_init(self):
+    def test_init_with_fake_data(self):
 
         exp = ImagenetExperiment()
         temp_data = TempFakeSavedData(
