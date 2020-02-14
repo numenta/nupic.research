@@ -39,6 +39,7 @@ from nupic.research.frameworks.pytorch.restore_utils import (
     load_multi_state,
 )
 from nupic.torch.models import MNISTSparseCNN
+from nupic.torch.modules import KWinners
 
 
 def lower_forward(model, x):
@@ -66,7 +67,7 @@ def full_forward(model, x):
     return y
 
 
-class RestoreUtilsTest(unittest.TestCase):
+class RestoreUtilsTest1(unittest.TestCase):
 
     def setUp(self):
 
@@ -251,6 +252,61 @@ class RestoreUtilsTest(unittest.TestCase):
         out = upper_forward(model, self.in_2)
         num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
         self.assertEqual(num_matches, 20)  # all correct
+
+
+class RestoreUtilsTest2(unittest.TestCase):
+
+    def setUp(self):
+
+        set_random_seed(20)
+        self.model = torch.nn.Sequential(
+            torch.nn.Linear(8, 8),
+            KWinners(8, percent_on=0.1),
+        )
+
+        # Create temporary results directory.
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.results_dir = Path(self.tempdir.name) / Path("results")
+        self.results_dir.mkdir()
+
+        # Save model state.
+        state = {}
+        with io.BytesIO() as buffer:
+            serialize_state_dict(buffer, self.model.state_dict(), compresslevel=-1)
+            state["model"] = buffer.getvalue()
+
+        self.checkpoint_path = self.results_dir / Path("mymodel")
+        with open(self.checkpoint_path, "wb") as f:
+            pickle.dump(state, f)
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def test_permuted_model_loading(self):
+
+        model = torch.nn.Sequential(
+            KWinners(8, percent_on=0.1),
+            torch.nn.Linear(8, 8),
+        )
+
+        param_map = {
+            "0.weight": "1.weight",
+            "0.bias": "1.bias",
+            "1.boost_strength": "0.boost_strength",
+            "1.duty_cycle": "0.duty_cycle",
+        }
+
+        model = load_multi_state(
+            model,
+            restore_linear=self.checkpoint_path,
+            param_map=param_map,
+        )
+
+        model = load_multi_state(
+            model,
+            restore_full_model=self.checkpoint_path,
+            param_map=param_map,
+        )
 
 
 if __name__ == "__main__":
