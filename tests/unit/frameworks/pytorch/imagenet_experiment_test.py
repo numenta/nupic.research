@@ -101,16 +101,29 @@ class ImagenetExperimentTest(unittest.TestCase):
 
         exp = ImagenetExperiment()
         temp_data = TempFakeSavedData(
-            train_size=10,
+            train_size=12,
             batch_size=2,
             num_classes=10,
         )
 
+        temp_data_path = temp_data.dataset_path
         with temp_data as data:
 
             self.config["data"] = data.dataset_path
             self.config["num_classes"] = data.train_num_classes
+            self.config["batch_size"] = 4
             exp.setup_experiment(self.config)
+
+            i = 0
+            for image, _ in exp.train_loader:
+                batch_size = image.shape[0]
+                self.assertEqual(batch_size, 4)
+                i += 1
+            self.assertEqual(i, 3)  # there should be 12 / 4 batches
+
+        # Validate data was deleted.
+        data_exists = os.path.exists(temp_data_path)
+        self.assertFalse(data_exists)
 
 
 if __name__ == "__main__":
