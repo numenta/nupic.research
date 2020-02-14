@@ -97,12 +97,30 @@ def get_nonlinear_param_names(
     return list(set(nonlinear_params))
 
 
+def remap_state_dict(state_dict, param_map):
+    """
+    Remaps the names of the params according to 'param_map'.
+    """
+
+    new_state_dict = {}
+    for param, state in state_dict.items():
+
+        if param in param_map:
+            new_param = param_map[param]
+            new_state_dict[new_param] = state
+        else:
+            new_state_dict[param] = state
+
+    return new_state_dict
+
+
 def load_multi_state(
     model,
     restore_full_model=None,
     restore_linear=None,
     restore_nonlinear=None,
     strict=True,
+    param_map=None,
 ):
     """
     Example 1:
@@ -137,6 +155,12 @@ def load_multi_state(
         state_dict = get_state_dict(restore_full_model)
 
         if state_dict:
+
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
+
+            # Load state.
             model.load_state_dict(state_dict, strict=True)
 
         return model
@@ -151,6 +175,10 @@ def load_multi_state(
         state_dict = get_state_dict(restore_linear)
 
         if state_dict:
+
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
 
             # Check all desired linear params are present.
             if strict:
@@ -167,6 +195,8 @@ def load_multi_state(
                 param_name: state_dict[param_name]
                 for param_name in linear_params
             }
+
+            # Load state.
             model.load_state_dict(linear_state, strict=False)
 
     # Case 2b:  Non-Linear param states
@@ -175,6 +205,10 @@ def load_multi_state(
         state_dict = get_state_dict(restore_nonlinear)
 
         if state_dict:
+
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
 
             # Check all desired nonlinear params are present.
             if strict:
@@ -191,6 +225,8 @@ def load_multi_state(
                 param_name: state_dict[param_name]
                 for param_name in nonlinear_params
             }
+
+            # Load state.
             model.load_state_dict(nonlinear_state, strict=False)
 
     # Validate results / quick sanity-check.
