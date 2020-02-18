@@ -23,3 +23,4 @@ from .alexnet_binaryactivation import *
 from .alexnet_binaryactivation_kwinners import *
 from .lenet_backpropstructure import *
 from .lesparsenet import *
+from .lenet_vdrop import *
