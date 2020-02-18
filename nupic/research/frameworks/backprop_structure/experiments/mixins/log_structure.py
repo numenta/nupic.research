@@ -27,6 +27,10 @@ from nupic.research.frameworks.backprop_structure.modules import (
     HardConcreteGatedConv2d,
     HardConcreteGatedLinear,
 )
+from nupic.research.frameworks.backprop_structure.modules.vdrop_layers import (
+    VDropConv2d,
+    VDropLinear,
+)
 
 
 def nonzero_counts(model, verbose):
@@ -36,7 +40,9 @@ def nonzero_counts(model, verbose):
         if isinstance(layer, (BinaryGatedConv2d,
                               BinaryGatedLinear,
                               HardConcreteGatedConv2d,
-                              HardConcreteGatedLinear)):
+                              HardConcreteGatedLinear,
+                              VDropConv2d,
+                              VDropLinear)):
             num_inputs = 1.
             for d in layer.weight_size()[1:]:
                 num_inputs *= d
