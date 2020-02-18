@@ -34,9 +34,9 @@ class Supervised(object):
                  model_alg, model_params,
                  dataset_name, dataset_params,
                  training_iterations,
-                 optim_alg, optim_params,
-                 lr_scheduler_alg, lr_scheduler_params,
                  batch_size_train, batch_size_test,
+                 optim_alg=None, optim_params=None,
+                 lr_scheduler_alg=None, lr_scheduler_params=None,
                  use_tqdm=False, tqdm_mininterval=None):
         (self.batch_size_train_first_epoch,
          self.batch_size_train) = batch_size_train
@@ -57,13 +57,21 @@ class Supervised(object):
 
         self.training_iterations = training_iterations
 
-        optim_constructor = getattr(torch.optim, optim_alg)
-        self.optimizer = optim_constructor(self._get_parameters(),
-                                           **optim_params)
+        if optim_alg is not None:
+            optim_constructor = getattr(torch.optim, optim_alg)
+            self.optimizer = optim_constructor(self._get_parameters(),
+                                               **optim_params)
+        else:
+            # The caller or overrider is taking responsibility for setting the
+            # optimizer before calling run_epoch.
+            self.optimizer = None
 
-        sched_constructor = getattr(torch.optim.lr_scheduler, lr_scheduler_alg)
-        self.lr_scheduler = sched_constructor(self.optimizer,
-                                              **lr_scheduler_params)
+        if lr_scheduler_alg is not None:
+            sched_constructor = getattr(torch.optim.lr_scheduler, lr_scheduler_alg)
+            self.lr_scheduler = sched_constructor(self.optimizer,
+                                                  **lr_scheduler_params)
+        else:
+            self.lr_scheduler = None
 
         self.loss_func = nn.CrossEntropyLoss()
 
@@ -142,13 +150,14 @@ class Supervised(object):
                 train_correct += pred.eq(target.view_as(pred)).sum().item()
                 num_train_batches += 1
 
-        self.lr_scheduler.step()
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step()
         self._after_train_epoch()
 
         result = {
             "mean_train_accuracy": train_correct / len(train_loader.dataset),
             "mean_training_loss": train_loss / num_train_batches,
-            "lr": self.optimizer.state_dict()["param_groups"][0]["lr"],
+            "lr": self.optimizer.param_groups[0]["lr"],
             "done": iteration + 1 >= self.training_iterations,
         }
 
