@@ -22,7 +22,6 @@ import collections
 import itertools
 import os
 import pickle
-import posixpath
 from bisect import bisect
 from functools import partial
 from io import BytesIO
@@ -30,6 +29,7 @@ from pathlib import Path
 
 import h5py
 import numpy as np
+import posixpath
 import torch
 from PIL import Image
 from torch.utils.data import Dataset, Subset
