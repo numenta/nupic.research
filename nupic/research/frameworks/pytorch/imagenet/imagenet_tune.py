@@ -284,6 +284,9 @@ class ImagenetTrainable(Trainable):
             worker_config["rank"] = i
             status.append(w.setup_experiment.remote(worker_config))
 
+        if config.get("checkpoint_at_init", False):
+            self.save()
+
         # Wait for remote functions to complete
         ray.get(status)
 
