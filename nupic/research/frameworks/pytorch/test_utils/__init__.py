@@ -18,6 +18,5 @@
 #  http://numenta.org/licenses/
 #
 
-from .imagenet_experiment import ImagenetExperiment
-from .auto_augment import ImageNetPolicy
-
+from .fake_data import *
+from .temp_fake_data import *
