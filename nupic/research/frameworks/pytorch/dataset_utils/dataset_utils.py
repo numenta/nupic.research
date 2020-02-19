@@ -54,6 +54,13 @@ __all__ = [
 ]
 
 
+TENSOR_EXTENTIONS = [".pt", ".PT"]
+
+
+def is_tensor_file(filename):
+    return any([filename.endswith(extension) for extension in TENSOR_EXTENTIONS])
+
+
 def create_validation_data_sampler(dataset, ratio):
     """Create `torch.utils.data.Sampler` used to split the dataset into 2
     ramdom sampled subsets. The first should used for training and the second
@@ -399,7 +406,7 @@ class HDF5Dataset(VisionDataset):
                     if self._load_as_images:
                         files = filter(is_image_file, group)
                     else:
-                        files = group
+                        files = filter(is_tensor_file, group)
 
                     # Construct the absolute path name within the HDF5 file
                     path_names = map(
