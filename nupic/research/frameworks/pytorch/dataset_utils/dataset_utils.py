@@ -357,6 +357,8 @@ class HDF5Dataset(VisionDataset):
         Number of classes used to Limit the dataset size. Not limited when None
     :param classes:
         Limit the dataset to images from the given classes.
+    :param load_as_images:
+        whether to use `Image.open` or `torch.load` when loading data
     :param kwargs:
         Other argument passed to :class:`VisionDataset` constructor
     """
