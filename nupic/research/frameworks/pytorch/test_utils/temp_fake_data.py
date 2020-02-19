@@ -25,8 +25,10 @@ from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
 from nupic.research.frameworks.pytorch.dataset_utils import HDF5DataSaver
-
-from .experiment_utils import create_train_dataloader, create_validation_dataloader
+from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
+    create_train_dataloader,
+    create_validation_dataloader,
+)
 
 __all__ = [
     "TempFakeSavedData",
