@@ -59,12 +59,10 @@ class VDropLinear(Module):
         if self.training:
             y_mu = F.linear(x, self.w_mu, self.bias)
 
-            w_mu2 = self.w_mu ** 2
-            w_alpha = self.w_logsigma2.exp() / (w_mu2 + self.epsilon)
-
             # Avoid sqrt(0), otherwise a divide-by-zero occurs during backprop.
-            y_sigma = F.linear(x ** 2,
-                               w_alpha * w_mu2).clamp(self.epsilon).sqrt()
+            y_sigma = F.linear(
+                x ** 2, self.w_logsigma2.exp()
+            ).clamp(self.epsilon).sqrt()
 
             rv = self.tensor(y_mu.size()).normal_()
             return y_mu + (rv * y_sigma)
@@ -140,13 +138,11 @@ class VDropConv2d(Module):
             y_mu = F.conv2d(x, self.w_mu, self.bias, self.stride, self.padding,
                             self.dilation, self.groups)
 
-            w_mu2 = self.w_mu ** 2
-            w_alpha = self.w_logsigma2.exp() / (w_mu2 + self.epsilon)
-
             # Avoid sqrt(0), otherwise a divide-by-zero occurs during backprop.
-            y_sigma = F.conv2d(x ** 2, w_alpha * w_mu2, None, self.stride,
-                               self.padding, self.dilation, self.groups).clamp(
-                                   self.epsilon).sqrt()
+            y_sigma = F.conv2d(
+                x ** 2, self.w_logsigma2.exp(), None, self.stride, self.padding,
+                self.dilation, self.groups
+            ).clamp(self.epsilon).sqrt()
 
             rv = self.tensor(y_mu.size()).normal_()
             return y_mu + (rv * y_sigma)
