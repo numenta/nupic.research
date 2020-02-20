@@ -58,7 +58,7 @@ class HDF5DataSaver(object):
 
     @staticmethod
     def hdf5_save(
-        data_path, image_data, group_name, class_name, image_name, lock=None
+        data_path, image_data, group_name, class_name, image_name, mode="a", lock=None
     ):
         """
         Save imagenet images to HDF5
@@ -71,7 +71,7 @@ class HDF5DataSaver(object):
         wnid = class_name
         if lock is not None:
             lock.acquire()
-        hdf5_file = h5py.File(name=data_path, mode="a")
+        hdf5_file = h5py.File(name=data_path, mode=mode)
         try:
             main_group = hdf5_file.require_group(group_name)
             wnid_group = main_group.require_group(wnid)
