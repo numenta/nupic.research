@@ -262,7 +262,9 @@ class ImagenetExperiment:
             multiprocessing.set_start_method("spawn")
 
         # Configure Training data loader
-        self.train_loader = create_train_dataloader(
+        self.create_train_dataloader = config.get(
+            "create_train_dataloader", create_train_dataloader)
+        self.train_loader = self.create_train_dataloader(
             data_dir=data_dir,
             train_dir=train_dir,
             batch_size=self.batch_size,
@@ -276,6 +278,8 @@ class ImagenetExperiment:
         # Configure Validation data loader
         val_dir = config.get("val_dir", "val")
         val_batch_size = config.get("val_batch_size", self.batch_size)
+        self.create_validation_dataloader = config.get(
+            "create_validation_dataloader", create_validation_dataloader)
         self.val_loader = create_validation_dataloader(
             data_dir=data_dir,
             val_dir=val_dir,
@@ -299,6 +303,10 @@ class ImagenetExperiment:
         # Only profile from rank 0
         self.profile = config.get("profile", False) and self.rank == 0
 
+        # Set train and validate methods.
+        self.train_model = config.get("train_model_func", train_model)
+        self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
+
         # Register post-epoch hooks. To be used as `self.model.apply(post_epoch_hook)`
         self.post_epoch_hooks = config.get("post_epoch_hooks", [])
 
@@ -307,7 +315,7 @@ class ImagenetExperiment:
             loader = self.val_loader
 
         if epoch in self.epochs_to_validate:
-            results = evaluate_model(
+            results = self.evaluate_model(
                 model=self.model,
                 loader=loader,
                 device=self.device,
@@ -331,7 +339,7 @@ class ImagenetExperiment:
     def train_epoch(self, epoch):
         with torch.autograd.profiler.profile(use_cuda=torch.cuda.is_available(),
                                              enabled=self.profile) as prof:
-            train_model(
+            self.train_model(
                 model=self.model,
                 loader=self.train_loader,
                 optimizer=self.optimizer,
