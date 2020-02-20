@@ -28,6 +28,11 @@ __all__ = [
 
 
 class FakeDataLoader(DataLoader):
+    """
+    This class wraps the dataset `FakeData` to reduce the overhead of incorporating
+    the fake dataset into a `DataLoader` and turning the images to `torch.Tensors`
+    upon readout.
+    """
 
     def __init__(
         self,

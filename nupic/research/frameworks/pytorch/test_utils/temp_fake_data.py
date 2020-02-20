@@ -39,8 +39,22 @@ class TempFakeSavedData(object):
     """
     This class:
        1) Saves data in hdf5 format to a temporary directory managed by `tempfile`.
-       2) Instantiates dataloaders and datasets to iterate over the saved data.
+       2) Instantiates `DataLoader`s and `Datasets`'s' to iterate over the saved data.
        3) Deletes the saved data upon `cleanup()` or `__exit__`.
+
+    Example:
+    ```
+    temp_data = TempFakeSavedData()
+    train_loader = temp_data.train_dataloader
+
+    batches = 0
+    for image, target in train_loader:
+        assert image.shape == (3, 224, 224)
+        batch += 1
+    assert batches == 5
+
+    temp_data.cleanup()
+    ```
     """
 
     def __init__(
