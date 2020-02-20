@@ -23,10 +23,8 @@ from unittest import TestCase
 
 import torch
 
-from nupic.research.frameworks.pytorch.dataset_utils import (
-    FakeDataLoader,
-    ProgressiveRandomResizedCrop,
-)
+from nupic.research.frameworks.pytorch.dataset_utils import ProgressiveRandomResizedCrop
+from nupic.research.frameworks.pytorch.test_utils import FakeDataLoader
 
 
 class ProgressiveRandomResizedCropTest(TestCase):
