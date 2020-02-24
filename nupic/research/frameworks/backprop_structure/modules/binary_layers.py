@@ -240,7 +240,6 @@ class BinaryGatedLinear(Module):
         else:
             w, b = self.sample_weight_and_bias()
             return F.linear(x, w, b)
-            return self._forward(x)
 
     def get_expected_nonzeros(self):
         exc_p1, inh_p1 = self.get_gate_probabilities()
@@ -337,7 +336,6 @@ class BinaryGatedConv2d(Module):
                                              *self.kernel_size))
         self.inh_p1 = Parameter(torch.Tensor(out_channels, in_channels // groups,
                                              *self.kernel_size))
-        self.dim_z = out_channels
         self.input_shape = None
 
         self.use_bias = bias
