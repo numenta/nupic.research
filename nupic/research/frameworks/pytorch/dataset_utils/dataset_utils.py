@@ -42,6 +42,24 @@ from torchvision.datasets.folder import (
 )
 from torchvision.transforms import RandomResizedCrop
 
+__all__ = [
+    "create_validation_data_sampler",
+    "select_subset",
+    "UnionDataset",
+    "split_dataset",
+    "PreprocessedDataset",
+    "CachedDatasetFolder",
+    "ProgressiveRandomResizedCrop",
+    "HDF5Dataset",
+]
+
+
+TENSOR_EXTENTIONS = [".pt", ".PT"]
+
+
+def is_tensor_file(filename):
+    return any([filename.endswith(extension) for extension in TENSOR_EXTENTIONS])
+
 
 def create_validation_data_sampler(dataset, ratio):
     """Create `torch.utils.data.Sampler` used to split the dataset into 2
@@ -346,15 +364,21 @@ class HDF5Dataset(VisionDataset):
         Number of classes used to Limit the dataset size. Not limited when None
     :param classes:
         Limit the dataset to images from the given classes.
+    :param load_as_images:
+        whether to use `Image.open` or `torch.load` when loading data
     :param kwargs:
         Other argument passed to :class:`VisionDataset` constructor
     """
 
-    def __init__(self, hdf5_file, root, num_classes=None, classes=None, **kwargs):
+    def __init__(
+        self, hdf5_file, root,
+        num_classes=None, classes=None, load_as_images=True, **kwargs
+    ):
         assert h5py.is_hdf5(hdf5_file)
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
 
         self._hdf5_file = hdf5_file
+        self._load_as_images = load_as_images
         with h5py.File(name=self._hdf5_file, mode="r") as hdf5:
             hdf5_root = hdf5[root]
             self._classes = {
@@ -378,7 +402,11 @@ class HDF5Dataset(VisionDataset):
                 self._images = []
                 for class_name in self._classes:
                     group = hdf5_root[class_name]
-                    files = filter(is_image_file, group)
+
+                    if self._load_as_images:
+                        files = filter(is_image_file, group)
+                    else:
+                        files = filter(is_tensor_file, group)
 
                     # Construct the absolute path name within the HDF5 file
                     path_names = map(
@@ -440,8 +468,11 @@ class HDF5Dataset(VisionDataset):
             image_data = image_file[()]
 
         # Convert image to RGB
-        image = Image.open(BytesIO(image_data))
-        sample = image.convert("RGB")
+        if self._load_as_images:
+            image = Image.open(BytesIO(image_data))
+            sample = image.convert("RGB")
+        else:
+            sample = torch.load(BytesIO(image_data))
 
         # Apply transforms
         if self.transform is not None:

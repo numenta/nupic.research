@@ -90,7 +90,8 @@ class ImagenetExperiment:
         self.logger = None
         self.seed = 42
         self.profile = False
-        self.validate_after_epoch = 0
+        self.launch_time = 0
+        self.epochs_to_validate = []
 
     def setup_experiment(self, config):
         """
@@ -98,8 +99,9 @@ class ImagenetExperiment:
 
         :param config: Dictionary containing the configuration parameters
 
-            - distributed: Whether or not to use  Pytorch Distributed training
+            - distributed: Whether or not to use Pytorch Distributed training
             - backend: Pytorch Distributed backend ("nccl", "gloo")
+                    Default: nccl
             - world_size: Total number of processes participating
             - rank: Rank of the current process
             - data: Dataset path
@@ -145,10 +147,14 @@ class ImagenetExperiment:
             - checkpoint_file: if not None, will start from this model. The model
                                must have the same model_args and model_class as the
                                current experiment.
-            - validate_after_epoch: will only run validate after this epoch.
-                                    Default: epochs - 3
+            - epochs_to_validate: list of epochs to run validate(). A -1 asks
+                                  to run validate before any training occurs.
+                                  Default: last three epochs.
+            - launch_time: time the config was created (via time.time). Used to report
+                           wall clock time until the first batch is done.
+                           Default: time.time() in this setup_experiment().
         """
-        # Configure logger
+        # Configure logging related stuff
         log_format = config.get("log_format", logging.BASIC_FORMAT)
         log_level = getattr(logging, config.get("log_level", "INFO").upper())
         console = logging.StreamHandler()
@@ -157,6 +163,7 @@ class ImagenetExperiment:
         self.logger.setLevel(log_level)
         self.logger.addHandler(console)
         self.progress = config.get("progress", False)
+        self.launch_time = config.get("launch_time", time.time())
 
         # Configure seed
         self.seed = config.get("seed", self.seed)
@@ -239,7 +246,8 @@ class ImagenetExperiment:
         # Configure data loaders
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
-        self.validate_after_epoch = config.get("validate_after_epoch", self.epochs - 3)
+        self.epochs_to_validate = config.get("epochs_to_validate",
+                                             range(self.epochs - 3, self.epochs + 1))
         workers = config.get("workers", 0)
         data_dir = config["data"]
         train_dir = config.get("train_dir", "train")
@@ -276,7 +284,7 @@ class ImagenetExperiment:
             num_classes=num_classes,
         )
 
-        # Configure leaning rate scheduler
+        # Configure learning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
         if lr_scheduler_class is not None:
             lr_scheduler_args = config.get("lr_scheduler_args", {})
@@ -298,7 +306,7 @@ class ImagenetExperiment:
         if loader is None:
             loader = self.val_loader
 
-        if epoch >= self.validate_after_epoch:
+        if epoch in self.epochs_to_validate:
             results = evaluate_model(
                 model=self.model,
                 loader=loader,
@@ -337,6 +345,9 @@ class ImagenetExperiment:
             self.logger.info(prof.key_averages().table(sort_by="self_cpu_time_total"))
 
     def run_epoch(self, epoch):
+        if -1 in self.epochs_to_validate and epoch == 0:
+            self.logger.debug("Validating before any training:")
+            self.validate(epoch=-1)
         self.pre_epoch(epoch)
         self.train_epoch(epoch)
         self.post_epoch(epoch)
@@ -358,10 +369,14 @@ class ImagenetExperiment:
     def pre_batch(self, model, batch_idx, epoch):
         pass
 
-    def post_batch(self, model, loss, batch_idx, epoch, num_images, times):
+    def post_batch(self, model, loss, batch_idx, epoch, num_images, time_string):
         # Update 1cycle learning rate after every batch
         if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
+
+        if self.progress and epoch == 0 and batch_idx == 0:
+            self.logger.debug("Launch time to end of first batch: %s",
+                              time.time() - self.launch_time)
 
         if self.progress and (batch_idx % 40) == 0:
             total_batches = self.total_batches
@@ -370,11 +385,11 @@ class ImagenetExperiment:
                 # Compute actual batch size from distributed sampler
                 total_batches *= self.train_loader.sampler.num_replicas
                 current_batch *= self.train_loader.sampler.num_replicas
-            self.logger.debug("End of batch. Epoch: %s, Batch: %s/%s, loss: %s, "
-                              "Learning rate: %s",
-                              epoch, current_batch, total_batches, loss, self.get_lr())
-            self.logger.debug("    num_images: %s, rank: %s, times: %s",
-                              num_images, self.rank, times)
+            self.logger.debug("End of batch for rank: %s. Epoch: %s, Batch: %s/%s, "
+                              "loss: %s, Learning rate: %s num_images: %s",
+                              self.rank, epoch, current_batch, total_batches, loss,
+                              self.get_lr(), num_images)
+            self.logger.debug("Timing: %s", time_string)
 
     def post_epoch(self, epoch):
         count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0
@@ -433,7 +448,8 @@ class ImagenetExperiment:
     def set_state(self, state):
         """
         Restore the experiment from the state returned by `get_state`
-        :param state: dictionary with "model", "optimizer" and "lr_scheduler" states
+        :param state: dictionary with "model", "optimizer", "lr_scheduler", and "amp"
+                      states
         """
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
