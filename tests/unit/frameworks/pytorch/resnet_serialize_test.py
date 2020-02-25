@@ -2,7 +2,7 @@ import unittest
 import tempfile
 import torch
 
-from nupic.research.frameworks.pytorch.models.resnets import ResNet
+from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import create_model
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 
@@ -15,7 +15,7 @@ class ResNetSerialization(unittest.TestCase):
             num_classes=3,
             defaults_sparse=True,
         ))
-        model_class = ResNet
+        model_class = resnet50
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         model = create_model(
