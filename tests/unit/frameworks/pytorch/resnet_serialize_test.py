@@ -18,6 +18,7 @@
 #  http://numenta.org/licenses/
 #
 
+
 import tempfile
 import unittest
 
@@ -29,7 +30,7 @@ from nupic.research.frameworks.pytorch.models.resnets import resnet50
 
 
 class ResNetSerialization(unittest.TestCase):
-    '''Test if loaded model is identical to initially saved one'''
+    """Test if loaded model is identical to initially saved one"""
     def test_identical(self):
         # model args for ResNet, may become function arguments later on
         model_args = dict(config=dict(
