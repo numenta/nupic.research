@@ -1,10 +1,11 @@
-import unittest
 import tempfile
+import unittest
+
 import torch
 
-from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import create_model
 from nupic.research.frameworks.pytorch.model_compare import compare_models
+from nupic.research.frameworks.pytorch.models.resnets import resnet50
 
 
 class ResNetSerialization(unittest.TestCase):
