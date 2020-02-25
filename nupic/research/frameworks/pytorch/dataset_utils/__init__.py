@@ -1,5 +1,5 @@
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions apply:
 #
@@ -18,9 +18,5 @@
 #  http://numenta.org/licenses/
 #
 
-from .alexnet import *
-from .alexnet_binaryactivation import *
-from .alexnet_binaryactivation_kwinners import *
-from .lenet_backpropstructure import *
-from .lesparsenet import *
-from .lenet_vdrop import *
+from .dataset_utils import *
+from .hdf5_utils import *

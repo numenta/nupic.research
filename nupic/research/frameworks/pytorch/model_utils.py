@@ -91,16 +91,19 @@ def train_model(
                 "Mixed precision requires NVIDA APEX."
                 "Please install apex from https://www.github.com/nvidia/apex")
 
+    t0 = time.time()
     for batch_idx, (data, target) in enumerate(loader):
-        num_images = len(target)
-        t1 = time.time()
         if batch_idx >= batches_in_epoch:
             break
+
+        num_images = len(target)
+        data = data.to(device, non_blocking=async_gpu)
+        target = target.to(device, non_blocking=async_gpu)
+        t1 = time.time()
+
         if pre_batch_callback is not None:
             pre_batch_callback(model=model, batch_idx=batch_idx)
 
-        data = data.to(device, non_blocking=async_gpu)
-        target = target.to(device, non_blocking=async_gpu)
         optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)
@@ -118,10 +121,13 @@ def train_model(
         t4 = time.time()
 
         if post_batch_callback is not None:
+            time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
+                           + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
+                                                              t4 - t3)
             post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
-                                num_images=num_images,
-                                times=[t2 - t1, t3 - t2, t4 - t3])
+                                num_images=num_images, time_string=time_string)
         del loss
+        t0 = time.time()
 
     if progress_bar is not None:
         loader.n = loader.total
