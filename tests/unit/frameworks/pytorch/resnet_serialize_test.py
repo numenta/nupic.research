@@ -45,35 +45,34 @@ def save_model(model):
 
 class ResNetSerialization(unittest.TestCase):
     def test_identical(self):
+        model_args = dict(config=dict(
+            num_classes=3,
+            defaults_sparse=True,
+        ))
+        model_class = nupic.research.frameworks.pytorch.models.resnets.resnet50
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        model = create_model(
+            model_class=model_class,
+            model_args=model_args,
+            init_batch_norm=False,
+            device=device,
+        )
+
+        checkpoint_file = save_model(model)
+
+        model2 = create_model(
+            model_class=model_class,
+            model_args=model_args,
+            init_batch_norm=False,
+            device=device,
+            checkpoint_file=checkpoint_file.name
+        )
+
+        checkpoint_file.close()
+        assert checkpoint_file.file.closed
         self.assertTrue(compare_models(model, model2, (3, 224, 224)))
 
 
 if __name__ == "__main__":
-    model_args = dict(config=dict(
-        num_classes=3,
-        defaults_sparse=True,
-    ))
-    model_class = nupic.research.frameworks.pytorch.models.resnets.resnet50
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    model = create_model(
-        model_class=model_class,
-        model_args=model_args,
-        init_batch_norm=False,
-        device=device,
-    )
-
-    checkpoint_file = save_model(model)
-
-    model2 = create_model(
-        model_class=model_class,
-        model_args=model_args,
-        init_batch_norm=False,
-        device=device,
-        checkpoint_file=checkpoint_file.name
-    )
-
-    checkpoint_file.close()
-    assert checkpoint_file.file.closed
-    print("Comparing: ")
     unittest.main(verbosity=2)
