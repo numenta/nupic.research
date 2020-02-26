@@ -280,7 +280,7 @@ class ImagenetExperiment:
         val_batch_size = config.get("val_batch_size", self.batch_size)
         self.create_validation_dataloader = config.get(
             "create_validation_dataloader", create_validation_dataloader)
-        self.val_loader = create_validation_dataloader(
+        self.val_loader = self.create_validation_dataloader(
             data_dir=data_dir,
             val_dir=val_dir,
             batch_size=val_batch_size,
