@@ -31,18 +31,6 @@ from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.model_utils import serialize_state_dict
 
 
-def save_model(model):
-    state = {}
-    with io.BytesIO() as buffer:
-        serialize_state_dict(buffer, model.state_dict())
-        state["model"] = buffer.getvalue()
-
-    checkpoint_path = tempfile.NamedTemporaryFile(delete=True)
-    pickle.dump(state, checkpoint_path)
-    checkpoint_path.flush()
-    return checkpoint_path
-
-
 class ResNetSerialization(unittest.TestCase):
     def test_identical(self):
         model_args = dict(config=dict(
@@ -59,19 +47,26 @@ class ResNetSerialization(unittest.TestCase):
             device=device,
         )
 
-        checkpoint_file = save_model(model)
+        state = {}
+        with io.BytesIO() as buffer:
+            serialize_state_dict(buffer, model.state_dict())
+            state["model"] = buffer.getvalue()
 
-        model2 = create_model(
-            model_class=model_class,
-            model_args=model_args,
-            init_batch_norm=False,
-            device=device,
-            checkpoint_file=checkpoint_file.name
-        )
+        with tempfile.NamedTemporaryFile(delete=True) as checkpoint_file:
+            pickle.dump(state, checkpoint_file)
+            checkpoint_file.flush()
 
-        checkpoint_file.close()
-        assert checkpoint_file.file.closed
-        self.assertTrue(compare_models(model, model2, (3, 224, 224)))
+            model2 = create_model(
+                model_class=model_class,
+                model_args=model_args,
+                init_batch_norm=False,
+                device=device,
+                checkpoint_file=checkpoint_file.name
+            )
+
+            checkpoint_file.close()
+            self.assertTrue(compare_models(model, model2, (3, 224, 224)))
+            self.assertTrue(checkpoint_file.file.closed)
 
 
 if __name__ == "__main__":
