@@ -65,7 +65,6 @@ class ResNetSerialization(unittest.TestCase):
             )
 
             self.assertTrue(compare_models(model, model2, (3, 224, 224)))
-            self.assertTrue(checkpoint_file.file.closed)
 
 
 if __name__ == "__main__":
