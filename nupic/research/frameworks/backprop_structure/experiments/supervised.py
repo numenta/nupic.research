@@ -25,13 +25,21 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-import nupic.research.frameworks.backprop_structure.dataset_managers as dm
-import nupic.research.frameworks.backprop_structure.networks as networks
+import nupic.research.frameworks.backprop_structure.dataset_managers
+import nupic.research.frameworks.backprop_structure.networks
 
 
 class Supervised(object):
+    DATASET_MODULES = [
+        nupic.research.frameworks.backprop_structure.dataset_managers
+    ]
+
+    NETWORKS_MODULES = [
+        nupic.research.frameworks.backprop_structure.networks
+    ]
+
     def __init__(self,
-                 model_alg, model_params,
+                 network_name, network_params,
                  dataset_name, dataset_params,
                  training_iterations,
                  batch_size_train, batch_size_test,
@@ -48,11 +56,23 @@ class Supervised(object):
                                    if torch.cuda.is_available()
                                    else "cpu")
 
-        model_constructor = getattr(networks, model_alg)
-        self.model = model_constructor(**model_params)
-        self.model.to(self.device)
+        network_constructor = None
+        for networks in self.NETWORKS_MODULES:
+            if hasattr(networks, network_name):
+                network_constructor = getattr(networks, network_name)
+                break
+        if network_constructor is None:
+            raise ValueError(f"Unrecognized network_name {network_name}")
+        self.network = network_constructor(**network_params)
+        self.network.to(self.device)
 
-        dm_constructor = getattr(dm, dataset_name)
+        dm_constructor = None
+        for dm in self.DATASET_MODULES:
+            if hasattr(dm, dataset_name):
+                dm_constructor = getattr(dm, dataset_name)
+                break
+        if dm_constructor is None:
+            raise ValueError(f"Unrecognized dataset_name {dataset_name}")
         self.dataset_manager = dm_constructor(**dataset_params)
 
         self.training_iterations = training_iterations
@@ -84,7 +104,7 @@ class Supervised(object):
         )
 
     def test(self, loader):
-        self.model.eval()
+        self.network.eval()
         val_loss = 0
         num_val_batches = 0
         val_correct = 0
@@ -96,7 +116,7 @@ class Supervised(object):
 
             for data, target in batches:
                 data, target = data.to(self.device), target.to(self.device)
-                output = self.model(data)
+                output = self.network(data)
                 val_loss += self.loss_func(output, target).item()
                 # get the index of the max log-probability
                 pred = output.argmax(dim=1, keepdim=True)
@@ -110,7 +130,7 @@ class Supervised(object):
         }
 
     def run_epoch(self, iteration):
-        self.model.train()
+        self.network.train()
         self._before_train_epoch()
 
         batch_size = (self.batch_size_train_first_epoch
@@ -136,7 +156,7 @@ class Supervised(object):
 
         for data, target in batches:
             data, target = data.to(self.device), target.to(self.device)
-            output = self.model(data)
+            output = self.network(data)
             loss = self.loss_func(output, target) + self._regularization()
 
             self.optimizer.zero_grad()
@@ -167,15 +187,15 @@ class Supervised(object):
 
     def save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-        torch.save(self.model.state_dict(), checkpoint_path)
+        torch.save(self.network.state_dict(), checkpoint_path)
         return checkpoint_path
 
     def restore(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-        self.model.load_state_dict(torch.load(checkpoint_path))
+        self.network.load_state_dict(torch.load(checkpoint_path))
 
     def _get_parameters(self):
-        return self.model.parameters()
+        return self.network.parameters()
 
     def _regularization(self):
         return 0

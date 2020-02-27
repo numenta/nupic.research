@@ -44,8 +44,8 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoise),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            model_alg="gsc_alexnet",
-            model_params=dict(),
+            network_name="gsc_alexnet",
+            network_params=dict(),
 
             dataset_name="PreprocessedGSC",
             dataset_params={},

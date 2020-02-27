@@ -85,5 +85,5 @@ class LogStructure(object):
 
     def run_epoch(self, iteration):
         result = super().run_epoch(iteration)
-        result.update(nonzero_counts(self.model, self.log_verbose_structure))
+        result.update(nonzero_counts(self.network, self.log_verbose_structure))
         return result
