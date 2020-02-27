@@ -58,8 +58,8 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
         first_batch_size = int(first_batch_size)
 
         super().__init__(
-            model_alg="mnist_lenet_backpropstructure",
-            model_params=dict(
+            network_name="mnist_lenet_backpropstructure",
+            network_params=dict(
                 l0_strength=l0_strength,
                 droprate_init=droprate_init,
                 decay_mean=True,

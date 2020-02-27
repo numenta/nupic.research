@@ -50,8 +50,8 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseBoostingRezeroCovariance),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            model_alg="mnist_lesparsenet",
-            model_params=dict(),
+            network_name="mnist_lesparsenet",
+            network_params=dict(),
 
             dataset_name="MNIST",
             dataset_params={},
