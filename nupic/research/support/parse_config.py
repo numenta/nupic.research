@@ -32,7 +32,10 @@ def parse_config(config_file, experiments=None, globals_param=None, locals_param
     :return: Dictionary with the parsed configuration
     """
     cfgparser = configparser.ConfigParser()
-    cfgparser.read_file(config_file)
+    try:
+        cfgparser.read_file(config_file)
+    except:
+        cfgparser.read(config_file)
 
     params = {}
     for exp in cfgparser.sections():
