@@ -45,8 +45,8 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseBoosting),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            model_alg="gsc_alexnet_binaryactivation_kwinners",
-            model_params=dict(),
+            network_name="gsc_alexnet_binaryactivation_kwinners",
+            network_params=dict(),
 
             dataset_name="PreprocessedGSC",
             dataset_params={},
