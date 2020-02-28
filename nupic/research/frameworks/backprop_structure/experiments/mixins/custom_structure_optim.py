@@ -33,7 +33,7 @@ class CustomStructureOptim(object):
     def _get_parameters(self):
         main_parameters = []
         structure_parameters = []
-        for i, module in enumerate(self.model.modules()):
+        for i, module in enumerate(self.network.modules()):
             # Skip the nn.Sequential module
             if i > 0:
                 if isinstance(module, (BinaryGatedConv2d,

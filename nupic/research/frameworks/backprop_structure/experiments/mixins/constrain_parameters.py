@@ -38,4 +38,4 @@ def constrain_parameters(module):
 class ConstrainParameters(object):
     def _after_optimizer_step(self):
         super()._after_optimizer_step()
-        self.model.apply(constrain_parameters)
+        self.network.apply(constrain_parameters)
