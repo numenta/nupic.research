@@ -140,6 +140,18 @@ class ImagenetExperiment:
             - mixed_precision: Whether or not to enable apex mixed precision
             - mixed_precision_args: apex mixed precision arguments.
                                     See "amp.initialize"
+            - create_train_dataloader: Optional user defined function to create
+                                       the training data loader. See below for
+                                       input params.
+            - create_validation_dataloader: Optional user defined function to create
+                                            the validation data loader. See below for
+                                            input params.
+            - train_model_func: Optional user defined function to train the model,
+                                expected to behave similarly to `train_model`
+                                in terms of input parameters and return values
+            - evaluate_model_func: Optional user defined function to validate the model
+                                   expected to behave similarly to `evaluate_model`
+                                   in terms of input parameters and return values
             - init_hooks: list of hooks (functions) to call on the model
                           just following its initialization
             - post_epoch_hooks: list of hooks (functions) to call on the model
@@ -147,6 +159,11 @@ class ImagenetExperiment:
             - checkpoint_file: if not None, will start from this model. The model
                                must have the same model_args and model_class as the
                                current experiment.
+            - checkpoint_at_init: boolean argument for whether to create a checkpoint
+                                  of the initialized model. this differs from
+                                  `checkpoint_at_start` for which the checkpoint occurs
+                                  after the first epoch of training as opposed to
+                                  before it
             - epochs_to_validate: list of epochs to run validate(). A -1 asks
                                   to run validate before any training occurs.
                                   Default: last three epochs.
