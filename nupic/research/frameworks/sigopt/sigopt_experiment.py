@@ -17,28 +17,33 @@
 #
 #  http://numenta.org/licenses/
 #
-import logging
+import math
 import os
 
 from sigopt import Connection
 
-from nupic.research.frameworks.pytorch.imagenet.imagenet_experiment import (
-    ImagenetExperiment
-)
-
-__all__ = ["SigOptExperiment"]
-
 
 class SigOptExperiment:
     """
-    SigOpt class used to sit between an experiment runner (such as Ray) and the
-    ImagenetExperiment class.
+    Class used to wrap around the SigOpt API and designed to be used in any experiment
+    runner. A particular experiment runner, such as ImagenetTrainable, will want to
+    subclass and redefine update_config_with_suggestion() to be specific to their
+    config.
     """
 
-    def __init__(self):
-        self.logger = None
-        self.experiment_id = None
-        self.imagenet_experiment = ImagenetExperiment()
+    def __init__(self, experiment_id=None, sigopt_config=None):
+        """
+        Initiate a connection to the SigOpt API and optionally store the id
+        and config for an existing experiment.  The SigOpt API key should be
+        defined in the environment variable 'SIGOPT_KEY'.
+
+        :param experiment_id: (int) An existing experiment id.
+        :param sigopt_config: (dict) The config used to create experiment id.
+        """
+        self.experiment_id = experiment_id
+        self.sigopt_config = sigopt_config
+        self.conn = None
+        self.training_run = None
 
         self.api_key = os.environ.get("SIGOPT_KEY", None)
         if self.api_key is None:
@@ -47,137 +52,176 @@ class SigOptExperiment:
 
         try:
             self.conn = Connection(client_token=self.api_key)
-        except:
+        except Exception:
             print("Could not connect to SigOpt!")
             raise
 
-
-    def setup_experiment(self, config, sigopt_config, experiment_id=None):
-
+    def create_experiment(self, sigopt_config=None):
         """
-        Configure the sigopt experiment for training
+        Create a new sigopt experiment using the config.
 
-        :param config: Dictionary containing ImagenetExperiment config parameters.
-                       This dict will be updated using the SigOpt suggestions and
-                       then passed onto ImagenetExperiment.setup()
+        :param sigopt_config: dictionary containing the SigOpt experiment parameters. If
+        this is None, this method does nothing and acts as a pass through.
 
-        :param sigopt_config: Dictionary containing the SigOpt experiment parameters
-
-        :param experiment_id: If None, create a new experiment ID. If not None,
-                              reuse an existing experiment.
+        If sigopt_config contains the key experiment_id we reuse the corresponding
+        existing experiment. If None, or this key doesn't exist, we create a brand new
+        experiment using sigopt_config, and update sigopt_config with the new
+        experiment_id.
         """
-        # Configure logging related stuff
-        log_format = config.get("log_format", logging.BASIC_FORMAT)
-        log_level = getattr(logging, config.get("log_level", "INFO").upper())
-        console = logging.StreamHandler()
-        console.setFormatter(logging.Formatter(log_format))
-        self.logger = logging.getLogger(config.get("name", type(self).__name__))
-        self.logger.setLevel(log_level)
-        self.logger.addHandler(console)
+        if sigopt_config is None:
+            return
+        self.sigopt_config = sigopt_config
 
-        # Create SigOpt experiment if needed
-        if experiment_id is None:
-            experiment = s.conn.experiments().create(
-                name=sigopt_config["name"],
-                # Define which parameters you would like to tune
-                parameters=sigopt_config["parameters"],
-                metrics=[dict(name='function_value', objective='maximize')],
-                parallel_bandwidth=1,
-                # Define an Observation Budget for your experiment
-                observation_budget=sigopt_config["observation_budget"],
-                project=sigopt_config["project"],
-            )
-            self.experiment_id = experiment.id
-            self.logger.info(
-                "Created experiment: https://app.sigopt.com/experiment/%s",
-                experiment.id)
+        # Create SigOpt experiment if requested
+        # experiment = self.conn.experiments().create(
+        #     name=sigopt_config["name"],
+        #     parameters=sigopt_config["parameters"],
+        #     metrics=sigopt_config["metrics"],
+        #     parallel_bandwidth=sigopt_config.get("parallel_bandwidth", 1),
+        #     observation_budget=sigopt_config["observation_budget"],
+        #     project=sigopt_config["project"],
+        #     linear_constraints=sigopt_config.get("linear_constraints", [])
+        # )
+        experiment = self.conn.experiments().create(**sigopt_config)
+        self.experiment_id = experiment.id
+        self.sigopt_config = sigopt_config
+        sigopt_config["experiment_id"] = experiment.id
+        print("Created experiment: https://app.sigopt.com/experiment/"
+              + str(experiment.id))
 
-        # Get the next suggestion
-        experiment = s.conn.experiments(self.experiment_id).fetch()
-        suggestion = s.conn.experiments(experiment.id).suggestions().create()
-        self.logger.debug("   suggestion: %s", suggestion.assignments)
+        return self.experiment_id
 
-        # Configure model config
-        config.update(suggestion)
+    def get_next_suggestion(self):
+        experiment = self.conn.experiments(self.experiment_id).fetch()
+        suggestion = self.conn.experiments(experiment.id).suggestions().create()
+        return suggestion
 
-        # Call ImagenetExperiment setup()
-        self.imagenet_experiment.setup_experiment(config)
-
-        # Somewhere we need to return the end value. We also need to be able to
-        # send in validation results after every validation call so that we can
-        # do early stopping.
-
-    def run_epoch(self, epoch):
-        return self.imagenet_experiment.run_epoch(epoch)
-
-    def get_state(self):
-        """
-        Get experiment serialized state as a dictionary of  byte arrays
-        :return: dictionary with "model", "optimizer" and "lr_scheduler" states
-        """
-        return self.imagenet_experiment.get_state()
-
-    def set_state(self, state):
-        """
-        Restore the experiment from the state returned by `get_state`
-        :param state: dictionary with "model", "optimizer", "lr_scheduler", and "amp"
-                      states
-        """
-        self.imagenet_experiment.set_state(state)
-
-    def stop_experiment(self):
-        self.imagenet_experiment.stop_experiment()
-
-    def get_node_ip(self):
-        """Returns the IP address of the current ray node."""
-        return self.imagenet_experiment.get_node_ip()
-
-
-from sigopt.examples import franke_function
-
-def evaluate_model(assignments):
-    return franke_function(assignments['x'], assignments['y'])
-
-
-if __name__ == "__main__":
-    s = SigOptExperiment()
-    experiment = s.conn.experiments(160659).fetch()
-    # experiment = s.conn.experiments().create(
-    #     name='Franke Optimization (Python)',
-    #     # Define which parameters you would like to tune
-    #     parameters=[
-    #         dict(name='x', type='double', bounds=dict(min=0.0, max=1.0)),
-    #         dict(name='y', type='double', bounds=dict(min=0.0, max=1.0)),
-    #     ],
-    #     metrics=[dict(name='function_value', objective='maximize')],
-    #     parallel_bandwidth=1,
-    #     # Define an Observation Budget for your experiment
-    #     observation_budget=30,
-    #     project="sigopt-examples",
-    # )
-    print("Created experiment: https://app.sigopt.com/experiment/" + experiment.id)
-
-    # Run the Optimization Loop until the Observation Budget is exhausted
-    for _ in range(5):
-        print("observation count:", experiment.progress.observation_count)
-        suggestion = s.conn.experiments(experiment.id).suggestions().create()
-        print("   suggestion: ", suggestion.assignments)
-        value = evaluate_model(suggestion.assignments)
-        s.conn.experiments(experiment.id).observations().create(
+    def update_observation(self, suggestion, value):
+        self.conn.experiments(self.experiment_id).observations().create(
             suggestion=suggestion.id,
             value=value,
         )
 
-        # Update the experiment object
-        experiment = s.conn.experiments(experiment.id).fetch()
+    def get_observation_count(self):
+        experiment = self.conn.experiments(self.experiment_id).fetch()
+        return experiment.progress.observation_count
 
-    # Fetch the best configuration and explore your experiment
-    all_best_assignments = s.conn.experiments(experiment.id).best_assignments().fetch()
-    # Returns a list of dict-like Observation objects
-    best_assignments = all_best_assignments.data[0].assignments
-    best_value = evaluate_model(best_assignments)
-    print("Best Assignments: " + str(best_assignments))
-    print("Best x value: " + str(best_assignments['x']))
-    print("Best y value: " + str(best_assignments['y']))
-    print("Best model value:", best_value)
-    print("Explore your experiment: https://app.sigopt.com/experiment/" + experiment.id + "/analysis")
+    def observations(self):
+        observations = self.conn.experiments(self.experiment_id).observations().fetch()
+        return observations.data
+
+    def open_suggestions(self):
+        suggestions = self.conn.experiments(self.experiment_id).suggestions().fetch(
+            state="open")
+        return suggestions.data
+
+    def delete_suggestion(self, suggestion):
+        self.conn.experiments(self.experiment_id).suggestions(
+            suggestion.id).delete()
+
+    def delete_open_suggestions(self):
+        """
+        Delete all open suggestions.
+        """
+        self.conn.experiments(self.experiment_id).suggestions().delete(state="open")
+
+    def get_best_assignments(self):
+        return self.conn.experiments(
+            self.experiment_id).best_assignments().fetch().data[0]
+
+    def create_training_run(self, suggestion):
+        """
+        Create training run using this suggestion. The training run is cached
+        for later creating checkpoints.
+        """
+        self.training_run = self.conn.experiments(
+            self.experiment_id).training_runs().create(suggestion=suggestion.id)
+
+    def create_checkpoint(self, metric_value):
+        """
+        Create a checkpoint for the (single) metric that is being optimized. In order to
+        use this you must have specified training_monitor when creating the experiment,
+        and must have called create_training_run() for this training run.
+        """
+        assert self.training_run is not None
+        self.conn.experiments(self.experiment_id).training_runs(
+            self.training_run.id).checkpoints().create(
+            values=[dict(name=self.sigopt_config["metrics"][0]["name"],
+                         value=metric_value)],
+        )
+
+    def get_experiment_details(self):
+        return self.conn.experiments(self.experiment_id).fetch()
+
+    @staticmethod
+    def update_config_with_suggestion(config, suggestion):
+        """
+        Given a SigOpt suggestion, update this config dict.
+        """
+        config.update(suggestion.assignments)
+
+
+class SigOptImagenetExperiment(SigOptExperiment):
+    """
+    SigOpt class used to sit between an experiment runner (such as Ray) and the
+    ImagenetExperiment class. update_config_with_suggestion() is specific to our
+    ImagenetExperiments.
+    """
+
+    @staticmethod
+    def update_config_with_suggestion(config, suggestion):
+        """
+        Given a SigOpt suggestion, update our various config dicts properly.
+        """
+        assignments = suggestion.assignments
+
+        assert "optimizer_args" in config
+        assert "lr_scheduler_args" in config
+
+        # Optimizer args
+        if "log_lr" in assignments:
+            config["optimizer_args"]["lr"] = math.exp(assignments["log_lr"])
+            assignments.pop("lr")
+
+        if "momentum" in assignments:
+            config["optimizer_args"]["momentum"] = assignments["momentum"]
+            config["lr_scheduler_args"]["max_momentum"] = assignments["momentum"]
+            assignments.pop("momentum")
+
+        if "weight_decay" in assignments:
+            config["optimizer_args"]["weight_decay"] = assignments["weight_decay"]
+            assignments.pop("weight_decay")
+
+        # lr_scheduler args
+        if "gamma" in assignments:
+            config["lr_scheduler_args"]["gamma"] = assignments["gamma"]
+            assignments.pop("gamma")
+
+        if "step_size" in assignments:
+            config["lr_scheduler_args"]["step_size"] = assignments["step_size"]
+            assignments.pop("step_size")
+
+        # Parameters for OneCycleLR
+        if "pct_start" in assignments:
+            config["lr_scheduler_args"]["pct_start"] = assignments["pct_start"]
+            assignments.pop("pct_start")
+
+        if "cycle_momentum" in assignments:
+            config["lr_scheduler_args"]["cycle_momentum"] = \
+                eval(assignments["cycle_momentum"])
+            assignments.pop("cycle_momentum")
+
+        if "max_lr" in assignments or "init_lr" in assignments:
+            # From the OneCycleLR docs:
+            #   initial_lr = max_lr/div_factor
+            #   min_lr = initial_lr/final_div_factor
+            max_lr = assignments.get("max_lr", 6.0)
+            init_lr = assignments.get("init_lr", 1.0)
+
+            config["lr_scheduler_args"]["max_lr"] = max_lr
+            config["lr_scheduler_args"]["div_factor"] = max_lr / init_lr
+            config["lr_scheduler_args"]["final_div_factor"] = init_lr / 0.00025
+            assignments.pop("init_lr", None)
+            assignments.pop("max_lr", None)
+
+        config.update(assignments)
