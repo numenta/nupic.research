@@ -52,8 +52,8 @@ class ExploratoryExperiment(experiments.Supervised):
         first_batch_size = int(first_batch_size)
 
         super().__init__(
-            model_alg="gsc_lesparsenet",
-            model_params=dict(
+            network_name="gsc_lesparsenet",
+            network_params=dict(
                 cnn_activity_percent_on=(1.0, 1.0),
                 cnn_weight_percent_on=(1.0, 1.0),
                 linear_activity_percent_on=(1.0,),

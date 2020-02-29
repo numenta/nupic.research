@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,10 +19,20 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.torch.modules import update_boost_strength
+from functools import partial
+
+from torch import nn
+from torchvision.models.resnet import BasicBlock, ResNet
 
 
-class UpdateBoostStrength(object):
-    def _before_train_epoch(self):
-        super()._before_train_epoch()
-        self.network.apply(update_boost_strength)
+class SingleInputChannelResNet(ResNet):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=(3, 3), padding=(3, 3),
+                               bias=False)
+
+
+mnist_resnet = partial(SingleInputChannelResNet,
+                       block=BasicBlock,
+                       layers=[2, 2, 2, 2],
+                       num_classes=10)
