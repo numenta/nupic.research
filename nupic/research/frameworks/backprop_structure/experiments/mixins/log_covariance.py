@@ -38,7 +38,7 @@ class LogCovariance(object):
 
             return accumulate_activation
 
-        hooks = [getattr(self.model, layername)
+        hooks = [getattr(self.network, layername)
                  .register_forward_hook(accumulator(layername))
                  for layername in self.log_covariance_layernames]
         result = super().test(loader)
