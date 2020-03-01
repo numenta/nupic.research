@@ -32,6 +32,7 @@ from ray.tune.ray_trial_executor import RESOURCE_REFRESH_PERIOD, RayTrialExecuto
 from ray.tune.resources import Resources
 
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
+from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 logger = logging.getLogger(__name__)
@@ -255,6 +256,20 @@ class ImagenetTrainable(Trainable):
         committed_resource = 0.0
         resources = {}
 
+        # Update the config through SigOpt.
+        self.sigopt = None
+        if "sigopt_config" in config:
+            assert config.get("sigopt_experiment_id", None) is not None
+            self.sigopt = SigOptImagenetExperiment(
+                experiment_id=config["sigopt_experiment_id"],
+                sigopt_config=config["sigopt_config"])
+            self.suggestion = self.sigopt.get_next_suggestion()
+            self.sigopt.update_config_with_suggestion(config, self.suggestion)
+            print("SigOpt suggestion: ", self.suggestion)
+            print("Config after Sigopt:")
+            pprint(config)
+        self.epochs = config["epochs"]
+
         # Create one ray remote process for each experiment in the process group
         self.procs = []
         for _ in range(world_size):
@@ -294,6 +309,15 @@ class ImagenetTrainable(Trainable):
 
         # Wait for remote functions to complete
         results = ray.get(status)
+
+        # Update the sigopt configuration once we're at the end
+        if self.iteration >= self.epochs - 1 and self.sigopt is not None:
+            if results[0]["mean_accuracy"] > 0.0:
+                print("Updating observation with value=", results[0]["mean_accuracy"])
+                self.sigopt.update_observation(self.suggestion,
+                                               results[0]["mean_accuracy"])
+                print("Full results: ")
+                pprint(results[0])
 
         # Return the results from the first remote function
         return copy.deepcopy(results[0])
@@ -339,11 +363,11 @@ def run(config):
     kwargs.update(queue_trials=True)
 
     # Group trial into nodes as much as possible
-    kwargs.update(trial_executor=AffinityExecutor(
-        queue_trials=kwargs.get("queue_trials", True),
-        reuse_actors=kwargs.get("reuse_actors", False),
-        ray_auto_init=kwargs.get("ray_auto_init", True)
-    ))
+    # kwargs.update(trial_executor=AffinityExecutor(
+    #     queue_trials=kwargs.get("queue_trials", True),
+    #     reuse_actors=kwargs.get("reuse_actors", False),
+    #     ray_auto_init=kwargs.get("ray_auto_init", True)
+    # ))
 
     pprint(kwargs)
     tune.run(**kwargs)
