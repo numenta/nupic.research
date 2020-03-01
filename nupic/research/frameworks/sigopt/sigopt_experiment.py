@@ -126,8 +126,14 @@ class SigOptExperiment:
         self.conn.experiments(self.experiment_id).suggestions().delete(state="open")
 
     def get_best_assignments(self):
-        return self.conn.experiments(
-            self.experiment_id).best_assignments().fetch().data[0]
+        a = self.conn.experiments(self.experiment_id).best_assignments().fetch().data
+
+        # If you have not completed any observations, or you are early on a multitask
+        # experiment, you could have no best assignments.
+        if len(a) == 0:
+            return None
+        else:
+            return a[0]
 
     def create_training_run(self, suggestion):
         """
@@ -163,20 +169,30 @@ class SigOptExperiment:
 
 class SigOptImagenetExperiment(SigOptExperiment):
     """
-    SigOpt class used to sit between an experiment runner (such as Ray) and the
-    ImagenetExperiment class. update_config_with_suggestion() is specific to our
-    ImagenetExperiments.
+    A subclass of SigOptExperiment used to sit between an experiment runner (such as
+    Ray) and the ImagenetExperiment class. update_config_with_suggestion() is specific
+    to our ImagenetExperiment config.
     """
 
-    @staticmethod
-    def update_config_with_suggestion(config, suggestion):
+    def update_config_with_suggestion(self, config, suggestion):
         """
-        Given a SigOpt suggestion, update our various config dicts properly.
+        Given a SigOpt suggestion, update our various config dicts properly so that we
+        can pass it onto ImagenetExperiment.
         """
         assignments = suggestion.assignments
 
         assert "optimizer_args" in config
         assert "lr_scheduler_args" in config
+
+        # For multi-task experiments where epoch is the task. Must have a metadata
+        # field called max_epochs.
+        if suggestion.task is not None and "epoch" in suggestion.task.name:
+            max_epochs = self.sigopt_config["metadata"]["max_epochs"]
+            epochs = int(max_epochs * suggestion.task.cost)
+            print("Suggested task/cost/epochs for this multitask experiment: ",
+                  suggestion.task.name, suggestion.task.cost, epochs)
+            config["epochs"] = epochs
+            config["lr_scheduler_args"]["epochs"] = epochs
 
         # Optimizer args
         if "log_lr" in assignments:
@@ -203,7 +219,10 @@ class SigOptImagenetExperiment(SigOptExperiment):
 
         # Parameters for OneCycleLR
         if "pct_start" in assignments:
-            config["lr_scheduler_args"]["pct_start"] = assignments["pct_start"]
+            # Ensure integer number of epochs in pct start to avoid crash.
+            start_epochs = int(assignments["pct_start"] * config["epochs"] + 0.5)
+            pct_start = float(start_epochs) / config["epochs"]
+            config["lr_scheduler_args"]["pct_start"] = pct_start
             assignments.pop("pct_start")
 
         if "cycle_momentum" in assignments:
