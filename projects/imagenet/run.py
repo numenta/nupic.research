@@ -25,6 +25,7 @@ import torch
 
 from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.imagenet import imagenet_tune
+from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -62,6 +63,8 @@ if __name__ == "__main__":
                         help="How often to checkpoint (epochs)")
     parser.add_argument("--profile", action="store_true",
                         help="Enable torch.autograd.profiler.profile during training")
+    parser.add_argument("-t", "--create_sigopt", action="store_true",
+                        help="Create a new sigopt experiment using the config")
     parser.add_argument(
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
@@ -78,4 +81,11 @@ if __name__ == "__main__":
     # Merge configuration with command line arguments
     config.update(vars(args))
 
-    imagenet_tune.run(config)
+    if "create_sigopt" in args:
+        s = SigOptImagenetExperiment()
+        s.create_experiment(config["sigopt_config"])
+        print(
+            "Created experiment: https://app.sigopt.com/experiment/"
+            + str(s.experiment_id))
+    else:
+        imagenet_tune.run(config)
