@@ -73,15 +73,6 @@ class SigOptExperiment:
         self.sigopt_config = sigopt_config
 
         # Create SigOpt experiment if requested
-        # experiment = self.conn.experiments().create(
-        #     name=sigopt_config["name"],
-        #     parameters=sigopt_config["parameters"],
-        #     metrics=sigopt_config["metrics"],
-        #     parallel_bandwidth=sigopt_config.get("parallel_bandwidth", 1),
-        #     observation_budget=sigopt_config["observation_budget"],
-        #     project=sigopt_config["project"],
-        #     linear_constraints=sigopt_config.get("linear_constraints", [])
-        # )
         experiment = self.conn.experiments().create(**sigopt_config)
         self.experiment_id = experiment.id
         self.sigopt_config = sigopt_config
