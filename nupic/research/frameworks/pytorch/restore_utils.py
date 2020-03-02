@@ -19,13 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import io
-import logging
 import os
 import pickle
 
 import torch
 
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
+from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
 
 def get_state_dict(checkpoint_path):
@@ -42,15 +42,76 @@ def get_state_dict(checkpoint_path):
         return None
 
 
-def get_linear_param_names(model):
+def get_linear_param_names(
+    model,
+    include_buffers=True,
+    include_sparse_weights_params=True,
+):
 
     linear_params = []
     for name_m, m in model.named_modules():
-        if isinstance(m, torch.nn.Linear):
+
+        # Identify whether to treat `SparseWeightsBase` as have linear params.
+        if include_sparse_weights_params and isinstance(m, SparseWeightsBase):
+            module = m.module  # -> may contain a linear layer
+        else:
+            module = m
+
+        # Check if the 'module' is linear then iterate over params/buffers of 'm'.
+        # Note: 'm' will either be a `torch.nn.Linear` or a `SparseWeightsBase`.
+        if isinstance(module, torch.nn.Linear):
+
+            # Iterate over all params of m.
             for name_p, _ in m.named_parameters():
                 full_name = name_m + ("." if name_m else "") + name_p
                 linear_params.append(full_name)
-    return linear_params
+
+            # Iterate over all buffers of m.
+            if include_buffers:
+
+                for name_b, _ in m.named_buffers():
+                    full_name = name_m + ("." if name_m else "") + name_b
+                    linear_params.append(full_name)
+
+    return list(set(linear_params))
+
+
+def get_nonlinear_param_names(
+    model,
+    include_buffers=True,
+    include_sparse_weights_params=True,
+):
+    linear_param_names = get_linear_param_names(
+        model, include_buffers, include_sparse_weights_params
+    )
+    nonlinear_params = []
+    for name_p, _ in model.named_parameters():
+        if name_p not in linear_param_names:
+            nonlinear_params.append(name_p)
+
+    if include_buffers:
+        for name_b, _ in model.named_buffers():
+            if name_b not in linear_param_names:
+                nonlinear_params.append(name_b)
+
+    return list(set(nonlinear_params))
+
+
+def remap_state_dict(state_dict, param_map):
+    """
+    Remaps the names of the params according to 'param_map'.
+    """
+
+    new_state_dict = {}
+    for param, state in state_dict.items():
+
+        if param in param_map:
+            new_param = param_map[param]
+            new_state_dict[new_param] = state
+        else:
+            new_state_dict[param] = state
+
+    return new_state_dict
 
 
 def load_multi_state(
@@ -58,6 +119,8 @@ def load_multi_state(
     restore_full_model=None,
     restore_linear=None,
     restore_nonlinear=None,
+    strict=True,
+    param_map=None,
 ):
     """
     Example 1:
@@ -92,12 +155,19 @@ def load_multi_state(
         state_dict = get_state_dict(restore_full_model)
 
         if state_dict:
-            model.load_state_dict(state_dict, strict=False)
+
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
+
+            # Load state.
+            model.load_state_dict(state_dict, strict=True)
 
         return model
 
     # Case 2: Use separate sources for Linear and Non-Linear states.
     linear_params = get_linear_param_names(model)
+    nonlinear_params = get_nonlinear_param_names(model)
 
     # Case 2a:  Linear param states
     linear_state = dict()
@@ -106,11 +176,27 @@ def load_multi_state(
 
         if state_dict:
 
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
+
+            # Check all desired linear params are present.
+            if strict:
+                assert set(linear_params) <= set(state_dict.keys()), "".join([
+                    "Found linear params in the model ",
+                    "which are not present in the checkpoint '{}'.\n".format(
+                        restore_linear),
+                    "Params not present include:\n {}".format(
+                        set(linear_params) - set(state_dict.keys()))
+                ])
+
+            # Get and load desired linear params.
             linear_state = {
                 param_name: state_dict[param_name]
-                for param_name, param in state_dict.items()
-                if param_name in linear_params
+                for param_name in linear_params
             }
+
+            # Load state.
             model.load_state_dict(linear_state, strict=False)
 
     # Case 2b:  Non-Linear param states
@@ -120,21 +206,31 @@ def load_multi_state(
 
         if state_dict:
 
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
+
+            # Check all desired nonlinear params are present.
+            if strict:
+                assert set(nonlinear_params) <= set(state_dict.keys()), "".join([
+                    "Found nonlinear params in the model ",
+                    "which are not present in the checkpoint '{}'.\n".format(
+                        restore_nonlinear),
+                    "Params not present include:\n {}".format(
+                        set(nonlinear_params) - set(state_dict.keys()))
+                ])
+
+            # Get and load desired nonlinear params.
             nonlinear_state = {
                 param_name: state_dict[param_name]
-                for param_name, param in state_dict.items()
-                if param_name not in linear_params
+                for param_name in nonlinear_params
             }
+
+            # Load state.
             model.load_state_dict(nonlinear_state, strict=False)
 
     # Validate results / quick sanity-check.
     assert set(linear_state.keys()).isdisjoint(nonlinear_state.keys())
-    if linear_params and restore_linear:
-        if not set(linear_state.keys()) == set(linear_params):
-            logging.warning(
-                "Warning: Unable to load all linear params [{}] from {}".format(
-                    linear_params, restore_linear)
-            )
 
     return model
 
