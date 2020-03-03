@@ -49,8 +49,8 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseRezeroCovariance),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            model_alg="mnist_lesparsenet",
-            model_params=dict(
+            network_name="mnist_lesparsenet",
+            network_params=dict(
                 cnn_activity_percent_on=(1.0, 1.0),
                 cnn_weight_percent_on=(0.6, 0.45),
                 linear_activity_percent_on=(1.0,),

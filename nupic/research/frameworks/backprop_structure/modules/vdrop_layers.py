@@ -102,7 +102,6 @@ class VDropConv2d(Module):
         self.stride = pair(stride)
         self.padding = pair(padding)
         self.dilation = pair(dilation)
-        self.output_padding = pair(0)
         self.groups = groups
 
         self.w_mu = Parameter(torch.Tensor(out_channels, in_channels // groups,
@@ -167,8 +166,21 @@ class VDropConv2d(Module):
         # To capture the -1, subtract it, but only in cases where there is at
         # least one weight.
         nz_by_unit = self.get_inference_nonzeros()
-        multiplies = torch.sum(nz_by_unit)
-        adds = multiplies - torch.sum(nz_by_unit > 0)
+        multiplies_per_instance = torch.sum(nz_by_unit)
+        adds_per_instance = multiplies_per_instance - torch.sum(nz_by_unit > 0)
+
+        # for rows
+        instances = (
+            (self.input_shape[-2] - self.kernel_size[0]
+             + 2 * self.padding[0]) / self.stride[0]) + 1
+        # multiplying with cols
+        instances *= (
+            (self.input_shape[-1] - self.kernel_size[1] + 2 * self.padding[1])
+            / self.stride[1]) + 1
+
+        multiplies = multiplies_per_instance * instances
+        adds = adds_per_instance * instances
+
         return multiplies.item(), adds.item()
 
     def weight_size(self):

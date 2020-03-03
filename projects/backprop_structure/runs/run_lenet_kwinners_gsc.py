@@ -46,8 +46,8 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseBoosting),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            model_alg="gsc_lesparsenet",
-            model_params=dict(
+            network_name="gsc_lesparsenet",
+            network_params=dict(
                 cnn_weight_percent_on=(1.0, 1.0),
                 linear_weight_percent_on=(1.0,),
             ),
