@@ -52,7 +52,7 @@ def get_logger(name, verbose):
     return logger
 
 
-class SparseSpeechExperiment(object):
+class ClasswiseSpeechExperiment(object):
     """This experiment tests the Google Speech Commands dataset, available
     here:
 
@@ -80,9 +80,6 @@ class SparseSpeechExperiment(object):
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-        self.preprocessed_dataset_class = PreprocessedDataset
-
-        self.load_datasets()
 
         if self.model_type == "le_sparse":
             model = LeSparseNet(
@@ -195,14 +192,14 @@ class SparseSpeechExperiment(object):
 
         return optimizer
 
-    def train(self, epoch):
+    def train(self, epoch, training_class):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
         number of mini batches exceeds the parameter "batches_in_epoch".
         """
         self.logger.info("epoch: %s", epoch)
-
+        self.load_datasets(training_class)
         t0 = time.time()
 
         self.logger.info(
@@ -211,7 +208,7 @@ class SparseSpeechExperiment(object):
             if self.lr_scheduler is None
             else self.lr_scheduler.get_lr(),
         )
-
+        
         self.pre_epoch()
         train_model(self.model, self.train_loader, self.optimizer, self.device,
                     batches_in_epoch=self.batches_in_epoch)
@@ -273,28 +270,28 @@ class SparseSpeechExperiment(object):
             ret[noise] = self.test(self.test_loader)
         return ret
 
-    def load_datasets(self):
+    def load_datasets(self, class_):
         """
         GSC specifies specific files to be used as training, test, and validation.
 
         We assume the data has already been processed using the pre-processing scripts
         here: https://github.com/numenta/nupic.torch/tree/master/examples/gsc
         """
-        validation_dataset = preprocessed_dataset_class(
+        validation_dataset = ClasswiseDataset(
             cachefilepath=self.data_dir,
-            basename="gsc_valid",
+            basename="data_valid",
             qualifiers=[""],
         )
 
-        test_dataset = preprocessed_dataset_class(
+        test_dataset = ClasswiseDataset(
             cachefilepath=self.data_dir,
-            basename="gsc_test_noise",
-            qualifiers=["{:02d}".format(int(100 * n)) for n in self.noise_values],
+            basename="data_test_",
+            qualifiers=range(class_,class_+1)
         )
-        train_dataset = preprocessed_dataset_class(
+        train_dataset = ClasswiseDataset(
             cachefilepath=self.data_dir,
-            basename="gsc_train",
-            qualifiers=range(30),
+            basename="data_train_",
+            qualifiers=range(class_,class_+1),
         )
 
         self.train_loader = DataLoader(
@@ -308,3 +305,17 @@ class SparseSpeechExperiment(object):
         self.test_loader = DataLoader(
             test_dataset, batch_size=self.batch_size, shuffle=False
         )
+
+
+class ClasswiseDataset(PreprocessedDataset):
+    def load_qualifier(self, qualifier):
+        """
+        Call this to load the a copy of a dataset with the specific qualifier into
+        memory.
+
+        :return: Name of the file that was actually loaded.
+        """
+        file_name = os.path.join(self.path, self.basename + "{}.npz".format(qualifier))
+#         self.tensors = list(np.load(file_name, allow_pickle=True))
+        self.tensors = list(torch.load(file_name))
+        return file_name
