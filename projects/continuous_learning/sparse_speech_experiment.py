@@ -53,7 +53,7 @@ def get_logger(name, verbose):
     return logger
 
 
-class ClasswiseSpeechExperiment(object):
+class ContinuousSpeechExperiment(object):
     """This experiment tests the Google Speech Commands dataset, available
     here:
 
@@ -72,6 +72,7 @@ class ClasswiseSpeechExperiment(object):
 
         # Get our directories correct
         self.data_dir = config["data_dir"]
+        self.test_data_dir = []
         
         # Configure Model
         self.model_type = config["model_type"]
@@ -83,7 +84,6 @@ class ClasswiseSpeechExperiment(object):
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
         
         self.load_datasets()
-
 
         if self.model_type == "le_sparse":
             model = LeSparseNet(
@@ -216,19 +216,19 @@ class ClasswiseSpeechExperiment(object):
         self.pre_epoch()
         train_model(self.model, self.train_loader[training_class], self.optimizer, self.device,
                     batches_in_epoch=self.batches_in_epoch)
-        self.post_epoch()
+        self.post_epoch(training_class)
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def post_epoch(self):
+    def post_epoch(self, class_):
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
-        self.train_loader.dataset.load_next()
+        self.train_loader[class_].dataset.load_next()
 
     def pre_epoch(self):
         self.model.apply(update_boost_strength)
 
-    def test(self, class_, test_loader=None):
+    def test_class(self, class_, test_loader=None):
         """Test the model using the given loader and return test metrics."""
         if test_loader is None:
             test_loader = self.test_loader
@@ -248,6 +248,19 @@ class ClasswiseSpeechExperiment(object):
         })
 
         return ret
+    
+    def test(self, test_loader=None):
+        if test_loader is None:
+            test_loader = self.gen_test_loader
+        
+        ret = evaluate_model(self.model, test_loader, self.device)
+        ret["mean_accuracy"] = 100. * ret["mean_accuracy"]
+        entropy = self.entropy()
+        ret.update({
+            "entropy": float(entropy)
+            "total_samples": len(loader.sampler),
+            "non_zero_parameters": count_nonzero_params(self.model)[1],
+        })
 
     def entropy(self):
         """Returns the current entropy."""
@@ -297,6 +310,12 @@ class ClasswiseSpeechExperiment(object):
         self.validation_loader = DataLoader(
                 validation_dataset, batch_size=self.batch_size, shuffle=False
             )
+        
+        self.gen_test_loader = PreprocessedDataset(
+                cachefilepath=self.test_data_dir,
+                basename="gsc_test_noise",
+                qualifiers = ["{:02d}".format(int(100 * n)) for n in self.noise_values],
+        )
 
         for class_ in np.arange(1,12):
 
