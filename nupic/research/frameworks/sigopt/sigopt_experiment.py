@@ -101,6 +101,22 @@ class SigOptExperiment:
         observations = self.conn.experiments(self.experiment_id).observations().fetch()
         return observations.data
 
+    def create_observation(self, assignments, value, task=None):
+        """
+        Create an observation with custom assignments.
+        """
+        if task is None:
+            self.conn.experiments(self.experiment_id).observations().create(
+                assignments=assignments,
+                value=value
+            )
+        else:
+            self.conn.experiments(self.experiment_id).observations().create(
+                assignments=assignments,
+                value=value,
+                task=task
+            )
+
     def open_suggestions(self):
         suggestions = self.conn.experiments(self.experiment_id).suggestions().fetch(
             state="open")
