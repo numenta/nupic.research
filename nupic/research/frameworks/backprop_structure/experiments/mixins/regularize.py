@@ -60,7 +60,7 @@ class Regularize(object):
 
     def _regularization(self):
         reg = torch.tensor(0.).to(self.device)
-        for layer in self.model.modules():
+        for layer in self.network.modules():
             if isinstance(layer, (BinaryGatedConv2d,
                                   BinaryGatedLinear,
                                   HardConcreteGatedConv2d,
