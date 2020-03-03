@@ -256,19 +256,7 @@ class ImagenetTrainable(Trainable):
         committed_resource = 0.0
         resources = {}
 
-        # Update the config through SigOpt.
-        self.sigopt = None
-        if "sigopt_config" in config:
-            assert config.get("sigopt_experiment_id", None) is not None
-            self.sigopt = SigOptImagenetExperiment(
-                experiment_id=config["sigopt_experiment_id"],
-                sigopt_config=config["sigopt_config"])
-            self.suggestion = self.sigopt.get_next_suggestion()
-            self.sigopt.update_config_with_suggestion(config, self.suggestion)
-            print("SigOpt suggestion: ", self.suggestion)
-            print("Config after Sigopt:")
-            pprint(config)
-        self.epochs = config["epochs"]
+        self._process_config(config)
 
         # Create one ray remote process for each experiment in the process group
         self.procs = []
@@ -312,19 +300,12 @@ class ImagenetTrainable(Trainable):
             status.append(w.run_epoch.remote(self.iteration))
 
         # Wait for remote functions to complete
-        results = ray.get(status)
-
-        # Update the sigopt configuration once we're at the end
-        if self.iteration >= self.epochs - 1 and self.sigopt is not None:
-            if results[0]["mean_accuracy"] > 0.0:
-                print("Updating observation with value=", results[0]["mean_accuracy"])
-                self.sigopt.update_observation(self.suggestion,
-                                               results[0]["mean_accuracy"])
-                print("Full results: ")
-                pprint(results[0])
-
         # Return the results from the first remote function
-        return copy.deepcopy(results[0])
+        results = ray.get(status)
+        ret = copy.deepcopy(results[0])
+        self._process_result(ret)
+
+        return ret
 
     def _save(self, _):
         # All models are synchronized. Just save the state of first model
@@ -340,6 +321,46 @@ class ImagenetTrainable(Trainable):
             w.stop_experiment.remote()
             w.__ray_terminate__.remote()
 
+    def _process_config(self, config):
+        pass
+
+    def _process_result(self, result):
+        pass
+
+
+class SigOptImagenetTrainable(ImagenetTrainable):
+    """
+    This class updates the config using SigOpt before the models and workers are
+    instantiated, and updates the result using SigOpt once training completes.
+    """
+    def _process_config(self, config):
+        # Update the config through SigOpt.
+        self.sigopt = None
+        if "sigopt_config" in config:
+            assert config.get("sigopt_experiment_id", None) is not None
+            self.sigopt = SigOptImagenetExperiment(
+                experiment_id=config["sigopt_experiment_id"],
+                sigopt_config=config["sigopt_config"])
+            self.suggestion = self.sigopt.get_next_suggestion()
+            self.sigopt.update_config_with_suggestion(config, self.suggestion)
+            print("SigOpt suggestion: ", self.suggestion)
+            print("Config after Sigopt:")
+            pprint(config)
+            self.epochs = config["epochs"]
+
+    def _process_result(self, result):
+        # Update sigopt with the new result once we're at the end
+        if self.sigopt is not None:
+            result["early_stop"] = result.get("early_stop", 0.0)
+            if self.iteration >= self.epochs - 1:
+                result["early_stop"] = 1.0
+                if result["mean_accuracy"] > 0.0:
+                    print("Updating observation with value=", result["mean_accuracy"])
+                    self.sigopt.update_observation(self.suggestion,
+                                                   result["mean_accuracy"])
+                    print("Full results: ")
+                    pprint(result)
+
 
 def run(config):
     # Connect to ray
@@ -348,7 +369,12 @@ def run(config):
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-    kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
+
+    if "sigopt_config" in config:
+        kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
+                                         *tune.run.__defaults__]))
+    else:
+        kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
 
     # Update`tune.run` kwargs with config
     kwargs.update(config)
