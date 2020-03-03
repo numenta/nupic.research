@@ -21,6 +21,7 @@
 import logging
 import os
 import time
+import numpy as np
 
 import torch
 import torch.optim as optim
@@ -71,7 +72,7 @@ class ClasswiseSpeechExperiment(object):
 
         # Get our directories correct
         self.data_dir = config["data_dir"]
-
+        
         # Configure Model
         self.model_type = config["model_type"]
         self.num_classes = 12
@@ -80,6 +81,9 @@ class ClasswiseSpeechExperiment(object):
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+        
+        self.load_datasets()
+
 
         if self.model_type == "le_sparse":
             model = LeSparseNet(
@@ -199,7 +203,7 @@ class ClasswiseSpeechExperiment(object):
         number of mini batches exceeds the parameter "batches_in_epoch".
         """
         self.logger.info("epoch: %s", epoch)
-        self.load_datasets(training_class)
+
         t0 = time.time()
 
         self.logger.info(
@@ -210,7 +214,7 @@ class ClasswiseSpeechExperiment(object):
         )
         
         self.pre_epoch()
-        train_model(self.model, self.train_loader, self.optimizer, self.device,
+        train_model(self.model, self.train_loader[training_class], self.optimizer, self.device,
                     batches_in_epoch=self.batches_in_epoch)
         self.post_epoch()
 
@@ -224,18 +228,22 @@ class ClasswiseSpeechExperiment(object):
     def pre_epoch(self):
         self.model.apply(update_boost_strength)
 
-    def test(self, test_loader=None):
+    def test(self, class_, test_loader=None):
         """Test the model using the given loader and return test metrics."""
         if test_loader is None:
             test_loader = self.test_loader
-
-        ret = evaluate_model(self.model, test_loader, self.device)
+        try:
+            loader = test_loader[class_]
+        except:
+            loader = self.validation_loader
+            
+        ret = evaluate_model(self.model, loader, self.device)
         ret["mean_accuracy"] = 100.0 * ret["mean_accuracy"]
 
         entropy = self.entropy()
         ret.update({
             "entropy": float(entropy),
-            "total_samples": len(test_loader.sampler),
+            "total_samples": len(loader.sampler),
             "non_zero_parameters": count_nonzero_params(self.model)[1],
         })
 
@@ -255,6 +263,7 @@ class ClasswiseSpeechExperiment(object):
     def validate(self):
         """Run validation."""
         if self.validation_loader:
+            
             return self.test(self.validation_loader)
         return None
 
@@ -270,41 +279,46 @@ class ClasswiseSpeechExperiment(object):
             ret[noise] = self.test(self.test_loader)
         return ret
 
-    def load_datasets(self, class_):
+    def load_datasets(self):
         """
         GSC specifies specific files to be used as training, test, and validation.
 
         We assume the data has already been processed using the pre-processing scripts
         here: https://github.com/numenta/nupic.torch/tree/master/examples/gsc
         """
+        self.test_loader = []
+        self.train_loader = []
+        
         validation_dataset = ClasswiseDataset(
-            cachefilepath=self.data_dir,
-            basename="data_valid",
-            qualifiers=[""],
-        )
-
-        test_dataset = ClasswiseDataset(
-            cachefilepath=self.data_dir,
-            basename="data_test_",
-            qualifiers=range(class_,class_+1)
-        )
-        train_dataset = ClasswiseDataset(
-            cachefilepath=self.data_dir,
-            basename="data_train_",
-            qualifiers=range(class_,class_+1),
-        )
-
-        self.train_loader = DataLoader(
-            train_dataset, batch_size=self.batch_size, shuffle=True
-        )
-
+                        cachefilepath=self.data_dir,
+                        basename="data_valid",
+                        qualifiers=[""],
+            )
         self.validation_loader = DataLoader(
-            validation_dataset, batch_size=self.batch_size, shuffle=False
-        )
+                validation_dataset, batch_size=self.batch_size, shuffle=False
+            )
 
-        self.test_loader = DataLoader(
-            test_dataset, batch_size=self.batch_size, shuffle=False
-        )
+        for class_ in np.arange(1,12):
+
+            test_dataset = ClasswiseDataset(
+                cachefilepath=self.data_dir,
+                basename="data_test_",
+                qualifiers=range(class_,class_+1)
+            )
+            train_dataset = ClasswiseDataset(
+                cachefilepath=self.data_dir,
+                basename="data_train_",
+                qualifiers=range(class_,class_+1),
+            )
+
+            self.train_loader.append(DataLoader(
+                train_dataset, batch_size=self.batch_size, shuffle=True
+            ))
+
+
+            self.test_loader.append(DataLoader(
+                test_dataset, batch_size=self.batch_size, shuffle=False
+            ))
 
 
 class ClasswiseDataset(PreprocessedDataset):
