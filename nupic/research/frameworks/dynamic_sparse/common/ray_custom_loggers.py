@@ -38,8 +38,6 @@ from ray.tune.util import flatten_dict
 
 logger = logging.getLogger(__name__)
 
-# import tensorflow as tf  # noqa: @ remove
-
 
 def to_tf_values(result, path, histo_bins=1000):
     """Adapted from [1], generate a list of tf.Summary.Value() objects that
