@@ -1,10 +1,13 @@
+import configparser
 import sys
+
+import numpy as np
+
+from nupic.research.support import parse_config
+from sparse_speech_experiment import *
+
 sys.path.append('../')
 
-from sparse_speech_experiment import *
-import configparser
-from nupic.research.support import parse_config
-import numpy as np
 
 config_file = "../experiments.cfg"
 exp = "sparseCNN2"
