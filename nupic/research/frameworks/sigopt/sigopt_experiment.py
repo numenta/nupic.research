@@ -251,3 +251,45 @@ class SigOptImagenetExperiment(SigOptExperiment):
             assignments.pop("max_lr", None)
 
         config.update(assignments)
+
+
+class SigOptDynamicImagenetExperiment(SigOptImagenetExperiment):
+    """
+    A subclass of `SigOptImagenetExperiment` to enable suggestions
+    for dynamic parameters (e.g. pruning rates and sparsity levels)
+
+    As of now, only dynamic parameters are configurable for the
+    linear (output) layer.
+    """
+
+    def get_linear_params_config(self, config):
+        model_config = config["model_args"]["config"]
+        layer_params_config = model_config["layer_params_kwargs"]
+        linear_params_config = layer_params_config["default_linear_params"]
+        return linear_params_config
+
+    def update_config_with_suggestion(self, config, suggestion):
+        """
+        Given a SigOpt suggestion, update our various config dicts properly so that we
+        can pass it onto ImagenetExperiment.
+        """
+        assignments = suggestion.assignments
+
+        # One-cycle pruning args.
+        if "start_on_percentage" in assignments:
+            self.get_linear_params_config().update(dict(
+                start_on_percentage=assignments["start_on_percentage"]
+            ))
+            assignments.pop("start_on_percentage")
+
+        if "mid_on_percentage" in assignments:
+            self.get_linear_params_config().update(dict(
+                mid_on_percentage=assignments["mid_on_percentage"]
+            ))
+            assignments.pop("mid_on_percentage")
+
+        if "end_on_percentage" in assignments:
+            self.get_linear_params_config().update(dict(
+                end_on_percentage=assignments["end_on_percentage"]
+            ))
+            assignments.pop("end_on_percentage")
