@@ -204,7 +204,7 @@ class SigOptImagenetExperiment(SigOptExperiment):
         # Optimizer args
         if "log_lr" in assignments:
             config["optimizer_args"]["lr"] = math.exp(assignments["log_lr"])
-            assignments.pop("lr")
+            assignments.pop("log_lr")
 
         if "momentum" in assignments:
             config["optimizer_args"]["momentum"] = assignments["momentum"]
