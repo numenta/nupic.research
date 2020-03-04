@@ -31,8 +31,8 @@ from ray.tune import Trainable, tune
 from ray.tune.ray_trial_executor import RESOURCE_REFRESH_PERIOD, RayTrialExecutor
 from ray.tune.resources import Resources
 
+import nupic.research.frameworks.sigopt.sigopt_experiment as sigopt_experiment
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
-from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 logger = logging.getLogger(__name__)
@@ -338,9 +338,18 @@ class SigOptImagenetTrainable(ImagenetTrainable):
         self.sigopt = None
         if "sigopt_config" in config:
             assert config.get("sigopt_experiment_id", None) is not None
-            self.sigopt = SigOptImagenetExperiment(
+
+            # Check for user specified sigopt-experiment class.
+            experiment_class = config.get(
+                "sigopt_experiment_class", "SigOptImagenetExperiment")
+            experiment_class = getattr(sigopt_experiment, experiment_class)
+
+            # Instantiate experiment.
+            self.sigopt = experiment_class(
                 experiment_id=config["sigopt_experiment_id"],
                 sigopt_config=config["sigopt_config"])
+
+            # Get suggestion and update config.
             self.suggestion = self.sigopt.get_next_suggestion()
             self.sigopt.update_config_with_suggestion(config, self.suggestion)
             print("SigOpt suggestion: ", self.suggestion)
