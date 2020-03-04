@@ -357,6 +357,10 @@ class SigOptImagenetTrainable(ImagenetTrainable):
             pprint(config)
             self.epochs = config["epochs"]
 
+        # Get names of performance metrics.
+        assert "metrics" in config
+        self.metric_names = [metric["name"] for metric in config["metrics"]]
+
     def _process_result(self, result):
         # Update sigopt with the new result once we're at the end
         if self.sigopt is not None:
@@ -365,8 +369,13 @@ class SigOptImagenetTrainable(ImagenetTrainable):
                 result["early_stop"] = 1.0
                 if result["mean_accuracy"] > 0.0:
                     print("Updating observation with value=", result["mean_accuracy"])
-                    self.sigopt.update_observation(self.suggestion,
-                                                   result["mean_accuracy"])
+
+                    # Collect and report relevant metrics.
+                    values = [
+                        dict(name=name, value=result[name])
+                        for name in self.metric_names
+                    ]
+                    self.sigopt.update_observation(self.suggestion, values=values)
                     print("Full results: ")
                     pprint(result)
 
