@@ -126,6 +126,7 @@ class ContinuousSpeechExperiment(object):
         if self.use_cuda:
             self.device = torch.device("cuda")
             model = model.cuda()
+            print("model on GPU")
         else:
             self.device = torch.device("cpu")
 
@@ -195,6 +196,7 @@ class ContinuousSpeechExperiment(object):
             raise LookupError("Incorrect optimizer value")
 
         return optimizer
+        
 
     def train(self, epoch, training_class):
         """Train one epoch of this model by iterating through mini batches.
@@ -293,6 +295,22 @@ class ContinuousSpeechExperiment(object):
             self.test_loader.dataset.load_qualifier(noise_qualifier)
             ret[noise] = self.test(self.test_loader)
         return ret
+
+    def combine_classes(self,class1,class2):
+
+        data1 = torch.load(self.data_dir + "data_train_{}.npz".format(class1))
+        data2 = torch.load(self.data_dir + "data_train_{}.npz".format(class2))
+        combined_samples = torch.cat((data1[0],data2[0]), dims=0)
+        combined_labels = torch.cat((data1[1],data2[1]), dims=0)
+        combined_dataset = list((combined_samples, combined_labels))
+
+        self.data_loader = DataLoader(
+            combined_dataset,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
+
+        
 
     def load_datasets(self):
         """
