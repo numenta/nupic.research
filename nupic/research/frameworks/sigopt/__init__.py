@@ -1,6 +1,5 @@
-# ------------------------------------------------------------------------------
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions apply:
 #
@@ -18,30 +17,5 @@
 #
 #  http://numenta.org/licenses/
 #
-# ------------------------------------------------------------------------------
-# Install nupic.torch and nupic.tensorflow directly from github master branch
-nupic.torch @ git+https://github.com/numenta/nupic.torch.git
-nupic.tensorflow @ git+https://github.com/numenta/nupic.tensorflow.git
 
-awscli
-ax-platform
-boto3
-elasticsearch
-jupyter
-librosa==0.7.1
-matplotlib
-numpy
-pandas
-python-dateutil==2.8.0
-fastai
-pillow==6.0.0
-python-dotenv
-ray[all]==0.8.0
-requests
-scikit-image
-seaborn>=0.9.0
-sigopt
-tabulate
-torchvision==0.4.2
-tqdm
-h5py
+from .sigopt_experiment import SigOptExperiment, SigOptImagenetExperiment
