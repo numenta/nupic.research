@@ -87,10 +87,10 @@ class SigOptExperiment:
         suggestion = self.conn.experiments(experiment.id).suggestions().create()
         return suggestion
 
-    def update_observation(self, suggestion, value):
+    def update_observation(self, suggestion, values):
         self.conn.experiments(self.experiment_id).observations().create(
             suggestion=suggestion.id,
-            value=value,
+            values=values,
         )
 
     def get_observation_count(self):
