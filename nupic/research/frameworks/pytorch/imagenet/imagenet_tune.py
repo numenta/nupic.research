@@ -357,9 +357,9 @@ class SigOptImagenetTrainable(ImagenetTrainable):
             pprint(config)
             self.epochs = config["epochs"]
 
-        # Get names of performance metrics.
-        assert "metrics" in config
-        self.metric_names = [metric["name"] for metric in config["metrics"]]
+            # Get names of performance metrics.
+            assert "metrics" in config["sigopt_config"]
+            self.metric_names = [metric["name"] for metric in config["sigopt_config"]["metrics"]]
 
     def _process_result(self, result):
         # Update sigopt with the new result once we're at the end
