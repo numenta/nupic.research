@@ -21,6 +21,7 @@
 import logging
 import os
 import time
+import tempfile
 
 import numpy as np
 import torch
@@ -76,13 +77,14 @@ class ContinuousSpeechExperiment(object):
         
         # Configure Model
         self.model_type = config["model_type"]
-        self.num_classes = 12
+        self.num_classes = config["num_classes"]
         self.log_interval = config["log_interval"]
         self.batches_in_epoch = config["batches_in_epoch"]
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
         
+        self.validation = False
         self.load_datasets()
 
         if self.model_type == "le_sparse":
@@ -197,8 +199,7 @@ class ContinuousSpeechExperiment(object):
 
         return optimizer
         
-
-    def train(self, epoch, training_class):
+    def train(self, epoch, training_classes):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
@@ -214,18 +215,19 @@ class ContinuousSpeechExperiment(object):
             if self.lr_scheduler is None
             else self.lr_scheduler.get_lr(),
         )
-        
+        f = self.combine_classes(training_classes)
         self.pre_epoch()
-        train_model(self.model, self.train_loader[training_class], self.optimizer, self.device,
+        train_model(self.model, self.train_loader, self.optimizer, self.device,
                     batches_in_epoch=self.batches_in_epoch)
-        self.post_epoch(training_class)
+        self.post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
-
-    def post_epoch(self, class_):
+        f.close()
+ 
+    def post_epoch(self):
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
-        self.train_loader[class_].dataset.load_next()
+        self.train_loader.dataset.load_next()
 
     def pre_epoch(self):
         self.model.apply(update_boost_strength)
@@ -234,11 +236,12 @@ class ContinuousSpeechExperiment(object):
         """Test the model using the given loader and return test metrics."""
         if test_loader is None:
             test_loader = self.test_loader
-        try:
+
+        if not self.validation:
             loader = test_loader[class_]
-        except:
+        else:
             loader = self.validation_loader
-            
+
         ret = evaluate_model(self.model, loader, self.device)
         ret["mean_accuracy"] = 100.0 * ret["mean_accuracy"]
 
@@ -250,11 +253,11 @@ class ContinuousSpeechExperiment(object):
         })
 
         return ret
-    
+
     def test(self, test_loader=None):
         if test_loader is None:
             test_loader = self.gen_test_loader
-        
+
         ret = evaluate_model(self.model, test_loader, self.device)
         ret["mean_accuracy"] = 100. * ret["mean_accuracy"]
         entropy = self.entropy()
@@ -279,8 +282,9 @@ class ContinuousSpeechExperiment(object):
 
     def validate(self):
         """Run validation."""
+        self.validation = True
         if self.validation_loader:
-            
+
             return self.test(self.validation_loader)
         return None
 
@@ -296,21 +300,35 @@ class ContinuousSpeechExperiment(object):
             ret[noise] = self.test(self.test_loader)
         return ret
 
-    def combine_classes(self,class1,class2):
+    def combine_classes(self, training_classes):
+        data = []
+        for k in training_classes:
+            data.append(torch.load(self.data_dir + "data_train_{}.npz".format(k)))
 
-        data1 = torch.load(self.data_dir + "data_train_{}.npz".format(class1))
-        data2 = torch.load(self.data_dir + "data_train_{}.npz".format(class2))
-        combined_samples = torch.cat((data1[0],data2[0]), dims=0)
-        combined_labels = torch.cat((data1[1],data2[1]), dims=0)
+        samples_ = [data[k][0] for k in range(len(training_classes))]
+        labels_ = [data[k][1] for k in range(len(training_classes))]
+        combined_samples = torch.cat(samples_)
+        combined_labels = torch.cat(labels_)
         combined_dataset = list((combined_samples, combined_labels))
 
-        self.data_loader = DataLoader(
-            combined_dataset,
+        f = tempfile.NamedTemporaryFile(delete=True)
+        torch.save(combined_dataset, f)
+        dataset = ClasswiseDataset(
+            cachefilepath=os.path.split(f.name)[0],
+            basename=os.path.split(f.name)[1],
+            qualifiers=["tmp"]
+        )
+
+        data_loader = DataLoader(
+            dataset,
             batch_size=self.batch_size,
             shuffle=True
         )
+        f.flush()
 
-        
+        self.train_loader = data_loader
+        del samples_, labels_, data
+        return f
 
     def load_datasets(self):
         """
@@ -319,45 +337,43 @@ class ContinuousSpeechExperiment(object):
         We assume the data has already been processed using the pre-processing scripts
         here: https://github.com/numenta/nupic.torch/tree/master/examples/gsc
         """
-        self.test_loader = []
-        self.train_loader = []
-        
         validation_dataset = ClasswiseDataset(
-                        cachefilepath=self.data_dir,
-                        basename="data_valid",
-                        qualifiers=[""],
-            )
-        self.validation_loader = DataLoader(
-                validation_dataset, batch_size=self.batch_size, shuffle=False
-            )
-        
-        gen_test_dataset = PreprocessedDataset(
-                cachefilepath=self.test_data_dir,
-                basename="gsc_test_noise",
-                qualifiers = ["{:02d}".format(int(100 * n)) for n in self.noise_values],
+            cachefilepath=self.data_dir,
+            basename="data_valid",
+            qualifiers=[""],
         )
+        self.validation_loader = DataLoader(
+            validation_dataset, batch_size=self.batch_size, shuffle=False
+        )
+        
+        self.gen_test_dataset = PreprocessedDataset(
+            cachefilepath=self.test_data_dir,
+            basename="gsc_test_noise",
+            qualifiers=["{:02d}".format(int(100 * n)) for n in self.noise_values],
+        )
+        # self.gen_test_dataset.tensors[1] -
 
         self.gen_test_loader = DataLoader(
-            gen_test_dataset, batch_size=self.batch_size, shuffle=True
+            self.gen_test_dataset, batch_size=self.batch_size, shuffle=True
         )
-
-        for class_ in np.arange(1,12):
-
+        
+        self.test_loader = []
+        # Iterate over labels
+        for class_ in np.arange(11):
             test_dataset = ClasswiseDataset(
                 cachefilepath=self.data_dir,
                 basename="data_test_",
-                qualifiers=range(class_,class_+1)
+                qualifiers=[class_+1]
             )
-            train_dataset = ClasswiseDataset(
-                cachefilepath=self.data_dir,
-                basename="data_train_",
-                qualifiers=range(class_,class_+1),
-            )
+            # train_dataset = ClasswiseDataset(
+            #     cachefilepath=self.data_dir,
+            #     basename="data_train_",
+            #     qualifiers=range(class_,class_+1),
+            # )
 
-            self.train_loader.append(DataLoader(
-                train_dataset, batch_size=self.batch_size, shuffle=True
-            ))
-
+            # self.train_loader.append(DataLoader(
+            #     train_dataset, batch_size=self.batch_size, shuffle=True
+            # ))
 
             self.test_loader.append(DataLoader(
                 test_dataset, batch_size=self.batch_size, shuffle=False
@@ -372,7 +388,10 @@ class ClasswiseDataset(PreprocessedDataset):
 
         :return: Name of the file that was actually loaded.
         """
-        file_name = os.path.join(self.path, self.basename + "{}.npz".format(qualifier))
+        if qualifier == "tmp":
+            file_name = os.path.join(self.path, self.basename)
+        else:
+            file_name = os.path.join(self.path, self.basename + "{}.npz".format(qualifier))
 #         self.tensors = list(np.load(file_name, allow_pickle=True))
         self.tensors = list(torch.load(file_name))
         return file_name
