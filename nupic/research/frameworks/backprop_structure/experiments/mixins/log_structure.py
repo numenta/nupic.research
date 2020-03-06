@@ -21,28 +21,12 @@
 
 import torch
 
-from nupic.research.frameworks.backprop_structure.modules import (
-    BinaryGatedConv2d,
-    BinaryGatedLinear,
-    HardConcreteGatedConv2d,
-    HardConcreteGatedLinear,
-)
-from nupic.research.frameworks.backprop_structure.modules.vdrop_layers import (
-    VDropConv2d,
-    VDropLinear,
-)
-
 
 def nonzero_counts(model, verbose):
     result = {}
 
     for layername, layer in model.named_modules():
-        if isinstance(layer, (BinaryGatedConv2d,
-                              BinaryGatedLinear,
-                              HardConcreteGatedConv2d,
-                              HardConcreteGatedLinear,
-                              VDropConv2d,
-                              VDropLinear)):
+        if hasattr(layer, "get_inference_nonzeros"):
             num_inputs = 1.
             for d in layer.weight_size()[1:]:
                 num_inputs *= d
