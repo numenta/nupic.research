@@ -43,9 +43,12 @@ class Supervised(object):
                  dataset_name, dataset_params,
                  training_iterations,
                  batch_size_train, batch_size_test,
+                 logdir,
                  optim_alg=None, optim_params=None,
                  lr_scheduler_alg=None, lr_scheduler_params=None,
                  use_tqdm=False, tqdm_mininterval=None):
+        self.logdir = logdir
+
         (self.batch_size_train_first_epoch,
          self.batch_size_train) = batch_size_train
         self.batch_size_test = batch_size_test
@@ -131,7 +134,7 @@ class Supervised(object):
 
     def run_epoch(self, iteration):
         self.network.train()
-        self._before_train_epoch()
+        self._before_train_epoch(iteration)
 
         batch_size = (self.batch_size_train_first_epoch
                       if iteration == 0
@@ -172,7 +175,7 @@ class Supervised(object):
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
-        self._after_train_epoch()
+        self._after_train_epoch(iteration)
 
         result = {
             "mean_train_accuracy": train_correct / len(train_loader.dataset),
@@ -200,10 +203,10 @@ class Supervised(object):
     def _regularization(self):
         return 0
 
-    def _before_train_epoch(self):
+    def _before_train_epoch(self, iteration):
         pass
 
-    def _after_train_epoch(self):
+    def _after_train_epoch(self, iteration):
         pass
 
     def _after_optimizer_step(self):
