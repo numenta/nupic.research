@@ -273,23 +273,18 @@ class SigOptDynamicImagenetExperiment(SigOptImagenetExperiment):
         Given a SigOpt suggestion, update our various config dicts properly so that we
         can pass it onto ImagenetExperiment.
         """
+        super().update_config_with_suggestion(config, suggestion)
+
         assignments = suggestion.assignments
 
-        # One-cycle pruning args.
-        if "start_on_percentage" in assignments:
-            self.get_linear_params_config().update(dict(
-                start_on_percentage=assignments["start_on_percentage"]
-            ))
-            assignments.pop("start_on_percentage")
-
         if "mid_on_percentage" in assignments:
-            self.get_linear_params_config().update(dict(
+            self.get_linear_params_config(config).update(dict(
                 mid_on_percentage=assignments["mid_on_percentage"]
             ))
             assignments.pop("mid_on_percentage")
 
         if "end_on_percentage" in assignments:
-            self.get_linear_params_config().update(dict(
+            self.get_linear_params_config(config).update(dict(
                 end_on_percentage=assignments["end_on_percentage"]
             ))
             assignments.pop("end_on_percentage")
