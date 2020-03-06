@@ -70,7 +70,7 @@ if __name__ == "__main__":
             training_iterations=30,
 
             use_tqdm=False,
-            batch_size_train=16,
+            batch_size_train=(16, 16),
             batch_size_test=1000,
 
             noise_test_at_end=True,

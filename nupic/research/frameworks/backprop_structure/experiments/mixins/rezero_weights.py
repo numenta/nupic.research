@@ -23,6 +23,6 @@ from nupic.torch.modules import rezero_weights
 
 
 class RezeroWeights(object):
-    def _after_train_epoch(self):
-        super()._after_train_epoch()
+    def _after_train_epoch(self, *args, **kwargs):
+        super()._after_train_epoch(*args, **kwargs)
         self.network.apply(rezero_weights)
