@@ -21,17 +21,6 @@
 
 import torch
 
-from nupic.research.frameworks.backprop_structure.modules import (
-    BinaryGatedConv2d,
-    BinaryGatedLinear,
-    HardConcreteGatedConv2d,
-    HardConcreteGatedLinear,
-)
-from nupic.research.frameworks.backprop_structure.modules.vdrop_layers import (
-    VDropConv2d,
-    VDropLinear,
-)
-
 
 class Regularize(object):
     def __init__(self, reg_schedule=None, downscale_reg_with_training_set=False,
@@ -61,12 +50,7 @@ class Regularize(object):
     def _regularization(self):
         reg = torch.tensor(0.).to(self.device)
         for layer in self.network.modules():
-            if isinstance(layer, (BinaryGatedConv2d,
-                                  BinaryGatedLinear,
-                                  HardConcreteGatedConv2d,
-                                  HardConcreteGatedLinear,
-                                  VDropConv2d,
-                                  VDropLinear)):
+            if hasattr(layer, "regularization"):
                 reg += layer.regularization()
         return (self.reg_weight
                 * self.reg_coefficient
