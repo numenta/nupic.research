@@ -1,12 +1,14 @@
-from torch.utils.data import DataLoader
-import torch
-
 import sys
-sys.path.append('../')
-import numpy as np 
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader
 
 from cont_speech_experiment import ContinuousSpeechExperiment
 from nupic.research.support import parse_config
+
+sys.path.append('../')
+
 
 data_dir = "/home/ec2-user/nta/data/data_classes/"
 config_file = "experiments.cfg"

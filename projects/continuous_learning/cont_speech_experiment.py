@@ -33,8 +33,11 @@ from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
     set_random_seed,
-    train_model,
+    # train_model,
 )
+
+from cl_utils import train_model
+
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
@@ -86,6 +89,8 @@ class ContinuousSpeechExperiment(object):
         
         self.validation = False
         self.load_datasets()
+
+        self.freeze_params = config["freeze_params"]
 
         if self.model_type == "le_sparse":
             model = LeSparseNet(
@@ -199,7 +204,7 @@ class ContinuousSpeechExperiment(object):
 
         return optimizer
         
-    def train(self, epoch, training_classes):
+    def train(self, epoch, training_classes, indices):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
@@ -217,7 +222,13 @@ class ContinuousSpeechExperiment(object):
         )
         f = self.combine_classes(training_classes)
         self.pre_epoch()
+
+        fparams = []
+        if self.freeze_params == "output":
+            fparams.append([self.model.output.weight, indices])
+
         train_model(self.model, self.train_loader, self.optimizer, self.device,
+                    freeze_params=fparams,
                     batches_in_epoch=self.batches_in_epoch)
         self.post_epoch()
 
@@ -257,6 +268,13 @@ class ContinuousSpeechExperiment(object):
     def test(self, test_loader=None):
         if test_loader is None:
             test_loader = self.gen_test_loader
+
+        if not self.validation:
+            loader = test_loader
+            self.validation = False
+        else:
+            loader = self.validation_loader
+            
 
         ret = evaluate_model(self.model, test_loader, self.device)
         ret["mean_accuracy"] = 100. * ret["mean_accuracy"]
@@ -303,7 +321,7 @@ class ContinuousSpeechExperiment(object):
     def combine_classes(self, training_classes):
         data = []
         for k in training_classes:
-            data.append(torch.load(self.data_dir + "data_train_{}.npz".format(k)))
+            data.append(torch.load(self.data_dir + "data_train_{}.npz".format(k+1)))
 
         samples_ = [data[k][0] for k in range(len(training_classes))]
         labels_ = [data[k][1] for k in range(len(training_classes))]
@@ -351,20 +369,23 @@ class ContinuousSpeechExperiment(object):
             basename="gsc_test_noise",
             qualifiers=["{:02d}".format(int(100 * n)) for n in self.noise_values],
         )
-        # self.gen_test_dataset.tensors[1] -
+        self.gen_test_dataset.tensors[1] -= 1
 
         self.gen_test_loader = DataLoader(
             self.gen_test_dataset, batch_size=self.batch_size, shuffle=True
         )
         
         self.test_loader = []
+
         # Iterate over labels
-        for class_ in np.arange(11):
+        for class_ in np.arange(12):
             test_dataset = ClasswiseDataset(
                 cachefilepath=self.data_dir,
                 basename="data_test_",
                 qualifiers=[class_+1]
             )
+
+            # test_dataset.tensors[1] -= 1
             # train_dataset = ClasswiseDataset(
             #     cachefilepath=self.data_dir,
             #     basename="data_train_",
