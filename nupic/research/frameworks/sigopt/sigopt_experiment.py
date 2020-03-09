@@ -87,10 +87,10 @@ class SigOptExperiment:
         suggestion = self.conn.experiments(experiment.id).suggestions().create()
         return suggestion
 
-    def update_observation(self, suggestion, value):
+    def update_observation(self, suggestion, values):
         self.conn.experiments(self.experiment_id).observations().create(
             suggestion=suggestion.id,
-            value=value,
+            values=values,
         )
 
     def get_observation_count(self):
@@ -204,7 +204,7 @@ class SigOptImagenetExperiment(SigOptExperiment):
         # Optimizer args
         if "log_lr" in assignments:
             config["optimizer_args"]["lr"] = math.exp(assignments["log_lr"])
-            assignments.pop("lr")
+            assignments.pop("log_lr")
 
         if "momentum" in assignments:
             config["optimizer_args"]["momentum"] = assignments["momentum"]
