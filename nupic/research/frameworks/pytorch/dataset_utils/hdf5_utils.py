@@ -89,4 +89,4 @@ class HDF5DataSaver(object):
         data_path = self.data_path
         lock = self.lock
         self.hdf5_save(
-            data_path, image_data, group_name, class_name, image_name, lock)
+            data_path, image_data, group_name, class_name, image_name, lock=lock)
