@@ -334,6 +334,17 @@ class SigOptImagenetTrainable(ImagenetTrainable):
     instantiated, and updates the result using SigOpt once training completes.
     """
     def _process_config(self, config):
+        """
+        :param config:
+            Dictionary configuration of the trainable
+
+            - sigopt_experiment_id: id of experiment
+            - sigopt_config: dict to specify configuration of sigopt experiment
+            - sigopt_experiment_class: class inherited from `SigoptExperiment` which
+                                       characterizes how the trainable will get and
+                                       utilize suggestions
+
+        """
         # Update the config through SigOpt.
         self.sigopt = None
         if "sigopt_config" in config:
