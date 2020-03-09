@@ -333,7 +333,7 @@ class ResNet(nn.Module):
     https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py"""
 
     def __init__(self, config=None):
-        super(ResNet, self).__init__()
+        super().__init__()
 
         # update config
         defaults = dict(
