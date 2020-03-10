@@ -36,7 +36,9 @@ from nupic.research.frameworks.pytorch.model_utils import (
     # train_model,
 )
 
-from cl_utils import train_model
+# from nupic.research.frameworks.pytorch.model_utils import train_model as train_full_model
+
+from cl_utils import train_multi_model, train_model
 
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
@@ -204,6 +206,30 @@ class ContinuousSpeechExperiment(object):
 
         return optimizer
         
+    def train_entire_dataset(self, epoch):
+        """Train one epoch of this model by iterating through mini batches.
+
+        An epoch ends after one pass through the training set, or if the
+        number of mini batches exceeds the parameter "batches_in_epoch".
+        """
+        self.logger.info("epoch: %s", epoch)
+
+        t0 = time.time()
+
+        self.logger.info(
+            "Learning rate: %s",
+            self.learning_rate
+            if self.lr_scheduler is None
+            else self.lr_scheduler.get_lr(),
+        )
+
+        self.pre_epoch()
+        train_model(self.model, self.full_train_loader, self.optimizer, self.device,
+                    batches_in_epoch=self.batches_in_epoch)
+        self.full_post_epoch()
+
+        self.logger.info("training duration: %s", time.time() - t0)
+
     def train(self, epoch, training_classes, indices):
         """Train one epoch of this model by iterating through mini batches.
 
@@ -227,7 +253,7 @@ class ContinuousSpeechExperiment(object):
         if self.freeze_params == "output":
             fparams.append([self.model.output.weight, indices])
 
-        train_model(self.model, self.train_loader, self.optimizer, self.device,
+        train_multi_model(self.model, self.train_loader, self.optimizer, self.device,
                     freeze_params=fparams,
                     batches_in_epoch=self.batches_in_epoch)
         self.post_epoch()
@@ -239,6 +265,11 @@ class ContinuousSpeechExperiment(object):
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
+   
+    def full_post_epoch(self):
+        self.model.apply(rezero_weights)
+        self.lr_scheduler.step()
+        self.full_train_loader.dataset.load_next()
 
     def pre_epoch(self):
         self.model.apply(update_boost_strength)
@@ -321,7 +352,7 @@ class ContinuousSpeechExperiment(object):
     def combine_classes(self, training_classes):
         data = []
         for k in training_classes:
-            data.append(torch.load(self.data_dir + "data_train_{}.npz".format(k+1)))
+            data.append(torch.load(self.data_dir + "data_train_{}.npz".format(k + 1)))
 
         samples_ = [data[k][0] for k in range(len(training_classes))]
         labels_ = [data[k][1] for k in range(len(training_classes))]
@@ -374,7 +405,18 @@ class ContinuousSpeechExperiment(object):
         self.gen_test_loader = DataLoader(
             self.gen_test_dataset, batch_size=self.batch_size, shuffle=True
         )
+
+        self.train_dataset = PreprocessedDataset(
+            cachefilepath = self.test_data_dir,
+            basename="gsc_train",
+            qualifiers=range(30)
+        )
+        # self.train_dataset.tensors[1] -= 1
         
+        self.full_train_loader = DataLoader(
+            self.train_dataset, batch_size=self.batch_size, shuffle=True
+        )
+
         self.test_loader = []
 
         # Iterate over labels
@@ -384,17 +426,6 @@ class ContinuousSpeechExperiment(object):
                 basename="data_test_",
                 qualifiers=[class_+1]
             )
-
-            # test_dataset.tensors[1] -= 1
-            # train_dataset = ClasswiseDataset(
-            #     cachefilepath=self.data_dir,
-            #     basename="data_train_",
-            #     qualifiers=range(class_,class_+1),
-            # )
-
-            # self.train_loader.append(DataLoader(
-            #     train_dataset, batch_size=self.batch_size, shuffle=True
-            # ))
 
             self.test_loader.append(DataLoader(
                 test_dataset, batch_size=self.batch_size, shuffle=False
@@ -412,7 +443,8 @@ class ClasswiseDataset(PreprocessedDataset):
         if qualifier == "tmp":
             file_name = os.path.join(self.path, self.basename)
         else:
-            file_name = os.path.join(self.path, self.basename + "{}.npz".format(qualifier))
+            file_name = os.path.join(self.path,
+                 self.basename + "{}.npz".format(qualifier))
 #         self.tensors = list(np.load(file_name, allow_pickle=True))
         self.tensors = list(torch.load(file_name))
         return file_name
