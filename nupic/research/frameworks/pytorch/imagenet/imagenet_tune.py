@@ -372,6 +372,8 @@ class SigOptImagenetTrainable(ImagenetTrainable):
             self.metric_names = [
                 metric["name"] for metric in config["sigopt_config"]["metrics"]
             ]
+            assert "mean_accuracy" in self.metric_names, \
+                "For now, we only update the observation if `mean_accuracy` is present."
 
     def _process_result(self, result):
         # Update sigopt with the new result once we're at the end
