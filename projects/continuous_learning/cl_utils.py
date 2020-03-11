@@ -225,3 +225,13 @@ def train_model(
     if progress_bar is not None:
         loader.n = loader.total
         loader.close()
+
+def unravel_index(index, shape):
+    """stole from 
+    https://github.com/pytorch/pytorch/blob/master/torch/testing/__init__.py
+    """
+    res = []
+    for size in shape[::-1]:
+        res.append(int(index % size))
+        index = int(index // size)
+    return tuple(res[::-1])
