@@ -46,12 +46,14 @@ PARAMETERS = [
 
 
 class ExploratoryExperiment(experiments.Supervised):
-    def __init__(self, lr, momentum, weight_decay, gamma, step_size,
+    def __init__(self, logdir, lr, momentum, weight_decay, gamma, step_size,
                  first_batch_size):
         step_size = int(step_size)
         first_batch_size = int(first_batch_size)
 
         super().__init__(
+            logdir=logdir,
+
             network_name="mnist_lesparsenet",
             network_params=dict(
                 cnn_activity_percent_on=(1.0, 1.0),

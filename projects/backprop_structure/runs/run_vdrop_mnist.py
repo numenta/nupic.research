@@ -43,9 +43,11 @@ class VDropExperiment(mixins.ConstrainParameters,
                       mixins.LogStructure,
                       mixins.Regularize,
                       experiments.Supervised):
-    def __init__(self):
+    def __init__(self, logdir):
 
         super().__init__(
+            logdir=logdir,
+
             network_name="mnist_lenet_vdrop",
             network_params=dict(),
 

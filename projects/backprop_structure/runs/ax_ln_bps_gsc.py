@@ -49,11 +49,13 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
                             mixins.LogStructure,
                             mixins.Regularize,
                             experiments.Supervised):
-    def __init__(self, lr, l0_strength, droprate_init, gamma, step_size):
+    def __init__(self, logdir, lr, l0_strength, droprate_init, gamma, step_size):
 
         step_size = int(step_size)
 
         super().__init__(
+            logdir=logdir,
+
             network_name="gsc_lenet_backpropstructure",
             network_params=dict(
                 l0_strength=l0_strength,
