@@ -309,8 +309,9 @@ class ImagenetExperiment:
         lr_scheduler_class = config.get("lr_scheduler_class", None)
         if lr_scheduler_class is not None:
             lr_scheduler_args = config.get("lr_scheduler_args", {})
-            self.logger.debug("LR Scheduler args:")
-            self.logger.debug(pformat(lr_scheduler_args))
+            self.logger.info("LR Scheduler args:")
+            self.logger.info(pformat(lr_scheduler_args))
+            self.logger.info("steps_per_epoch=%s", self.total_batches)
             self.lr_scheduler = create_lr_scheduler(
                 optimizer=self.optimizer,
                 lr_scheduler_class=lr_scheduler_class,
@@ -400,8 +401,8 @@ class ImagenetExperiment:
             self.lr_scheduler.step()
 
         if self.progress and epoch == 0 and batch_idx == 0:
-            self.logger.debug("Launch time to end of first batch: %s",
-                              time.time() - self.launch_time)
+            self.logger.info("Launch time to end of first batch: %s",
+                             time.time() - self.launch_time)
 
         if self.progress and (batch_idx % 40) == 0:
             total_batches = self.total_batches
