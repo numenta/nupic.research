@@ -166,8 +166,7 @@ class SigOptExperiment:
     def get_experiment_details(self):
         return self.conn.experiments(self.experiment_id).fetch()
 
-    @staticmethod
-    def update_config_with_suggestion(config, suggestion):
+    def update_config_with_suggestion(self, config, suggestion):
         """
         Given a SigOpt suggestion, update this config dict.
         """
