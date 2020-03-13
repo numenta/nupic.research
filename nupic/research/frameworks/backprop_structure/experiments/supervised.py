@@ -188,6 +188,9 @@ class Supervised(object):
         result.update(test_result)
         return result
 
+    def on_finished(self):
+        pass
+
     def save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
         torch.save(self.network.state_dict(), checkpoint_path)
