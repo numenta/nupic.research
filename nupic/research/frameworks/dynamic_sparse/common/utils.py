@@ -30,10 +30,18 @@ from torchvision import datasets
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
 
-from .experiments import RayTrainable, base_experiment, iterative_pruning_experiment
+from .experiments import (
+    RayTrainable,
+    base_experiment,
+    iterative_pruning_experiment,
+    sigopt_experiment,
+)
 
 custom_datasets = {"TinyImageNet": TinyImageNet}
-custom_experiments = {"IterativePruning": iterative_pruning_experiment}
+custom_experiments = {
+    "IterativePruning": iterative_pruning_experiment,
+    "SigOpt": sigopt_experiment,
+}
 
 
 def download_dataset(config):

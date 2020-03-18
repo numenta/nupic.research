@@ -25,4 +25,4 @@ from .layers import *
 from .main import *
 from .utils import *
 from .wideresnet import *
-from nupic.research.frameworks.pytorch.models.resnets import resnet50
+from nupic.research.frameworks.pytorch.models.resnets import resnet18,resnet50
