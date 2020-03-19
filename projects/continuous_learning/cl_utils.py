@@ -9,6 +9,20 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
+def k_grad(module, pct):
+    if w.ndim > 1:
+        s, inds = torch.sort(torch.abs(module.grad), axis=1)
+        k = int(pct/100 * module.shape[1])
+
+        m = module.grad.gather(1, inds)
+        m[:,:-k,:,:] = 0.
+    
+    else:
+        s, inds = torch.sort(torch.abs(module.grad))
+        k = int(pct/100 * module.shape[0])
+        m[:-k] = 0.
+        
+    module.grad = m
 
 def train_multi_model(
     model,
@@ -21,7 +35,7 @@ def train_multi_model(
     pre_batch_callback=None,
     post_batch_callback=None,
     progress_bar=None,
-    
+
 ):
     """Train the given model by iterating through mini batches. An epoch ends
     after one pass through the training set, or if the number of mini batches
@@ -104,6 +118,12 @@ def train_multi_model(
                 param_indices = param[1]
                 param_module.grad[param_indices, :] = 0.0
                 # print(torch.mean(param_module.grad[param_indices,:]))
+
+        for w in list(model.parameters()):
+            try:
+                k_grad(w, 7)
+            except:
+                pass
 
         t3 = time.time()
         optimizer.step()
