@@ -31,6 +31,9 @@ def as_ray_trainable(experiment_class):
         def _train(self):
             return self.exp.run_epoch(self.iteration)
 
+        def _stop(self):
+            return self.exp.on_finished()
+
         def _save(self, checkpoint_dir):
             return self.exp.save(checkpoint_dir)
 
