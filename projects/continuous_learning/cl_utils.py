@@ -9,20 +9,19 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-def k_grad(module, pct):
-    if w.ndim > 1:
-        s, inds = torch.sort(torch.abs(module.grad), axis=1)
-        k = int(pct/100 * module.shape[1])
 
-        m = module.grad.gather(1, inds)
-        m[:,:-k,:,:] = 0.
+def k_grad(module, pct):
     
-    else:
-        s, inds = torch.sort(torch.abs(module.grad))
-        k = int(pct/100 * module.shape[0])
-        m[:-k] = 0.
-        
-    module.grad = m
+    k = int(pct/100 * module.numel())
+    xr = module.grad.reshape(1,-1)
+    xr_abs = torch.abs(xr)
+    s, inds = torch.topk(xr_abs, k, sorted=False)
+    grs = xr[:,inds]
+    res = torch.zeros_like(xr)
+    res.scatter_(1,inds,xr.gather(1,inds))
+    res = res.reshape(module.grad.shape)
+    
+    module.grad = res.detach()
 
 def train_multi_model(
     model,
@@ -113,17 +112,19 @@ def train_multi_model(
             loss.backward()
 
         if len(freeze_params) > 0:
-            for param in freeze_params:
-                param_module = param[0]
-                param_indices = param[1]
-                param_module.grad[param_indices, :] = 0.0
+            with torch.no_grad():
+                for param in freeze_params:
+                    param_module = param[0]
+                    param_indices = param[1]
+                    param_module.grad[param_indices, :] = 0.0
                 # print(torch.mean(param_module.grad[param_indices,:]))
-
-        for w in list(model.parameters()):
-            try:
-                k_grad(w, 7)
-            except:
-                pass
+        
+        # with torch.no_grad():
+        #     for w in list(model.parameters())[:-1]:
+        #         try:
+        #             k_grad(w, 2)
+        #         except:
+        #             pass
 
         t3 = time.time()
         optimizer.step()
