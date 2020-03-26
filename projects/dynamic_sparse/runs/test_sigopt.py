@@ -28,24 +28,40 @@ from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 
 # create sigopt params space
 # set observation budget -> not available in SigOpt-Ray integration
-# sigopt_params_space = [
-#     {
-#         "name": "learning_rate",
-#         "type": "double",
-#         "bounds": {
-#             "min": 0.0001,
-#             "max": 0.2
-#         },
-#     },
-#     {
-#         "name": "on_perc",
-#         "type": "double",
-#         "bounds": {
-#             "min": 0.1,
-#             "max": 1.0
-#         },
-#     },
-# ]
+sigopt_params_space = [
+    {
+        "name": "learning_rate",
+        "type": "double",
+        "bounds": {
+            "min": 0.0001,
+            "max": 0.2
+        },
+    },
+    {
+        "name": "on_perc",
+        "type": "double",
+        "bounds": {
+            "min": 0.1,
+            "max": 1.0
+        },
+    },
+    {
+        "name": "momentum",
+        "type": "double",
+        "bounds": {
+            "min": 0,
+            "max": 1.0
+        },
+    },    
+    {
+        "name": "weight_decay",
+        "type": "double",
+        "bounds": {
+            "min": 0,
+            "max": 0.1
+        },
+    },
+]
 
 # alternative initialization based on configuration
 exp_config = dict(
@@ -63,6 +79,8 @@ exp_config = dict(
     # 1- random search baseline
     learning_rate=tune.sample_from(lambda spec: np.random.uniform(0.0001, 0.2)),
     on_perc=tune.sample_from(lambda spec: np.random.uniform(0.1, 1.0)),
+    momentum=tune.sample_from(lambda spec: np.random.uniform(0, 1.0)),
+    weight_decay=tune.sample_from(lambda spec: np.random.uniform(0, 0.1)),
     # 2- sigopt extra parameters
     # experiment_type="SigOpt",
     # params_space=sigopt_params_space,
@@ -72,13 +90,13 @@ exp_config = dict(
 # run
 tune_config = dict(
     # name=__file__,
-    name="sigopt_baseline_comp",
-    num_samples=100,
+    name="sigopt_test3",
+    num_samples=300,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 10},
-    resources_per_trial={"cpu": 0, "gpu": 0.20},
+    stop={"training_iteration": 20},
+    resources_per_trial={"cpu": 0, "gpu": 0.2},
     verbose=2,
 )
 
