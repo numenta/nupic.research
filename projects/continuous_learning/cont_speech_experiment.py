@@ -105,6 +105,7 @@ class ContinuousSpeechExperiment(object):
                 linear_weight_percent_on=config["weight_sparsity"],
                 boost_strength=config["boost_strength"],
                 boost_strength_factor=config["boost_strength_factor"],
+                duty_cycle_period=config["duty_cycle_period"],
                 use_batch_norm=config["use_batch_norm"],
                 dropout=config.get("dropout", 0.0),
                 num_classes=self.num_classes,
@@ -230,7 +231,7 @@ class ContinuousSpeechExperiment(object):
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def train(self, epoch, training_classes, indices):
+    def train(self, epoch, training_classes, indices, freeze_grad=False):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
@@ -250,11 +251,13 @@ class ContinuousSpeechExperiment(object):
         self.pre_epoch()
 
         fparams = []
-        if self.freeze_params == "output":
-            fparams.append([self.model.output.weight, indices])
+        # if self.freeze_params == "output":
+        if self.freeze_params == "linear2":
+            fparams.append([self.model.linear2.module.weight, indices])
 
         train_multi_model(self.model, self.train_loader, self.optimizer, self.device,
                     freeze_params=fparams,
+                    freeze_grad=freeze_grad,
                     batches_in_epoch=self.batches_in_epoch)
         self.post_epoch()
 
