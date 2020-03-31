@@ -13,15 +13,31 @@ from tqdm import tqdm
 def k_grad(module, pct):
     
     k = int(pct/100 * module.numel())
-    xr = module.grad.reshape(1,-1)
+    xr = module.reshape(1,-1)
+    xr_grad = module.grad.reshape(1,-1)
     xr_abs = torch.abs(xr)
     s, inds = torch.topk(xr_abs, k, sorted=False)
-    grs = xr[:,inds]
-    res = torch.zeros_like(xr)
-    res.scatter_(1,inds,xr.gather(1,inds))
-    res = res.reshape(module.grad.shape)
-    
+    xr_grad[:,inds] = 0.
+    res = xr_grad.reshape(module.shape)
+
     module.grad = res.detach()
+
+
+# def k_grad(module, pct):
+    
+#     k = int(pct/100 * module.numel())
+#     xr = module.grad.reshape(1,-1)
+#     xr_abs = torch.abs(xr)
+#     # s, inds = torch.topk(xr_abs, k, sorted=False)
+#     s, inds = torch.sort(xr_abs, dim=1)
+#     xr[:,inds[k:-k]] *= 2
+#     xr[:,inds[:-k]] = 0.
+#     res = xr.reshape(module.grad.shape)
+#     # res = torch.zeros_like(xr)
+#     # res.scatter_(1,inds,xr.gather(1,inds))
+#     # res = res.reshape(module.grad.shape)
+    
+#     module.grad = res.detach()
 
 def train_multi_model(
     model,
@@ -29,6 +45,7 @@ def train_multi_model(
     optimizer,
     device,
     freeze_params,
+    freeze_grad,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
@@ -119,12 +136,13 @@ def train_multi_model(
                     param_module.grad[param_indices, :] = 0.0
                 # print(torch.mean(param_module.grad[param_indices,:]))
         
-        # with torch.no_grad():
-        #     for w in list(model.parameters())[:-1]:
-        #         try:
-        #             k_grad(w, 2)
-        #         except:
-        #             pass
+        if freeze_grad:
+            with torch.no_grad():
+                for w in list(model.parameters())[:-1]:
+                    try:
+                        k_grad(w, 7)
+                    except:
+                        pass
 
         t3 = time.time()
         optimizer.step()
