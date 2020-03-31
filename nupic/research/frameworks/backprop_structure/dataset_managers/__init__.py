@@ -21,3 +21,4 @@
 
 from .gsc import PreprocessedGSC
 from .mnist import MNIST
+from .imagenet import ImageNet100
