@@ -24,6 +24,7 @@ import torch
 import torch.nn
 from torch.autograd import Variable
 
+from nupic.research.frameworks.pytorch.modules import Mish
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.pytorch.models.resnets import (
     ResNet,
@@ -397,6 +398,35 @@ class ResnetTest(unittest.TestCase):
         net(Variable(torch.randn(2, 3, 32, 32)))
 
         self.assertIsInstance(net, ResNet, "Loads ResNet18")
+
+    def test_configurable_activation(self):
+        """
+        Test for configuring activation that precedes kwinners.
+        """
+
+        # Test failure case: none torch.nn.Module `base_activation`
+        with self.assertRaises(
+            AssertionError,
+            msg="`base_activation` should be subclassed from torch.nn.Module"
+        ):
+            base_activation = lambda: "dummy object"  # only pass the type, not the constructed module
+            ResNet(config=dict(
+                depth=18,
+                base_activation=base_activation
+            ))
+
+        # Test case with Mish activation.
+        base_activation = Mish
+        resnet = ResNet(config=dict(
+            depth=18,
+            base_activation=base_activation
+        ))
+        # print(resnet._modules.items())
+        mish_layers = []
+        for layer in resnet.modules():
+            if isinstance(layer, Mish):
+                mish_layers.append(layer)
+        self.assertEqual(len(mish_layers), 17)
 
 
 if __name__ == "__main__":
