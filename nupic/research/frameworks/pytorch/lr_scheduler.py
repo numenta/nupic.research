@@ -23,29 +23,6 @@ from bisect import bisect
 from torch.optim.lr_scheduler import OneCycleLR, _LRScheduler
 
 
-class ScaledLR(_LRScheduler):
-    """
-    Multiply the learning rate of each parameter group  by a specific factor
-    assigned to the epoch. This LR scheduler could be chained together with
-    other schedulers. This is useful when scaling the LR to the batch size.
-
-    .. seealso:: See https://arxiv.org/pdf/1706.02677.pdf
-
-    :param optimizer: Wrapped optimizer
-    :param lr_scale: dict mapping initial epoch to LR scale
-    :param last_epoch: The index of last epoch. Default: -1.
-    """
-
-    def __init__(self, optimizer, lr_scale, last_epoch=-1):
-        self.lr_scale = lr_scale
-        self.epochs = sorted(self.lr_scale.keys())
-        super().__init__(optimizer=optimizer, last_epoch=last_epoch)
-
-    def get_lr(self):
-        scale = self.lr_scale[self.epochs[bisect(self.epochs, self.last_epoch) - 1]]
-        return map(lambda group: group["lr"] * scale, self.optimizer.param_groups)
-
-
 class ComposedLRScheduler(_LRScheduler):
     """
     Learning scheduler composed of different LR schedulers and optimizer
