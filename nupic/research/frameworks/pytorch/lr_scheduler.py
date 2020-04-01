@@ -101,15 +101,13 @@ class ComposedLRScheduler(_LRScheduler):
 
         super().__init__(optimizer=optimizer, last_epoch=last_epoch)
 
-    def step(self, epoch=None):
+    def step(self):
         """
         Step should be called after every batch update if OneCycleLR is one of
         the mapped LR Schedulers. Make sure to specify "steps_per_epoch" when
         """
         # Get milestone for current step
-        current_step = epoch
-        if current_step is None:
-            current_step = self.last_epoch + 1
+        current_step = self.last_epoch + 1
         current_epoch = current_step // self.steps_per_epoch
         current_batch = current_step % self.steps_per_epoch
         current_milestone = self.milestones[bisect(self.milestones, current_epoch) - 1]
@@ -127,10 +125,13 @@ class ComposedLRScheduler(_LRScheduler):
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
 
-        super().step(epoch)
+        self.last_epoch += 1
 
     def get_lr(self):
         return self.lr_scheduler.get_lr()
+
+    def get_last_lr(self):
+        return self.lr_scheduler.get_last_lr()
 
     def _update_optimizer(self):
         params = self.schedulers[self.active_milestone]
