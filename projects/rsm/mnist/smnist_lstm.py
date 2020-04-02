@@ -26,6 +26,7 @@ import time
 from os.path import expanduser
 
 import torch
+from tensorboardX import SummaryWriter
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -34,7 +35,6 @@ import baseline_models
 import rsm
 import rsm_samplers
 import util
-from tensorboardX import SummaryWriter
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
