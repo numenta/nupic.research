@@ -4,14 +4,12 @@
 name: nupic.research
 channels:
   - pytorch
-  - fastai
-  - intel
   - defaults
   - conda-forge
 
 dependencies:
-  - python=3.7
-  - pip
+  - defaults::python=3.7
+  - defaults::pip
 
   # See nupic.torch requirements.txt
   - pytorch=1.4
