@@ -274,7 +274,8 @@ class ImagenetTrainable(Trainable):
 
         # Use first process as head of the group
         ip = ray.get(self.procs[0].get_node_ip.remote())
-        port = config.get("dist_port", 54321)
+        port = ray.get(self.procs[0].get_free_port.remote())
+        port = config.get("dist_port", port)
         dist_url = "tcp://{}:{}".format(ip, port)
 
         # Configure each process in the group

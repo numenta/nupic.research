@@ -46,6 +46,7 @@ class Supervised(object):
                  logdir,
                  optim_alg=None, optim_params=None,
                  lr_scheduler_alg=None, lr_scheduler_params=None,
+                 lr_step_every_batch=False,
                  use_tqdm=False, tqdm_mininterval=None):
         self.logdir = logdir
 
@@ -68,6 +69,9 @@ class Supervised(object):
             raise ValueError(f"Unrecognized network_name {network_name}")
         self.network = network_constructor(**network_params)
         self.network.to(self.device)
+
+        if torch.cuda.device_count() > 1:
+            self.network = nn.DataParallel(self.network)
 
         dm_constructor = None
         for dm in self.DATASET_MODULES:
@@ -95,6 +99,7 @@ class Supervised(object):
                                                   **lr_scheduler_params)
         else:
             self.lr_scheduler = None
+        self.lr_step_every_batch = lr_step_every_batch
 
         self.loss_func = nn.CrossEntropyLoss()
 
@@ -167,13 +172,16 @@ class Supervised(object):
             self.optimizer.step()
             self._after_optimizer_step()
 
+            if self.lr_scheduler is not None and self.lr_step_every_batch:
+                self.lr_scheduler.step()
+
             with torch.no_grad():
                 train_loss += loss.item()
                 pred = output.argmax(dim=1, keepdim=True)
                 train_correct += pred.eq(target.view_as(pred)).sum().item()
                 num_train_batches += 1
 
-        if self.lr_scheduler is not None:
+        if self.lr_scheduler is not None and not self.lr_step_every_batch:
             self.lr_scheduler.step()
         self._after_train_epoch(iteration)
 
@@ -187,6 +195,9 @@ class Supervised(object):
         test_result = self.test(self.test_loader)
         result.update(test_result)
         return result
+
+    def on_finished(self):
+        pass
 
     def save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
