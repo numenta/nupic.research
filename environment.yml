@@ -4,6 +4,7 @@
 name: nupic.research
 channels:
   - pytorch
+  - fastai
   - defaults
   - conda-forge
 
