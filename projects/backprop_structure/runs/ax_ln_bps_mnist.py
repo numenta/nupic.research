@@ -22,9 +22,12 @@
 import os
 
 import numpy as np
+import torch.optim
 
+import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
+import nupic.research.frameworks.backprop_structure.networks as networks
 from nupic.research.frameworks.backprop_structure.ray_ax import (
     ax_optimize_accuracy_weightsparsity,
 )
@@ -60,24 +63,24 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
         super().__init__(
             logdir=logdir,
 
-            network_name="mnist_lenet_backpropstructure",
-            network_params=dict(
+            network_name=networks.mnist_lenet_backpropstructure,
+            network_args=dict(
                 l0_strength=l0_strength,
                 droprate_init=droprate_init,
                 decay_mean=True,
                 use_batch_norm=False,
             ),
 
-            dataset_name="MNIST",
-            dataset_params={},
+            dataset_name=datasets.MNIST,
+            dataset_args={},
 
-            optim_alg="Adam",
-            optim_params=dict(
+            optim_class=torch.optim.Adam,
+            optim_args=dict(
                 lr=lr,
             ),
 
-            lr_scheduler_alg="StepLR",
-            lr_scheduler_params=dict(
+            lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+            lr_scheduler_args=dict(
                 step_size=step_size,
                 gamma=gamma,
             ),
