@@ -25,8 +25,11 @@ import os
 import ray
 import sigopt
 import torch
+import torch.optim
 from ray import tune
 
+import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
+import nupic.research.frameworks.backprop_structure.networks as networks
 from nupic.research.frameworks.backprop_structure import experiments
 from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
@@ -53,20 +56,20 @@ class TuneExperiment(tune.Trainable):
         batch_size = 1 << assignments["log_2_batch_size"]
 
         params = dict(
-            network_name="mnist_resnet",
-            network_params=dict(),
+            network_name=networks.mnist_resnet,
+            network_args=dict(),
 
-            dataset_name="MNIST",
-            dataset_params={},
+            dataset_name=datasets.MNIST,
+            dataset_args={},
 
             optim_alg=assignments["optimizer"],
-            optim_params=dict(
+            optim_args=dict(
                 lr=math.exp(assignments["log_lr"]),
                 weight_decay=math.exp(assignments["log_weight_decay"])
             ),
 
-            lr_scheduler_alg="StepLR",
-            lr_scheduler_params=dict(
+            lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+            lr_scheduler_args=dict(
                 step_size=assignments["step_size"],
                 gamma=assignments["gamma"],
             ),
