@@ -52,7 +52,7 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseRezeroCovariance),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            network_name=networks.mnist_lesparsenet,
+            network_class=networks.mnist_lesparsenet,
             network_args=dict(
                 cnn_activity_percent_on=(1.0, 1.0),
                 cnn_weight_percent_on=(0.6, 0.45),
@@ -61,10 +61,10 @@ if __name__ == "__main__":
                 use_batch_norm=False,
             ),
 
-            dataset_name=datasets.MNIST,
+            dataset_class=datasets.MNIST,
             dataset_args={},
 
-            optim_alg=torch.optim.SGD,
+            optim_class=torch.optim.SGD,
             optim_args=dict(
                 lr=0.02,
             ),
