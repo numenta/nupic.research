@@ -1,9 +1,26 @@
-import torch
-import numpy as np 
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+#
 
-from cont_speech_experiment import ContinuousSpeechExperiment, ClasswiseDataset 
-
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
+import numpy as np
+import time
 
 
 def register_act(experiment, dp_logs=True):
@@ -33,9 +50,9 @@ def register_act(experiment, dp_logs=True):
     corr_mats = []
     dot_mats = []
     for key in all_keys:
-        mod_output = [np.vstack([outputs[n][key][k,:].flatten()
+        mod_output = [np.vstack([outputs[n][key][k, :].flatten()
                                 for k in range(experiment.batch_size)])
-                                for n in range(len(outputs))]
+                      for n in range(len(outputs))]
 
         corr_mat = np.zeros((10, 10))
         iu = np.triu_indices(experiment.batch_size, 1)
@@ -55,6 +72,7 @@ def register_act(experiment, dp_logs=True):
         dot_mats.append(dot_mat)
 
     off_indices = np.triu_indices(10, 1)
+    print(off_indices)
     offdiag_corrs = [np.mean(cc[off_indices]) for cc in corr_mats]
     diag_corrs = [np.mean(np.diag(cc)) for cc in corr_mats]
 
@@ -68,31 +86,44 @@ def register_act(experiment, dp_logs=True):
     return offdiag_corrs, diag_corrs, offdiag_dotprods, diag_dotprods
 
 
-def plot_metrics(metrics, order=[0, 2, 4, 6, 9, 11]):
+def plot_metrics(metrics, order=[0, 2, 4, 6, 9, 11], savefig=False):
     metrics_list = []
     for metric in metrics:
         metric_list = [[N[k] for k in order] for N in metric]
         metrics_list.append(np.array(metric_list).T)
 
     metrics_list = np.array(metrics_list)
-    metric_divider = len(metrics) / 2
+    metric_divider = len(metrics) / 2 - 1
+    ylim_ = [np.min([np.min(x) for x in metrics_list]) - 0.5,
+             np.max([np.max(x) for x in metrics_list]) + 0.5]
 
-    fig, ax = plt.subplots(2,2, figsize=(10,10))
+    fig, ax = plt.subplots(2, 2, figsize=(12, 12))
     cnt = 0
     for axis in np.hstack(ax):
         array_ = metrics_list[cnt]
         axis.plot(array_, "o", alpha=0.6)
 
-        module_keys = ["cnn1", "cnn1_actfn", "cnn2", "cnn2_actfn", "linear1", "linear1_actfn"]
-        metric_names = ["Pearson off-diag", "Pearson diag", "Dot product off-diag", "Dot product diag"]
+        module_keys = ["cnn1", "cnn1_actfn", "cnn2",
+                       "cnn2_actfn", "linear1", "linear1_actfn"]
+        metric_names = ["Pearson off-diag", "Pearson diag",
+                        "Dot product off-diag", "Dot product diag"]
         ylabels = ["Pearson correlation", "log norm. dot product"]
-        plt.xticks(range(6), module_keys, rotation=80)
-        # plt.ylim((-8.3, 5))
-        plt.title(metric_names[cnt])
-        plt.ylabel(ylabels[int(cnt / 2)], fontsize=11)
-        plt.axhline([0], color="k", linestyle="--")
+
+        axis.set_xticks(range(6))
+        axis.set_title(metric_names[cnt])
+        axis.set_ylabel(ylabels[int(cnt / 2)], fontsize=11)
         axis.spines["top"].set_visible(False)
         axis.spines["right"].set_visible(False)
+        if cnt > metric_divider:
+            axis.axhline([0], color="k", linestyle="--")
+            axis.set_ylim(ylim_)
+            axis.set_xticklabels(module_keys, rotation=60)
 
+        else:
+            axis.set_ylim((0., 1.))
 
         cnt += 1
+
+    if savefig:
+        timestamp = time.time()
+        plt.savefig("../plots/corr_quantifications_{}".format(timestamp))
