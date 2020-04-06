@@ -63,7 +63,7 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
         super().__init__(
             logdir=logdir,
 
-            network_name=networks.mnist_lenet_backpropstructure,
+            network_class=networks.mnist_lenet_backpropstructure,
             network_args=dict(
                 l0_strength=l0_strength,
                 droprate_init=droprate_init,
@@ -71,7 +71,7 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
                 use_batch_norm=True,
             ),
 
-            dataset_name=datasets.MNIST,
+            dataset_class=datasets.MNIST,
             dataset_args={},
 
             optim_class=torch.optim.Adam,

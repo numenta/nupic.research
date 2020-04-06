@@ -48,13 +48,13 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseBoosting),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            network_name=networks.gsc_alexnet_binaryactivation_kwinners,
+            network_class=networks.gsc_alexnet_binaryactivation_kwinners,
             network_args=dict(),
 
-            dataset_name=datasets.PreprocessedGSC,
+            dataset_class=datasets.PreprocessedGSC,
             dataset_args={},
 
-            optim_alg=torch.optim.SGD,
+            optim_class=torch.optim.SGD,
             optim_args=dict(
                 lr=0.01,
             ),
