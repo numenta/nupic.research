@@ -24,10 +24,13 @@ import os
 import numpy as np
 import ray
 import torch
+import torch.optim
 from ray import tune
 
+import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
+import nupic.research.frameworks.backprop_structure.networks as networks
 from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
@@ -50,19 +53,19 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseBoostingRezeroCovariance),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            network_name="mnist_lesparsenet",
-            network_params=dict(),
+            network_name=networks.mnist_lesparsenet,
+            network_args=dict(),
 
-            dataset_name="MNIST",
-            dataset_params={},
+            dataset_name=datasets.MNIST,
+            dataset_args={},
 
-            optim_alg="SGD",
-            optim_params=dict(
+            optim_alg=torch.optim.SGD,
+            optim_args=dict(
                 lr=0.02,
             ),
 
-            lr_scheduler_alg="StepLR",
-            lr_scheduler_params=dict(
+            lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+            lr_scheduler_args=dict(
                 step_size=1,
                 gamma=0.8,
             ),
