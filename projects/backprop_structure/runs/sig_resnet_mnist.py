@@ -56,13 +56,13 @@ class TuneExperiment(tune.Trainable):
         batch_size = 1 << assignments["log_2_batch_size"]
 
         params = dict(
-            network_name=networks.mnist_resnet,
+            network_class=networks.mnist_resnet,
             network_args=dict(),
 
-            dataset_name=datasets.MNIST,
+            dataset_class=datasets.MNIST,
             dataset_args={},
 
-            optim_alg=assignments["optimizer"],
+            optim_class=getattr(torch.optim, assignments["optimizer"]),
             optim_args=dict(
                 lr=math.exp(assignments["log_lr"]),
                 weight_decay=math.exp(assignments["log_weight_decay"])

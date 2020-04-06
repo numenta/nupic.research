@@ -52,13 +52,13 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseBoostingRezero),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            network_name=networks.gsc_lesparsenet,
+            network_class=networks.gsc_lesparsenet,
             network_args=dict(),
 
-            dataset_name=datasets.PreprocessedGSC,
+            dataset_class=datasets.PreprocessedGSC,
             dataset_args={},
 
-            optim_alg=torch.optim.SGD,
+            optim_class=torch.optim.SGD,
             optim_args=dict(
                 lr=0.01,
                 weight_decay=0.01,
