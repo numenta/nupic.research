@@ -57,7 +57,7 @@ class ExploratoryExperiment(experiments.Supervised):
         super().__init__(
             logdir=logdir,
 
-            network_name=networks.gsc_lesparsenet,
+            network_class=networks.gsc_lesparsenet,
             network_args=dict(
                 cnn_activity_percent_on=(1.0, 1.0),
                 cnn_weight_percent_on=(1.0, 1.0),
@@ -65,10 +65,10 @@ class ExploratoryExperiment(experiments.Supervised):
                 linear_weight_percent_on=(1.0,),
             ),
 
-            dataset_name=datasets.PreprocessedGSC,
+            dataset_class=datasets.PreprocessedGSC,
             dataset_args={},
 
-            optim_alg=torch.optim.SGD,
+            optim_class=torch.optim.SGD,
             optim_args=dict(
                 lr=lr,
                 momentum=momentum,
