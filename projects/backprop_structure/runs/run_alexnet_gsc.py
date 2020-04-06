@@ -47,10 +47,10 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoise),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            network_name=networks.gsc_alexnet,
+            network_class=networks.gsc_alexnet,
             network_args=dict(),
 
-            dataset_name=datasets.PreprocessedGSC,
+            dataset_class=datasets.PreprocessedGSC,
             dataset_args={},
 
             optim_class=torch.optim.Adam,

@@ -53,13 +53,13 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseBoostingRezeroCovariance),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            network_name=networks.mnist_lesparsenet,
+            network_class=networks.mnist_lesparsenet,
             network_args=dict(),
 
-            dataset_name=datasets.MNIST,
+            dataset_class=datasets.MNIST,
             dataset_args={},
 
-            optim_alg=torch.optim.SGD,
+            optim_class=torch.optim.SGD,
             optim_args=dict(
                 lr=0.02,
             ),

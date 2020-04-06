@@ -59,7 +59,7 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
         super().__init__(
             logdir=logdir,
 
-            network_name=networks.gsc_lenet_backpropstructure,
+            network_class=networks.gsc_lenet_backpropstructure,
             network_args=dict(
                 l0_strength=l0_strength,
                 droprate_init=droprate_init,
@@ -67,7 +67,7 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
                 use_batch_norm=True,
             ),
 
-            dataset_name=datasets.PreprocessedGSC,
+            dataset_class=datasets.PreprocessedGSC,
             dataset_args={},
 
             optim_class=torch.optim.Adam,
