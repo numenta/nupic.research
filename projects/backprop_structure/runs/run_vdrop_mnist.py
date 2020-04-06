@@ -51,10 +51,10 @@ class VDropExperiment(mixins.ConstrainParameters,
         super().__init__(
             logdir=logdir,
 
-            network_name=networks.mnist_lenet_vdrop,
+            network_class=networks.mnist_lenet_vdrop,
             network_args=dict(),
 
-            dataset_name=datasets.MNIST,
+            dataset_class=datasets.MNIST,
             dataset_args={},
 
             training_iterations=NUM_TRAINING_ITERATIONS,
