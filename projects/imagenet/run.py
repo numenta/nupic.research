@@ -46,8 +46,6 @@ if __name__ == "__main__":
                         help="Number of dataloaders workers")
     parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
                         help="Pytorch Distributed backend", default="nccl")
-    parser.add_argument("-d", "--dist-port", type=int, default=54321,
-                        help="tcp port to use for distributed pytorch training")
     parser.add_argument("-s", "--with-server", action="store_true",
                         help="Start Ray Tune API server")
     parser.add_argument("-p", "--progress", action="store_true",
