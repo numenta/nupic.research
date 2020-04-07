@@ -150,6 +150,14 @@ def load_multi_state(
     ```
     """
 
+    # Validate paths.
+    if restore_full_model:
+        assert os.path.isfile(restore_full_model)
+    if restore_linear:
+        assert os.path.isfile(restore_linear)
+    if restore_nonlinear:
+        assert os.path.isfile(restore_nonlinear)
+
     # Case 1: Full model state specified.
     if restore_full_model:
         state_dict = get_state_dict(restore_full_model)
