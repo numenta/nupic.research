@@ -24,7 +24,6 @@ import torch
 import torch.nn
 from torch.autograd import Variable
 
-from nupic.research.frameworks.pytorch.modules import Mish
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.pytorch.models.resnets import (
     ResNet,
@@ -32,6 +31,7 @@ from nupic.research.frameworks.pytorch.models.resnets import (
     resnet50,
     resnet101,
 )
+from nupic.research.frameworks.pytorch.modules import Mish
 from nupic.research.frameworks.pytorch.sparse_layer_params import (
     LayerParams,
     SparseWeightsLayerParams,
@@ -404,12 +404,15 @@ class ResnetTest(unittest.TestCase):
         Test for configuring activation that precedes kwinners.
         """
 
+        def dummy_object():
+            return None
+
         # Test failure case: none torch.nn.Module `base_activation`
         with self.assertRaises(
             AssertionError,
             msg="`base_activation` should be subclassed from torch.nn.Module"
         ):
-            base_activation = lambda: "dummy object"  # only pass the type, not the constructed module
+            base_activation = dummy_object
             ResNet(config=dict(
                 depth=18,
                 base_activation=base_activation
