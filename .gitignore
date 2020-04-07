@@ -102,16 +102,23 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# IDE
 .idea
-/projects/ray_tune_example/mnist/results
-/projects/whydense/cifar/data
+.vscode 
+
+# MacOS hidden files
 .DS_Store
-/projects/ray_tune_example/mnist/data
-/projects/whydense/cifar/results
+
+# Domino files
 .domino*
 domino*
-/projects/whydense/cifar/results1
 
 # local scripts
 cleancode.sh
 checkcode.sh
+/projects/ray_tune_example/mnist/results
+/projects/whydense/cifar/data
+/projects/ray_tune_example/mnist/data
+/projects/whydense/cifar/results
+/projects/whydense/cifar/results1
