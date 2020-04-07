@@ -103,6 +103,8 @@ def remap_state_dict(state_dict, param_map):
     """
 
     new_state_dict = {}
+    assert set(param_map.keys()) <= set(state_dict.keys()), \
+        "The given map should be from keys that are subset of the loadable params."
     for param, state in state_dict.items():
 
         if param in param_map:
