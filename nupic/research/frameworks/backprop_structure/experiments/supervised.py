@@ -25,27 +25,17 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-import nupic.research.frameworks.backprop_structure.dataset_managers
-import nupic.research.frameworks.backprop_structure.networks
-
 
 class Supervised(object):
-    DATASET_MODULES = [
-        nupic.research.frameworks.backprop_structure.dataset_managers
-    ]
-
-    NETWORKS_MODULES = [
-        nupic.research.frameworks.backprop_structure.networks
-    ]
-
     def __init__(self,
-                 network_name, network_params,
-                 dataset_name, dataset_params,
+                 network_class, network_args,
+                 dataset_class, dataset_args,
                  training_iterations,
                  batch_size_train, batch_size_test,
                  logdir,
-                 optim_alg=None, optim_params=None,
-                 lr_scheduler_alg=None, lr_scheduler_params=None,
+                 optim_class=None, optim_args=None,
+                 lr_scheduler_class=None, lr_scheduler_args=None,
+                 lr_step_every_batch=False,
                  use_tqdm=False, tqdm_mininterval=None):
         self.logdir = logdir
 
@@ -59,42 +49,29 @@ class Supervised(object):
                                    if torch.cuda.is_available()
                                    else "cpu")
 
-        network_constructor = None
-        for networks in self.NETWORKS_MODULES:
-            if hasattr(networks, network_name):
-                network_constructor = getattr(networks, network_name)
-                break
-        if network_constructor is None:
-            raise ValueError(f"Unrecognized network_name {network_name}")
-        self.network = network_constructor(**network_params)
+        self.network = network_class(**network_args)
         self.network.to(self.device)
 
-        dm_constructor = None
-        for dm in self.DATASET_MODULES:
-            if hasattr(dm, dataset_name):
-                dm_constructor = getattr(dm, dataset_name)
-                break
-        if dm_constructor is None:
-            raise ValueError(f"Unrecognized dataset_name {dataset_name}")
-        self.dataset_manager = dm_constructor(**dataset_params)
+        if torch.cuda.device_count() > 1:
+            self.network = nn.DataParallel(self.network)
+
+        self.dataset_manager = dataset_class(**dataset_args)
 
         self.training_iterations = training_iterations
 
-        if optim_alg is not None:
-            optim_constructor = getattr(torch.optim, optim_alg)
-            self.optimizer = optim_constructor(self._get_parameters(),
-                                               **optim_params)
+        if optim_class is not None:
+            self.optimizer = optim_class(self._get_parameters(), **optim_args)
         else:
             # The caller or overrider is taking responsibility for setting the
             # optimizer before calling run_epoch.
             self.optimizer = None
 
-        if lr_scheduler_alg is not None:
-            sched_constructor = getattr(torch.optim.lr_scheduler, lr_scheduler_alg)
-            self.lr_scheduler = sched_constructor(self.optimizer,
-                                                  **lr_scheduler_params)
+        if lr_scheduler_class is not None:
+            self.lr_scheduler = lr_scheduler_class(self.optimizer,
+                                                   **lr_scheduler_args)
         else:
             self.lr_scheduler = None
+        self.lr_step_every_batch = lr_step_every_batch
 
         self.loss_func = nn.CrossEntropyLoss()
 
@@ -167,13 +144,16 @@ class Supervised(object):
             self.optimizer.step()
             self._after_optimizer_step()
 
+            if self.lr_scheduler is not None and self.lr_step_every_batch:
+                self.lr_scheduler.step()
+
             with torch.no_grad():
                 train_loss += loss.item()
                 pred = output.argmax(dim=1, keepdim=True)
                 train_correct += pred.eq(target.view_as(pred)).sum().item()
                 num_train_batches += 1
 
-        if self.lr_scheduler is not None:
+        if self.lr_scheduler is not None and not self.lr_step_every_batch:
             self.lr_scheduler.step()
         self._after_train_epoch(iteration)
 
@@ -187,6 +167,9 @@ class Supervised(object):
         test_result = self.test(self.test_loader)
         result.update(test_result)
         return result
+
+    def on_finished(self):
+        pass
 
     def save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")

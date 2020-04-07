@@ -26,6 +26,7 @@ import time
 from pprint import pformat
 
 import ray.services
+import ray.util.sgd.utils as ray_utils
 import torch
 import torch.autograd
 import torch.distributed as dist
@@ -518,3 +519,7 @@ class ImagenetExperiment:
     def get_node_ip(self):
         """Returns the IP address of the current ray node."""
         return ray.services.get_node_ip_address()
+
+    def get_free_port(self):
+        """Returns free TCP port in the current ray node"""
+        return ray_utils.find_free_port()
