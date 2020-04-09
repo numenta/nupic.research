@@ -31,4 +31,5 @@ def mish(x):
     Code adapted from:
        https://github.com/digantamisra98/Mish/blob/master/Mish/Torch/functional.py
     """
+    # TODO: Make this more "in place" to use less GPU memory.
     return x * torch.tanh(F.softplus(x))
