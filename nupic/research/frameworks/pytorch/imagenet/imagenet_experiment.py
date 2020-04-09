@@ -42,6 +42,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_optimizer,
     create_train_dataloader,
     create_validation_dataloader,
+    get_free_port
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
@@ -190,8 +191,10 @@ class ImagenetExperiment:
         # Configure distribute pytorch
         self.distributed = config.get("distributed", False)
         self.rank = config.get("rank", 0)
+        tcp_port = config.get("tcp_port", 54321)
+
         if self.distributed:
-            dist_url = config.get("dist_url", "tcp://127.0.0.1:54321")
+            dist_url = config.get("dist_url", f"tcp://127.0.0.1:{tcp_port}")
             backend = config.get("backend", "nccl")
             world_size = config.get("world_size", 1)
             dist.init_process_group(
@@ -522,4 +525,5 @@ class ImagenetExperiment:
 
     def get_free_port(self):
         """Returns free TCP port in the current ray node"""
-        return ray_utils.find_free_port()
+        return get_free_port()
+        # return ray_utils.find_free_port()
