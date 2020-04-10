@@ -426,7 +426,8 @@ class TrialsCollection():
         self.total_trials = len(self.pending) + len(self.completed)
 
     def report_progress(self):
-        print(f"***** Trials completed: {len(self.completed)}/{self.total_trials}")        
+        print(f"***** Trials completed: {len(self.completed)}/{self.total_trials}")
+                
     def retrieve(self):
         while len(self.pending) > 0:
             trial = self.pending.pop()
