@@ -55,7 +55,7 @@ if __name__ == "__main__":
                         help="Python Logging level")
     parser.add_argument("-f", "--log-format",
                         help="Python Logging Format")
-    parser.add_argument("-x", "--max-failures", type=int, default=1,
+    parser.add_argument("-x", "--max-failures", type=int,
                         help="How many times to try to recover before stopping")
     parser.add_argument("-c", "--checkpoint-freq", type=int,
                         help="How often to checkpoint (epochs)")
