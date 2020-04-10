@@ -103,6 +103,8 @@ def remap_state_dict(state_dict, param_map):
     """
 
     new_state_dict = {}
+    assert set(param_map.keys()) <= set(state_dict.keys()), \
+        "The given map should be from keys that are subset of the loadable params."
     for param, state in state_dict.items():
 
         if param in param_map:
@@ -149,6 +151,14 @@ def load_multi_state(
     model = load_multi_state(model, **kwargs)
     ```
     """
+
+    # Validate paths.
+    if restore_full_model:
+        assert os.path.isfile(restore_full_model)
+    if restore_linear:
+        assert os.path.isfile(restore_linear)
+    if restore_nonlinear:
+        assert os.path.isfile(restore_nonlinear)
 
     # Case 1: Full model state specified.
     if restore_full_model:
