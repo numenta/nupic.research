@@ -111,7 +111,11 @@ DEFAULT = dict(
     checkpoint_score_attr="training_iteration",
 
     # How many times to try to recover before stopping the trial
-    max_failures=-1,
+    max_failures=3,
+
+    # How many times to retry the epoch before stopping. This is useful when
+    # using distributed training with spot instances.
+    max_retries=3,
 
     # Python Logging level : "critical", "error", "warning", "info", "debug"
     log_level="debug",
