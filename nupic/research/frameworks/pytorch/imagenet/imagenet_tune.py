@@ -24,6 +24,7 @@ from pprint import pprint
 
 import ray
 import ray.resource_spec
+from ray.exceptions import RayActorError
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 
@@ -56,6 +57,65 @@ class ImagenetTrainable(Trainable):
         return resource
 
     def _setup(self, config):
+        # Try to recover a trial at least this many times
+        self.max_retries = max(config.get("max_retries", 3), 0)
+
+        # Create ray remote workers
+        self._create_workers(config)
+
+        # Save initialized model
+        if config.get("checkpoint_at_init", False):
+            self.save()
+
+    def _train(self):
+        last_ex = None
+
+        # Save checkpoint if retrying
+        checkpoint_path = None
+        if self.max_retries > 0:
+            logger.warning("Retrying detected. Automatically checkpointing.")
+            checkpoint_path = self.save()
+
+        for i in range(1 + self.max_retries):
+            try:
+                status = []
+                for w in self.procs:
+                    status.append(w.run_epoch.remote(self.iteration))
+
+                # Wait for remote functions to complete
+                # Return the results from the first remote function
+                results = ray.get(status)
+                ret = copy.deepcopy(results[0])
+                self._process_result(ret)
+                return ret
+            except Exception as ex:
+                logger.warning(f"Training failed, retrying {i+1}/{self.max_retries}",
+                               exc_info=ex)
+                last_ex = ex
+
+                # Restart all workers on failure
+                self._kill_workers()
+                self._create_workers(copy.deepcopy(self.config))
+                self.restore(checkpoint_path)
+        else:
+            logger.error(f"Training failed after {self.max_retries} retries",
+                         exc_info=last_ex)
+            raise RuntimeError(f"Training failed after {self.max_retries} retries",
+                               last_ex)
+
+    def _save(self, _):
+        # All models are synchronized. Just save the state of first model
+        return ray.get(self.procs[0].get_state.remote())
+
+    def _restore(self, state):
+        # Restore the state to every process
+        state_id = ray.put(state)
+        ray.get([w.set_state.remote(state_id) for w in self.procs])
+
+    def _create_workers(self, config):
+        """
+        Create one ray remote process for each GPU/process
+        """
         num_gpus = config.get("num_gpus", 0)
         num_cpus = config.get("num_cpus", 1)
 
@@ -74,7 +134,6 @@ class ImagenetTrainable(Trainable):
 
         self._process_config(config)
 
-        # Create one ray remote process for each experiment in the process group
         self.procs = []
         for _ in range(world_size):
             experiment = ray.remote(
@@ -100,36 +159,23 @@ class ImagenetTrainable(Trainable):
         # Wait for remote functions to complete
         ray.get(status)
 
-        # Save initialized model.
-        if config.get("checkpoint_at_init", False):
-            self.save()
-
-    def _train(self):
-        status = []
+    def _kill_workers(self):
         for w in self.procs:
-            status.append(w.run_epoch.remote(self.iteration))
-
-        # Wait for remote functions to complete
-        # Return the results from the first remote function
-        results = ray.get(status)
-        ret = copy.deepcopy(results[0])
-        self._process_result(ret)
-
-        return ret
-
-    def _save(self, _):
-        # All models are synchronized. Just save the state of first model
-        return ray.get(self.procs[0].get_state.remote())
-
-    def _restore(self, state):
-        # Restore the state to every process
-        state_id = ray.put(state)
-        ray.get([w.set_state.remote(state_id) for w in self.procs])
+            logger.warning(f"Killing worker {w}.")
+            ray.kill(w)
+        self.procs = []
 
     def _stop(self):
-        for w in self.procs:
-            w.stop_experiment.remote()
-            w.__ray_terminate__.remote()
+        try:
+            status = [w.stop_experiment.remote() for w in self.procs]
+            # wait until all remote workers stop
+            ray.get(status)
+            for w in self.procs:
+                w.__ray_terminate__.remote()
+            self.procs = []
+        except RayActorError as ex:
+            logger.warning("Failed to shutdown gracefully", exc_info=ex)
+            self._kill_workers()
 
     def _process_config(self, config):
         pass
