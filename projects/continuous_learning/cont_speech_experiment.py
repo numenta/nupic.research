@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2018, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -20,30 +20,29 @@
 # ----------------------------------------------------------------------
 import logging
 import os
-import time
 import tempfile
+import time
 
 import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+from cl_utils import train_model, train_multi_model
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
-from nupic.research.frameworks.pytorch.model_utils import (
+from nupic.research.frameworks.pytorch.model_utils import (  # train_model,
     count_nonzero_params,
     evaluate_model,
     set_random_seed,
-    # train_model,
 )
-
-# from nupic.research.frameworks.pytorch.model_utils import train_model as train_full_model
-
-from cl_utils import train_multi_model, train_model
-
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import rezero_weights, update_boost_strength
+
+# from nupic.research.frameworks.pytorch.model_utils import train_model as train_full_model
+
+
 
 
 def get_logger(name, verbose):
@@ -206,7 +205,22 @@ class ContinuousSpeechExperiment(object):
             raise LookupError("Incorrect optimizer value")
 
         return optimizer
-        
+
+    def get_act(self, name):
+        act = {}
+        def hook(model, input_, output):
+            act[name] = output
+        return hook
+
+    def register_act(self):
+        layer_list = list(self.model.named_children())
+        k = [x[0] for x in layer_list]
+        cnt = 0
+        for module in self.model:
+            module.register_forward_hook(self.get_act(k[cnt]))
+            cnt += 1
+                
+
     def train_entire_dataset(self, epoch):
         """Train one epoch of this model by iterating through mini batches.
 
@@ -255,14 +269,19 @@ class ContinuousSpeechExperiment(object):
         if self.freeze_params == "linear2":
             fparams.append([self.model.linear2.module.weight, indices])
 
+        act = {}
+        self.register_act()
         train_multi_model(self.model, self.train_loader, self.optimizer, self.device,
                     freeze_params=fparams,
                     freeze_grad=freeze_grad,
                     batches_in_epoch=self.batches_in_epoch)
+
+        outputs = act
         self.post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
         f.close()
+        return outputs
  
     def post_epoch(self):
         self.model.apply(rezero_weights)
@@ -309,7 +328,6 @@ class ContinuousSpeechExperiment(object):
         else:
             loader = self.validation_loader
             
-
         ret = evaluate_model(self.model, test_loader, self.device)
         ret["mean_accuracy"] = 100. * ret["mean_accuracy"]
         entropy = self.entropy()
@@ -401,7 +419,7 @@ class ContinuousSpeechExperiment(object):
         self.gen_test_dataset = PreprocessedDataset(
             cachefilepath=self.test_data_dir,
             basename="gsc_test_noise",
-            qualifiers=["{:02d}".format(int(100 * n)) for n in self.noise_values],
+            qualifiers=["00"],
         )
         self.gen_test_dataset.tensors[1] -= 1
 
