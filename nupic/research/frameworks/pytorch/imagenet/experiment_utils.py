@@ -24,9 +24,10 @@ import os
 import pickle
 import socket
 from contextlib import closing
+from copy import deepcopy
 
-import numpy as np
 import h5py
+import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models.resnet
@@ -36,7 +37,6 @@ from torch.utils.data import DistributedSampler
 from torchvision import transforms
 from torchvision.transforms import RandomResizedCrop
 
-from copy import deepcopy
 import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.dataset_utils import (
     CachedDatasetFolder,
@@ -49,36 +49,129 @@ from .auto_augment import ImageNetPolicy
 
 IMAGENET_NUM_CLASSES = {
     10: [
-        "n02091244", "n02112350", "n02454379", "n02979186", "n03372029",
-        "n03791053", "n03891332", "n04065272", "n04462240", "n15075141"
+        "n02091244",
+        "n02112350",
+        "n02454379",
+        "n02979186",
+        "n03372029",
+        "n03791053",
+        "n03891332",
+        "n04065272",
+        "n04462240",
+        "n15075141",
     ],
     100: [
-        "n01440764", "n01592084", "n01601694", "n01630670", "n01631663",
-        "n01664065", "n01677366", "n01693334", "n01734418", "n01751748",
-        "n01755581", "n01855672", "n01877812", "n01978287", "n01981276",
-        "n02025239", "n02027492", "n02033041", "n02056570", "n02089867",
-        "n02091244", "n02091635", "n02093428", "n02094258", "n02104365",
-        "n02105251", "n02106662", "n02107312", "n02108422", "n02112350",
-        "n02129165", "n02174001", "n02268443", "n02317335", "n02410509",
-        "n02423022", "n02454379", "n02457408", "n02488291", "n02497673",
-        "n02536864", "n02640242", "n02655020", "n02727426", "n02783161",
-        "n02808304", "n02841315", "n02871525", "n02892201", "n02971356",
-        "n02979186", "n02981792", "n03018349", "n03125729", "n03133878",
-        "n03207941", "n03250847", "n03272010", "n03372029", "n03400231",
-        "n03457902", "n03481172", "n03482405", "n03602883", "n03680355",
-        "n03697007", "n03763968", "n03791053", "n03804744", "n03837869",
-        "n03854065", "n03891332", "n03954731", "n03956157", "n03970156",
-        "n03976657", "n04004767", "n04065272", "n04120489", "n04149813",
-        "n04192698", "n04200800", "n04252225", "n04259630", "n04332243",
-        "n04335435", "n04346328", "n04350905", "n04404412", "n04461696",
-        "n04462240", "n04509417", "n04550184", "n04606251", "n07716358",
-        "n07718472", "n07836838", "n09428293", "n13040303", "n15075141"
+        "n01440764",
+        "n01592084",
+        "n01601694",
+        "n01630670",
+        "n01631663",
+        "n01664065",
+        "n01677366",
+        "n01693334",
+        "n01734418",
+        "n01751748",
+        "n01755581",
+        "n01855672",
+        "n01877812",
+        "n01978287",
+        "n01981276",
+        "n02025239",
+        "n02027492",
+        "n02033041",
+        "n02056570",
+        "n02089867",
+        "n02091244",
+        "n02091635",
+        "n02093428",
+        "n02094258",
+        "n02104365",
+        "n02105251",
+        "n02106662",
+        "n02107312",
+        "n02108422",
+        "n02112350",
+        "n02129165",
+        "n02174001",
+        "n02268443",
+        "n02317335",
+        "n02410509",
+        "n02423022",
+        "n02454379",
+        "n02457408",
+        "n02488291",
+        "n02497673",
+        "n02536864",
+        "n02640242",
+        "n02655020",
+        "n02727426",
+        "n02783161",
+        "n02808304",
+        "n02841315",
+        "n02871525",
+        "n02892201",
+        "n02971356",
+        "n02979186",
+        "n02981792",
+        "n03018349",
+        "n03125729",
+        "n03133878",
+        "n03207941",
+        "n03250847",
+        "n03272010",
+        "n03372029",
+        "n03400231",
+        "n03457902",
+        "n03481172",
+        "n03482405",
+        "n03602883",
+        "n03680355",
+        "n03697007",
+        "n03763968",
+        "n03791053",
+        "n03804744",
+        "n03837869",
+        "n03854065",
+        "n03891332",
+        "n03954731",
+        "n03956157",
+        "n03970156",
+        "n03976657",
+        "n04004767",
+        "n04065272",
+        "n04120489",
+        "n04149813",
+        "n04192698",
+        "n04200800",
+        "n04252225",
+        "n04259630",
+        "n04332243",
+        "n04335435",
+        "n04346328",
+        "n04350905",
+        "n04404412",
+        "n04461696",
+        "n04462240",
+        "n04509417",
+        "n04550184",
+        "n04606251",
+        "n07716358",
+        "n07718472",
+        "n07836838",
+        "n09428293",
+        "n13040303",
+        "n15075141",
     ],
 }
 
 
 def create_train_dataloader(
-    data_dir, train_dir, batch_size, workers, distributed, num_classes=1000,
+    data_dir,
+    train_dir,
+    batch_size,
+    workers,
+    distributed,
+    num_classes=1000,
     use_auto_augment=False,
 ):
     """
@@ -103,10 +196,9 @@ def create_train_dataloader(
                 ImageNetPolicy(),
                 transforms.ToTensor(),
                 transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
-                    inplace=True
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], inplace=True
                 ),
-            ],
+            ]
         )
     else:
         transform = transforms.Compose(
@@ -115,23 +207,30 @@ def create_train_dataloader(
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
-                    inplace=True
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], inplace=True
                 ),
-            ],
+            ]
         )
     if h5py.is_hdf5(data_dir):
         # Use fixed Imagenet classes if mapping is available
         if num_classes in IMAGENET_NUM_CLASSES:
             classes = IMAGENET_NUM_CLASSES[num_classes]
-            dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
-                                  classes=classes, transform=transform)
+            dataset = HDF5Dataset(
+                hdf5_file=data_dir, root=train_dir, classes=classes, transform=transform
+            )
         else:
-            dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
-                                  num_classes=num_classes, transform=transform)
+            dataset = HDF5Dataset(
+                hdf5_file=data_dir,
+                root=train_dir,
+                num_classes=num_classes,
+                transform=transform,
+            )
     else:
-        dataset = CachedDatasetFolder(root=os.path.join(data_dir, train_dir),
-                                      num_classes=num_classes, transform=transform)
+        dataset = CachedDatasetFolder(
+            root=os.path.join(data_dir, train_dir),
+            num_classes=num_classes,
+            transform=transform,
+        )
     if distributed:
         train_sampler = DistributedSampler(dataset)
     else:
@@ -147,8 +246,9 @@ def create_train_dataloader(
     )
 
 
-def create_validation_dataloader(data_dir, val_dir, batch_size, workers,
-                                 num_classes=1000):
+def create_validation_dataloader(
+    data_dir, val_dir, batch_size, workers, num_classes=1000
+):
     """
     Configure Imagenet validation dataloader
 
@@ -169,22 +269,29 @@ def create_validation_dataloader(data_dir, val_dir, batch_size, workers,
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
-                inplace=True
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], inplace=True
             ),
         ]
     )
     if h5py.is_hdf5(data_dir):
         if num_classes in IMAGENET_NUM_CLASSES:
             classes = IMAGENET_NUM_CLASSES[num_classes]
-            dataset = HDF5Dataset(hdf5_file=data_dir, root=val_dir,
-                                  classes=classes, transform=transform)
+            dataset = HDF5Dataset(
+                hdf5_file=data_dir, root=val_dir, classes=classes, transform=transform
+            )
         else:
-            dataset = HDF5Dataset(hdf5_file=data_dir, root=val_dir,
-                                  num_classes=num_classes, transform=transform)
+            dataset = HDF5Dataset(
+                hdf5_file=data_dir,
+                root=val_dir,
+                num_classes=num_classes,
+                transform=transform,
+            )
     else:
-        dataset = CachedDatasetFolder(root=os.path.join(data_dir, val_dir),
-                                      num_classes=num_classes, transform=transform)
+        dataset = CachedDatasetFolder(
+            root=os.path.join(data_dir, val_dir),
+            num_classes=num_classes,
+            transform=transform,
+        )
     return torch.utils.data.DataLoader(
         dataset=dataset,
         batch_size=batch_size,
@@ -194,8 +301,7 @@ def create_validation_dataloader(data_dir, val_dir, batch_size, workers,
     )
 
 
-def create_optimizer(model, optimizer_class, optimizer_args,
-                     batch_norm_weight_decay):
+def create_optimizer(model, optimizer_class, optimizer_args, batch_norm_weight_decay):
     """
     Configure the optimizer with the option to ignore `weight_decay` from all
     batch norm module parameters
@@ -245,8 +351,9 @@ def create_optimizer(model, optimizer_class, optimizer_args,
     return optimizer_class(model_params, **optimizer_args)
 
 
-def create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
-                        steps_per_epoch):
+def create_lr_scheduler(
+    optimizer, lr_scheduler_class, lr_scheduler_args, steps_per_epoch
+):
     """
     Configure learning rate scheduler
 
@@ -299,21 +406,31 @@ def init_resnet50_batch_norm(model):
         elif isinstance(m, torchvision.models.resnet.Bottleneck):
             # initialized the last BatchNorm in each Bottleneck to 0
             m.bn3.weight = nn.Parameter(torch.zeros_like(m.bn3.weight))
-        elif isinstance(m, (
-            nupic.research.frameworks.pytorch.models.resnets.BasicBlock,
-            nupic.research.frameworks.pytorch.models.resnets.Bottleneck
-        )):
+        elif isinstance(
+            m,
+            (
+                nupic.research.frameworks.pytorch.models.resnets.BasicBlock,
+                nupic.research.frameworks.pytorch.models.resnets.Bottleneck,
+            ),
+        ):
             # initialized the last BatchNorm in each BasicBlock to 0
-            *_, last_bn = filter(lambda x: isinstance(x, nn.BatchNorm2d),
-                                 m.regular_path)
+            *_, last_bn = filter(
+                lambda x: isinstance(x, nn.BatchNorm2d), m.regular_path
+            )
             last_bn.weight = nn.Parameter(torch.zeros_like(last_bn.weight))
         elif isinstance(m, nn.Linear):
             # initialized linear layers weights from a gaussian distribution
             m.weight.data.normal_(0, 0.01)
 
 
-def create_model(model_class, model_args, init_batch_norm, device,
-                 checkpoint_file=None, init_hooks=None):
+def create_model(
+    model_class,
+    model_args,
+    init_batch_norm,
+    device,
+    checkpoint_file=None,
+    init_hooks=None,
+):
     """
     Create imagenet experiment model with option to load state from checkpoint
 
@@ -350,21 +467,25 @@ def create_model(model_class, model_args, init_batch_norm, device,
 
     return model
 
+
 def get_free_port():
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        # bind on port 0 - kernel will select an unused port 
+        # bind on port 0 - kernel will select an unused port
         s.bind(("", 0))
         # removed socket.SO_REUSEADDR arg
-        # fixes TCP error due to two process with same rank in same port      
+        # fixes TCP error due to two process with same rank in same port
         return s.getsockname()[1]
 
-class SearchOption():
-    """ 
-    Allow usage of random search and grid search for exploration of hyperparameters space
+
+class SearchOption:
+    """
+    Allow usage of random and grid search for exploration of hyperparameters space
     In-place substitute for Ray Tune simlar options while not available
     """
+
     def __init__(self, elements):
         self.elements = elements
+
 
 class RandomSearch(SearchOption):
     """Sample from a list of options or a stochastic function"""
@@ -373,17 +494,20 @@ class RandomSearch(SearchOption):
         # get element
         if callable(self.elements):
             element = self.elements()
-        elif hasattr(self.elements, '__iter__'):
+        elif hasattr(self.elements, "__iter__"):
             element = np.random.choice(self.elements)
         else:
-            raise ValueError("RandomSearch requires a function with no args or an iterator")
-                
+            raise ValueError(
+                "RandomSearch requires a function with no args or an iterator"
+            )
+
         # assign
         if k2 is None:
             config[k1] = element
         else:
             config[k1][k2] = element
-                        
+
+
 class GridSearch(SearchOption):
     """Expand one experiment per option"""
 
@@ -393,19 +517,19 @@ class GridSearch(SearchOption):
             expanded_config = deepcopy(config)
             if k2 is None:
                 expanded_config[k1] = el
-            else: 
+            else:
                 expanded_config[k1][k2] = el
             expanded_list.append(expanded_config)
 
         return expanded_list
 
-class TrialsCollection():
 
+class TrialsCollection:
     def __init__(self, config, num_trials, restore=True):
 
         # all experiments are required a name for later retrieval
         if "experiment_name" not in config:
-            self.name = "".join([chr(np.random.randint(97,123)) for _ in range(10)])
+            self.name = "".join([chr(np.random.randint(97, 123)) for _ in range(10)])
         else:
             self.name = config["experiment_name"]
         print(f"***** Experiment {self.name} started")
@@ -435,23 +559,24 @@ class TrialsCollection():
 
     def mark_completed(self, trial, save=True):
         self.completed.append(trial)
-        if save: self.save()
+        if save:
+            self.save()
 
     def save(self):
-        with open(self.path_pending, 'wb') as f:
+        with open(self.path_pending, "wb") as f:
             pickle.dump(self.pending, f)
-        with open(self.path_completed, 'wb') as f:
+        with open(self.path_completed, "wb") as f:
             pickle.dump(self.completed, f)
 
     def restore(self):
-        with open(self.path_pending, 'rb') as f:
+        with open(self.path_pending, "rb") as f:
             self.pending = pickle.load(f)
-        with open(self.path_completed, 'rb') as f:
+        with open(self.path_completed, "rb") as f:
             self.completed = pickle.load(f)
 
     @staticmethod
     def expand_trials(base_config, num_samples=1):
-        """ 
+        """
         Convert experiments using SearchOption into a list of experiments
         List of experiments can be executed in parallel or sequentially
         """
@@ -482,7 +607,7 @@ class TrialsCollection():
 
             if not pending_analysis:
                 trials.append(config)
-                
+
         # multiply by num_samples
         trials = trials * num_samples
 

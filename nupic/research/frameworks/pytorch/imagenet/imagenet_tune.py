@@ -20,20 +20,21 @@
 import copy
 import logging
 import os
+import time
 from pprint import pprint
 
-import time
-import socket
-import torch
-import numpy as np
 import ray
 import ray.resource_spec
+import torch
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
+from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
+    TrialsCollection,
+    get_free_port,
+)
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
-from nupic.research.frameworks.pytorch.imagenet.experiment_utils import TrialsCollection, get_free_port
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 logger = logging.getLogger(__name__)
@@ -56,8 +57,6 @@ class ImagenetTrainable(Trainable):
             # Assign extra CPUs for dataloaders
             workers = config.get("workers", 0)
             num_cpus = workers * num_gpus
-        # print("***** resources")
-        # print(num_gpus, num_cpus, workers)
 
         resource = Resources(cpu=0, gpu=0, extra_cpu=num_cpus, extra_gpu=num_gpus)
         return resource
@@ -89,7 +88,6 @@ class ImagenetTrainable(Trainable):
             self.procs.append(experiment.remote())
 
         # Use first process as head of the group
-        # TODO: TCP error likely from this get free port function
         ip = ray.get(self.procs[0].get_node_ip.remote())
         port = ray.get(self.procs[0].get_free_port.remote())
         port = config.get("dist_port", port)
@@ -287,23 +285,24 @@ def run_single_instance(config):
         ray.init(load_code_from_local=True, webui_host="0.0.0.0")
 
         config["tcp_port"] = get_free_port()
-        kwargs["config"] = config        
+        kwargs["config"] = config
         tune.run(**kwargs)
         print("**** ended training")
 
-        # report time elapsed 
+        # report time elapsed
         t1 = time.time()
         print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
         print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
 
-        ray.shutdown()    
+        ray.shutdown()
 
         # save trials for later retrieval
         trials.mark_completed(config, save=True)
 
-        # sleep to avoid interference between runs        
+        # sleep to avoid interference between runs
         time.sleep(2)
 
         # error message when experiment ends
 
-    print(f"***** Experiment {trials.name} finished: {len(trials.completed)} trials completed")
+    print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
+          " trials completed")
