@@ -134,30 +134,45 @@ class ImagenetTrainable(Trainable):
 
         self._process_config(config)
 
-        self.procs = []
-        for _ in range(world_size):
-            experiment = ray.remote(
-                num_cpus=num_cpus, num_gpus=num_gpus)(ImagenetExperiment)
-            self.procs.append(experiment.remote())
+        for i in range(1 + self.max_retries):
+            try:
+                self.procs = []
+                for _ in range(world_size):
+                    experiment = ray.remote(
+                        num_cpus=num_cpus, num_gpus=num_gpus)(ImagenetExperiment)
+                    self.procs.append(experiment.remote())
 
-        # Use first process as head of the group
-        ip = ray.get(self.procs[0].get_node_ip.remote())
-        port = ray.get(self.procs[0].get_free_port.remote())
-        port = config.get("dist_port", port)
-        dist_url = "tcp://{}:{}".format(ip, port)
+                # Use first process as head of the group
+                ip = ray.get(self.procs[0].get_node_ip.remote())
+                port = ray.get(self.procs[0].get_free_port.remote())
+                port = config.get("dist_port", port)
+                dist_url = "tcp://{}:{}".format(ip, port)
 
-        # Configure each process in the group
-        status = []
-        for i, w in enumerate(self.procs):
-            worker_config = copy.deepcopy(config)
-            worker_config["distributed"] = True
-            worker_config["dist_url"] = dist_url
-            worker_config["world_size"] = world_size
-            worker_config["rank"] = i
-            status.append(w.setup_experiment.remote(worker_config))
+                # Configure each process in the group
+                status = []
+                for i, w in enumerate(self.procs):
+                    worker_config = copy.deepcopy(config)
+                    worker_config["distributed"] = True
+                    worker_config["dist_url"] = dist_url
+                    worker_config["world_size"] = world_size
+                    worker_config["rank"] = i
+                    status.append(w.setup_experiment.remote(worker_config))
 
-        # Wait for remote functions to complete
-        ray.get(status)
+                # Wait for remote functions to complete
+                ray.get(status)
+                break
+            except Exception as ex:
+                logger.warning(f"Failed to create workers failed, "
+                               f"retrying {i + 1}/{self.max_retries}", exc_info=ex)
+                last_ex = ex
+
+                # Restart all workers on failure
+                self._kill_workers()
+        else:
+            logger.error(f"Failed to create workers after {self.max_retries} retries",
+                         exc_info=last_ex)
+            raise RuntimeError(f"Failed to create workers after {self.max_retries} "
+                               f"retries", last_ex)
 
     def _kill_workers(self):
         for w in self.procs:
