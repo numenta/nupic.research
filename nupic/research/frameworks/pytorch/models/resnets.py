@@ -165,11 +165,34 @@ def conv_layer(
 def activation_layer(
     out,
     layer_params,
-    kernel_size=0
+    kernel_size=0,
+    base_activation=None,
 ):
     """Basic activation layer.
-    Defaults to ReLU if `activation_params` are evaluated from `layer_params`.
-    Otherwise KWinners is used."""
+    Defaults to `base_activation` if `activation_params is None` from `layer_params`.
+
+    :param out: number of output channels from the preceding (conv) layer
+    :param layer_params: `LayerParams` object with `get_activation_params` function.
+                         This gives `kwinner_class` and the kwargs to construct it.
+                         Note: This entails a slightly different behavior from
+                         `conv_layer` and `linear_layer` where the layer type
+                         (e.g. kwinner, SparseWeights, ect.) are passed separately
+                         and not through `layer_params`. This may be fixed for
+                         consistency in the future.
+    :param kernel_size: kernal size (e.g. 1, 3, ect) of preceding (conv) layer
+    :param base_activation: this is the activation module applied irrespective
+                            of the `kwinner_class`. If `kwinner_class` is present,
+                            it's applied before. Otherwise, it's the only activation
+                            that's applied.
+    """
+
+    # Determine default base_activation.
+    if base_activation is None:
+        base_activation = nn.ReLU(inplace=True)
+    else:
+        base_activation = base_activation()
+    assert isinstance(base_activation, nn.Module), \
+        "`base_activation` should be subclassed from torch.nn.Module"
 
     # Compute layer_params for kwinners activation module.
     if layer_params is not None:
@@ -182,14 +205,14 @@ def activation_layer(
         # Check if overriding default kwinner class
         kwinner_class = activation_params.pop("kwinner_class", KWinners2d)
         return nn.Sequential(
-            nn.ReLU(inplace=True),
+            base_activation,
             kwinner_class(
                 out,
                 **activation_params
             ),
         )
     else:
-        return nn.ReLU(inplace=True)
+        return base_activation
 
 
 class BasicBlock(nn.Module):
@@ -197,7 +220,10 @@ class BasicBlock(nn.Module):
 
     expansion = 1
 
-    def __init__(self, in_planes, planes, sparse_weights_type, layer_params, stride=1):
+    def __init__(
+        self, in_planes, planes, sparse_weights_type, layer_params,
+        stride=1, base_activation=None
+    ):
         super(BasicBlock, self).__init__()
 
         self.regular_path = nn.Sequential(
@@ -210,7 +236,8 @@ class BasicBlock(nn.Module):
                 stride=stride,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, layer_params["conv3x3_1"]),
+            activation_layer(
+                planes, layer_params["conv3x3_1"], base_activation=base_activation),
             conv_layer(
                 "3x3",
                 planes,
@@ -235,7 +262,8 @@ class BasicBlock(nn.Module):
                 nn.BatchNorm2d(planes),
             )
 
-        self.post_activation = activation_layer(planes, layer_params["shortcut"])
+        self.post_activation = activation_layer(
+            planes, layer_params["shortcut"], base_activation=base_activation)
 
     def forward(self, x):
         out = self.regular_path(x)
@@ -249,7 +277,10 @@ class Bottleneck(nn.Module):
 
     expansion = 4
 
-    def __init__(self, in_planes, planes, sparse_weights_type, layer_params, stride=1):
+    def __init__(
+        self, in_planes, planes, sparse_weights_type, layer_params,
+        stride=1, base_activation=None
+    ):
         super(Bottleneck, self).__init__()
         self.regular_path = nn.Sequential(
             # 1st layer
@@ -261,7 +292,10 @@ class Bottleneck(nn.Module):
                 sparse_weights_type=sparse_weights_type,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, layer_params["conv1x1_1"], kernel_size=1),
+            activation_layer(
+                planes, layer_params["conv1x1_1"],
+                kernel_size=1, base_activation=base_activation
+            ),
             # 2nd layer
             conv_layer(
                 "3x3",
@@ -272,7 +306,10 @@ class Bottleneck(nn.Module):
                 stride=stride,
             ),
             nn.BatchNorm2d(planes),
-            activation_layer(planes, layer_params["conv3x3_2"], kernel_size=3),
+            activation_layer(
+                planes, layer_params["conv3x3_2"],
+                kernel_size=3, base_activation=base_activation
+            ),
             # 3rd layer
             conv_layer(
                 "1x1",
@@ -299,7 +336,8 @@ class Bottleneck(nn.Module):
             )
 
         self.post_activation = activation_layer(
-            self.expansion * planes, layer_params["shortcut"], kernel_size=1
+            self.expansion * planes, layer_params["shortcut"],
+            kernel_size=1, base_activation=base_activation
         )
 
     def forward(self, x):
@@ -339,6 +377,7 @@ class ResNet(nn.Module):
         defaults = dict(
             depth=50,
             num_classes=1000,
+            base_activation=None,  # See `activation_layer` function above.
             linear_sparse_weights_type="SparseWeights",
             conv_sparse_weights_type="SparseWeights2d",
             defaults_sparse=False,
@@ -389,7 +428,9 @@ class ResNet(nn.Module):
                 stride=2,
             ),
             nn.BatchNorm2d(64),
-            activation_layer(64, self.sparse_params["stem"], kernel_size=7),
+            activation_layer(
+                64, self.sparse_params["stem"],
+                kernel_size=7, base_activation=self.base_activation),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
             # groups 1 to 4
             self._make_group(
@@ -446,6 +487,7 @@ class ResNet(nn.Module):
                     layer_params=layer_params,
                     sparse_weights_type=self.conv_sparse_weights_type,
                     stride=stride,
+                    base_activation=self.base_activation,
                 )
             )
             self.in_planes = planes * block.expansion

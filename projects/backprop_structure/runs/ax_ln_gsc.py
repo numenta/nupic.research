@@ -22,9 +22,12 @@
 import os
 
 import numpy as np
+import torch.optim
 
+import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
+import nupic.research.frameworks.backprop_structure.networks as networks
 from nupic.research.frameworks.backprop_structure.ray_ax import ax_optimize_accuracy
 
 NUM_TRAINING_ITERATIONS = 30
@@ -54,26 +57,26 @@ class ExploratoryExperiment(experiments.Supervised):
         super().__init__(
             logdir=logdir,
 
-            network_name="gsc_lesparsenet",
-            network_params=dict(
+            network_class=networks.gsc_lesparsenet,
+            network_args=dict(
                 cnn_activity_percent_on=(1.0, 1.0),
                 cnn_weight_percent_on=(1.0, 1.0),
                 linear_activity_percent_on=(1.0,),
                 linear_weight_percent_on=(1.0,),
             ),
 
-            dataset_name="PreprocessedGSC",
-            dataset_params={},
+            dataset_class=datasets.PreprocessedGSC,
+            dataset_args={},
 
-            optim_alg="SGD",
-            optim_params=dict(
+            optim_class=torch.optim.SGD,
+            optim_args=dict(
                 lr=lr,
                 momentum=momentum,
                 weight_decay=weight_decay,
             ),
 
-            lr_scheduler_alg="StepLR",
-            lr_scheduler_params=dict(
+            lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+            lr_scheduler_args=dict(
                 step_size=step_size,
                 gamma=gamma,
             ),
