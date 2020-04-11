@@ -23,29 +23,6 @@ from bisect import bisect
 from torch.optim.lr_scheduler import OneCycleLR, _LRScheduler
 
 
-class ScaledLR(_LRScheduler):
-    """
-    Multiply the learning rate of each parameter group  by a specific factor
-    assigned to the epoch. This LR scheduler could be chained together with
-    other schedulers. This is useful when scaling the LR to the batch size.
-
-    .. seealso:: See https://arxiv.org/pdf/1706.02677.pdf
-
-    :param optimizer: Wrapped optimizer
-    :param lr_scale: dict mapping initial epoch to LR scale
-    :param last_epoch: The index of last epoch. Default: -1.
-    """
-
-    def __init__(self, optimizer, lr_scale, last_epoch=-1):
-        self.lr_scale = lr_scale
-        self.epochs = sorted(self.lr_scale.keys())
-        super().__init__(optimizer=optimizer, last_epoch=last_epoch)
-
-    def get_lr(self):
-        scale = self.lr_scale[self.epochs[bisect(self.epochs, self.last_epoch) - 1]]
-        return map(lambda group: group["lr"] * scale, self.optimizer.param_groups)
-
-
 class ComposedLRScheduler(_LRScheduler):
     """
     Learning scheduler composed of different LR schedulers and optimizer
@@ -124,15 +101,13 @@ class ComposedLRScheduler(_LRScheduler):
 
         super().__init__(optimizer=optimizer, last_epoch=last_epoch)
 
-    def step(self, epoch=None):
+    def step(self):
         """
         Step should be called after every batch update if OneCycleLR is one of
         the mapped LR Schedulers. Make sure to specify "steps_per_epoch" when
         """
         # Get milestone for current step
-        current_step = epoch
-        if current_step is None:
-            current_step = self.last_epoch + 1
+        current_step = self.last_epoch + 1
         current_epoch = current_step // self.steps_per_epoch
         current_batch = current_step % self.steps_per_epoch
         current_milestone = self.milestones[bisect(self.milestones, current_epoch) - 1]
@@ -150,10 +125,13 @@ class ComposedLRScheduler(_LRScheduler):
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
 
-        super().step(epoch)
+        self.last_epoch += 1
 
     def get_lr(self):
         return self.lr_scheduler.get_lr()
+
+    def get_last_lr(self):
+        return self.lr_scheduler.get_last_lr()
 
     def _update_optimizer(self):
         params = self.schedulers[self.active_milestone]

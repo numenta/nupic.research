@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,6 +19,17 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .gsc import PreprocessedGSC
-from .mnist import MNIST
-from .imagenet import ImageNet100
+import torch
+import torch.nn.functional as F
+
+
+def mish(x):
+    """
+    Applies the mish function element-wise:
+    mish(x) = x * tanh(softplus(x)) = x * tanh(ln(1 + exp(x)))
+
+    Code adapted from:
+       https://github.com/digantamisra98/Mish/blob/master/Mish/Torch/functional.py
+    """
+    # TODO: Make this more "in place" to use less GPU memory.
+    return x * torch.tanh(F.softplus(x))
