@@ -28,10 +28,13 @@ import os
 import numpy as np
 import ray
 import torch
+import torch.optim
 from ray import tune
 
+import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
+import nupic.research.frameworks.backprop_structure.networks as networks
 from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
@@ -48,11 +51,11 @@ class VDropExperiment(mixins.ConstrainParameters,
         super().__init__(
             logdir=logdir,
 
-            network_name="mnist_lenet_vdrop",
-            network_params=dict(),
+            network_class=networks.mnist_lenet_vdrop,
+            network_args=dict(),
 
-            dataset_name="MNIST",
-            dataset_params={},
+            dataset_class=datasets.MNIST,
+            dataset_args={},
 
             training_iterations=NUM_TRAINING_ITERATIONS,
 

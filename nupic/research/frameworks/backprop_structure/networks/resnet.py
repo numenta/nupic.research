@@ -263,7 +263,7 @@ class ResNet(nn.Module):
 
 def mnist_stem(out_planes):
     return nn.Conv2d(1, out_planes, kernel_size=3, stride=2,
-                     padding=3, bias=False)
+                     padding=1, bias=False)
 
 
 mnist_resnet = partial(ResNet,
