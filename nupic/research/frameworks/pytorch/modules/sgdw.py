@@ -19,7 +19,15 @@
 #
 
 import torch
-from torch.optim import Optimizer, required
+from torch.optim import Optimizer
+
+
+class _RequiredParameter(object):
+    """Singleton class representing a required parameter for an Optimizer."""
+    def __repr__(self):
+        return "<required parameter>"
+
+required = _RequiredParameter()
 
 class SGDW(Optimizer):
     r"""Implements SGDW algorithm.
