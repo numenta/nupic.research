@@ -21,7 +21,6 @@
 
 import codecs
 import csv
-import distutils.version
 import logging
 import os
 import pickle
@@ -30,30 +29,52 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import PIL.Image
 import seaborn as sns
 from ray.tune.logger import CSVLogger, JsonLogger, Logger
 from ray.tune.result import TIME_TOTAL_S, TIMESTEPS_TOTAL, TRAINING_ITERATION
-from ray.tune.utils import flatten_dict
+from ray.tune.util import flatten_dict
 
 logger = logging.getLogger(__name__)
 
 
-def to_tf_values(result, path, histo_bins=1000):
-    """Adapted from [1], generate a list of tf.Summary.Value() objects that
+# Note:
+# This file is introduced as a potential replacement for `ray_custom_loggers.py`.
+# Therein, the code is written for tensorflow>=1.13.1; however, we've moved to using
+# tensorflow 2.0 and up.
+#
+
+
+def record_tf_values(result, path, step, num_hist_bins=None):
+    """
     Tensorboard will display under scalars, images, histograms, & distributions
     tabs.
 
-    We manually generate the summary objects from raw data passed from tune via the logger.
+    We manually generate the summary objects from raw data passed from tune
+    via the logger.
 
     Currently supports:
         * Scalar (any prefix, already supported by TFLogger)
+        * Seaborn plot ("seaborn_" prefix; see below for configuration details)
         * Image ("img_" prefix)
         * Histograms ("hist_" prefix)
 
-    [1] https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514#file-tensorboard_logging-py-L41  # noqa
+    ```
+    writer = tf.summary.create_file_writer("/some/path")
+    result = {
+        "my_scalor": 4,
+        "hist_some_array": [1, 2, 3, 4],
+        "seaborn_dict": dict(
+            plot_type="lineplot",
+            x=[1, 2, 3],
+            y=[1, 2, 3],
+        ),
+        "img_some_array": np.random.rand(3, 3, 3, 3)
+    }
+
+    with writer.as_default():
+        record_tf_values(result=result, path=["ray", "tune"], step=1)
+    write.flush()
     """
-    values = []
     for attr, value in result.items():
         if value is not None:
             if attr.startswith("seaborn_"):
@@ -63,22 +84,22 @@ def to_tf_values(result, path, histo_bins=1000):
                 #   value = {
                 #
                 #      # Plot setup.
-                #      plot_type: string - name of seaborn plotting function
-                #      config: dict (optional) - passed to seaborn.set
-                #      edit_axes_func: callable (optional) - edits axes (e.g. set xlim)
+                #      plot_type: string,         # name of seaborn plotting function
+                #      config: {...},             # (optional) passed to seaborn.set
+                #      edit_axes_func: <callable> # (optional) edits axes e.g. set xlim
                 #
                 #      # Params -  to be passed to seaborn plotting method.
-                #      data: DataFrame
-                #      x: string - col of data
-                #      y: string - col of data, same size as x
-                #      hue: None or array like, same size as x and y
+                #      data: pandas.DataFrame(...),
+                #      x: <string>, # label of desired column of data
+                #      y: <string>, # label of desired column of data , same size as x
+                #      hue: <None or array like>  # same size as x and y
                 #
                 #   }
                 #
                 if not isinstance(value, dict):
                     continue
 
-                # Plot scatter plot.
+                # Get seaborn plot type and config.
                 config = value.pop("config", {})
                 plot_type = value.pop("plot_type", None)
                 edit_axes_func = value.pop("edit_axes_func", lambda x: x)
@@ -86,86 +107,50 @@ def to_tf_values(result, path, histo_bins=1000):
                 if not hasattr(sns, plot_type):
                     continue
 
+                # Plot seaborn plot.
                 plot_type = getattr(sns, plot_type)
                 sns.set(**config)
                 ax = plot_type(**value)
                 edit_axes_func(ax)
 
-                # Save to BytesIO stream.
+                # Convert to figure to numpy array of an equivalent.
+                # Save the plot to a PNG in memory.
                 stream = BytesIO()
-                canvas = ax.figure.canvas if hasattr(ax, "figure") else ax.fig.canvas
-                canvas.draw()
-                (w, h) = canvas.get_width_height()
-                pilimage = PIL.Image.frombytes("RGB", (w, h), canvas.tostring_rgb())
-                pilimage.save(stream, "PNG")
+                plt.savefig(stream, format="png")
+                stream.seek(0)
 
-                # Create an Image object
-                img_sum = tf.Summary.Image(
-                    encoded_image_string=stream.getvalue(), height=h, width=w
-                )
+                # Convert PNG buffer to TF image
+                image_tf = tf.image.decode_png(stream.getvalue(), channels=4)
 
-                # Create a Summary value
-                values.append(
-                    tf.Summary.Value(tag="/".join(path + [attr]), image=img_sum)
-                )
-                plt.clf()
+                # Add the batch dimension
+                image_tf = tf.expand_dims(image_tf, 0)
+
+                # Save array as an image.
+                name = "/".join(path + [attr])
+                tf.summary.image(name=name, data=image_tf, step=step)
 
             if attr.startswith("img_"):
-                # for nr, img in enumerate(value):
-                # Write the image to a string
-                s = BytesIO()
-                img = np.array(value)
-                plt.imsave(s, img, format="png")
 
-                # Create an Image object
-                img_sum = tf.Summary.Image(
-                    encoded_image_string=s.getvalue(),
-                    height=img.shape[0],
-                    width=img.shape[1],
-                )
-                # Create a Summary value
-                values.append(
-                    tf.Summary.Value(tag="/".join(path + [attr]), image=img_sum)
-                )
-            elif attr.startswith("hist_"):
-                # Convert to a numpy array
+                # Convert to numpy array and save.
+                name = "/".join(path + [attr])
                 value_np = np.array(value)
+                tf.summary.image(name=name, data=value_np, step=step)
 
-                # Create histogram using numpy
-                counts, bin_edges = np.histogram(value_np, bins=histo_bins)
+            elif attr.startswith("hist_"):
 
-                # Fill fields of histogram proto
-                hist = tf.HistogramProto()
-                hist.min = float(np.min(value_np))
-                hist.max = float(np.max(value_np))
-                hist.num = int(np.prod(value_np.shape))
-                hist.sum = float(np.sum(value_np))
-                hist.sum_squares = float(np.sum(value_np ** 2))
-                bin_edges = bin_edges[1:]
-
-                # Add bin edges and counts
-                for edge in bin_edges:
-                    hist.bucket_limit.append(edge)
-                for c in counts:
-                    hist.bucket.append(c)
-
-                # Create and write Summary
-                values.append(tf.Summary.Value(tag="/".join(path + [attr]), histo=hist))
+                # Convert to a numpy array
+                name = "/".join(path + [attr])
+                value_np = np.array(value)
+                tf.summary.histogram(
+                    name=name, data=value_np, step=step, buckets=num_hist_bins)
 
             else:
-                if use_tf150_api:
-                    type_list = [int, float, np.float32, np.float64, np.int32]
-                else:
-                    type_list = [int, float]
-                if type(value) in type_list:
-                    values.append(
-                        tf.Summary.Value(
-                            tag="/".join(path + [attr]), simple_value=value
-                        )
+                if type(value) in [int, float, np.float32, np.float64, np.int32]:
+                    tf.summary.scalar(
+                        name="/".join(path + [attr]), data=value, step=step
                     )
                 elif type(value) is dict:
-                    values.extend(to_tf_values(value, path + [attr]))
-    return values
+                    record_tf_values(result=value, path=path + [attr], step=step)
 
 
 class TFLoggerPlus(Logger):
@@ -178,38 +163,46 @@ class TFLoggerPlus(Logger):
 
     def _init(self):
         try:
-            global tf, use_tf150_api
+            global tf
             if "RLLIB_TEST_NO_TF_IMPORT" in os.environ:
                 logger.warning("Not importing TensorFlow for test purposes")
                 tf = None
             else:
                 import tensorflow
-
                 tf = tensorflow
-                use_tf150_api = distutils.version.LooseVersion(
-                    tf.__version__
-                ) >= distutils.version.LooseVersion("1.5.0")
+
         except ImportError:
             logger.warning(
                 "Couldn't import TensorFlow - " "disabling TensorBoard logging."
             )
-        self._file_writer = tf.summary.FileWriter(self.logdir)
+        self._file_writer = tf.summary.create_file_writer(self.logdir)
 
     def on_result(self, result):
-        tmp = result.copy()
+
+        # Copy and remove extraneous results.
+        result = result.copy()
         for k in ["config", "pid", "timestamp", TIME_TOTAL_S, TRAINING_ITERATION]:
-            if k in tmp:
-                del tmp[k]  # not useful to tf log these
-        values = to_tf_values(tmp, ["ray", "tune"])
-        train_stats = tf.Summary(value=values)
-        t = result.get(TIMESTEPS_TOTAL) or result[TRAINING_ITERATION]
-        self._file_writer.add_summary(train_stats, t)
-        iteration_value = to_tf_values(
-            {"training_iteration": result[TRAINING_ITERATION]}, ["ray", "tune"]
-        )
-        iteration_stats = tf.Summary(value=iteration_value)
-        self._file_writer.add_summary(iteration_stats, t)
-        self._file_writer.flush()
+            if k in result:
+                del result[k]  # not useful to tf log these
+
+        # Get and record training iteration (i.e. step).
+        step = result[TRAINING_ITERATION] or result.get(TIMESTEPS_TOTAL)
+        with self._file_writer.as_default():
+            record_tf_values(
+                result={"training_iteration": step},
+                path=["ray", "tune"],
+                step=step
+            )
+            self.flush()
+
+        # Record results.
+        with self._file_writer.as_default():
+            record_tf_values(
+                result=result,
+                path=["ray", "tune"],
+                step=step
+            )
+            self.flush()
 
     def flush(self):
         self._file_writer.flush()
@@ -248,3 +241,31 @@ class CSVLoggerPlus(CSVLogger):
 
 
 DEFAULT_LOGGERS = (JsonLogger, CSVLoggerPlus, TFLoggerPlus)
+
+
+if __name__ == "__main__":
+
+    # ---------------------
+    # Test of TFLoggerPlus
+    # ---------------------
+
+    from tempfile import TemporaryDirectory
+
+    tempdir = TemporaryDirectory()
+    logger = TFLoggerPlus(config={}, logdir=tempdir.name)
+    result = {
+        "hello": 4,
+        "hist_": [1, 2, 3, 4],
+        "seaborn_test": dict(
+            plot_type="lineplot",
+            x=[1, 2, 3],
+            y=[1, 2, 3],
+        ),
+        "img_test": np.random.rand(3, 3, 3, 3)
+    }
+
+    with logger._file_writer.as_default():
+        record_tf_values(result=result, path=["ray", "tune"], step=1)
+
+    print("Logged results successfully.")
+    input("Try \ntensorboard --logdir={}".format(tempdir.name))
