@@ -29,38 +29,10 @@ from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
 # create sigopt params space
 # set observation budget -> not available in SigOpt-Ray integration
 sigopt_params_space = [
-    {
-        "name": "learning_rate",
-        "type": "double",
-        "bounds": {
-            "min": 0.0001,
-            "max": 0.2
-        },
-    },
-    {
-        "name": "on_perc",
-        "type": "double",
-        "bounds": {
-            "min": 0.1,
-            "max": 1.0
-        },
-    },
-    {
-        "name": "momentum",
-        "type": "double",
-        "bounds": {
-            "min": 0,
-            "max": 1.0
-        },
-    },    
-    {
-        "name": "weight_decay",
-        "type": "double",
-        "bounds": {
-            "min": 0,
-            "max": 0.1
-        },
-    },
+    {"name": "learning_rate", "type": "double", "bounds": {"min": 0.0001, "max": 0.2}},
+    {"name": "on_perc", "type": "double", "bounds": {"min": 0.1, "max": 1.0}},
+    {"name": "momentum", "type": "double", "bounds": {"min": 0, "max": 1.0}},
+    {"name": "weight_decay", "type": "double", "bounds": {"min": 0, "max": 0.1}},
 ]
 
 # alternative initialization based on configuration
