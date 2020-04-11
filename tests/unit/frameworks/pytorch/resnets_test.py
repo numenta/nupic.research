@@ -31,6 +31,7 @@ from nupic.research.frameworks.pytorch.models.resnets import (
     resnet50,
     resnet101,
 )
+from nupic.research.frameworks.pytorch.modules import Mish
 from nupic.research.frameworks.pytorch.sparse_layer_params import (
     LayerParams,
     SparseWeightsLayerParams,
@@ -397,6 +398,38 @@ class ResnetTest(unittest.TestCase):
         net(Variable(torch.randn(2, 3, 32, 32)))
 
         self.assertIsInstance(net, ResNet, "Loads ResNet18")
+
+    def test_configurable_activation(self):
+        """
+        Test for configuring activation that precedes kwinners.
+        """
+
+        def dummy_object():
+            return None
+
+        # Test failure case: none torch.nn.Module `base_activation`
+        with self.assertRaises(
+            AssertionError,
+            msg="`base_activation` should be subclassed from torch.nn.Module"
+        ):
+            base_activation = dummy_object
+            ResNet(config=dict(
+                depth=18,
+                base_activation=base_activation
+            ))
+
+        # Test case with Mish activation.
+        base_activation = Mish
+        resnet = ResNet(config=dict(
+            depth=18,
+            base_activation=base_activation
+        ))
+        # print(resnet._modules.items())
+        mish_layers = []
+        for layer in resnet.modules():
+            if isinstance(layer, Mish):
+                mish_layers.append(layer)
+        self.assertEqual(len(mish_layers), 17)
 
 
 if __name__ == "__main__":
