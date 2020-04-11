@@ -108,6 +108,7 @@ def sigopt_experiment(config):
         # manually define max concurrent
         max_concurrent=5,
         reward_attr=exp_config["performance_metric"],
+        # optimization_budget=100
     )
 
     tune.run(RayTrainable, search_alg=algo, **config)
