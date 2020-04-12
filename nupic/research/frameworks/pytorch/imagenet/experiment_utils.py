@@ -195,7 +195,7 @@ def create_validation_dataloader(data_dir, val_dir, batch_size, workers,
 
 
 def create_optimizer(model, optimizer_class, optimizer_args,
-                     batch_norm_weight_decay):
+                     batch_norm_weight_decay, bias_weight_decay):
     """
     Configure the optimizer with the option to ignore `weight_decay` from all
     batch norm module parameters
@@ -214,36 +214,27 @@ def create_optimizer(model, optimizer_class, optimizer_args,
         If False, remove 'weight_decay' from batch norm parameters
         See https://arxiv.org/abs/1807.11205
 
+    :param bias_weight_decay:
+        Whether or not to apply weight decay to bias modules parameters.
+        If False, remove 'weight_decay' from bias parameters
+
     :return: Configured optimizer
     """
-    if batch_norm_weight_decay:
-        # No need to remove weight decay. Use same optimizer args for all parameters
-        model_params = model.parameters()
-    else:
-        # Group batch norm parameters
-        def group_by_batch_norm(module):
-            return isinstance(module, _BatchNorm)
 
-        sorted_modules = sorted(model.modules(), key=group_by_batch_norm)
-        grouped_parameters = {
-            k: list(itertools.chain.from_iterable(m.parameters(False) for m in g))
-            for k, g in itertools.groupby(sorted_modules, key=group_by_batch_norm)
-        }
-
-        model_params = []
-        for is_bn, params in grouped_parameters.items():
-            # Group model_params
-            group_args = copy.deepcopy(optimizer_args)
-            group_args.update(params=params)
-
-            # Remove 'weight_decay' from batch norm parameters
-            if is_bn:
-                group_args.update(weight_decay=0.0)
-
-            model_params.append(group_args)
-
+    group_decay, group_no_decay = [], []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if ".bn" in name and not batch_norm_weight_decay:
+            group_no_decay.append(param)
+        elif ".bias" in name and not bias_weight_decay:
+            group_no_decay.append(param)
+        else:
+            group_decay.append(param)
+    model_params = [dict(params=group_decay), 
+                    dict(params=group_no_decay, weight_decay=.0)]
+        
     return optimizer_class(model_params, **optimizer_args)
-
 
 def create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
                         steps_per_epoch):

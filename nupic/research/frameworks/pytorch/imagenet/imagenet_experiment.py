@@ -42,6 +42,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_optimizer,
     create_train_dataloader,
     create_validation_dataloader,
+    get_free_port
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
@@ -230,11 +231,13 @@ class ImagenetExperiment:
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
         batch_norm_weight_decay = config.get("batch_norm_weight_decay", True)
+        bias_weight_decay = config.get("bias_weight_decay", True)
         self.optimizer = create_optimizer(
             model=self.model,
             optimizer_class=optimizer_class,
             optimizer_args=optimizer_args,
             batch_norm_weight_decay=batch_norm_weight_decay,
+            bias_weight_decay=bias_weight_decay,
         )
 
         # Validate mixed precision requirements
@@ -524,4 +527,4 @@ class ImagenetExperiment:
 
     def get_free_port(self):
         """Returns free TCP port in the current ray node"""
-        return ray_utils.find_free_port()
+        return get_free_port()
