@@ -107,7 +107,6 @@ def register_act(experiment, dp_logs=True, shuffle=False):
     def try_log(x):
         out = np.log10(x)
         if np.isnan(out) or np.isinf(out):
-            # return np.log10(1e-4)
             pass
         else:
             return out

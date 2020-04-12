@@ -135,7 +135,6 @@ class ContinuousSpeechExperiment(object):
         if self.use_cuda:
             self.device = torch.device("cuda")
             model = model.cuda()
-            print("model on GPU")
         else:
             self.device = torch.device("cpu")
 
