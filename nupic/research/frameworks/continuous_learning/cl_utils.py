@@ -1,6 +1,23 @@
-import gzip
-import pickle
-import random
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+#
+
 import sys
 import time
 
@@ -11,33 +28,34 @@ from tqdm import tqdm
 
 
 def k_grad(module, pct):
-    
-    k = int(pct/100 * module.numel())
-    xr = module.reshape(1,-1)
-    xr_grad = module.grad.reshape(1,-1)
+    k = int(pct / 100 * module.numel())
+    xr = module.reshape(1, -1)
+    xr_grad = module.grad.reshape(1, -1)
     xr_abs = torch.abs(xr)
     s, inds = torch.topk(xr_abs, k, sorted=False)
-    xr_grad[:,inds] = 0.
+    xr_grad[:, inds] = 0.
     res = xr_grad.reshape(module.shape)
 
     module.grad = res.detach()
 
 
-# def k_grad(module, pct):
-    
-#     k = int(pct/100 * module.numel())
-#     xr = module.grad.reshape(1,-1)
-#     xr_abs = torch.abs(xr)
-#     # s, inds = torch.topk(xr_abs, k, sorted=False)
-#     s, inds = torch.sort(xr_abs, dim=1)
-#     xr[:,inds[k:-k]] *= 2
-#     xr[:,inds[:-k]] = 0.
-#     res = xr.reshape(module.grad.shape)
-#     # res = torch.zeros_like(xr)
-#     # res.scatter_(1,inds,xr.gather(1,inds))
-#     # res = res.reshape(module.grad.shape)
-    
-#     module.grad = res.detach()
+def get_act(name):
+    def hook(model, input_, output):
+        act[name] = output
+    return hook
+
+
+def k_weight(module, act):
+    cnt = 0
+    layer_list = list(experiment.model.named_children())
+    k = [x[0] for x in layer_list]
+
+    for module in experiment.model:
+        module.register_forward_hook(get_act(k[cnt]))
+        cnt += 1
+
+    s, inds = torch.topk(torch.abs())
+
 
 def train_multi_model(
     model,
@@ -135,7 +153,7 @@ def train_multi_model(
                     param_indices = param[1]
                     param_module.grad[param_indices, :] = 0.0
                 # print(torch.mean(param_module.grad[param_indices,:]))
-        
+
         if freeze_grad:
             with torch.no_grad():
                 for w in list(model.parameters())[:-1]:
@@ -151,7 +169,7 @@ def train_multi_model(
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                              t4 - t3)
+                                                            t4 - t3)
             post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
                                 num_images=num_images, time_string=time_string)
         del loss
@@ -160,6 +178,7 @@ def train_multi_model(
     if progress_bar is not None:
         loader.n = loader.total
         loader.close()
+
 
 def train_model(
     model,
@@ -255,7 +274,7 @@ def train_model(
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                              t4 - t3)
+                                                            t4 - t3)
             post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
                                 num_images=num_images, time_string=time_string)
         del loss
@@ -265,8 +284,9 @@ def train_model(
         loader.n = loader.total
         loader.close()
 
+
 def unravel_index(index, shape):
-    """stole from 
+    """stole from
     https://github.com/pytorch/pytorch/blob/master/torch/testing/__init__.py
     """
     res = []
