@@ -43,8 +43,6 @@ from nupic.torch.modules import rezero_weights, update_boost_strength
 # from nupic.research.frameworks.pytorch.model_utils import train_model as train_full_model
 
 
-
-
 def get_logger(name, verbose):
     """Configure Logger based on verbose level (0: ERROR, 1: INFO, 2: DEBUG)"""
     logger = logging.getLogger(name)
@@ -78,7 +76,7 @@ class ContinuousSpeechExperiment(object):
         # Get our directories correct
         self.data_dir = config["data_dir"]
         self.test_data_dir = config["test_dir"]
-        
+
         # Configure Model
         self.model_type = config["model_type"]
         self.num_classes = config["num_classes"]
@@ -87,7 +85,7 @@ class ContinuousSpeechExperiment(object):
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-        
+
         self.validation = False
         self.load_datasets()
 
@@ -207,6 +205,7 @@ class ContinuousSpeechExperiment(object):
 
     def get_act(self, name):
         act = {}
+
         def hook(model, input_, output):
             act[name] = output
         return hook
@@ -218,7 +217,6 @@ class ContinuousSpeechExperiment(object):
         for module in self.model:
             module.register_forward_hook(self.get_act(k[cnt]))
             cnt += 1
-                
 
     def train_entire_dataset(self, epoch):
         """Train one epoch of this model by iterating through mini batches.
@@ -264,16 +262,15 @@ class ContinuousSpeechExperiment(object):
         self.pre_epoch()
 
         fparams = []
-        # if self.freeze_params == "output":
-        if self.freeze_params == "linear2":
+        if self.freeze_params == "output":
             fparams.append([self.model.linear2.module.weight, indices])
 
         act = {}
         self.register_act()
         train_multi_model(self.model, self.train_loader, self.optimizer, self.device,
-                    freeze_params=fparams,
-                    freeze_grad=freeze_grad,
-                    batches_in_epoch=self.batches_in_epoch)
+                          freeze_params=fparams,
+                          freeze_grad=freeze_grad,
+                          batches_in_epoch=self.batches_in_epoch)
 
         outputs = act
         self.post_epoch()
@@ -281,12 +278,12 @@ class ContinuousSpeechExperiment(object):
         self.logger.info("training duration: %s", time.time() - t0)
         f.close()
         return outputs
- 
+
     def post_epoch(self):
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
-   
+
     def full_post_epoch(self):
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
@@ -326,7 +323,7 @@ class ContinuousSpeechExperiment(object):
             self.validation = False
         else:
             loader = self.validation_loader
-            
+
         ret = evaluate_model(self.model, test_loader, self.device)
         ret["mean_accuracy"] = 100. * ret["mean_accuracy"]
         entropy = self.entropy()
@@ -414,7 +411,7 @@ class ContinuousSpeechExperiment(object):
         self.validation_loader = DataLoader(
             validation_dataset, batch_size=self.batch_size, shuffle=False
         )
-        
+
         self.gen_test_dataset = PreprocessedDataset(
             cachefilepath=self.test_data_dir,
             basename="gsc_test_noise",
@@ -427,12 +424,11 @@ class ContinuousSpeechExperiment(object):
         )
 
         self.train_dataset = PreprocessedDataset(
-            cachefilepath = self.test_data_dir,
+            cachefilepath=self.test_data_dir,
             basename="gsc_train",
             qualifiers=range(30)
         )
-        # self.train_dataset.tensors[1] -= 1
-        
+
         self.full_train_loader = DataLoader(
             self.train_dataset, batch_size=self.batch_size, shuffle=True
         )
@@ -444,7 +440,7 @@ class ContinuousSpeechExperiment(object):
             test_dataset = ClasswiseDataset(
                 cachefilepath=self.data_dir,
                 basename="data_test_",
-                qualifiers=[class_+1]
+                qualifiers=[class_ + 1]
             )
 
             self.test_loader.append(DataLoader(
@@ -464,7 +460,6 @@ class ClasswiseDataset(PreprocessedDataset):
             file_name = os.path.join(self.path, self.basename)
         else:
             file_name = os.path.join(self.path,
-                 self.basename + "{}.npz".format(qualifier))
-#         self.tensors = list(np.load(file_name, allow_pickle=True))
+                                     self.basename + "{}.npz".format(qualifier))
         self.tensors = list(torch.load(file_name))
         return file_name

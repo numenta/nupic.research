@@ -18,62 +18,164 @@
 #  http://numenta.org/licenses/
 #
 
-import torch
+import time
+
 import numpy as np
 
+from cont_speech_experiment import ContinuousSpeechExperiment
+from correlation_metrics import plot_metrics, register_act
 from nupic.research.support import parse_config
-from correlation_metrics import register_act, plot_metrics
-from cont_speech_experiment import ContinuousSpeechExperiment, ClasswiseDataset
+
 
 class SparseCorrExperiment(object):
-    def __init__(self, config):
+    def __init__(self, config_file):
         self.dense_network = "denseCNN2"
         self.sparse_network = "sparseCNN2"
-        self.default_cnn_size = 64
         self.config_init = parse_config(config_file)
-        
-    def layer_size_comparison(self, layer_sizes, plot_results=True, freeze_linear=False, shuffled=False):
-        sparse_factor = [layer_sizes[0]/k for k in layer_sizes]
-        curr_sparsity = config_init["sparseCNN2"]["cnn_weight_sparsity"]
-        curr_percent_on = config_init["sparseCNN2"]["cnn_percent_on"]
-        
+
+    def model_comparison(self, plot_results=True, freeze_linear=False, shuffled=False):
         odcorrs, dcorrs = [], []
         oddotproducts, ddotproducts = [], []
-        
+        output = [odcorrs, dcorrs, oddotproducts, ddotproducts]
+
         if shuffled:
             shodcorrs, shdcorrs = [], []
             shoddotproducts, shddotproducts = [], []
-        
+            sh_output = [shodcorrs, shdcorrs, shoddotproducts, shddotproducts]
+
         for exp in [self.dense_network, self.sparse_network]:
-            for size in layer_sizes:
+            config = self.config_init[exp]
+            config["name"] = exp
+
+            if freeze_linear:
+                config["freeze_params"] = "output"
+            else:
+                config["freeze_params"] = []
+
+            outputs = self.run_experiment(config, shuffled=shuffled)
+            if shuffled:
+                [output[k].append(outputs[k]) for k in range(len(outputs[0]))]
+                [sh_output[k].append(sh_output[k]) for k in range(len(outputs[1]))]
+            else:
+                [output[k].append(outputs[k]) for k in range(len(outputs))]
+
+        plot_metrics(outputs)
+        if shuffled:
+            plot_metrics(sh_outputs)
+            return output, sh_output
+        else:
+            return output
+
+    def act_fn_comparison(self, plot_results=True, freeze_linear=False, shuffled=False):
+        cnn_weight_sparsities = [(1., 1.), (0.5, 0.2)]
+        linear_weight_sparsities = [(1.,), (0.1,)]
+        cnn_percent_on = [(0.095, 0.125), (1., 1.)]
+        linear_percent_on = [(0.1,), (1.,)]
+        exp = self.sparse_network
+
+        odcorrs, dcorrs = [], []
+        oddotproducts, ddotproducts = [], []
+        output = [odcorrs, dcorrs, oddotproducts, ddotproducts]
+
+        if shuffled:
+            shodcorrs, shdcorrs = [], []
+            shoddotproducts, shddotproducts = [], []
+            sh_output = [shodcorrs, shdcorrs, shoddotproducts, shddotproducts]
+
+        for i in range(2):
+            for j in range(2):
                 config = self.config_init[exp]
-                
+                config["name"] = exp
+
+                config["cnn_weight_sparsity"] = cnn_weight_sparsities[i]
+                config["weight_sparsity"] = linear_weight_sparsities[i]
+                config["cnn_percent_on"] = cnn_percent_on[j]
+                config["linear_percent_on"] = linear_percent_on[j]
+
                 if freeze_linear:
                     config["freeze_params"] = "output"
                 else:
                     config["freeze_params"] = []
-                    
-                config["cnn_out_channels"] = (size,size)
-                config["cnn_weight_sparsity"] = (curr_sparsity[0]*sparse_factor, curr_sparsity[1]*sparse_factor)
-                config["cnn_percent_on"] = (curr_percent_on[0]*sparse_factor, curr_percent_on[1]*sparse_factor)
-    
-                outputs = run_experiment(config, shuffle=shuffled)
+
+                outputs = self.run_experiment(config, shuffled=shuffled)
                 if shuffled:
-                    results.append(outputs[0])
-                    shuffled_results.append(outputs[1])
-                    
-        
-    def run_experiment(config, shuffled=False):
-        experiment = ContinuousSpeechExperiment(config=config)
-        start_time = time.time()
-        experiment.train_entire_dataset(0)
-        end_time = np.round(time.time() - start_time, 3)
-        print("{} layer size network trained in {} s".format(size, end_time))
+                    [output[k].append(outputs[k]) for k in range(len(outputs[0]))]
+                    [sh_output[k].append(sh_output[k]) for k in range(len(outputs[1]))]
+                else:
+                    [output[k].append(outputs[k]) for k in range(len(outputs))]
+
+        leg = ["dense + k-winner", "dense + ReLU", "sparse + k-winner", "sparse + ReLU"]
+        plot_metrics(outputs, legend_=leg)
+        if shuffled:
+            plot_metrics(sh_output, legend_=leg)
+            return output, sh_output
+        else:
+            return output
+            
+    def layer_size_comparison(self, layer_sizes, plot_results=True,
+                              freeze_linear=False, shuffled=False):
+        # get a factor to multiply the weight sparsity and percent on with
+        sparse_factor = [layer_sizes[0] / k for k in layer_sizes]
+
+        # get the default sparsity in the config file to multiply with "sparse_factor"
+        curr_sparsity = self.config_init["sparseCNN2"]["cnn_weight_sparsity"]
+        curr_percent_on = self.config_init["sparseCNN2"]["cnn_percent_on"]
+
+        odcorrs, dcorrs = [], []
+        oddotproducts, ddotproducts = [], []
+        output = [odcorrs, dcorrs, oddotproducts, ddotproducts]
 
         if shuffled:
-            corrs, shuffled_corrs = register_act(experiment)
+            shodcorrs, shdcorrs = [], []
+            shoddotproducts, shddotproducts = [], []
+            sh_output = [shodcorrs, shdcorrs, shoddotproducts, shddotproducts]
+
+        for exp in [self.dense_network, self.sparse_network]:
+            for ind in range(len(layer_sizes)):
+                config = self.config_init[exp]
+                config["name"] = exp
+
+                if freeze_linear:
+                    config["freeze_params"] = "output"
+                else:
+                    config["freeze_params"] = []
+
+                config["cnn_out_channels"] = (layer_sizes[ind], layer_sizes[ind])
+                config["cnn_weight_sparsity"] = (
+                    curr_sparsity[0] * sparse_factor[ind],
+                    curr_sparsity[1] * sparse_factor[ind])
+                config["cnn_percent_on"] = (
+                    curr_percent_on[0] * sparse_factor[ind],
+                    curr_percent_on[1] * sparse_factor[ind])
+
+                outputs = self.run_experiment(
+                    config, layer_sizes[ind], shuffled=shuffled)
+                if shuffled:
+                    [output[k].append(outputs[k]) for k in range(len(outputs[0]))]
+                    [sh_output[k].append(sh_output[k]) for k in range(len(outputs[1]))]
+                else:
+                    [output[k].append(outputs[k]) for k in range(len(outputs))]
+
+        leg = list(zip(np.repeat(["denseCNN", "sparseCNN"], len(layer_sizes)),
+                   3 * layer_sizes)
+        plot_metrics(outputs, legend_=leg)
+        if shuffled:
+            plot_metrics(sh_output, legend_=leg)
+            return output, sh_output
+        else:
+            return output
+
+    def run_experiment(self, config, layer_size=None, shuffled=False):
+        experiment=ContinuousSpeechExperiment(config=config)
+        start_time=time.time()
+        experiment.train_entire_dataset(0)
+        end_time=np.round(time.time() - start_time, 3)
+        if layer_size is not None:
+            print("{} layer size network trained in {} s".format(layer_size, end_time))
+
+        if shuffled:
+            corrs, shuffled_corrs=register_act(experiment)
             return corrs, shuffled_corrs
         else:
-            corrs = register_act(experiment)                    
-            return corrs                
-        
+            corrs=register_act(experiment)
+            return corrs

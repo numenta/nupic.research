@@ -143,6 +143,14 @@ def register_act(experiment, dp_logs=True, shuffle=False):
 def plot_metrics(metrics, order=[0, 2, 4, 6, 9, 11], savefig=False,
                  savestring=None,
                  legend_=None):
+    """ Plot correlation metrics
+    :param metrics: metrics to plot,
+    :param order (optional): metric list indices to plot (i.e. modules),
+    :param savefig (optional): Boolean, if True will save the figure
+     with an optional custom string,
+    :param savestring (optional): string of saved file if savefig=True,
+    :param legend_ (optional): custom legend
+    """
     metrics_list = []
     for metric in metrics:
         metric_list = [[N[k] for k in order] for N in metric]
@@ -159,7 +167,7 @@ def plot_metrics(metrics, order=[0, 2, 4, 6, 9, 11], savefig=False,
     cnt = 0
     for axis in np.hstack(ax):
         array_ = metrics_list[cnt]
-        axis.plot(array_, "o", alpha=0.6)
+        axis.plot(array_, "o", alpha=0.4)
 
         module_keys = ["cnn1", "cnn1_actfn", "cnn2",
                        "cnn2_actfn", "linear1", "linear1_actfn"]
