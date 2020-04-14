@@ -37,7 +37,16 @@ class SequentialSearch(SearchOption):
     """Pick sequentially from a list with size equal to number of trials"""
 
     def expand_in_place(self, config, index, k1, k2=None):
-        # get element
+        """
+        Updates config in place with one of the elements in a list
+
+        :param config: (dict) Config (or kwargs) from the experiment
+        :param index: (int) Position of the element to be selected in the list
+        :param k1: (str) Argument from config that will be updated
+        :param k2: (str) Argument from config that will be updated. Secondary key
+                         used if argument to be updated is in an nested dictionary.
+                         k1 is the key for the outer dict, and k2 for the inner dict
+        """
         if index >= len(self.elements):
             raise ValueError(
                 "Number of elements in SequentialSearch shorter "
@@ -57,7 +66,15 @@ class RandomSearch(SearchOption):
     """Sample from a list of options or a stochastic function"""
 
     def expand_in_place(self, config, k1, k2=None):
-        # get element
+        """
+        Updates config in place with a random element selected from a list or function.
+
+        :param config: (dict) Config (or kwargs) from the experiment
+        :param k1: (str) Argument from config that will be updated
+        :param k2: (str) Argument from config that will be updated. Secondary key
+                         used if argument to be updated is in an nested dictionary.
+                         k1 is the key for the outer dict, and k2 for the inner dict
+        """
         if callable(self.elements):
             element = self.elements()
         elif hasattr(self.elements, "__iter__"):
@@ -78,6 +95,17 @@ class GridSearch(SearchOption):
     """Expand one experiment per option"""
 
     def expand_to_list(self, config, k1, k2=None):
+        """
+        Returns a list of experiment, with each one containing one of the
+        possible elements of the grid search.
+
+        :param config: (dict) Config (or kwargs) from the experiment
+        :param k1: (str) Argument from config that will be updated
+        :param k2: (str) Argument from config that will be updated. Secondary key
+                         used if argument to be updated is in an nested dictionary.
+                         k1 is the key for the outer dict, and k2 for the inner dict
+        :return: returns a copy of the original config with the parameter updated
+        """
         expanded_list = []
         for el in self.elements:
             expanded_config = deepcopy(config)
@@ -156,14 +184,18 @@ class TrialsCollection:
         with open(self.path_completed, "rb") as f:
             self.completed = pickle.load(f)
 
-    @staticmethod
+    @staticmethod  # noqa: C901
     def expand_trials(base_config, num_samples=1):
         """
         Convert experiments using SearchOption into a list of experiments
         List of experiments can be executed in parallel or sequentially
+
+        Iterates through main dictionary, and through dictionaries within the main dict
+        This picks up nested arguments such as in optimizer_args and lr_scheduler
+        Only supports two levels
+        TODO: replace for cleaner and more flexible recursive approach
         """
 
-        # TODO: replace for cleaner and more flexible recursive approach
         # expand all grid search
         stack = [base_config]
         trials = []

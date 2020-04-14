@@ -191,10 +191,9 @@ class ImagenetExperiment:
         # Configure distribute pytorch
         self.distributed = config.get("distributed", False)
         self.rank = config.get("rank", 0)
-        tcp_port = config.get("tcp_port", 54321)
 
         if self.distributed:
-            dist_url = config.get("dist_url", f"tcp://127.0.0.1:{tcp_port}")
+            dist_url = config.get("dist_url", "tcp://127.0.0.1:54321")
             backend = config.get("backend", "nccl")
             world_size = config.get("world_size", 1)
             dist.init_process_group(
