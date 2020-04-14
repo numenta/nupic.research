@@ -46,8 +46,6 @@ if __name__ == "__main__":
                         help="Number of dataloaders workers")
     parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
                         help="Pytorch Distributed backend", default="nccl")
-    parser.add_argument("-d", "--dist-port", type=int, default=54321,
-                        help="tcp port to use for distributed pytorch training")
     parser.add_argument("-s", "--with-server", action="store_true",
                         help="Start Ray Tune API server")
     parser.add_argument("-p", "--progress", action="store_true",
@@ -57,7 +55,7 @@ if __name__ == "__main__":
                         help="Python Logging level")
     parser.add_argument("-f", "--log-format",
                         help="Python Logging Format")
-    parser.add_argument("-x", "--max-failures", type=int, default=1,
+    parser.add_argument("-x", "--max-failures", type=int,
                         help="How many times to try to recover before stopping")
     parser.add_argument("-c", "--checkpoint-freq", type=int,
                         help="How often to checkpoint (epochs)")
