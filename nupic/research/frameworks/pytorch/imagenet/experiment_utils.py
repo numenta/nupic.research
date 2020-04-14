@@ -19,19 +19,15 @@
 #
 import copy
 import io
-import itertools
 import os
 import pickle
 import socket
 from contextlib import closing
-from copy import deepcopy
 
 import h5py
-import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models.resnet
-from torch.nn.modules.batchnorm import _BatchNorm
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DistributedSampler
 from torchvision import transforms
@@ -341,7 +337,6 @@ def create_model(model_class, model_args, init_batch_norm, device,
 
     return model
 
-
 def get_free_port():
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         # bind on port 0 - kernel will select an unused port
@@ -351,150 +346,3 @@ def get_free_port():
         return s.getsockname()[1]
 
 
-class SearchOption:
-    """
-    Allow usage of random and grid search for exploration of hyperparameters space
-    In-place substitute for Ray Tune simlar options while not available
-    """
-
-    def __init__(self, elements):
-        self.elements = elements
-
-
-class RandomSearch(SearchOption):
-    """Sample from a list of options or a stochastic function"""
-
-    def expand_in_place(self, config, k1, k2=None):
-        # get element
-        if callable(self.elements):
-            element = self.elements()
-        elif hasattr(self.elements, "__iter__"):
-            element = np.random.choice(self.elements)
-        else:
-            raise ValueError(
-                "RandomSearch requires a function with no args or an iterator"
-            )
-
-        # assign
-        if k2 is None:
-            config[k1] = element
-        else:
-            config[k1][k2] = element
-
-
-class GridSearch(SearchOption):
-    """Expand one experiment per option"""
-
-    def expand_to_list(self, config, k1, k2=None):
-        expanded_list = []
-        for el in self.elements:
-            expanded_config = deepcopy(config)
-            if k2 is None:
-                expanded_config[k1] = el
-            else:
-                expanded_config[k1][k2] = el
-            expanded_list.append(expanded_config)
-
-        return expanded_list
-
-
-class TrialsCollection:
-    def __init__(self, config, num_trials, restore=True):
-
-        # all experiments are required a name for later retrieval
-        if "experiment_name" not in config:
-            self.name = "".join([chr(np.random.randint(97, 123)) for _ in range(10)])
-        else:
-            self.name = config["experiment_name"]
-        print(f"***** Experiment {self.name} started")
-
-        self.base_config = config
-        self.num_trials = num_trials
-        self.path = config["local_dir"]
-        self.path_pending = os.path.join(self.path, self.name + "_pending.p")
-        self.path_completed = os.path.join(self.path, self.name + "_completed.p")
-
-        if restore and os.path.exists(self.path_pending):
-            self.restore()
-        else:
-            self.pending = self.expand_trials(config, num_trials)
-            self.completed = []
-            self.save()
-
-        self.total_trials = len(self.pending) + len(self.completed)
-
-    def report_progress(self):
-        print(f"***** Trials completed: {len(self.completed)}/{self.total_trials}")
-
-    def retrieve(self):
-        while len(self.pending) > 0:
-            trial = self.pending.pop()
-            yield trial
-
-    def mark_completed(self, trial, save=True):
-        self.completed.append(trial)
-        if save:
-            self.save()
-
-    def save(self):
-        with open(self.path_pending, "wb") as f:
-            pickle.dump(self.pending, f)
-        with open(self.path_completed, "wb") as f:
-            pickle.dump(self.completed, f)
-
-    def restore(self):
-        with open(self.path_pending, "rb") as f:
-            self.pending = pickle.load(f)
-        with open(self.path_completed, "rb") as f:
-            self.completed = pickle.load(f)
-
-    @staticmethod
-    def expand_trials(base_config, num_samples=1):
-        """
-        Convert experiments using SearchOption into a list of experiments
-        List of experiments can be executed in parallel or sequentially
-        """
-
-        trials = []
-
-        # TODO: replace for cleaner and more flexible recursive approach
-        # expand all grid search
-        stack = [base_config]
-        while len(stack) != 0:
-            config = stack.pop()
-            pending_analysis = False
-            # first level
-            for k1, v1 in config.items():
-                if pending_analysis:
-                    break
-                elif v1.__class__ == GridSearch:
-                    stack.extend(v1.expand_to_list(config, k1))
-                    pending_analysis = True
-                elif type(v1) == dict:
-                    # second level
-                    for k2, v2 in v1.items():
-                        if pending_analysis:
-                            break
-                        elif v2.__class__ == GridSearch:
-                            stack.extend(v2.expand_to_list(config, k1, k2))
-                            pending_analysis = True
-
-            if not pending_analysis:
-                trials.append(config)
-
-        # multiply by num_samples
-        trials = trials * num_samples
-
-        # replace all sample from and random search
-        for config in trials:
-            # first level
-            for k1, v1 in config.items():
-                if v1.__class__ == RandomSearch:
-                    v1.expand_in_place(config, k1)
-                elif type(v1) == dict:
-                    # second level
-                    for k2, v2 in v1.items():
-                        if v2.__class__ == RandomSearch:
-                            v2.expand_in_place(config, k1, k2)
-
-        return trials
