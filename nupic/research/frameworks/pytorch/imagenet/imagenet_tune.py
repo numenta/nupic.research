@@ -357,7 +357,7 @@ def run_single_instance(config):
         # Connect to ray, no specific redis address
         ray.init(load_code_from_local=True, webui_host="0.0.0.0")
 
-        config["tcp_port"] = get_free_port()
+        config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
         kwargs["config"] = config
         tune.run(**kwargs)
         print("**** ended training")
