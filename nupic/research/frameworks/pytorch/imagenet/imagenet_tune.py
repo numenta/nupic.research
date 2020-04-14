@@ -26,12 +26,17 @@ from pprint import pprint
 import ray
 import ray.resource_spec
 import ray.util.sgd.utils as ray_utils
+import torch
 from ray.exceptions import RayActorError
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 from ray.tune.utils import warn_if_slow
 
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
+from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
+    TrialsCollection,
+)
+from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
@@ -311,3 +316,66 @@ def run(config):
     pprint(kwargs)
     tune.run(**kwargs)
     ray.shutdown()
+
+
+def run_single_instance(config):
+
+    # get number of GPUs
+    config["num_gpus"] = torch.cuda.device_count()
+    config["workers"] = 4
+    config["log_level"] = "INFO"
+    config["reuse_actors"] = False
+
+    # Build kwargs for `tune.run` function using merged config and command line dict
+    kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
+    kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
+    # Update`tune.run` kwargs with config
+    kwargs.update(config)
+    kwargs["config"] = config
+    # Update tune stop criteria with config epochs
+    stop = kwargs.get("stop", {}) or dict()
+    epochs = config.get("epochs", 1)
+    stop.update(training_iteration=epochs)
+    kwargs["stop"] = stop
+    # Make sure to only select`tune.run` function arguments
+    kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
+    # pprint(kwargs)
+
+    # current torch distributed approach requires num_samples to be 1
+    num_samples = 1
+    if "num_samples" in kwargs:
+        num_samples = kwargs["num_samples"]
+        kwargs["num_samples"] = 1
+
+    trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
+    t_init = time.time()
+
+    for config in trials.retrieve():
+        t0 = time.time()
+        trials.report_progress()
+
+        # Connect to ray, no specific redis address
+        ray.init(load_code_from_local=True, webui_host="0.0.0.0")
+
+        config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
+        kwargs["config"] = config
+        tune.run(**kwargs)
+        print("**** ended training")
+
+        # report time elapsed
+        t1 = time.time()
+        print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
+        print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
+
+        ray.shutdown()
+
+        # save trials for later retrieval
+        trials.mark_completed(config, save=True)
+
+        # sleep to avoid interference between runs
+        time.sleep(2)
+
+        # error message when experiment ends
+
+    print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
+          " trials completed")
