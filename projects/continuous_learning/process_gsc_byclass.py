@@ -19,7 +19,6 @@
 #
 
 import os
-import sys
 
 import numpy as np
 import torch
@@ -106,7 +105,7 @@ def process_gsc_by_class(data_dir=None):
             if n == 0.0:
                 tensor_string = "data_test_0noise{}.npz".format(k)
             else:
-                tensor_string = "data_test_{}_{}.npz".format(k,n)
+                tensor_string = "data_test_{}_{}.npz".format(k, n)
 
             with open(data_dir + "/data_classes/" + tensor_string, "wb") as f:
                 torch.save(out_tensor, f)

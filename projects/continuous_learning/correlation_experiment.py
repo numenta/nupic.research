@@ -303,25 +303,28 @@ def plot_duty_cycles(experiment):
                 alpha = 0.12 / np.log(ks[0].shape[0])
                 plt.plot(ks, "k.", alpha=0.3)
                 plt.plot(ks, "k", alpha=alpha)
-                plt.xticks(np.arange(5), np.arange(1,6))
+                plt.xticks(np.arange(5), np.arange(1, 6))
                 plt.ylim((0., 0.2))
                 plt.title(items[idx])
                 plt.xlabel("Training iteration")
                 plt.ylabel("Duty cycle")
 
+
 def plot_entropies(experiment):
-    for en in experiment.entropies:
-        if len(en[0]) > 0:
-            entropies = [item.flatten() for sublist in en for item in sublist]
-            plt.figure(figsize=(10,10))
+    for ents in experiment.entropies:
+        if len(ents[0]) > 0:
+            ents_flat = [item.flatten() for sublist in ents for item in sublist]
+            plt.figure(figsize=(10, 12))
             items = ["conv1", "conv2", "linear1"]
 
             for idx in range(len(items)):
-                plt.subplot(2,2, idx + 1)
-                ks = entropies[idx::len(items)]
-                plt.plot(ks, "k.", alpha=0.6)
+                plt.subplot(2, 2, idx + 1)
+                ks = ents_flat[idx::len(items)]
+                alpha = 0.12 / np.log(ks[0].shape[0])
+                plt.plot(ks, "k.", alpha=0.3)
                 plt.plot(ks, "k", alpha=alpha)
-                plt.xticks(np.arange(5), np.arange(1,6))
+                plt.xticks(np.arange(5), np.arange(1, 6))
+                plt.ylim((0., 0.2))
                 plt.title(items[idx])
                 plt.xlabel("Training iteration")
                 plt.ylabel("Entropy")

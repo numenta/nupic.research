@@ -21,7 +21,6 @@
 import sys
 import time
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -129,7 +128,7 @@ def train_multi_model(
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                            t4 - t3)
+                                                              t4 - t3)
             post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
                                 num_images=num_images, time_string=time_string)
         del loss
@@ -234,7 +233,7 @@ def train_model(
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                            t4 - t3)
+                                                              t4 - t3)
             post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
                                 num_images=num_images, time_string=time_string)
         del loss

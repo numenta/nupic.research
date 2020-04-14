@@ -299,10 +299,10 @@ class ContinuousSpeechExperiment(object):
             test_loader = self.gen_test_loader
 
         if not self.validation:
-            loader = test_loader
+            test_loader = test_loader
             self.validation = False
         else:
-            loader = self.validation_loader
+            test_loader = self.validation_loader
 
         ret = evaluate_model(self.model, test_loader, self.device)
         ret["mean_accuracy"] = 100. * ret["mean_accuracy"]

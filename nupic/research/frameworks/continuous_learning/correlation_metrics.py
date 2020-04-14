@@ -141,7 +141,7 @@ def register_act(experiment, dp_logs=True, shuffle=False):
         return corrs_
 
 
-def plot_metrics(metrics, order=[0, 2, 4, 6, 9, 11], savefig=False,
+def plot_metrics(metrics, order=None, savefig=False,
                  savestring=None,
                  legend_=None):
     """ Plot correlation metrics
@@ -153,8 +153,9 @@ def plot_metrics(metrics, order=[0, 2, 4, 6, 9, 11], savefig=False,
     :param legend_ (optional): custom legend
     """
     metrics_list = []
+    order = [0, 2, 4, 6, 9, 11]
     for metric in metrics:
-        metric_list = [[N[k] for k in order] for N in metric]
+        metric_list = [[n[k] for k in order] for n in metric]
         metrics_list.append(np.array(metric_list).T)
 
     metrics_list = np.array(metrics_list)
