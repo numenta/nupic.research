@@ -28,9 +28,12 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from cl_utils import train_model, train_multi_model
+from nupic.research.frameworks.continuous_learning.cl_utils import (
+    train_model,
+    train_multi_model,
+)
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
-from nupic.research.frameworks.pytorch.model_utils import (  # train_model,
+from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
     set_random_seed,
@@ -39,8 +42,6 @@ from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import rezero_weights, update_boost_strength
-
-# from nupic.research.frameworks.pytorch.model_utils import train_model as train_full_model
 
 
 def get_logger(name, verbose):
