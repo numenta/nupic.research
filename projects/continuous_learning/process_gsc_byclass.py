@@ -1,3 +1,4 @@
+# ----------------------------------------------------------------------
 #  Numenta Platform for Intelligent Computing (NuPIC)
 #  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
