@@ -173,8 +173,8 @@ def _read_experiment(experiment_state, experiment_path):
             with open(params_file) as f:
                 params[exp_tag] = json.load(f)
 
+    # import pdb; pdb.set_trace()
     return progress, params
-
 
 def _get_value(
     progress,
@@ -284,6 +284,10 @@ def _get_value(
                 elif isinstance(v, list):
                     v = "-".join([str(v_i) for v_i in v])
                     stats[k].append(v)
+                # iterate through dictionaries to get keys inside
+                elif isinstance(v, dict):
+                    for k2, v2 in v.items():
+                        stats["_".join([k, k2])].append(v2)
                 # otherwise append the value as it is
                 else:
                     stats[k].append(v)
