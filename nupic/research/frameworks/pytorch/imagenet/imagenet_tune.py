@@ -33,10 +33,10 @@ from ray.tune.resources import Resources
 from ray.tune.utils import warn_if_slow
 
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
-from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
+from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
     TrialsCollection,
-    get_free_port,
 )
+from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
