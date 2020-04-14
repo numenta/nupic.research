@@ -101,13 +101,14 @@ def register_act(experiment, dp_logs=True, shuffle=False):
             shuffled_corr_mats.append(shuff_corr_mat)
             shuffled_dot_mats.append(shuff_dot_mat)
 
-            sh_offdiag_corrs = [np.nanmean(cc_[off_indices]) for cc_ in shuffled_corr_mats]
+            sh_offdiag_corrs = [np.nanmean(cc_[off_indices])
+                                for cc_ in shuffled_corr_mats]
             sh_diag_corrs = [np.nanmean(np.diag(cc_)) for cc_ in shuffled_corr_mats]
 
     def try_log(x):
         out = np.log10(x)
         if np.isnan(out) or np.isinf(out):
-            pass
+            return np.nan
         else:
             return out
 
@@ -167,7 +168,7 @@ def plot_metrics(metrics, order=[0, 2, 4, 6, 9, 11], savefig=False,
     cnt = 0
     for axis in np.hstack(ax):
         array_ = metrics_list[cnt]
-        axis.plot(array_, "o", alpha=0.4)
+        axis.plot(array_, "o", alpha=0.6)
 
         module_keys = ["cnn1", "cnn1_actfn", "cnn2",
                        "cnn2_actfn", "linear1", "linear1_actfn"]
@@ -201,6 +202,7 @@ def plot_metrics(metrics, order=[0, 2, 4, 6, 9, 11], savefig=False,
             axis.set_xticklabels("")
 
         cnt += 1
+    plt.show()
 
     if savefig:
         if savestring is not None:

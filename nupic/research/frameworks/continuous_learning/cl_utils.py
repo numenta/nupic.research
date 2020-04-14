@@ -27,43 +27,12 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 
-def k_grad(module, pct):
-    k = int(pct / 100 * module.numel())
-    xr = module.reshape(1, -1)
-    xr_grad = module.grad.reshape(1, -1)
-    xr_abs = torch.abs(xr)
-    s, inds = torch.topk(xr_abs, k, sorted=False)
-    xr_grad[:, inds] = 0.
-    res = xr_grad.reshape(module.shape)
-
-    module.grad = res.detach()
-
-
-def get_act(name):
-    def hook(model, input_, output):
-        act[name] = output
-    return hook
-
-
-def k_weight(module, act):
-    cnt = 0
-    layer_list = list(experiment.model.named_children())
-    k = [x[0] for x in layer_list]
-
-    for module in experiment.model:
-        module.register_forward_hook(get_act(k[cnt]))
-        cnt += 1
-
-    s, inds = torch.topk(torch.abs())
-
-
 def train_multi_model(
     model,
     loader,
     optimizer,
     device,
     freeze_params,
-    freeze_grad,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
@@ -152,15 +121,6 @@ def train_multi_model(
                     param_module = param[0]
                     param_indices = param[1]
                     param_module.grad[param_indices, :] = 0.0
-                # print(torch.mean(param_module.grad[param_indices,:]))
-
-        if freeze_grad:
-            with torch.no_grad():
-                for w in list(model.parameters())[:-1]:
-                    try:
-                        k_grad(w, 7)
-                    except:
-                        pass
 
         t3 = time.time()
         optimizer.step()

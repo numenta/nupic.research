@@ -20,8 +20,8 @@
 
 import time
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 from cont_speech_experiment import ContinuousSpeechExperiment
 from nupic.research.frameworks.continuous_learning.correlation_metrics import (
@@ -31,7 +31,7 @@ from nupic.research.frameworks.continuous_learning.correlation_metrics import (
 from nupic.research.support import parse_config
 
 
-def train_sequential(experiment):
+def train_sequential(experiment, print_acc=False):
     """ Trains a ContinuousSpeechExperiment sequentially,
     i.e. by pairs of labels
     :param experiment: ContinuousSpeechExperiment
@@ -39,26 +39,48 @@ def train_sequential(experiment):
     np.random.seed(np.random.randint(0, 100))
     train_labels = np.reshape(np.random.permutation(np.arange(1, 11)), (5, 2))
 
-    epochs = 1
-    indices = []
-
+    epochs = 1  # 1 run per class pair
+    entropies, duty_cycles = [], []
     for label in train_labels:
         print("training on class {}".format(label))
 
-        indices = np.hstack(
+        freeze_indices = np.hstack(  # class indices to freeze in output layer
             [0, np.delete(train_labels,
                           np.where(train_labels == label)[0], axis=0).flatten()])
 
         for epoch in range(epochs):
-            print("training: epoch {}".format(epoch + 1))
-            experiment.train(epoch, label, indices)
+            experiment.train(epoch, label, indices=freeze_indices)
 
             mt = experiment.test()
-            print("Mean accuracy: {}".format(mt["mean_accuracy"]))
+            if print_acc:
+                print("Mean accuracy: {}".format(mt["mean_accuracy"]))
 
-    outputs = register_act(experiment)
+            entropies.append(get_entropies(experiment))
+            duty_cycles.append(get_duty_cycles(experiment))
 
-    return outputs
+    return entropies, duty_cycles
+
+
+def get_duty_cycles(experiment):
+    duty_cycles = []
+    for module in experiment.model:
+        dc = module.state_dict()
+        if "duty_cycle" in dc:
+            duty_cycles.append(dc["duty_cycle"].detach().cpu().numpy())
+
+    return duty_cycles
+
+
+def get_entropies(experiment):
+    entropies = []
+    for module in experiment.model.modules():
+        if module == experiment.model:
+            continue
+        if hasattr(module, "entropy"):
+            entropy = module.entropy()
+            entropies.append(entropy.detach().cpu().numpy())
+
+    return entropies
 
 
 class SparseCorrExperiment(object):
@@ -66,8 +88,16 @@ class SparseCorrExperiment(object):
         self.dense_network = "denseCNN2"
         self.sparse_network = "sparseCNN2"
         self.config_init = parse_config(config_file)
+        self.entropies = []
+        self.duty_cycles = []
+
+    def reset_ents_dcs(self):
+        self.entropies = []
+        self.duty_cycles = []
 
     def model_comparison(self, freeze_linear=False, sequential=False, shuffled=False):
+        """ Compare metrics on dense and sparse CNN"""
+        self.reset_ents_dcs()
         odcorrs, dcorrs = [], []
         oddotproducts, ddotproducts = [], []
         output = [odcorrs, dcorrs, oddotproducts, ddotproducts]
@@ -89,8 +119,8 @@ class SparseCorrExperiment(object):
             if shuffled:
                 outputs, sh_outputs = self.run_experiment(config, sequential=sequential,
                                                           shuffled=True)
-                [output[k].append(outputs[k]) for k in range(len(outputs[0]))]
-                [sh_output[k].append(sh_outputs[k]) for k in range(len(outputs[1]))]
+                [output[k].append(outputs[k]) for k in range(len(outputs))]
+                [sh_output[k].append(sh_outputs[k]) for k in range(len(sh_outputs))]
             else:
                 outputs = self.run_experiment(config, sequential=sequential,
                                               shuffled=False)
@@ -105,6 +135,8 @@ class SparseCorrExperiment(object):
             return output
 
     def act_fn_comparison(self, freeze_linear=False, sequential=False, shuffled=False):
+        """ Compare k-winner and ReLU activations on sparse and dense weights. """
+        self.reset_ents_dcs()
         cnn_weight_sparsities = [(1., 1.), (0.5, 0.2)]
         linear_weight_sparsities = [(1.,), (0.1,)]
         cnn_percent_on = [(0.095, 0.125), (1., 1.)]
@@ -135,12 +167,12 @@ class SparseCorrExperiment(object):
                 else:
                     config["freeze_params"] = []
 
-                outputs = self.run_experiment(config, shuffled=shuffled)
                 if shuffled:
                     outputs, sh_outputs = self.run_experiment(config, shuffled=shuffled)
-                    [output[k].append(outputs[k]) for k in range(len(outputs[0]))]
-                    [sh_output[k].append(sh_outputs[k]) for k in range(len(outputs[1]))]
+                    [output[k].append(outputs[k]) for k in range(len(outputs))]
+                    [sh_output[k].append(sh_outputs[k]) for k in range(len(sh_outputs))]
                 else:
+                    outputs = self.run_experiment(config, shuffled=shuffled)
                     [output[k].append(outputs[k]) for k in range(len(outputs))]
 
         leg = ["dense + k-winner", "dense + ReLU", "sparse + k-winner", "sparse + ReLU"]
@@ -152,8 +184,16 @@ class SparseCorrExperiment(object):
         else:
             return output
 
-    def layer_size_comparison(self, layer_sizes, compare_models=False,
-                              freeze_linear=False, sequential=False, shuffled=False):
+    def layer_size_comparison(self, layer_sizes,
+                              compare_models=False,
+                              freeze_linear=False,
+                              sequential=False,
+                              shuffled=False):
+        """Get metrics for specified layer sizes
+        :param layer_sizes: list of desired CNN layer sizes
+        :param compare_models (Boolean): will also run a dense CNN
+        """
+        self.reset_ents_dcs()
         # get a factor to multiply the weight sparsity and percent on with
         sparse_factor = [layer_sizes[0] / k for k in layer_sizes]
 
@@ -193,13 +233,11 @@ class SparseCorrExperiment(object):
                     curr_percent_on[0] * sparse_factor[ind],
                     curr_percent_on[1] * sparse_factor[ind])
 
-                outputs = self.run_experiment(
-                    config, layer_sizes[ind], shuffled=shuffled)
                 if shuffled:
                     outputs, sh_outputs = self.run_experiment(
                         config, layer_sizes[ind], shuffled=shuffled)
-                    [output[k].append(outputs[k]) for k in range(len(outputs[0]))]
-                    [sh_output[k].append(sh_outputs[k]) for k in range(len(outputs[1]))]
+                    [output[k].append(outputs[k]) for k in range(len(outputs))]
+                    [sh_output[k].append(sh_outputs[k]) for k in range(len(sh_outputs))]
                 else:
                     outputs = self.run_experiment(
                         config, layer_sizes[ind], shuffled=shuffled)
@@ -215,13 +253,28 @@ class SparseCorrExperiment(object):
         else:
             return output
 
-    def run_experiment(self, config, layer_size=None, sequential=False, shuffled=False):
+    def run_experiment(self, config,
+                       layer_size=None,
+                       sequential=False,
+                       shuffled=False,
+                       boosting=True,
+                       duty_cycle_period=1000):
+
+        if not boosting:
+            config["boost_strength"] = 0.0
+            config["boost_strength_factor"] = 0.0
+
+        config["duty_cycle_period"] = duty_cycle_period
+
         experiment = ContinuousSpeechExperiment(config=config)
         start_time = time.time()
         if sequential:
-            train_sequential(experiment)
+            entropies, duty_cycles = train_sequential(experiment)
         else:
             experiment.train_entire_dataset(0)
+
+        self.entropies.append(entropies)
+        self.duty_cycles.append(duty_cycles)
 
         end_time = np.round(time.time() - start_time, 3)
         if layer_size is not None:
@@ -237,12 +290,38 @@ class SparseCorrExperiment(object):
             return corrs
 
 
-if __name__ == "__main__":
-    plt.ion()
-    config_file = "experiments.cfg"
-    experiment = SparseCorrExperiment(config_file=config_file)
-    mod_comp_corrs = experiment.model_comparison()
-    print("model comparison experiment complete")
-    plt.show()
-    act_fun_corrs = experiment.act_fn_comparison()
-    layer_size_corrs = experiment.layer_size_comparison(layer_sizes=[64, 128, 256])
+def plot_duty_cycles(experiment):
+    for dc in experiment.duty_cycles:
+        if len(dc[0]) > 0:
+            dc_flat = [item.flatten() for sublist in dc for item in sublist]
+            plt.figure(figsize=(10, 12))
+            items = ["conv1", "conv2", "linear1"]
+
+            for idx in range(len(items)):
+                plt.subplot(2, 2, idx + 1)
+                ks = dc_flat[idx::len(items)]
+                alpha = 0.12 / np.log(ks[0].shape[0])
+                plt.plot(ks, "k.", alpha=0.3)
+                plt.plot(ks, "k", alpha=alpha)
+                plt.xticks(np.arange(5), np.arange(1,6))
+                plt.ylim((0., 0.2))
+                plt.title(items[idx])
+                plt.xlabel("Training iteration")
+                plt.ylabel("Duty cycle")
+
+def plot_entropies(experiment):
+    for en in experiment.entropies:
+        if len(en[0]) > 0:
+            entropies = [item.flatten() for sublist in en for item in sublist]
+            plt.figure(figsize=(10,10))
+            items = ["conv1", "conv2", "linear1"]
+
+            for idx in range(len(items)):
+                plt.subplot(2,2, idx + 1)
+                ks = entropies[idx::len(items)]
+                plt.plot(ks, "k.", alpha=0.6)
+                plt.plot(ks, "k", alpha=alpha)
+                plt.xticks(np.arange(5), np.arange(1,6))
+                plt.title(items[idx])
+                plt.xlabel("Training iteration")
+                plt.ylabel("Entropy")

@@ -204,21 +204,6 @@ class ContinuousSpeechExperiment(object):
 
         return optimizer
 
-    def get_act(self, name):
-        act = {}
-
-        def hook(model, input_, output):
-            act[name] = output
-        return hook
-
-    def register_act(self):
-        layer_list = list(self.model.named_children())
-        k = [x[0] for x in layer_list]
-        cnt = 0
-        for module in self.model:
-            module.register_forward_hook(self.get_act(k[cnt]))
-            cnt += 1
-
     def train_entire_dataset(self, epoch):
         """Train one epoch of this model by iterating through mini batches.
 
@@ -243,7 +228,7 @@ class ContinuousSpeechExperiment(object):
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def train(self, epoch, training_classes, indices, freeze_grad=False):
+    def train(self, epoch, training_classes, indices):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
@@ -266,19 +251,13 @@ class ContinuousSpeechExperiment(object):
         if self.freeze_params == "output":
             fparams.append([self.model.linear2.module.weight, indices])
 
-        act = {}
-        self.register_act()
         train_multi_model(self.model, self.train_loader, self.optimizer, self.device,
                           freeze_params=fparams,
-                          freeze_grad=freeze_grad,
                           batches_in_epoch=self.batches_in_epoch)
 
-        outputs = act
         self.post_epoch()
-
         self.logger.info("training duration: %s", time.time() - t0)
         f.close()
-        return outputs
 
     def post_epoch(self):
         self.model.apply(rezero_weights)
@@ -370,7 +349,7 @@ class ContinuousSpeechExperiment(object):
     def combine_classes(self, training_classes):
         data = []
         for k in training_classes:
-            data.append(torch.load(self.data_dir + "data_train_{}.npz".format(k + 1)))
+            data.append(torch.load(self.data_dir + "/data_train_{}.npz".format(k + 1)))
 
         samples_ = [data[k][0] for k in range(len(training_classes))]
         labels_ = [data[k][1] for k in range(len(training_classes))]
@@ -440,7 +419,7 @@ class ContinuousSpeechExperiment(object):
         for class_ in np.arange(12):
             test_dataset = ClasswiseDataset(
                 cachefilepath=self.data_dir,
-                basename="data_test_",
+                basename="data_test_0noise",
                 qualifiers=[class_ + 1]
             )
 
