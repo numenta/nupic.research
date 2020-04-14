@@ -22,6 +22,8 @@ import io
 import itertools
 import os
 import pickle
+import socket
+from contextlib import closing
 
 import h5py
 import torch
@@ -345,3 +347,12 @@ def create_model(model_class, model_args, init_batch_norm, device,
             model = hook(model, **kwargs) or model
 
     return model
+
+
+def get_free_port():
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        # bind on port 0 - kernel will select an unused port
+        s.bind(("", 0))
+        # removed socket.SO_REUSEADDR arg
+        # TCP error due to two process with same rank in same port - maybe a fix
+        return s.getsockname()[1]
