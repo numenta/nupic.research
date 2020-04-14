@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2018, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -20,26 +20,24 @@
 # ----------------------------------------------------------------------
 import logging
 import os
-import time
 import tempfile
+import time
 
 import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+from nupic.research.frameworks.continuous_learning.cl_utils import (
+    train_model,
+    train_multi_model,
+)
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
     set_random_seed,
-    # train_model,
 )
-
-# from nupic.research.frameworks.pytorch.model_utils import train_model as train_full_model
-
-from cl_utils import train_multi_model, train_model
-
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
@@ -79,7 +77,7 @@ class ContinuousSpeechExperiment(object):
         # Get our directories correct
         self.data_dir = config["data_dir"]
         self.test_data_dir = config["test_dir"]
-        
+
         # Configure Model
         self.model_type = config["model_type"]
         self.num_classes = config["num_classes"]
@@ -88,7 +86,7 @@ class ContinuousSpeechExperiment(object):
         self.batch_size = config["batch_size"]
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-        
+
         self.validation = False
         self.load_datasets()
 
@@ -136,7 +134,6 @@ class ContinuousSpeechExperiment(object):
         if self.use_cuda:
             self.device = torch.device("cuda")
             model = model.cuda()
-            print("model on GPU")
         else:
             self.device = torch.device("cpu")
 
@@ -206,7 +203,7 @@ class ContinuousSpeechExperiment(object):
             raise LookupError("Incorrect optimizer value")
 
         return optimizer
-        
+
     def train_entire_dataset(self, epoch):
         """Train one epoch of this model by iterating through mini batches.
 
@@ -231,7 +228,7 @@ class ContinuousSpeechExperiment(object):
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def train(self, epoch, training_classes, indices, freeze_grad=False):
+    def train(self, epoch, training_classes, indices):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
@@ -251,24 +248,22 @@ class ContinuousSpeechExperiment(object):
         self.pre_epoch()
 
         fparams = []
-        # if self.freeze_params == "output":
-        if self.freeze_params == "linear2":
+        if self.freeze_params == "output":
             fparams.append([self.model.linear2.module.weight, indices])
 
         train_multi_model(self.model, self.train_loader, self.optimizer, self.device,
-                    freeze_params=fparams,
-                    freeze_grad=freeze_grad,
-                    batches_in_epoch=self.batches_in_epoch)
-        self.post_epoch()
+                          freeze_params=fparams,
+                          batches_in_epoch=self.batches_in_epoch)
 
+        self.post_epoch()
         self.logger.info("training duration: %s", time.time() - t0)
         f.close()
- 
+
     def post_epoch(self):
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
-   
+
     def full_post_epoch(self):
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
@@ -304,11 +299,10 @@ class ContinuousSpeechExperiment(object):
             test_loader = self.gen_test_loader
 
         if not self.validation:
-            loader = test_loader
+            test_loader = test_loader
             self.validation = False
         else:
-            loader = self.validation_loader
-            
+            test_loader = self.validation_loader
 
         ret = evaluate_model(self.model, test_loader, self.device)
         ret["mean_accuracy"] = 100. * ret["mean_accuracy"]
@@ -355,7 +349,7 @@ class ContinuousSpeechExperiment(object):
     def combine_classes(self, training_classes):
         data = []
         for k in training_classes:
-            data.append(torch.load(self.data_dir + "data_train_{}.npz".format(k + 1)))
+            data.append(torch.load(self.data_dir + "/data_train_{}.npz".format(k + 1)))
 
         samples_ = [data[k][0] for k in range(len(training_classes))]
         labels_ = [data[k][1] for k in range(len(training_classes))]
@@ -397,11 +391,11 @@ class ContinuousSpeechExperiment(object):
         self.validation_loader = DataLoader(
             validation_dataset, batch_size=self.batch_size, shuffle=False
         )
-        
+
         self.gen_test_dataset = PreprocessedDataset(
             cachefilepath=self.test_data_dir,
             basename="gsc_test_noise",
-            qualifiers=["{:02d}".format(int(100 * n)) for n in self.noise_values],
+            qualifiers=["00"],
         )
         self.gen_test_dataset.tensors[1] -= 1
 
@@ -410,12 +404,11 @@ class ContinuousSpeechExperiment(object):
         )
 
         self.train_dataset = PreprocessedDataset(
-            cachefilepath = self.test_data_dir,
+            cachefilepath=self.test_data_dir,
             basename="gsc_train",
             qualifiers=range(30)
         )
-        # self.train_dataset.tensors[1] -= 1
-        
+
         self.full_train_loader = DataLoader(
             self.train_dataset, batch_size=self.batch_size, shuffle=True
         )
@@ -426,8 +419,8 @@ class ContinuousSpeechExperiment(object):
         for class_ in np.arange(12):
             test_dataset = ClasswiseDataset(
                 cachefilepath=self.data_dir,
-                basename="data_test_",
-                qualifiers=[class_+1]
+                basename="data_test_0noise",
+                qualifiers=[class_ + 1]
             )
 
             self.test_loader.append(DataLoader(
@@ -447,7 +440,6 @@ class ClasswiseDataset(PreprocessedDataset):
             file_name = os.path.join(self.path, self.basename)
         else:
             file_name = os.path.join(self.path,
-                 self.basename + "{}.npz".format(qualifier))
-#         self.tensors = list(np.load(file_name, allow_pickle=True))
+                                     self.basename + "{}.npz".format(qualifier))
         self.tensors = list(torch.load(file_name))
         return file_name

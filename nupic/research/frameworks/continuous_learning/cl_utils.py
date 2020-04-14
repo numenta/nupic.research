@@ -1,43 +1,31 @@
-import gzip
-import pickle
-import random
+# ----------------------------------------------------------------------
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+#
+
 import sys
 import time
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-
-def k_grad(module, pct):
-    
-    k = int(pct/100 * module.numel())
-    xr = module.reshape(1,-1)
-    xr_grad = module.grad.reshape(1,-1)
-    xr_abs = torch.abs(xr)
-    s, inds = torch.topk(xr_abs, k, sorted=False)
-    xr_grad[:,inds] = 0.
-    res = xr_grad.reshape(module.shape)
-
-    module.grad = res.detach()
-
-
-# def k_grad(module, pct):
-    
-#     k = int(pct/100 * module.numel())
-#     xr = module.grad.reshape(1,-1)
-#     xr_abs = torch.abs(xr)
-#     # s, inds = torch.topk(xr_abs, k, sorted=False)
-#     s, inds = torch.sort(xr_abs, dim=1)
-#     xr[:,inds[k:-k]] *= 2
-#     xr[:,inds[:-k]] = 0.
-#     res = xr.reshape(module.grad.shape)
-#     # res = torch.zeros_like(xr)
-#     # res.scatter_(1,inds,xr.gather(1,inds))
-#     # res = res.reshape(module.grad.shape)
-    
-#     module.grad = res.detach()
 
 def train_multi_model(
     model,
@@ -45,7 +33,6 @@ def train_multi_model(
     optimizer,
     device,
     freeze_params,
-    freeze_grad,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
@@ -134,15 +121,6 @@ def train_multi_model(
                     param_module = param[0]
                     param_indices = param[1]
                     param_module.grad[param_indices, :] = 0.0
-                # print(torch.mean(param_module.grad[param_indices,:]))
-        
-        if freeze_grad:
-            with torch.no_grad():
-                for w in list(model.parameters())[:-1]:
-                    try:
-                        k_grad(w, 7)
-                    except:
-                        pass
 
         t3 = time.time()
         optimizer.step()
@@ -160,6 +138,7 @@ def train_multi_model(
     if progress_bar is not None:
         loader.n = loader.total
         loader.close()
+
 
 def train_model(
     model,
@@ -265,8 +244,9 @@ def train_model(
         loader.n = loader.total
         loader.close()
 
+
 def unravel_index(index, shape):
-    """stole from 
+    """stole from
     https://github.com/pytorch/pytorch/blob/master/torch/testing/__init__.py
     """
     res = []
