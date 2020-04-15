@@ -42,7 +42,6 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_optimizer,
     create_train_dataloader,
     create_validation_dataloader,
-    get_free_port
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
@@ -526,4 +525,5 @@ class ImagenetExperiment:
 
     def get_free_port(self):
         """Returns free TCP port in the current ray node"""
-        return get_free_port()
+        return ray_utils.find_free_port()
+
