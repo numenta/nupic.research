@@ -227,10 +227,11 @@ def create_optimizer(model, optimizer_class, optimizer_args,
             group_no_decay.append(param)
         else:
             group_decay.append(param)
-    model_params = [dict(params=group_decay), 
+    model_params = [dict(params=group_decay),
                     dict(params=group_no_decay, weight_decay=.0)]
-        
+
     return optimizer_class(model_params, **optimizer_args)
+
 
 def create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
                         steps_per_epoch):
@@ -336,6 +337,7 @@ def create_model(model_class, model_args, init_batch_norm, device,
             model = hook(model, **kwargs) or model
 
     return model
+
 
 def get_free_port():
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:

@@ -21,7 +21,7 @@
 
 # adapted from https://github.com/meliketoy/wide-resnet.pytorch/
 
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict, namedtuple
 
 import torch.nn as nn
 
@@ -227,7 +227,7 @@ class BasicBlock(nn.Module):
         super(BasicBlock, self).__init__()
 
         self.regular_path = nn.Sequential(OrderedDict([
-            ('conv1', conv_layer(
+            ("conv1", conv_layer(
                 "3x3",
                 in_planes,
                 planes,
@@ -235,23 +235,23 @@ class BasicBlock(nn.Module):
                 sparse_weights_type=sparse_weights_type,
                 stride=stride,
             )),
-            ('bn1', nn.BatchNorm2d(planes)),
-            ('act1', activation_layer(
+            ("bn1", nn.BatchNorm2d(planes)),
+            ("act1", activation_layer(
                 planes, layer_params["conv3x3_1"], base_activation=base_activation)),
-            ('conv2', conv_layer(
+            ("conv2", conv_layer(
                 "3x3",
                 planes,
                 planes,
                 layer_params["conv3x3_2"],
                 sparse_weights_type=sparse_weights_type,
             )),
-            ('bn2', nn.BatchNorm2d(planes)),
+            ("bn2", nn.BatchNorm2d(planes)),
         ]))
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(OrderedDict([
-                ('conv', conv_layer(
+                ("conv", conv_layer(
                     "1x1",
                     in_planes,
                     planes,
@@ -259,7 +259,7 @@ class BasicBlock(nn.Module):
                     sparse_weights_type=sparse_weights_type,
                     stride=stride,
                 )),
-                ('bn', nn.BatchNorm2d(planes)),
+                ("bn", nn.BatchNorm2d(planes)),
             ]))
 
         self.post_activation = activation_layer(
@@ -284,20 +284,20 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.regular_path = nn.Sequential(OrderedDict([
             # 1st layer
-            ('conv1', conv_layer(
+            ("conv1", conv_layer(
                 "1x1",
                 in_planes,
                 planes,
                 layer_params["conv1x1_1"],
                 sparse_weights_type=sparse_weights_type,
             )),
-            ('bn1', nn.BatchNorm2d(planes)),
-            ('act1', activation_layer(
+            ("bn1", nn.BatchNorm2d(planes)),
+            ("act1", activation_layer(
                 planes, layer_params["conv1x1_1"],
                 kernel_size=1, base_activation=base_activation
             )),
             # 2nd layer
-            ('conv2', conv_layer(
+            ("conv2", conv_layer(
                 "3x3",
                 planes,
                 planes,
@@ -305,26 +305,26 @@ class Bottleneck(nn.Module):
                 sparse_weights_type=sparse_weights_type,
                 stride=stride,
             )),
-            ('bn2', nn.BatchNorm2d(planes)),
-            ('act2', activation_layer(
+            ("bn2", nn.BatchNorm2d(planes)),
+            ("act2", activation_layer(
                 planes, layer_params["conv3x3_2"],
                 kernel_size=3, base_activation=base_activation
             )),
             # 3rd layer
-            ('conv3', conv_layer(
+            ("conv3", conv_layer(
                 "1x1",
                 planes,
                 self.expansion * planes,
                 layer_params["conv1x1_3"],
                 sparse_weights_type=sparse_weights_type,
             )),
-            ('bn3', nn.BatchNorm2d(self.expansion * planes)),
+            ("bn3", nn.BatchNorm2d(self.expansion * planes)),
         ]))
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(OrderedDict([
-                ('conv', conv_layer(
+                ("conv", conv_layer(
                     "1x1",
                     in_planes,
                     self.expansion * planes,
@@ -332,7 +332,7 @@ class Bottleneck(nn.Module):
                     sparse_weights_type=sparse_weights_type,
                     stride=stride,
                 )),
-                ('bn', nn.BatchNorm2d(self.expansion * planes)),
+                ("bn", nn.BatchNorm2d(self.expansion * planes)),
             ]))
 
         self.post_activation = activation_layer(
@@ -419,7 +419,7 @@ class ResNet(nn.Module):
 
         self.features = nn.Sequential(OrderedDict([
             # stem
-            ('stem', conv_layer(
+            ("stem", conv_layer(
                 "7x7",
                 3,
                 64,
@@ -427,26 +427,26 @@ class ResNet(nn.Module):
                 sparse_weights_type=self.conv_sparse_weights_type,
                 stride=2,
             )),
-            ('bn_stem', nn.BatchNorm2d(64)),
-            ('act_stem', activation_layer(
+            ("bn_stem", nn.BatchNorm2d(64)),
+            ("act_stem", activation_layer(
                 64, self.sparse_params["stem"],
                 kernel_size=7, base_activation=self.base_activation)),
-            ('pool_stem', nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
+            ("pool_stem", nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
             # groups 1 to 4
-            ('group1', self._make_group(
+            ("group1", self._make_group(
                 block, 64, num_blocks[0], self.sparse_params["filters64"], stride=1
             )),
-            ('group2', self._make_group(
+            ("group2", self._make_group(
                 block, 128, num_blocks[1], self.sparse_params["filters128"], stride=2
             )),
-            ('group3', self._make_group(
+            ("group3", self._make_group(
                 block, 256, num_blocks[2], self.sparse_params["filters256"], stride=2
             )),
-            ('group4', self._make_group(
+            ("group4", self._make_group(
                 block, 512, num_blocks[3], self.sparse_params["filters512"], stride=2
             )),
-            ('avg_pool', nn.AdaptiveAvgPool2d(1)),
-            ('flatten', Flatten()),
+            ("avg_pool", nn.AdaptiveAvgPool2d(1)),
+            ("flatten", Flatten()),
         ]))
 
         # last output layer

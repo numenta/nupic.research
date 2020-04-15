@@ -53,22 +53,28 @@ warnings.filterwarnings("ignore")
 def mean_and_std(s):
     return "{:.3f} ± {:.3f}".format(s.mean(), s.std())
 
+
 def round_mean(s):
     return "{:.0f}".format(round(s.mean()))
 
-stats = ['min', 'max', 'mean', 'std']
 
-def agg(df, columns, metric='mean_accuracy_max', filter=None, round=3):
-    if filter is None:
-        return (df.groupby(columns)
-             .agg({f"{metric}_epoch": round_mean,
-                   metric: stats,                
-                   'seed': ['count']})).round(round)
+stats = ["min", "max", "mean", "std"]
+
+
+def agg(df, columns, metric="mean_accuracy_max", filter_by=None, decimals=3):
+    if filter_by is None:
+        return (
+            df.groupby(columns).agg(
+                {f"{metric}_epoch": round_mean, metric: stats, "seed": ["count"]}
+            )
+        ).round(decimals)
     else:
-        return (df[filter].groupby(columns)
-             .agg({f"{metric}_epoch": round_mean,
-                   metric: stats,                
-                   'seed': ['count']})).round(round)
+        return (
+            df[filter_by]
+            .groupby(columns)
+            .agg({f"{metric}_epoch": round_mean, metric: stats, "seed": ["count"]})
+        ).round(decimals)
+
 
 # ---------
 # Utils
@@ -137,8 +143,9 @@ def unpickle_within_dataframe(df, conditions):
 # ---------------------------
 
 
-def load(experiment_path, performance_metrics=None, raw_metrics=None,
-    required_epochs=None):
+def load(
+    experiment_path, performance_metrics=None, raw_metrics=None, required_epochs=None
+):
     """Load a single experiment into a dataframe"""
     experiment_path = os.path.expanduser(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
@@ -146,32 +153,42 @@ def load(experiment_path, performance_metrics=None, raw_metrics=None,
     # run once per experiment state
     # columns might differ between experiments
     dataframes = []
-    idx =0
+    idx = 0
     for exp_state, exp_name in experiment_states:
         progress, params = _read_experiment(exp_state, experiment_path)
-        idx=10
+        idx = 10
         if len(progress) != 0 and idx > 3:
             # print(len(progress))
             # print(progress)
             # import pdb; pdb.set_trace()
             # break
-            dataframes.append(_get_value(progress, params, exp_name, 
-                performance_metrics, raw_metrics=raw_metrics, 
-                required_epochs=required_epochs))
+            dataframes.append(
+                _get_value(
+                    progress,
+                    params,
+                    exp_name,
+                    performance_metrics,
+                    raw_metrics=raw_metrics,
+                    required_epochs=required_epochs,
+                )
+            )
 
     # concats all dataframes if there are any and return
     if not dataframes:
         return pd.DataFrame([])
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
-def load_many(experiment_paths, performance_metrics=None, raw_metrics=None,
-    required_epochs=None):
+
+def load_many(
+    experiment_paths, performance_metrics=None, raw_metrics=None, required_epochs=None
+):
     """Load several experiments into a single dataframe"""
     dataframes = [
-        load(path, performance_metrics, raw_metrics, required_epochs) 
+        load(path, performance_metrics, raw_metrics, required_epochs)
         for path in experiment_paths
     ]
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
+
 
 def _read_experiment(experiment_state, experiment_path):
     checkpoint_dicts = experiment_state["checkpoints"]
@@ -202,7 +219,8 @@ def _read_experiment(experiment_state, experiment_path):
     # import pdb; pdb.set_trace()
     return progress, params
 
-def _get_value(
+
+def _get_value(  # noqa: C901
     progress,
     params,
     exp_name,
@@ -210,7 +228,7 @@ def _get_value(
     full_metrics=None,
     raw_metrics=None,
     exp_substring="",
-    required_epochs=None
+    required_epochs=None,
 ):
     """
     For every experiment whose name matches exp_substring, scan the history
