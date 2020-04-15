@@ -45,6 +45,32 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 # ---------
+# Panda Utils
+# ---------
+
+
+# helper functions
+def mean_and_std(s):
+    return "{:.3f} ± {:.3f}".format(s.mean(), s.std())
+
+def round_mean(s):
+    return "{:.0f}".format(round(s.mean()))
+
+stats = ['min', 'max', 'mean', 'std']
+
+def agg(df, columns, metric='mean_accuracy_max', filter=None, round=3):
+    if filter is None:
+        return (df.groupby(columns)
+             .agg({f"{metric}_epoch": round_mean,
+                   metric: stats,                
+                   'seed': ['count']})).round(round)
+    else:
+        return (df[filter].groupby(columns)
+             .agg({f"{metric}_epoch": round_mean,
+                   metric: stats,                
+                   'seed': ['count']})).round(round)
+
+# ---------
 # Utils
 # ---------
 
