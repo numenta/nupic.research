@@ -19,8 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import torch
-
 
 class Regularize(object):
     def __init__(self, reg_schedule=None, downscale_reg_with_training_set=False,
@@ -48,13 +46,20 @@ class Regularize(object):
             self.reg_weight = reg_schedule[0]
 
     def _regularization(self):
-        reg = torch.tensor(0.).to(self.device)
+        reg = None  # Perform accumulation on the device.
         for layer in self.network.modules():
             if hasattr(layer, "regularization"):
-                reg += layer.regularization()
-        return (self.reg_weight
-                * self.reg_coefficient
-                * reg)
+                if reg is None:
+                    reg = layer.regularization()
+                else:
+                    reg += layer.regularization()
+
+        if reg is None:
+            return 0
+        else:
+            return (self.reg_weight
+                    * self.reg_coefficient
+                    * reg)
 
     def run_epoch(self, iteration):
         if iteration in self.reg_schedule:
