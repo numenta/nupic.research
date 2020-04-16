@@ -36,7 +36,8 @@ class Supervised(object):
                  optim_class=None, optim_args=None,
                  lr_scheduler_class=None, lr_scheduler_args=None,
                  lr_step_every_batch=False,
-                 use_tqdm=False, tqdm_mininterval=None):
+                 use_tqdm=False, tqdm_mininterval=None,
+                 parallel=False):
         self.logdir = logdir
 
         (self.batch_size_train_first_epoch,
@@ -52,7 +53,7 @@ class Supervised(object):
         self.network = network_class(**network_args)
         self.network.to(self.device)
 
-        if torch.cuda.device_count() > 1:
+        if parallel and torch.cuda.device_count() > 1:
             self.network = nn.DataParallel(self.network)
 
         self.dataset_manager = dataset_class(**dataset_args)
@@ -130,10 +131,6 @@ class Supervised(object):
         else:
             batches = train_loader
 
-        train_loss = 0.
-        train_correct = 0.
-        num_train_batches = 0
-
         for data, target in batches:
             data, target = data.to(self.device), target.to(self.device)
             output = self.network(data)
@@ -147,19 +144,11 @@ class Supervised(object):
             if self.lr_scheduler is not None and self.lr_step_every_batch:
                 self.lr_scheduler.step()
 
-            with torch.no_grad():
-                train_loss += loss.item()
-                pred = output.argmax(dim=1, keepdim=True)
-                train_correct += pred.eq(target.view_as(pred)).sum().item()
-                num_train_batches += 1
-
         if self.lr_scheduler is not None and not self.lr_step_every_batch:
             self.lr_scheduler.step()
         self._after_train_epoch(iteration)
 
         result = {
-            "mean_train_accuracy": train_correct / len(train_loader.dataset),
-            "mean_training_loss": train_loss / num_train_batches,
             "lr": self.optimizer.param_groups[0]["lr"],
             "done": iteration + 1 >= self.training_iterations,
         }
