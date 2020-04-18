@@ -38,10 +38,12 @@ from torch.optim.lr_scheduler import OneCycleLR
 
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
-    create_model,
     create_optimizer,
     create_train_dataloader,
     create_validation_dataloader,
+)
+from nupic.research.frameworks.pytorch.imagenet.network_utils import (
+    create_model_from_config,
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
@@ -206,18 +208,7 @@ class ImagenetExperiment:
             self.progress = self.progress and self.rank == 0
 
         # Configure model
-        model_class = config["model_class"]
-        model_args = config.get("model_args", {})
-        init_batch_norm = config.get("init_batch_norm", False)
-        init_hooks = config.get("init_hooks", None)
-        self.model = create_model(
-            model_class=model_class,
-            model_args=model_args,
-            init_batch_norm=init_batch_norm,
-            device=self.device,
-            init_hooks=init_hooks,
-            checkpoint_file=config.get("checkpoint_file", None)
-        )
+        self.model = create_model_from_config(config, self.device)
         if self.rank == 0:
             self.logger.debug(self.model)
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(self.model)
