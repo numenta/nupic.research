@@ -208,7 +208,6 @@ class ImagenetExperiment:
             self.progress = self.progress and self.rank == 0
 
         # Configure model
-        config["checkpoint_file"] = config.get("checkpoint_file", None)
         self.model = create_model_from_config(config, self.device)
         if self.rank == 0:
             self.logger.debug(self.model)
