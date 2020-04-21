@@ -122,6 +122,7 @@ def load_multi_state(
     restore_linear=None,
     restore_nonlinear=None,
     strict=True,
+    include_buffers=True,
     param_map=None,
 ):
     """
@@ -176,8 +177,8 @@ def load_multi_state(
         return model
 
     # Case 2: Use separate sources for Linear and Non-Linear states.
-    linear_params = get_linear_param_names(model)
-    nonlinear_params = get_nonlinear_param_names(model)
+    linear_params = get_linear_param_names(model, include_buffers=include_buffers)
+    nonlinear_params = get_nonlinear_param_names(model, include_buffers=include_buffers)
 
     # Case 2a:  Linear param states
     linear_state = dict()
