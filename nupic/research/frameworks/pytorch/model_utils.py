@@ -35,6 +35,7 @@ def train_model(
     loader,
     optimizer,
     device,
+    freeze_params=None,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
@@ -55,6 +56,10 @@ def train_model(
     :param batches_in_epoch: Max number of mini batches to train.
     :param device: device to use ('cpu' or 'cuda')
     :type device: :class:`torch.device
+    :param freeze_params: Parameters to freeze at specified indices
+     - freeze_params[0] -> network module
+     - freeze_params[1] -> weight indices
+    :type param: list or tuple
     :param criterion: loss function to use
     :type criterion: function
     :param post_batch_callback: Callback function to be called after every batch
@@ -115,6 +120,13 @@ def train_model(
                 scaled_loss.backward()
         else:
             loss.backward()
+
+        if len(freeze_params) > 0:
+            with torch.no_grad():
+                for param in freeze_params:
+                    param_module = param[0]
+                    param_indices = param[1]
+                    param_module.grad[param_indices, :] = 0.0
 
         t3 = time.time()
         optimizer.step()
