@@ -32,7 +32,7 @@ import pandas as pd
 import seaborn as sns
 from ray.tune.logger import CSVLogger, JsonLogger, Logger
 from ray.tune.result import TIME_TOTAL_S, TIMESTEPS_TOTAL, TRAINING_ITERATION
-from ray.tune.util import flatten_dict
+from ray.tune.utils import flatten_dict
 
 logger = logging.getLogger(__name__)
 
@@ -181,21 +181,12 @@ class TFLoggerPlus(Logger):
 
         # Copy and remove extraneous results.
         result = result.copy()
-        for k in ["config", "pid", "timestamp", TIME_TOTAL_S, TRAINING_ITERATION]:
+        for k in ["config", "pid", "timestamp", TIME_TOTAL_S]:
             if k in result:
                 del result[k]  # not useful to tf log these
 
-        # Get and record training iteration (i.e. step).
-        step = result[TRAINING_ITERATION] or result.get(TIMESTEPS_TOTAL)
-        with self._file_writer.as_default():
-            record_tf_values(
-                result={"training_iteration": step},
-                path=["ray", "tune"],
-                step=step
-            )
-            self.flush()
-
         # Record results.
+        step = result[TRAINING_ITERATION]
         with self._file_writer.as_default():
             record_tf_values(
                 result=result,
