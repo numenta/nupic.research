@@ -122,6 +122,8 @@ class ImagenetExperiment:
                               constructor
             - batch_norm_weight_decay: Whether or not to apply weight decay to
                                        batch norm modules parameters
+            - bias_weight_decay: Whether or not to apply weight decay to
+                                       bias parameters
             - lr_scheduler_class: Learning rate scheduler class.
                                  Must inherit from "_LRScheduler"
             - lr_scheduler_args: Learning rate scheduler class class arguments

@@ -28,6 +28,7 @@ import h5py
 import torch
 import torch.nn as nn
 import torchvision.models.resnet
+from torch.nn.modules.batchnorm import _BatchNorm
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DistributedSampler
 from torchvision import transforms
@@ -217,11 +218,18 @@ def create_optimizer(model, optimizer_class, optimizer_args,
     :return: Configured optimizer
     """
 
+    # get pointers to batch norm layers, don't rely on name
+    bn_param_ptrs = set()
+    for m in model.modules():
+        if isinstance(m, _BatchNorm):
+            bn_param_ptrs.add(m.weight.data_ptr())
+            bn_param_ptrs.add(m.bias.data_ptr())
+
     group_decay, group_no_decay = [], []
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        if ".bn" in name and not batch_norm_weight_decay:
+        if param.data_ptr() in bn_param_ptrs and not batch_norm_weight_decay:
             group_no_decay.append(param)
         elif ".bias" in name and not bias_weight_decay:
             group_no_decay.append(param)
