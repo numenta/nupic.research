@@ -193,7 +193,7 @@ def split_dataset(dataset, groupby):
 
 
 class PreprocessedDataset(Dataset):
-    def __init__(self, cachefilepath, basename, qualifiers):
+    def __init__(self, cachefilepath, basename, qualifiers, transform=None):
         """
         A Pytorch Dataset class representing a pre-generated processed dataset stored in
         an efficient compressed numpy format (.npz). The dataset is represented by
@@ -216,9 +216,15 @@ class PreprocessedDataset(Dataset):
         self.num_cycle = itertools.cycle(qualifiers)
         self.tensors = []
         self.load_next()
+        self.transform = transform
 
     def __getitem__(self, index):
-        return tuple(tensor[index] for tensor in self.tensors)
+        samples = tuple(tensor[index] for tensor in self.tensors)
+
+        if self.transform:
+            return self.transform(list(samples))
+        else:
+            return samples
 
     def __len__(self):
         return len(self.tensors[0])
