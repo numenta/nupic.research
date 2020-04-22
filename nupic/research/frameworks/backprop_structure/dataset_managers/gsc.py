@@ -35,7 +35,9 @@ def dataset_from_npz(filepath):
 
 class PreprocessedGSC(object):
     def __init__(self):
-        self.folder = Path(os.path.expanduser("~/nta/datasets/gsc"))
+        self.folder = Path(
+            os.path.expanduser("~/nta/data/gsc/gsc_preprocessed")
+        )
         matches = [re.search(r"gsc_train(\d+).npz", filename)
                    for filename in os.listdir(self.folder)]
         self.seeds = [int(match.group(1))
