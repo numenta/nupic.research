@@ -143,6 +143,9 @@ class ImagenetExperiment:
             - mixed_precision: Whether or not to enable apex mixed precision
             - mixed_precision_args: apex mixed precision arguments.
                                     See "amp.initialize"
+            - sample_transform: Transform acting on the training samples. To be used
+                                additively after default transform or auto-augment.
+            - target_transform: Transform acting on the training targets.
             - create_train_dataloader: Optional user defined function to create
                                        the training data loader. See below for
                                        input params.
@@ -272,6 +275,8 @@ class ImagenetExperiment:
             multiprocessing.set_start_method("spawn")
 
         # Configure Training data loader
+        sample_transform = config.get("sample_transform", None)
+        target_transform = config.get("target_transform", None)
         self.create_train_dataloader = config.get(
             "create_train_dataloader", create_train_dataloader)
         self.train_loader = self.create_train_dataloader(
@@ -282,6 +287,8 @@ class ImagenetExperiment:
             distributed=self.distributed,
             num_classes=num_classes,
             use_auto_augment=config.get("use_auto_augment", False),
+            sample_transform=sample_transform,  # will be used additively w/ auto-aug
+            target_transform=target_transform,
         )
         self.total_batches = len(self.train_loader)
 
