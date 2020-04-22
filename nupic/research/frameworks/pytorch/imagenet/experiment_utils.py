@@ -18,8 +18,6 @@
 #  http://numenta.org/licenses/
 #
 import copy
-import io
-import itertools
 import os
 import socket
 from contextlib import closing
