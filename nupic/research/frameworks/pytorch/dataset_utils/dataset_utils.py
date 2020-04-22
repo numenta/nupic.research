@@ -210,6 +210,8 @@ class PreprocessedDataset(Dataset):
 
         :param qualifiers: List of qualifiers for each preprocessed files in this
         dataset.
+
+        :param transform: transform to apply to dataset tensors (torchvision.transform)
         """
         self.path = cachefilepath
         self.basename = basename
