@@ -56,9 +56,10 @@ def train_model(
     :param batches_in_epoch: Max number of mini batches to train.
     :param device: device to use ('cpu' or 'cuda')
     :type device: :class:`torch.device
-    :param freeze_params: Parameters to freeze at specified indices
-     - freeze_params[0] -> network module
-     - freeze_params[1] -> weight indices
+    :param freeze_params: List of parameters to freeze at specified indices
+     For each parameter in the list:
+     - parameter[0] -> network module
+     - parameter[1] -> weight indices
     :type param: list or tuple
     :param criterion: loss function to use
     :type criterion: function
@@ -121,7 +122,7 @@ def train_model(
         else:
             loss.backward()
 
-        if len(freeze_params) > 0:
+        if freeze_params is not None:
             with torch.no_grad():
                 for param in freeze_params:
                     param_module = param[0]
