@@ -294,6 +294,10 @@ def run(config):
     if "sigopt_config" in config:
         kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
                                          *tune.run.__defaults__]))
+    elif "imagenet_trainable" in config:
+        imagenet_trainable = config["imagenet_trainable"]
+        assert isinstance(imagenet_trainable, ImagenetTrainable)
+        kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
     else:
         kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
 

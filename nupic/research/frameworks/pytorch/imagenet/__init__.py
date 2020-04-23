@@ -19,5 +19,6 @@
 #
 
 from .imagenet_experiment import ImagenetExperiment
+from .imagenet_tune import ImagenetTrainable
 from .auto_augment import ImageNetPolicy
 
