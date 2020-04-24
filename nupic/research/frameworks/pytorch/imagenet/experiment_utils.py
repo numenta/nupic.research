@@ -117,7 +117,7 @@ def create_train_dataloader(
         )
 
     transform = transforms.Compose(
-        transforms=transform + (sample_transform or []))
+        transforms=[transform] + (sample_transform or []))
     target_transform = target_transform
 
     if h5py.is_hdf5(data_dir):
