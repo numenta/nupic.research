@@ -124,6 +124,8 @@ class ImagenetExperiment:
                               constructor
             - batch_norm_weight_decay: Whether or not to apply weight decay to
                                        batch norm modules parameters
+            - bias_weight_decay: Whether or not to apply weight decay to
+                                       bias parameters
             - lr_scheduler_class: Learning rate scheduler class.
                                  Must inherit from "_LRScheduler"
             - lr_scheduler_args: Learning rate scheduler class class arguments
@@ -223,11 +225,13 @@ class ImagenetExperiment:
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
         batch_norm_weight_decay = config.get("batch_norm_weight_decay", True)
+        bias_weight_decay = config.get("bias_weight_decay", True)
         self.optimizer = create_optimizer(
             model=self.model,
             optimizer_class=optimizer_class,
             optimizer_args=optimizer_args,
             batch_norm_weight_decay=batch_norm_weight_decay,
+            bias_weight_decay=bias_weight_decay,
         )
 
         # Validate mixed precision requirements
