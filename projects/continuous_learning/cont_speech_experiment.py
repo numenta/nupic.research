@@ -231,7 +231,14 @@ class ContinuousSpeechExperiment(object):
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def train(self, epoch, training_classes, indices=None):
+    def train(self,
+              epoch,
+              training_classes,
+              freeze_params=None,
+              freeze_fun=None,
+              freeze_pct=90,
+              freeze_output=False,
+              output_indices=None):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
@@ -250,12 +257,13 @@ class ContinuousSpeechExperiment(object):
         f = self.combine_classes(training_classes)
         self.pre_epoch()
 
-        fparams = []
-        if self.freeze_params == "output":
-            fparams.append([self.model.linear2.module.weight, indices])
-
+        # fparams = []
+        # if self.freeze_params == "output":
+        #     fparams.append([self.model.linear2.module.weight, indices])
         train_model(self.model, self.train_loader, self.optimizer, self.device,
-                    freeze_params=fparams,
+                    freeze_params=freeze_params, freeze_fun=freeze_fun,
+                    freeze_pct=freeze_pct, freeze_output=freeze_output,
+                    duty_cycles=self.get_duty_cycles(), output_indices=output_indices,
                     batches_in_epoch=self.batches_in_epoch)
 
         self.post_epoch()
@@ -274,6 +282,13 @@ class ContinuousSpeechExperiment(object):
 
     def pre_epoch(self):
         self.model.apply(update_boost_strength)
+
+    def get_duty_cycles(self):
+        dc_dictionary = {k[0]: k[1].duty_cycle
+                         for k in self.model.named_children()
+                         if "duty_cycle" in k[1].state_dict()}
+
+        return dc_dictionary
 
     def test_class(self, class_, test_loader=None):
         """Test the model using the given loader and return test metrics."""

@@ -36,6 +36,11 @@ def train_model(
     optimizer,
     device,
     freeze_params=None,
+    freeze_fun=None,
+    freeze_pct=90,
+    freeze_output=True,
+    output_indices=None,
+    duty_cycles=None,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
@@ -98,6 +103,7 @@ def train_model(
                 "Please install apex from https://www.github.com/nvidia/apex")
 
     t0 = time.time()
+
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
@@ -123,15 +129,15 @@ def train_model(
             loss.backward()
 
         if freeze_params is not None:
-            with torch.no_grad():
-                for param in freeze_params:
-                    param_module = param[0]
-                    param_indices = param[1]
-                    param_module.grad[param_indices, :] = 0.0
+            freeze_fun(model, freeze_params, duty_cycles, freeze_pct)
+
+        if freeze_output:
+            freeze_output_layer(model, output_indices)
 
         t3 = time.time()
         optimizer.step()
         t4 = time.time()
+        # print(torch.mean(model.output.weight.grad.data[3,:]))
 
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
@@ -266,3 +272,9 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
+
+
+def freeze_output_layer(model, indices):
+    with torch.no_grad():
+        [model.output.weight.grad.data[index, :].fill_(0.0) for index in indices]
+        [model.output.bias.grad.data[index].fill_(0.0) for index in indices]
