@@ -28,6 +28,7 @@ from torch import nn as nn
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
+from nupic.torch.modules import rezero_weights
 
 
 def init_resnet50_batch_norm(model):
@@ -92,6 +93,9 @@ def create_model(model_class, model_args, init_batch_norm, device,
     elif init_hooks:
         for hook, kwargs in init_hooks:
             model = hook(model, **kwargs) or model
+
+    # Some initialization strategies can destroy sparsity, so we call rezero here
+    model.apply(rezero_weights)
 
     return model
 

@@ -47,7 +47,6 @@ class SequentialSearch(SearchOption):
                          used if argument to be updated is in an nested dictionary.
                          k1 is the key for the outer dict, and k2 for the inner dict
         """
-
         if index >= len(self.elements):
             raise ValueError(
                 "Number of elements in SequentialSearch shorter "
