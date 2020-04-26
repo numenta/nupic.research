@@ -18,29 +18,24 @@
 #  http://numenta.org/licenses/
 #
 import copy
-import io
 import os
-import pickle
 import socket
 from contextlib import closing
 
 import h5py
 import torch
-import torch.nn as nn
-import torchvision.models.resnet
+from torch.nn.modules.batchnorm import _BatchNorm
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DistributedSampler
 from torchvision import transforms
 from torchvision.transforms import RandomResizedCrop
 
-import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.dataset_utils import (
     CachedDatasetFolder,
     HDF5Dataset,
     MaxupDataset
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
-from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
 
 from .auto_augment import ImageNetPolicy
 
@@ -221,11 +216,18 @@ def create_optimizer(model, optimizer_class, optimizer_args,
     :return: Configured optimizer
     """
 
+    # get pointers to batch norm layers, don't rely on name
+    bn_param_ptrs = set()
+    for m in model.modules():
+        if isinstance(m, _BatchNorm):
+            bn_param_ptrs.add(m.weight.data_ptr())
+            bn_param_ptrs.add(m.bias.data_ptr())
+
     group_decay, group_no_decay = [], []
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        if ".bn" in name and not batch_norm_weight_decay:
+        if param.data_ptr() in bn_param_ptrs and not batch_norm_weight_decay:
             group_no_decay.append(param)
         elif ".bias" in name and not bias_weight_decay:
             group_no_decay.append(param)
@@ -275,72 +277,6 @@ def create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
         lr_scheduler_args["steps_per_epoch"] = steps_per_epoch
 
     return lr_scheduler_class(optimizer, **lr_scheduler_args)
-
-
-def init_resnet50_batch_norm(model):
-    """
-    Initialize ResNet50 batch norm modules
-    See https://arxiv.org/pdf/1706.02677.pdf
-
-    :param model: Resnet 50 model
-    """
-    for m in model.modules():
-        if isinstance(m, torchvision.models.resnet.BasicBlock):
-            # initialized the last BatchNorm in each BasicBlock to 0
-            m.bn2.weight = nn.Parameter(torch.zeros_like(m.bn2.weight))
-        elif isinstance(m, torchvision.models.resnet.Bottleneck):
-            # initialized the last BatchNorm in each Bottleneck to 0
-            m.bn3.weight = nn.Parameter(torch.zeros_like(m.bn3.weight))
-        elif isinstance(m, (
-            nupic.research.frameworks.pytorch.models.resnets.BasicBlock,
-            nupic.research.frameworks.pytorch.models.resnets.Bottleneck
-        )):
-            # initialized the last BatchNorm in each BasicBlock to 0
-            *_, last_bn = filter(lambda x: isinstance(x, nn.BatchNorm2d),
-                                 m.regular_path)
-            last_bn.weight = nn.Parameter(torch.zeros_like(last_bn.weight))
-        elif isinstance(m, nn.Linear):
-            # initialized linear layers weights from a gaussian distribution
-            m.weight.data.normal_(0, 0.01)
-
-
-def create_model(model_class, model_args, init_batch_norm, device,
-                 checkpoint_file=None, init_hooks=None):
-    """
-    Create imagenet experiment model with option to load state from checkpoint
-
-    :param model_class:
-            The model class. Must inherit from torch.nn.Module
-    :param model_args:
-        The model constructor arguments
-    :param init_batch_norm:
-        Whether or not to initialize batch norm modules
-    :param device:
-        Model device
-    :param checkpoint_file:
-        Optional checkpoint file to load model state
-
-    :return: Configured model
-    """
-    model = model_class(**model_args)
-    if init_batch_norm:
-        init_resnet50_batch_norm(model)
-    model.to(device)
-
-    # Load model parameters from checkpoint
-    if checkpoint_file is not None:
-        with open(checkpoint_file, "rb") as pickle_file:
-            state = pickle.load(pickle_file)
-        with io.BytesIO(state["model"]) as buffer:
-            state_dict = deserialize_state_dict(buffer, device)
-        model.load_state_dict(state_dict)
-
-    # Modify init via hooks.
-    elif init_hooks:
-        for hook, kwargs in init_hooks:
-            model = hook(model, **kwargs) or model
-
-    return model
 
 
 def get_free_port():

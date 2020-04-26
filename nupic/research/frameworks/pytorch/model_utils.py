@@ -36,6 +36,7 @@ def train_model(
     optimizer,
     device,
     maxup_num_images,
+    freeze_params=None,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
@@ -56,6 +57,11 @@ def train_model(
     :param batches_in_epoch: Max number of mini batches to train.
     :param device: device to use ('cpu' or 'cuda')
     :type device: :class:`torch.device
+    :param freeze_params: List of parameters to freeze at specified indices
+     For each parameter in the list:
+     - parameter[0] -> network module
+     - parameter[1] -> weight indices
+    :type param: list or tuple
     :param criterion: loss function to use
     :type criterion: function
     :param post_batch_callback: Callback function to be called after every batch
@@ -140,6 +146,13 @@ def train_model(
         else:
             loss.backward()
 
+        if freeze_params is not None:
+            with torch.no_grad():
+                for param in freeze_params:
+                    param_module = param[0]
+                    param_indices = param[1]
+                    param_module.grad[param_indices, :] = 0.0
+
         t3 = time.time()
         optimizer.step()
         t4 = time.time()
@@ -165,6 +178,7 @@ def evaluate_model(
     batches_in_epoch=sys.maxsize,
     criterion=F.nll_loss,
     progress=None,
+    post_batch_callback=None,
 ):
     """Evaluate pre-trained model using given test dataset loader.
 
@@ -180,6 +194,9 @@ def evaluate_model(
     :type criterion: function
     :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
     :type progress: dict or None
+    :param post_batch_callback: Callback function to be called after every batch
+                                with the following parameters:
+                                batch_idx, target, output, pred
 
     :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
     :rtype: dict
@@ -205,6 +222,10 @@ def evaluate_model(
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum().item()
             total += len(data)
+
+            if post_batch_callback is not None:
+                post_batch_callback(batch_idx=batch_idx, target=target, output=output,
+                                    pred=pred)
 
     if progress is not None:
         loader.close()

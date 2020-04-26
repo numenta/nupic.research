@@ -153,15 +153,9 @@ def load(
     # run once per experiment state
     # columns might differ between experiments
     dataframes = []
-    idx = 0
     for exp_state, exp_name in experiment_states:
         progress, params = _read_experiment(exp_state, experiment_path)
-        idx = 10
-        if len(progress) != 0 and idx > 3:
-            # print(len(progress))
-            # print(progress)
-            # import pdb; pdb.set_trace()
-            # break
+        if len(progress) != 0:
             dataframes.append(
                 _get_value(
                     progress,
@@ -216,7 +210,6 @@ def _read_experiment(experiment_state, experiment_path):
             with open(params_file) as f:
                 params[exp_tag] = json.load(f)
 
-    # import pdb; pdb.set_trace()
     return progress, params
 
 
