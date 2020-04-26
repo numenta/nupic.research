@@ -35,6 +35,7 @@ def train_model(
     loader,
     optimizer,
     device,
+    maxup_num_images,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
@@ -92,14 +93,37 @@ def train_model(
                 "Please install apex from https://www.github.com/nvidia/apex")
 
     t0 = time.time()
-    for batch_idx, (data, target) in enumerate(loader):
+    for batch_idx, (samples, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
 
         num_images = len(target)
-        data = data.to(device, non_blocking=async_gpu)
         target = target.to(device, non_blocking=async_gpu)
+
+
+        # try loading all into GPU - will it fit?
+        samples = samples.to(device, non_blocking=async_gpu)
         t1 = time.time()
+
+        # calculate loss for all the tranformed versions of the image
+        losses = []
+        for dim in range(maxup_num_images):
+            # each data is actually a 5d tensor, not a 4d.
+            # the second dimension is the one I have to unroll
+            data = samples[:, dim, :, :, :]
+            # data = data.to(device, non_blocking=async_gpu)
+
+            # need to calculate loss with no grad
+            with torch.no_grad():
+                output = model(data)
+                losses.append(criterion(output, target).item())
+
+        # get the image which shows the greatest loss
+        max_loss_dim = np.argmax(losses)
+
+        # proceed training as normal with this image only
+        data = samples[:, max_loss_dim, :, :, :]
+        # data = data.to(device, non_blocking=async_gpu)
 
         if pre_batch_callback is not None:
             pre_batch_callback(model=model, batch_idx=batch_idx)

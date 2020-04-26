@@ -210,6 +210,9 @@ class ImagenetExperiment:
         model_args = config.get("model_args", {})
         init_batch_norm = config.get("init_batch_norm", False)
         init_hooks = config.get("init_hooks", None)
+        num_classes = config.get("num_classes", 1000)
+        model_args["config"] = config.get("model_config", {})
+        # model_args["config"]["num_classes"] = num_classes
         self.model = create_model(
             model_class=model_class,
             model_args=model_args,
@@ -272,7 +275,6 @@ class ImagenetExperiment:
         workers = config.get("workers", 0)
         data_dir = config["data"]
         train_dir = config.get("train_dir", "train")
-        num_classes = config.get("num_classes", 1000)
 
         # Get initial batch size
         self.batch_size = config.get("batch_size", 1)
@@ -283,6 +285,9 @@ class ImagenetExperiment:
             multiprocessing.set_start_method("spawn")
 
         # Configure Training data loader
+        self.maxup_num_images = config.get("maxup_num_images", 0)
+        assert self.maxup_num_images > 0, "Please define maxup_num_images"
+
         self.create_train_dataloader = config.get(
             "create_train_dataloader", create_train_dataloader)
         self.train_loader = self.create_train_dataloader(
@@ -291,6 +296,7 @@ class ImagenetExperiment:
             batch_size=self.batch_size,
             workers=workers,
             distributed=self.distributed,
+            maxup_num_images=self.maxup_num_images,
             num_classes=num_classes,
             use_auto_augment=config.get("use_auto_augment", False),
         )
@@ -366,6 +372,7 @@ class ImagenetExperiment:
                 loader=self.train_loader,
                 optimizer=self.optimizer,
                 device=self.device,
+                maxup_num_images=self.maxup_num_images,
                 criterion=self.loss_function,
                 batches_in_epoch=self.batches_in_epoch,
                 pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),

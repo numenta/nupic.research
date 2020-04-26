@@ -37,6 +37,7 @@ import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.dataset_utils import (
     CachedDatasetFolder,
     HDF5Dataset,
+    MaxupDataset
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
@@ -45,9 +46,9 @@ from .auto_augment import ImageNetPolicy
 
 IMAGENET_NUM_CLASSES = {
     10: [
-        "n02091244", "n02112350", "n02454379", "n02979186", "n03372029",
-        "n03791053", "n03891332", "n04065272", "n04462240", "n15075141"
-    ],
+        "n01440764", "n02102040", "n02979186", "n03000684", "n03028079", 
+        "n03394916", "n03417042", "n03425413", "n03445777", "n03888257"
+    ], 
     100: [
         "n01440764", "n01592084", "n01601694", "n01630670", "n01631663",
         "n01664065", "n01677366", "n01693334", "n01734418", "n01751748",
@@ -74,8 +75,8 @@ IMAGENET_NUM_CLASSES = {
 
 
 def create_train_dataloader(
-    data_dir, train_dir, batch_size, workers, distributed, num_classes=1000,
-    use_auto_augment=False,
+    data_dir, train_dir, batch_size, workers, distributed, maxup_num_images,
+    num_classes=1000, use_auto_augment=False,
 ):
     """
     Configure Imagenet training dataloader
@@ -118,12 +119,15 @@ def create_train_dataloader(
         )
     if h5py.is_hdf5(data_dir):
         # Use fixed Imagenet classes if mapping is available
+        # switch to my temporary version of mixup
         if num_classes in IMAGENET_NUM_CLASSES:
             classes = IMAGENET_NUM_CLASSES[num_classes]
-            dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
+            dataset = MaxupDataset(hdf5_file=data_dir, root=train_dir,
+                                  maxup_num_images=maxup_num_images,
                                   classes=classes, transform=transform)
         else:
-            dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
+            dataset = MaxupDataset(hdf5_file=data_dir, root=train_dir,
+                                  maxup_num_images=maxup_num_images,
                                   num_classes=num_classes, transform=transform)
     else:
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, train_dir),
