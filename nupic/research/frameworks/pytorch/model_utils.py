@@ -41,6 +41,8 @@ def train_model(
     pre_batch_callback=None,
     post_batch_callback=None,
     progress_bar=None,
+    teacher_model=None,
+    kd_factor=None
 ):
     """Train the given model by iterating through mini batches. An epoch ends
     after one pass through the training set, or if the number of mini batches
@@ -111,8 +113,24 @@ def train_model(
             pre_batch_callback(model=model, batch_idx=batch_idx)
 
         optimizer.zero_grad()
+
         output = model(data)
-        loss = criterion(output, target)
+
+        # alternative knowledge distillation training
+        if teacher_model is not None:
+            with torch.no_grad():
+                # target is linear combination of teacher and target softmaxes
+                softmax_output_teacher = F.softmax(teacher_model(data))
+                one_hot_target = F.one_hot(target, num_classes=1000) # num_classes=data.shape[-1])  
+                combined_target = (kd_factor * softmax_output_teacher +
+                                    (1-kd_factor) * one_hot_target)
+            # requires a custom loss function
+            loss = soft_cross_entropy(output, combined_target)
+            del one_hot_target, softmax_output_teacher, combined_target
+        # regular training
+        else:
+            loss = criterion(output, target)
+
         del data, target, output
 
         t2 = time.time()
@@ -258,7 +276,6 @@ def serialize_state_dict(fileobj, state_dict, compresslevel=3):
     with gzip.GzipFile(fileobj=fileobj, mode="wb", compresslevel=compresslevel) as fout:
         torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
-
 def deserialize_state_dict(fileobj, device=None):
     """
     Deserialize state dict saved via :func:`_serialize_state_dict` from
@@ -274,3 +291,27 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
+
+def soft_cross_entropy(output, target, size_average=True):
+    """ Cross entropy that accepts soft targets
+    Args:
+         pred: predictions for neural network
+         targets: targets, can be soft
+         size_average: if false, sum is returned instead of mean
+
+    Examples::
+
+        input = torch.FloatTensor([[1.1, 2.8, 1.3], [1.1, 2.1, 4.8]])
+        input = torch.autograd.Variable(out, requires_grad=True)
+
+        target = torch.FloatTensor([[0.05, 0.9, 0.05], [0.05, 0.05, 0.9]])
+        target = torch.autograd.Variable(y1)
+        loss = cross_entropy(input, target)
+        loss.backward()
+
+    see: https://discuss.pytorch.org/t/cross-entropy-with-one-hot-targets/13580/5
+    """
+    if size_average:
+        return torch.mean(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
+    else:
+        return torch.sum(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))

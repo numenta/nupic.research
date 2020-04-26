@@ -45,3 +45,4 @@ tabulate
 torchvision==0.5.0
 tqdm
 h5py
+pretrainedmodels

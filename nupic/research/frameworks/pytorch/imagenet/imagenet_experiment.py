@@ -321,6 +321,16 @@ class ImagenetExperiment:
         # Register post-epoch hooks. To be used as `self.model.apply(post_epoch_hook)`
         self.post_epoch_hooks = config.get("post_epoch_hooks", [])
 
+        # Accept a new teacher model
+        self.teacher_model = None
+        # how much of the teacher model to use in the final target
+        self.kd_factor = config.get("kd_factor", 0)
+        teacher_model_class = config.get("teacher_model_class", None)
+        if teacher_model_class is not None:
+            self.teacher_model = teacher_model_class(num_classes=1000, pretrained='imagenet')
+            self.teacher_model.to(self.device)
+        print("KD params", teacher_model_class, self.kd_factor, self.teacher_model is not None)
+
     def validate(self, epoch, loader=None):
         if loader is None:
             loader = self.val_loader
@@ -359,6 +369,8 @@ class ImagenetExperiment:
                 batches_in_epoch=self.batches_in_epoch,
                 pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
                 post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
+                teacher_model=self.teacher_model,
+                kd_factor=self.kd_factor,
             )
         if self.profile and prof is not None:
             self.logger.info(prof.key_averages().table(sort_by="self_cpu_time_total"))
