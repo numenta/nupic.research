@@ -178,9 +178,13 @@ def evaluate_model(
     :rtype: dict
     """
     model.eval()
-    loss = 0
-    correct = 0
     total = 0
+
+    # Perform accumulation on device, avoid paying performance cost of
+    # tensor.to(device) and .item().
+    loss = None
+    correct = None
+
     async_gpu = loader.pin_memory
 
     if progress is not None:
@@ -194,9 +198,21 @@ def evaluate_model(
             target = target.to(device, non_blocking=async_gpu)
 
             output = model(data)
-            loss += criterion(output, target, reduction="sum").item()
+
+            loss_ = criterion(output, target, reduction="sum")
+            if loss is None:
+                loss = loss_
+            else:
+                loss += loss_
+
             pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
+
+            correct_ = pred.eq(target.view_as(pred)).sum()
+            if correct is None:
+                correct = correct_
+            else:
+                correct += correct_
+
             total += len(data)
 
             if post_batch_callback is not None:
@@ -205,6 +221,9 @@ def evaluate_model(
 
     if progress is not None:
         loader.close()
+
+    correct = (correct.item() if correct is not None else 0)
+    loss = (loss.item() if loss is not None else 0.)
 
     return {
         "total_correct": correct,
