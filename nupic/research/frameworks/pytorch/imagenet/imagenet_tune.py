@@ -295,7 +295,9 @@ def run(config):
         kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
                                          *tune.run.__defaults__]))
     else:
-        kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
+        imagenet_trainable = config.get("imagenet_trainable", ImagenetTrainable)
+        assert issubclass(imagenet_trainable, ImagenetTrainable)
+        kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
 
     # Update`tune.run` kwargs with config
     kwargs.update(config)
