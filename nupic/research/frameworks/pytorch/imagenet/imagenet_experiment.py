@@ -95,6 +95,8 @@ class ImagenetExperiment:
         self.profile = False
         self.launch_time = 0
         self.epochs_to_validate = []
+        self.teacher_model = None
+        self.kd_factor_decay = None        
 
     def setup_experiment(self, config):
         """
@@ -173,6 +175,20 @@ class ImagenetExperiment:
             - launch_time: time the config was created (via time.time). Used to report
                            wall clock time until the first batch is done.
                            Default: time.time() in this setup_experiment().
+            - teacher_model_class: Class for pretrained model to be used as teacher
+                                   in knowledge distillation.
+            - kd_factor: Determines the percentage of the target that comes 
+                         from the teacher model. Value should be int or float 
+                         between 0 and 1. Defaults to 1.
+            - kd_factor_at_last_epoch: KD factor at last epoch. Will calculate linear decay
+                                       based on initial kd_factor and kd_factor_last_epoch.
+                                       Value should be int or float between 0 and 1.
+                                       If None, no decay is applied. Defaults to None.
+            - teacher_model_class: time the config was created (via time.time). Used to report
+                           wall clock time until the first batch is done.
+                           Default: time.time() in this setup_experiment().
+
+
         """
         # Configure logging related stuff
         log_format = config.get("log_format", logging.BASIC_FORMAT)
@@ -321,15 +337,22 @@ class ImagenetExperiment:
         # Register post-epoch hooks. To be used as `self.model.apply(post_epoch_hook)`
         self.post_epoch_hooks = config.get("post_epoch_hooks", [])
 
-        # Accept a new teacher model
-        self.teacher_model = None
-        # how much of the teacher model to use in the final target
-        self.kd_factor = config.get("kd_factor", 0)
+        # Teacher model and knowledge distillation variables
         teacher_model_class = config.get("teacher_model_class", None)
         if teacher_model_class is not None:
-            self.teacher_model = teacher_model_class(num_classes=1000, pretrained='imagenet')
+            # load teacher model, set to eval only and transfer to GPU
+            self.teacher_model = teacher_model_class()
+            self.teacher_model.eval()
             self.teacher_model.to(self.device)
-        print("KD params", teacher_model_class, self.kd_factor, self.teacher_model is not None)
+            self.logger.info("KD params: ", teacher_model_class, self.kd_factor)
+
+            # configure kd factor and decay
+            self.kd_factor = config.get("kd_factor", 1)
+            assert 0 <= self.kd_factor <= 1, "KD factor should greater than or equal 0 or less than or equal 1"
+            kd_factor_at_last_epoch = config.get("kd_factor_at_last_epoch", None)
+            if kd_factor_at_last_epoch is not None:
+                assert 0 <= self.kd_factor_at_last_epoch <= 1, "KD factor should greater than or equal 0 or less than or equal 1"
+                self.kd_factor_decay = (self.kd_factor - kd_factor_at_last_epoch)/(self.epochs-1) 
 
     def validate(self, epoch, loader=None):
         if loader is None:
@@ -445,6 +468,11 @@ class ImagenetExperiment:
         # Update learning rate
         if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
+
+        # Update knowledge distillation factor
+        if self.kd_factor_decay is not None:
+            self.kd_factor -= self.kd_factor_decay
+            self.logger.debug(f"KD factor: {self.kd_factor:.3f} at epoch {epoch}")
 
         self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s", epoch,
                           self.get_lr(), self.get_weight_decay())
