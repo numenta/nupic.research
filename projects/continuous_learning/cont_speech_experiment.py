@@ -238,6 +238,8 @@ class ContinuousSpeechExperiment(object):
               freeze_fun=None,
               freeze_pct=90,
               freeze_output=False,
+              layer_type="dense",
+              linear_number=2,
               output_indices=None):
         """Train one epoch of this model by iterating through mini batches.
 
@@ -262,7 +264,8 @@ class ContinuousSpeechExperiment(object):
         #     fparams.append([self.model.linear2.module.weight, indices])
         train_model(self.model, self.train_loader, self.optimizer, self.device,
                     freeze_params=freeze_params, freeze_fun=freeze_fun,
-                    freeze_pct=freeze_pct, freeze_output=freeze_output,
+                    freeze_pct=freeze_pct, freeze_output=freeze_output, layer_type=layer_type,
+                    linear_number=linear_number,
                     duty_cycles=self.get_duty_cycles(), output_indices=output_indices,
                     batches_in_epoch=self.batches_in_epoch)
 
