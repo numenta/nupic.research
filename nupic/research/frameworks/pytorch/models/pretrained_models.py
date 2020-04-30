@@ -44,7 +44,7 @@ def resnet50_swsl():
     """
     From: https://github.com/facebookresearch/semi-supervised-ImageNet1K-models
 
-    Regular Resnet50 network trained on semi-weakly supervised fashion.
+    Regular Resnet50 network trained in semi-weakly supervised fashion.
 
     "Semi-weakly" supervised (SWSL) ImageNet models are pre-trained on 940 million public 
     images with 1.5K hashtags matching with 1000 ImageNet1K synsets, followed by fine-tuning 

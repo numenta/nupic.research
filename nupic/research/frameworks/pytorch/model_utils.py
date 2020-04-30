@@ -307,12 +307,12 @@ def soft_cross_entropy(output, target, size_average=True):
 
     Examples::
 
-        input = torch.FloatTensor([[1.1, 2.8, 1.3], [1.1, 2.1, 4.8]])
-        input = torch.autograd.Variable(out, requires_grad=True)
+        output = torch.FloatTensor([[1.1, 2.8, 1.3], [1.1, 2.1, 4.8]])
+        output = torch.autograd.Variable(out, requires_grad=True)
 
         target = torch.FloatTensor([[0.05, 0.9, 0.05], [0.05, 0.05, 0.9]])
         target = torch.autograd.Variable(y1)
-        loss = cross_entropy(input, target)
+        loss = cross_entropy(output, target)
         loss.backward()
 
     see: https://discuss.pytorch.org/t/cross-entropy-with-one-hot-targets/13580/5
