@@ -22,9 +22,9 @@
 """
 Pretrained models available for knowledge distillation.
 
-For best usage, use a shared space for head node and works to access
-pretrained weights by setting the environment variable TORCH_HOME.
-Preload the weights on head node the first time running.
+For faster loading in worker nodes, use a shared space for head node and workers
+to access pretrained weights by setting the environment variable TORCH_HOME.
+Preload the weights on head node when running for the first time.
 
 Example:
 export TORCH_HOME=/home/ec2-user/nta/results/torch
@@ -33,8 +33,7 @@ In Python console:
 from nupic.research.frameworks.pytorch.models import <model name>
 <model name>()
 
-Note: models larger than Resnet50 will not fit the GPU with
-the regular batch size
+Note: models larger than Resnet50 will not fit the GPU with the regular batch size
 """
 
 import pretrainedmodels
