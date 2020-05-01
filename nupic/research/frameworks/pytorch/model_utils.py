@@ -323,3 +323,16 @@ def soft_cross_entropy(output, target, size_average=True):
         return torch.mean(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
     else:
         return torch.sum(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
+
+
+def linear_decay(first_epoch_value, last_epoch_value, current_epoch, total_epochs):
+    """
+    Calculates value for a current epoch in a linear decay.
+
+    :param first_epoch_value: Value at first epoch (before training).
+    :param last_epoch_value: Value at last epoch (before training).
+    :param current_epoch: Current epoch. Assumes first epoch is 0.
+    :param total_epochs: Total number of epochs in training.
+    """
+    step_size = (last_epoch_value - first_epoch_value) / (total_epochs - 1)
+    return first_epoch_value - step_size * current_epoch

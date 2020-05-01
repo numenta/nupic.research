@@ -53,6 +53,7 @@ from nupic.research.frameworks.pytorch.model_utils import (
     serialize_state_dict,
     set_random_seed,
     train_model,
+    linear_decay,
 )
 from nupic.torch.modules import rezero_weights, update_boost_strength
 
@@ -96,7 +97,8 @@ class ImagenetExperiment:
         self.launch_time = 0
         self.epochs_to_validate = []
         self.teacher_model = None
-        self.kd_factor_decay = None
+        self.kd_factor_init = None
+        self.kd_factor_end = None
 
     def setup_experiment(self, config):
         """
@@ -182,14 +184,13 @@ class ImagenetExperiment:
                            Default: time.time() in this setup_experiment().
             - teacher_model_class: Class for pretrained model to be used as teacher
                                    in knowledge distillation.
-            - kd_factor: Determines the percentage of the target that comes
-                         from the teacher model. Value should be int or float
-                         between 0 and 1. Defaults to 1.
-            - kd_factor_at_last_epoch: KD factor at last epoch. Will calculate
-                                       linear decay based on initial kd_factor and
-                                       kd_factor_last_epoch. Value should be int or
-                                       float between 0 and 1. If None, no decay is
-                                       applied. Defaults to None.
+            - kd_factor_init: Determines the percentage of the target that comes
+                              from the teacher model. Value should be int or float
+                              between 0 and 1. Defaults to 1.
+            - kd_factor_end: KD factor at last epoch. Will calculate linear decay
+                             based on initial kd_factor_init and kd_factor_end.
+                             Value should be int or float between 0 and 1.
+                             If None, no decay is applied. Defaults to None.
         """
         # Configure logging related stuff
         log_format = config.get("log_format", logging.BASIC_FORMAT)
@@ -351,19 +352,17 @@ class ImagenetExperiment:
             self.teacher_model = teacher_model_class()
             self.teacher_model.eval()
             self.teacher_model.to(self.device)
+            self.logger.info(f"KD teacher class: {teacher_model_class}")
 
-            # configure kd factor and decay
-            self.kd_factor = config.get("kd_factor", 1)
-            assert 0 <= self.kd_factor <= 1, \
-                "KD factor should be >= 0 and <= 1"
-            kd_factor_at_last_epoch = config.get("kd_factor_at_last_epoch", None)
-            if kd_factor_at_last_epoch is not None:
-                assert 0 <= self.kd_factor_at_last_epoch <= 1, \
+            # initalize Knowledge Distillation factor
+            self.kd_factor_init = config.get("kd_factor_init", 1)
+            assert 0 <= self.kd_factor_init <= 1, \
+                "KD factor at first epoch should be >= 0 and <= 1"
+            self.kd_factor_end = config.get("kd_factor_end", None)
+            if self.kd_factor_end is not None:
+                assert 0 <= self.kd_factor_end <= 1, \
                     "KD factor at last epoch should be >= 0 and <= 1"
-                self.kd_factor_decay = ((self.kd_factor - kd_factor_at_last_epoch)
-                                        / (self.epochs - 1))
-
-            self.logger.info(f"KD params: {teacher_model_class} {self.kd_factor}")
+            self.logger.info(f"KD factor: {self.kd_factor_init} {self.kd_factor_end}")
 
     def validate(self, epoch, loader=None):
         if loader is None:
@@ -392,6 +391,17 @@ class ImagenetExperiment:
         return results
 
     def train_epoch(self, epoch):
+
+        # linear decay knowledge distillation factor if required
+        if self.kd_factor_end is not None:
+            kd_factor = linear_decay(first_epoch_value=self.kd_factor_init,
+                                     last_epoch_value=self.kd_factor_end,
+                                     current_epoch=epoch,
+                                     total_epochs=self.epochs)
+            self.logger.debug(f"KD factor: {kd_factor:.3f} at epoch {epoch}")
+        else:
+            kd_factor = self.kd_factor_init
+
         with torch.autograd.profiler.profile(use_cuda=torch.cuda.is_available(),
                                              enabled=self.profile) as prof:
             self.train_model(
@@ -404,7 +414,7 @@ class ImagenetExperiment:
                 pre_batch_callback=functools.partial(self.pre_batch, epoch=epoch),
                 post_batch_callback=functools.partial(self.post_batch, epoch=epoch),
                 teacher_model=self.teacher_model,
-                kd_factor=self.kd_factor,
+                kd_factor=kd_factor,
             )
         if self.profile and prof is not None:
             self.logger.info(prof.key_averages().table(sort_by="self_cpu_time_total"))
@@ -479,11 +489,6 @@ class ImagenetExperiment:
         # Update learning rate
         if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
-
-        # Update knowledge distillation factor
-        if self.kd_factor_decay is not None:
-            self.kd_factor -= self.kd_factor_decay
-            self.logger.debug(f"KD factor: {self.kd_factor:.3f} at epoch {epoch}")
 
         self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s", epoch,
                           self.get_lr(), self.get_weight_decay())
