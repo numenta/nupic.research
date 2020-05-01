@@ -31,11 +31,6 @@ import torch
 import torch.autograd
 import torch.distributed as dist
 import torch.utils.data
-from torch.backends import cudnn
-from torch.nn import DataParallel
-from torch.nn.parallel import DistributedDataParallel
-from torch.optim.lr_scheduler import OneCycleLR
-
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
     create_optimizer,
@@ -50,12 +45,16 @@ from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     deserialize_state_dict,
     evaluate_model,
+    linear_decay,
     serialize_state_dict,
     set_random_seed,
     train_model,
-    linear_decay,
 )
 from nupic.torch.modules import rezero_weights, update_boost_strength
+from torch.backends import cudnn
+from torch.nn import DataParallel
+from torch.nn.parallel import DistributedDataParallel
+from torch.optim.lr_scheduler import OneCycleLR
 
 try:
     from apex import amp
