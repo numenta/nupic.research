@@ -18,7 +18,6 @@
 #  http://numenta.org/licenses/
 #
 import copy
-import itertools
 import os
 import socket
 from contextlib import closing
@@ -71,7 +70,7 @@ IMAGENET_NUM_CLASSES = {
 
 def create_train_dataloader(
     data_dir, train_dir, batch_size, workers, distributed, num_classes=1000,
-    use_auto_augment=False,
+    use_auto_augment=False, sample_transform=None, target_transform=None,
 ):
     """
     Configure Imagenet training dataloader
@@ -85,6 +84,9 @@ def create_train_dataloader(
     :param workers: how many data loading subprocesses to use
     :param distributed: Whether or not to use `DistributedSampler`
     :param num_classes: Limit the dataset size to the given number of classes
+    :param sample_transform: List of transforms acting on the samples
+                             to be added to the defaults below
+    :param target_transform: List of transforms acting on the targets
     :return: torch.utils.data.DataLoader
     """
     if use_auto_augment:
@@ -112,18 +114,26 @@ def create_train_dataloader(
                 ),
             ],
         )
+
+    transform = transforms.Compose(
+        transforms=[transform] + (sample_transform or []))
+    target_transform = target_transform
+
     if h5py.is_hdf5(data_dir):
         # Use fixed Imagenet classes if mapping is available
         if num_classes in IMAGENET_NUM_CLASSES:
             classes = IMAGENET_NUM_CLASSES[num_classes]
             dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
-                                  classes=classes, transform=transform)
+                                  classes=classes, transform=transform,
+                                  target_transform=target_transform)
         else:
             dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
-                                  num_classes=num_classes, transform=transform)
+                                  num_classes=num_classes, transform=transform,
+                                  target_transform=target_transform)
     else:
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, train_dir),
-                                      num_classes=num_classes, transform=transform)
+                                      num_classes=num_classes, transform=transform,
+                                      target_transform=target_transform)
     if distributed:
         train_sampler = DistributedSampler(dataset)
     else:
@@ -187,7 +197,7 @@ def create_validation_dataloader(data_dir, val_dir, batch_size, workers,
 
 
 def create_optimizer(model, optimizer_class, optimizer_args,
-                     batch_norm_weight_decay):
+                     batch_norm_weight_decay, bias_weight_decay):
     """
     Configure the optimizer with the option to ignore `weight_decay` from all
     batch norm module parameters
@@ -206,33 +216,32 @@ def create_optimizer(model, optimizer_class, optimizer_args,
         If False, remove 'weight_decay' from batch norm parameters
         See https://arxiv.org/abs/1807.11205
 
+    :param bias_weight_decay:
+        Whether or not to apply weight decay to bias modules parameters.
+        If False, remove 'weight_decay' from bias parameters
+
     :return: Configured optimizer
     """
-    if batch_norm_weight_decay:
-        # No need to remove weight decay. Use same optimizer args for all parameters
-        model_params = model.parameters()
-    else:
-        # Group batch norm parameters
-        def group_by_batch_norm(module):
-            return isinstance(module, _BatchNorm)
 
-        sorted_modules = sorted(model.modules(), key=group_by_batch_norm)
-        grouped_parameters = {
-            k: list(itertools.chain.from_iterable(m.parameters(False) for m in g))
-            for k, g in itertools.groupby(sorted_modules, key=group_by_batch_norm)
-        }
+    # get pointers to batch norm layers, don't rely on name
+    bn_param_ptrs = set()
+    for m in model.modules():
+        if isinstance(m, _BatchNorm):
+            bn_param_ptrs.add(m.weight.data_ptr())
+            bn_param_ptrs.add(m.bias.data_ptr())
 
-        model_params = []
-        for is_bn, params in grouped_parameters.items():
-            # Group model_params
-            group_args = copy.deepcopy(optimizer_args)
-            group_args.update(params=params)
-
-            # Remove 'weight_decay' from batch norm parameters
-            if is_bn:
-                group_args.update(weight_decay=0.0)
-
-            model_params.append(group_args)
+    group_decay, group_no_decay = [], []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if param.data_ptr() in bn_param_ptrs and not batch_norm_weight_decay:
+            group_no_decay.append(param)
+        elif ".bias" in name and not bias_weight_decay:
+            group_no_decay.append(param)
+        else:
+            group_decay.append(param)
+    model_params = [dict(params=group_decay),
+                    dict(params=group_no_decay, weight_decay=.0)]
 
     return optimizer_class(model_params, **optimizer_args)
 

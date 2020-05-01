@@ -126,6 +126,8 @@ class ImagenetExperiment:
                               constructor
             - batch_norm_weight_decay: Whether or not to apply weight decay to
                                        batch norm modules parameters
+            - bias_weight_decay: Whether or not to apply weight decay to
+                                       bias parameters
             - lr_scheduler_class: Learning rate scheduler class.
                                  Must inherit from "_LRScheduler"
             - lr_scheduler_args: Learning rate scheduler class class arguments
@@ -145,6 +147,9 @@ class ImagenetExperiment:
             - mixed_precision: Whether or not to enable apex mixed precision
             - mixed_precision_args: apex mixed precision arguments.
                                     See "amp.initialize"
+            - sample_transform: Transform acting on the training samples. To be used
+                                additively after default transform or auto-augment.
+            - target_transform: Transform acting on the training targets.
             - create_train_dataloader: Optional user defined function to create
                                        the training data loader. See below for
                                        input params.
@@ -236,11 +241,13 @@ class ImagenetExperiment:
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
         batch_norm_weight_decay = config.get("batch_norm_weight_decay", True)
+        bias_weight_decay = config.get("bias_weight_decay", True)
         self.optimizer = create_optimizer(
             model=self.model,
             optimizer_class=optimizer_class,
             optimizer_args=optimizer_args,
             batch_norm_weight_decay=batch_norm_weight_decay,
+            bias_weight_decay=bias_weight_decay,
         )
 
         # Validate mixed precision requirements
@@ -288,6 +295,8 @@ class ImagenetExperiment:
             multiprocessing.set_start_method("spawn")
 
         # Configure Training data loader
+        sample_transform = config.get("sample_transform", None)
+        target_transform = config.get("target_transform", None)
         self.create_train_dataloader = config.get(
             "create_train_dataloader", create_train_dataloader)
         self.train_loader = self.create_train_dataloader(
@@ -298,6 +307,8 @@ class ImagenetExperiment:
             distributed=self.distributed,
             num_classes=num_classes,
             use_auto_augment=config.get("use_auto_augment", False),
+            sample_transform=sample_transform,  # will be used additively w/ auto-aug
+            target_transform=target_transform,
         )
         self.total_batches = len(self.train_loader)
 
