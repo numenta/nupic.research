@@ -355,11 +355,11 @@ class ImagenetExperiment:
             # configure kd factor and decay
             self.kd_factor = config.get("kd_factor", 1)
             assert 0 <= self.kd_factor <= 1, \
-                "KD factor should greater than or equal 0 or less than or equal 1"
+                "KD factor should be >= 0 and <= 1"
             kd_factor_at_last_epoch = config.get("kd_factor_at_last_epoch", None)
             if kd_factor_at_last_epoch is not None:
                 assert 0 <= self.kd_factor_at_last_epoch <= 1, \
-                    "KD factor should greater than or equal 0 or less than or equal 1"
+                    "KD factor at last epoch should be >= 0 and <= 1"
                 self.kd_factor_decay = ((self.kd_factor - kd_factor_at_last_epoch)
                                         / (self.epochs - 1))
 
