@@ -334,5 +334,5 @@ def linear_decay(first_epoch_value, last_epoch_value, current_epoch, total_epoch
     :param current_epoch: Current epoch. Assumes first epoch is 0.
     :param total_epochs: Total number of epochs in training.
     """
-    step_size = (last_epoch_value - first_epoch_value) / (total_epochs - 1)
+    step_size = (first_epoch_value - last_epoch_value) / (total_epochs - 1)
     return first_epoch_value - step_size * current_epoch
