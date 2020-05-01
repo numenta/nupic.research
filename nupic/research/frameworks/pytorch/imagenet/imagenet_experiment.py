@@ -344,7 +344,6 @@ class ImagenetExperiment:
             self.teacher_model = teacher_model_class()
             self.teacher_model.eval()
             self.teacher_model.to(self.device)
-            self.logger.info("KD params: ", teacher_model_class, self.kd_factor)
 
             # configure kd factor and decay
             self.kd_factor = config.get("kd_factor", 1)
@@ -353,6 +352,8 @@ class ImagenetExperiment:
             if kd_factor_at_last_epoch is not None:
                 assert 0 <= self.kd_factor_at_last_epoch <= 1, "KD factor should greater than or equal 0 or less than or equal 1"
                 self.kd_factor_decay = (self.kd_factor - kd_factor_at_last_epoch)/(self.epochs-1) 
+
+            self.logger.info(f"KD params: {teacher_model_class} {self.kd_factor}")
 
     def validate(self, epoch, loader=None):
         if loader is None:
