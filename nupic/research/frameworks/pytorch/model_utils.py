@@ -76,7 +76,7 @@ def train_model(
     :type progress_bar: dict or None
     :param teacher model: Teacher model used for knowledge distillation
     :type teacher model: torch.nn.Module
-    :param kd_factor: Determines the percentage of the target that comes 
+    :param kd_factor: Determines the percentage of the target that comes
                       from the teacher model.
     :type kd_factor: int or float
 
@@ -126,9 +126,9 @@ def train_model(
             with torch.no_grad():
                 # target is linear combination of teacher and target softmaxes
                 softmax_output_teacher = F.softmax(teacher_model(data))
-                one_hot_target = F.one_hot(target, num_classes=output.shape[-1])  
-                combined_target = (kd_factor * softmax_output_teacher +
-                                    (1-kd_factor) * one_hot_target)
+                one_hot_target = F.one_hot(target, num_classes=output.shape[-1])
+                combined_target = (kd_factor * softmax_output_teacher
+                                   + (1 - kd_factor) * one_hot_target)
             # requires a custom loss function.
             del softmax_output_teacher, one_hot_target
             loss = soft_cross_entropy(output, combined_target)
@@ -282,6 +282,7 @@ def serialize_state_dict(fileobj, state_dict, compresslevel=3):
     with gzip.GzipFile(fileobj=fileobj, mode="wb", compresslevel=compresslevel) as fout:
         torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
+
 def deserialize_state_dict(fileobj, device=None):
     """
     Deserialize state dict saved via :func:`_serialize_state_dict` from
@@ -297,6 +298,7 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
+
 
 def soft_cross_entropy(output, target, size_average=True):
     """ Cross entropy that accepts soft targets

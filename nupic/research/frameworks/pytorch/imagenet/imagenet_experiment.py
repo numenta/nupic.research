@@ -96,7 +96,7 @@ class ImagenetExperiment:
         self.launch_time = 0
         self.epochs_to_validate = []
         self.teacher_model = None
-        self.kd_factor_decay = None        
+        self.kd_factor_decay = None
 
     def setup_experiment(self, config):
         """
@@ -182,18 +182,14 @@ class ImagenetExperiment:
                            Default: time.time() in this setup_experiment().
             - teacher_model_class: Class for pretrained model to be used as teacher
                                    in knowledge distillation.
-            - kd_factor: Determines the percentage of the target that comes 
-                         from the teacher model. Value should be int or float 
+            - kd_factor: Determines the percentage of the target that comes
+                         from the teacher model. Value should be int or float
                          between 0 and 1. Defaults to 1.
-            - kd_factor_at_last_epoch: KD factor at last epoch. Will calculate linear decay
-                                       based on initial kd_factor and kd_factor_last_epoch.
-                                       Value should be int or float between 0 and 1.
-                                       If None, no decay is applied. Defaults to None.
-            - teacher_model_class: time the config was created (via time.time). Used to report
-                           wall clock time until the first batch is done.
-                           Default: time.time() in this setup_experiment().
-
-
+            - kd_factor_at_last_epoch: KD factor at last epoch. Will calculate
+                                       linear decay based on initial kd_factor and
+                                       kd_factor_last_epoch. Value should be int or
+                                       float between 0 and 1. If None, no decay is
+                                       applied. Defaults to None.
         """
         # Configure logging related stuff
         log_format = config.get("log_format", logging.BASIC_FORMAT)
@@ -358,11 +354,14 @@ class ImagenetExperiment:
 
             # configure kd factor and decay
             self.kd_factor = config.get("kd_factor", 1)
-            assert 0 <= self.kd_factor <= 1, "KD factor should greater than or equal 0 or less than or equal 1"
+            assert 0 <= self.kd_factor <= 1, \
+                "KD factor should greater than or equal 0 or less than or equal 1"
             kd_factor_at_last_epoch = config.get("kd_factor_at_last_epoch", None)
             if kd_factor_at_last_epoch is not None:
-                assert 0 <= self.kd_factor_at_last_epoch <= 1, "KD factor should greater than or equal 0 or less than or equal 1"
-                self.kd_factor_decay = (self.kd_factor - kd_factor_at_last_epoch)/(self.epochs-1) 
+                assert 0 <= self.kd_factor_at_last_epoch <= 1, \
+                    "KD factor should greater than or equal 0 or less than or equal 1"
+                self.kd_factor_decay = ((self.kd_factor - kd_factor_at_last_epoch)
+                                        / (self.epochs - 1))
 
             self.logger.info(f"KD params: {teacher_model_class} {self.kd_factor}")
 

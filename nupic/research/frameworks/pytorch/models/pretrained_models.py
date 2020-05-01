@@ -22,23 +22,24 @@
 """
 Pretrained models available for knowledge distillation.
 
-For best usage, use a shared space for head node and works to access 
+For best usage, use a shared space for head node and works to access
 pretrained weights by setting the environment variable TORCH_HOME.
 Preload the weights on head node the first time running.
 
-Example: 
+Example:
 export TORCH_HOME=/home/ec2-user/nta/results/torch
 
 In Python console:
 from nupic.research.frameworks.pytorch.models import <model name>
 <model name>()
 
-Note: models larger than Resnet50 will not fit the GPU with 
+Note: models larger than Resnet50 will not fit the GPU with
 the regular batch size
 """
 
-import torch
 import pretrainedmodels
+import torch
+
 
 def resnet50_swsl():
     """
@@ -46,60 +47,67 @@ def resnet50_swsl():
 
     Regular Resnet50 network trained in semi-weakly supervised fashion.
 
-    "Semi-weakly" supervised (SWSL) ImageNet models are pre-trained on 940 million public 
-    images with 1.5K hashtags matching with 1000 ImageNet1K synsets, followed by fine-tuning 
-    on ImageNet1K dataset. In this case, the associated hashtags are only used for building 
-    a better teacher model. 
+    "Semi-weakly" supervised (SWSL) ImageNet models are pre-trained on 940 million
+    public images with 1.5K hashtags matching with 1000 ImageNet1K synsets, followed
+    by fine-tuning on ImageNet1K dataset. In this case, the associated hashtags are
+    only used for building a better teacher model.
 
-    During training the student model, those hashtags are ingored and the student model is 
-    pretrained with a subset of 64M images selected by the teacher model from the same 
-    940 million public image dataset.
+    During training the student model, those hashtags are ingored and the student model
+    is pretrained with a subset of 64M images selected by the teacher model from the
+    same 940 million public image dataset.
 
-    Params 25M, GFLOPs 4, Top-1 acc 81.2, Top-5 acc 96.0      
+    Params 25M, GFLOPs 4, Top-1 acc 81.2, Top-5 acc 96.0
     """
-    return torch.hub.load('facebookresearch/semi-supervised-ImageNet1K-models', 'resnet50_swsl')
+    return torch.hub.load(
+        "facebookresearch/semi-supervised-ImageNet1K-models", "resnet50_swsl"
+    )
+
 
 def resnext101_32x16d_wsl():
     """
     From: https://github.com/facebookresearch/WSL-Images
 
     Residual networks with grouped convolutional layers
-    ResNeXt-101 32×Cd, which has 101 layers, 32 groups, and group widths C of: 
-    4 (8B multiply-add FLOPs, 43M parameters), 8 (16B,88M), 
+    ResNeXt-101 32×Cd, which has 101 layers, 32 groups, and group widths C of:
+    4 (8B multiply-add FLOPs, 43M parameters), 8 (16B,88M),
     16 (36B, 193M), 32 (87B, 466M), and 48 (153B, 829M).
 
-    Pre-trained in weakly-supervised fashion on 940 million public images with 1.5K hashtags 
-    matching with 1000 ImageNet1K synsets, followed by fine-tuning on ImageNet1K dataset    
+    Pre-trained in weakly-supervised fashion on 940 million public images with
+    1.5K hashtags matching with 1000 ImageNet1K synsets, followed by fine-tuning
+    on ImageNet1K dataset
 
     Params 193M, GFLOPs 36, Top-1 acc 84.2, Top-5 acc 97.2
     """
-    return torch.hub.load('facebookresearch/WSL-Images', 'resnext101_32x16d_wsl')
+    return torch.hub.load("facebookresearch/WSL-Images", "resnext101_32x16d_wsl")
+
 
 def resnext101_32x48d_wsl():
     """
     From: https://github.com/facebookresearch/WSL-Images
 
     Residual networks with grouped convolutional layers
-    ResNeXt-101 32×Cd, which has 101 layers, 32 groups, and group widths C of: 
-    4 (8B multiply-add FLOPs, 43M parameters), 8 (16B,88M), 
+    ResNeXt-101 32×Cd, which has 101 layers, 32 groups, and group widths C of:
+    4 (8B multiply-add FLOPs, 43M parameters), 8 (16B,88M),
     16 (36B, 193M), 32 (87B, 466M), and 48 (153B, 829M).
 
-    Pre-trained in weakly-supervised fashion on 940 million public images with 1.5K hashtags 
-    matching with 1000 ImageNet1K synsets, followed by fine-tuning on ImageNet1K dataset 
+    Pre-trained in weakly-supervised fashion on 940 million public images with
+    1.5K hashtags matching with 1000 ImageNet1K synsets, followed by fine-tuning
+    on ImageNet1K dataset
 
     Params 829M, GFLOPs 153, Top-1 acc 85.4, Top-5 acc 97.6
     """
-    return torch.hub.load('facebookresearch/WSL-Images', 'resnext101_32x48d_wsl')
+    return torch.hub.load("facebookresearch/WSL-Images", "resnext101_32x48d_wsl")
+
 
 def se_resnext50_32x4d():
     """
     From: https://github.com/Cadene/pretrained-models.pytorch
     From: https://github.com/hujie-frank/SENet
-    
+
     Residual networks with grouped convolutional layers and squeeze & excitation blocks
     ResNext: https://arxiv.org/pdf/1611.05431.pdf
     Squeeze and Excitation: https://arxiv.org/abs/1709.01507
 
     Params 27M, GFLOPs 4.25, Top-1 acc 79.076, Top-5 acc 94.434
     """
-    return pretrainedmodels.se_resnext50_32x4d(num_classes=1000, pretrained='imagenet')
+    return pretrainedmodels.se_resnext50_32x4d(num_classes=1000, pretrained="imagenet")
