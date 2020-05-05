@@ -19,3 +19,4 @@
 #
 from .k_winners import KWinners2dLocal
 from .mish import Mish
+from .weight_mask_layers import *
