@@ -180,10 +180,9 @@ def evaluate_model(
     model.eval()
     total = 0
 
-    # Perform accumulation on device, avoid paying performance cost of
-    # tensor.to(device) and .item().
-    loss = None
-    correct = None
+    # Perform accumulation on device, avoid paying performance cost of .item()
+    loss = torch.tensor(0., device=device)
+    correct = torch.tensor(0, device=device)
 
     async_gpu = loader.pin_memory
 
@@ -198,21 +197,9 @@ def evaluate_model(
             target = target.to(device, non_blocking=async_gpu)
 
             output = model(data)
-
-            loss_ = criterion(output, target, reduction="sum")
-            if loss is None:
-                loss = loss_
-            else:
-                loss += loss_
-
+            loss += criterion(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
-
-            correct_ = pred.eq(target.view_as(pred)).sum()
-            if correct is None:
-                correct = correct_
-            else:
-                correct += correct_
-
+            correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
 
             if post_batch_callback is not None:
@@ -222,8 +209,8 @@ def evaluate_model(
     if progress is not None:
         loader.close()
 
-    correct = (correct.item() if correct is not None else 0)
-    loss = (loss.item() if loss is not None else 0.)
+    correct = correct.item()
+    loss = loss.item()
 
     return {
         "total_correct": correct,
