@@ -27,6 +27,8 @@ from nupic.torch.modules import rezero_weights
 
 class RezeroWeights:
     """
+    Rezero the SparseWeights after every epoch.
+
     Note that the SparseWeights rezeroes weights during the forward pass during
     learning, so this mixin only needs to be applied on post_epoch rather than
     post_batch.
