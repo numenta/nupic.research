@@ -36,6 +36,8 @@ class RezeroWeights:
                               float(nonzero_params_sparse2) / params_sparse)
 
     def post_epoch(self, epoch):
+        super().post_epoch(epoch)
+
         count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0
         if count_nnz:
             params_sparse, nonzero_params_sparse1 = count_nonzero_params(
@@ -51,5 +53,3 @@ class RezeroWeights:
                 params_sparse, nonzero_params_sparse1,
                 nonzero_params_sparse2,
                 float(nonzero_params_sparse2) / params_sparse)
-
-        super().post_epoch(epoch)
