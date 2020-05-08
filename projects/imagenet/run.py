@@ -24,8 +24,18 @@ import socket
 import torch
 
 from experiments import CONFIGS
-from nupic.research.frameworks.pytorch.imagenet import imagenet_tune
+from nupic.research.frameworks.pytorch.imagenet import imagenet_tune, mixins
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
+
+
+def insert_experiment_mixin(config, mixin):
+    experiment_class = config["experiment_class"]
+    class Cls(mixin, experiment_class):
+        pass
+
+    Cls.__name__ = f"{mixin.__name__}{experiment_class.__name__}"
+    config["experiment_class"] = Cls
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -78,6 +88,12 @@ if __name__ == "__main__":
 
     # Merge configuration with command line arguments
     config.update(vars(args))
+
+    if "profile" in args and args.profile:
+        insert_experiment_mixin(config, mixins.Profile)
+
+    if "profile_autograd" in args and args.profile_autograd:
+        insert_experiment_mixin(config, mixins.ProfileAutograd)
 
     if "create_sigopt" in args:
         s = SigOptImagenetExperiment()

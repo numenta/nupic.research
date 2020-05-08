@@ -29,10 +29,11 @@ class ProfileAutograd:
         self.profile_autograd = self.rank == 0
 
     def train_epoch(self, epoch):
-        with torch.autograd.profiler.profile(use_cuda=torch.cuda.is_available(),
-                                             enabled=self.profile) as prof:
+        with torch.autograd.profiler.profile(
+                use_cuda=torch.cuda.is_available(),
+                enabled=self.profile_autograd) as prof:
             super().train_epoch(epoch)
 
-        if self.profile and prof is not None:
+        if self.profile_autograd and prof is not None:
             self.logger.info(prof.key_averages().table(
                 sort_by="self_cpu_time_total"))

@@ -26,21 +26,32 @@ import pstats
 
 class Profile:
     def setup_experiment(self, config):
-        pr = cProfile.Profile()
-        pr.enable()
+        self.use_cProfile = (self.rank == 0)
+        if self.use_cProfile:
+            pr = cProfile.Profile()
+            pr.enable()
+
         super().setup_experiment(config)
-        pr.disable()
-        pstats.Stats(pr).dump_stats(
-            os.path.join(self.logdir, f"profile-initialization.profile")
-        )
+
+        if self.use_cProfile:
+            pr.disable()
+            filepath = os.path.join(self.logdir,
+                                    f"profile-initialization.profile")
+            pstats.Stats(pr).dump_stats(filepath)
+            self.logger.info(f"Saved {filepath}")
 
     def run_epoch(self, epoch):
-        pr = cProfile.Profile()
-        pr.enable()
+        if self.use_cProfile:
+            pr = cProfile.Profile()
+            pr.enable()
+
         result = super().run_epoch(epoch)
-        pr.disable()
-        pstats.Stats(pr).dump_stats(
-            os.path.join(self.logdir, f"profile-epoch{epoch}.profile")
-        )
+
+        if self.use_cProfile:
+            pr.disable()
+            filepath = os.path.join(self.logdir,
+                                    f"profile-epoch{epoch}.profile")
+            pstats.Stats(pr).dump_stats(filepath)
+            self.logger.info(f"Saved {filepath}")
 
         return result
