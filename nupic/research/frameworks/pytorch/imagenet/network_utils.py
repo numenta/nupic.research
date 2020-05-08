@@ -19,6 +19,7 @@
 #
 import io
 import pickle
+from collections import OrderedDict
 
 import torch
 import torchvision.models
@@ -86,6 +87,12 @@ def create_model(model_class, model_args, init_batch_norm, device,
             state = pickle.load(pickle_file)
         with io.BytesIO(state["model"]) as buffer:
             state_dict = deserialize_state_dict(buffer, device)
+
+        # Make sure checkpoint is compatible with model
+        if model.state_dict().keys() != state_dict.keys():
+            state_dict = OrderedDict(
+                zip(model.state_dict().keys(), state_dict.values()))
+
         model.load_state_dict(state_dict)
 
     return model
