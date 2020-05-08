@@ -30,14 +30,9 @@ import ray.tune as tune
 import torch
 
 import nupic.research.frameworks.pytorch.models.resnets
-from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment, mixins
-
-
-class RezeroedKWinnersImagenetExperiment(mixins.RezeroWeights,
-                                         mixins.UpdateBoostStrength,
-                                         ImagenetExperiment):
-    pass
-
+from nupic.research.frameworks.pytorch.imagenet import (
+    RezeroedKWinnersImagenetExperiment,
+)
 
 # Batch size depends on the GPU memory.
 # On AWS P3 (Tesla V100) each GPU can hold 128 batches
