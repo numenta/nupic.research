@@ -30,6 +30,7 @@ from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExp
 
 def insert_experiment_mixin(config, mixin):
     experiment_class = config["experiment_class"]
+
     class Cls(mixin, experiment_class):
         pass
 
@@ -70,6 +71,8 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--checkpoint-freq", type=int,
                         help="How often to checkpoint (epochs)")
     parser.add_argument("--profile", action="store_true",
+                        help="Enable torch.autograd.profiler.profile during training")
+    parser.add_argument("--profile-autograd", action="store_true",
                         help="Enable torch.autograd.profiler.profile during training")
     parser.add_argument("-t", "--create_sigopt", action="store_true",
                         help="Create a new sigopt experiment using the config")
