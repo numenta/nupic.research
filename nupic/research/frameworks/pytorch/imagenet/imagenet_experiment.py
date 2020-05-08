@@ -74,7 +74,7 @@ class ImagenetExperiment:
     def __init__(self):
         self.model = None
         self.optimizer = None
-        self.loss_function_f = None
+        self._loss_function = None
         self.lr_scheduler = None
         self.train_loader = None
         self.val_loader = None
@@ -248,7 +248,7 @@ class ImagenetExperiment:
         else:
             self.model = DataParallel(self.model)
 
-        self.loss_function_f = config.get(
+        self._loss_function = config.get(
             "loss_function", torch.nn.functional.cross_entropy
         )
 
@@ -424,7 +424,7 @@ class ImagenetExperiment:
                           self.get_lr(), self.get_weight_decay())
 
     def loss_function(self, output, target, **kwargs):
-        return self.loss_function_f(output, target, **kwargs)
+        return self._loss_function(output, target, **kwargs)
 
     def get_state(self):
         """
