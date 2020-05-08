@@ -28,7 +28,6 @@ from torch import nn as nn
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
-from nupic.torch.modules import rezero_weights
 
 
 def init_resnet50_batch_norm(model):
