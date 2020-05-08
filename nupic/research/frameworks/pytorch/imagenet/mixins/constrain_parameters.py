@@ -21,6 +21,15 @@
 
 
 class ConstrainParameters(object):
+    """
+    Calls modules' "constrain_parameters" method after every batch.
+    """
+    def __init__(self):
+        super().__init__()
+        self.execution_order["setup_experiment"].append(
+            "ConstrainParameters initialization")
+        self.execution_order["post_batch"].append("ConstrainParameters")
+
     def setup_experiment(self, config):
         super().setup_experiment(config)
         self._constrain_parameters_modules = [

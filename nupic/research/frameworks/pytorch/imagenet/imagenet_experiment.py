@@ -91,6 +91,19 @@ class ImagenetExperiment:
         self.seed = 42
         self.launch_time = 0
         self.epochs_to_validate = []
+        # Updated by mixins and subclasses.
+        self.execution_order = dict(
+            setup_experiment=["ImagenetExperiment.setup_experiment"],
+            create_model=["ImagenetExperiment.create_model"],
+            validate=["ImagenetExperiment.validate"],
+            train_epoch=["ImagenetExperiment.train_epoch"],
+            run_epoch=["ImagenetExperiment.run_epoch"],
+            pre_epoch=["ImagenetExperiment.pre_epoch"],
+            post_epoch=["ImagenetExperiment.post_epoch"],
+            pre_batch=["ImagenetExperiment.pre_batch"],
+            post_batch=["ImagenetExperiment.post_batch"],
+            loss_function=["ImagenetExperiment.loss_function"],
+        )
 
     def setup_experiment(self, config):
         """
@@ -155,10 +168,6 @@ class ImagenetExperiment:
             - evaluate_model_func: Optional user defined function to validate the model
                                    expected to behave similarly to `evaluate_model`
                                    in terms of input parameters and return values
-            - init_hooks: list of hooks (functions) to call on the model
-                          just following its initialization
-            - post_epoch_hooks: list of hooks (functions) to call on the model
-                                following each epoch of training
             - checkpoint_file: if not None, will start from this model. The model
                                must have the same model_args and model_class as the
                                current experiment.
@@ -193,6 +202,9 @@ class ImagenetExperiment:
         # Configure distribute pytorch
         self.distributed = config.get("distributed", False)
         self.rank = config.get("rank", 0)
+
+        if self.rank == 0:
+            self.logger.info(f"Execution order: {self.execution_order}")
 
         if self.distributed:
             dist_url = config.get("dist_url", "tcp://127.0.0.1:54321")
@@ -318,9 +330,6 @@ class ImagenetExperiment:
         self.train_model = config.get("train_model_func", train_model)
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
-        # Register post-epoch hooks. To be used as `self.model.apply(post_epoch_hook)`
-        self.post_epoch_hooks = config.get("post_epoch_hooks", [])
-
     def create_model(self, config):
         return create_model_from_config(config, self.device)
 
@@ -409,10 +418,6 @@ class ImagenetExperiment:
             self.logger.debug("Timing: %s", time_string)
 
     def post_epoch(self, epoch):
-        if self.post_epoch_hooks:
-            for hook in self.post_epoch_hooks:
-                self.model.apply(hook)
-
         self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s", epoch,
                           self.get_lr(), self.get_weight_decay())
 

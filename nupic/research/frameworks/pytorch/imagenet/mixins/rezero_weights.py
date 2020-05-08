@@ -26,8 +26,23 @@ from nupic.torch.modules import rezero_weights
 
 
 class RezeroWeights:
+    """
+    Note that the SparseWeights rezeroes weights during the forward pass during
+    learning, so this mixin only needs to be applied on post_epoch rather than
+    post_batch.
+    """
+    def __init__(self):
+        super().__init__()
+        self.execution_order["setup_experiment"].append("RezeroWeights")
+        self.execution_order["post_epoch"].append("RezeroWeights")
+
     def setup_experiment(self, config):
         super().setup_experiment(config)
+
+        # Some initialization strategies can destroy sparsity, so we call rezero
+        # here.
+        self.model.apply(rezero_weights)
+
         if self.rank == 0:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(
                 self.model)

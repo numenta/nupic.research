@@ -25,6 +25,16 @@ import pstats
 
 
 class Profile:
+    """
+    Save cProfile traces for initialization and each run_epoch.
+    """
+    def __init__(self):
+        super().__init__()
+        self.execution_order["setup_experiment"].insert(0, "Profile begin")
+        self.execution_order["setup_experiment"].append("Profile end")
+        self.execution_order["run_epoch"].insert(0, "Profile begin")
+        self.execution_order["run_epoch"].append("Profile end")
+
     def setup_experiment(self, config):
         self.use_cProfile = (self.rank == 0)
         if self.use_cProfile:

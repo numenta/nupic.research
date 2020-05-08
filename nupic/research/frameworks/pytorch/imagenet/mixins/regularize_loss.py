@@ -23,6 +23,17 @@ import torch
 
 
 class RegularizeLoss(object):
+    """
+    Add a regularization term to the loss function.
+    """
+    def __init__(self):
+        super().__init__()
+        self.execution_order["setup_experiment"].append(
+            "RegularizeLoss initialization")
+        self.execution_order["loss_function"].append("RegularizeLoss")
+        self.execution_order["pre_epoch"].append(
+            "RegularizeLoss update regularization weight")
+
     def setup_experiment(self, config):
         """
         @param reg_schedule (dict)
@@ -64,8 +75,7 @@ class RegularizeLoss(object):
         loss += reg
         return loss
 
-    def run_epoch(self, epoch):
+    def pre_epoch(self, epoch):
+        return super().pre_epoch(epoch)
         if epoch in self.reg_schedule:
             self.reg_weight = self.reg_schedule[epoch]
-
-        return super().run_epoch(epoch)

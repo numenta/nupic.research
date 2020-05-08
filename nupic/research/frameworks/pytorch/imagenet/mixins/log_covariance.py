@@ -23,6 +23,18 @@ import torch
 
 
 class LogCovariance(object):
+    """
+    During testing, record the covariance of unit activations within each
+    specified layer.
+    """
+    def __init__(self):
+        super().__init__()
+        self.execution_order["setup_experiment"].append(
+            "LogCovariance initialization")
+        self.execution_order["validate"].insert(0, "LogCovariance add hooks")
+        self.execution_order["validate"].append(
+            "LogCovariance remove hooks, compute covariance")
+
     def setup_experiment(self, config):
         super().setup_experiment(config)
         self.log_covariance_layernames = config.get("log_covariance_layernames",
@@ -41,7 +53,7 @@ class LogCovariance(object):
         hooks = [getattr(self.module, layername)
                  .register_forward_hook(accumulator(layername))
                  for layername in self.log_covariance_layernames]
-        result = super().test(*args, **kwargs)
+        result = super().validate(*args, **kwargs)
         for hook in hooks:
             hook.remove()
 

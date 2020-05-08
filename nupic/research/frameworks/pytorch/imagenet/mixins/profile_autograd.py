@@ -23,6 +23,16 @@ import torch.autograd
 
 
 class ProfileAutograd:
+    """
+    Use torch's autograd profiler during training.
+    """
+    def __init__(self):
+        super().__init__()
+        self.execution_order["setup_experiment"].append(
+            "ProfileAutograd initialization")
+        self.execution_order["train_epoch"].insert(0, "ProfileAutograd begin")
+        self.execution_order["train_epoch"].append("ProfileAutograd end")
+
     def setup_experiment(self, config):
         super().setup_experiment(config)
         # Only profile from rank 0

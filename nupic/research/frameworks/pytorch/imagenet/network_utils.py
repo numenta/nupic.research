@@ -89,14 +89,6 @@ def create_model(model_class, model_args, init_batch_norm, device,
             state_dict = deserialize_state_dict(buffer, device)
         model.load_state_dict(state_dict)
 
-    # Modify init via hooks.
-    elif init_hooks:
-        for hook, kwargs in init_hooks:
-            model = hook(model, **kwargs) or model
-
-    # Some initialization strategies can destroy sparsity, so we call rezero here
-    model.apply(rezero_weights)
-
     return model
 
 
@@ -108,8 +100,6 @@ def create_model_from_config(config, device):
             - model_args: model model class arguments passed to the constructor
             - init_batch_norm: Whether or not to Initialize running batch norm
                                mean to 0.
-            - init_hooks: list of hooks (functions) to call on the model
-                          just following its initialization
             - checkpoint_file: if not None, will start from this model. The model
                                must have the same model_args and model_class as the
                                current experiment.
@@ -122,13 +112,11 @@ def create_model_from_config(config, device):
     model_class = config["model_class"]
     model_args = config.get("model_args", {})
     init_batch_norm = config.get("init_batch_norm", False)
-    init_hooks = config.get("init_hooks", None)
     model = create_model(
         model_class=model_class,
         model_args=model_args,
         init_batch_norm=init_batch_norm,
         device=device,
-        init_hooks=init_hooks,
         checkpoint_file=config.get("checkpoint_file", None)
     )
 
