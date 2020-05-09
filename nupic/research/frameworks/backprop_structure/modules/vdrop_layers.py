@@ -219,6 +219,10 @@ class FixedVDropConv2d(MaskedConv2d):
                          stride=stride, padding=padding, dilation=dilation,
                          groups=groups, bias=bias, mask_mode=mask_mode)
         self.alpha = alpha
+        self.tensor_constructor = (torch.FloatTensor
+                                   if not torch.cuda.is_available()
+                                   else torch.cuda.FloatTensor)
+        self.epsilon = 1e-8
 
     def extra_repr(self):
         return f"alpha={self.alpha}"
@@ -229,7 +233,8 @@ class FixedVDropConv2d(MaskedConv2d):
                 x,
                 lambda: self.weight * self.weight_mask,
                 lambda: self.alpha * (self.weight.pow(2) * self.weight_mask),
-                self.bias, self.stride, self.padding, self.dilation, self.groups)
+                self.bias, self.stride, self.padding, self.dilation, self.groups,
+                self.tensor_constructor, self.epsilon)
         else:
             return F.conv2d(
                 x, self.weight, self.bias, self.stride, self.padding,
