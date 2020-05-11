@@ -35,15 +35,12 @@ class RezeroWeights:
     """
     def __init__(self):
         super().__init__()
-        self.execution_order["setup_experiment"].append("RezeroWeights")
+        self.execution_order["setup_experiment"].append("RezeroWeights logging")
+        self.execution_order["create_model"].append("RezeroWeights")
         self.execution_order["post_epoch"].append("RezeroWeights")
 
     def setup_experiment(self, config):
         super().setup_experiment(config)
-
-        # Some initialization strategies can destroy sparsity, so we call rezero
-        # here.
-        self.model.apply(rezero_weights)
 
         if self.rank == 0:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(
@@ -51,6 +48,13 @@ class RezeroWeights:
             self.logger.debug("Params total/nnz %s / %s = %s ",
                               params_sparse, nonzero_params_sparse2,
                               float(nonzero_params_sparse2) / params_sparse)
+
+    def create_model(self, config):
+        model = super().create_model(config)
+        # Some initialization strategies can destroy sparsity, so we call rezero
+        # here.
+        model.apply(rezero_weights)
+        return model
 
     def post_epoch(self, epoch):
         super().post_epoch(epoch)
