@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 """
-Pretrained models available for knowledge distillation.
+Pretrained models imported from external repositories.
 
 For faster loading in worker nodes, use a shared space for head node and workers
 to access pretrained weights by setting the environment variable TORCH_HOME.

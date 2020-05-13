@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import functools
 import sys
 import time
 
@@ -47,11 +48,11 @@ class KnowledgeDistillation(object):
             - teacher_model_class: Class for pretrained model to be used as teacher
                                    in knowledge distillation.
             - kd_factor_init: Determines the percentage of the target that comes
-                              from the teacher model. Value should be int or float
+                              from the teacher model. Value should be float
                               between 0 and 1. Defaults to 1.
             - kd_factor_end: KD factor at last epoch. Will calculate linear decay
                              based on initial kd_factor_init and kd_factor_end.
-                             Value should be int or float between 0 and 1.
+                             Value should be float between 0 and 1.
                              If None, no decay is applied. Defaults to None.
         """
         super().setup_experiment(config)
@@ -150,7 +151,7 @@ def train_model_with_teacher(
     :type teacher model: torch.nn.Module
     :param kd_factor: Determines the percentage of the target that comes
                       from the teacher model.
-    :type kd_factor: int or float
+    :type kd_factor: float
 
     :return: mean loss for epoch
     :rtype: float
@@ -245,9 +246,9 @@ def train_model_with_teacher(
 def soft_cross_entropy(output, target, size_average=True):
     """ Cross entropy that accepts soft targets
     Args:
-         output: predictions for neural network
-         targets: targets, can be soft
-         size_average: if false, sum is returned instead of mean
+    :param output: predictions for neural network
+    :param targets: targets, can be soft
+    :param size_average: if false, sum is returned instead of mean
 
     Examples::
 
