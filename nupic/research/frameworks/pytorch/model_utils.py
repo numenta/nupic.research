@@ -41,8 +41,6 @@ def train_model(
     pre_batch_callback=None,
     post_batch_callback=None,
     progress_bar=None,
-    teacher_model=None,
-    kd_factor=None
 ):
     """Train the given model by iterating through mini batches. An epoch ends
     after one pass through the training set, or if the number of mini batches
@@ -74,11 +72,6 @@ def train_model(
     :param progress_bar: Optional :class:`tqdm` progress bar args.
                          None for no progress bar
     :type progress_bar: dict or None
-    :param teacher model: Teacher model used for knowledge distillation
-    :type teacher model: torch.nn.Module
-    :param kd_factor: Determines the percentage of the target that comes
-                      from the teacher model.
-    :type kd_factor: int or float
 
     :return: mean loss for epoch
     :rtype: float
@@ -118,25 +111,8 @@ def train_model(
             pre_batch_callback(model=model, batch_idx=batch_idx)
 
         optimizer.zero_grad()
-
         output = model(data)
-
-        # alternative knowledge distillation training
-        if teacher_model is not None:
-            with torch.no_grad():
-                # target is linear combination of teacher and target softmaxes
-                softmax_output_teacher = F.softmax(teacher_model(data))
-                one_hot_target = F.one_hot(target, num_classes=output.shape[-1])
-                combined_target = (kd_factor * softmax_output_teacher
-                                   + (1 - kd_factor) * one_hot_target)
-            # requires a custom loss function.
-            del softmax_output_teacher, one_hot_target
-            loss = soft_cross_entropy(output, combined_target)
-            del combined_target
-        # regular training
-        else:
-            loss = criterion(output, target)
-
+        loss = criterion(output, target)
         del data, target, output
 
         t2 = time.time()
@@ -202,9 +178,12 @@ def evaluate_model(
     :rtype: dict
     """
     model.eval()
-    loss = 0
-    correct = 0
     total = 0
+
+    # Perform accumulation on device, avoid paying performance cost of .item()
+    loss = torch.tensor(0., device=device)
+    correct = torch.tensor(0, device=device)
+
     async_gpu = loader.pin_memory
 
     if progress is not None:
@@ -218,9 +197,9 @@ def evaluate_model(
             target = target.to(device, non_blocking=async_gpu)
 
             output = model(data)
-            loss += criterion(output, target, reduction="sum").item()
+            loss += criterion(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
+            correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
 
             if post_batch_callback is not None:
@@ -229,6 +208,9 @@ def evaluate_model(
 
     if progress is not None:
         loader.close()
+
+    correct = correct.item()
+    loss = loss.item()
 
     return {
         "total_correct": correct,
@@ -298,41 +280,3 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
-
-
-def soft_cross_entropy(output, target, size_average=True):
-    """ Cross entropy that accepts soft targets
-    Args:
-         output: predictions for neural network
-         targets: targets, can be soft
-         size_average: if false, sum is returned instead of mean
-
-    Examples::
-
-        output = torch.FloatTensor([[1.1, 2.8, 1.3], [1.1, 2.1, 4.8]])
-        output = torch.autograd.Variable(out, requires_grad=True)
-
-        target = torch.FloatTensor([[0.05, 0.9, 0.05], [0.05, 0.05, 0.9]])
-        target = torch.autograd.Variable(y1)
-        loss = cross_entropy(output, target)
-        loss.backward()
-
-    see: https://discuss.pytorch.org/t/cross-entropy-with-one-hot-targets/13580/5
-    """
-    if size_average:
-        return torch.mean(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
-    else:
-        return torch.sum(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
-
-
-def linear_decay(first_epoch_value, last_epoch_value, current_epoch, total_epochs):
-    """
-    Calculates value for a current epoch in a linear decay.
-
-    :param first_epoch_value: Value at first epoch (before training).
-    :param last_epoch_value: Value at last epoch (before training).
-    :param current_epoch: Current epoch. Assumes first epoch is 0.
-    :param total_epochs: Total number of epochs in training.
-    """
-    step_size = (first_epoch_value - last_epoch_value) / (total_epochs - 1)
-    return first_epoch_value - step_size * current_epoch
