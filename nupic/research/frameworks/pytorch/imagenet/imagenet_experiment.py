@@ -17,7 +17,6 @@
 #
 #  http://numenta.org/licenses/
 #
-import functools
 import io
 import logging
 import multiprocessing
@@ -91,7 +90,7 @@ class ImagenetExperiment:
         self.seed = 42
         self.launch_time = 0
         self.epochs_to_validate = []
-        self.epoch = 0
+        self.current_epoch = 0
         # Updated by mixins and subclasses.
         self.execution_order = dict(
             setup_experiment=["ImagenetExperiment.setup_experiment"],
@@ -270,7 +269,7 @@ class ImagenetExperiment:
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
         self.epochs_to_validate = config.get("epochs_to_validate",
                                              range(self.epochs - 3, self.epochs + 1))
-        self.epoch = 0
+        self.current_epoch = 0
         workers = config.get("workers", 0)
         data_dir = config["data"]
         train_dir = config.get("train_dir", "train")
@@ -339,7 +338,7 @@ class ImagenetExperiment:
         if loader is None:
             loader = self.val_loader
 
-        if self.epoch in self.epochs_to_validate:
+        if self.current_epoch in self.epochs_to_validate:
             results = self.evaluate_model(
                 model=self.model,
                 loader=loader,
@@ -374,9 +373,9 @@ class ImagenetExperiment:
         )
 
     def run_epoch(self):
-        if -1 in self.epochs_to_validate and self.epoch == 0:
+        if -1 in self.epochs_to_validate and self.current_epoch == 0:
             self.logger.debug("Validating before any training:")
-            self.validate(epoch=-1)
+            self.validate()
         self.pre_epoch()
         self.train_epoch()
         self.post_epoch()
@@ -388,12 +387,12 @@ class ImagenetExperiment:
             self.logger.debug("---------- End of run epoch ------------")
             self.logger.debug("")
 
-        self.epoch += 1
+        self.current_epoch += 1
         return ret
 
     def pre_epoch(self):
         if self.distributed:
-            self.train_loader.sampler.set_epoch(self.epoch)
+            self.train_loader.sampler.set_epoch(self.current_epoch)
 
     def pre_batch(self, model, batch_idx):
         pass
@@ -403,7 +402,7 @@ class ImagenetExperiment:
         if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
-        if self.progress and self.epoch == 0 and batch_idx == 0:
+        if self.progress and self.current_epoch == 0 and batch_idx == 0:
             self.logger.info("Launch time to end of first batch: %s",
                              time.time() - self.launch_time)
 
@@ -416,20 +415,20 @@ class ImagenetExperiment:
                 current_batch *= self.train_loader.sampler.num_replicas
             self.logger.debug("End of batch for rank: %s. Epoch: %s, Batch: %s/%s, "
                               "loss: %s, Learning rate: %s num_images: %s",
-                              self.rank, self.epoch, current_batch, total_batches, loss,
+                              self.rank, self.current_epoch, current_batch, total_batches, loss,
                               self.get_lr(), num_images)
             self.logger.debug("Timing: %s", time_string)
 
     def post_epoch(self):
         self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s",
-                          self.epoch, self.get_lr(), self.get_weight_decay())
+                          self.current_epoch, self.get_lr(), self.get_weight_decay())
 
         # Update learning rate
         if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
         self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s",
-                          self.epoch, self.get_lr(), self.get_weight_decay())
+                          self.current_epoch, self.get_lr(), self.get_weight_decay())
 
     def loss_function(self, output, target, **kwargs):
         return self._loss_function(output, target, **kwargs)
@@ -440,7 +439,7 @@ class ImagenetExperiment:
         :return: dictionary with "model", "optimizer" and "lr_scheduler" states
         """
         state = {
-            "epoch": self.epoch
+            "current_epoch": self.current_epoch
         }
 
         # Save state into a byte array to avoid ray's GPU serialization issues
@@ -470,7 +469,7 @@ class ImagenetExperiment:
         :param state: dictionary with "model", "optimizer", "lr_scheduler", and "amp"
                       states
         """
-        self.epoch = state.get("epoch", 0)
+        self.current_epoch = state.get("current_epoch", 0)
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)

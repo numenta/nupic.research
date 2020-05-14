@@ -60,7 +60,7 @@ class Profile:
         if self.use_cProfile:
             pr.disable()
             filepath = os.path.join(self.logdir,
-                                    f"profile-epoch{self.epoch}.profile")
+                                    f"profile-epoch{self.current_epoch}.profile")
             pstats.Stats(pr).dump_stats(filepath)
             self.logger.info(f"Saved {filepath}")
 

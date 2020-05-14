@@ -120,9 +120,9 @@ class ImagenetTrainable(Trainable):
     def _restore(self, state):
         self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
 
-        # Update epoch for old checkpoints
-        if "epoch" not in state:
-            state.update(epoch=self.iteration)
+        # Update current_epoch for old checkpoints
+        if "current_epoch" not in state:
+            state.update(current_epoch=self.iteration)
 
         # Restore the state to every process
         state_id = ray.put(state)

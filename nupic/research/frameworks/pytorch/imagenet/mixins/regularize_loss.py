@@ -77,5 +77,5 @@ class RegularizeLoss(object):
 
     def pre_epoch(self):
         super().pre_epoch()
-        if self.epoch in self.reg_schedule:
-            self.reg_weight = self.reg_schedule[self.epoch]
+        if self.current_epoch in self.reg_schedule:
+            self.reg_weight = self.reg_schedule[self.current_epoch]
