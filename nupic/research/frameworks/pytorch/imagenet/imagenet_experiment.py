@@ -415,8 +415,8 @@ class ImagenetExperiment:
                 current_batch *= self.train_loader.sampler.num_replicas
             self.logger.debug("End of batch for rank: %s. Epoch: %s, Batch: %s/%s, "
                               "loss: %s, Learning rate: %s num_images: %s",
-                              self.rank, self.current_epoch, current_batch, total_batches, loss,
-                              self.get_lr(), num_images)
+                              self.rank, self.current_epoch, current_batch,
+                              total_batches, loss, self.get_lr(), num_images)
             self.logger.debug("Timing: %s", time_string)
 
     def post_epoch(self):
