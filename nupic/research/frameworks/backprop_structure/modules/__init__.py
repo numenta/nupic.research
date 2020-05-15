@@ -20,3 +20,4 @@
 
 from .binary_layers import BinaryGatedConv2d, BinaryGatedLinear
 from .reparameterization_layers import HardConcreteGatedConv2d, HardConcreteGatedLinear
+from .vdrop_layers import *
