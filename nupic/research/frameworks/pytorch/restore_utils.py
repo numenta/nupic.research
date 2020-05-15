@@ -58,7 +58,8 @@ def load_multi_state(
                    loadable state of models params must be a subset (<=) of the
                    state stored within the checkpoint. If False, the overlap between
                    the model's loadable state and checkpoint's save state will be loaded
-    :param include_buffers: whether to load the models buffers as well
+    :param include_buffers: whether to load the models buffers as well; doesn't work
+                            with restore_full_model.
     :param resize_buffers: whether to resize the models buffers before loading the
                            state; this ensure the model has the same buffer sizes as
                            those saved within the checkpoint prior to loading.
@@ -75,8 +76,8 @@ def load_multi_state(
     model = ResNet()
     model = load_multi_state(
         model,
-        restore_linear=path_to_checkpoint_1     # include linear state
-        restore_nonlinear=path_to_checkpoint_2  # include nonlinear state
+        restore_linear=path_to_checkpoint_1     # includes linear state
+        restore_nonlinear=path_to_checkpoint_2  # includes nonlinear state
     )
     ```
     """
@@ -99,8 +100,12 @@ def load_multi_state(
             if param_map:
                 state_dict = remap_state_dict(state_dict, param_map)
 
+            # Resize the linear buffers.
+            if resize_buffers:
+                resize_model_buffers(model, state_dict)  # done in place
+
             # Load state.
-            model.load_state_dict(state_dict, strict=True)
+            model.load_state_dict(state_dict, strict=strict)
 
         return model
 
