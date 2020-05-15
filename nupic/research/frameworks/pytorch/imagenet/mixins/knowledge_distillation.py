@@ -79,19 +79,17 @@ class KnowledgeDistillation(object):
             self.kd_factor = self.kd_factor_init
         self.logger.info(f"KD factor: {self.kd_factor_init} {self.kd_factor_end}")
 
-    def _train_model(self, epoch):
+    def _train_model(self):
         """Private train model that has access to Experiment attributes
-
-        :param epoch: Epoch number
         """
         # calculates kd factor based on a linear decay
         if self.kd_factor_end is not None:
             self.kd_factor = linear_decay(first_epoch_value=self.kd_factor_init,
                                           last_epoch_value=self.kd_factor_end,
-                                          current_epoch=epoch,
+                                          current_epoch=self.current_epoch,
                                           total_epochs=self.epochs)
-            self.logger.debug(f"KD factor: {self.kd_factor:.3f} at epoch {epoch}")
-        super()._train_model(epoch)
+            self.logger.debug(f"KD factor: {self.kd_factor:.3f} at epoch {self.current_epoch}")
+        super()._train_model()
 
     def calculate_batch_loss(self, data, target, async_gpu=True):
         """
