@@ -116,6 +116,95 @@ def remap_state_dict(state_dict, param_map):
     return new_state_dict
 
 
+def _get_sub_module(module, name):
+    """
+    Gets a submodule either by name or index - Pytorch either uses names for module
+    attributes (e.g. "module.classifier") or indices for sequential models
+    (e.g. `module[0]`).
+    ```
+    """
+    if name.isdigit():
+        return module[int(name)]
+    else:
+        return getattr(module, name)
+
+
+def get_module_attr(module, name):
+    """
+    Get model attribute of torch.nn.Module given its name.
+    Ex:
+    ```
+    name = "features.stem.weight"
+    weight = get_module_attr(net, name)
+    ```
+    """
+
+    # Split off the last sub-name.
+    # Ex. "features.stem.weight" -> ("features.stem", "weight")
+    parent_name, sub_name = (name.split(".", 1) + [None])[0:2]
+
+    if sub_name is not None:
+        parent_module = _get_sub_module(module, parent_name)
+        sub_module = get_module_attr(parent_module, sub_name)
+        return sub_module
+    else:
+        sub_module = _get_sub_module(module, parent_name)
+        return sub_module
+
+
+def set_module_attr(module, name, value):
+    """
+    Set model attribute of torch.nn.Module given its name.
+    Ex:
+    ```
+    name = "features.stem.weight"
+    weight = Parameter(...)
+    set_module_attr(net, name, weight)
+    ```
+    """
+
+    # Split name: pytorch convention uses "." for each child module.
+    all_names = name.split(".")
+
+    # Get all names except the last.
+    # Ex. "features.stem.weight" -> "features.stem"
+    parents_names = all_names[:-1]
+
+    if not parents_names:
+        setattr(module, name, value)
+
+    else:
+        # Get the parent module of the last child module.
+        parent_name = ".".join(parents_names)
+        parent_module = get_module_attr(module, parent_name)
+
+        # Set the new value of the last child module.
+        child_name = all_names[-1]
+        setattr(parent_module, child_name, value)
+
+
+def resize_model_buffers(model, state_dict):
+    """
+    Resizes the models buffers by initializing a zero tensor
+    matching the same size as that within the state_dict.
+    """
+
+    for name, init_buffer in list(model.named_buffers()):
+
+        if name not in state_dict:
+            continue
+
+        saved_buffer = state_dict[name]
+        new_buffer = torch.zeros(
+            saved_buffer.shape,
+            dtype=init_buffer.dtype,
+            layout=init_buffer.layout,
+            device=init_buffer.device,
+        )
+
+        set_module_attr(model, name, new_buffer)
+
+
 def load_multi_state(
     model,
     restore_full_model=None,
@@ -123,6 +212,7 @@ def load_multi_state(
     restore_nonlinear=None,
     strict=True,
     include_buffers=True,
+    resize_buffers=False,
     param_map=None,
 ):
     """
@@ -207,6 +297,10 @@ def load_multi_state(
                 for param_name in linear_params
             }
 
+            # Resize the linear buffers.
+            if resize_buffers:
+                resize_model_buffers(model, linear_state)  # done in place
+
             # Load state.
             model.load_state_dict(linear_state, strict=False)
 
@@ -236,6 +330,10 @@ def load_multi_state(
                 param_name: state_dict[param_name]
                 for param_name in nonlinear_params
             }
+
+            # Resize the linear buffers.
+            if resize_buffers:
+                resize_model_buffers(model, nonlinear_state)  # done in place
 
             # Load state.
             model.load_state_dict(nonlinear_state, strict=False)
