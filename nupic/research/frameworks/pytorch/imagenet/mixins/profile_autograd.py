@@ -38,11 +38,11 @@ class ProfileAutograd:
         # Only profile from rank 0
         self.profile_autograd = self.rank == 0
 
-    def train_epoch(self, epoch):
+    def train_epoch(self):
         with torch.autograd.profiler.profile(
                 use_cuda=torch.cuda.is_available(),
                 enabled=self.profile_autograd) as prof:
-            super().train_epoch(epoch)
+            super().train_epoch()
 
         if self.profile_autograd and prof is not None:
             self.logger.info(prof.key_averages().table(

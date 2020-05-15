@@ -93,7 +93,7 @@ class ImagenetTrainable(Trainable):
         try:
             status = []
             for w in self.procs:
-                status.append(w.run_epoch.remote(self.iteration))
+                status.append(w.run_epoch.remote())
 
             # Wait for remote functions and check for errors
             # Return the results from the first remote function
@@ -119,6 +119,11 @@ class ImagenetTrainable(Trainable):
 
     def _restore(self, state):
         self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
+
+        # Update current_epoch for old checkpoints
+        if "current_epoch" not in state:
+            state.update(current_epoch=self.iteration)
+
         # Restore the state to every process
         state_id = ray.put(state)
         ray.get([w.set_state.remote(state_id) for w in self.procs])

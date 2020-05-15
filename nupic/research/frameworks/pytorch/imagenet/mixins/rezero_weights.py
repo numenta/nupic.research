@@ -56,8 +56,8 @@ class RezeroWeights:
         model.apply(rezero_weights)
         return model
 
-    def post_epoch(self, epoch):
-        super().post_epoch(epoch)
+    def post_epoch(self):
+        super().post_epoch()
 
         count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0
         if count_nnz:
