@@ -36,7 +36,7 @@ class RegularizeLoss(object):
 
     def setup_experiment(self, config):
         """
-        @param reg_schedule (dict)
+        @param reg_schedule (list of tuples)
         Mapping from epoch number to the reg_weight to use on that timestep and
         afterward.
 
@@ -57,8 +57,8 @@ class RegularizeLoss(object):
             self.reg_schedule = {}
             self.reg_weight = 1.0
         else:
-            self.reg_schedule = reg_schedule
-            self.reg_weight = reg_schedule[0]
+            self.reg_schedule = dict(reg_schedule)
+            self.reg_weight = self.reg_schedule[0]
 
         self._regularized_modules = [module
                                      for module in self.model.modules()
@@ -76,6 +76,6 @@ class RegularizeLoss(object):
         return loss
 
     def pre_epoch(self, epoch):
-        return super().pre_epoch(epoch)
+        super().pre_epoch(epoch)
         if epoch in self.reg_schedule:
             self.reg_weight = self.reg_schedule[epoch]
