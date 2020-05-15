@@ -88,7 +88,8 @@ class KnowledgeDistillation(object):
                                           last_epoch_value=self.kd_factor_end,
                                           current_epoch=self.current_epoch,
                                           total_epochs=self.epochs)
-            self.logger.debug(f"KD factor: {self.kd_factor:.3f} at epoch {self.current_epoch}")
+            self.logger.debug(
+                f"KD factor: {self.kd_factor:.3f} at epoch {self.current_epoch}")
         super()._train_model()
 
     def calculate_batch_loss(self, data, target, async_gpu=True):
