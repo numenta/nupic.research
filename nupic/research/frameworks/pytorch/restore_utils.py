@@ -27,6 +27,165 @@ import torch
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
+# ----------------
+# Main utils
+# ----------------
+
+
+def load_multi_state(
+    model,
+    restore_full_model=None,
+    restore_linear=None,
+    restore_nonlinear=None,
+    strict=True,
+    include_buffers=True,
+    resize_buffers=False,
+    param_map=None,
+):
+    """
+    A function for flexible loading of torch.nn.Module's.
+
+    :param model: model to load state; instance of torch.nn.Module
+    :param restore_full_model: path to checkpoint; loads full model, supersedes
+                               restore_linear and restore_nonlinear
+    :param restore_linear: path to checkpoint; loads linear state (including
+                           SparseWeights params), may be used in conjunction with
+                           restore_nonlinear.
+    :param restore_nonlinear: path to checkpoint; loads non-linear state (the difference
+                              between all-state and linear-state), may be used in
+                              conjunction with restore_linear.
+    :param strict: similar to `strict` of pytorch's `load_state_dict`; If True, the
+                   loadable state of models params must be a subset (<=) of the
+                   state stored within the checkpoint. If False, the overlap between
+                   the model's loadable state and checkpoint's save state will be loaded
+    :param include_buffers: whether to load the models buffers as well
+    :param resize_buffers: whether to resize the models buffers before loading the
+                           state; this ensure the model has the same buffer sizes as
+                           those saved within the checkpoint prior to loading.
+                           Otherwise, pytorch may throw an error.
+    :param param_map: a dict mapping names of state within the checkpoint to new desired
+                      names; this helps when the names of the model's state don't quite
+                      match that of the checkpoints. Ex:
+                      `param_map = {"features.weight": "features.new_weight"}`
+                      where `model.weight` exists within the checkpoint and the model
+                      has the attribute `model.features.new_weight`.
+
+    Example:
+    ```
+    model = ResNet()
+    model = load_multi_state(
+        model,
+        restore_linear=path_to_checkpoint_1     # include linear state
+        restore_nonlinear=path_to_checkpoint_2  # include nonlinear state
+    )
+    ```
+    """
+
+    # Validate paths.
+    if restore_full_model:
+        assert os.path.isfile(restore_full_model)
+    if restore_linear:
+        assert os.path.isfile(restore_linear)
+    if restore_nonlinear:
+        assert os.path.isfile(restore_nonlinear)
+
+    # Case 1: Full model state specified.
+    if restore_full_model:
+        state_dict = get_state_dict(restore_full_model)
+
+        if state_dict:
+
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
+
+            # Load state.
+            model.load_state_dict(state_dict, strict=True)
+
+        return model
+
+    # Case 2: Use separate sources for Linear and Non-Linear states.
+    linear_params = get_linear_param_names(model, include_buffers=include_buffers)
+    nonlinear_params = get_nonlinear_param_names(model, include_buffers=include_buffers)
+
+    # Case 2a:  Linear param states
+    linear_state = dict()
+    if restore_linear:
+        state_dict = get_state_dict(restore_linear)
+
+        if state_dict:
+
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
+
+            # Check all desired linear params are present.
+            if strict:
+                assert set(linear_params) <= set(state_dict.keys()), "".join([
+                    "Found linear params in the model ",
+                    "which are not present in the checkpoint '{}'.\n".format(
+                        restore_linear),
+                    "Params not present include:\n {}".format(
+                        set(linear_params) - set(state_dict.keys()))
+                ])
+
+            # Get and load desired linear params.
+            linear_state = {
+                param_name: state_dict[param_name]
+                for param_name in linear_params
+            }
+
+            # Resize the linear buffers.
+            if resize_buffers:
+                resize_model_buffers(model, linear_state)  # done in place
+
+            # Load state.
+            model.load_state_dict(linear_state, strict=False)
+
+    # Case 2b:  Non-Linear param states
+    nonlinear_state = dict()
+    if restore_nonlinear:
+        state_dict = get_state_dict(restore_nonlinear)
+
+        if state_dict:
+
+            # Remap param names in state_dict.
+            if param_map:
+                state_dict = remap_state_dict(state_dict, param_map)
+
+            # Check all desired nonlinear params are present.
+            if strict:
+                assert set(nonlinear_params) <= set(state_dict.keys()), "".join([
+                    "Found nonlinear params in the model ",
+                    "which are not present in the checkpoint '{}'.\n".format(
+                        restore_nonlinear),
+                    "Params not present include:\n {}".format(
+                        set(nonlinear_params) - set(state_dict.keys()))
+                ])
+
+            # Get and load desired nonlinear params.
+            nonlinear_state = {
+                param_name: state_dict[param_name]
+                for param_name in nonlinear_params
+            }
+
+            # Resize the linear buffers.
+            if resize_buffers:
+                resize_model_buffers(model, nonlinear_state)  # done in place
+
+            # Load state.
+            model.load_state_dict(nonlinear_state, strict=False)
+
+    # Validate results / quick sanity-check.
+    assert set(linear_state.keys()).isdisjoint(nonlinear_state.keys())
+
+    return model
+
+
+# -------------------
+# Supplemental utils
+# -------------------
+
 
 def get_state_dict(checkpoint_path):
 
@@ -207,165 +366,3 @@ def resize_model_buffers(model, state_dict):
         )
 
         set_module_attr(model, name, new_buffer)
-
-
-def load_multi_state(
-    model,
-    restore_full_model=None,
-    restore_linear=None,
-    restore_nonlinear=None,
-    strict=True,
-    include_buffers=True,
-    resize_buffers=False,
-    param_map=None,
-):
-    """
-    A function for flexible loading of torch.nn.Module's.
-
-    :param model: model to load state; instance of torch.nn.Module
-    :param restore_full_model: path to checkpoint; loads full model, supersedes
-                               restore_linear and restore_nonlinear
-    :param restore_linear: path to checkpoint; loads linear state (including
-                           SparseWeights params), may be used in conjunction with
-                           restore_nonlinear.
-    :param restore_nonlinear: path to checkpoint; loads non-linear state (the difference
-                              between all-state and linear-state), may be used in
-                              conjunction with restore_linear.
-    :param strict: similar to `strict` of pytorch's `load_state_dict`; If True, the
-                   loadable state of models params must be a subset (<=) of the
-                   state stored within the checkpoint. If False, the overlap between
-                   the model's loadable state and checkpoint's save state will be loaded
-    :param include_buffers: whether to load the models buffers as well
-    :param resize_buffers: whether to resize the models buffers before loading the
-                           state; this ensure the model has the same buffer sizes as
-                           those saved within the checkpoint prior to loading.
-                           Otherwise, pytorch may throw an error.
-    :param param_map: a dict mapping names of state within the checkpoint to new desired
-                      names; this helps when the names of the model's state don't quite
-                      match that of the checkpoints. Ex:
-                      `param_map = {"features.weight": "features.new_weight"}`
-                      where `model.weight` exists within the checkpoint and the model
-                      has the attribute `model.features.new_weight`.
-
-    Example:
-    ```
-    model = ResNet()
-    model = load_multi_state(
-        model,
-        restore_linear=path_to_checkpoint_1     # include linear state
-        restore_nonlinear=path_to_checkpoint_2  # include nonlinear state
-    )
-    ```
-    """
-
-    # Validate paths.
-    if restore_full_model:
-        assert os.path.isfile(restore_full_model)
-    if restore_linear:
-        assert os.path.isfile(restore_linear)
-    if restore_nonlinear:
-        assert os.path.isfile(restore_nonlinear)
-
-    # Case 1: Full model state specified.
-    if restore_full_model:
-        state_dict = get_state_dict(restore_full_model)
-
-        if state_dict:
-
-            # Remap param names in state_dict.
-            if param_map:
-                state_dict = remap_state_dict(state_dict, param_map)
-
-            # Load state.
-            model.load_state_dict(state_dict, strict=True)
-
-        return model
-
-    # Case 2: Use separate sources for Linear and Non-Linear states.
-    linear_params = get_linear_param_names(model, include_buffers=include_buffers)
-    nonlinear_params = get_nonlinear_param_names(model, include_buffers=include_buffers)
-
-    # Case 2a:  Linear param states
-    linear_state = dict()
-    if restore_linear:
-        state_dict = get_state_dict(restore_linear)
-
-        if state_dict:
-
-            # Remap param names in state_dict.
-            if param_map:
-                state_dict = remap_state_dict(state_dict, param_map)
-
-            # Check all desired linear params are present.
-            if strict:
-                assert set(linear_params) <= set(state_dict.keys()), "".join([
-                    "Found linear params in the model ",
-                    "which are not present in the checkpoint '{}'.\n".format(
-                        restore_linear),
-                    "Params not present include:\n {}".format(
-                        set(linear_params) - set(state_dict.keys()))
-                ])
-
-            # Get and load desired linear params.
-            linear_state = {
-                param_name: state_dict[param_name]
-                for param_name in linear_params
-            }
-
-            # Resize the linear buffers.
-            if resize_buffers:
-                resize_model_buffers(model, linear_state)  # done in place
-
-            # Load state.
-            model.load_state_dict(linear_state, strict=False)
-
-    # Case 2b:  Non-Linear param states
-    nonlinear_state = dict()
-    if restore_nonlinear:
-        state_dict = get_state_dict(restore_nonlinear)
-
-        if state_dict:
-
-            # Remap param names in state_dict.
-            if param_map:
-                state_dict = remap_state_dict(state_dict, param_map)
-
-            # Check all desired nonlinear params are present.
-            if strict:
-                assert set(nonlinear_params) <= set(state_dict.keys()), "".join([
-                    "Found nonlinear params in the model ",
-                    "which are not present in the checkpoint '{}'.\n".format(
-                        restore_nonlinear),
-                    "Params not present include:\n {}".format(
-                        set(nonlinear_params) - set(state_dict.keys()))
-                ])
-
-            # Get and load desired nonlinear params.
-            nonlinear_state = {
-                param_name: state_dict[param_name]
-                for param_name in nonlinear_params
-            }
-
-            # Resize the linear buffers.
-            if resize_buffers:
-                resize_model_buffers(model, nonlinear_state)  # done in place
-
-            # Load state.
-            model.load_state_dict(nonlinear_state, strict=False)
-
-    # Validate results / quick sanity-check.
-    assert set(linear_state.keys()).isdisjoint(nonlinear_state.keys())
-
-    return model
-
-
-def freeze_all_params(net):
-    for p in net.parameters():
-        p.requires_grad = False
-
-
-def unfreeze_linear_params(net):
-    for m in net.modules():
-        if isinstance(m, torch.nn.Linear):
-            for p in m.parameters():
-                p.requires_grad = True
