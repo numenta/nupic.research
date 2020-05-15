@@ -21,6 +21,15 @@
 
 import numpy as np
 import torch
+from torch import nn
+import torch.nn.functional as F
+# from nupic.research.frameworks.continuous_learning.dendrite_layers import DendriteLayer
+
+
+def clear_labels(labels):
+    indices = np.arange(11)
+    out = np.delete(indices, labels)
+    return out
 
 
 def get_act(experiment):
@@ -62,7 +71,7 @@ def dc_grad(model, kwinner_modules, duty_cycles, pct=90):
         else:
             # module = module_dict[module_name]
             dc = torch.squeeze(duty_cycles[module_name])
-            # print(dc)
+
             k = int((1 - pct / 100) * len(dc))
             _, inds = torch.topk(dc, k)
 
@@ -87,3 +96,24 @@ def dc_grad(model, kwinner_modules, duty_cycles, pct=90):
                 [weight_grads[ind, :].fill_(0.0) for ind in inds]
 
             [bias_grads[ind].data.fill_(0.0) for ind in inds]
+
+
+def init_weights(m):
+    if type(m) == nn.Linear or type(m) == nn.Conv2d:
+        torch.nn.init.kaiming_uniform_(m.weight)
+        m.bias.data.fill_(0.01)
+
+
+# class ADA_fun(nn.Module):
+#     def __init__(self, a=1, c=1, l=0.005):
+#         super(ADA_fun, self).__init__()
+#         self.a = a
+#         self.c = c
+#         self.l = l
+
+#     def forward(self, x):
+#         neg_relu = torch.clamp(x, max=0)
+#         ADA = F.relu(x) * torch.exp(-x * self.a + self.c)
+#         ADA_l = self.l * neg_relu + ADA
+#         return ADA_l
+
