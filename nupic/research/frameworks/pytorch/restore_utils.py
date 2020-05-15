@@ -100,6 +100,10 @@ def get_nonlinear_param_names(
 def remap_state_dict(state_dict, param_map):
     """
     Remaps the names of the params according to 'param_map'.
+    Ex:
+    ```
+    param_map["foo"] == "bar"
+    state_dict["foo"] == new_state_dict["bar"]
     """
 
     new_state_dict = {}
@@ -118,7 +122,7 @@ def remap_state_dict(state_dict, param_map):
 
 def _get_sub_module(module, name):
     """
-    Gets a submodule either by name or index - Pytorch either uses names for module
+    Gets a submodule either by name or index - pytorch either uses names for module
     attributes (e.g. "module.classifier") or indices for sequential models
     (e.g. `module[0]`).
     ```
@@ -216,30 +220,41 @@ def load_multi_state(
     param_map=None,
 ):
     """
-    Example 1:
+    A function for flexible loading of torch.nn.Module's.
+
+    :param model: model to load state; instance of torch.nn.Module
+    :param restore_full_model: path to checkpoint; loads full model, supersedes
+                               restore_linear and restore_nonlinear
+    :param restore_linear: path to checkpoint; loads linear state (including
+                           SparseWeights params), may be used in conjunction with
+                           restore_nonlinear.
+    :param restore_nonlinear: path to checkpoint; loads non-linear state (the difference
+                              between all-state and linear-state), may be used in
+                              conjunction with restore_linear.
+    :param strict: similar to `strict` of pytorch's `load_state_dict`; If True, the
+                   loadable state of models params must be a subset (<=) of the
+                   state stored within the checkpoint. If False, the overlap between
+                   the model's loadable state and checkpoint's save state will be loaded
+    :param include_buffers: whether to load the models buffers as well
+    :param resize_buffers: whether to resize the models buffers before loading the
+                           state; this ensure the model has the same buffer sizes as
+                           those saved within the checkpoint prior to loading.
+                           Otherwise, pytorch may throw an error.
+    :param param_map: a dict mapping names of state within the checkpoint to new desired
+                      names; this helps when the names of the model's state don't quite
+                      match that of the checkpoints. Ex:
+                      `param_map = {"features.weight": "features.new_weight"}`
+                      where `model.weight` exists within the checkpoint and the model
+                      has the attribute `model.features.new_weight`.
+
+    Example:
     ```
-    checkpoint_linear = "~/.../checkpoint_20/checkpoint"
-    checkpoint_nonlinear = "~/.../checkpoint_1/checkpoint""
-
-    kwargs = {
-        "restore_linear": checkpoint_linear,
-        "restore_nonlinear": checkpoint_nonlinear,
-    }
-
     model = ResNet()
-    model = load_multi_state(model, **kwargs)
-    ```
-
-    Example 2:
-    ```
-    checkpoint_model = "~/.../checkpoint_1/checkpoint""
-
-    kwargs = {
-        "restore_full_model": checkpoint_model,
-    }
-
-    model = ResNet()
-    model = load_multi_state(model, **kwargs)
+    model = load_multi_state(
+        model,
+        restore_linear=path_to_checkpoint_1     # include linear state
+        restore_nonlinear=path_to_checkpoint_2  # include nonlinear state
+    )
     ```
     """
 
