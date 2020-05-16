@@ -65,17 +65,18 @@ class RegularizeLoss(object):
     def loss_function(self, *args, **kwargs):
         loss = super().loss_function(*args, **kwargs)
 
-        # This is inner loop code, avoid any unnecessary tensor allocation.
-        reg = None
-        for module in self._regularized_modules:
-            if reg is None:
-                reg = module.regularization()
-            else:
-                reg += module.regularization()
+        if self.reg_weight != 0:
+            # This is inner loop code, avoid any unnecessary tensor allocation.
+            reg = None
+            for module in self._regularized_modules:
+                if reg is None:
+                    reg = module.regularization()
+                else:
+                    reg += module.regularization()
 
-        if reg is not None:
-            reg *= self.reg_weight * self.reg_coefficient
-            loss += reg
+            if reg is not None:
+                reg *= self.reg_weight * self.reg_coefficient
+                loss += reg
 
         return loss
 
