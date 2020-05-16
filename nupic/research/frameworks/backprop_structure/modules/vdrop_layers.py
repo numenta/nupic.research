@@ -129,8 +129,9 @@ class VDropConv2d(nn.Module):
 
         self.threshold = 3
         self.epsilon = 1e-8
-        self.tensor = (torch.FloatTensor if not torch.cuda.is_available()
-                       else torch.cuda.FloatTensor)
+        self.tensor_constructor = (torch.FloatTensor
+                                   if not torch.cuda.is_available()
+                                   else torch.cuda.FloatTensor)
 
     def extra_repr(self):
         s = (f"{self.in_channels}, {self.out_channels}, "
