@@ -35,7 +35,6 @@ def train_model(
     loader,
     optimizer,
     device,
-    maxup_num_images,
     freeze_params=None,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
@@ -99,39 +98,13 @@ def train_model(
                 "Please install apex from https://www.github.com/nvidia/apex")
 
     t0 = time.time()
-    for batch_idx, (samples, target) in enumerate(loader):
+    for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
 
         num_images = len(target)
+        data = data.to(device, non_blocking=async_gpu)
         target = target.to(device, non_blocking=async_gpu)
-        one_hot_target = None
-
-        # try loading all into GPU - will it fit?
-        samples = samples.to(device, non_blocking=async_gpu)
-        t1 = time.time()
-
-        # calculate loss for all the tranformed versions of the image
-        losses = []
-        for dim in range(maxup_num_images):
-            # each data is actually a 5d tensor, not a 4d.
-            # the second dimension is the one I have to unroll
-            data = samples[:, dim, :, :, :]
-
-            # calculate partial loss with no grad
-            with torch.no_grad():
-                output = model(data)
-                if one_hot_target is None:
-                    one_hot_target = F.one_hot(target, num_classes=output.shape[-1])
-                losses.append(partial_cross_entropy(output, one_hot_target))
-
-        # make it into tensor
-        # 0-dim is number of maxup images, 1-dim is batch size
-        losses = torch.stack(losses)
-        # take the max over the 0-dim, maxup images
-        max_indices = torch.argmax(losses, dim=0)
-        # use max indices to select locally
-        data = samples[range(num_images), max_indices, :, :, :]
 
         if pre_batch_callback is not None:
             pre_batch_callback(model=model, batch_idx=batch_idx)
@@ -306,25 +279,3 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
-
-def partial_cross_entropy(output, target):
-    """ Cross entropy that accepts soft targets
-    Args:
-         pred: predictions for neural network
-         targets: targets, can be soft
-         size_average: if false, sum is returned instead of mean
-
-    Examples::
-
-        output = torch.FloatTensor([[1.1, 2.8, 1.3], [1.1, 2.1, 4.8]])
-        output = torch.autograd.Variable(out, requires_grad=True)
-
-        target = torch.FloatTensor([[0.05, 0.9, 0.05], [0.05, 0.05, 0.9]])
-        target = torch.autograd.Variable(y1)
-        loss = cross_entropy(output, target)
-        loss.backward()
-
-    adapted from: 
-    https://discuss.pytorch.org/t/cross-entropy-with-one-hot-targets/13580/5
-    """
-    return torch.sum(-target * F.log_softmax(output), dim=1)

@@ -33,7 +33,6 @@ from torchvision.transforms import RandomResizedCrop
 from nupic.research.frameworks.pytorch.dataset_utils import (
     CachedDatasetFolder,
     HDF5Dataset,
-    MaxupDataset
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 

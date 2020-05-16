@@ -51,7 +51,6 @@ __all__ = [
     "CachedDatasetFolder",
     "ProgressiveRandomResizedCrop",
     "HDF5Dataset",
-    "MaxupDataset",
 ]
 
 
@@ -382,8 +381,7 @@ class HDF5Dataset(VisionDataset):
     def __init__(
         self, hdf5_file, root,
         num_classes=None, classes=None, load_as_images=True,
-        replicas_per_sample=1,
-        **kwargs
+        replicas_per_sample=1, **kwargs
     ):
         assert h5py.is_hdf5(hdf5_file)
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
