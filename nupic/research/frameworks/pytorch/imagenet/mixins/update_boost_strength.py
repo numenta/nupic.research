@@ -30,6 +30,6 @@ class UpdateBoostStrength:
         super().__init__()
         self.execution_order["pre_epoch"].append("UpdateBoostStrength")
 
-    def pre_epoch(self, epoch):
-        super().pre_epoch(epoch)
+    def pre_epoch(self):
+        super().pre_epoch()
         self.model.apply(update_boost_strength)
