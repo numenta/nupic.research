@@ -424,7 +424,8 @@ class ImagenetExperiment:
                           self.current_epoch, self.get_lr(), self.get_weight_decay())
 
         # Update learning rate
-        if not isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
+        if self.lr_scheduler is not None and not isinstance(
+                self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
 
         self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s",
@@ -452,9 +453,10 @@ class ImagenetExperiment:
             serialize_state_dict(buffer, self.optimizer.state_dict())
             state["optimizer"] = buffer.getvalue()
 
-        with io.BytesIO() as buffer:
-            serialize_state_dict(buffer, self.lr_scheduler.state_dict())
-            state["lr_scheduler"] = buffer.getvalue()
+        if self.lr_scheduler is not None:
+            with io.BytesIO() as buffer:
+                serialize_state_dict(buffer, self.lr_scheduler.state_dict())
+                state["lr_scheduler"] = buffer.getvalue()
 
         if self.mixed_precision:
             with io.BytesIO() as buffer:
