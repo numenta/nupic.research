@@ -105,7 +105,7 @@ def train_model(
 
         num_images = len(target)
         target = target.to(device, non_blocking=async_gpu)
-
+        one_hot_target = None
 
         # try loading all into GPU - will it fit?
         samples = samples.to(device, non_blocking=async_gpu)
@@ -117,19 +117,21 @@ def train_model(
             # each data is actually a 5d tensor, not a 4d.
             # the second dimension is the one I have to unroll
             data = samples[:, dim, :, :, :]
-            # data = data.to(device, non_blocking=async_gpu)
 
-            # need to calculate loss with no grad
+            # calculate partial loss with no grad
             with torch.no_grad():
                 output = model(data)
-                losses.append(criterion(output, target).item())
+                if one_hot_target is None:
+                    one_hot_target = F.one_hot(target, num_classes=output.shape[-1])
+                losses.append(partial_cross_entropy(output, one_hot_target))
 
-        # get the image which shows the greatest loss
-        max_loss_dim = np.argmax(losses)
-
-        # proceed training as normal with this image only
-        data = samples[:, max_loss_dim, :, :, :]
-        # data = data.to(device, non_blocking=async_gpu)
+        # make it into tensor
+        # 0-dim is number of maxup images, 1-dim is batch size
+        losses = torch.stack(losses)
+        # take the max over the 0-dim, maxup images
+        max_indices = torch.argmax(losses, dim=0)
+        # use max indices to select locally
+        data = samples[range(num_images), max_indices, :, :, :]
 
         if pre_batch_callback is not None:
             pre_batch_callback(model=model, batch_idx=batch_idx)
@@ -202,9 +204,12 @@ def evaluate_model(
     :rtype: dict
     """
     model.eval()
-    loss = 0
-    correct = 0
     total = 0
+
+    # Perform accumulation on device, avoid paying performance cost of .item()
+    loss = torch.tensor(0., device=device)
+    correct = torch.tensor(0, device=device)
+
     async_gpu = loader.pin_memory
 
     if progress is not None:
@@ -218,9 +223,9 @@ def evaluate_model(
             target = target.to(device, non_blocking=async_gpu)
 
             output = model(data)
-            loss += criterion(output, target, reduction="sum").item()
+            loss += criterion(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
+            correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
 
             if post_batch_callback is not None:
@@ -229,6 +234,9 @@ def evaluate_model(
 
     if progress is not None:
         loader.close()
+
+    correct = correct.item()
+    loss = loss.item()
 
     return {
         "total_correct": correct,
@@ -298,3 +306,25 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
+
+def partial_cross_entropy(output, target):
+    """ Cross entropy that accepts soft targets
+    Args:
+         pred: predictions for neural network
+         targets: targets, can be soft
+         size_average: if false, sum is returned instead of mean
+
+    Examples::
+
+        output = torch.FloatTensor([[1.1, 2.8, 1.3], [1.1, 2.1, 4.8]])
+        output = torch.autograd.Variable(out, requires_grad=True)
+
+        target = torch.FloatTensor([[0.05, 0.9, 0.05], [0.05, 0.05, 0.9]])
+        target = torch.autograd.Variable(y1)
+        loss = cross_entropy(output, target)
+        loss.backward()
+
+    adapted from: 
+    https://discuss.pytorch.org/t/cross-entropy-with-one-hot-targets/13580/5
+    """
+    return torch.sum(-target * F.log_softmax(output), dim=1)

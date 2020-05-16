@@ -51,7 +51,7 @@ __all__ = [
     "CachedDatasetFolder",
     "ProgressiveRandomResizedCrop",
     "HDF5Dataset",
-    "MaxupDataset",    
+    "MaxupDataset",
 ]
 
 
@@ -381,11 +381,14 @@ class HDF5Dataset(VisionDataset):
 
     def __init__(
         self, hdf5_file, root,
-        num_classes=None, classes=None, load_as_images=True, **kwargs
+        num_classes=None, classes=None, load_as_images=True,
+        replicas_per_sample=1,
+        **kwargs
     ):
         assert h5py.is_hdf5(hdf5_file)
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
 
+        self.replicas_per_sample = replicas_per_sample
         self._hdf5_file = hdf5_file
         self._load_as_images = load_as_images
         with h5py.File(name=self._hdf5_file, mode="r") as hdf5:
@@ -483,12 +486,18 @@ class HDF5Dataset(VisionDataset):
         else:
             sample = torch.load(BytesIO(image_data))
 
-        # Apply transforms
         if self.transform is not None:
-            sample = self.transform(sample)
+            if self.replicas_per_sample > 1:
+                # add an extra dimension with size replicas_per_sample
+                sample = torch.stack([
+                    self.transform(sample) for _ in range(replicas_per_sample)
+                ])
+            else:
+                sample = self.transform(sample)
         if self.target_transform is not None:
             target = self.target_transform(target)
 
+        # return list of samples, instead of a sample
         return sample, target
 
     def __len__(self):
@@ -500,66 +509,3 @@ class HDF5Dataset(VisionDataset):
 
     def get_classes(self):
         return self._classes
-
-
-class MaxupDataset(HDF5Dataset):
-    """
-    Redefines HDF5 dataset to return multiple transformations of the same image
-    :param maxup_num_images:
-        Number of augmented images to be loaded for each image in dataset
-    """
-
-    def __init__(
-        self, hdf5_file, root, maxup_num_images,
-        num_classes=None, classes=None, load_as_images=True, **kwargs
-    ):
-
-        # load super class with 
-        super(MaxupDataset, self).__init__(hdf5_file, root,
-        num_classes, classes, load_as_images, **kwargs)
-
-        # define specific attributes
-        print("Loading Maxup Dataset")
-        self.maxup_num_images = maxup_num_images
-
-    def __getitem__(self, index):
-        file_name = self._images[index]
-
-        # Parent group represents the image target class
-        class_name = posixpath.dirname(file_name)
-        target = self._classes[class_name]
-
-        if self._hdf5 is None:
-            self._hdf5 = h5py.File(name=self._hdf5_file, mode="r")
-
-        group = self._hdf5[class_name]
-        image_file = group[file_name]
-
-        # If dataset is contiguous and uncompressed map it directly to memory
-        if image_file.chunks is None and image_file.compression is None:
-            image_data = np.memmap(
-                image_file.file.filename,
-                mode="r",
-                shape=image_file.shape,
-                offset=image_file.id.get_offset(),
-                dtype=image_file.dtype)
-        else:
-            # Load image data from dataset
-            image_data = image_file[()]
-
-        # Convert image to RGB
-        if self._load_as_images:
-            image = Image.open(BytesIO(image_data))
-            sample = image.convert("RGB")
-        else:
-            sample = torch.load(BytesIO(image_data))
-
-        # Apply transforms - return a list of samples the size of m
-        m = self.maxup_num_images
-        if self.transform is not None:
-            samples = torch.stack([self.transform(sample) for _ in range(m)])
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        # return list of samples, instead of a sample
-        return samples, target

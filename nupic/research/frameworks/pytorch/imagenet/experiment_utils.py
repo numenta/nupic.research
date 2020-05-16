@@ -41,9 +41,9 @@ from .auto_augment import ImageNetPolicy
 
 IMAGENET_NUM_CLASSES = {
     10: [
-        "n01440764", "n02102040", "n02979186", "n03000684", "n03028079", 
+        "n01440764", "n02102040", "n02979186", "n03000684", "n03028079",
         "n03394916", "n03417042", "n03425413", "n03445777", "n03888257"
-    ], 
+    ],
     100: [
         "n01440764", "n01592084", "n01601694", "n01630670", "n01631663",
         "n01664065", "n01677366", "n01693334", "n01734418", "n01751748",
@@ -70,8 +70,9 @@ IMAGENET_NUM_CLASSES = {
 
 
 def create_train_dataloader(
-    data_dir, train_dir, batch_size, workers, distributed, maxup_num_images,
-    num_classes=1000, use_auto_augment=False,
+    data_dir, train_dir, batch_size, workers, distributed, num_classes=1000,
+    use_auto_augment=False, sample_transform=None, target_transform=None,
+    replicas_per_sample=1
 ):
     """
     Configure Imagenet training dataloader
@@ -85,6 +86,9 @@ def create_train_dataloader(
     :param workers: how many data loading subprocesses to use
     :param distributed: Whether or not to use `DistributedSampler`
     :param num_classes: Limit the dataset size to the given number of classes
+    :param sample_transform: List of transforms acting on the samples
+                             to be added to the defaults below
+    :param target_transform: List of transforms acting on the targets
     :return: torch.utils.data.DataLoader
     """
     if use_auto_augment:
@@ -112,21 +116,29 @@ def create_train_dataloader(
                 ),
             ],
         )
+
+    transform = transforms.Compose(
+        transforms=[transform] + (sample_transform or []))
+    target_transform = target_transform
+
     if h5py.is_hdf5(data_dir):
         # Use fixed Imagenet classes if mapping is available
         # switch to my temporary version of mixup
         if num_classes in IMAGENET_NUM_CLASSES:
             classes = IMAGENET_NUM_CLASSES[num_classes]
-            dataset = MaxupDataset(hdf5_file=data_dir, root=train_dir,
-                                  maxup_num_images=maxup_num_images,
-                                  classes=classes, transform=transform)
+            dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
+                                  classes=classes, transform=transform,
+                                  target_transform=target_transform,
+                                  replicas_per_sample=replicas_per_sample)
         else:
-            dataset = MaxupDataset(hdf5_file=data_dir, root=train_dir,
-                                  maxup_num_images=maxup_num_images,
-                                  num_classes=num_classes, transform=transform)
+            dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
+                                  num_classes=num_classes, transform=transform,
+                                  target_transform=target_transform,
+                                  replicas_per_sample=replicas_per_sample)
     else:
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, train_dir),
-                                      num_classes=num_classes, transform=transform)
+                                      num_classes=num_classes, transform=transform,
+                                      target_transform=target_transform)
     if distributed:
         train_sampler = DistributedSampler(dataset)
     else:

@@ -19,6 +19,7 @@
 #
 import io
 import pickle
+from collections import OrderedDict
 
 import torch
 import torchvision.models
@@ -28,7 +29,6 @@ from torch import nn as nn
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
-from nupic.torch.modules import rezero_weights
 
 
 def init_resnet50_batch_norm(model):
@@ -87,6 +87,7 @@ def create_model(model_class, model_args, init_batch_norm, device,
             state = pickle.load(pickle_file)
         with io.BytesIO(state["model"]) as buffer:
             state_dict = deserialize_state_dict(buffer, device)
+<<<<<<< HEAD
         # model.load_state_dict(state_dict)
  
         def make_compatible(curr_state_dict, state_dict):
@@ -95,14 +96,15 @@ def create_model(model_class, model_args, init_batch_norm, device,
             return {k:v for k,v in zip(curr_state_dict.keys(), state_dict.values())}
         model.load_state_dict(make_compatible(model.state_dict(), state_dict))
 
+=======
+>>>>>>> 68b26a41cfc03e6e5c9543fdd80bf3dcef09befe
 
-    # Modify init via hooks.
-    elif init_hooks:
-        for hook, kwargs in init_hooks:
-            model = hook(model, **kwargs) or model
+        # Make sure checkpoint is compatible with model
+        if model.state_dict().keys() != state_dict.keys():
+            state_dict = OrderedDict(
+                zip(model.state_dict().keys(), state_dict.values()))
 
-    # Some initialization strategies can destroy sparsity, so we call rezero here
-    model.apply(rezero_weights)
+        model.load_state_dict(state_dict)
 
     return model
 
@@ -115,8 +117,6 @@ def create_model_from_config(config, device):
             - model_args: model model class arguments passed to the constructor
             - init_batch_norm: Whether or not to Initialize running batch norm
                                mean to 0.
-            - init_hooks: list of hooks (functions) to call on the model
-                          just following its initialization
             - checkpoint_file: if not None, will start from this model. The model
                                must have the same model_args and model_class as the
                                current experiment.
@@ -129,13 +129,11 @@ def create_model_from_config(config, device):
     model_class = config["model_class"]
     model_args = config.get("model_args", {})
     init_batch_norm = config.get("init_batch_norm", False)
-    init_hooks = config.get("init_hooks", None)
     model = create_model(
         model_class=model_class,
         model_args=model_args,
         init_batch_norm=init_batch_norm,
         device=device,
-        init_hooks=init_hooks,
         checkpoint_file=config.get("checkpoint_file", None)
     )
 

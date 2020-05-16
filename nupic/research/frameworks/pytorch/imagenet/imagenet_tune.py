@@ -32,7 +32,6 @@ from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 from ray.tune.utils import warn_if_slow
 
-from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
 from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
     TrialsCollection,
 )
@@ -64,6 +63,8 @@ class ImagenetTrainable(Trainable):
         return resource
 
     def _setup(self, config):
+        config["logdir"] = self.logdir
+
         # Configure logging related stuff
         log_format = config.get("log_format", logging.BASIC_FORMAT)
         log_level = getattr(logging, config.get("log_level", "INFO").upper())
@@ -144,11 +145,13 @@ class ImagenetTrainable(Trainable):
 
         self._process_config(config)
 
+        experiment_class = config["experiment_class"]
+
         for i in range(1 + self.max_retries):
             self.procs = []
             for _ in range(world_size):
                 experiment = ray.remote(
-                    num_cpus=num_cpus, num_gpus=num_gpus)(ImagenetExperiment)
+                    num_cpus=num_cpus, num_gpus=num_gpus)(experiment_class)
                 self.procs.append(experiment.remote())
 
             # Use first process as head of the group
@@ -295,7 +298,9 @@ def run(config):
         kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
                                          *tune.run.__defaults__]))
     else:
-        kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
+        imagenet_trainable = config.get("imagenet_trainable", ImagenetTrainable)
+        assert issubclass(imagenet_trainable, ImagenetTrainable)
+        kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
 
     # Update`tune.run` kwargs with config
     kwargs.update(config)
