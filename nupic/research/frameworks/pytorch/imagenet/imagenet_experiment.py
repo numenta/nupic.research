@@ -204,7 +204,7 @@ class ImagenetExperiment:
         self.rank = config.get("rank", 0)
 
         if self.rank == 0:
-            self.logger.info(f"Execution order: {self.execution_order}")
+            self.logger.info(f"Execution order: {pformat(self.execution_order)}")
 
         if self.distributed:
             dist_url = config.get("dist_url", "tcp://127.0.0.1:54321")
