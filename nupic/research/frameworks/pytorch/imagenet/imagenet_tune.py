@@ -335,6 +335,7 @@ def run_single_instance(config):
     config["workers"] = 4
     config["log_level"] = "INFO"
     config["reuse_actors"] = False
+    config["dist_port"] = get_free_port()
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]

@@ -105,6 +105,7 @@ def train_model(
         num_images = len(target)
         data = data.to(device, non_blocking=async_gpu)
         target = target.to(device, non_blocking=async_gpu)
+        t1 = time.time()
 
         if pre_batch_callback is not None:
             pre_batch_callback(model=model, batch_idx=batch_idx)

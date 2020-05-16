@@ -488,7 +488,7 @@ class HDF5Dataset(VisionDataset):
             if self.replicas_per_sample > 1:
                 # add an extra dimension with size replicas_per_sample
                 sample = torch.stack([
-                    self.transform(sample) for _ in range(replicas_per_sample)
+                    self.transform(sample) for _ in range(self.replicas_per_sample)
                 ])
             else:
                 sample = self.transform(sample)
