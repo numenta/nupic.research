@@ -122,7 +122,6 @@ def create_train_dataloader(
 
     if h5py.is_hdf5(data_dir):
         # Use fixed Imagenet classes if mapping is available
-        # switch to my temporary version of mixup
         if num_classes in IMAGENET_NUM_CLASSES:
             classes = IMAGENET_NUM_CLASSES[num_classes]
             dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
