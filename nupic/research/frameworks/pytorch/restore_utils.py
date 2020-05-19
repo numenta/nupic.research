@@ -371,3 +371,15 @@ def resize_model_buffers(model, state_dict):
         )
 
         set_module_attr(model, name, new_buffer)
+
+
+def freeze_all_params(net):
+    for p in net.parameters():
+        p.requires_grad = False
+
+
+def unfreeze_linear_params(net):
+    for m in net.modules():
+        if isinstance(m, torch.nn.Linear):
+            for p in m.parameters():
+                p.requires_grad = True
