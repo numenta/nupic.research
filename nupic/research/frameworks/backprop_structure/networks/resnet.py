@@ -149,7 +149,7 @@ class ResNet(nn.Module):
     - You can provide stem, conv1x1, and conv3x3 constructors.
     """
 
-    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
+    def __init__(self, block, layers, num_classes, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None, conv1x1_layer=None, conv3x3_layer=None,
                  stem_layer=None):
@@ -266,12 +266,28 @@ def mnist_stem(out_planes):
                      padding=1, bias=False)
 
 
-mnist_resnet = partial(ResNet,
-                       block=BasicBlock,
-                       layers=[2, 2, 2, 2],
-                       num_classes=10,
-                       stem=mnist_stem)
+def imagenet_stem(out_planes):
+    return nn.Conv2d(3, out_planes, kernel_size=7, stride=2,
+                     padding=3, bias=False)
+
+
+resnet18_mnist = partial(ResNet,
+                         block=BasicBlock,
+                         layers=[2, 2, 2, 2],
+                         num_classes=10,
+                         stem_layer=mnist_stem)
+resnet18_imagenet = partial(ResNet,
+                            block=BasicBlock,
+                            layers=[2, 2, 2, 2],
+                            stem_layer=imagenet_stem)
+resnet50_imagenet = partial(ResNet,
+                            block=Bottleneck,
+                            layers=[3, 4, 6, 3],
+                            stem_layer=imagenet_stem)
+
 
 __all__ = [
-    "mnist_resnet"
+    "resnet18_mnist",
+    "resnet18_imagenet",
+    "resnet50_imagenet",
 ]

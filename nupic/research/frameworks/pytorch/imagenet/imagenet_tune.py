@@ -32,7 +32,6 @@ from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
 from ray.tune.utils import warn_if_slow
 
-from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
 from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
     TrialsCollection,
 )
@@ -64,6 +63,8 @@ class ImagenetTrainable(Trainable):
         return resource
 
     def _setup(self, config):
+        config["logdir"] = self.logdir
+
         # Configure logging related stuff
         log_format = config.get("log_format", logging.BASIC_FORMAT)
         log_level = getattr(logging, config.get("log_level", "INFO").upper())
@@ -92,7 +93,7 @@ class ImagenetTrainable(Trainable):
         try:
             status = []
             for w in self.procs:
-                status.append(w.run_epoch.remote(self.iteration))
+                status.append(w.run_epoch.remote())
 
             # Wait for remote functions and check for errors
             # Return the results from the first remote function
@@ -118,6 +119,11 @@ class ImagenetTrainable(Trainable):
 
     def _restore(self, state):
         self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
+
+        # Update current_epoch for old checkpoints
+        if "current_epoch" not in state:
+            state.update(current_epoch=self.iteration)
+
         # Restore the state to every process
         state_id = ray.put(state)
         ray.get([w.set_state.remote(state_id) for w in self.procs])
@@ -144,11 +150,13 @@ class ImagenetTrainable(Trainable):
 
         self._process_config(config)
 
+        experiment_class = config["experiment_class"]
+
         for i in range(1 + self.max_retries):
             self.procs = []
             for _ in range(world_size):
                 experiment = ray.remote(
-                    num_cpus=num_cpus, num_gpus=num_gpus)(ImagenetExperiment)
+                    num_cpus=num_cpus, num_gpus=num_gpus)(experiment_class)
                 self.procs.append(experiment.remote())
 
             # Use first process as head of the group
