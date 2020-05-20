@@ -71,6 +71,7 @@ IMAGENET_NUM_CLASSES = {
 def create_train_dataloader(
     data_dir, train_dir, batch_size, workers, distributed, num_classes=1000,
     use_auto_augment=False, sample_transform=None, target_transform=None,
+    replicas_per_sample=1
 ):
     """
     Configure Imagenet training dataloader
@@ -87,6 +88,10 @@ def create_train_dataloader(
     :param sample_transform: List of transforms acting on the samples
                              to be added to the defaults below
     :param target_transform: List of transforms acting on the targets
+    :param replicas_per_sample: Number of replicas to create per sample
+                                in the batch (each replica is transformed
+                                independently). Used in maxup.
+
     :return: torch.utils.data.DataLoader
     """
     if use_auto_augment:
@@ -125,11 +130,13 @@ def create_train_dataloader(
             classes = IMAGENET_NUM_CLASSES[num_classes]
             dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
                                   classes=classes, transform=transform,
-                                  target_transform=target_transform)
+                                  target_transform=target_transform,
+                                  replicas_per_sample=replicas_per_sample)
         else:
             dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
                                   num_classes=num_classes, transform=transform,
-                                  target_transform=target_transform)
+                                  target_transform=target_transform,
+                                  replicas_per_sample=replicas_per_sample)
     else:
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, train_dir),
                                       num_classes=num_classes, transform=transform,
