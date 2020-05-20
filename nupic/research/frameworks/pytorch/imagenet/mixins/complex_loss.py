@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import functools
 import time
 
 
@@ -36,20 +35,16 @@ class ComplexLoss(object):
             "ComplexLoss.calculate_batch_loss"
         ]
 
-    def train_epoch(self, epoch):
+    def train_epoch(self):
         """Overwrites train model to use private train_model method
-
-        :param epoch: Epoch number (provided by trainable)
         """
-        self._train_model(epoch)
+        self._train_model()
 
-    def _train_model(self, epoch):
+    def _train_model(self):
         """Private train model that has access to Experiment attributes
-
-        :param epoch: Epoch number
         """
-        pre_batch_callback = functools.partial(self.pre_batch, epoch=epoch)
-        post_batch_callback = functools.partial(self.post_batch, epoch=epoch)
+        pre_batch_callback = self.pre_batch
+        post_batch_callback = self.post_batch
 
         self.model.train()
         # Use asynchronous GPU copies when the memory is pinned

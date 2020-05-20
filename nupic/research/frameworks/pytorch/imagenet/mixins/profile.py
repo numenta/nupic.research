@@ -50,17 +50,17 @@ class Profile:
             pstats.Stats(pr).dump_stats(filepath)
             self.logger.info(f"Saved {filepath}")
 
-    def run_epoch(self, epoch):
+    def run_epoch(self):
         if self.use_cProfile:
             pr = cProfile.Profile()
             pr.enable()
 
-        result = super().run_epoch(epoch)
+        result = super().run_epoch()
 
         if self.use_cProfile:
             pr.disable()
             filepath = os.path.join(self.logdir,
-                                    f"profile-epoch{epoch}.profile")
+                                    f"profile-epoch{self.current_epoch}.profile")
             pstats.Stats(pr).dump_stats(filepath)
             self.logger.info(f"Saved {filepath}")
 
