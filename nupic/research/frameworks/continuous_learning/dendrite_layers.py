@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from nupic.torch.modules import SparseWeights, KWinners
 from torch import nn
-# from nupic.research.frameworks.continuous_learning.utils import ADA_fun
+
 
 class DendriteInput(nn.Module):
     def __init__(self,
@@ -18,10 +18,9 @@ class DendriteInput(nn.Module):
                  boost_strength=2.,
                  boost_strength_factor=0.9,
                  duty_cycle_period=1000,
-                 device_type="cuda"):
+                 ):
         super(DendriteInput, self).__init__()
         self.threshold = threshold
-        self.device_type = device_type
         linear = nn.Linear(in_dim, n_dendrites)
 
         if sparse_weights:
@@ -55,14 +54,14 @@ class DendriteInput(nn.Module):
 
 
 class DendriteOutput(nn.Module):
-    def __init__(self, out_dim, dpc, device_type="cuda"):
+    def __init__(self, out_dim, dpc):
         super(DendriteOutput, self).__init__()
         self.dpc = dpc
-        self.mask = self.dend_mask(out_dim).to(torch.device(device_type))
+        self.register_buffer("mask", self.dend_mask(out_dim))
         self.weight = torch.nn.Parameter(torch.Tensor(out_dim, dpc * out_dim))
         self.bias = torch.nn.Parameter(torch.Tensor(out_dim))
-        nn.init.kaiming_uniform_(self.weight)
-        self.bias.data.fill_(0.)
+        # nn.init.kaiming_uniform_(self.weight)
+        # self.bias.data.fill_(0.)
 
     def forward(self, x):
         w = self.weight * self.mask
@@ -86,7 +85,7 @@ class DendriteLayer(nn.Module):
                  sparse_weights=True,
                  weight_sparsity=0.2,
                  percent_on=0.1,
-                 device="cuda"):
+                 ):
         super(DendriteLayer, self).__init__()
 
         self.dpc = dpc
@@ -99,24 +98,24 @@ class DendriteLayer(nn.Module):
             sparse_weights=sparse_weights,
             weight_sparsity=weight_sparsity,
             percent_on=percent_on,
-            device_type=device
         )
-        self.output = DendriteOutput(out_dim, self.dpc, device_type=device)
+        self.output = DendriteOutput(out_dim, self.dpc)
 
     def forward(self, x):
         out1 = self.input(x)
         out2 = self.output(out1)
         return out2
 
-class ADA_fun(nn.Module):
-    def __init__(self, a=1, c=1, l=0.005):
-        super(ADA_fun, self).__init__()
-        self.a = a
-        self.c = c
-        self.l = l
 
-    def forward(self, x):
-        neg_relu = torch.clamp(x, max=0)
-        ADA = F.relu(x) * torch.exp(-x * self.a + self.c)
-        ADA_l = self.l * neg_relu + ADA
-        return ADA_l
+# class ADA_fun(nn.Module):
+#     def __init__(self, a=1, c=1, l=0.005):
+#         super(ADA_fun, self).__init__()
+#         self.a = a
+#         self.c = c
+#         self.l = l
+
+#     def forward(self, x):
+#         neg_relu = torch.clamp(x, max=0)
+#         ADA = F.relu(x) * torch.exp(-x * self.a + self.c)
+#         ADA_l = self.l * neg_relu + ADA
+#         return ADA_l
