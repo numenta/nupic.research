@@ -374,17 +374,24 @@ class HDF5Dataset(VisionDataset):
         Limit the dataset to images from the given classes.
     :param load_as_images:
         whether to use `Image.open` or `torch.load` when loading data
+    :param replicas_per_sample:
+        Number of replicas to create per sample in the batch.
+        (each replica is transformed independently)
+        Used in maxup.
+
     :param kwargs:
         Other argument passed to :class:`VisionDataset` constructor
     """
 
     def __init__(
         self, hdf5_file, root,
-        num_classes=None, classes=None, load_as_images=True, **kwargs
+        num_classes=None, classes=None, load_as_images=True,
+        replicas_per_sample=1, **kwargs
     ):
         assert h5py.is_hdf5(hdf5_file)
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
 
+        self.replicas_per_sample = replicas_per_sample
         self._hdf5_file = hdf5_file
         self._load_as_images = load_as_images
         with h5py.File(name=self._hdf5_file, mode="r") as hdf5:
@@ -482,9 +489,14 @@ class HDF5Dataset(VisionDataset):
         else:
             sample = torch.load(BytesIO(image_data))
 
-        # Apply transforms
         if self.transform is not None:
-            sample = self.transform(sample)
+            if self.replicas_per_sample > 1:
+                # add an extra dimension with size replicas_per_sample
+                sample = torch.stack([
+                    self.transform(sample) for _ in range(self.replicas_per_sample)
+                ])
+            else:
+                sample = self.transform(sample)
         if self.target_transform is not None:
             target = self.target_transform(target)
 

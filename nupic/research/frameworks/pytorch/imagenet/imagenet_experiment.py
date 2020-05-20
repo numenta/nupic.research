@@ -156,6 +156,9 @@ class ImagenetExperiment:
             - sample_transform: Transform acting on the training samples. To be used
                                 additively after default transform or auto-augment.
             - target_transform: Transform acting on the training targets.
+            - replicas_per_sample: Number of replicas to create per sample in the batch.
+                                   (each replica is transformed independently)
+                                   Used in maxup.
             - create_train_dataloader: Optional user defined function to create
                                        the training data loader. See below for
                                        input params.
@@ -286,6 +289,7 @@ class ImagenetExperiment:
         # Configure Training data loader
         sample_transform = config.get("sample_transform", None)
         target_transform = config.get("target_transform", None)
+        replicas_per_sample = config.get("replicas_per_sample", 1)
         self.create_train_dataloader = config.get(
             "create_train_dataloader", create_train_dataloader)
         self.train_loader = self.create_train_dataloader(
@@ -298,6 +302,7 @@ class ImagenetExperiment:
             use_auto_augment=config.get("use_auto_augment", False),
             sample_transform=sample_transform,  # will be used additively w/ auto-aug
             target_transform=target_transform,
+            replicas_per_sample=replicas_per_sample,
         )
         self.total_batches = len(self.train_loader)
 
