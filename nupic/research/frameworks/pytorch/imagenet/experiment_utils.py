@@ -88,6 +88,10 @@ def create_train_dataloader(
     :param sample_transform: List of transforms acting on the samples
                              to be added to the defaults below
     :param target_transform: List of transforms acting on the targets
+    :param replicas_per_sample: Number of replicas to create per sample
+                                in the batch (each replica is transformed
+                                independently). Used in maxup.
+
     :return: torch.utils.data.DataLoader
     """
     if use_auto_augment:

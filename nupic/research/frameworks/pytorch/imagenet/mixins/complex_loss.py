@@ -76,7 +76,7 @@ class ComplexLoss(object):
 
             self.optimizer.zero_grad()
 
-            loss, output = self.calculate_batch_loss(data, target, async_gpu=True)
+            loss, output = self.calculate_batch_loss(data, target, async_gpu=async_gpu)
             del output
 
             t2 = time.time()

@@ -374,6 +374,11 @@ class HDF5Dataset(VisionDataset):
         Limit the dataset to images from the given classes.
     :param load_as_images:
         whether to use `Image.open` or `torch.load` when loading data
+    :param replicas_per_sample:
+        Number of replicas to create per sample in the batch.
+        (each replica is transformed independently)
+        Used in maxup.
+
     :param kwargs:
         Other argument passed to :class:`VisionDataset` constructor
     """
@@ -495,7 +500,6 @@ class HDF5Dataset(VisionDataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        # return list of samples, instead of a sample
         return sample, target
 
     def __len__(self):
