@@ -41,7 +41,6 @@ from exp_lesparse import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import rezero_weights, update_boost_strength
-from nupic.research.frameworks.continuous_learning.k_winners import new_epoch
 
 from fb_sparsenet import FBNet
 
@@ -96,7 +95,6 @@ class ContinuousSpeechExperiment(object):
         self.running_accuracy = []
         self.frozen_inds = None
         self.combine_xy = False
-        self.boost_strength = config["boost_strength"]
 
         if self.model_type == "le_sparse":
             model = LeSparseNet(
@@ -146,7 +144,7 @@ class ContinuousSpeechExperiment(object):
                 "use_kwinner_local", False),
             )
             self.combine_xy = True
-            
+
         elif self.model_type == "resnet9":
             model = resnet9(
                 num_classes=self.num_classes, in_channels=1
@@ -309,7 +307,6 @@ class ContinuousSpeechExperiment(object):
         f.close()
 
     def post_epoch(self):
-        self.model.apply(new_epoch)
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
