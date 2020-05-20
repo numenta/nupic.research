@@ -496,6 +496,13 @@ class ImagenetExperiment:
         if self.distributed:
             dist.destroy_process_group()
 
+    def should_stop(self):
+        """
+        Whether or not the experiment should stop. Usually determined by the
+        number of epochs but customizable to any other stopping criteria
+        """
+        return self.current_epoch >= self.epochs
+
     def get_lr(self):
         """
         Returns the current learning rate
