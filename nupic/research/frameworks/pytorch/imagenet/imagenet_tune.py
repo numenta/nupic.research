@@ -20,6 +20,7 @@
 import copy
 import logging
 import os
+import pickle
 import time
 from pprint import pprint
 
@@ -88,6 +89,13 @@ class ImagenetTrainable(Trainable):
         if config.get("checkpoint_at_init", False):
             self.save()
 
+        # Load initial state from checkpoint file
+        checkpoint_file = config.get("checkpoint_file", None)
+        if checkpoint_file is not None:
+            with open(checkpoint_file, mode="rb") as f:
+                state = pickle.load(f)
+                self._restore(state)
+
     def _train(self):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
@@ -118,15 +126,14 @@ class ImagenetTrainable(Trainable):
             return ray.get(self.procs[0].get_state.remote())
 
     def _restore(self, state):
-        self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
-
-        # Update current_epoch for old checkpoints
-        if "current_epoch" not in state:
-            state.update(current_epoch=self.iteration)
-
         # Restore the state to every process
         state_id = ray.put(state)
         ray.get([w.set_state.remote(state_id) for w in self.procs])
+
+        # Update current iteration using experiment epoch
+        self._iteration = ray.get(self.procs[0].get_current_epoch.remote())
+
+        self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
 
     def _create_workers(self, config):
         """

@@ -520,6 +520,12 @@ class ImagenetExperiment:
         """
         return [p["lr"] for p in self.optimizer.param_groups]
 
+    def get_current_epoch(self):
+        """
+        Returns the current epoch of the running experiment
+        """
+        return self.current_epoch
+
     def get_weight_decay(self):
         """
         Returns the current weight decay

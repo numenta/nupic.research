@@ -53,6 +53,8 @@ if __name__ == "__main__":
                         help="number of CPUs to use when GPU is not available."),
     parser.add_argument("-r", "--resume", action="store_true",
                         help="Resume training from last known checkpoint")
+    parser.add_argument("-c", "--checkpoint-file",
+                        help="Resume experiment from specific checkpoint file")
     parser.add_argument("-j", "--workers", type=int, default=6,
                         help="Number of dataloaders workers")
     parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
@@ -68,7 +70,7 @@ if __name__ == "__main__":
                         help="Python Logging Format")
     parser.add_argument("-x", "--max-failures", type=int,
                         help="How many times to try to recover before stopping")
-    parser.add_argument("-c", "--checkpoint-freq", type=int,
+    parser.add_argument("--checkpoint-freq", type=int,
                         help="How often to checkpoint (epochs)")
     parser.add_argument("--profile", action="store_true",
                         help="Enable torch.autograd.profiler.profile during training")
