@@ -294,7 +294,7 @@ class SigOptImagenetTrainable(ImagenetTrainable):
 def run(config):
     # Connect to ray
     address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
-    ray.init(address=address)
+    ray.init(address=address, local_mode=config.get("local_mode", False))
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]

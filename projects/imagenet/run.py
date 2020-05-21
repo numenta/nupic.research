@@ -80,6 +80,8 @@ if __name__ == "__main__":
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
         help="redis address of an existing Ray server")
+    parser.add_argument("--local-mode", action="store_true",
+                        help="Start ray in local mode. Useful for debugging")
 
     args = parser.parse_args()
     if args.name is None:
