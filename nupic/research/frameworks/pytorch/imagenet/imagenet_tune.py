@@ -30,6 +30,7 @@ import torch
 from ray.exceptions import RayActorError
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
+from ray.tune.result import DONE
 from ray.tune.utils import warn_if_slow
 
 from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
@@ -101,6 +102,12 @@ class ImagenetTrainable(Trainable):
                 results = ray.get(status)
                 ret = copy.deepcopy(results[0])
                 self._process_result(ret)
+
+                # Check if we should stop the experiment
+                stop_status = self.procs[0].should_stop.remote()
+                if ray_utils.check_for_failure([stop_status]):
+                    ret[DONE] = ray.get(stop_status)
+
                 return ret
 
             err_msg = (f"{self._trial_info.trial_name}({self.iteration}): "
@@ -310,12 +317,6 @@ def run(config):
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
-
-    # Update tune stop criteria with config epochs
-    stop = kwargs.get("stop", {}) or dict()
-    epochs = config.get("epochs", 1)
-    stop.update(training_iteration=epochs)
-    kwargs["stop"] = stop
 
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
