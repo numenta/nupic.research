@@ -476,7 +476,6 @@ class ImagenetExperiment:
         :param state: dictionary with "model", "optimizer", "lr_scheduler", and "amp"
                       states
         """
-        self.current_epoch = state.get("current_epoch", 0)
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
@@ -496,6 +495,19 @@ class ImagenetExperiment:
             with io.BytesIO(state["amp"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
             amp.load_state_dict(state_dict)
+
+        if "current_epoch" in state:
+            self.current_epoch = state["current_epoch"]
+        else:
+            # Try to recover current epoch from LR Scheduler state
+            last_epoch = self.lr_scheduler.last_epoch + 1
+            if isinstance(self.lr_scheduler, ComposedLRScheduler):
+                self.current_epoch = last_epoch // self.lr_scheduler.steps_per_epoch
+            elif isinstance(self.lr_scheduler, OneCycleLR):
+                steps_per_epoch = self.lr_scheduler.total_steps // self.epochs
+                self.current_epoch = last_epoch // steps_per_epoch
+            else:
+                self.current_epoch = last_epoch
 
     def stop_experiment(self):
         if self.distributed:
