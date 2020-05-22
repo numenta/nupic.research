@@ -28,10 +28,12 @@ import ray
 import ray.resource_spec
 import ray.util.sgd.utils as ray_utils
 import torch
+
+from nupic.research.support.ray_utils import get_last_checkpoint
 from ray.exceptions import RayActorError
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
-from ray.tune.result import DONE
+from ray.tune.result import DONE, RESULT_DUPLICATE
 from ray.tune.utils import warn_if_slow
 
 from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
@@ -91,15 +93,31 @@ class ImagenetTrainable(Trainable):
             self.save()
 
         # Load initial state from checkpoint file
-        checkpoint_file = config.get("checkpoint_file", None)
-        if checkpoint_file is not None:
-            with open(checkpoint_file, mode="rb") as f:
+        self._checkpoint_file = config.get("checkpoint_file", None)
+        if self._checkpoint_file is not None:
+            with open(self._checkpoint_file, mode="rb") as f:
                 state = pickle.load(f)
                 self._restore(state)
+                self._restored = True
+
+        self._first_run = True
 
     def _train(self):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
+            # Check if restore checkpoint file fulfills the stop criteria on first run
+            if self._first_run:
+                self._first_run = False
+                if self._restored and self._should_stop():
+                    self.logger.warning(
+                        f"Restored checkpoint file '{self._checkpoint_file}' fulfills "
+                        f"stop criteria without additional training.")
+                    return {
+                        # do not train or log results, just stop
+                        RESULT_DUPLICATE: True,
+                        DONE: True
+                    }
+
             status = []
             for w in self.procs:
                 status.append(w.run_epoch.remote())
@@ -112,9 +130,7 @@ class ImagenetTrainable(Trainable):
                 self._process_result(ret)
 
                 # Check if we should stop the experiment
-                stop_status = self.procs[0].should_stop.remote()
-                if ray_utils.check_for_failure([stop_status]):
-                    ret[DONE] = ray.get(stop_status)
+                ret[DONE] = self._should_stop()
 
                 return ret
 
@@ -125,6 +141,18 @@ class ImagenetTrainable(Trainable):
         except Exception:
             self._kill_workers()
             raise
+
+    def _should_stop(self):
+        """
+        Whether or not we should stop the experiment
+        """
+        # Check if we should stop the experiment
+        stop_status = self.procs[0].should_stop.remote()
+        if ray_utils.check_for_failure([stop_status]):
+            return ray.get(stop_status)
+        else:
+            # Stop on failures
+            return True
 
     def _save(self, _=None):
         self.logger.debug(f"_save: {self._trial_info.trial_name}({self.iteration})")
@@ -320,6 +348,12 @@ def run(config):
         imagenet_trainable = config.get("imagenet_trainable", ImagenetTrainable)
         assert issubclass(imagenet_trainable, ImagenetTrainable)
         kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
+
+    # Check if restoring experiment from last known checkpoint
+    if config.pop("restore", False):
+        result_dir = os.path.join(config["local_dir"], config["name"])
+        checkpoint_file = get_last_checkpoint(result_dir)
+        config["checkpoint_file"] = checkpoint_file
 
     # Update`tune.run` kwargs with config
     kwargs.update(config)

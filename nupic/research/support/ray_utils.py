@@ -21,6 +21,8 @@ import glob
 import json
 import os
 
+from ray.tune.trial_runner import _TuneFunctionDecoder
+
 
 def load_ray_tune_experiments(
     experiment_path, load_results=False
@@ -104,3 +106,32 @@ def load_ray_tune_experiment(
                 experiment["results"] = [json.loads(s) for s in rows]
 
     return experiment_state
+
+
+def get_last_checkpoint(results_dir):
+    """
+    Find the last checkpoint given the ray tune results directory
+
+    :param results_dir:  ray tune results directory
+    :return: checkpoint file or None when no checkpoints are found
+    """
+    # Get experiment states sorted by date
+    experiment_state_json = glob.glob(f"{results_dir}/experiment_state-*.json")
+    experiment_state_json.sort(key=os.path.getmtime, reverse=True)
+
+    for file_path in experiment_state_json:
+        with open(file_path, mode="r") as f:
+            experiment_state = json.load(f, cls=_TuneFunctionDecoder)
+
+        # Get newest checkpoint from last experiment
+        checkpoint = next(reversed(experiment_state["checkpoints"]))
+        newest_checkpoint = checkpoint["checkpoint_manager"].newest_checkpoint
+
+        # Update checkpoint location
+        checkpoint_file = newest_checkpoint.value
+        if checkpoint_file is not None:
+            checkpoint_file = checkpoint_file.replace(checkpoint["local_dir"], str(results_dir))
+            return checkpoint_file
+
+    # No checkpoint available
+    return None
