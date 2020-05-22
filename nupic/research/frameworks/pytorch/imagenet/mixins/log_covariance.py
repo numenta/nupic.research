@@ -27,14 +27,6 @@ class LogCovariance(object):
     During testing, record the covariance of unit activations within each
     specified layer.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["setup_experiment"].append(
-            "LogCovariance initialization")
-        self.execution_order["validate"].insert(0, "LogCovariance add hooks")
-        self.execution_order["validate"].append(
-            "LogCovariance remove hooks, compute covariance")
-
     def setup_experiment(self, config):
         super().setup_experiment(config)
         self.log_covariance_layernames = config.get("log_covariance_layernames",
@@ -69,3 +61,11 @@ class LogCovariance(object):
             result["{}/variance_sum".format(layername)] = var.sum().item()
 
         return result
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("LogCovariance initialization")
+        eo["validate"].insert(0, "LogCovariance add hooks")
+        eo["validate"].append("LogCovariance remove hooks, compute covariance")
+        return eo
