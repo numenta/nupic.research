@@ -130,7 +130,8 @@ def get_last_checkpoint(results_dir):
         # Update checkpoint location
         checkpoint_file = newest_checkpoint.value
         if checkpoint_file is not None:
-            checkpoint_file = checkpoint_file.replace(checkpoint["local_dir"], str(results_dir))
+            checkpoint_file = checkpoint_file.replace(
+                checkpoint["local_dir"], str(results_dir))
             return checkpoint_file
 
     # No checkpoint available

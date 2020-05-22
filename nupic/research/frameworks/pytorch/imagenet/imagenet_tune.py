@@ -28,8 +28,6 @@ import ray
 import ray.resource_spec
 import ray.util.sgd.utils as ray_utils
 import torch
-
-from nupic.research.support.ray_utils import get_last_checkpoint
 from ray.exceptions import RayActorError
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
@@ -41,6 +39,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
+from nupic.research.support.ray_utils import get_last_checkpoint
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
