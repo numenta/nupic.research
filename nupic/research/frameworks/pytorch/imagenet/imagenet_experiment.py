@@ -91,19 +91,6 @@ class ImagenetExperiment:
         self.launch_time = 0
         self.epochs_to_validate = []
         self.current_epoch = 0
-        # Updated by mixins and subclasses.
-        self.execution_order = dict(
-            setup_experiment=["ImagenetExperiment.setup_experiment"],
-            create_model=["ImagenetExperiment.create_model"],
-            validate=["ImagenetExperiment.validate"],
-            train_epoch=["ImagenetExperiment.train_epoch"],
-            run_epoch=["ImagenetExperiment.run_epoch"],
-            pre_epoch=["ImagenetExperiment.pre_epoch"],
-            post_epoch=["ImagenetExperiment.post_epoch"],
-            pre_batch=["ImagenetExperiment.pre_batch"],
-            post_batch=["ImagenetExperiment.post_batch"],
-            loss_function=["ImagenetExperiment.loss_function"],
-        )
 
     def setup_experiment(self, config):
         """
@@ -201,7 +188,8 @@ class ImagenetExperiment:
         self.rank = config.get("rank", 0)
 
         if self.rank == 0:
-            self.logger.info(f"Execution order: {pformat(self.execution_order)}")
+            self.logger.info(
+                f"Execution order: {pformat(self.get_execution_order())}")
 
         if self.distributed:
             dist_url = config.get("dist_url", "tcp://127.0.0.1:54321")
@@ -560,3 +548,22 @@ class ImagenetExperiment:
     def get_free_port(self):
         """Returns free TCP port in the current ray node"""
         return ray_utils.find_free_port()
+
+    @classmethod
+    def get_execution_order(cls):
+        return dict(
+            setup_experiment=["ImagenetExperiment.setup_experiment"],
+            create_model=["ImagenetExperiment.create_model"],
+            create_train_dataloader=["ImagenetExperiment.create_train_dataloader"],
+            create_validation_dataloader=[
+                "ImagenetExperiment.create_validation_dataloader"
+            ],
+            validate=["ImagenetExperiment.validate"],
+            train_epoch=["ImagenetExperiment.train_epoch"],
+            run_epoch=["ImagenetExperiment.run_epoch"],
+            pre_epoch=["ImagenetExperiment.pre_epoch"],
+            post_epoch=["ImagenetExperiment.post_epoch"],
+            pre_batch=["ImagenetExperiment.pre_batch"],
+            post_batch=["ImagenetExperiment.post_batch"],
+            loss_function=["ImagenetExperiment.loss_function"],
+        )

@@ -24,14 +24,6 @@ class RegularizeLoss(object):
     """
     Add a regularization term to the loss function.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["setup_experiment"].append(
-            "RegularizeLoss initialization")
-        self.execution_order["loss_function"].append("RegularizeLoss")
-        self.execution_order["pre_epoch"].append(
-            "RegularizeLoss update regularization weight")
-
     def setup_experiment(self, config):
         """
         @param reg_schedule (list of tuples)
@@ -84,3 +76,11 @@ class RegularizeLoss(object):
         super().pre_epoch()
         if self.current_epoch in self.reg_schedule:
             self.reg_weight = self.reg_schedule[self.current_epoch]
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("RegularizeLoss initialization")
+        eo["loss_function"].append("RegularizeLoss")
+        eo["pre_epoch"].append("RegularizeLoss update regularization weight")
+        return eo
