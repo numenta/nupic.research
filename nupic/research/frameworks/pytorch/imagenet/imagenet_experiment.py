@@ -28,17 +28,17 @@ import ray.services
 import ray.util.sgd.utils as ray_utils
 import torch
 import torch.distributed as dist
-import torch.utils.data
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
+from torch.utils.data import DataLoader, DistributedSampler
 
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
     create_optimizer,
-    create_train_dataloader,
-    create_validation_dataloader,
+    create_train_dataset,
+    create_validation_dataset,
 )
 from nupic.research.frameworks.pytorch.imagenet.network_utils import (
     create_model_from_config,
@@ -159,12 +159,6 @@ class ImagenetExperiment:
             - replicas_per_sample: Number of replicas to create per sample in the batch.
                                    (each replica is transformed independently)
                                    Used in maxup.
-            - create_train_dataloader: Optional user defined function to create
-                                       the training data loader. See below for
-                                       input params.
-            - create_validation_dataloader: Optional user defined function to create
-                                            the validation data loader. See below for
-                                            input params.
             - train_model_func: Optional user defined function to train the model,
                                 expected to behave similarly to `train_model`
                                 in terms of input parameters and return values
@@ -273,10 +267,6 @@ class ImagenetExperiment:
         self.epochs_to_validate = config.get("epochs_to_validate",
                                              range(self.epochs - 3, self.epochs + 1))
         self.current_epoch = 0
-        workers = config.get("workers", 0)
-        data_dir = config["data"]
-        train_dir = config.get("train_dir", "train")
-        num_classes = config.get("num_classes", 1000)
 
         # Get initial batch size
         self.batch_size = config.get("batch_size", 1)
@@ -286,38 +276,10 @@ class ImagenetExperiment:
         if torch.cuda.is_available():
             multiprocessing.set_start_method("spawn")
 
-        # Configure Training data loader
-        sample_transform = config.get("sample_transform", None)
-        target_transform = config.get("target_transform", None)
-        replicas_per_sample = config.get("replicas_per_sample", 1)
-        self.create_train_dataloader = config.get(
-            "create_train_dataloader", create_train_dataloader)
-        self.train_loader = self.create_train_dataloader(
-            data_dir=data_dir,
-            train_dir=train_dir,
-            batch_size=self.batch_size,
-            workers=workers,
-            distributed=self.distributed,
-            num_classes=num_classes,
-            use_auto_augment=config.get("use_auto_augment", False),
-            sample_transform=sample_transform,  # will be used additively w/ auto-aug
-            target_transform=target_transform,
-            replicas_per_sample=replicas_per_sample,
-        )
+        # Configure data loaders
+        self.train_loader = self.create_train_dataloader(config)
+        self.val_loader = self.create_validation_dataloader(config)
         self.total_batches = len(self.train_loader)
-
-        # Configure Validation data loader
-        val_dir = config.get("val_dir", "val")
-        val_batch_size = config.get("val_batch_size", self.batch_size)
-        self.create_validation_dataloader = config.get(
-            "create_validation_dataloader", create_validation_dataloader)
-        self.val_loader = self.create_validation_dataloader(
-            data_dir=data_dir,
-            val_dir=val_dir,
-            batch_size=val_batch_size,
-            workers=workers,
-            num_classes=num_classes,
-        )
 
         # Configure learning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
@@ -338,6 +300,57 @@ class ImagenetExperiment:
 
     def create_model(self, config):
         return create_model_from_config(config, self.device)
+
+    @classmethod
+    def create_train_dataloader(cls, config):
+        """
+        This method is a classmethod so that it can be used directly by analysis
+        tools, while also being easily overrideable.
+        """
+        dataset = create_train_dataset(
+            data_dir=config["data"],
+            train_dir=config.get("train_dir", "train"),
+            num_classes=config.get("num_classes", 1000),
+            use_auto_augment=config.get("use_auto_augment", False),
+            sample_transform=config.get("sample_transform", None),
+            target_transform=config.get("target_transform", None),
+            replicas_per_sample=config.get("replicas_per_sample", 1),
+        )
+
+        if config.get("distributed", False):
+            sampler = DistributedSampler(dataset)
+        else:
+            sampler = None
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("batch_size", 1),
+            shuffle=sampler is None,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    @classmethod
+    def create_validation_dataloader(cls, config):
+        """
+        This method is a classmethod so that it can be used directly by analysis
+        tools, while also being easily overrideable.
+        """
+        dataset = create_validation_dataset(
+            data_dir=config["data"],
+            val_dir=config.get("val_dir", "val"),
+            num_classes=config.get("num_classes", 1000),
+        )
+
+        # Non-distributed.
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("val_batch_size",
+                                  config.get("batch_size", 1)),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            pin_memory=False,
+        )
 
     def validate(self, loader=None):
         if loader is None:
