@@ -27,18 +27,6 @@ class KnowledgeDistillation(object):
     """
     Sets the network to learn from a teacher model
     """
-    def __init__(self):
-        super().__init__()
-
-        self.execution_order["setup_experiment"].append(
-            "Knowledge Distillation initialization")
-        self.execution_order["calculate_batch_loss"] = [
-            "KnowledgeDistillation.calculate_batch_loss"
-        ]
-        self.execution_order["_train_model"].insert(
-            0, "Update kd factor based on linear decay"
-        )
-
     def setup_experiment(self, config):
         """
         Add following variables to config
@@ -117,6 +105,16 @@ class KnowledgeDistillation(object):
 
         del softmax_output_teacher, combined_target
         return loss, output
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("Knowledge Distillation initialization")
+        eo["calculate_batch_loss"] = [
+            "KnowledgeDistillation.calculate_batch_loss"
+        ]
+        eo["_train_model"].insert(0, "Update kd factor based on linear decay")
+        return eo
 
 
 def soft_cross_entropy(output, target, size_average=True):

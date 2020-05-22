@@ -24,12 +24,6 @@ class ConstrainParameters(object):
     """
     Calls modules' "constrain_parameters" method after every batch.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["setup_experiment"].append(
-            "ConstrainParameters initialization")
-        self.execution_order["post_batch"].append("ConstrainParameters")
-
     def setup_experiment(self, config):
         super().setup_experiment(config)
         self._constrain_parameters_modules = [
@@ -42,3 +36,10 @@ class ConstrainParameters(object):
         super().post_batch(*args, **kwargs)
         for module in self._constrain_parameters_modules:
             module.constrain_parameters()
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("ConstrainParameters initialization")
+        eo["post_batch"].append("ConstrainParameters")
+        return eo

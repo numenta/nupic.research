@@ -34,13 +34,6 @@ class MaxupStandard(object):
 
     Requires ComplexLoss Mixin
     """
-    def __init__(self):
-        super().__init__()
-
-        self.execution_order["calculate_batch_loss"] = [
-            "MaxupStandard.calculate_batch_loss"
-        ]
-
     def calculate_batch_loss(self, data, target, async_gpu=True):
         """
         :param data: input to the training function, as specified by dataloader
@@ -74,6 +67,12 @@ class MaxupStandard(object):
         del data, data_variant, target, losses
         return loss, output
 
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["calculate_batch_loss"] = ["MaxupStandard.calculate_batch_loss"]
+        return eo
+
 
 class MaxupPerSample(object):
     """
@@ -86,13 +85,6 @@ class MaxupPerSample(object):
 
     Requires ComplexLoss Mixin
     """
-    def __init__(self):
-        super().__init__()
-
-        self.execution_order["calculate_batch_loss"] = [
-            "MaxupPerSample.calculate_batch_loss"
-        ]
-
     def calculate_batch_loss(self, data, target, async_gpu=True):
         """
         :param data: input to the training function, as specified by dataloader
@@ -131,6 +123,12 @@ class MaxupPerSample(object):
 
         del data, data_variant, target, one_hot_target, losses, max_indices
         return loss, output
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["calculate_batch_loss"] = ["MaxupPerSample.calculate_batch_loss"]
+        return eo
 
 
 def sample_cross_entropy(output, target):

@@ -26,10 +26,12 @@ class UpdateBoostStrength:
     """
     Update the KWinners boost strength before every epoch.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["pre_epoch"].append("UpdateBoostStrength")
-
     def pre_epoch(self):
         super().pre_epoch()
         self.model.apply(update_boost_strength)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["pre_epoch"].append("UpdateBoostStrength")
+        return eo

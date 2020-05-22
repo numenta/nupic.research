@@ -28,13 +28,6 @@ class Profile:
     """
     Save cProfile traces for initialization and each run_epoch.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["setup_experiment"].insert(0, "Profile begin")
-        self.execution_order["setup_experiment"].append("Profile end")
-        self.execution_order["run_epoch"].insert(0, "Profile begin")
-        self.execution_order["run_epoch"].append("Profile end")
-
     def setup_experiment(self, config):
         self.use_cProfile = (self.rank == 0)
         if self.use_cProfile:
@@ -65,3 +58,12 @@ class Profile:
             self.logger.info(f"Saved {filepath}")
 
         return result
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].insert(0, "Profile begin")
+        eo["setup_experiment"].append("Profile end")
+        eo["run_epoch"].insert(0, "Profile begin")
+        eo["run_epoch"].append("Profile end")
+        return eo
