@@ -233,12 +233,19 @@ def aggregate_eval_results(results):
     """
     correct = sum(result["total_correct"] for result in results)
     total = sum(result["total_tested"] for result in results)
+    if total == 0:
+        loss = 0
+        accuracy = 0
+    else:
+        loss = sum(result["mean_loss"] * result["total_tested"]
+                   for result in results) / total
+        accuracy = correct / total
+
     return {
         "total_correct": correct,
         "total_tested": total,
-        "mean_loss": sum(result["mean_loss"] * result["total_tested"]
-                         for result in results) / total,
-        "mean_accuracy": correct / total,
+        "mean_loss": loss,
+        "mean_accuracy": accuracy,
     }
 
 
