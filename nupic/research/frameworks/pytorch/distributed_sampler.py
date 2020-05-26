@@ -29,14 +29,21 @@ class UnpaddedDistributedSampler(Sampler):
     A fork of the pytorch DistributedSampler that doesn't repeat data, instead
     allowing the number of batches per process to be off-by-one from each other.
     This makes this sampler usable for validation (it's deterministic and
-    doesn't require shuffling). Diffs to the code are annotated with "MODIFY"
-    comments.
+    doesn't require shuffling). It is potentially unsafe to use this sampler for
+    training, because during training the DistributedDataParallel syncs buffers
+    on each forward pass, so it could freeze if one of the processes runs one
+    fewer batch. During validation, buffers are only synced on the first batch,
+    so this is safe to use as long as each process runs at least one batch. We
+    verify this in an assert.
+
+    Diffs to the code are annotated with "MODIFY" comments.
 
     Sampler that restricts data loading to a subset of the dataset.
     It is especially useful in conjunction with
     :class:`torch.nn.parallel.DistributedDataParallel`. In such case, each
-    process can pass a DistributedSampler instance as a DataLoader sampler,
-    and load a subset of the original dataset that is exclusive to it.
+    process can pass an UnpaddedDistributedSampler instance as a DataLoader
+    sampler, and load a subset of the original dataset that is exclusive to it.
+
     .. note::
         Dataset is assumed to be of constant size.
     Arguments:
@@ -50,7 +57,7 @@ class UnpaddedDistributedSampler(Sampler):
         make shuffling work; each process will use the same random seed
         otherwise.
     Example::
-        >>> sampler = DistributedSampler(dataset) if is_distributed else None
+        >>> sampler = UnpaddedDistributedSampler(dataset) if is_distributed else None
         >>> loader = DataLoader(dataset, shuffle=(sampler is None),
         ...                     sampler=sampler)
         >>> for epoch in range(start_epoch, n_epochs):
@@ -76,6 +83,10 @@ class UnpaddedDistributedSampler(Sampler):
         # self.total_size = self.num_samples * self.num_replicas
         self.num_samples = len(range(self.rank, len(self.dataset), self.num_replicas))
         self.total_size = len(self.dataset)
+
+        # If any process has at least one batch, every other process needs to
+        # have at least one batch, or the DistributedDataParallel could lock up.
+        assert self.num_samples >= 1 or self.total_size == 0
         # END MODIFY
 
         self.shuffle = shuffle

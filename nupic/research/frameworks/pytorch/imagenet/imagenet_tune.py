@@ -123,7 +123,7 @@ class ImagenetTrainable(Trainable):
                 status.append(w.run_epoch.remote())
 
             # Wait for remote functions and check for errors
-            # Return the results from the first remote function
+            # Aggregate the results from all processes
             if ray_utils.check_for_failure(status):
                 results = ray.get(status)
 
