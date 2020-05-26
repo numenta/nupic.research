@@ -43,9 +43,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_train_dataset,
     create_validation_dataset,
 )
-from nupic.research.frameworks.pytorch.imagenet.network_utils import (
-    create_model_from_config,
-)
+from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     deserialize_state_dict,
@@ -209,7 +207,7 @@ class ImagenetExperiment:
             self.progress = self.progress and self.rank == 0
 
         # Configure model
-        self.model = self.create_model(config)
+        self.model = self.create_model(config, self.device)
         if self.rank == 0:
             self.logger.debug(self.model)
 
@@ -289,8 +287,31 @@ class ImagenetExperiment:
         self.train_model = config.get("train_model_func", train_model)
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
-    def create_model(self, config):
-        return create_model_from_config(config, self.device)
+    @classmethod
+    def create_model(cls, config, device):
+        """
+        Create imagenet model from an ImagenetExperiment config
+        :param config:
+            - model_class: Model class. Must inherit from "torch.nn.Module"
+            - model_args: model model class arguments passed to the constructor
+            - init_batch_norm: Whether or not to Initialize running batch norm
+                               mean to 0.
+            - checkpoint_file: if not None, will start from this model. The
+                               model must have the same model_args and
+                               model_class as the current experiment.
+        :param device:
+                Pytorch device
+
+        :return:
+                Model instance
+        """
+        return create_model(
+            model_class=config["model_class"],
+            model_args=config.get("model_args", {}),
+            init_batch_norm=config.get("init_batch_norm", False),
+            device=device,
+            checkpoint_file=config.get("checkpoint_file", None)
+        )
 
     @classmethod
     def create_train_dataloader(cls, config):
