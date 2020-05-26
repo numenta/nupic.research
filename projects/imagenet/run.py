@@ -51,8 +51,8 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--num-cpus", type=int,
                         default=torch.get_num_interop_threads(),
                         help="number of CPUs to use when GPU is not available."),
-    parser.add_argument("-r", "--resume", action="store_true",
-                        help="Resume training from last known checkpoint")
+    parser.add_argument("-r", "--restore", action="store_true",
+                        help="Restore training from last known checkpoint")
     parser.add_argument("-c", "--checkpoint-file",
                         help="Resume experiment from specific checkpoint file")
     parser.add_argument("-j", "--workers", type=int, default=6,
