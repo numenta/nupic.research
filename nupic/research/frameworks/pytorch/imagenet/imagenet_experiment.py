@@ -34,6 +34,9 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 
+from nupic.research.frameworks.pytorch.distributed_sampler import (
+    UnpaddedDistributedSampler,
+)
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
     create_optimizer,
@@ -351,14 +354,18 @@ class ImagenetExperiment:
             num_classes=config.get("num_classes", 1000),
         )
 
-        # Non-distributed.
+        if config.get("distributed", False):
+            sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
+        else:
+            sampler = None
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("val_batch_size",
                                   config.get("batch_size", 1)),
             shuffle=False,
             num_workers=config.get("workers", 0),
-            pin_memory=False,
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
         )
 
     def validate(self, loader=None):
@@ -376,6 +383,7 @@ class ImagenetExperiment:
         else:
             results = {
                 "total_correct": 0,
+                "total_tested": 0,
                 "mean_loss": 0.0,
                 "mean_accuracy": 0.0,
             }

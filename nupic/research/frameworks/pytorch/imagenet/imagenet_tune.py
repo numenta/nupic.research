@@ -38,6 +38,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
     TrialsCollection,
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
+from nupic.research.frameworks.pytorch.model_utils import aggregate_eval_results
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
 from nupic.research.support.ray_utils import get_last_checkpoint
 
@@ -122,10 +123,13 @@ class ImagenetTrainable(Trainable):
                 status.append(w.run_epoch.remote())
 
             # Wait for remote functions and check for errors
-            # Return the results from the first remote function
+            # Aggregate the results from all processes
             if ray_utils.check_for_failure(status):
                 results = ray.get(status)
+
                 ret = copy.deepcopy(results[0])
+                ret.update(aggregate_eval_results(results))
+
                 self._process_result(ret)
 
                 # Check if we should stop the experiment
