@@ -56,7 +56,7 @@ class TuneExperiment(tune.Trainable):
         batch_size = 1 << assignments["log_2_batch_size"]
 
         params = dict(
-            network_class=networks.mnist_resnet,
+            network_class=networks.resnet18_mnist,
             network_args=dict(),
 
             dataset_class=datasets.MNIST,

@@ -25,6 +25,7 @@ nupic.tensorflow @ git+https://github.com/numenta/nupic.tensorflow.git
 
 awscli
 ax-platform
+gpytorch==1.1.0
 boto3
 elasticsearch
 jupyter
@@ -45,3 +46,4 @@ tabulate
 torchvision==0.5.0
 tqdm
 h5py
+pretrainedmodels==0.7.4

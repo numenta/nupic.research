@@ -19,6 +19,7 @@
 #
 import io
 import pickle
+from collections import OrderedDict
 
 import torch
 import torchvision.models
@@ -86,46 +87,12 @@ def create_model(model_class, model_args, init_batch_norm, device,
             state = pickle.load(pickle_file)
         with io.BytesIO(state["model"]) as buffer:
             state_dict = deserialize_state_dict(buffer, device)
+
+        # Make sure checkpoint is compatible with model
+        if model.state_dict().keys() != state_dict.keys():
+            state_dict = OrderedDict(
+                zip(model.state_dict().keys(), state_dict.values()))
+
         model.load_state_dict(state_dict)
-
-    # Modify init via hooks.
-    elif init_hooks:
-        for hook, kwargs in init_hooks:
-            model = hook(model, **kwargs) or model
-
-    return model
-
-
-def create_model_from_config(config, device):
-    """
-    Create imagenet model from an ImagenetExperiment config
-    :param config:
-            - model_class: Model class. Must inherit from "torch.nn.Module"
-            - model_args: model model class arguments passed to the constructor
-            - init_batch_norm: Whether or not to Initialize running batch norm
-                               mean to 0.
-            - init_hooks: list of hooks (functions) to call on the model
-                          just following its initialization
-            - checkpoint_file: if not None, will start from this model. The model
-                               must have the same model_args and model_class as the
-                               current experiment.
-    :param device:
-            Pytorch device
-
-    :return:
-            Model instance
-    """
-    model_class = config["model_class"]
-    model_args = config.get("model_args", {})
-    init_batch_norm = config.get("init_batch_norm", False)
-    init_hooks = config.get("init_hooks", None)
-    model = create_model(
-        model_class=model_class,
-        model_args=model_args,
-        init_batch_norm=init_batch_norm,
-        device=device,
-        init_hooks=init_hooks,
-        checkpoint_file=config.get("checkpoint_file", None)
-    )
 
     return model

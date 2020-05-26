@@ -154,6 +154,7 @@ def evaluate_model(
     batches_in_epoch=sys.maxsize,
     criterion=F.nll_loss,
     progress=None,
+    post_batch_callback=None,
 ):
     """Evaluate pre-trained model using given test dataset loader.
 
@@ -169,14 +170,20 @@ def evaluate_model(
     :type criterion: function
     :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
     :type progress: dict or None
+    :param post_batch_callback: Callback function to be called after every batch
+                                with the following parameters:
+                                batch_idx, target, output, pred
 
     :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
     :rtype: dict
     """
     model.eval()
-    loss = 0
-    correct = 0
     total = 0
+
+    # Perform accumulation on device, avoid paying performance cost of .item()
+    loss = torch.tensor(0., device=device)
+    correct = torch.tensor(0, device=device)
+
     async_gpu = loader.pin_memory
 
     if progress is not None:
@@ -190,18 +197,55 @@ def evaluate_model(
             target = target.to(device, non_blocking=async_gpu)
 
             output = model(data)
-            loss += criterion(output, target, reduction="sum").item()
+            loss += criterion(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
+            correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
+
+            if post_batch_callback is not None:
+                post_batch_callback(batch_idx=batch_idx, target=target, output=output,
+                                    pred=pred)
 
     if progress is not None:
         loader.close()
 
+    correct = correct.item()
+    loss = loss.item()
+
     return {
         "total_correct": correct,
+        "total_tested": total,
         "mean_loss": loss / total if total > 0 else 0,
         "mean_accuracy": correct / total if total > 0 else 0,
+    }
+
+
+def aggregate_eval_results(results):
+    """Aggregate multiple results from evaluate_model into a single result.
+
+    :param results:
+        A list of return values from evaluate_model.
+    :type results: list
+
+    :return:
+        A single result dict with evaluation results aggregated.
+    :rtype: dict
+    """
+    correct = sum(result["total_correct"] for result in results)
+    total = sum(result["total_tested"] for result in results)
+    if total == 0:
+        loss = 0
+        accuracy = 0
+    else:
+        loss = sum(result["mean_loss"] * result["total_tested"]
+                   for result in results) / total
+        accuracy = correct / total
+
+    return {
+        "total_correct": correct,
+        "total_tested": total,
+        "mean_loss": loss,
+        "mean_accuracy": accuracy,
     }
 
 

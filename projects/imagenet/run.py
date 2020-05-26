@@ -24,8 +24,19 @@ import socket
 import torch
 
 from experiments import CONFIGS
-from nupic.research.frameworks.pytorch.imagenet import imagenet_tune
+from nupic.research.frameworks.pytorch.imagenet import imagenet_tune, mixins
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
+
+
+def insert_experiment_mixin(config, mixin):
+    experiment_class = config["experiment_class"]
+
+    class Cls(mixin, experiment_class):
+        pass
+
+    Cls.__name__ = f"{mixin.__name__}{experiment_class.__name__}"
+    config["experiment_class"] = Cls
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -40,8 +51,10 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--num-cpus", type=int,
                         default=torch.get_num_interop_threads(),
                         help="number of CPUs to use when GPU is not available."),
-    parser.add_argument("-r", "--resume", action="store_true",
-                        help="Resume training from last known checkpoint")
+    parser.add_argument("-r", "--restore", action="store_true",
+                        help="Restore training from last known checkpoint")
+    parser.add_argument("-c", "--checkpoint-file",
+                        help="Resume experiment from specific checkpoint file")
     parser.add_argument("-j", "--workers", type=int, default=6,
                         help="Number of dataloaders workers")
     parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
@@ -57,9 +70,11 @@ if __name__ == "__main__":
                         help="Python Logging Format")
     parser.add_argument("-x", "--max-failures", type=int,
                         help="How many times to try to recover before stopping")
-    parser.add_argument("-c", "--checkpoint-freq", type=int,
+    parser.add_argument("--checkpoint-freq", type=int,
                         help="How often to checkpoint (epochs)")
     parser.add_argument("--profile", action="store_true",
+                        help="Enable torch.autograd.profiler.profile during training")
+    parser.add_argument("--profile-autograd", action="store_true",
                         help="Enable torch.autograd.profiler.profile during training")
     parser.add_argument("-t", "--create_sigopt", action="store_true",
                         help="Create a new sigopt experiment using the config")
@@ -67,6 +82,8 @@ if __name__ == "__main__":
         "-a", "--redis-address",
         default="{}:6379".format(socket.gethostbyname(socket.gethostname())),
         help="redis address of an existing Ray server")
+    parser.add_argument("--local-mode", action="store_true",
+                        help="Start ray in local mode. Useful for debugging")
 
     args = parser.parse_args()
     if args.name is None:
@@ -78,6 +95,12 @@ if __name__ == "__main__":
 
     # Merge configuration with command line arguments
     config.update(vars(args))
+
+    if "profile" in args and args.profile:
+        insert_experiment_mixin(config, mixins.Profile)
+
+    if "profile_autograd" in args and args.profile_autograd:
+        insert_experiment_mixin(config, mixins.ProfileAutograd)
 
     if "create_sigopt" in args:
         s = SigOptImagenetExperiment()
