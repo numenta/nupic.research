@@ -286,6 +286,6 @@ class LeSparseNet(nn.Sequential):
             input_size = linear_n[i]
 
         # Classifier
-        # self.add_module("output", nn.Linear(input_size, num_classes))
+        self.add_module("output", nn.Linear(input_size, num_classes))
         if use_softmax:
             self.add_module("softmax", nn.LogSoftmax(dim=1))
