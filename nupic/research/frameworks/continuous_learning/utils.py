@@ -21,10 +21,7 @@
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torch import nn
-
-# from nupic.research.frameworks.continuous_learning.dendrite_layers import DendriteLayer
 
 
 def clear_labels(labels):
@@ -87,8 +84,9 @@ def dc_grad(model, kwinner_modules, duty_cycles, pct=90):
             module_index = int(np.where(["linear{}".format(module_num) in k[0]
                                          for k in all_modules])[0][0])
 
-        weight_grads, bias_grads = [k.grad
-                                    for k in all_modules[module_index][1].parameters()]
+        weight_grads, bias_grads = [
+            k.grad for k in all_modules[module_index][1].parameters()
+        ]
 
         with torch.no_grad():
             if module_type == "cnn":

@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import abc
-from functools import partial
 
 import numpy as np
 import torch
@@ -41,13 +40,16 @@ def update_boost_strength(m):
     if isinstance(m, KWinnersBase):
         m.update_boost_strength()
 
+
 def new_epoch(m):
     if isinstance(m, KWinnersBase):
         m.get_new_epoch()
 
+
 def per_epoch(m, bpe):
     if isinstance(m, KWinnersBase):
         m.per_epoch = bpe
+
 
 class KWinnersBase(nn.Module, metaclass=abc.ABCMeta):
     """Base KWinners class.
@@ -143,7 +145,7 @@ class KWinnersBase(nn.Module, metaclass=abc.ABCMeta):
 
     def boost_per_epoch(self, bpe):
         self.per_epoch = bpe
-            
+
     def entropy(self):
         """Returns the current total entropy of this layer."""
         _, entropy = binary_entropy(self.duty_cycle)
