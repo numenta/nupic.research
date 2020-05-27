@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 import abc
 
+from functools import partial
 import numpy as np
 import torch
 import torch.nn as nn
@@ -40,11 +41,13 @@ def update_boost_strength(m):
     if isinstance(m, KWinnersBase):
         m.update_boost_strength()
 
-
 def new_epoch(m):
     if isinstance(m, KWinnersBase):
         m.get_new_epoch()
 
+def per_epoch(m, bpe):
+    if isinstance(m, KWinnersBase):
+        m.per_epoch = bpe
 
 class KWinnersBase(nn.Module, metaclass=abc.ABCMeta):
     """Base KWinners class.
@@ -81,6 +84,7 @@ class KWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         boost_strength_factor=1.0,
         duty_cycle_period=1000,
         new_epoch=False,
+        per_epoch=False,
     ):
         super(KWinnersBase, self).__init__()
         assert boost_strength >= 0.0
@@ -102,6 +106,7 @@ class KWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         self.boost_strength_factor = boost_strength_factor
         self.duty_cycle_period = duty_cycle_period
         self.new_epoch = new_epoch
+        self.per_epoch = per_epoch
 
     def extra_repr(self):
         return (
@@ -136,6 +141,9 @@ class KWinnersBase(nn.Module, metaclass=abc.ABCMeta):
     def get_new_epoch(self):
         self.new_epoch = True
 
+    def boost_per_epoch(self, bpe):
+        self.per_epoch = bpe
+            
     def entropy(self):
         """Returns the current total entropy of this layer."""
         _, entropy = binary_entropy(self.duty_cycle)
@@ -188,6 +196,7 @@ class KWinners(KWinnersBase):
         boost_strength_factor=0.9,
         duty_cycle_period=1000,
         new_epoch=False,
+        per_epoch=False,
     ):
 
         super(KWinners, self).__init__(
@@ -205,15 +214,21 @@ class KWinners(KWinnersBase):
         # self.running_duty_cycle = torch.zeros(self.n)
         self.register_buffer("running_duty_cycle", self.duty_cycle)
         self.new_epoch = new_epoch
+        self.per_epoch = per_epoch
 
     def forward(self, x):
         if self.training:
             x = F.KWinners.apply(x, self.running_duty_cycle,
                                  self.k, self.boost_strength)
             self.update_duty_cycle(x)
-            if self.new_epoch:
+            print(self.per_epoch)
+            if self.per_epoch:
+                if self.new_epoch:
+                    self.running_duty_cycle = self.duty_cycle
+                    self.new_epoch = False
+            else:
                 self.running_duty_cycle = self.duty_cycle
-                self.new_epoch = False
+
         else:
             x = F.KWinners.apply(x, self.running_duty_cycle, self.k_inference,
                                  self.boost_strength)
@@ -278,6 +293,8 @@ class KWinners2d(KWinnersBase):
         boost_strength_factor=0.9,
         duty_cycle_period=1000,
         local=False,
+        new_epoch=False,
+        per_epoch=False,
     ):
 
         super(KWinners2d, self).__init__(
@@ -300,6 +317,7 @@ class KWinners2d(KWinnersBase):
         self.register_buffer("duty_cycle", torch.zeros((1, channels, 1, 1)))
         self.register_buffer("running_duty_cycle", self.duty_cycle)
         self.new_epoch = new_epoch
+        self.per_epoch = per_epoch
 
     def forward(self, x):
 
@@ -313,9 +331,13 @@ class KWinners2d(KWinnersBase):
             x = self.kwinner_function(x, self.running_duty_cycle, self.k,
                                       self.boost_strength)
             self.update_duty_cycle(x)
-            if self.new_epoch:
+            if self.per_epoch:
+                if self.new_epoch:
+                    self.running_duty_cycle = self.duty_cycle
+                    self.new_epoch = False
+            else:
                 self.running_duty_cycle = self.duty_cycle
-                self.new_epoch = False
+
         else:
             x = self.kwinner_function(x, self.running_duty_cycle, self.k_inference,
                                       self.boost_strength)
