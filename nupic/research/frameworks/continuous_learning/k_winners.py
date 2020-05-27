@@ -19,8 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import abc
-
 from functools import partial
+
 import numpy as np
 import torch
 import torch.nn as nn

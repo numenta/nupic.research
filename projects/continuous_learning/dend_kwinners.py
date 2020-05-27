@@ -21,7 +21,6 @@
 
 import abc
 
-import numpy as np
 import torch
 import torch.nn as nn
 
@@ -37,7 +36,7 @@ def update_boost_strength(m):
 
     :param m: KWinner module
     """
-    if isinstance(m, KWinnersBase):
+    if isinstance(m, DKWinnersBase):
         m.update_boost_strength()
 
 
@@ -143,12 +142,12 @@ class DKWinners(DKWinnersBase):
     def forward(self, x):
 
         if self.training:
-            x = Generic_KWinners.apply(x, self.duty_cycle, self.k,
-                                       self.dpc, self.boost_strength)
+            x = GenericKWinners.apply(x, self.duty_cycle, self.k,
+                                      self.dpc, self.boost_strength)
             self.update_duty_cycle(x)
         else:
-            x = Generic_KWinners.apply(x, self.duty_cycle, self.k_inference,
-                                       self.dpc, self.boost_strength)
+            x = GenericKWinners.apply(x, self.duty_cycle, self.k_inference,
+                                      self.dpc, self.boost_strength)
 
         return x
 
@@ -161,7 +160,7 @@ class DKWinners(DKWinnersBase):
         self.duty_cycle.div_(period)
 
 
-class Generic_KWinners(torch.autograd.Function):
+class GenericKWinners(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, duty_cycles, out_dim, dpc, boost_strength):
 
@@ -180,7 +179,7 @@ class Generic_KWinners(torch.autograd.Function):
             ind = torch.argmax(boosted[:, k * (dpc - 1):k * (dpc - 1) + dpc], dim=1)
             mask[:, k, ind].fill_(1.)
 
-        mask = mask.reshape(boosted.shape[0], out_dim * dpc).cuda()  # reshape 
+        mask = mask.reshape(boosted.shape[0], out_dim * dpc).cuda()  # reshape
         res = mask * x
         ctx.save_for_backward(mask)
         return res

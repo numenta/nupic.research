@@ -21,8 +21,9 @@
 
 import numpy as np
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
+
 # from nupic.research.frameworks.continuous_learning.dendrite_layers import DendriteLayer
 
 
@@ -116,4 +117,3 @@ def init_weights(m):
 #         ADA = F.relu(x) * torch.exp(-x * self.a + self.c)
 #         ADA_l = self.l * neg_relu + ADA
 #         return ADA_l
-

@@ -20,8 +20,8 @@
 
 import numpy as np
 from torch import nn
-import torch
 
+from nupic.research.frameworks.continuous_learning.dendrite_layers import DendriteLayer
 from nupic.research.frameworks.pytorch.modules import KWinners2dLocal
 from nupic.research.frameworks.pytorch.modules.consolidated_sparse_weights import (
     ConsolidatedSparseWeights,
@@ -34,9 +34,6 @@ from nupic.torch.modules import (
     SparseWeights,
     SparseWeights2d,
 )
-
-from nupic.research.frameworks.continuous_learning.dendrite_layers import DendriteLayer
-# from nupic.research.frameworks.continuous_learning.utils import add_sparse_dendrite_layer
 
 
 def add_sparse_cnn_layer(

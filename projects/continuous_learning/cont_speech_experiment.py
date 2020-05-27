@@ -18,6 +18,7 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+
 import logging
 import os
 import tempfile
@@ -30,6 +31,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+# from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
+from exp_lesparse import LeSparseNet
+from fb_sparsenet import FBNet
+from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
@@ -37,14 +42,9 @@ from nupic.research.frameworks.pytorch.model_utils import (
     set_random_seed,
     train_model,
 )
-# from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
-from exp_lesparse import LeSparseNet
 from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
 from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import rezero_weights, update_boost_strength
-from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
-
-from fb_sparsenet import FBNet
 
 
 def get_logger(name, verbose):
@@ -147,7 +147,7 @@ class ContinuousSpeechExperiment(object):
                 "use_kwinner_local", False),
             )
             self.combine_xy = True
-            
+
         elif self.model_type == "resnet9":
             model = resnet9(
                 num_classes=self.num_classes, in_channels=1
@@ -161,7 +161,7 @@ class ContinuousSpeechExperiment(object):
 
         else:
             raise RuntimeError("Unknown model type: " + self.model_type)
-        
+
         self.use_cuda = torch.cuda.is_available()
         self.logger.debug("use_cuda %s", self.use_cuda)
         if self.use_cuda:
