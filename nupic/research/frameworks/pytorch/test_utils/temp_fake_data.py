@@ -21,13 +21,14 @@
 import os
 import tempfile
 
+from torch.utils.data import DataLoader
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
 from nupic.research.frameworks.pytorch.dataset_utils import HDF5DataSaver
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
-    create_train_dataloader,
-    create_validation_dataloader,
+    create_train_dataset,
+    create_validation_dataset,
 )
 
 __all__ = [
@@ -103,18 +104,23 @@ class TempFakeSavedData(object):
         self.batch_size = batch_size
         self.train_num_classes = len(self.classes["train"])
         self.val_num_classes = len(self.classes["val"])
-        self.train_dataloader = create_train_dataloader(
-            self.dataset_path, "train", self.batch_size,
-            workers=num_workers, num_classes=self.train_num_classes, distributed=False
+        self.train_dataset = create_train_dataset(
+            self.dataset_path, "train", num_classes=self.train_num_classes,
         )
-        self.val_dataloader = create_validation_dataloader(
-            self.dataset_path, "val", batch_size,
-            workers=num_workers, num_classes=self.val_num_classes
-        )
+        self.train_dataloader = DataLoader(
+            dataset=self.train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers)
 
-        # Set the datasets that correspond to the dataloaders.
-        self.train_dataset = self.train_dataloader.dataset
-        self.val_dataset = self.val_dataloader.dataset
+        self.val_dataset = create_validation_dataset(
+            self.dataset_path, "val", num_classes=self.val_num_classes
+        )
+        self.val_dataloader = DataLoader(
+            dataset=self.val_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers)
 
     def _append_dataset(self, dataset, group_name):
 

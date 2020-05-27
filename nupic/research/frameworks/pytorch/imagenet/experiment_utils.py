@@ -23,10 +23,8 @@ import socket
 from contextlib import closing
 
 import h5py
-import torch
 from torch.nn.modules.batchnorm import _BatchNorm
 from torch.optim.lr_scheduler import OneCycleLR
-from torch.utils.data import DistributedSampler
 from torchvision import transforms
 from torchvision.transforms import RandomResizedCrop
 
@@ -68,26 +66,26 @@ IMAGENET_NUM_CLASSES = {
 }
 
 
-def create_train_dataloader(
-    data_dir, train_dir, batch_size, workers, distributed, num_classes=1000,
-    use_auto_augment=False, sample_transform=None, target_transform=None,
-):
+def create_train_dataset(data_dir, train_dir, num_classes=1000,
+                         use_auto_augment=False, sample_transform=None,
+                         target_transform=None, replicas_per_sample=1):
     """
-    Configure Imagenet training dataloader
+    Configure Imagenet training dataset
 
-    Creates :class:`torch.utils.data.DataLoader` using :class:`CachedDatasetFolder`
-    or :class:`HDF5Dataset` pre-configured for the training cycle
+    Creates :class:`CachedDatasetFolder` :class:`HDF5Dataset` pre-configured
+    for the training cycle
 
     :param data_dir: The directory or hdf5 file containing the dataset
     :param train_dir: The directory or hdf5 group containing the training data
-    :param batch_size: Images per batch
-    :param workers: how many data loading subprocesses to use
-    :param distributed: Whether or not to use `DistributedSampler`
     :param num_classes: Limit the dataset size to the given number of classes
     :param sample_transform: List of transforms acting on the samples
                              to be added to the defaults below
     :param target_transform: List of transforms acting on the targets
-    :return: torch.utils.data.DataLoader
+    :param replicas_per_sample: Number of replicas to create per sample
+                                in the batch (each replica is transformed
+                                independently). Used in maxup.
+
+    :return: CachedDatasetFolder or HDF5Dataset
     """
     if use_auto_augment:
         transform = transforms.Compose(
@@ -117,7 +115,6 @@ def create_train_dataloader(
 
     transform = transforms.Compose(
         transforms=[transform] + (sample_transform or []))
-    target_transform = target_transform
 
     if h5py.is_hdf5(data_dir):
         # Use fixed Imagenet classes if mapping is available
@@ -125,44 +122,31 @@ def create_train_dataloader(
             classes = IMAGENET_NUM_CLASSES[num_classes]
             dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
                                   classes=classes, transform=transform,
-                                  target_transform=target_transform)
+                                  target_transform=target_transform,
+                                  replicas_per_sample=replicas_per_sample)
         else:
             dataset = HDF5Dataset(hdf5_file=data_dir, root=train_dir,
                                   num_classes=num_classes, transform=transform,
-                                  target_transform=target_transform)
+                                  target_transform=target_transform,
+                                  replicas_per_sample=replicas_per_sample)
     else:
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, train_dir),
                                       num_classes=num_classes, transform=transform,
                                       target_transform=target_transform)
-    if distributed:
-        train_sampler = DistributedSampler(dataset)
-    else:
-        train_sampler = None
-
-    return torch.utils.data.DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=train_sampler is None,
-        num_workers=workers,
-        sampler=train_sampler,
-        pin_memory=torch.cuda.is_available(),
-    )
+    return dataset
 
 
-def create_validation_dataloader(data_dir, val_dir, batch_size, workers,
-                                 num_classes=1000):
+def create_validation_dataset(data_dir, val_dir, num_classes=1000):
     """
     Configure Imagenet validation dataloader
 
-    Creates :class:`torch.utils.data.DataLoader` using :class:`CachedDatasetFolder`
-    or :class:`HDF5Dataset` pre-configured for the validation cycle.
+    Creates :class:`CachedDatasetFolder` or :class:`HDF5Dataset` pre-configured
+    for the validation cycle.
 
     :param data_dir: The directory or hdf5 file containing the dataset
     :param val_dir: The directory containing or hdf5 group the validation data
-    :param batch_size: Images per batch
-    :param workers: how many data loading subprocesses to use
     :param num_classes: Limit the dataset size to the given number of classes
-    :return: torch.utils.data.DataLoader
+    :return: CachedDatasetFolder or HDF5Dataset
     """
 
     transform = transforms.Compose(
@@ -187,13 +171,7 @@ def create_validation_dataloader(data_dir, val_dir, batch_size, workers,
     else:
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, val_dir),
                                       num_classes=num_classes, transform=transform)
-    return torch.utils.data.DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=workers,
-        pin_memory=False,
-    )
+    return dataset
 
 
 def create_optimizer(model, optimizer_class, optimizer_args,

@@ -20,6 +20,7 @@
 import copy
 import logging
 import os
+import pickle
 import time
 from pprint import pprint
 
@@ -30,13 +31,16 @@ import torch
 from ray.exceptions import RayActorError
 from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
+from ray.tune.result import DONE, RESULT_DUPLICATE
 from ray.tune.utils import warn_if_slow
 
 from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
     TrialsCollection,
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
+from nupic.research.frameworks.pytorch.model_utils import aggregate_eval_results
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
+from nupic.research.support.ray_utils import get_last_checkpoint
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -88,19 +92,49 @@ class ImagenetTrainable(Trainable):
         if config.get("checkpoint_at_init", False):
             self.save()
 
+        # Load initial state from checkpoint file
+        self._checkpoint_file = config.get("checkpoint_file", None)
+        if self._checkpoint_file is not None:
+            with open(self._checkpoint_file, mode="rb") as f:
+                state = pickle.load(f)
+                self._restore(state)
+                self._restored = True
+
+        self._first_run = True
+
     def _train(self):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
+            # Check if restore checkpoint file fulfills the stop criteria on first run
+            if self._first_run:
+                self._first_run = False
+                if self._restored and self._should_stop():
+                    self.logger.warning(
+                        f"Restored checkpoint file '{self._checkpoint_file}' fulfills "
+                        f"stop criteria without additional training.")
+                    return {
+                        # do not train or log results, just stop
+                        RESULT_DUPLICATE: True,
+                        DONE: True
+                    }
+
             status = []
             for w in self.procs:
                 status.append(w.run_epoch.remote())
 
             # Wait for remote functions and check for errors
-            # Return the results from the first remote function
+            # Aggregate the results from all processes
             if ray_utils.check_for_failure(status):
                 results = ray.get(status)
+
                 ret = copy.deepcopy(results[0])
+                ret.update(aggregate_eval_results(results))
+
                 self._process_result(ret)
+
+                # Check if we should stop the experiment
+                ret[DONE] = self._should_stop()
+
                 return ret
 
             err_msg = (f"{self._trial_info.trial_name}({self.iteration}): "
@@ -111,6 +145,18 @@ class ImagenetTrainable(Trainable):
             self._kill_workers()
             raise
 
+    def _should_stop(self):
+        """
+        Whether or not we should stop the experiment
+        """
+        # Check if we should stop the experiment
+        stop_status = self.procs[0].should_stop.remote()
+        if ray_utils.check_for_failure([stop_status]):
+            return ray.get(stop_status)
+        else:
+            # Stop on failures
+            return True
+
     def _save(self, _=None):
         self.logger.debug(f"_save: {self._trial_info.trial_name}({self.iteration})")
         # All models are synchronized. Just save the state of first model
@@ -118,15 +164,14 @@ class ImagenetTrainable(Trainable):
             return ray.get(self.procs[0].get_state.remote())
 
     def _restore(self, state):
-        self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
-
-        # Update current_epoch for old checkpoints
-        if "current_epoch" not in state:
-            state.update(current_epoch=self.iteration)
-
         # Restore the state to every process
         state_id = ray.put(state)
         ray.get([w.set_state.remote(state_id) for w in self.procs])
+
+        # Update current iteration using experiment epoch
+        self._iteration = ray.get(self.procs[0].get_current_epoch.remote())
+
+        self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
 
     def _create_workers(self, config):
         """
@@ -294,7 +339,7 @@ class SigOptImagenetTrainable(ImagenetTrainable):
 def run(config):
     # Connect to ray
     address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
-    ray.init(address=address)
+    ray.init(address=address, local_mode=config.get("local_mode", False))
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
@@ -307,15 +352,15 @@ def run(config):
         assert issubclass(imagenet_trainable, ImagenetTrainable)
         kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
 
+    # Check if restoring experiment from last known checkpoint
+    if config.pop("restore", False):
+        result_dir = os.path.join(config["local_dir"], config["name"])
+        checkpoint_file = get_last_checkpoint(result_dir)
+        config["checkpoint_file"] = checkpoint_file
+
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
-
-    # Update tune stop criteria with config epochs
-    stop = kwargs.get("stop", {}) or dict()
-    epochs = config.get("epochs", 1)
-    stop.update(training_iteration=epochs)
-    kwargs["stop"] = stop
 
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
@@ -335,6 +380,7 @@ def run_single_instance(config):
     config["workers"] = 4
     config["log_level"] = "INFO"
     config["reuse_actors"] = False
+    config["dist_port"] = get_free_port()
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]

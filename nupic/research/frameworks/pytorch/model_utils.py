@@ -233,8 +233,38 @@ def evaluate_model(
 
     return {
         "total_correct": correct,
+        "total_tested": total,
         "mean_loss": loss / total if total > 0 else 0,
         "mean_accuracy": correct / total if total > 0 else 0,
+    }
+
+
+def aggregate_eval_results(results):
+    """Aggregate multiple results from evaluate_model into a single result.
+
+    :param results:
+        A list of return values from evaluate_model.
+    :type results: list
+
+    :return:
+        A single result dict with evaluation results aggregated.
+    :rtype: dict
+    """
+    correct = sum(result["total_correct"] for result in results)
+    total = sum(result["total_tested"] for result in results)
+    if total == 0:
+        loss = 0
+        accuracy = 0
+    else:
+        loss = sum(result["mean_loss"] * result["total_tested"]
+                   for result in results) / total
+        accuracy = correct / total
+
+    return {
+        "total_correct": correct,
+        "total_tested": total,
+        "mean_loss": loss,
+        "mean_accuracy": accuracy,
     }
 
 

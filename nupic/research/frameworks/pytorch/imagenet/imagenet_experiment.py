@@ -28,21 +28,22 @@ import ray.services
 import ray.util.sgd.utils as ray_utils
 import torch
 import torch.distributed as dist
-import torch.utils.data
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
+from torch.utils.data import DataLoader, DistributedSampler
 
+from nupic.research.frameworks.pytorch.distributed_sampler import (
+    UnpaddedDistributedSampler,
+)
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
     create_optimizer,
-    create_train_dataloader,
-    create_validation_dataloader,
+    create_train_dataset,
+    create_validation_dataset,
 )
-from nupic.research.frameworks.pytorch.imagenet.network_utils import (
-    create_model_from_config,
-)
+from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     deserialize_state_dict,
@@ -91,19 +92,6 @@ class ImagenetExperiment:
         self.launch_time = 0
         self.epochs_to_validate = []
         self.current_epoch = 0
-        # Updated by mixins and subclasses.
-        self.execution_order = dict(
-            setup_experiment=["ImagenetExperiment.setup_experiment"],
-            create_model=["ImagenetExperiment.create_model"],
-            validate=["ImagenetExperiment.validate"],
-            train_epoch=["ImagenetExperiment.train_epoch"],
-            run_epoch=["ImagenetExperiment.run_epoch"],
-            pre_epoch=["ImagenetExperiment.pre_epoch"],
-            post_epoch=["ImagenetExperiment.post_epoch"],
-            pre_batch=["ImagenetExperiment.pre_batch"],
-            post_batch=["ImagenetExperiment.post_batch"],
-            loss_function=["ImagenetExperiment.loss_function"],
-        )
 
     def setup_experiment(self, config):
         """
@@ -156,12 +144,9 @@ class ImagenetExperiment:
             - sample_transform: Transform acting on the training samples. To be used
                                 additively after default transform or auto-augment.
             - target_transform: Transform acting on the training targets.
-            - create_train_dataloader: Optional user defined function to create
-                                       the training data loader. See below for
-                                       input params.
-            - create_validation_dataloader: Optional user defined function to create
-                                            the validation data loader. See below for
-                                            input params.
+            - replicas_per_sample: Number of replicas to create per sample in the batch.
+                                   (each replica is transformed independently)
+                                   Used in maxup.
             - train_model_func: Optional user defined function to train the model,
                                 expected to behave similarly to `train_model`
                                 in terms of input parameters and return values
@@ -204,7 +189,8 @@ class ImagenetExperiment:
         self.rank = config.get("rank", 0)
 
         if self.rank == 0:
-            self.logger.info(f"Execution order: {pformat(self.execution_order)}")
+            self.logger.info(
+                f"Execution order: {pformat(self.get_execution_order())}")
 
         if self.distributed:
             dist_url = config.get("dist_url", "tcp://127.0.0.1:54321")
@@ -221,7 +207,7 @@ class ImagenetExperiment:
             self.progress = self.progress and self.rank == 0
 
         # Configure model
-        self.model = self.create_model(config)
+        self.model = self.create_model(config, self.device)
         if self.rank == 0:
             self.logger.debug(self.model)
 
@@ -270,10 +256,6 @@ class ImagenetExperiment:
         self.epochs_to_validate = config.get("epochs_to_validate",
                                              range(self.epochs - 3, self.epochs + 1))
         self.current_epoch = 0
-        workers = config.get("workers", 0)
-        data_dir = config["data"]
-        train_dir = config.get("train_dir", "train")
-        num_classes = config.get("num_classes", 1000)
 
         # Get initial batch size
         self.batch_size = config.get("batch_size", 1)
@@ -283,36 +265,10 @@ class ImagenetExperiment:
         if torch.cuda.is_available():
             multiprocessing.set_start_method("spawn")
 
-        # Configure Training data loader
-        sample_transform = config.get("sample_transform", None)
-        target_transform = config.get("target_transform", None)
-        self.create_train_dataloader = config.get(
-            "create_train_dataloader", create_train_dataloader)
-        self.train_loader = self.create_train_dataloader(
-            data_dir=data_dir,
-            train_dir=train_dir,
-            batch_size=self.batch_size,
-            workers=workers,
-            distributed=self.distributed,
-            num_classes=num_classes,
-            use_auto_augment=config.get("use_auto_augment", False),
-            sample_transform=sample_transform,  # will be used additively w/ auto-aug
-            target_transform=target_transform,
-        )
+        # Configure data loaders
+        self.train_loader = self.create_train_dataloader(config)
+        self.val_loader = self.create_validation_dataloader(config)
         self.total_batches = len(self.train_loader)
-
-        # Configure Validation data loader
-        val_dir = config.get("val_dir", "val")
-        val_batch_size = config.get("val_batch_size", self.batch_size)
-        self.create_validation_dataloader = config.get(
-            "create_validation_dataloader", create_validation_dataloader)
-        self.val_loader = self.create_validation_dataloader(
-            data_dir=data_dir,
-            val_dir=val_dir,
-            batch_size=val_batch_size,
-            workers=workers,
-            num_classes=num_classes,
-        )
 
         # Configure learning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
@@ -331,8 +287,86 @@ class ImagenetExperiment:
         self.train_model = config.get("train_model_func", train_model)
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
-    def create_model(self, config):
-        return create_model_from_config(config, self.device)
+    @classmethod
+    def create_model(cls, config, device):
+        """
+        Create imagenet model from an ImagenetExperiment config
+        :param config:
+            - model_class: Model class. Must inherit from "torch.nn.Module"
+            - model_args: model model class arguments passed to the constructor
+            - init_batch_norm: Whether or not to Initialize running batch norm
+                               mean to 0.
+            - checkpoint_file: if not None, will start from this model. The
+                               model must have the same model_args and
+                               model_class as the current experiment.
+        :param device:
+                Pytorch device
+
+        :return:
+                Model instance
+        """
+        return create_model(
+            model_class=config["model_class"],
+            model_args=config.get("model_args", {}),
+            init_batch_norm=config.get("init_batch_norm", False),
+            device=device,
+            checkpoint_file=config.get("checkpoint_file", None)
+        )
+
+    @classmethod
+    def create_train_dataloader(cls, config):
+        """
+        This method is a classmethod so that it can be used directly by analysis
+        tools, while also being easily overrideable.
+        """
+        dataset = create_train_dataset(
+            data_dir=config["data"],
+            train_dir=config.get("train_dir", "train"),
+            num_classes=config.get("num_classes", 1000),
+            use_auto_augment=config.get("use_auto_augment", False),
+            sample_transform=config.get("sample_transform", None),
+            target_transform=config.get("target_transform", None),
+            replicas_per_sample=config.get("replicas_per_sample", 1),
+        )
+
+        if config.get("distributed", False):
+            sampler = DistributedSampler(dataset)
+        else:
+            sampler = None
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("batch_size", 1),
+            shuffle=sampler is None,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    @classmethod
+    def create_validation_dataloader(cls, config):
+        """
+        This method is a classmethod so that it can be used directly by analysis
+        tools, while also being easily overrideable.
+        """
+        dataset = create_validation_dataset(
+            data_dir=config["data"],
+            val_dir=config.get("val_dir", "val"),
+            num_classes=config.get("num_classes", 1000),
+        )
+
+        if config.get("distributed", False):
+            sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
+        else:
+            sampler = None
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("val_batch_size",
+                                  config.get("batch_size", 1)),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
 
     def validate(self, loader=None):
         if loader is None:
@@ -349,6 +383,7 @@ class ImagenetExperiment:
         else:
             results = {
                 "total_correct": 0,
+                "total_tested": 0,
                 "mean_loss": 0.0,
                 "mean_accuracy": 0.0,
             }
@@ -471,7 +506,6 @@ class ImagenetExperiment:
         :param state: dictionary with "model", "optimizer", "lr_scheduler", and "amp"
                       states
         """
-        self.current_epoch = state.get("current_epoch", 0)
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
@@ -492,9 +526,29 @@ class ImagenetExperiment:
                 state_dict = deserialize_state_dict(buffer, self.device)
             amp.load_state_dict(state_dict)
 
+        if "current_epoch" in state:
+            self.current_epoch = state["current_epoch"]
+        else:
+            # Try to recover current epoch from LR Scheduler state
+            last_epoch = self.lr_scheduler.last_epoch + 1
+            if isinstance(self.lr_scheduler, ComposedLRScheduler):
+                self.current_epoch = last_epoch // self.lr_scheduler.steps_per_epoch
+            elif isinstance(self.lr_scheduler, OneCycleLR):
+                steps_per_epoch = self.lr_scheduler.total_steps // self.epochs
+                self.current_epoch = last_epoch // steps_per_epoch
+            else:
+                self.current_epoch = last_epoch
+
     def stop_experiment(self):
         if self.distributed:
             dist.destroy_process_group()
+
+    def should_stop(self):
+        """
+        Whether or not the experiment should stop. Usually determined by the
+        number of epochs but customizable to any other stopping criteria
+        """
+        return self.current_epoch >= self.epochs
 
     def get_lr(self):
         """
@@ -502,6 +556,12 @@ class ImagenetExperiment:
         :return: list of learning rates used by the optimizer
         """
         return [p["lr"] for p in self.optimizer.param_groups]
+
+    def get_current_epoch(self):
+        """
+        Returns the current epoch of the running experiment
+        """
+        return self.current_epoch
 
     def get_weight_decay(self):
         """
@@ -517,3 +577,22 @@ class ImagenetExperiment:
     def get_free_port(self):
         """Returns free TCP port in the current ray node"""
         return ray_utils.find_free_port()
+
+    @classmethod
+    def get_execution_order(cls):
+        return dict(
+            setup_experiment=["ImagenetExperiment.setup_experiment"],
+            create_model=["ImagenetExperiment.create_model"],
+            create_train_dataloader=["ImagenetExperiment.create_train_dataloader"],
+            create_validation_dataloader=[
+                "ImagenetExperiment.create_validation_dataloader"
+            ],
+            validate=["ImagenetExperiment.validate"],
+            train_epoch=["ImagenetExperiment.train_epoch"],
+            run_epoch=["ImagenetExperiment.run_epoch"],
+            pre_epoch=["ImagenetExperiment.pre_epoch"],
+            post_epoch=["ImagenetExperiment.post_epoch"],
+            pre_batch=["ImagenetExperiment.pre_batch"],
+            post_batch=["ImagenetExperiment.post_batch"],
+            loss_function=["ImagenetExperiment.loss_function"],
+        )

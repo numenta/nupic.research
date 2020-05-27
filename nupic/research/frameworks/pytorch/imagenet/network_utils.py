@@ -96,34 +96,3 @@ def create_model(model_class, model_args, init_batch_norm, device,
         model.load_state_dict(state_dict)
 
     return model
-
-
-def create_model_from_config(config, device):
-    """
-    Create imagenet model from an ImagenetExperiment config
-    :param config:
-            - model_class: Model class. Must inherit from "torch.nn.Module"
-            - model_args: model model class arguments passed to the constructor
-            - init_batch_norm: Whether or not to Initialize running batch norm
-                               mean to 0.
-            - checkpoint_file: if not None, will start from this model. The model
-                               must have the same model_args and model_class as the
-                               current experiment.
-    :param device:
-            Pytorch device
-
-    :return:
-            Model instance
-    """
-    model_class = config["model_class"]
-    model_args = config.get("model_args", {})
-    init_batch_norm = config.get("init_batch_norm", False)
-    model = create_model(
-        model_class=model_class,
-        model_args=model_args,
-        init_batch_norm=init_batch_norm,
-        device=device,
-        checkpoint_file=config.get("checkpoint_file", None)
-    )
-
-    return model

@@ -27,14 +27,6 @@ class ComplexLoss(object):
     Defines a new training loop that has direct access to Experiment attributes
     and can be customized for more complex loss functions
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["train_epoch"] = ["ComplexLoss.train_epoch"]
-        self.execution_order["_train_model"] = ["ComplexLoss._train_model"]
-        self.execution_order["calculate_batch_loss"] = [
-            "ComplexLoss.calculate_batch_loss"
-        ]
-
     def train_epoch(self):
         """Overwrites train model to use private train_model method
         """
@@ -76,7 +68,7 @@ class ComplexLoss(object):
 
             self.optimizer.zero_grad()
 
-            loss, output = self.calculate_batch_loss(data, target, async_gpu=True)
+            loss, output = self.calculate_batch_loss(data, target, async_gpu=async_gpu)
             del output
 
             t2 = time.time()
@@ -113,3 +105,11 @@ class ComplexLoss(object):
 
         del data, target
         return loss, output
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["train_epoch"] = ["ComplexLoss.train_epoch"]
+        eo["_train_model"] = ["ComplexLoss._train_model"]
+        eo["calculate_batch_loss"] = ["ComplexLoss.calculate_batch_loss"]
+        return eo

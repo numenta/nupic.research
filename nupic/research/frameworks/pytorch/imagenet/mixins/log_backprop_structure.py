@@ -26,12 +26,6 @@ class LogBackpropStructure(object):
     """
     Structure logging for the backprop_structure modules.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["setup_experiment"].append(
-            "LogBackpropStructure initialization")
-        self.execution_order["run_epoch"].append("LogBackpropStructure")
-
     def setup_experiment(self, config):
         super().setup_experiment(config)
         self.log_verbose_structure = config.get("log_verbose_structure", False)
@@ -40,6 +34,13 @@ class LogBackpropStructure(object):
         result = super().run_epoch(*args, **kwargs)
         result.update(nonzero_counts(self.model, self.log_verbose_structure))
         return result
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("LogBackpropStructure initialization")
+        eo["run_epoch"].append("LogBackpropStructure")
+        return eo
 
 
 def nonzero_counts(model, verbose):

@@ -26,13 +26,6 @@ class ProfileAutograd:
     """
     Use torch's autograd profiler during training.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["setup_experiment"].append(
-            "ProfileAutograd initialization")
-        self.execution_order["train_epoch"].insert(0, "ProfileAutograd begin")
-        self.execution_order["train_epoch"].append("ProfileAutograd end")
-
     def setup_experiment(self, config):
         super().setup_experiment(config)
         # Only profile from rank 0
@@ -47,3 +40,11 @@ class ProfileAutograd:
         if self.profile_autograd and prof is not None:
             self.logger.info(prof.key_averages().table(
                 sort_by="self_cpu_time_total"))
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("ProfileAutograd initialization")
+        eo["train_epoch"].insert(0, "ProfileAutograd begin")
+        eo["train_epoch"].append("ProfileAutograd end")
+        return eo
