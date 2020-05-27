@@ -154,8 +154,8 @@ def train_model(
             reset_fun(model, reset_params)
 
         if post_batch_callback is not None:
-            time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s," +
-                           "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
+            time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
+                           + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
                                                               t4 - t3)
             post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
                                 num_images=num_images, time_string=time_string)
@@ -218,7 +218,7 @@ def evaluate_model(
                 output = model(data, target)
             else:
                 output = model(data)
-                
+
             loss += criterion(output, target, reduction="sum").item()
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum().item()
@@ -345,10 +345,14 @@ def freeze_output_layer(model, indices, layer_type="dense", linear_number=2):
     elif layer_type == "kwinner":
         module_dict = {k[0]: k[1] for k in model.named_parameters()}
         with torch.no_grad():
-            [module_dict["linear{}.module.weight".format(linear_number)].grad.data[index, :].fill_(0.0)
-             for index in indices]
-            [module_dict["linear{}.module.bias".format(linear_number)].grad.data[index].fill_(0.0)
-             for index in indices]
+            [module_dict[
+                "linear{}.module.weight".format(linear_number)
+            ].grad.data[index, :].fill_(0.0)
+                for index in indices]
+            [module_dict[
+                "linear{}.module.bias".format(linear_number)
+            ].grad.data[index].fill_(0.0)
+                for index in indices]
 
     else:
         raise AssertionError("layer_type must be ''dense'' or ''kwinner''")
