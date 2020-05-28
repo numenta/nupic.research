@@ -36,11 +36,23 @@ def train_model(
     optimizer,
     device,
     freeze_params=None,
+    freeze_fun=None,
+    freeze_pct=90,
+    freeze_output=False,
+    layer_type="dense",
+    linear_number=2,
+    output_indices=None,
+    duty_cycles=None,
+    frozen_dcs=None,
+    reset_weights=None,
+    reset_fun=None,
+    reset_params=None,
     criterion=F.nll_loss,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
     post_batch_callback=None,
     progress_bar=None,
+    combine_data=False,
 ):
     """Train the given model by iterating through mini batches. An epoch ends
     after one pass through the training set, or if the number of mini batches
@@ -98,6 +110,7 @@ def train_model(
                 "Please install apex from https://www.github.com/nvidia/apex")
 
     t0 = time.time()
+
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
@@ -111,7 +124,11 @@ def train_model(
             pre_batch_callback(model=model, batch_idx=batch_idx)
 
         optimizer.zero_grad()
-        output = model(data)
+        if combine_data:
+            output = model(data, target)
+        else:
+            output = model(data)
+
         loss = criterion(output, target)
         del data, target, output
 
@@ -123,15 +140,18 @@ def train_model(
             loss.backward()
 
         if freeze_params is not None:
-            with torch.no_grad():
-                for param in freeze_params:
-                    param_module = param[0]
-                    param_indices = param[1]
-                    param_module.grad[param_indices, :] = 0.0
+            freeze_fun(model, freeze_params, duty_cycles, freeze_pct)
+
+        if freeze_output:
+            freeze_output_layer(model, output_indices, layer_type=layer_type,
+                                linear_number=linear_number)
 
         t3 = time.time()
         optimizer.step()
         t4 = time.time()
+
+        if reset_weights is not None:
+            reset_fun(model, reset_params)
 
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
@@ -155,6 +175,7 @@ def evaluate_model(
     criterion=F.nll_loss,
     progress=None,
     post_batch_callback=None,
+    combine_data=False,
 ):
     """Evaluate pre-trained model using given test dataset loader.
 
@@ -178,12 +199,9 @@ def evaluate_model(
     :rtype: dict
     """
     model.eval()
+    loss = 0
+    correct = 0
     total = 0
-
-    # Perform accumulation on device, avoid paying performance cost of .item()
-    loss = torch.tensor(0., device=device)
-    correct = torch.tensor(0, device=device)
-
     async_gpu = loader.pin_memory
 
     if progress is not None:
@@ -196,10 +214,14 @@ def evaluate_model(
             data = data.to(device, non_blocking=async_gpu)
             target = target.to(device, non_blocking=async_gpu)
 
-            output = model(data)
-            loss += criterion(output, target, reduction="sum")
+            if combine_data:
+                output = model(data, target)
+            else:
+                output = model(data)
+
+            loss += criterion(output, target, reduction="sum").item()
             pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum()
+            correct += pred.eq(target.view_as(pred)).sum().item()
             total += len(data)
 
             if post_batch_callback is not None:
@@ -208,9 +230,6 @@ def evaluate_model(
 
     if progress is not None:
         loader.close()
-
-    correct = correct.item()
-    loss = loss.item()
 
     return {
         "total_correct": correct,
@@ -310,3 +329,30 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
+
+
+def freeze_output_layer(model, indices, layer_type="dense", linear_number=2):
+    """ Freeze output layer gradients of specific classes for classification.
+    :param layer_type: can be "dense" (i.e. model.output) or "kwinner"
+    :param linear_number: "linear" module number for k winner
+    (e.g. linear1_kwinners, linear2_kwinners etc.)
+    """
+    if layer_type == "dense":
+        with torch.no_grad():
+            [model.output.weight.grad.data[index, :].fill_(0.0) for index in indices]
+            [model.output.bias.grad.data[index].fill_(0.0) for index in indices]
+
+    elif layer_type == "kwinner":
+        module_dict = {k[0]: k[1] for k in model.named_parameters()}
+        with torch.no_grad():
+            [module_dict[
+                "linear{}.module.weight".format(linear_number)
+            ].grad.data[index, :].fill_(0.0)
+                for index in indices]
+            [module_dict[
+                "linear{}.module.bias".format(linear_number)
+            ].grad.data[index].fill_(0.0)
+                for index in indices]
+
+    else:
+        raise AssertionError("layer_type must be ''dense'' or ''kwinner''")
