@@ -42,8 +42,6 @@ from nupic.research.frameworks.pytorch.model_utils import (
     set_random_seed,
     train_model,
 )
-from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
-from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import rezero_weights, update_boost_strength
 
 
@@ -147,17 +145,6 @@ class ContinuousSpeechExperiment(object):
                 "use_kwinner_local", False),
             )
             self.combine_xy = True
-
-        elif self.model_type == "resnet9":
-            model = resnet9(
-                num_classes=self.num_classes, in_channels=1
-            )
-
-        elif self.model_type == "gsc_sparse_cnn":
-            model = GSCSparseCNN()
-
-        elif self.model_type == "gsc_super_sparse_cnn":
-            model = GSCSuperSparseCNN()
 
         else:
             raise RuntimeError("Unknown model type: " + self.model_type)
