@@ -178,7 +178,6 @@ def evaluate_model(
     combine_data=False,
 ):
     """Evaluate pre-trained model using given test dataset loader.
-
     :param model: Pretrained pytorch model
     :type model: torch.nn.Module
     :param loader: test dataset loader
@@ -194,14 +193,16 @@ def evaluate_model(
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters:
                                 batch_idx, target, output, pred
-
     :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
     :rtype: dict
     """
     model.eval()
-    loss = 0
-    correct = 0
     total = 0
+
+    # Perform accumulation on device, avoid paying performance cost of .item()
+    loss = torch.tensor(0., device=device)
+    correct = torch.tensor(0, device=device)
+
     async_gpu = loader.pin_memory
 
     if progress is not None:
@@ -219,9 +220,9 @@ def evaluate_model(
             else:
                 output = model(data)
 
-            loss += criterion(output, target, reduction="sum").item()
+            loss += criterion(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
+            correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
 
             if post_batch_callback is not None:
@@ -230,6 +231,9 @@ def evaluate_model(
 
     if progress is not None:
         loader.close()
+
+    correct = correct.item()
+    loss = loss.item()
 
     return {
         "total_correct": correct,
@@ -241,11 +245,9 @@ def evaluate_model(
 
 def aggregate_eval_results(results):
     """Aggregate multiple results from evaluate_model into a single result.
-
     :param results:
         A list of return values from evaluate_model.
     :type results: list
-
     :return:
         A single result dict with evaluation results aggregated.
     :rtype: dict
@@ -272,7 +274,6 @@ def set_random_seed(seed, deterministic_mode=True):
     """
     Set pytorch, python random, and numpy random seeds (these are all the seeds we
     normally use).
-
     :param seed:  (int) seed value
     :param deterministic_mode: (bool) If True, then even on a GPU we'll get more
            deterministic results, though performance may be slower. See:
