@@ -38,7 +38,6 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
     TrialsCollection,
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
-from nupic.research.frameworks.pytorch.model_utils import aggregate_eval_results
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
 from nupic.research.support.ray_utils import get_last_checkpoint
 
@@ -127,9 +126,7 @@ class ImagenetTrainable(Trainable):
             if ray_utils.check_for_failure(status):
                 results = ray.get(status)
 
-                ret = copy.deepcopy(results[0])
-                ret.update(aggregate_eval_results(results))
-
+                ret = self.experiment_class.aggregate_results(results)
                 self._process_result(ret)
 
                 # Check if we should stop the experiment
@@ -195,13 +192,13 @@ class ImagenetTrainable(Trainable):
 
         self._process_config(config)
 
-        experiment_class = config["experiment_class"]
+        self.experiment_class = config["experiment_class"]
 
         for i in range(1 + self.max_retries):
             self.procs = []
             for _ in range(world_size):
                 experiment = ray.remote(
-                    num_cpus=num_cpus, num_gpus=num_gpus)(experiment_class)
+                    num_cpus=num_cpus, num_gpus=num_gpus)(self.experiment_class)
                 self.procs.append(experiment.remote())
 
             # Use first process as head of the group
