@@ -66,6 +66,8 @@ class ImagenetTrainable(Trainable):
         return resource
 
     def _setup(self, config):
+        self.experiment_class = config["experiment_class"]
+
         config["logdir"] = self.logdir
 
         # Configure logging related stuff
@@ -191,8 +193,6 @@ class ImagenetTrainable(Trainable):
             num_cpus = 1
 
         self._process_config(config)
-
-        self.experiment_class = config["experiment_class"]
 
         for i in range(1 + self.max_retries):
             self.procs = []
