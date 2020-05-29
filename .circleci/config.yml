@@ -77,7 +77,7 @@ jobs:
   install_dependencies:
     working_directory: ~/nta/nupic.research
     docker:
-      - image: circleci/python:3.6
+      - image: circleci/python:3.7
     steps:
       - attach_workspace:
           at: ~/nta
@@ -105,7 +105,7 @@ jobs:
   check_style:
     working_directory: ~/nta/nupic.research
     docker:
-      - image: circleci/python:3.6
+      - image: circleci/python:3.7
     steps:
       - attach_workspace:
           at: ~/nta
@@ -122,7 +122,7 @@ jobs:
   test:
     working_directory: ~/nta/nupic.research
     docker:
-      - image: circleci/python:3.6
+      - image: circleci/python:3.7
     steps:
       - attach_workspace:
           at: ~/nta
@@ -141,7 +141,7 @@ jobs:
   build:
     working_directory: ~/nta/nupic.research
     docker:
-      - image: circleci/python:3.6
+      - image: circleci/python:3.7
     steps:
       - attach_workspace:
           at: ~/nta
