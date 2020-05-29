@@ -92,13 +92,13 @@ class ImagenetTrainable(Trainable):
         if config.get("checkpoint_at_init", False):
             self.save()
 
-        # Load initial state from checkpoint file
-        self._checkpoint_file = config.get("checkpoint_file", None)
-        if self._checkpoint_file is not None:
-            with open(self._checkpoint_file, mode="rb") as f:
-                state = pickle.load(f)
-                self._restore(state)
-                self._restored = True
+        # # Load initial state from checkpoint file
+        # self._checkpoint_file = config.get("checkpoint_file", None)
+        # if self._checkpoint_file is not None:
+        #     with open(self._checkpoint_file, mode="rb") as f:
+        #         state = pickle.load(f)
+        #         self._restore(state)
+        #         self._restored = True
 
         self._first_run = True
 

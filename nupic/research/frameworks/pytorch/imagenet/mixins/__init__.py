@@ -30,3 +30,4 @@ from .update_boost_strength import UpdateBoostStrength
 from .knowledge_distillation import KnowledgeDistillation
 from .complex_loss import ComplexLoss
 from .maxup import MaxupStandard, MaxupPerSample
+from .custom_batch_norm import CustomBatchNorm

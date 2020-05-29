@@ -23,6 +23,7 @@ import multiprocessing
 import sys
 import time
 from pprint import pformat
+from collections import OrderedDict
 
 import ray.services
 import ray.util.sgd.utils as ray_utils
@@ -509,7 +510,14 @@ class ImagenetExperiment:
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-            self.model.module.load_state_dict(state_dict)
+
+            # fix for old checkpoints - why was this not here before? 
+            if self.model.state_dict().keys() != state_dict.keys():
+                state_dict = OrderedDict(
+                    zip(self.model.state_dict().keys(), state_dict.values()))
+
+            # why access the module, really required?
+            self.model.load_state_dict(state_dict)
 
         if "optimizer" in state:
             with io.BytesIO(state["optimizer"]) as buffer:
