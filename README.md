@@ -25,7 +25,7 @@ What you should understand about this repository
 Papers
 ======
 
-A list of our papers is [available here](https://numenta.com/neuroscience-research/research-publications/). If you are interested in scripts and code used in published papers, [this repository](https://github.com/numenta/htmpapers) contains reproducible code for selected Numenta papers.
+A list of our papers is [available here](https://numenta.com/neuroscience-research/research-publications/). If you are interested in the scripts and code used in published papers, [this repository](https://github.com/numenta/htmpapers) contains reproducible code for selected Numenta papers.
 
 Installation
 ============
