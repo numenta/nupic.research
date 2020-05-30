@@ -252,7 +252,7 @@ class ImagenetExperiment:
             "loss_function", torch.nn.functional.cross_entropy
         )
 
-        # Configure data loaders
+        self.num_classes = config.get("num_classes", 1000)
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
         self.epochs_to_validate = config.get("epochs_to_validate",
@@ -381,6 +381,7 @@ class ImagenetExperiment:
                 device=self.device,
                 criterion=self.loss_function,
                 batches_in_epoch=self.batches_in_epoch,
+                to_device_fn=self.send_data_to_device,
             )
         else:
             results = {
@@ -407,6 +408,7 @@ class ImagenetExperiment:
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch,
+            to_device_fn=self.send_data_to_device,
         )
 
     def run_epoch(self):
@@ -468,8 +470,17 @@ class ImagenetExperiment:
         self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s",
                           self.current_epoch, self.get_lr(), self.get_weight_decay())
 
-    def loss_function(self, output, target, **kwargs):
-        return self._loss_function(output, target, **kwargs)
+    def loss_function(self, output, target, reduction="mean"):
+        return self._loss_function(output, target, reduction=reduction)
+
+    def send_data_to_device(self, data, target, device, non_blocking):
+        """
+        This provides an extensibility point for performing any final
+        transformations on the data or targets.
+        """
+        data = data.to(self.device, non_blocking=non_blocking)
+        target = target.to(self.device, non_blocking=non_blocking)
+        return data, target
 
     @classmethod
     def aggregate_results(cls, results):
@@ -614,5 +625,6 @@ class ImagenetExperiment:
             pre_batch=["ImagenetExperiment.pre_batch"],
             post_batch=["ImagenetExperiment.post_batch"],
             loss_function=["ImagenetExperiment.loss_function"],
+            send_data_to_device=["ImagenetExperiment.send_data_to_device"],
             aggregate_results=["ImagenetExperiment.aggregate_results"],
         )
