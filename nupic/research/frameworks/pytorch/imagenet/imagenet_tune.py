@@ -83,23 +83,26 @@ class ImagenetTrainable(Trainable):
             f"_setup: trial={self._trial_info.trial_name}({self.iteration}), "
             f"config={config}")
 
+        # Get checkpoint file to restore the training from
+        self.restore_checkpoint_file = config.pop("restore_checkpoint_file", None)
+
         # Try to recover a trial at least this many times
         self.max_retries = max(config.get("max_retries", 3), 0)
 
         # Create ray remote workers
         self._create_workers(config)
 
-        # Save initialized model
-        if config.get("checkpoint_at_init", False):
-            self.save()
-
         # Load initial state from checkpoint file
-        self._checkpoint_file = config.get("checkpoint_file", None)
-        if self._checkpoint_file is not None:
-            with open(self._checkpoint_file, mode="rb") as f:
+        self._restored = False
+        if self.restore_checkpoint_file is not None:
+            with open(self.restore_checkpoint_file, mode="rb") as f:
                 state = pickle.load(f)
                 self._restore(state)
                 self._restored = True
+
+        elif config.get("checkpoint_at_init", False):
+            # Save initialized model
+            self.save()
 
         self._first_run = True
 
@@ -111,8 +114,8 @@ class ImagenetTrainable(Trainable):
                 self._first_run = False
                 if self._restored and self._should_stop():
                     self.logger.warning(
-                        f"Restored checkpoint file '{self._checkpoint_file}' fulfills "
-                        f"stop criteria without additional training.")
+                        f"Restored checkpoint file '{self.restore_checkpoint_file}' "
+                        f"fulfills stop criteria without additional training.")
                     return {
                         # do not train or log results, just stop
                         RESULT_DUPLICATE: True,
@@ -379,8 +382,7 @@ def run(config):
     # Check if restoring experiment from last known checkpoint
     if config.pop("restore", False):
         result_dir = os.path.join(config["local_dir"], config["name"])
-        checkpoint_file = get_last_checkpoint(result_dir)
-        config["checkpoint_file"] = checkpoint_file
+        config["restore_checkpoint_file"] = get_last_checkpoint(result_dir)
 
     # Update`tune.run` kwargs with config
     kwargs.update(config)
