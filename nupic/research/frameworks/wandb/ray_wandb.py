@@ -102,9 +102,10 @@ class WandbLogger(wandb.ray.WandbLogger):
     ray.tune config. For example,
 
     ```
+    from ray.tune.logger import DEFAULT_LOGGERS
     tune.run(
         MyTrianable,
-        loggers=[WandbLogger],
+        loggers=DEFAULT_LOGGERS + [WandbLogger],
         config={
             "monitor": True,
             "env_config": {
