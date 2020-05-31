@@ -379,7 +379,8 @@ class ImagenetExperiment:
                 model=self.model,
                 loader=loader,
                 device=self.device,
-                criterion=self.loss_function,
+                criterion=self.error_loss,
+                complexity_loss_fn=self.complexity_loss,
                 batches_in_epoch=self.batches_in_epoch,
                 to_device_fn=self.send_data_to_device,
             )
@@ -404,7 +405,8 @@ class ImagenetExperiment:
             loader=self.train_loader,
             optimizer=self.optimizer,
             device=self.device,
-            criterion=self.loss_function,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch,
@@ -470,8 +472,17 @@ class ImagenetExperiment:
         self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s",
                           self.current_epoch, self.get_lr(), self.get_weight_decay())
 
-    def loss_function(self, output, target, reduction="mean"):
+    def error_loss(self, output, target, reduction="mean"):
+        """
+        The error loss component of the loss function.
+        """
         return self._loss_function(output, target, reduction=reduction)
+
+    def complexity_loss(self, model):
+        """
+        The model complexity component of the loss function.
+        """
+        pass
 
     def send_data_to_device(self, data, target, device, non_blocking):
         """
@@ -624,7 +635,8 @@ class ImagenetExperiment:
             post_epoch=["ImagenetExperiment.post_epoch"],
             pre_batch=["ImagenetExperiment.pre_batch"],
             post_batch=["ImagenetExperiment.post_batch"],
-            loss_function=["ImagenetExperiment.loss_function"],
+            error_loss=["ImagenetExperiment.error_loss"],
+            complexity_loss=["ImagenetExperiment.complexity_loss"],
             send_data_to_device=["ImagenetExperiment.send_data_to_device"],
             aggregate_results=["ImagenetExperiment.aggregate_results"],
         )

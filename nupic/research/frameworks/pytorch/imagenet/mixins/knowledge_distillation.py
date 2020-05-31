@@ -105,7 +105,7 @@ class KnowledgeDistillation(object):
 
         return data, combined_target
 
-    def loss_function(self, output, target, reduction="mean"):
+    def error_loss(self, output, target, reduction="mean"):
         """
         :param output: output from the model
         :param target: target to be matched by model
@@ -113,7 +113,7 @@ class KnowledgeDistillation(object):
         """
         if not self.model.training:
             # Targets are from the dataloader
-            return super().loss_function(output, target, reduction=reduction)
+            return super().error_loss(output, target, reduction=reduction)
 
         return soft_cross_entropy(output, target, reduction)
 
@@ -126,8 +126,8 @@ class KnowledgeDistillation(object):
         eo["send_data_to_device"].append(
             "} else: { Compute Knowledge Distillation targets }"
         )
-        eo["loss_function"].insert(0, "If not training: {")
-        eo["loss_function"].append(
+        eo["error_loss"].insert(0, "If not training: {")
+        eo["error_loss"].append(
             "} else: { Knowledge Distillation soft_cross_entropy }"
         )
         return eo

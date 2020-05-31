@@ -37,6 +37,7 @@ def train_model(
     device,
     freeze_params=None,
     criterion=F.nll_loss,
+    complexity_loss_fn=None,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
     post_batch_callback=None,
@@ -64,6 +65,8 @@ def train_model(
     :type param: list or tuple
     :param criterion: loss function to use
     :type criterion: function
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters: model, batch_idx
     :type post_batch_callback: function
@@ -125,6 +128,11 @@ def train_model(
         loss = criterion(output, target)
         del data, target, output
 
+        if complexity_loss_fn is not None:
+            c_loss = complexity_loss_fn(model)
+            if c_loss is not None:
+                loss += c_loss
+
         t2 = time.time()
         if use_amp:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -163,6 +171,7 @@ def evaluate_model(
     device,
     batches_in_epoch=sys.maxsize,
     criterion=F.nll_loss,
+    complexity_loss_fn=None,
     progress=None,
     post_batch_callback=None,
     to_device_fn=None,
@@ -179,6 +188,8 @@ def evaluate_model(
     :type batches_in_epoch: int
     :param criterion: loss function to use
     :type criterion: function
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
     :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
     :type progress: dict or None
     :param post_batch_callback: Callback function to be called after every batch
@@ -232,12 +243,21 @@ def evaluate_model(
         loader.close()
 
     correct = correct.item()
+
+    if total > 0:
+        loss /= total
+
+    if complexity_loss_fn is not None:
+        c_loss = complexity_loss_fn(model)
+        if c_loss is not None:
+            loss += c_loss
+
     loss = loss.item()
 
     return {
         "total_correct": correct,
         "total_tested": total,
-        "mean_loss": loss / total if total > 0 else 0,
+        "mean_loss": loss,
         "mean_accuracy": correct / total if total > 0 else 0,
     }
 
