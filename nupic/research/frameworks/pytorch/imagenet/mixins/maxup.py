@@ -31,21 +31,24 @@ class MaxupStandard(object):
     learns from batch with worst loss.
 
     Paper: https://arxiv.org/pdf/2002.09024.pdf
-
-    Requires ComplexLoss Mixin
     """
-    def calculate_batch_loss(self, data, target, async_gpu=True):
+    def send_data_to_device(self, data, target, device, non_blocking):
         """
-        :param data: input to the training function, as specified by dataloader
+        :param data: input to the model, as specified by dataloader
         :param target: target to be matched by model, as specified by dataloader
-        :param async_gpu: define whether or not to use
-                          asynchronous GPU copies when the memory is pinned
+        :param device: identical to self.device
+        :param non_blocking: define whether or not to use
+                             asynchronous GPU copies when the memory is pinned
         """
+        if not self.model.training:
+            return super().send_data_to_device(data, target, device,
+                                               non_blocking)
 
         if len(data.shape) < 5:
             raise ValueError("Define replicas_per_sample > 1")
 
-        target = target.to(self.device, non_blocking=async_gpu)
+        data = data.to(self.device, non_blocking=non_blocking)
+        target = target.to(self.device, non_blocking=non_blocking)
 
         # calculate loss for all the different variants of the batch
         losses = []
@@ -61,16 +64,16 @@ class MaxupStandard(object):
 
         # regular training with the max loss
         data_variant = data[:, max_loss_dim, :, :, :]
-        output = self.model(data_variant)
-        loss = self.loss_function(output, target)
 
-        del data, data_variant, target, losses
-        return loss, output
+        return data_variant, target
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["calculate_batch_loss"] = ["MaxupStandard.calculate_batch_loss"]
+        eo["send_data_to_device"].insert(0, "If not training: {")
+        eo["send_data_to_device"].append(
+            "} else: { MaxupStandard: Choose data variant }"
+        )
         return eo
 
 
@@ -82,21 +85,25 @@ class MaxupPerSample(object):
     in the methods section of the paper.
 
     Paper: https://arxiv.org/pdf/2002.09024.pdf
-
-    Requires ComplexLoss Mixin
     """
-    def calculate_batch_loss(self, data, target, async_gpu=True):
+    def send_data_to_device(self, data, target, device, non_blocking):
         """
-        :param data: input to the training function, as specified by dataloader
+        :param data: input to the model, as specified by dataloader
         :param target: target to be matched by model, as specified by dataloader
-        :param async_gpu: define whether or not to use
-                          asynchronous GPU copies when the memory is pinned
+        :param device: identical to self.device
+        :param non_blocking: define whether or not to use
+                             asynchronous GPU copies when the memory is pinned
         """
+        if not self.model.training:
+            return super().send_data_to_device(data, target, device,
+                                               non_blocking)
+
         # calculate loss for all the tranformed versions of the image
         if len(data.shape) < 5:
             raise ValueError("Define replicas_per_sample > 1")
 
-        target = target.to(self.device, non_blocking=async_gpu)
+        data = data.to(self.device, non_blocking=non_blocking)
+        target = target.to(self.device, non_blocking=non_blocking)
 
         # calculate loss for all the tranformed versions of the image
         losses = []
@@ -118,16 +125,16 @@ class MaxupPerSample(object):
         max_indices = torch.argmax(losses, dim=0)
         # use max indices to select locally
         data_variant = data[range(len(target)), max_indices, :, :, :]
-        output = self.model(data_variant)
-        loss = self.loss_function(output, target)
 
-        del data, data_variant, target, one_hot_target, losses, max_indices
-        return loss, output
+        return data_variant, target
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["calculate_batch_loss"] = ["MaxupPerSample.calculate_batch_loss"]
+        eo["send_data_to_device"].insert(0, "If not training: {")
+        eo["send_data_to_device"].append(
+            "} else: { MaxupPerSample: Choose data variant }"
+        )
         return eo
 
 
