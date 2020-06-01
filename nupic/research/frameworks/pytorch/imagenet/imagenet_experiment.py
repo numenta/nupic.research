@@ -17,13 +17,13 @@
 #
 #  http://numenta.org/licenses/
 #
+import copy
 import io
 import logging
 import multiprocessing
 import sys
 import time
 from pprint import pformat
-from collections import OrderedDict
 
 import ray.services
 import ray.util.sgd.utils as ray_utils
@@ -47,6 +47,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
 from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
+    aggregate_eval_results,
     deserialize_state_dict,
     evaluate_model,
     serialize_state_dict,
@@ -470,6 +471,23 @@ class ImagenetExperiment:
     def loss_function(self, output, target, **kwargs):
         return self._loss_function(output, target, **kwargs)
 
+    @classmethod
+    def aggregate_results(cls, results):
+        """
+        Aggregate multiple processes' "run_epoch" results into a single result.
+
+        :param results:
+            A list of return values from run_epoch from different processes.
+        :type results: list
+
+        :return:
+            A single result dict with results aggregated.
+        :rtype: dict
+        """
+        result = copy.deepcopy(results[0])
+        result.update(aggregate_eval_results(results))
+        return result
+
     def get_state(self):
         """
         Get experiment serialized state as a dictionary of  byte arrays
@@ -510,14 +528,6 @@ class ImagenetExperiment:
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-
-            # fix for old checkpoints - why was this not here before? 
-            if self.model.state_dict().keys() != state_dict.keys():
-                state_dict = OrderedDict(
-                    zip(self.model.state_dict().keys(), state_dict.values()))
-
-            # why access the module, really required?
-            self.model.load_state_dict(state_dict)
 
         if "optimizer" in state:
             with io.BytesIO(state["optimizer"]) as buffer:
@@ -603,4 +613,5 @@ class ImagenetExperiment:
             pre_batch=["ImagenetExperiment.pre_batch"],
             post_batch=["ImagenetExperiment.post_batch"],
             loss_function=["ImagenetExperiment.loss_function"],
+            aggregate_results=["ImagenetExperiment.aggregate_results"],
         )
