@@ -24,45 +24,41 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from dend_kwinners import DKWinners
 from nupic.torch.modules import SparseWeights  # , KWinnersBase, KWinners
+from nupic.torch.modules.k_winners import KWinners2d
 
 
 class DendriteInput(nn.Module):
+    """ Sparse linear layer from previous output to
+    "dendrites" - this is the first part of a module
+    that projects via dendrite segments to output units.
+
+    :param in_dim: input dimension
+
+    :param n_dendrites: total number of dendrites - note this will
+    be an integer multiple of the number of downstream units
+
+    :param threshold: (currently unused) - threshold for an
+    in-development dendritic activation or gating function
+
+    :param weight_sparsity: Weight sparsity of the sparse weights.
+    If weight_sparsity=1, it will default to a standard linear layer.
+    """
+
     def __init__(self,
                  in_dim,
                  n_dendrites,
                  threshold=2,
-                 sparse_weights=True,
                  weight_sparsity=0.2,
-                 #  percent_on=0.1,
-                 #  k_inference_factor=1,
-                 #  boost_strength=2.,
-                 #  boost_strength_factor=0.9,
-                 #  duty_cycle_period=1000,
                  ):
         super(DendriteInput, self).__init__()
         self.threshold = threshold
         linear = nn.Linear(in_dim, n_dendrites)
 
-        if sparse_weights:
+        if weight_sparsity < 1:
             self.linear = SparseWeights(linear, weight_sparsity)
         else:
             self.linear = linear
-
-        # if 0 < percent_on < 1.0:
-        #     self.act_fun = KWinners(
-        #         n=n_dendrites,
-        #         percent_on=percent_on,
-        #         k_inference_factor=k_inference_factor,
-        #         boost_strength=boost_strength,
-        #         boost_strength_factor=boost_strength_factor,
-        #         duty_cycle_period=duty_cycle_period,
-        #     )
-        # else:
-            # self.act_fun = nn.ReLU()
-
-        # self.act_fun = ADA_fun().cuda()
 
     def dendrite_activation(self, x):
         return torch.clamp(x, min=self.threshold)
@@ -73,12 +69,23 @@ class DendriteInput(nn.Module):
 
 
 class DendriteOutput(nn.Module):
-    def __init__(self, out_dim, dpc):
+    """ Masked linear layer from dendrites to output
+    units. This is the second part of the full module.
+
+    :param out_dim: output dimension (number of downstream units)
+
+    :param dendrites_per_unit: integer number of dendrite
+    segments per unit
+    """
+
+    def __init__(self, out_dim, dendrites_per_unit):
         super(DendriteOutput, self).__init__()
-        self.dpc = dpc
+        self.dendrites_per_unit = dendrites_per_unit
         self.register_buffer("mask", self.dend_mask(out_dim))
-        self.weight = torch.nn.Parameter(torch.Tensor(out_dim, dpc * out_dim))
+        self.weight = torch.nn.Parameter(torch.Tensor(out_dim,
+                                                      dendrites_per_unit * out_dim))
         self.bias = torch.nn.Parameter(torch.Tensor(out_dim))
+        # for stability - will integrate separate weight init. later
         nn.init.xavier_normal_(self.weight)
         self.bias.data.fill_(0.)
 
@@ -87,21 +94,40 @@ class DendriteOutput(nn.Module):
         return F.linear(x, w, self.bias)
 
     def dend_mask(self, out_dim):
+        """This creates a mask such that each dendrite
+        unit only projects to one downstream unit
+        """
         mask = torch.zeros(out_dim, out_dim)
-        torch.diag
         inds = np.diag_indices(out_dim)
         mask[inds[0], inds[1]] = 1.
-        out_mask = torch.repeat_interleave(mask, self.dpc, dim=0).T
+        out_mask = torch.repeat_interleave(mask, self.dendrites_per_unit, dim=0).T
         return out_mask
 
 
 class DendriteLayer(nn.Module):
+    """ This is the full module, combining DendriteInput
+    and DendriteOutput. The module also specifies an
+    activation function for the dendrite units
+    (in this case a Kwinners2DLocal).
+
+    The parameters k_inference_factor through
+    duty_cycle_period are parameters for the KWinner2D
+    activation. See 'nupic.torch.modules.k_winners'
+    Note that "percent_on" will be overwritten in the
+    KWinner2D module to specify k=1.
+
+    :param in_dim: input dimension for DendriteInput
+
+    :param out_dim: output dimension for DendriteOutput
+
+    :param dendrites_per_neuron: dendrites per downstream unit
+
+
+    """
     def __init__(self,
                  in_dim,
                  out_dim,
-                 dpc,
-                 threshold=2,
-                 sparse_weights=True,
+                 dendrites_per_neuron,
                  weight_sparsity=0.2,
                  k_inference_factor=1.,
                  boost_strength=2.,
@@ -110,44 +136,39 @@ class DendriteLayer(nn.Module):
                  ):
         super(DendriteLayer, self).__init__()
 
-        self.dpc = dpc
-        self.n_dendrites = out_dim * self.dpc
+        self.dendrites_per_neuron = dendrites_per_neuron
+        self.n_dendrites = out_dim * self.dendrites_per_neuron
         self.out_dim = out_dim
 
-        self.threshold = threshold
         self.input = DendriteInput(
             in_dim=in_dim,
             n_dendrites=self.n_dendrites,
-            threshold=self.threshold,
-            sparse_weights=sparse_weights,
             weight_sparsity=weight_sparsity,
         )
-        self.output = DendriteOutput(out_dim, self.dpc)
+        self.output = DendriteOutput(out_dim, self.dendrites_per_neuron)
 
-        self.act_fun = DKWinners(
-            n=self.n_dendrites,
-            out_dim=self.out_dim,
-            dpc=self.dpc,
-            k_inference_factor=k_inference_factor,
+        self.act_fun = KWinners2d(
+            channels=self.out_dim,
+            percent_on=0.1,  # will be overwritten
+            k_inference_factor=k_inference_factor,  # will be overwritten
             boost_strength=boost_strength,
             boost_strength_factor=boost_strength_factor,
             duty_cycle_period=duty_cycle_period,
+            local=True,
         )
+        self.act_fun.k = 1
+        self.act_fun.k_inference = 1
 
     def forward(self, x):
-        out1 = self.act_fun(self.input(x))
-        out2 = self.output(out1)
+        batch_size = x.shape[0]
+        out0 = self.input(x)
+        with torch.no_grad():
+            out0_ = out0.reshape(batch_size, self.dpc, self.out_dim, 1)
+
+        out1 = self.act_fun(out0_)
+        with torch.no_grad():
+            out1_ = torch.squeeze(out1)
+        out1_ = out1_.reshape(batch_size, self.out_dim * self.dpc)
+
+        out2 = self.output(out1_)
         return out2
-
-# class ADA_fun(nn.Module):
-#     def __init__(self, a=1, c=1, l=0.005):
-#         super(ADA_fun, self).__init__()
-#         self.a = a
-#         self.c = c
-#         self.l = l
-
-#     def forward(self, x):
-#         neg_relu = torch.clamp(x, max=0)
-#         ADA = F.relu(x) * torch.exp(-x * self.a + self.c)
-#         ADA_l = self.l * neg_relu + ADA
-#         return ADA_l
