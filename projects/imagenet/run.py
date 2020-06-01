@@ -53,7 +53,7 @@ if __name__ == "__main__":
                         help="number of CPUs to use when GPU is not available."),
     parser.add_argument("-r", "--restore", action="store_true",
                         help="Restore training from last known checkpoint")
-    parser.add_argument("-c", "--checkpoint-file",
+    parser.add_argument("-c", "--checkpoint-file", dest="restore_checkpoint_file",
                         help="Resume experiment from specific checkpoint file")
     parser.add_argument("-j", "--workers", type=int, default=6,
                         help="Number of dataloaders workers")
