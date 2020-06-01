@@ -380,6 +380,7 @@ class ResNet(nn.Module):
             base_activation=None,  # See `activation_layer` function above.
             linear_sparse_weights_type="SparseWeights",
             conv_sparse_weights_type="SparseWeights2d",
+            resnet_params=default_resnet_params,
             defaults_sparse=False,
             layer_params_type=None,  # Sub-classed from `LayerParams`.
             # To be passed to layer_params_type:
@@ -404,7 +405,7 @@ class ResNet(nn.Module):
                 self.activation_params_func = auto_sparse_activation_params
 
         if not hasattr(self, "sparse_params"):
-            self.sparse_params = default_resnet_params(
+            self.sparse_params = self.resnet_params(
                 *cf_dict[str(self.depth)],
                 layer_params_type=self.layer_params_type,
                 layer_params_kwargs=self.layer_params_kwargs,
