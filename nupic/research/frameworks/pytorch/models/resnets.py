@@ -222,9 +222,10 @@ class BasicBlock(nn.Module):
 
     def __init__(
         self, in_planes, planes, sparse_weights_type, layer_params,
-        stride=1, base_activation=None
+        stride=1, base_activation=None, batch_norm_args=None
     ):
         super(BasicBlock, self).__init__()
+        batch_norm_args = batch_norm_args or {}
 
         self.regular_path = nn.Sequential(OrderedDict([
             ("conv1", conv_layer(
@@ -235,7 +236,7 @@ class BasicBlock(nn.Module):
                 sparse_weights_type=sparse_weights_type,
                 stride=stride,
             )),
-            ("bn1", nn.BatchNorm2d(planes)),
+            ("bn1", nn.BatchNorm2d(planes, **batch_norm_args)),
             ("act1", activation_layer(
                 planes, layer_params["conv3x3_1"], base_activation=base_activation)),
             ("conv2", conv_layer(
@@ -245,7 +246,7 @@ class BasicBlock(nn.Module):
                 layer_params["conv3x3_2"],
                 sparse_weights_type=sparse_weights_type,
             )),
-            ("bn2", nn.BatchNorm2d(planes)),
+            ("bn2", nn.BatchNorm2d(planes, **batch_norm_args)),
         ]))
 
         self.shortcut = nn.Sequential()
@@ -259,7 +260,7 @@ class BasicBlock(nn.Module):
                     sparse_weights_type=sparse_weights_type,
                     stride=stride,
                 )),
-                ("bn", nn.BatchNorm2d(planes)),
+                ("bn", nn.BatchNorm2d(planes, **batch_norm_args)),
             ]))
 
         self.post_activation = activation_layer(
@@ -279,9 +280,11 @@ class Bottleneck(nn.Module):
 
     def __init__(
         self, in_planes, planes, sparse_weights_type, layer_params,
-        stride=1, base_activation=None
+        stride=1, base_activation=None, batch_norm_args=None
     ):
         super(Bottleneck, self).__init__()
+        batch_norm_args = batch_norm_args or {}
+
         self.regular_path = nn.Sequential(OrderedDict([
             # 1st layer
             ("conv1", conv_layer(
@@ -291,7 +294,7 @@ class Bottleneck(nn.Module):
                 layer_params["conv1x1_1"],
                 sparse_weights_type=sparse_weights_type,
             )),
-            ("bn1", nn.BatchNorm2d(planes)),
+            ("bn1", nn.BatchNorm2d(planes, **batch_norm_args)),
             ("act1", activation_layer(
                 planes, layer_params["conv1x1_1"],
                 kernel_size=1, base_activation=base_activation
@@ -305,7 +308,7 @@ class Bottleneck(nn.Module):
                 sparse_weights_type=sparse_weights_type,
                 stride=stride,
             )),
-            ("bn2", nn.BatchNorm2d(planes)),
+            ("bn2", nn.BatchNorm2d(planes, **batch_norm_args)),
             ("act2", activation_layer(
                 planes, layer_params["conv3x3_2"],
                 kernel_size=3, base_activation=base_activation
@@ -318,7 +321,7 @@ class Bottleneck(nn.Module):
                 layer_params["conv1x1_3"],
                 sparse_weights_type=sparse_weights_type,
             )),
-            ("bn3", nn.BatchNorm2d(self.expansion * planes)),
+            ("bn3", nn.BatchNorm2d(self.expansion * planes, **batch_norm_args)),
         ]))
 
         self.shortcut = nn.Sequential()
@@ -332,7 +335,7 @@ class Bottleneck(nn.Module):
                     sparse_weights_type=sparse_weights_type,
                     stride=stride,
                 )),
-                ("bn", nn.BatchNorm2d(self.expansion * planes)),
+                ("bn", nn.BatchNorm2d(self.expansion * planes, **batch_norm_args)),
             ]))
 
         self.post_activation = activation_layer(
@@ -388,6 +391,7 @@ class ResNet(nn.Module):
             linear_params_func=None,
             conv_params_func=None,
             activation_params_func=None,
+            batch_norm_args=None
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -418,6 +422,8 @@ class ResNet(nn.Module):
 
         block, num_blocks = self._config_layers()
 
+        self.batch_norm_args = self.batch_norm_args or {}
+
         self.features = nn.Sequential(OrderedDict([
             # stem
             ("stem", conv_layer(
@@ -428,23 +434,27 @@ class ResNet(nn.Module):
                 sparse_weights_type=self.conv_sparse_weights_type,
                 stride=2,
             )),
-            ("bn_stem", nn.BatchNorm2d(64)),
+            ("bn_stem", nn.BatchNorm2d(64, **self.batch_norm_args)),
             ("act_stem", activation_layer(
                 64, self.sparse_params["stem"],
                 kernel_size=7, base_activation=self.base_activation)),
             ("pool_stem", nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
             # groups 1 to 4
             ("group1", self._make_group(
-                block, 64, num_blocks[0], self.sparse_params["filters64"], stride=1
+                block, 64, num_blocks[0], self.sparse_params["filters64"], stride=1,
+                batch_norm_args=self.batch_norm_args
             )),
             ("group2", self._make_group(
-                block, 128, num_blocks[1], self.sparse_params["filters128"], stride=2
+                block, 128, num_blocks[1], self.sparse_params["filters128"], stride=2,
+                batch_norm_args=self.batch_norm_args
             )),
             ("group3", self._make_group(
-                block, 256, num_blocks[2], self.sparse_params["filters256"], stride=2
+                block, 256, num_blocks[2], self.sparse_params["filters256"], stride=2,
+                batch_norm_args=self.batch_norm_args
             )),
             ("group4", self._make_group(
-                block, 512, num_blocks[3], self.sparse_params["filters512"], stride=2
+                block, 512, num_blocks[3], self.sparse_params["filters512"], stride=2,
+                batch_norm_args=self.batch_norm_args
             )),
             ("avg_pool", nn.AdaptiveAvgPool2d(1)),
             ("flatten", Flatten()),
@@ -466,7 +476,8 @@ class ResNet(nn.Module):
 
         return cf_dict[str(self.depth)]
 
-    def _make_group(self, block, planes, num_blocks, sparse_params, stride):
+    def _make_group(self, block, planes, num_blocks,
+                    sparse_params, stride, batch_norm_args):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
 
@@ -489,6 +500,7 @@ class ResNet(nn.Module):
                     sparse_weights_type=self.conv_sparse_weights_type,
                     stride=stride,
                     base_activation=self.base_activation,
+                    batch_norm_args=batch_norm_args
                 )
             )
             self.in_planes = planes * block.expansion
