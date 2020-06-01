@@ -115,6 +115,15 @@ class DendriteLayer(nn.Module):
         )
 
     def forward(self, x):
-        out1 = self.act_fun(self.input(x))
-        out2 = self.output(out1)
+        batch_size = x.shape[0]
+        out0 = self.input(x)
+        with torch.no_grad():
+            out0_ = out0.reshape(batch_size, self.dpc, self.out_dim, 1)
+
+        out1 = self.act_fun(out0_)
+        with torch.no_grad():
+            out1_ = torch.squeeze(out1)
+        out1_ = out1_.reshape(batch_size, self.out_dim * self.dpc)
+
+        out2 = self.output(out1_)
         return out2
