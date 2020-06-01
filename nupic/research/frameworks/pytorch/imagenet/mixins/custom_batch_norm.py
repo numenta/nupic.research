@@ -22,7 +22,6 @@
 from torch.nn.modules.batchnorm import _BatchNorm
 
 
-
 class CustomBatchNorm(object):
     """
     Allows customization of batch norm parameters
@@ -47,5 +46,5 @@ class CustomBatchNorm(object):
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append(
-            "Customization of batch norm layers")        
+            "Customization of batch norm layers")
         return eo
