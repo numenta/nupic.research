@@ -120,30 +120,6 @@ class ContinuousSpeechExperiment(object):
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
 
-        elif self.model_type == "fb_CNN":  # not yet finalized
-            model = FBNet(input_shape=config.get("input_shape", (1, 32, 32)),
-                          cnn_out_channels=config["cnn_out_channels"],
-                          cnn_pct_on=config["cnn_percent_on"],
-                          cnn_weight_sparsity=config["cnn_weight_sparsity"],
-                          linear_n=config["linear_n"],
-                          linear_pct_on=config["linear_percent_on"],
-                          linear_weight_sparsity=config["weight_sparsity"],
-                          num_classes=self.num_classes,
-                          boost_strength=config["boost_strength"],
-                          boost_strength_factor=config["boost_strength_factor"],
-                          duty_cycle_period=config["duty_cycle_period"],
-                          k_inference_factor=config["k_inference_factor"],
-                          use_batch_norm=config["use_batch_norm"],
-                          dropout=config.get("dropout", 0.0),
-                          activation_fct_before_max_pool=config.get(
-                "activation_fct_before_max_pool", False),
-                consolidated_sparse_weights=config.get(
-                "consolidated_sparse_weights", False),
-                use_kwinners_local=config.get(
-                "use_kwinner_local", False),
-            )
-            self.combine_xy = True
-
         else:
             raise RuntimeError("Unknown model type: " + self.model_type)
 
