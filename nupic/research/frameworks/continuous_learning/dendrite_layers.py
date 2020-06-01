@@ -35,11 +35,6 @@ class DendriteInput(nn.Module):
                  threshold=2,
                  sparse_weights=True,
                  weight_sparsity=0.2,
-                 #  percent_on=0.1,
-                 #  k_inference_factor=1,
-                 #  boost_strength=2.,
-                 #  boost_strength_factor=0.9,
-                 #  duty_cycle_period=1000,
                  ):
         super(DendriteInput, self).__init__()
         self.threshold = threshold
@@ -49,20 +44,6 @@ class DendriteInput(nn.Module):
             self.linear = SparseWeights(linear, weight_sparsity)
         else:
             self.linear = linear
-
-        # if 0 < percent_on < 1.0:
-        #     self.act_fun = KWinners(
-        #         n=n_dendrites,
-        #         percent_on=percent_on,
-        #         k_inference_factor=k_inference_factor,
-        #         boost_strength=boost_strength,
-        #         boost_strength_factor=boost_strength_factor,
-        #         duty_cycle_period=duty_cycle_period,
-        #     )
-        # else:
-            # self.act_fun = nn.ReLU()
-
-        # self.act_fun = ADA_fun().cuda()
 
     def dendrite_activation(self, x):
         return torch.clamp(x, min=self.threshold)
@@ -88,7 +69,6 @@ class DendriteOutput(nn.Module):
 
     def dend_mask(self, out_dim):
         mask = torch.zeros(out_dim, out_dim)
-        torch.diag
         inds = np.diag_indices(out_dim)
         mask[inds[0], inds[1]] = 1.
         out_mask = torch.repeat_interleave(mask, self.dpc, dim=0).T
@@ -135,19 +115,15 @@ class DendriteLayer(nn.Module):
         )
 
     def forward(self, x):
-        out1 = self.act_fun(self.input(x))
-        out2 = self.output(out1)
+        batch_size = x.shape[0]
+        out0 = self.input(x)
+        with torch.no_grad():
+            out0_ = out0.reshape(batch_size, self.dpc, self.out_dim, 1)
+
+        out1 = self.act_fun(out0_)
+        with torch.no_grad():
+            out1_ = torch.squeeze(out1)
+        out1_ = out1_.reshape(batch_size, self.out_dim * self.dpc)
+
+        out2 = self.output(out1_)
         return out2
-
-# class ADA_fun(nn.Module):
-#     def __init__(self, a=1, c=1, l=0.005):
-#         super(ADA_fun, self).__init__()
-#         self.a = a
-#         self.c = c
-#         self.l = l
-
-#     def forward(self, x):
-#         neg_relu = torch.clamp(x, max=0)
-#         ADA = F.relu(x) * torch.exp(-x * self.a + self.c)
-#         ADA_l = self.l * neg_relu + ADA
-#         return ADA_l
