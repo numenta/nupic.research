@@ -41,7 +41,7 @@ def train_model(
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
     post_batch_callback=None,
-    to_device_fn=None,
+    transform_to_device_fn=None,
     progress_bar=None,
 ):
     """Train the given model by iterating through mini batches. An epoch ends
@@ -73,11 +73,12 @@ def train_model(
     :param pre_batch_callback: Callback function to be called before every batch
                                with the following parameters: model, batch_idx
     :type pre_batch_callback: function
-    :param to_device_fn: Function for sending data and labels to the device.
-                        This provides an extensibility point for performing any
-                        final transformations on the data or targets, and
-                        determining what actually needs to get sent to the device.
-    :type to_device_fn: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
     :param progress_bar: Optional :class:`tqdm` progress bar args.
                          None for no progress bar
     :type progress_bar: dict or None
@@ -112,12 +113,12 @@ def train_model(
             break
 
         num_images = len(target)
-        if to_device_fn is None:
+        if transform_to_device_fn is None:
             data = data.to(device, non_blocking=async_gpu)
             target = target.to(device, non_blocking=async_gpu)
         else:
-            data, target = to_device_fn(data, target, device,
-                                        non_blocking=async_gpu)
+            data, target = transform_to_device_fn(data, target, device,
+                                                  non_blocking=async_gpu)
         t1 = time.time()
 
         if pre_batch_callback is not None:
@@ -175,7 +176,7 @@ def evaluate_model(
     complexity_loss_fn=None,
     progress=None,
     post_batch_callback=None,
-    to_device_fn=None,
+    transform_to_device_fn=None,
 ):
     """Evaluate pre-trained model using given test dataset loader.
 
@@ -197,11 +198,12 @@ def evaluate_model(
                                 with the following parameters:
                                 batch_idx, target, output, pred
     :type post_batch_callback: function
-    :param to_device_fn: Function for sending data and labels to the device.
-                         This provides an extensibility point for performing any
-                         final transformations on the data or targets, and
-                         determining what actually needs to get sent to the device.
-    :type to_device_fn: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
 
     :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
     :rtype: dict
@@ -223,12 +225,12 @@ def evaluate_model(
             if batch_idx >= batches_in_epoch:
                 break
 
-            if to_device_fn is None:
+            if transform_to_device_fn is None:
                 data = data.to(device, non_blocking=async_gpu)
                 target = target.to(device, non_blocking=async_gpu)
             else:
-                data, target = to_device_fn(data, target, device,
-                                            non_blocking=async_gpu)
+                data, target = transform_to_device_fn(data, target, device,
+                                                      non_blocking=async_gpu)
 
             output = model(data)
             loss += criterion(output, target, reduction="sum")

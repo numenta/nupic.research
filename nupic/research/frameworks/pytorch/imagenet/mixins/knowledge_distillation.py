@@ -78,7 +78,7 @@ class KnowledgeDistillation(object):
             self.logger.debug(
                 f"KD factor: {self.kd_factor:.3f} at epoch {self.current_epoch}")
 
-    def send_data_to_device(self, data, target, device, non_blocking):
+    def transform_data_to_device(self, data, target, device, non_blocking):
         """
         :param data: input to the training function, as specified by dataloader
         :param target: target to be matched by model, as specified by dataloader
@@ -87,8 +87,8 @@ class KnowledgeDistillation(object):
                              asynchronous GPU copies when the memory is pinned
         """
         if not self.model.training:
-            return super().send_data_to_device(data, target, device,
-                                               non_blocking)
+            return super().transform_data_to_device(data, target, device,
+                                                    non_blocking)
 
         data = data.to(self.device, non_blocking=non_blocking)
         with torch.no_grad():
@@ -122,8 +122,8 @@ class KnowledgeDistillation(object):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("Knowledge Distillation initialization")
         eo["pre_epoch"].append("Update kd factor based on linear decay")
-        eo["send_data_to_device"].insert(0, "If not training: {")
-        eo["send_data_to_device"].append(
+        eo["transform_data_to_device"].insert(0, "If not training: {")
+        eo["transform_data_to_device"].append(
             "} else: { Compute Knowledge Distillation targets }"
         )
         eo["error_loss"].insert(0, "If not training: {")

@@ -382,7 +382,7 @@ class ImagenetExperiment:
                 criterion=self.error_loss,
                 complexity_loss_fn=self.complexity_loss,
                 batches_in_epoch=self.batches_in_epoch,
-                to_device_fn=self.send_data_to_device,
+                transform_to_device_fn=self.transform_data_to_device,
             )
         else:
             results = {
@@ -410,7 +410,7 @@ class ImagenetExperiment:
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch,
-            to_device_fn=self.send_data_to_device,
+            transform_to_device_fn=self.transform_data_to_device,
         )
 
     def run_epoch(self):
@@ -484,7 +484,7 @@ class ImagenetExperiment:
         """
         pass
 
-    def send_data_to_device(self, data, target, device, non_blocking):
+    def transform_data_to_device(self, data, target, device, non_blocking):
         """
         This provides an extensibility point for performing any final
         transformations on the data or targets.
@@ -637,6 +637,8 @@ class ImagenetExperiment:
             post_batch=["ImagenetExperiment.post_batch"],
             error_loss=["ImagenetExperiment.error_loss"],
             complexity_loss=["ImagenetExperiment.complexity_loss"],
-            send_data_to_device=["ImagenetExperiment.send_data_to_device"],
+            transform_data_to_device=[
+                "ImagenetExperiment.transform_data_to_device"
+            ],
             aggregate_results=["ImagenetExperiment.aggregate_results"],
         )

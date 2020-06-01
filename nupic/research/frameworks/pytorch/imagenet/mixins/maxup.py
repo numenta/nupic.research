@@ -32,7 +32,7 @@ class MaxupStandard(object):
 
     Paper: https://arxiv.org/pdf/2002.09024.pdf
     """
-    def send_data_to_device(self, data, target, device, non_blocking):
+    def transform_data_to_device(self, data, target, device, non_blocking):
         """
         :param data: input to the model, as specified by dataloader
         :param target: target to be matched by model, as specified by dataloader
@@ -41,8 +41,8 @@ class MaxupStandard(object):
                              asynchronous GPU copies when the memory is pinned
         """
         if not self.model.training:
-            return super().send_data_to_device(data, target, device,
-                                               non_blocking)
+            return super().transform_data_to_device(data, target, device,
+                                                    non_blocking)
 
         if len(data.shape) < 5:
             raise ValueError("Define replicas_per_sample > 1")
@@ -70,8 +70,8 @@ class MaxupStandard(object):
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["send_data_to_device"].insert(0, "If not training: {")
-        eo["send_data_to_device"].append(
+        eo["transform_data_to_device"].insert(0, "If not training: {")
+        eo["transform_data_to_device"].append(
             "} else: { MaxupStandard: Choose data variant }"
         )
         return eo
@@ -86,7 +86,7 @@ class MaxupPerSample(object):
 
     Paper: https://arxiv.org/pdf/2002.09024.pdf
     """
-    def send_data_to_device(self, data, target, device, non_blocking):
+    def transform_data_to_device(self, data, target, device, non_blocking):
         """
         :param data: input to the model, as specified by dataloader
         :param target: target to be matched by model, as specified by dataloader
@@ -95,8 +95,8 @@ class MaxupPerSample(object):
                              asynchronous GPU copies when the memory is pinned
         """
         if not self.model.training:
-            return super().send_data_to_device(data, target, device,
-                                               non_blocking)
+            return super().transform_data_to_device(data, target, device,
+                                                    non_blocking)
 
         # calculate loss for all the tranformed versions of the image
         if len(data.shape) < 5:
@@ -131,8 +131,8 @@ class MaxupPerSample(object):
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["send_data_to_device"].insert(0, "If not training: {")
-        eo["send_data_to_device"].append(
+        eo["transform_data_to_device"].insert(0, "If not training: {")
+        eo["transform_data_to_device"].append(
             "} else: { MaxupPerSample: Choose data variant }"
         )
         return eo
