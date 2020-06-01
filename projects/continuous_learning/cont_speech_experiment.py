@@ -31,16 +31,14 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-# from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from exp_lesparse import LeSparseNet
-from fb_sparsenet import FBNet
 from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
+from nupic.research.frameworks.continuous_learning.utils import train_model
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
     set_random_seed,
-    train_model,
 )
 from nupic.torch.modules import rezero_weights, update_boost_strength
 
@@ -122,7 +120,7 @@ class ContinuousSpeechExperiment(object):
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
 
-        elif self.model_type == "fb_CNN":
+        elif self.model_type == "fb_CNN":  # not yet finalized
             model = FBNet(input_shape=config.get("input_shape", (1, 32, 32)),
                           cnn_out_channels=config["cnn_out_channels"],
                           cnn_pct_on=config["cnn_percent_on"],
