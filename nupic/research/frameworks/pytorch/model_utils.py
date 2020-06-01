@@ -132,6 +132,7 @@ def train_model(
             c_loss = complexity_loss_fn(model)
             if c_loss is not None:
                 loss += c_loss
+            del c_loss
 
         t2 = time.time()
         if use_amp:
@@ -239,19 +240,19 @@ def evaluate_model(
                 post_batch_callback(batch_idx=batch_idx, target=target, output=output,
                                     pred=pred)
 
+        if total > 0:
+            loss /= total
+
+        if complexity_loss_fn is not None:
+            c_loss = complexity_loss_fn(model)
+            if c_loss is not None:
+                loss += c_loss
+            del c_loss
+
     if progress is not None:
         loader.close()
 
     correct = correct.item()
-
-    if total > 0:
-        loss /= total
-
-    if complexity_loss_fn is not None:
-        c_loss = complexity_loss_fn(model)
-        if c_loss is not None:
-            loss += c_loss
-
     loss = loss.item()
 
     return {
