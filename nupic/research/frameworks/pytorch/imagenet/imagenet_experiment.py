@@ -528,7 +528,7 @@ class ImagenetExperiment:
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-        self.model.module.load_state_dict(state_dict)
+            self.model.module.load_state_dict(state_dict)
 
         if "optimizer" in state:
             with io.BytesIO(state["optimizer"]) as buffer:
