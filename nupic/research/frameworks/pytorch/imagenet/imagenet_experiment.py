@@ -367,8 +367,7 @@ class ImagenetExperiment:
             shuffle=False,
             num_workers=config.get("workers", 0),
             sampler=sampler,
-            pin_memory=False,
-            # pin_memory=torch.cuda.is_available(),
+            pin_memory=torch.cuda.is_available(),
         )
 
     def validate(self, loader=None):
