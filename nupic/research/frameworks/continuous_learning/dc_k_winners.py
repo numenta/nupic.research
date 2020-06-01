@@ -18,27 +18,12 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-import abc
 
 import numpy as np
 import torch
-import torch.nn as nn
 
 import nupic.torch.functions as F
-from nupic.torch.duty_cycle_metrics import binary_entropy, max_entropy
-
-
-def update_boost_strength(m):
-    """Function used to update KWinner modules boost strength. This is typically done
-    during training at the beginning of each epoch.
-
-    Call using :meth:`torch.nn.Module.apply` after each epoch if required
-    For example: ``m.apply(update_boost_strength)``
-
-    :param m: KWinner module
-    """
-    if isinstance(m, KWinnersBase):
-        m.update_boost_strength()
+from nupic.torch.modules.k_winners import KWinnersBase
 
 
 def new_epoch(m):
@@ -51,113 +36,9 @@ def per_epoch(m, bpe):
         m.per_epoch = bpe
 
 
-class KWinnersBase(nn.Module, metaclass=abc.ABCMeta):
-    """Base KWinners class.
-
-    :param percent_on:
-      The activity of the top k = percent_on * number of input units will be
-      allowed to remain, the rest are set to zero.
-    :type percent_on: float
-
-    :param k_inference_factor:
-      During inference (training=False) we increase percent_on by this factor.
-      percent_on * k_inference_factor must be strictly less than 1.0, ideally much
-      lower than 1.0
-    :type k_inference_factor: float
-
-    :param boost_strength:
-      boost strength (0.0 implies no boosting). Must be >= 0.0
-    :type boost_strength: float
-
-    :param boost_strength_factor:
-      Boost strength factor to use [0..1]
-    :type boost_strength_factor: float
-
-    :param duty_cycle_period:
-      The period used to calculate duty cycles
-    :type duty_cycle_period: int
-    """
-
-    def __init__(
-        self,
-        percent_on,
-        k_inference_factor=1.0,
-        boost_strength=1.0,
-        boost_strength_factor=1.0,
-        duty_cycle_period=1000,
-        new_epoch=False,
-        per_epoch=False,
-    ):
-        super(KWinnersBase, self).__init__()
-        assert boost_strength >= 0.0
-        assert 0.0 <= boost_strength_factor <= 1.0
-        assert 0.0 < percent_on < 1.0
-        assert 0.0 < percent_on * k_inference_factor < 1.0
-
-        self.percent_on = percent_on
-        self.percent_on_inference = percent_on * k_inference_factor
-        self.k_inference_factor = k_inference_factor
-        self.learning_iterations = 0
-        self.n = 0
-        self.k = 0
-        self.k_inference = 0
-
-        # Boosting related parameters
-        self.register_buffer("boost_strength", torch.tensor(boost_strength,
-                                                            dtype=torch.float))
-        self.boost_strength_factor = boost_strength_factor
-        self.duty_cycle_period = duty_cycle_period
-        self.new_epoch = new_epoch
-        self.per_epoch = per_epoch
-
-    def extra_repr(self):
-        return (
-            "n={0}, percent_on={1}, boost_strength={2}, boost_strength_factor={3}, "
-            "k_inference_factor={4}, duty_cycle_period={5}".format(
-                self.n, self.percent_on, self.boost_strength,
-                self.boost_strength_factor, self.k_inference_factor,
-                self.duty_cycle_period
-            )
-        )
-
-    @abc.abstractmethod
-    def update_duty_cycle(self, x):
-        r"""Updates our duty cycle estimates with the new value. Duty cycles are
-        updated according to the following formula:
-
-        .. math::
-            dutyCycle = \frac{dutyCycle \times \left( period - batchSize \right)
-                                + newValue}{period}
-
-        :param x:
-          Current activity of each unit
-        """
-        raise NotImplementedError
-
-    def update_boost_strength(self):
-        """Update boost strength by multiplying by the boost strength factor.
-        This is typically done during training at the beginning of each epoch.
-        """
-        self.boost_strength *= self.boost_strength_factor
-
-    def get_new_epoch(self):
-        self.new_epoch = True
-
-    def boost_per_epoch(self, bpe):
-        self.per_epoch = bpe
-
-    def entropy(self):
-        """Returns the current total entropy of this layer."""
-        _, entropy = binary_entropy(self.duty_cycle)
-        return entropy
-
-    def max_entropy(self):
-        """Returns the maximum total entropy we can expect from this layer."""
-        return max_entropy(self.n, int(self.n * self.percent_on))
-
-
-class KWinners(KWinnersBase):
-    """Applies K-Winner function to the input tensor.
+class DCKWinners(KWinnersBase):
+    """Experimental; Applies K-Winner function to the input tensor
+    with duty cycles updated between epochs (rather than between inputs)"
 
     See :class:`htmresearch.frameworks.pytorch.functions.k_winners`
 
@@ -187,6 +68,14 @@ class KWinners(KWinnersBase):
     :param duty_cycle_period:
       The period used to calculate duty cycles
     :type duty_cycle_period: int
+
+    :param new_epoch:
+      If True and per_epoch=True, this will trigger update of the duty cycles
+    :type new_epoch: bool
+
+    :param per_epoch:
+      If True, the module will update duty cycles whenever new_epoch=True
+    :type per_epoch: bool
     """
 
     def __init__(
@@ -201,7 +90,7 @@ class KWinners(KWinnersBase):
         per_epoch=False,
     ):
 
-        super(KWinners, self).__init__(
+        super(DCKWinners, self).__init__(
             percent_on=percent_on,
             k_inference_factor=k_inference_factor,
             boost_strength=boost_strength,
@@ -213,7 +102,6 @@ class KWinners(KWinnersBase):
         self.k = int(round(n * percent_on))
         self.k_inference = int(self.k * self.k_inference_factor)
         self.register_buffer("duty_cycle", torch.zeros(self.n))
-        # self.running_duty_cycle = torch.zeros(self.n)
         self.register_buffer("running_duty_cycle", self.duty_cycle)
         self.new_epoch = new_epoch
         self.per_epoch = per_epoch
@@ -246,9 +134,10 @@ class KWinners(KWinnersBase):
         self.duty_cycle.div_(period)
 
 
-class KWinners2d(KWinnersBase):
+class DCKWinners2d(KWinnersBase):
     """
-    Applies K-Winner function to the input tensor.
+    Experimental; Applies K-Winner function to the input tensor
+    with duty cycles updated between epochs (rather than between inputs)"
 
     See :class:`htmresearch.frameworks.pytorch.functions.k_winners2d`
 
@@ -284,6 +173,14 @@ class KWinners2d(KWinnersBase):
         at each location) or globally (across the whole input and across
         all channels).
     :type local: bool
+
+    :param new_epoch:
+      If True and per_epoch=True, this will trigger update of the duty cycles
+    :type new_epoch: bool
+
+    :param per_epoch:
+      If True, the module will update duty cycles whenever new_epoch=True
+    :type per_epoch: bool
     """
 
     def __init__(
@@ -299,7 +196,7 @@ class KWinners2d(KWinnersBase):
         per_epoch=False,
     ):
 
-        super(KWinners2d, self).__init__(
+        super(DCKWinners2d, self).__init__(
             percent_on=percent_on,
             k_inference_factor=k_inference_factor,
             boost_strength=boost_strength,
@@ -358,10 +255,10 @@ class KWinners2d(KWinnersBase):
         self.duty_cycle.div_(period)
 
     def entropy(self):
-        entropy = super(KWinners2d, self).entropy()
+        entropy = super(DCKWinners2d, self).entropy()
         return entropy * self.n / self.channels
 
     def extra_repr(self):
         return "channels={}, local={}, {}".format(
-            self.channels, self.local, super(KWinners2d, self).extra_repr()
+            self.channels, self.local, super(DCKWinners2d, self).extra_repr()
         )

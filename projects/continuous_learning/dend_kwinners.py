@@ -142,12 +142,12 @@ class DKWinners(DKWinnersBase):
     def forward(self, x):
 
         if self.training:
-            x = GenericKWinners.apply(x, self.duty_cycle, self.k,
-                                      self.dpc, self.boost_strength)
+            x = DendriteKWinners.apply(x, self.duty_cycle, self.k,
+                                       self.dpc, self.boost_strength)
             self.update_duty_cycle(x)
         else:
-            x = GenericKWinners.apply(x, self.duty_cycle, self.k_inference,
-                                      self.dpc, self.boost_strength)
+            x = DendriteKWinners.apply(x, self.duty_cycle, self.k_inference,
+                                       self.dpc, self.boost_strength)
 
         return x
 
@@ -160,7 +160,7 @@ class DKWinners(DKWinnersBase):
         self.duty_cycle.div_(period)
 
 
-class GenericKWinners(torch.autograd.Function):
+class DendriteKWinners(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, duty_cycles, out_dim, dpc, boost_strength):
 

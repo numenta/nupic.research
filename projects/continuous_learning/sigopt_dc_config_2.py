@@ -28,12 +28,12 @@ sigopt_config = dict(
         dict(
             name="cnn1_size",
             type="int",
-            bounds=dict(min=256, max=512)
+            bounds=dict(min=450, max=1028)
         ),
         dict(
             name="cnn2_size",
             type="int",
-            bounds=dict(min=16, max=100)
+            bounds=dict(min=40, max=70)
         ),
         dict(
             name="cnn1_percent_on",
@@ -43,42 +43,42 @@ sigopt_config = dict(
         dict(
             name="cnn1_wt_sparsity",
             type="double",
-            bounds=dict(min=0.05, max=0.5)
+            bounds=dict(min=0.4, max=0.8)
         ),
         dict(
             name="cnn2_percent_on",
             type="double",
-            bounds=dict(min=0.02, max=0.5)
+            bounds=dict(min=0.02, max=0.15)
         ),
         dict(
             name="cnn2_wt_sparsity",
             type="double",
-            bounds=dict(min=0.01, max=0.25)
+            bounds=dict(min=0.2, max=0.6)
         ),
         dict(
             name="linear1_n",
             type="int",
-            bounds=dict(min=1600, max=2600)
+            bounds=dict(min=2400, max=3000)
         ),
         dict(
             name="linear1_percent_on",
             type="double",
-            bounds=dict(min=0.2, max=0.4)
+            bounds=dict(min=0.3, max=0.35)
         ),
         dict(
             name="linear1_weight_sparsity",
             type="double",
-            bounds=dict(min=0.01, max=0.5)
+            bounds=dict(min=0.45, max=0.8)
         ),
         dict(
             name="linear2_percent_on",
             type="double",
-            bounds=dict(min=0.03, max=0.5)
+            bounds=dict(min=0.45, max=0.8)
         ),
         dict(
             name="linear2_weight_sparsity",
             type="double",
-            bounds=dict(min=0.01, max=0.5)
+            bounds=dict(min=0.2, max=0.6)
         ),
         dict(
             name="duty_cycle_period",
@@ -88,7 +88,7 @@ sigopt_config = dict(
         dict(
             name="freeze_pct",
             type="int",
-            bounds=dict(min=1, max=10),
+            bounds=dict(min=1, max=4),
         )
     ],
     metrics=[
