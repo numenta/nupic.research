@@ -242,9 +242,6 @@ def evaluate_model(
                 post_batch_callback(batch_idx=batch_idx, target=target, output=output,
                                     pred=pred)
 
-        if total > 0:
-            loss /= total
-
         complexity_loss = (complexity_loss_fn(model)
                            if complexity_loss_fn is not None
                            else None)
@@ -258,7 +255,7 @@ def evaluate_model(
     result = {
         "total_correct": correct,
         "total_tested": total,
-        "mean_loss": loss,
+        "mean_loss": loss / total if total > 0 else 0,
         "mean_accuracy": correct / total if total > 0 else 0,
     }
 
