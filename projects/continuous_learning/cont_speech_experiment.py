@@ -18,10 +18,12 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+
 import logging
 import os
 import tempfile
 import time
+from functools import partial
 
 import numpy as np
 import torch
@@ -29,16 +31,15 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+from exp_lesparse import LeSparseNet
+from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
+from nupic.research.frameworks.continuous_learning.utils import train_model
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
     set_random_seed,
-    train_model,
 )
-from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
-from nupic.research.frameworks.pytorch.models.resnet_models import resnet9
-from nupic.torch.models.sparse_cnn import GSCSparseCNN, GSCSuperSparseCNN
 from nupic.torch.modules import rezero_weights, update_boost_strength
 
 
@@ -89,6 +90,10 @@ class ContinuousSpeechExperiment(object):
         self.load_datasets()
 
         self.freeze_params = config["freeze_params"]
+        self.running_accuracy = []
+        self.frozen_inds = None
+        self.combine_xy = False
+        self.boost_strength = config["boost_strength"]
 
         if self.model_type == "le_sparse":
             model = LeSparseNet(
@@ -99,6 +104,8 @@ class ContinuousSpeechExperiment(object):
                 linear_n=config["linear_n"],
                 linear_activity_percent_on=config["linear_percent_on"],
                 linear_weight_percent_on=config["weight_sparsity"],
+                dendrites_per_cell=config["dendrites_per_cell"],
+                use_dendrites=config["use_dendrites"],
                 boost_strength=config["boost_strength"],
                 boost_strength_factor=config["boost_strength_factor"],
                 duty_cycle_period=config["duty_cycle_period"],
@@ -112,17 +119,6 @@ class ContinuousSpeechExperiment(object):
                     "consolidated_sparse_weights", False),
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
-
-        elif self.model_type == "resnet9":
-            model = resnet9(
-                num_classes=self.num_classes, in_channels=1
-            )
-
-        elif self.model_type == "gsc_sparse_cnn":
-            model = GSCSparseCNN()
-
-        elif self.model_type == "gsc_super_sparse_cnn":
-            model = GSCSuperSparseCNN()
 
         else:
             raise RuntimeError("Unknown model type: " + self.model_type)
@@ -221,17 +217,28 @@ class ContinuousSpeechExperiment(object):
 
         self.pre_epoch()
 
-        fparams = []
+        fparams = None
         if self.freeze_params == "output":
             fparams.append([self.model.linear2.module.weight, indices])
 
         train_model(self.model, self.full_train_loader, self.optimizer, self.device,
-                    freeze_params=fparams, batches_in_epoch=self.batches_in_epoch)
+                    combine_data=self.combine_xy, freeze_params=fparams,
+                    batches_in_epoch=self.batches_in_epoch)
+
         self.full_post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def train(self, epoch, training_classes, indices=None):
+    def train(self,
+              epoch,
+              training_classes,
+              freeze_params=None,
+              freeze_fun=None,
+              freeze_pct=90,
+              freeze_output=False,
+              layer_type="dense",
+              linear_number=2,
+              output_indices=None):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
@@ -250,19 +257,25 @@ class ContinuousSpeechExperiment(object):
         f = self.combine_classes(training_classes)
         self.pre_epoch()
 
-        fparams = []
-        if self.freeze_params == "output":
-            fparams.append([self.model.linear2.module.weight, indices])
-
-        train_model(self.model, self.train_loader, self.optimizer, self.device,
-                    freeze_params=fparams,
+        train_model(self.model, self.train_loader, self.optimizer,
+                    self.device, freeze_params=freeze_params,
+                    freeze_fun=freeze_fun, freeze_pct=freeze_pct,
+                    freeze_output=freeze_output, layer_type=layer_type,
+                    linear_number=linear_number, duty_cycles=self.get_duty_cycles(),
+                    output_indices=output_indices, combine_data=self.combine_xy,
                     batches_in_epoch=self.batches_in_epoch)
 
         self.post_epoch()
         self.logger.info("training duration: %s", time.time() - t0)
+        self.update_accuracy()
         f.close()
 
+    def boost_per_epoch(self, bpe):
+        partial_boost = partial(per_epoch, bpe)
+        self.model.apply(partial_boost)
+
     def post_epoch(self):
+        self.model.apply(new_epoch)
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
@@ -275,6 +288,13 @@ class ContinuousSpeechExperiment(object):
     def pre_epoch(self):
         self.model.apply(update_boost_strength)
 
+    def get_duty_cycles(self):
+        dc_dictionary = {k[0]: k[1].duty_cycle
+                         for k in self.model.named_children()
+                         if "duty_cycle" in k[1].state_dict()}
+
+        return dc_dictionary
+
     def test_class(self, class_, test_loader=None):
         """Test the model using the given loader and return test metrics."""
         if test_loader is None:
@@ -285,7 +305,8 @@ class ContinuousSpeechExperiment(object):
         else:
             loader = self.validation_loader
 
-        ret = evaluate_model(self.model, loader, self.device)
+        ret = evaluate_model(self.model, loader, self.device,
+                             combine_data=self.combine_xy)
         ret["mean_accuracy"] = 100.0 * ret["mean_accuracy"]
 
         entropy = self.entropy()
@@ -317,6 +338,29 @@ class ContinuousSpeechExperiment(object):
         })
 
         return ret
+
+    def update_accuracy(self):
+        """Test on all classes after training on n classes"""
+        self.running_accuracy.append(
+            np.array([np.round(self.test_class(k)["mean_accuracy"], 2)
+                      for k in range(11)])
+        )
+
+    def get_forgetting_curve(self):
+        acc = np.vstack(self.running_accuracy)
+
+        def align_acc(acc, shift=2):
+            m, n = acc.shape
+            acc_ = np.full((m, n), np.nan)
+            for ind in np.arange(m):
+                acc_[:m - ind, 1 + shift * ind:1 + shift * (ind + 1)] =\
+                    acc[ind:, 1 + shift * ind:1 + shift * (ind + 1)]
+            return acc_
+        return align_acc(acc)
+
+    def get_auc(self):
+        fc = self.get_forgetting_curve()
+        return np.trapz(np.nanmean(fc, axis=1))
 
     def entropy(self):
         """Returns the current entropy."""
