@@ -83,6 +83,8 @@ class ImagenetTrainable(Trainable):
             f"_setup: trial={self._trial_info.trial_name}({self.iteration}), "
             f"config={config}")
 
+        self._validate_immediately = -1 in config.get("epochs_to_validate", [])
+
         # Get checkpoint file to restore the training from
         self.restore_checkpoint_file = config.pop("restore_checkpoint_file", None)
 
@@ -109,9 +111,23 @@ class ImagenetTrainable(Trainable):
     def _train(self):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
-            # Check if restore checkpoint file fulfills the stop criteria on first run
             if self._first_run:
                 self._first_run = False
+
+                if self._validate_immediately:
+                    self.logger.debug("Validating before any training:")
+                    status = []
+                    for w in self.procs:
+                        status.append(w.validate.remote())
+
+                    if ray_utils.check_for_failure(status):
+                        results = ray.get(status)
+                        ret = self.experiment_class.aggregate_validation_results(
+                            results)
+                        self.logger.info(ret)
+
+                # Check if restore checkpoint file fulfills the stop criteria on
+                # first run
                 if self._restored and self._should_stop():
                     self.logger.warning(
                         f"Restored checkpoint file '{self.restore_checkpoint_file}' "
@@ -133,6 +149,7 @@ class ImagenetTrainable(Trainable):
 
                 ret = self.experiment_class.aggregate_results(results)
                 self._process_result(ret)
+                self.logger.info(ret)
 
                 # Check if we should stop the experiment
                 ret[DONE] = self._should_stop()
