@@ -242,14 +242,9 @@ def evaluate_model(
                 post_batch_callback(batch_idx=batch_idx, target=target, output=output,
                                     pred=pred)
 
-        if total > 0:
-            loss /= total
-
-        if complexity_loss_fn is not None:
-            c_loss = complexity_loss_fn(model)
-            if c_loss is not None:
-                loss += c_loss
-            del c_loss
+        complexity_loss = (complexity_loss_fn(model)
+                           if complexity_loss_fn is not None
+                           else None)
 
     if progress is not None:
         loader.close()
@@ -257,16 +252,27 @@ def evaluate_model(
     correct = correct.item()
     loss = loss.item()
 
-    return {
+    result = {
         "total_correct": correct,
         "total_tested": total,
         "mean_loss": loss,
         "mean_accuracy": correct / total if total > 0 else 0,
     }
 
+    if complexity_loss is not None:
+        result["complexity_loss"] = complexity_loss.item()
+
+    return result
+
 
 def aggregate_eval_results(results):
     """Aggregate multiple results from evaluate_model into a single result.
+
+    This function ignores fields that don't need aggregation. To get the
+    complete result dict, start with a deepcopy of one of the result dicts,
+    as follows:
+        result = copy.deepcopy(results[0])
+        result.update(aggregate_eval_results(results))
 
     :param results:
         A list of return values from evaluate_model.
