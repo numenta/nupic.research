@@ -39,7 +39,10 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
-from nupic.research.support.ray_utils import get_last_checkpoint
+from nupic.research.support.ray_utils import (
+    get_last_checkpoint,
+    register_torch_serializers,
+)
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -340,6 +343,9 @@ def run(config):
     # Connect to ray
     address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
     ray.init(address=address, local_mode=config.get("local_mode", False))
+
+    # Register serializer and deserializer - needed when logging arrays and tensors.
+    register_torch_serializers()
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
