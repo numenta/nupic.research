@@ -252,7 +252,7 @@ class ImagenetExperiment:
             "loss_function", torch.nn.functional.cross_entropy
         )
 
-        # Configure data loaders
+        self.num_classes = config.get("num_classes", 1000)
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
         self.epochs_to_validate = config.get("epochs_to_validate",
@@ -374,28 +374,15 @@ class ImagenetExperiment:
         if loader is None:
             loader = self.val_loader
 
-        if self.current_epoch in self.epochs_to_validate:
-            results = self.evaluate_model(
-                model=self.model,
-                loader=loader,
-                device=self.device,
-                criterion=self.loss_function,
-                batches_in_epoch=self.batches_in_epoch,
-            )
-        else:
-            results = {
-                "total_correct": 0,
-                "total_tested": 0,
-                "mean_loss": 0.0,
-                "mean_accuracy": 0.0,
-            }
-
-        results.update(
-            learning_rate=self.get_lr()[0],
+        return self.evaluate_model(
+            model=self.model,
+            loader=loader,
+            device=self.device,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
+            batches_in_epoch=self.batches_in_epoch,
+            transform_to_device_fn=self.transform_data_to_device,
         )
-        self.logger.info(results)
-
-        return results
 
     def train_epoch(self):
         self.train_model(
@@ -403,21 +390,33 @@ class ImagenetExperiment:
             loader=self.train_loader,
             optimizer=self.optimizer,
             device=self.device,
-            criterion=self.loss_function,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch,
+            transform_to_device_fn=self.transform_data_to_device,
         )
 
     def run_epoch(self):
-        if -1 in self.epochs_to_validate and self.current_epoch == 0:
-            self.logger.debug("Validating before any training:")
-            self.validate()
         self.pre_epoch()
         self.train_epoch()
         self.post_epoch()
         t1 = time.time()
-        ret = self.validate()
+
+        if self.current_epoch in self.epochs_to_validate:
+            ret = self.validate()
+        else:
+            ret = {
+                "total_correct": 0,
+                "total_tested": 0,
+                "mean_loss": 0.0,
+                "mean_accuracy": 0.0,
+            }
+
+        ret.update(
+            learning_rate=self.get_lr()[0],
+        )
 
         if self.rank == 0:
             self.logger.debug("validate time: %s", time.time() - t1)
@@ -468,8 +467,26 @@ class ImagenetExperiment:
         self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s",
                           self.current_epoch, self.get_lr(), self.get_weight_decay())
 
-    def loss_function(self, output, target, **kwargs):
-        return self._loss_function(output, target, **kwargs)
+    def error_loss(self, output, target, reduction="mean"):
+        """
+        The error loss component of the loss function.
+        """
+        return self._loss_function(output, target, reduction=reduction)
+
+    def complexity_loss(self, model):
+        """
+        The model complexity component of the loss function.
+        """
+        pass
+
+    def transform_data_to_device(self, data, target, device, non_blocking):
+        """
+        This provides an extensibility point for performing any final
+        transformations on the data or targets.
+        """
+        data = data.to(self.device, non_blocking=non_blocking)
+        target = target.to(self.device, non_blocking=non_blocking)
+        return data, target
 
     @classmethod
     def aggregate_results(cls, results):
@@ -478,6 +495,27 @@ class ImagenetExperiment:
 
         :param results:
             A list of return values from run_epoch from different processes.
+        :type results: list
+
+        :return:
+            A single result dict with results aggregated.
+        :rtype: dict
+        """
+        return cls.aggregate_validation_results(results)
+
+    @classmethod
+    def aggregate_validation_results(cls, results):
+        """
+        Aggregate multiple processes' "validate" results into a single result.
+
+        This method exists separately from "aggregate_results" to support
+        running validation outside of "run_epoch" and aggregating those results
+        without causing error. Subclasses / mixins implementing
+        "aggregate_results" may expect all results to have the extra data
+        appended during run_epoch.
+
+        :param results:
+            A list of return values from validate from different processes.
         :type results: list
 
         :return:
@@ -613,6 +651,13 @@ class ImagenetExperiment:
             post_epoch=["ImagenetExperiment.post_epoch"],
             pre_batch=["ImagenetExperiment.pre_batch"],
             post_batch=["ImagenetExperiment.post_batch"],
-            loss_function=["ImagenetExperiment.loss_function"],
+            error_loss=["ImagenetExperiment.error_loss"],
+            complexity_loss=["ImagenetExperiment.complexity_loss"],
+            transform_data_to_device=[
+                "ImagenetExperiment.transform_data_to_device"
+            ],
             aggregate_results=["ImagenetExperiment.aggregate_results"],
+            aggregate_validation_results=[
+                "ImagenetExperiment.aggregate_validation_results"
+            ],
         )

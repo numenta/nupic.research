@@ -330,30 +330,3 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
-
-
-def freeze_output_layer(model, indices, layer_type="dense", linear_number=2):
-    """ Freeze output layer gradients of specific classes for classification.
-    :param layer_type: can be "dense" (i.e. model.output) or "kwinner"
-    :param linear_number: "linear" module number for k winner
-    (e.g. linear1_kwinners, linear2_kwinners etc.)
-    """
-    if layer_type == "dense":
-        with torch.no_grad():
-            [model.output.weight.grad.data[index, :].fill_(0.0) for index in indices]
-            [model.output.bias.grad.data[index].fill_(0.0) for index in indices]
-
-    elif layer_type == "kwinner":
-        module_dict = {k[0]: k[1] for k in model.named_parameters()}
-        with torch.no_grad():
-            [module_dict[
-                "linear{}.module.weight".format(linear_number)
-            ].grad.data[index, :].fill_(0.0)
-                for index in indices]
-            [module_dict[
-                "linear{}.module.bias".format(linear_number)
-            ].grad.data[index].fill_(0.0)
-                for index in indices]
-
-    else:
-        raise AssertionError("layer_type must be ''dense'' or ''kwinner''")
