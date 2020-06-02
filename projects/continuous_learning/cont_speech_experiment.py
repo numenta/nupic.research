@@ -31,16 +31,14 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-# from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from exp_lesparse import LeSparseNet
-from fb_sparsenet import FBNet
-
+from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
+from nupic.research.frameworks.continuous_learning.utils import train_model
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
     set_random_seed,
-    train_model,
 )
 from nupic.torch.modules import rezero_weights, update_boost_strength
 
@@ -121,30 +119,6 @@ class ContinuousSpeechExperiment(object):
                     "consolidated_sparse_weights", False),
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
-
-        elif self.model_type == "fb_CNN":
-            model = FBNet(input_shape=config.get("input_shape", (1, 32, 32)),
-                          cnn_out_channels=config["cnn_out_channels"],
-                          cnn_pct_on=config["cnn_percent_on"],
-                          cnn_weight_sparsity=config["cnn_weight_sparsity"],
-                          linear_n=config["linear_n"],
-                          linear_pct_on=config["linear_percent_on"],
-                          linear_weight_sparsity=config["weight_sparsity"],
-                          num_classes=self.num_classes,
-                          boost_strength=config["boost_strength"],
-                          boost_strength_factor=config["boost_strength_factor"],
-                          duty_cycle_period=config["duty_cycle_period"],
-                          k_inference_factor=config["k_inference_factor"],
-                          use_batch_norm=config["use_batch_norm"],
-                          dropout=config.get("dropout", 0.0),
-                          activation_fct_before_max_pool=config.get(
-                "activation_fct_before_max_pool", False),
-                consolidated_sparse_weights=config.get(
-                "consolidated_sparse_weights", False),
-                use_kwinners_local=config.get(
-                "use_kwinner_local", False),
-            )
-            self.combine_xy = True
 
         else:
             raise RuntimeError("Unknown model type: " + self.model_type)
@@ -296,7 +270,12 @@ class ContinuousSpeechExperiment(object):
         self.update_accuracy()
         f.close()
 
+    def boost_per_epoch(self, bpe):
+        partial_boost = partial(per_epoch, bpe)
+        self.model.apply(partial_boost)
+
     def post_epoch(self):
+        self.model.apply(new_epoch)
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
