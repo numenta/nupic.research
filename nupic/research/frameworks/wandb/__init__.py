@@ -19,24 +19,4 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.pytorch.imagenet import mixins
-from nupic.research.frameworks.pytorch.imagenet.imagenet_experiment import (
-    ImagenetExperiment,
-)
-
-
-class RezeroedKWinnersImagenetExperiment(mixins.RezeroWeights,
-                                         mixins.UpdateBoostStrength,
-                                         ImagenetExperiment):
-    pass
-
-
-class KnowledgeDistillationImagenetExperiment(mixins.KnowledgeDistillation,
-                                              RezeroedKWinnersImagenetExperiment):
-    pass
-
-
-__all__ = [
-    "RezeroedKWinnersImagenetExperiment",
-    "KnowledgeDistillationImagenetExperiment"
-]
+from .ray_wandb import *

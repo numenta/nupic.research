@@ -31,16 +31,21 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+<<<<<<< HEAD
 # from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from exp_lesparse import LeSparseNet
 from fb_sparsenet import FBNet
 
+=======
+from exp_lesparse import LeSparseNet
+from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
+from nupic.research.frameworks.continuous_learning.utils import train_model
+>>>>>>> 425201eeb54fa5b7c0617948ef7c7f5ff2942d8b
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     evaluate_model,
     set_random_seed,
-    train_model,
 )
 from nupic.torch.modules import rezero_weights, update_boost_strength
 
@@ -122,6 +127,7 @@ class ContinuousSpeechExperiment(object):
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
 
+<<<<<<< HEAD
         elif self.model_type == "fb_CNN":
             model = FBNet(input_shape=config.get("input_shape", (1, 32, 32)),
                           cnn_out_channels=config["cnn_out_channels"],
@@ -146,6 +152,8 @@ class ContinuousSpeechExperiment(object):
             )
             self.combine_xy = True
 
+=======
+>>>>>>> 425201eeb54fa5b7c0617948ef7c7f5ff2942d8b
         else:
             raise RuntimeError("Unknown model type: " + self.model_type)
 
@@ -296,7 +304,12 @@ class ContinuousSpeechExperiment(object):
         self.update_accuracy()
         f.close()
 
+    def boost_per_epoch(self, bpe):
+        partial_boost = partial(per_epoch, bpe)
+        self.model.apply(partial_boost)
+
     def post_epoch(self):
+        self.model.apply(new_epoch)
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
