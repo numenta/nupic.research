@@ -111,10 +111,20 @@ class ImagenetTrainable(Trainable):
     def _train(self):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
+            # Check if restore checkpoint file fulfills the stop criteria on first run
             if self._first_run:
                 self._first_run = False
+                if self._restored and self._should_stop():
+                    self.logger.warning(
+                        f"Restored checkpoint file '{self.restore_checkpoint_file}' "
+                        f"fulfills stop criteria without additional training.")
+                    return {
+                        # do not train or log results, just stop
+                        RESULT_DUPLICATE: True,
+                        DONE: True
+                    }
 
-                if self._validate_immediately:
+                if self._iteration == 0 and self._validate_immediately:
                     self.logger.debug("Validating before any training:")
                     status = []
                     for w in self.procs:
@@ -126,18 +136,6 @@ class ImagenetTrainable(Trainable):
                             results)
                         self.logger.info(ret)
 
-                # Check if restore checkpoint file fulfills the stop criteria on
-                # first run
-                if self._restored and self._should_stop():
-                    self.logger.warning(
-                        f"Restored checkpoint file '{self.restore_checkpoint_file}' "
-                        f"fulfills stop criteria without additional training.")
-                    return {
-                        # do not train or log results, just stop
-                        RESULT_DUPLICATE: True,
-                        DONE: True
-                    }
-
             status = []
             for w in self.procs:
                 status.append(w.run_epoch.remote())
@@ -148,8 +146,8 @@ class ImagenetTrainable(Trainable):
                 results = ray.get(status)
 
                 ret = self.experiment_class.aggregate_results(results)
-                self._process_result(ret)
                 self.logger.info(ret)
+                self._process_result(ret)
 
                 # Check if we should stop the experiment
                 ret[DONE] = self._should_stop()
