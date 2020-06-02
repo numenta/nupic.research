@@ -61,14 +61,14 @@ def load_multi_state(
     :param include_buffers: whether to load the models buffers as well; doesn't work
                             with restore_full_model.
     :param resize_buffers: whether to resize the models buffers before loading the
-                           state; this ensure the model has the same buffer sizes as
+                           state; this ensures the model has the same buffer sizes as
                            those saved within the checkpoint prior to loading.
                            Otherwise, pytorch may throw an error.
     :param param_map: a dict mapping names of state within the checkpoint to new desired
                       names; this helps when the names of the model's state don't quite
                       match that of the checkpoints. Ex:
                       `param_map = {"features.weight": "features.new_weight"}`
-                      where `model.weight` exists within the checkpoint and the model
+                      where "features.weight" exists within the checkpoint and the model
                       has the attribute `model.features.new_weight`.
 
     Example:
