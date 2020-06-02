@@ -37,9 +37,11 @@ def train_model(
     device,
     freeze_params=None,
     criterion=F.nll_loss,
+    complexity_loss_fn=None,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
     post_batch_callback=None,
+    transform_to_device_fn=None,
     progress_bar=None,
 ):
     """Train the given model by iterating through mini batches. An epoch ends
@@ -63,12 +65,20 @@ def train_model(
     :type param: list or tuple
     :param criterion: loss function to use
     :type criterion: function
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters: model, batch_idx
     :type post_batch_callback: function
     :param pre_batch_callback: Callback function to be called before every batch
                                with the following parameters: model, batch_idx
     :type pre_batch_callback: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
     :param progress_bar: Optional :class:`tqdm` progress bar args.
                          None for no progress bar
     :type progress_bar: dict or None
@@ -103,8 +113,12 @@ def train_model(
             break
 
         num_images = len(target)
-        data = data.to(device, non_blocking=async_gpu)
-        target = target.to(device, non_blocking=async_gpu)
+        if transform_to_device_fn is None:
+            data = data.to(device, non_blocking=async_gpu)
+            target = target.to(device, non_blocking=async_gpu)
+        else:
+            data, target = transform_to_device_fn(data, target, device,
+                                                  non_blocking=async_gpu)
         t1 = time.time()
 
         if pre_batch_callback is not None:
@@ -114,6 +128,12 @@ def train_model(
         output = model(data)
         loss = criterion(output, target)
         del data, target, output
+
+        if complexity_loss_fn is not None:
+            c_loss = complexity_loss_fn(model)
+            if c_loss is not None:
+                loss += c_loss
+            del c_loss
 
         t2 = time.time()
         if use_amp:
@@ -153,8 +173,10 @@ def evaluate_model(
     device,
     batches_in_epoch=sys.maxsize,
     criterion=F.nll_loss,
+    complexity_loss_fn=None,
     progress=None,
     post_batch_callback=None,
+    transform_to_device_fn=None,
 ):
     """Evaluate pre-trained model using given test dataset loader.
 
@@ -168,11 +190,20 @@ def evaluate_model(
     :type batches_in_epoch: int
     :param criterion: loss function to use
     :type criterion: function
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
     :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
     :type progress: dict or None
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters:
                                 batch_idx, target, output, pred
+    :type post_batch_callback: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
 
     :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
     :rtype: dict
@@ -193,8 +224,13 @@ def evaluate_model(
         for batch_idx, (data, target) in enumerate(loader):
             if batch_idx >= batches_in_epoch:
                 break
-            data = data.to(device, non_blocking=async_gpu)
-            target = target.to(device, non_blocking=async_gpu)
+
+            if transform_to_device_fn is None:
+                data = data.to(device, non_blocking=async_gpu)
+                target = target.to(device, non_blocking=async_gpu)
+            else:
+                data, target = transform_to_device_fn(data, target, device,
+                                                      non_blocking=async_gpu)
 
             output = model(data)
             loss += criterion(output, target, reduction="sum")
@@ -206,22 +242,37 @@ def evaluate_model(
                 post_batch_callback(batch_idx=batch_idx, target=target, output=output,
                                     pred=pred)
 
+        complexity_loss = (complexity_loss_fn(model)
+                           if complexity_loss_fn is not None
+                           else None)
+
     if progress is not None:
         loader.close()
 
     correct = correct.item()
     loss = loss.item()
 
-    return {
+    result = {
         "total_correct": correct,
         "total_tested": total,
-        "mean_loss": loss / total if total > 0 else 0,
+        "mean_loss": loss,
         "mean_accuracy": correct / total if total > 0 else 0,
     }
+
+    if complexity_loss is not None:
+        result["complexity_loss"] = complexity_loss.item()
+
+    return result
 
 
 def aggregate_eval_results(results):
     """Aggregate multiple results from evaluate_model into a single result.
+
+    This function ignores fields that don't need aggregation. To get the
+    complete result dict, start with a deepcopy of one of the result dicts,
+    as follows:
+        result = copy.deepcopy(results[0])
+        result.update(aggregate_eval_results(results))
 
     :param results:
         A list of return values from evaluate_model.
