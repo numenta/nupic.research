@@ -345,31 +345,7 @@ def run(config):
     ray.init(address=address, local_mode=config.get("local_mode", False))
 
     # Register serializer and deserializer - needed when logging arrays and tensors.
-    def serializer(obj):
-        if obj.requires_grad:
-            obj = obj.detach()
-        if obj.is_cuda:
-            return obj.cpu().numpy()
-        else:
-            return obj.numpy()
-
-    for tensor_type in [
-        torch.FloatTensor,
-        torch.DoubleTensor,
-        torch.HalfTensor,
-        torch.ByteTensor,
-        torch.CharTensor,
-        torch.ShortTensor,
-        torch.IntTensor,
-        torch.LongTensor,
-        torch.Tensor,
-    ]:
-        def deserializer(serialized_obj):
-            return tensor_type(serialized_obj)  # cast to tensor_type
-
-        ray.register_custom_serializer(
-            tensor_type, serializer=serializer, deserializer=deserializer
-        )
+    register_torch_serializers()
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
