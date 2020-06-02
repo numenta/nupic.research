@@ -22,16 +22,9 @@
 
 class RegularizeLoss(object):
     """
-    Add a regularization term to the loss function.
+    Implement the complexity_loss as the sum all module.regularization()
+    functions, times some specified scalar.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["setup_experiment"].append(
-            "RegularizeLoss initialization")
-        self.execution_order["loss_function"].append("RegularizeLoss")
-        self.execution_order["pre_epoch"].append(
-            "RegularizeLoss update regularization weight")
-
     def setup_experiment(self, config):
         """
         @param reg_schedule (list of tuples)
@@ -62,10 +55,10 @@ class RegularizeLoss(object):
                                      for module in self.model.modules()
                                      if hasattr(module, "regularization")]
 
-    def loss_function(self, *args, **kwargs):
-        loss = super().loss_function(*args, **kwargs)
+    def complexity_loss(self, model):
+        c_loss = super().complexity_loss(model)
 
-        if self.reg_weight != 0:
+        if self.reg_weight != 0 and len(self._regularized_modules) > 0:
             # This is inner loop code, avoid any unnecessary tensor allocation.
             reg = None
             for module in self._regularized_modules:
@@ -74,13 +67,22 @@ class RegularizeLoss(object):
                 else:
                     reg += module.regularization()
 
-            if reg is not None:
-                reg *= self.reg_weight * self.reg_coefficient
-                loss += reg
+            reg *= self.reg_weight * self.reg_coefficient
+            c_loss = (c_loss + reg
+                      if c_loss is not None
+                      else reg)
 
-        return loss
+        return c_loss
 
     def pre_epoch(self):
         super().pre_epoch()
         if self.current_epoch in self.reg_schedule:
             self.reg_weight = self.reg_schedule[self.current_epoch]
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("RegularizeLoss initialization")
+        eo["complexity_loss"].append("RegularizeLoss")
+        eo["pre_epoch"].append("RegularizeLoss update regularization weight")
+        return eo

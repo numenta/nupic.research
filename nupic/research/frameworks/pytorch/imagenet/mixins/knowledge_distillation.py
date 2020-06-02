@@ -27,18 +27,6 @@ class KnowledgeDistillation(object):
     """
     Sets the network to learn from a teacher model
     """
-    def __init__(self):
-        super().__init__()
-
-        self.execution_order["setup_experiment"].append(
-            "Knowledge Distillation initialization")
-        self.execution_order["calculate_batch_loss"] = [
-            "KnowledgeDistillation.calculate_batch_loss"
-        ]
-        self.execution_order["_train_model"].insert(
-            0, "Update kd factor based on linear decay"
-        )
-
     def setup_experiment(self, config):
         """
         Add following variables to config
@@ -79,9 +67,8 @@ class KnowledgeDistillation(object):
             self.kd_factor = self.kd_factor_init
         self.logger.info(f"KD factor: {self.kd_factor_init} {self.kd_factor_end}")
 
-    def _train_model(self):
-        """Private train model that has access to Experiment attributes
-        """
+    def pre_epoch(self):
+        super().pre_epoch()
         # calculates kd factor based on a linear decay
         if self.kd_factor_end is not None:
             self.kd_factor = linear_decay(first_epoch_value=self.kd_factor_init,
@@ -90,36 +77,63 @@ class KnowledgeDistillation(object):
                                           total_epochs=self.epochs)
             self.logger.debug(
                 f"KD factor: {self.kd_factor:.3f} at epoch {self.current_epoch}")
-        super()._train_model()
 
-    def calculate_batch_loss(self, data, target, async_gpu=True):
+    def transform_data_to_device(self, data, target, device, non_blocking):
         """
         :param data: input to the training function, as specified by dataloader
         :param target: target to be matched by model, as specified by dataloader
-        :param async_gpu: define whether or not to use
-                          asynchronous GPU copies when the memory is pinned
+        :param device: identical to self.device
+        :param non_blocking: define whether or not to use
+                             asynchronous GPU copies when the memory is pinned
         """
-        # knowlege distillation training
-        output = self.model(data)
+        if not self.model.training:
+            return super().transform_data_to_device(data, target, device,
+                                                    non_blocking)
+
+        data = data.to(self.device, non_blocking=non_blocking)
         with torch.no_grad():
             # target is linear combination of teacher and target softmaxes
             softmax_output_teacher = F.softmax(self.teacher_model(data))
             if self.kd_factor < 1:
-                target = target.to(self.device, non_blocking=async_gpu)
-                one_hot_target = F.one_hot(target, num_classes=output.shape[-1])
+                target = target.to(self.device, non_blocking=non_blocking)
+                one_hot_target = F.one_hot(target, num_classes=self.num_classes)
                 combined_target = (self.kd_factor * softmax_output_teacher
                                    + (1 - self.kd_factor) * one_hot_target)
                 del target, one_hot_target
             else:
                 combined_target = softmax_output_teacher
 
-        loss = soft_cross_entropy(output, combined_target)
+        return data, combined_target
 
-        del softmax_output_teacher, combined_target
-        return loss, output
+    def error_loss(self, output, target, reduction="mean"):
+        """
+        :param output: output from the model
+        :param target: target to be matched by model
+        :param reduction: reduction to apply to the output ("sum" or "mean")
+        """
+        if not self.model.training:
+            # Targets are from the dataloader
+            return super().error_loss(output, target, reduction=reduction)
+
+        return soft_cross_entropy(output, target, reduction)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("Knowledge Distillation initialization")
+        eo["pre_epoch"].append("Update kd factor based on linear decay")
+        eo["transform_data_to_device"].insert(0, "If not training: {")
+        eo["transform_data_to_device"].append(
+            "} else: { Compute Knowledge Distillation targets }"
+        )
+        eo["error_loss"].insert(0, "If not training: {")
+        eo["error_loss"].append(
+            "} else: { Knowledge Distillation soft_cross_entropy }"
+        )
+        return eo
 
 
-def soft_cross_entropy(output, target, size_average=True):
+def soft_cross_entropy(output, target, reduction="mean"):
     """ Cross entropy that accepts soft targets
     Args:
     :param output: predictions for neural network
@@ -138,10 +152,12 @@ def soft_cross_entropy(output, target, size_average=True):
 
     see: https://discuss.pytorch.org/t/cross-entropy-with-one-hot-targets/13580/5
     """
-    if size_average:
+    if reduction == "mean":
         return torch.mean(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
-    else:
+    elif reduction == "sum":
         return torch.sum(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
+    else:
+        raise ValueError(f"Unknown reduction: {reduction}")
 
 
 def linear_decay(first_epoch_value, last_epoch_value, current_epoch, total_epochs):

@@ -33,12 +33,6 @@ class RezeroWeights:
     learning, so this mixin only needs to be applied on post_epoch rather than
     post_batch.
     """
-    def __init__(self):
-        super().__init__()
-        self.execution_order["setup_experiment"].append("RezeroWeights logging")
-        self.execution_order["create_model"].append("RezeroWeights")
-        self.execution_order["post_epoch"].append("RezeroWeights")
-
     def setup_experiment(self, config):
         super().setup_experiment(config)
 
@@ -49,8 +43,9 @@ class RezeroWeights:
                               params_sparse, nonzero_params_sparse2,
                               float(nonzero_params_sparse2) / params_sparse)
 
-    def create_model(self, config):
-        model = super().create_model(config)
+    @classmethod
+    def create_model(cls, config, device):
+        model = super().create_model(config, device)
         # Some initialization strategies can destroy sparsity, so we call rezero
         # here.
         model.apply(rezero_weights)
@@ -74,3 +69,11 @@ class RezeroWeights:
                 params_sparse, nonzero_params_sparse1,
                 nonzero_params_sparse2,
                 float(nonzero_params_sparse2) / params_sparse)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("RezeroWeights logging")
+        eo["create_model"].append("RezeroWeights")
+        eo["post_epoch"].append("RezeroWeights")
+        return eo
