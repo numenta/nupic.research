@@ -86,6 +86,8 @@ class ImagenetTrainable(Trainable):
             f"_setup: trial={self._trial_info.trial_name}({self.iteration}), "
             f"config={config}")
 
+        self._validate_immediately = -1 in config.get("epochs_to_validate", [])
+
         # Get checkpoint file to restore the training from
         self.restore_checkpoint_file = config.pop("restore_checkpoint_file", None)
 
@@ -125,6 +127,18 @@ class ImagenetTrainable(Trainable):
                         DONE: True
                     }
 
+                if self._iteration == 0 and self._validate_immediately:
+                    self.logger.debug("Validating before any training:")
+                    status = []
+                    for w in self.procs:
+                        status.append(w.validate.remote())
+
+                    if ray_utils.check_for_failure(status):
+                        results = ray.get(status)
+                        ret = self.experiment_class.aggregate_validation_results(
+                            results)
+                        self.logger.info(ret)
+
             status = []
             for w in self.procs:
                 status.append(w.run_epoch.remote())
@@ -135,6 +149,7 @@ class ImagenetTrainable(Trainable):
                 results = ray.get(status)
 
                 ret = self.experiment_class.aggregate_results(results)
+                self.logger.info(ret)
                 self._process_result(ret)
 
                 # Check if we should stop the experiment
