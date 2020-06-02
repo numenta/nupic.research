@@ -39,7 +39,10 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
-from nupic.research.support.ray_utils import get_last_checkpoint
+from nupic.research.support.ray_utils import (
+    get_last_checkpoint,
+    register_torch_serializers,
+)
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 

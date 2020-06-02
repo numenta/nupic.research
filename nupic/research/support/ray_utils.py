@@ -21,6 +21,8 @@ import glob
 import json
 import os
 
+import ray
+import torch
 from ray.tune.trial_runner import _TuneFunctionDecoder
 
 
@@ -136,3 +138,48 @@ def get_last_checkpoint(results_dir):
 
     # No checkpoint available
     return None
+
+
+def register_torch_serializers():
+    """
+    Registers ray custom serializer and deserializer for torch.tensor types. According
+    to the ray documentation:
+        "The serializer and deserializer are used when transferring objects of cls
+        across processes and nodes."
+
+    In particular, these are found handy when array-like logs (from a
+    tune.Trainable) are transfered across nodes.
+
+    Example:
+    ```
+    ray.init()
+    register_torch_serializers()
+    ```
+    """
+
+    # Register serializer and deserializer - needed when logging arrays and tensors.
+    def serializer(obj):
+        if obj.requires_grad:
+            obj = obj.detach()
+        if obj.is_cuda:
+            return obj.cpu().numpy()
+        else:
+            return obj.numpy()
+
+    for tensor_type in [
+        torch.FloatTensor,
+        torch.DoubleTensor,
+        torch.HalfTensor,
+        torch.ByteTensor,
+        torch.CharTensor,
+        torch.ShortTensor,
+        torch.IntTensor,
+        torch.LongTensor,
+        torch.Tensor,
+    ]:
+        def deserializer(serialized_obj):
+            return tensor_type(serialized_obj)  # cast to tensor_type
+
+        ray.register_custom_serializer(
+            tensor_type, serializer=serializer, deserializer=deserializer
+        )
