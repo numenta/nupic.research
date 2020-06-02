@@ -36,23 +36,13 @@ def train_model(
     optimizer,
     device,
     freeze_params=None,
-    freeze_fun=None,
-    freeze_pct=90,
-    freeze_output=False,
-    layer_type="dense",
-    linear_number=2,
-    output_indices=None,
-    duty_cycles=None,
-    frozen_dcs=None,
-    reset_weights=None,
-    reset_fun=None,
-    reset_params=None,
     criterion=F.nll_loss,
+    complexity_loss_fn=None,
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
     post_batch_callback=None,
+    transform_to_device_fn=None,
     progress_bar=None,
-    combine_data=False,
 ):
     """Train the given model by iterating through mini batches. An epoch ends
     after one pass through the training set, or if the number of mini batches
@@ -75,12 +65,20 @@ def train_model(
     :type param: list or tuple
     :param criterion: loss function to use
     :type criterion: function
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters: model, batch_idx
     :type post_batch_callback: function
     :param pre_batch_callback: Callback function to be called before every batch
                                with the following parameters: model, batch_idx
     :type pre_batch_callback: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
     :param progress_bar: Optional :class:`tqdm` progress bar args.
                          None for no progress bar
     :type progress_bar: dict or None
@@ -110,27 +108,32 @@ def train_model(
                 "Please install apex from https://www.github.com/nvidia/apex")
 
     t0 = time.time()
-
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
             break
 
         num_images = len(target)
-        data = data.to(device, non_blocking=async_gpu)
-        target = target.to(device, non_blocking=async_gpu)
+        if transform_to_device_fn is None:
+            data = data.to(device, non_blocking=async_gpu)
+            target = target.to(device, non_blocking=async_gpu)
+        else:
+            data, target = transform_to_device_fn(data, target, device,
+                                                  non_blocking=async_gpu)
         t1 = time.time()
 
         if pre_batch_callback is not None:
             pre_batch_callback(model=model, batch_idx=batch_idx)
 
         optimizer.zero_grad()
-        if combine_data:
-            output = model(data, target)
-        else:
-            output = model(data)
-
+        output = model(data)
         loss = criterion(output, target)
         del data, target, output
+
+        if complexity_loss_fn is not None:
+            c_loss = complexity_loss_fn(model)
+            if c_loss is not None:
+                loss += c_loss
+            del c_loss
 
         t2 = time.time()
         if use_amp:
@@ -140,18 +143,15 @@ def train_model(
             loss.backward()
 
         if freeze_params is not None:
-            freeze_fun(model, freeze_params, duty_cycles, freeze_pct)
-
-        if freeze_output:
-            freeze_output_layer(model, output_indices, layer_type=layer_type,
-                                linear_number=linear_number)
+            with torch.no_grad():
+                for param in freeze_params:
+                    param_module = param[0]
+                    param_indices = param[1]
+                    param_module.grad[param_indices, :] = 0.0
 
         t3 = time.time()
         optimizer.step()
         t4 = time.time()
-
-        if reset_weights is not None:
-            reset_fun(model, reset_params)
 
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
@@ -173,11 +173,13 @@ def evaluate_model(
     device,
     batches_in_epoch=sys.maxsize,
     criterion=F.nll_loss,
+    complexity_loss_fn=None,
     progress=None,
     post_batch_callback=None,
-    combine_data=False,
+    transform_to_device_fn=None,
 ):
     """Evaluate pre-trained model using given test dataset loader.
+
     :param model: Pretrained pytorch model
     :type model: torch.nn.Module
     :param loader: test dataset loader
@@ -188,11 +190,21 @@ def evaluate_model(
     :type batches_in_epoch: int
     :param criterion: loss function to use
     :type criterion: function
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
     :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
     :type progress: dict or None
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters:
                                 batch_idx, target, output, pred
+    :type post_batch_callback: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
+
     :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
     :rtype: dict
     """
@@ -212,14 +224,15 @@ def evaluate_model(
         for batch_idx, (data, target) in enumerate(loader):
             if batch_idx >= batches_in_epoch:
                 break
-            data = data.to(device, non_blocking=async_gpu)
-            target = target.to(device, non_blocking=async_gpu)
 
-            if combine_data:
-                output = model(data, target)
+            if transform_to_device_fn is None:
+                data = data.to(device, non_blocking=async_gpu)
+                target = target.to(device, non_blocking=async_gpu)
             else:
-                output = model(data)
+                data, target = transform_to_device_fn(data, target, device,
+                                                      non_blocking=async_gpu)
 
+            output = model(data)
             loss += criterion(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum()
@@ -229,25 +242,42 @@ def evaluate_model(
                 post_batch_callback(batch_idx=batch_idx, target=target, output=output,
                                     pred=pred)
 
+        complexity_loss = (complexity_loss_fn(model)
+                           if complexity_loss_fn is not None
+                           else None)
+
     if progress is not None:
         loader.close()
 
     correct = correct.item()
     loss = loss.item()
 
-    return {
+    result = {
         "total_correct": correct,
         "total_tested": total,
         "mean_loss": loss / total if total > 0 else 0,
         "mean_accuracy": correct / total if total > 0 else 0,
     }
 
+    if complexity_loss is not None:
+        result["complexity_loss"] = complexity_loss.item()
+
+    return result
+
 
 def aggregate_eval_results(results):
     """Aggregate multiple results from evaluate_model into a single result.
+
+    This function ignores fields that don't need aggregation. To get the
+    complete result dict, start with a deepcopy of one of the result dicts,
+    as follows:
+        result = copy.deepcopy(results[0])
+        result.update(aggregate_eval_results(results))
+
     :param results:
         A list of return values from evaluate_model.
     :type results: list
+
     :return:
         A single result dict with evaluation results aggregated.
     :rtype: dict
@@ -274,6 +304,7 @@ def set_random_seed(seed, deterministic_mode=True):
     """
     Set pytorch, python random, and numpy random seeds (these are all the seeds we
     normally use).
+
     :param seed:  (int) seed value
     :param deterministic_mode: (bool) If True, then even on a GPU we'll get more
            deterministic results, though performance may be slower. See:
