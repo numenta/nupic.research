@@ -34,7 +34,7 @@ from torchvision import transforms
 # from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from exp_lesparse import LeSparseNet
 from fb_sparsenet import FBNet
-from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
+
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
@@ -296,12 +296,7 @@ class ContinuousSpeechExperiment(object):
         self.update_accuracy()
         f.close()
 
-    def boost_per_epoch(self, bpe):
-        partial_boost = partial(per_epoch, bpe)
-        self.model.apply(partial_boost)
-
     def post_epoch(self):
-        self.model.apply(new_epoch)
         self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
