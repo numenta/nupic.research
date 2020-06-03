@@ -26,6 +26,7 @@ from torch import nn
 
 from nupic.torch.modules import SparseWeights  # , KWinnersBase, KWinners
 from nupic.torch.modules.k_winners import KWinners2d
+from dend_kwinners import DendriteKWinners2d
 
 
 class DendriteInput(nn.Module):
@@ -129,10 +130,6 @@ class DendriteLayer(nn.Module):
                  out_dim,
                  dendrites_per_neuron,
                  weight_sparsity=0.2,
-                 k_inference_factor=1.,
-                 boost_strength=2.,
-                 boost_strength_factor=0.9,
-                 duty_cycle_period=1000,
                  ):
         super(DendriteLayer, self).__init__()
 
@@ -147,28 +144,23 @@ class DendriteLayer(nn.Module):
         )
         self.output = DendriteOutput(out_dim, self.dendrites_per_neuron)
 
-        self.act_fun = KWinners2d(
+        self.act_fun = DendriteKWinners2d(
             channels=self.out_dim,
-            percent_on=0.1,  # will be overwritten
-            k_inference_factor=k_inference_factor,  # will be overwritten
-            boost_strength=boost_strength,
-            boost_strength_factor=boost_strength_factor,
-            duty_cycle_period=duty_cycle_period,
+            k=1,
             local=True,
         )
         self.act_fun.k = 1
-        self.act_fun.k_inference = 1
 
     def forward(self, x):
         batch_size = x.shape[0]
         out0 = self.input(x)
         with torch.no_grad():
-            out0_ = out0.reshape(batch_size, self.dpc, self.out_dim, 1)
+            out0_ = out0.reshape(batch_size, self.dendrites_per_neuron, self.out_dim, 1)
 
         out1 = self.act_fun(out0_)
         with torch.no_grad():
             out1_ = torch.squeeze(out1)
-        out1_ = out1_.reshape(batch_size, self.out_dim * self.dpc)
+        out1_ = out1_.reshape(batch_size, self.out_dim * self.dendrites_per_neuron)
 
         out2 = self.output(out1_)
         return out2

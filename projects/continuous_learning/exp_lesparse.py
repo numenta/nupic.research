@@ -22,11 +22,168 @@ import numpy as np
 from torch import nn
 
 from nupic.research.frameworks.continuous_learning.dendrite_layers import DendriteLayer
-from nupic.research.frameworks.pytorch.models.le_sparse_net import (
-    add_sparse_cnn_layer,
-    add_sparse_linear_layer,
+from nupic.research.frameworks.pytorch.modules import KWinners2dLocal
+from nupic.research.frameworks.pytorch.modules.consolidated_sparse_weights import (
+    ConsolidatedSparseWeights,
+    ConsolidatedSparseWeights2D,
 )
-from nupic.torch.modules import Flatten, KWinners
+from nupic.torch.modules import (
+    Flatten,
+    KWinners,
+    KWinners2d,
+    SparseWeights,
+    SparseWeights2d,
+)
+
+# from nupic.research.frameworks.pytorch.models.le_sparse_net import (
+#     add_sparse_cnn_layer,
+#     add_sparse_linear_layer,
+# )
+
+
+def add_sparse_cnn_layer(
+    network,
+    suffix,
+    in_channels,
+    out_channels,
+    use_batch_norm,
+    weight_sparsity,
+    percent_on,
+    k_inference_factor,
+    boost_strength,
+    boost_strength_factor,
+    duty_cycle_period,
+    activation_fct_before_max_pool,
+    use_kwinners_local,
+    consolidated_sparse_weights,
+):
+    """Add sparse cnn layer to network.
+
+    :param network: The network to add the sparse layer to
+    :param suffix: Layer suffix. Used to name its components
+    :param in_channels: input channels
+    :param out_channels: output channels
+    :param use_batch_norm: whether or not to use batch norm
+    :param weight_sparsity: Pct of weights that are allowed to be non-zero
+    :param percent_on: Pct of ON (non-zero) units
+    :param k_inference_factor: During inference we increase percent_on by this factor
+    :param boost_strength: boost strength (0.0 implies no boosting)
+    :param boost_strength_factor:
+        boost strength is multiplied by this factor after each epoch
+    :param activation_fct_before_max_pool:
+        If true ReLU/K-winners will be placed before the max_pool step
+    :param use_kwinners_local:
+        Whether or not to choose the k-winners 2d locally only across the
+        channels instead of the whole input
+    """
+    cnn = nn.Conv2d(
+        in_channels=in_channels,
+        out_channels=out_channels,
+        kernel_size=5,
+        padding=0,
+        stride=1,
+    )
+    if 0 < weight_sparsity < 1.0:
+        if consolidated_sparse_weights:
+            sparse_cnn = ConsolidatedSparseWeights2D(cnn, weight_sparsity)
+        else:
+            sparse_cnn = SparseWeights2d(cnn, weight_sparsity)
+        network.add_module("cnn{}_cnn".format(suffix), sparse_cnn)
+    else:
+        network.add_module("cnn{}_cnn".format(suffix), cnn)
+
+    if use_batch_norm:
+        bn = nn.BatchNorm2d(out_channels, affine=False)
+        network.add_module("cnn{}_bn".format(suffix), bn)
+
+    if not activation_fct_before_max_pool:
+        maxpool = nn.MaxPool2d(kernel_size=2)
+        network.add_module("cnn{}_maxpool".format(suffix), maxpool)
+
+    if percent_on >= 1.0 or percent_on <= 0:
+        network.add_module("cnn{}_relu".format(suffix), nn.ReLU())
+    else:
+        kwinner_class = KWinners2dLocal if use_kwinners_local else KWinners2d
+        kwinner = kwinner_class(
+            channels=out_channels,
+            percent_on=percent_on,
+            k_inference_factor=k_inference_factor,
+            boost_strength=boost_strength,
+            boost_strength_factor=boost_strength_factor,
+            duty_cycle_period=duty_cycle_period,
+        )
+        network.add_module("cnn{}_kwinner".format(suffix), kwinner)
+
+    if activation_fct_before_max_pool:
+        maxpool = nn.MaxPool2d(kernel_size=2)
+        network.add_module("cnn{}_maxpool".format(suffix), maxpool)
+
+
+def add_sparse_linear_layer(
+    network,
+    suffix,
+    input_size,
+    linear_n,
+    dropout,
+    use_batch_norm,
+    weight_sparsity,
+    percent_on,
+    k_inference_factor,
+    boost_strength,
+    boost_strength_factor,
+    duty_cycle_period,
+    consolidated_sparse_weights,
+):
+    """Add sparse linear layer to network.
+
+    :param network: The network to add the sparse layer to
+    :param suffix: Layer suffix. Used to name its components
+    :param input_size: Input size
+    :param linear_n: Number of units
+    :param dropout: dropout value
+    :param use_batch_norm: whether or not to use batch norm
+    :param weight_sparsity: Pct of weights that are allowed to be non-zero
+    :param percent_on: Pct of ON (non-zero) units
+    :param k_inference_factor: During inference we increase percent_on by this factor
+    :param boost_strength: boost strength (0.0 implies no boosting)
+    :param boost_strength_factor:
+        boost strength is multiplied by this factor after each epoch
+    """
+    linear = nn.Linear(input_size, linear_n)
+    if 0 < weight_sparsity < 1.0:
+        if consolidated_sparse_weights:
+            network.add_module(
+                "linear{}".format(suffix),
+                ConsolidatedSparseWeights(linear, weight_sparsity)
+            )
+        else:
+            network.add_module(
+                "linear{}".format(suffix), SparseWeights(linear, weight_sparsity)
+            )
+    else:
+        network.add_module("linear{}_linear".format(suffix), linear)
+
+    if use_batch_norm:
+        network.add_module("linear{}_bn".format(suffix),
+                           nn.BatchNorm1d(linear_n, affine=False))
+
+    if 0 < percent_on < 1.0:
+        network.add_module(
+            "linear{}_kwinners".format(suffix),
+            KWinners(
+                n=linear_n,
+                percent_on=percent_on,
+                k_inference_factor=k_inference_factor,
+                boost_strength=boost_strength,
+                boost_strength_factor=boost_strength_factor,
+                duty_cycle_period=duty_cycle_period,
+            ),
+        )
+    else:
+        network.add_module("linear{}_relu".format(suffix), nn.ReLU())
+
+    if dropout > 0.0:
+        network.add_module("linear{}_dropout".format(suffix), nn.Dropout(dropout))
 
 
 def add_sparse_dendrite_layer(
@@ -34,8 +191,7 @@ def add_sparse_dendrite_layer(
     suffix,
     in_dim,
     out_dim,
-    dpc,
-    threshold=2.,
+    dendrites_per_neuron,
     use_batch_norm=False,
     weight_sparsity=0.2,
     percent_on=0.1,
@@ -48,13 +204,8 @@ def add_sparse_dendrite_layer(
     dendrite_layer = DendriteLayer(
         in_dim=in_dim,
         out_dim=out_dim,
-        dpc=dpc,
-        threshold=threshold,
+        dendrites_per_neuron=dendrites_per_neuron,
         weight_sparsity=weight_sparsity,
-        k_inference_factor=k_inference_factor,
-        boost_strength=boost_strength,
-        boost_strength_factor=boost_strength_factor,
-        duty_cycle_period=duty_cycle_period,
     )
 
     network.add_module(
@@ -169,14 +320,13 @@ class LeSparseNet(nn.Sequential):
         # Add Linear layers
         input_size = np.prod(current_input_shape)
         for i in range(len(linear_n)):
-            if use_dendrites:
+            if use_dendrites and i==0:
                 add_sparse_dendrite_layer(
                     network=self,
                     suffix=i + 1,
                     in_dim=input_size,
                     out_dim=linear_n[i],
-                    dpc=self.dpc,
-                    threshold=2.,
+                    dendrites_per_neuron=self.dpc,
                     use_batch_norm=use_batch_norm,
                     weight_sparsity=linear_weight_percent_on[i],
                     percent_on=linear_activity_percent_on[i],

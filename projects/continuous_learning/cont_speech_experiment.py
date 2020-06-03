@@ -323,8 +323,7 @@ class ContinuousSpeechExperiment(object):
         else:
             loader = self.validation_loader
 
-        ret = evaluate_model(self.model, loader, self.device,
-                             combine_data=self.combine_xy)
+        ret = evaluate_model(self.model, loader, self.device)
         ret["mean_accuracy"] = 100.0 * ret["mean_accuracy"]
 
         entropy = self.entropy()
