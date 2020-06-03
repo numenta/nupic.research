@@ -39,7 +39,10 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
-from nupic.research.support.ray_utils import get_last_checkpoint
+from nupic.research.support.ray_utils import (
+    get_last_checkpoint,
+    register_torch_serializers,
+)
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -83,6 +86,8 @@ class ImagenetTrainable(Trainable):
             f"_setup: trial={self._trial_info.trial_name}({self.iteration}), "
             f"config={config}")
 
+        self._validate_immediately = -1 in config.get("epochs_to_validate", [])
+
         # Get checkpoint file to restore the training from
         self.restore_checkpoint_file = config.pop("restore_checkpoint_file", None)
 
@@ -122,6 +127,18 @@ class ImagenetTrainable(Trainable):
                         DONE: True
                     }
 
+                if self._iteration == 0 and self._validate_immediately:
+                    self.logger.debug("Validating before any training:")
+                    status = []
+                    for w in self.procs:
+                        status.append(w.validate.remote())
+
+                    if ray_utils.check_for_failure(status):
+                        results = ray.get(status)
+                        ret = self.experiment_class.aggregate_validation_results(
+                            results)
+                        self.logger.info(ret)
+
             status = []
             for w in self.procs:
                 status.append(w.run_epoch.remote())
@@ -132,6 +149,7 @@ class ImagenetTrainable(Trainable):
                 results = ray.get(status)
 
                 ret = self.experiment_class.aggregate_results(results)
+                self.logger.info(ret)
                 self._process_result(ret)
 
                 # Check if we should stop the experiment
@@ -340,6 +358,9 @@ def run(config):
     # Connect to ray
     address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
     ray.init(address=address, local_mode=config.get("local_mode", False))
+
+    # Register serializer and deserializer - needed when logging arrays and tensors.
+    register_torch_serializers()
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]

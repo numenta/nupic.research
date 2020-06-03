@@ -104,11 +104,12 @@ def record_tf_values(result, path, step, num_hist_bins=None):
                 plot_type = value.pop("plot_type", None)
                 edit_axes_func = value.pop("edit_axes_func", lambda x: x)
 
-                if not hasattr(sns, plot_type):
+                if plot_type is None or not hasattr(sns, plot_type):
                     continue
 
                 # Plot seaborn plot.
                 plot_type = getattr(sns, plot_type)
+                plt.clf()
                 sns.set(**config)
                 ax = plot_type(**value)
                 edit_axes_func(ax)
