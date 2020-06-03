@@ -31,8 +31,21 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+<<<<<<< HEAD
 from exp_lesparse import LeSparseNet
 from nupic.research.frameworks.continuous_learning.utils import train_model
+=======
+<<<<<<< HEAD
+# from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
+from exp_lesparse import LeSparseNet
+from fb_sparsenet import FBNet
+
+=======
+from exp_lesparse import LeSparseNet
+from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
+from nupic.research.frameworks.continuous_learning.utils import train_model
+>>>>>>> 425201eeb54fa5b7c0617948ef7c7f5ff2942d8b
+>>>>>>> 7825b8032553c7ddee9ee27bed75eae964c33ed6
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
@@ -119,7 +132,12 @@ class ContinuousSpeechExperiment(object):
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
 
+<<<<<<< HEAD
         elif self.model_type == "fb_CNN":  # not yet finalized
+=======
+<<<<<<< HEAD
+        elif self.model_type == "fb_CNN":
+>>>>>>> 7825b8032553c7ddee9ee27bed75eae964c33ed6
             model = FBNet(input_shape=config.get("input_shape", (1, 32, 32)),
                           cnn_out_channels=config["cnn_out_channels"],
                           cnn_pct_on=config["cnn_percent_on"],
@@ -143,6 +161,11 @@ class ContinuousSpeechExperiment(object):
             )
             self.combine_xy = True
 
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> 425201eeb54fa5b7c0617948ef7c7f5ff2942d8b
+>>>>>>> 7825b8032553c7ddee9ee27bed75eae964c33ed6
         else:
             raise RuntimeError("Unknown model type: " + self.model_type)
 
