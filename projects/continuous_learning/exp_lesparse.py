@@ -320,7 +320,7 @@ class LeSparseNet(nn.Sequential):
         # Add Linear layers
         input_size = np.prod(current_input_shape)
         for i in range(len(linear_n)):
-            if use_dendrites and i==0:
+            if use_dendrites and i == 0:
                 add_sparse_dendrite_layer(
                     network=self,
                     suffix=i + 1,

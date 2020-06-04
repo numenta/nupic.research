@@ -87,7 +87,7 @@ class DendriteOutput(nn.Module):
                                                       dendrites_per_unit * out_dim))
         self.bias = torch.nn.Parameter(torch.Tensor(out_dim))
         # for stability - will integrate separate weight init. later
-        nn.init.xavier_normal_(self.weight)
+        nn.init.kaiming_uniform_(self.weight)
         self.bias.data.fill_(0.)
 
     def forward(self, x):
@@ -151,9 +151,12 @@ class DendriteLayer(nn.Module):
         )
         self.act_fun.k = 1
 
-    def forward(self, x):
+    def forward(self, x, y=None):
         batch_size = x.shape[0]
         out0 = self.input(x)
+        out0 = F.relu(out0)
+        if y is not None:
+            out0 = F.relu(out0) * y
         with torch.no_grad():
             out0_ = out0.reshape(batch_size, self.dendrites_per_neuron, self.out_dim, 1)
 

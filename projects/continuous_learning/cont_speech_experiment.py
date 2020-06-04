@@ -39,7 +39,6 @@ from exp_lesparse import LeSparseNet
 from fb_sparsenet import FBNet
 
 from exp_lesparse import LeSparseNet
-from nupic.research.frameworks.continuous_learning.k_winners import new_epoch, per_epoch
 from nupic.research.frameworks.continuous_learning.utils import train_model
 
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
