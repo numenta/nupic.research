@@ -112,6 +112,8 @@ class ImagenetExperiment:
             - val_dir: Dataset validation data relative path
             - val_batch_size: Validation batch size
             - workers: how many data loading processes to use
+            - train_loader_drop_last: Whether to skip last batch if it is
+                                      smaller than the batch size
             - num_classes: Limit the dataset size to the given number of classes
             - model_class: Model class. Must inherit from "torch.nn.Module"
             - model_args: model model class arguments passed to the constructor
@@ -342,6 +344,7 @@ class ImagenetExperiment:
             num_workers=config.get("workers", 0),
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
+            drop_last=config.get("train_loader_drop_last", False),
         )
 
     @classmethod
