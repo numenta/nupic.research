@@ -29,3 +29,5 @@ from .rezero_weights import RezeroWeights
 from .update_boost_strength import UpdateBoostStrength
 from .knowledge_distillation import KnowledgeDistillation
 from .maxup import MaxupStandard, MaxupPerSample
+from .log_every_loss import LogEveryLoss
+from .log_every_learning_rate import LogEveryLearningRate
