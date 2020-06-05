@@ -35,6 +35,9 @@ class LogEveryLoss:
                        ImagenetExperiment):
         pass
 
+    These numbers are stored on the GPU until the end of the epoch. If every
+    kilobyte of GPU memory is being used by the experiment, this could result in
+    running out of memory.
     """
     def setup_experiment(self, config):
         super().setup_experiment(config)

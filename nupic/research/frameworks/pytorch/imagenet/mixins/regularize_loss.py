@@ -26,6 +26,11 @@ class RegularizeLoss(object):
     """
     Implement the complexity_loss as the sum all module.regularization()
     functions, times some specified scalar.
+
+    This mixin also records the model complexity (the regularization() sum) for
+    each batch. These numbers are stored on the GPU until the end of the epoch.
+    If every kilobyte of GPU memory is being used by the experiment, this could
+    result in running out of memory.
     """
     def setup_experiment(self, config):
         """
