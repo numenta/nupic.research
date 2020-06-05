@@ -36,7 +36,7 @@ __all__ = [
     "auto_init",
 ]
 
-# Find directory of where wandb save it's results.
+# Find directory of where wandb save its results.
 if "WANDB_DIR" in os.environ:
     WANDB_DIR = os.path.join(os.environ["WANDB_DIR"], "wandb")
 else:
@@ -233,7 +233,7 @@ def get_latest_run_config():
 
 def get_latest_run_dir():
 
-    if not WANDB_DIR:
+    if WANDB_DIR is None:
         return None
 
     all_subdirs = []
