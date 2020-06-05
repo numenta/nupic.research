@@ -26,9 +26,8 @@ import warnings
 from copy import deepcopy
 from datetime import datetime
 
-from ray.tune.utils import flatten_dict
-
 import wandb
+from ray.tune.utils import flatten_dict
 
 __all__ = [
     "log",
