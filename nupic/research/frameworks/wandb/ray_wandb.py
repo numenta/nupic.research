@@ -22,12 +22,12 @@
 import json
 import numbers
 import os
+import warnings
 from copy import deepcopy
 from datetime import datetime
 
-from ray.tune.utils import flatten_dict
-
 import wandb
+from ray.tune.utils import flatten_dict
 
 __all__ = [
     "log",
@@ -35,8 +35,11 @@ __all__ = [
     "auto_init",
 ]
 
-# TODO: Add check for WANDB_DIR in `environ`
-WANDB_DIR = os.path.join(os.environ["WANDB_DIR"], "wandb")
+# Find directory of where wandb save its results.
+if "WANDB_DIR" in os.environ:
+    WANDB_DIR = os.path.join(os.environ["WANDB_DIR"], "wandb")
+else:
+    WANDB_DIR = None
 CONFIG_NAME = "ray_wandb_config.json"
 
 
@@ -44,11 +47,15 @@ def auto_init():
     """Auto init to last run."""
     try:
         latest_config = get_latest_run_config()
-        wandb.init(**latest_config)
+        if latest_config:
+            wandb.init(**latest_config)
+        else:
+            warnings.warn("Unable to load and init wandb config from last run.")
 
         # Save the config to the latest run directory.
-        latest_run = get_latest_run_dir()
-        save_wandb_config(latest_config, run_dir=latest_run)
+        latest_run_dir = get_latest_run_dir()
+        if latest_run_dir and latest_config:
+            save_wandb_config(latest_config, run_dir=latest_run_dir)
 
     except FileNotFoundError:
         print("Unable to init wandb from last run.")
@@ -163,7 +170,8 @@ class WandbLogger(wandb.ray.WandbLogger):
 
         # Save the config to the latest run directory.
         latest_run = get_latest_run_dir()
-        save_wandb_config(wandb_config, run_dir=latest_run)
+        if latest_run:
+            save_wandb_config(wandb_config, run_dir=latest_run)
 
         self.result_to_time_series_fn = self.config["env_config"].get(
             "result_to_time_series_fn", None)
@@ -212,6 +220,9 @@ class WandbLogger(wandb.ray.WandbLogger):
 def get_latest_run_config():
 
     latest_run = get_latest_run_dir()
+    if latest_run:
+        return None
+
     latest_run = os.path.join(latest_run, CONFIG_NAME)
     with open(latest_run, "r") as f:
         ray_wandb_config = json.load(f)
@@ -220,6 +231,9 @@ def get_latest_run_config():
 
 
 def get_latest_run_dir():
+
+    if WANDB_DIR is None:
+        return None
 
     all_subdirs = []
     for d in os.listdir(WANDB_DIR):
