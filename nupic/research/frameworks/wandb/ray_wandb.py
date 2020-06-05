@@ -51,7 +51,7 @@ def auto_init():
         if latest_config:
             wandb.init(**latest_config)
         else:
-            warnings.warn("Unable to load and init config from last run.")
+            warnings.warn("Unable to load and init wandb config from last run.")
 
         # Save the config to the latest run directory.
         latest_run_dir = get_latest_run_dir()
