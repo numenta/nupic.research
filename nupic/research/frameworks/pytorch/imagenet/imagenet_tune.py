@@ -115,6 +115,7 @@ class ImagenetTrainable(Trainable):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
             # Check if restore checkpoint file fulfills the stop criteria on first run
+            initial_val_result = None
             if self._first_run:
                 self._first_run = False
                 if self._restored and self._should_stop():
@@ -127,6 +128,10 @@ class ImagenetTrainable(Trainable):
                         DONE: True
                     }
 
+                # This initial validation would be simpler if it were in the
+                # ImagenetExperiment, but doing it here makes it possible to log
+                # the validation results immediately rather than waiting until
+                # the end of the first epoch.
                 if self._iteration == 0 and self._validate_immediately:
                     self.logger.debug("Validating before any training:")
                     status = []
@@ -135,9 +140,10 @@ class ImagenetTrainable(Trainable):
 
                     if ray_utils.check_for_failure(status):
                         results = ray.get(status)
-                        ret = self.experiment_class.aggregate_validation_results(
-                            results)
-                        self.logger.info(ret)
+                        initial_val_result = (
+                            self.experiment_class.aggregate_validation_results(
+                                results))
+                        self.logger.info(initial_val_result)
 
             status = []
             for w in self.procs:
@@ -149,7 +155,11 @@ class ImagenetTrainable(Trainable):
                 results = ray.get(status)
 
                 ret = self.experiment_class.aggregate_results(results)
-                self.logger.info(ret)
+                if initial_val_result is not None:
+                    ret["extra_val_results"].insert(0, (0, initial_val_result))
+                self.logger.info(
+                    self.experiment_class.get_printable_result(ret)
+                )
                 self._process_result(ret)
 
                 # Check if we should stop the experiment

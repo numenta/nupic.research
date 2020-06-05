@@ -26,6 +26,11 @@ class RegularizeLoss(object):
     """
     Implement the complexity_loss as the sum all module.regularization()
     functions, times some specified scalar.
+
+    This mixin also records the model complexity (the regularization() sum) for
+    each batch. These numbers are stored on the GPU until the end of the epoch.
+    If every kilobyte of GPU memory is being used by the experiment, this could
+    result in running out of memory.
     """
     def setup_experiment(self, config):
         """
@@ -50,6 +55,9 @@ class RegularizeLoss(object):
             if config.get("downscale_reg_with_training_set", False)
             else 1
         )
+
+        self.reg_scalar_history = []
+        self.model_complexity_history = []
 
         # Cache these floats
         self.reg_ramp_window_length = self.pct_end_ramp - self.pct_begin_ramp
@@ -81,22 +89,58 @@ class RegularizeLoss(object):
         pct = ((epoch * self.total_batches + batch_idx)
                / (epochs_per_cycle * self.total_batches))
         self.reg_scalar = self._compute_reg_scalar(pct)
+        self.reg_scalar_history.append(self.reg_scalar)
 
     def complexity_loss(self, model):
         c_loss = super().complexity_loss(model)
         assert model is self.model
         reg = torch.stack([module.regularization()
                            for module in self._regularized_modules]).sum()
+        if self.model.training:
+            self.model_complexity_history.append(reg.detach().clone())
         reg *= self.reg_scalar * self.reg_coefficient
         c_loss = (c_loss + reg
                   if c_loss is not None
                   else reg)
         return c_loss
 
+    def run_epoch(self):
+        result = super().run_epoch()
+        result["reg_scalar_history"] = self.reg_scalar_history
+        self.reg_scalar_history = []
+
+        result["model_complexity_history"] = torch.stack(
+            self.model_complexity_history).cpu().tolist()
+        self.model_complexity_history = []
+
+        return result
+
+    @classmethod
+    def expand_result_to_time_series(cls, result):
+        result_by_timestep = super().expand_result_to_time_series(result)
+
+        end = result["timestep"]
+        start = end - len(result["reg_scalar_history"])
+        for t, rs, c in zip(range(start, end),
+                            result["reg_scalar_history"],
+                            result["model_complexity_history"]):
+            result_by_timestep[t].update(
+                complexity_loss_scalar=rs,
+                model_complexity=c,
+            )
+
+        return result_by_timestep
+
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("RegularizeLoss: initialization")
         eo["complexity_loss"].append("RegularizeLoss: Compute")
-        eo["pre_batch"].append("RegularizeLoss: update regularization scalar")
+        eo["pre_batch"].append("RegularizeLoss: update and log "
+                               "regularization scalar")
+        eo["run_epoch"].append("RegularizeLoss: add regularization weight log "
+                               "to result dict")
+        eo["expand_result_to_time_series"].append(
+            "RegularizeLoss: regularization scalar and model complexity"
+        )
         return eo
