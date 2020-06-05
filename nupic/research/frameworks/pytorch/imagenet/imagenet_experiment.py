@@ -23,8 +23,10 @@ import logging
 import multiprocessing
 import sys
 import time
+from collections import defaultdict
 from pprint import pformat
 
+import numpy as np
 import ray.services
 import ray.util.sgd.utils as ray_utils
 import torch
@@ -168,6 +170,10 @@ class ImagenetExperiment:
             - epochs_to_validate: list of epochs to run validate(). A -1 asks
                                   to run validate before any training occurs.
                                   Default: last three epochs.
+            - extra_validations_per_epoch: number of additional validations to
+                                           perform mid-epoch. Additional
+                                           validations are distributed evenly
+                                           across training batches.
             - launch_time: time the config was created (via time.time). Used to report
                            wall clock time until the first batch is done.
                            Default: time.time() in this setup_experiment().
@@ -257,8 +263,6 @@ class ImagenetExperiment:
         self.num_classes = config.get("num_classes", 1000)
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
-        self.epochs_to_validate = config.get("epochs_to_validate",
-                                             range(self.epochs - 3, self.epochs + 1))
         self.current_epoch = 0
 
         # Get initial batch size
@@ -273,6 +277,35 @@ class ImagenetExperiment:
         self.train_loader = self.create_train_dataloader(config)
         self.val_loader = self.create_validation_dataloader(config)
         self.total_batches = len(self.train_loader)
+
+        self.epochs_to_validate = config.get("epochs_to_validate",
+                                             range(self.epochs - 3,
+                                                   self.epochs + 1))
+
+        extra_validations = config.get("extra_validations_per_epoch", 0)
+        batches_to_validate = np.linspace(
+            min(self.total_batches, self.batches_in_epoch),
+            0,
+            1 + extra_validations,
+            endpoint=False
+        )[::-1].round().astype("int").tolist()
+        self.additional_batches_to_validate = batches_to_validate[:-1]
+        if extra_validations > 0:
+            self.logger.info(
+                f"Extra validations per epoch: {extra_validations}, "
+                f"batch indices: {self.additional_batches_to_validate}")
+
+        # Used for logging. Conceptually, it is a version number for the model's
+        # parameters. By default, this is the elapsed number of batches that the
+        # model has been trained on. Experiments may also increment this on
+        # other events like model prunings. When validation is performed after a
+        # training batch, the validation results are assigned to the next
+        # timestep after that training batch, since it was performed on the
+        # subsequent version of the parameters.
+        self.current_timestep = 0
+
+        # A list of [(timestep, result), ...] for the current epoch.
+        self.extra_val_results = []
 
         # Configure learning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
@@ -397,7 +430,7 @@ class ImagenetExperiment:
             complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
-            post_batch_callback=self.post_batch,
+            post_batch_callback=self.post_batch_wrapper,
             transform_to_device_fn=self.transform_data_to_device,
         )
 
@@ -418,7 +451,9 @@ class ImagenetExperiment:
             }
 
         ret.update(
+            timestep=self.current_timestep,
             learning_rate=self.get_lr()[0],
+            extra_val_results=self.extra_val_results,
         )
 
         if self.rank == 0:
@@ -426,6 +461,7 @@ class ImagenetExperiment:
             self.logger.debug("---------- End of run epoch ------------")
             self.logger.debug("")
 
+        self.extra_val_results = []
         self.current_epoch += 1
         return ret
 
@@ -457,6 +493,24 @@ class ImagenetExperiment:
                               self.rank, self.current_epoch, current_batch,
                               total_batches, loss, self.get_lr(), num_images)
             self.logger.debug("Timing: %s", time_string)
+
+    def post_batch_wrapper(self, model, loss, batch_idx, *args, **kwargs):
+        """
+        Perform the post_batch updates, then maybe validate.
+
+        This method exists because post_batch is designed to be overridden, and
+        validation needs to wait until after all post_batch overrides have run.
+        """
+        self.post_batch(model, loss, batch_idx, *args, **kwargs)
+        self.current_timestep += 1
+        validate = (batch_idx in self.additional_batches_to_validate
+                    and self.current_epoch in self.epochs_to_validate)
+        if validate:
+            result = self.validate()
+            self.extra_val_results.append(
+                (self.current_timestep, result)
+            )
+            self.model.train()
 
     def post_epoch(self):
         self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s",
@@ -504,7 +558,19 @@ class ImagenetExperiment:
             A single result dict with results aggregated.
         :rtype: dict
         """
-        return cls.aggregate_validation_results(results)
+        ret = cls.aggregate_validation_results(results)
+
+        extra_val_aggregated = []
+        for i in range(len(ret["extra_val_results"])):
+            timestep = ret["extra_val_results"][i][0]
+            val_results = [process_result["extra_val_results"][i][1]
+                           for process_result in results]
+            extra_val_aggregated.append(
+                (timestep, aggregate_eval_results(val_results))
+            )
+        ret["extra_val_results"] = extra_val_aggregated
+
+        return ret
 
     @classmethod
     def aggregate_validation_results(cls, results):
@@ -529,13 +595,57 @@ class ImagenetExperiment:
         result.update(aggregate_eval_results(results))
         return result
 
+    @classmethod
+    def get_printable_result(cls, result):
+        """
+        Return a stripped down version of result that has its large data structures
+        removed so that the result can be printed to the console.
+        """
+        keys = ["total_correct", "total_tested", "mean_loss", "mean_accuracy",
+                "learning_rate", "timestep"]
+        return {key: result[key]
+                for key in keys
+                if key in result}
+
+    @classmethod
+    def expand_result_to_time_series(cls, result):
+        """
+        Given the result of a run_epoch call, returns a mapping from timesteps to
+        results. The mapping is stored as a dict so that subclasses and mixins
+        can easily add data to it.
+
+        Result keys are converted from Ray Tune requirements to better names,
+        and the keys are filtered to those that make useful charts.
+
+        :return: defaultdict mapping timesteps to result dicts
+        """
+        result_by_timestep = defaultdict(dict)
+
+        k_mapping = {
+            "mean_loss": "validation_loss",
+            "mean_accuracy": "validation_accuracy",
+            "learning_rate": "learning_rate",
+            "complexity_loss": "complexity_loss",
+        }
+        val_results = (result["extra_val_results"]
+                       + [(result["timestep"], result)])
+        for timestep, val_result in val_results:
+            result_by_timestep[timestep].update({
+                k2: val_result[k1]
+                for k1, k2 in k_mapping.items()
+                if k1 in val_result
+            })
+
+        return result_by_timestep
+
     def get_state(self):
         """
         Get experiment serialized state as a dictionary of  byte arrays
         :return: dictionary with "model", "optimizer" and "lr_scheduler" states
         """
         state = {
-            "current_epoch": self.current_epoch
+            "current_epoch": self.current_epoch,
+            "current_timestep": self.current_timestep,
         }
 
         # Save state into a byte array to avoid ray's GPU serialization issues
@@ -598,6 +708,11 @@ class ImagenetExperiment:
                 self.current_epoch = last_epoch // steps_per_epoch
             else:
                 self.current_epoch = last_epoch
+
+        if "current_timestep" in state:
+            self.current_timestep = state["current_timestep"]
+        else:
+            self.current_timestep = self.total_batches * self.current_epoch
 
     def stop_experiment(self):
         if self.distributed:
@@ -662,5 +777,9 @@ class ImagenetExperiment:
             aggregate_results=["ImagenetExperiment.aggregate_results"],
             aggregate_validation_results=[
                 "ImagenetExperiment.aggregate_validation_results"
+            ],
+            get_printable_result=["ImagenetExperiment.get_printable_result"],
+            expand_result_to_time_series=[
+                "ImagenetExperiment: validation results"
             ],
         )
