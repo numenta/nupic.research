@@ -708,6 +708,8 @@ class ImagenetExperiment:
 
         if "current_timestep" in state:
             self.current_timestep = state["current_timestep"]
+        else:
+            self.current_timestep = self.total_batches * self.current_epoch
 
     def stop_experiment(self):
         if self.distributed:
