@@ -109,16 +109,17 @@ class WandbLogger(wandb.ray.WandbLogger):
     ray.tune config. For example,
 
     ```
+    # Be sure to set `WANDB_API_KEY` in environment variables.
     from ray.tune.logger import DEFAULT_LOGGERS
     tune.run(
         MyTrianable,
         loggers=DEFAULT_LOGGERS + [WandbLogger],
         config={
-            "monitor": True,
             "env_config": {
                 "wandb": {
                     "project": "my-project-name",
-                    "monitor_gym": True
+                    "name": "my-exp-name"
+                    # "group": <optional and otherwise filled in with current datetime>
                 },
                 # Optional
                 "result_to_time_series_fn":
