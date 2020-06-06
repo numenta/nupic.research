@@ -377,7 +377,7 @@ class ImagenetExperiment:
             num_workers=config.get("workers", 0),
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
-            drop_last=config.get("train_loader_drop_last", False),
+            drop_last=config.get("train_loader_drop_last", True),
         )
 
     @classmethod
