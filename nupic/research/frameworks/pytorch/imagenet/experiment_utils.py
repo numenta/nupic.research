@@ -271,3 +271,10 @@ def get_free_port():
         # removed socket.SO_REUSEADDR arg
         # TCP error due to two process with same rank in same port - maybe a fix
         return s.getsockname()[1]
+
+
+def get_node_ip_address():
+    """
+    Determine the IP address of the local node.
+    """
+    return socket.gethostbyname(socket.getfqdn())
