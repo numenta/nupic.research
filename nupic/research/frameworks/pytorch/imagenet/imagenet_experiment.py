@@ -20,17 +20,15 @@
 import copy
 import io
 import logging
-import multiprocessing
 import sys
 import time
 from collections import defaultdict
 from pprint import pformat
 
 import numpy as np
-import ray.services
-import ray.util.sgd.utils as ray_utils
 import torch
 import torch.distributed as dist
+from torch import multiprocessing
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
@@ -45,6 +43,8 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_optimizer,
     create_train_dataset,
     create_validation_dataset,
+    get_free_port,
+    get_node_ip_address,
 )
 from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
@@ -270,8 +270,7 @@ class ImagenetExperiment:
 
         # CUDA runtime does not support the fork start method.
         # See https://pytorch.org/docs/stable/notes/multiprocessing.html
-        if torch.cuda.is_available():
-            multiprocessing.set_start_method("spawn")
+        multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
         self.train_loader = self.create_train_dataloader(config)
@@ -746,12 +745,12 @@ class ImagenetExperiment:
         return [p["weight_decay"] for p in self.optimizer.param_groups]
 
     def get_node_ip(self):
-        """Returns the IP address of the current ray node."""
-        return ray.services.get_node_ip_address()
+        """Returns the IP address of the current node."""
+        return get_node_ip_address()
 
     def get_free_port(self):
-        """Returns free TCP port in the current ray node"""
-        return ray_utils.find_free_port()
+        """Returns free TCP port in the current node"""
+        return get_free_port()
 
     @classmethod
     def get_execution_order(cls):
