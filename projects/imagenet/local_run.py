@@ -31,12 +31,12 @@ from functools import partial
 import torch
 import torch.multiprocessing as multiprocessing
 
-from nupic.research.frameworks.pytorch.imagenet import imagenet_run
 from nupic.research.frameworks.pytorch.imagenet import (
-    mixins, ImagenetExperiment
+    ImagenetExperiment,
+    imagenet_run,
+    mixins,
 )
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
-
 
 multiprocessing.set_start_method("spawn", force=True)
 
@@ -44,10 +44,8 @@ multiprocessing.set_start_method("spawn", force=True)
 def insert_experiment_mixin(config, mixin):
     experiment_class = config["experiment_class"]
 
-
     class Cls(mixin, experiment_class):
         pass
-
 
     Cls.__name__ = f"{mixin.__name__}{experiment_class.__name__}"
     config["experiment_class"] = Cls

@@ -23,9 +23,7 @@ import os
 
 import ray
 import torch
-from ray.tune.suggest.variant_generator import (
-    generate_variants, format_vars
-)
+from ray.tune.suggest.variant_generator import format_vars, generate_variants
 from ray.tune.trial_runner import _TuneFunctionDecoder
 
 

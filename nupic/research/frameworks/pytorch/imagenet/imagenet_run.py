@@ -30,7 +30,6 @@ import torch.multiprocessing as mp
 from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 
-
 # Disable HDF5 locking
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 

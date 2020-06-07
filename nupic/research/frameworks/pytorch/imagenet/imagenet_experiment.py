@@ -20,7 +20,6 @@
 import copy
 import io
 import logging
-from torch import multiprocessing
 import sys
 import time
 from collections import defaultdict
@@ -29,6 +28,7 @@ from pprint import pformat
 import numpy as np
 import torch
 import torch.distributed as dist
+from torch import multiprocessing
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
