@@ -21,8 +21,6 @@ import collections
 import os
 import pickle
 import time
-import uuid
-from datetime import datetime
 
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -105,8 +103,6 @@ def run(config, logger=None, on_checkpoint=None):
     num_gpus = config.get("num_gpus", 0)
     num_cpus = config.get("num_cpus", 1)
     experiment_class = config.get("experiment_class", ImagenetExperiment)
-    experiment_tag = config.pop("experiment_tag", None)
-    experiment_id = uuid.uuid4().hex
 
     # Determine the number of distributed processes based on the number GPUs and CPUs
     if num_gpus > 0:
@@ -125,7 +121,6 @@ def run(config, logger=None, on_checkpoint=None):
     worker_results = collections.defaultdict(list)
     results = []
     pending_workers = world_size
-    t1 = t0 = time.time()
     while pending_workers > 0:
         item = queue.get()
         if item is None:
@@ -140,29 +135,16 @@ def run(config, logger=None, on_checkpoint=None):
             # Aggregated worker results at the end of each epoch
             epoch_result = worker_results[epoch]
             if len(epoch_result) == world_size:
-                t2 = time.time()
                 epoch_result = experiment_class.aggregate_results(epoch_result)
-
-                # Update ray.tune fields
-                now = datetime.today()
-                epoch_result.update(training_iteration=epoch,
-                                    time_this_iter_s=t2 - t1,
-                                    time_total_s=t2 - t0,
-                                    date=now.strftime("%Y-%m-%d_%H-%M-%S"),
-                                    timestamp=int(time.mktime(now.timetuple())),
+                epoch_result.update(epoch=epoch,
+                                    timestamp=time.time(),
                                     pid=os.getpid(),
                                     hostname=os.uname()[1],
-                                    config=config,
-                                    experiment_tag=experiment_tag,
-                                    experiment_id=experiment_id,
-                                    neg_mean_loss=-epoch_result["mean_loss"],
-                                    timesteps_total=epoch_result.get("timestep", 0)
                                     )
                 # Log epoch result
                 results.append(epoch_result)
                 if logger is not None:
                     logger(epoch_result)
-                t1 = t2
 
     # Wait until all worker processes terminate
     ctx.join()
