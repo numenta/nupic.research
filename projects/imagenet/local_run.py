@@ -25,6 +25,8 @@ import argparse
 import copy
 import os
 import tempfile
+import time
+import uuid
 from datetime import datetime
 from functools import partial
 
@@ -65,6 +67,8 @@ def create_trials(config):
     timestamp = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
 
     for variant in trials:
+        variant["experiment_id"] = uuid.uuid4().hex
+
         # Create local dir
         local_dir = os.path.join(
             os.path.expanduser(variant["local_dir"]), variant["name"])
@@ -95,23 +99,66 @@ def save_checkpoint(config, epoch, checkpoint):
         pickle.dump(checkpoint, f)
 
 
-def run_trial(trial_config):
+def log_results(logger, config, results):
+    # Update ray.tune fields
+    timestamp = results["timestamp"]
+    results["config"] = config
+    results["experiment_id"] = config["experiment_id"]
+    results["experiment_tag"] = config["experiment_tag"]
+    results["training_iteration"] = results.pop("epoch")
+    results["neg_mean_loss"] = results["mean_loss"]
+    results["timesteps_total"] = results.get("timestep", 0)
+    results["timestamp"] = int(timestamp)
+    results["date"] = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d_%H-%M-%S")
+    results["time_this_iter_s"] = timestamp - logger.last_timestamp
+    results["time_total_s"] = timestamp - logger.start_timestamp
+    logger.on_result(results)
+    logger.last_timestamp = timestamp
+
+
+def run_trial(config):
     """
     Run a single trial configuration
     """
     # Configure ray.tune loggers
     from ray.tune.logger import UnifiedLogger
-    logger = UnifiedLogger(config=trial_config,
-                           logdir=trial_config["logdir"],
-                           loggers=trial_config.get("loggers", None))
+    logger = UnifiedLogger(config=config,
+                           logdir=config["logdir"],
+                           loggers=config.get("loggers", None))
+    logger.last_timestamp = logger.start_timestamp = time.time()
 
-    result = imagenet_run.run(config=trial_config,
-                              logger=logger.on_result,
-                              on_checkpoint=partial(save_checkpoint, trial_config))
+    result = imagenet_run.run(config=config,
+                              logger=partial(log_results, logger, config),
+                              on_checkpoint=partial(save_checkpoint, config))
 
     logger.flush()
     logger.close()
     return result
+
+
+def main(args):
+    # Get configuration values
+    config = copy.deepcopy(CONFIGS[args.name])
+
+    # Merge configuration with command line arguments
+    config.update(vars(args))
+
+    if "profile" in args and args.profile:
+        insert_experiment_mixin(config, mixins.Profile)
+
+    if "profile_autograd" in args and args.profile_autograd:
+        insert_experiment_mixin(config, mixins.ProfileAutograd)
+
+    if "create_sigopt" in args:
+        s = SigOptImagenetExperiment()
+        s.create_experiment(config["sigopt_config"])
+        print(
+            "Created experiment: https://app.sigopt.com/experiment/"
+            + str(s.experiment_id))
+
+    results = []
+    for trial in create_trials(config):
+        results.append(run_trial(trial))
 
 
 if __name__ == "__main__":
@@ -163,26 +210,4 @@ if __name__ == "__main__":
     if "name" not in args:
         parser.print_help()
         exit(1)
-
-    # Get configuration values
-    config = copy.deepcopy(CONFIGS[args.name])
-
-    # Merge configuration with command line arguments
-    config.update(vars(args))
-
-    if "profile" in args and args.profile:
-        insert_experiment_mixin(config, mixins.Profile)
-
-    if "profile_autograd" in args and args.profile_autograd:
-        insert_experiment_mixin(config, mixins.ProfileAutograd)
-
-    if "create_sigopt" in args:
-        s = SigOptImagenetExperiment()
-        s.create_experiment(config["sigopt_config"])
-        print(
-            "Created experiment: https://app.sigopt.com/experiment/"
-            + str(s.experiment_id))
-
-    results = []
-    for trial in create_trials(config):
-        results.append(run_trial(trial))
+    main(args)
