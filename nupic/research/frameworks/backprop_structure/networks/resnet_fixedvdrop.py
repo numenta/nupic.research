@@ -21,10 +21,9 @@ DEFAULT_ALPHA = (1 / 8) ** 2
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1,
             alpha=DEFAULT_ALPHA):
     """3x3 convolution with padding"""
-    assert groups == 1
     return FixedVDropConv2d(
         in_planes, out_planes, alpha=alpha, kernel_size=3, stride=stride,
-        padding=dilation, bias=False, dilation=dilation)
+        padding=dilation, groups=groups, dilation=dilation, bias=False)
 
 
 def conv1x1(in_planes, out_planes, stride=1, alpha=DEFAULT_ALPHA):

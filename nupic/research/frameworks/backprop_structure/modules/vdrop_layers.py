@@ -233,7 +233,7 @@ class FixedVDropConv2d(MaskedConv2d):
             return vdrop_conv_forward(
                 x,
                 lambda: self.weight * self.weight_mask,
-                lambda: self.alpha * (self.weight.pow(2) * self.weight_mask),
+                lambda: self.alpha * (self.weight.square() * self.weight_mask),
                 self.bias, self.stride, self.padding, self.dilation, self.groups,
                 self.tensor_constructor, self.epsilon)
         else:
@@ -265,7 +265,7 @@ def vdrop_linear_forward(x, get_w_mu, get_w_var, bias, tensor_constructor,
     Returns each weight's variance.
     """
     # Compute y_var
-    y = F.linear(x.pow(2), get_w_var())
+    y = F.linear(x.square(), get_w_var())
 
     # If any values are 0, we'll divide by zero on the backward pass.
     # Note that clamping y rather than y.data would use much more memory.
@@ -306,7 +306,7 @@ def vdrop_conv_forward(x, get_w_mu, get_w_var, bias, stride, padding, dilation,
     """
     # Compute y_var.
     y = F.conv2d(
-        x.pow(2), get_w_var(), None, stride, padding, dilation, groups
+        x.square(), get_w_var(), None, stride, padding, dilation, groups
     )
 
     # This handles two possible issues:
