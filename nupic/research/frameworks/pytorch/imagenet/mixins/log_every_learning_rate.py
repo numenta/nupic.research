@@ -23,23 +23,28 @@
 class LogEveryLearningRate:
     """
     Include the learning rate for every batch in the result dict.
+
+    Adjust config["log_timestep_freq"] to reduce the logging frequency.
     """
     def setup_experiment(self, config):
         super().setup_experiment(config)
         self.lr_history = []
         self.momentum_history = []
 
-    def post_batch(self, *args, **kwargs):
-        super().post_batch(*args, **kwargs)
+    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
+                   *args, **kwargs):
+        super().post_batch(model, error_loss, complexity_loss, batch_idx,
+                           *args, **kwargs)
 
-        # Get the lr and momentum from the first param group.
-        for param_group in self.optimizer.param_groups:
-            lr = param_group["lr"]
-            momentum = param_group["momentum"]
-            break
+        if self.should_log_batch(batch_idx):
+            # Get the lr and momentum from the first param group.
+            for param_group in self.optimizer.param_groups:
+                lr = param_group["lr"]
+                momentum = param_group["momentum"]
+                break
 
-        self.lr_history.append(lr)
-        self.momentum_history.append(momentum)
+            self.lr_history.append(lr)
+            self.momentum_history.append(momentum)
 
     def run_epoch(self):
         result = super().run_epoch()
@@ -52,12 +57,11 @@ class LogEveryLearningRate:
         return result
 
     @classmethod
-    def expand_result_to_time_series(cls, result):
-        result_by_timestep = super().expand_result_to_time_series(result)
+    def expand_result_to_time_series(cls, result, config):
+        result_by_timestep = super().expand_result_to_time_series(result,
+                                                                  config)
 
-        elapsed = result["timestep"]
-        for t, lr, momentum in zip(range(elapsed - len(result["lr_history"]),
-                                         elapsed),
+        for t, lr, momentum in zip(cls.get_recorded_timesteps(result, config),
                                    result["lr_history"],
                                    result["momentum_history"]):
             result_by_timestep[t].update(
