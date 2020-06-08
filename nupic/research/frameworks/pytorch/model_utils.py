@@ -126,21 +126,23 @@ def train_model(
 
         optimizer.zero_grad()
         output = model(data)
-        loss = criterion(output, target)
+        error_loss = criterion(output, target)
         del data, target, output
 
-        if complexity_loss_fn is not None:
-            c_loss = complexity_loss_fn(model)
-            if c_loss is not None:
-                loss += c_loss
-            del c_loss
+        complexity_loss = (complexity_loss_fn(model)
+                           if complexity_loss_fn is not None
+                           else None)
 
+        loss = (error_loss + complexity_loss
+                if complexity_loss is not None
+                else error_loss)
         t2 = time.time()
         if use_amp:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
                 scaled_loss.backward()
         else:
             loss.backward()
+        del loss
 
         if freeze_params is not None:
             with torch.no_grad():
@@ -157,9 +159,15 @@ def train_model(
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
                                                               t4 - t3)
-            post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
-                                num_images=num_images, time_string=time_string)
-        del loss
+            post_batch_callback(model=model,
+                                error_loss=error_loss.detach(),
+                                complexity_loss=(complexity_loss.detach()
+                                                 if complexity_loss is not None
+                                                 else None),
+                                batch_idx=batch_idx,
+                                num_images=num_images,
+                                time_string=time_string)
+        del error_loss, complexity_loss
         t0 = time.time()
 
     if progress_bar is not None:
