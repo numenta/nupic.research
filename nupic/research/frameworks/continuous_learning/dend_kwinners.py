@@ -27,23 +27,32 @@ import torch.nn as nn
 
 
 class DKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
+    """ Just enough of the KWinnersBase to be able to put it into
+    an experiment - no concept of duty cycles here, the idea is to do
+    a maxout (i.e. k-winner with k=1) on dendrites per neuron.
+    It uses some awkward matrix reshaping to do this, adapted from
+    "KWinners2DLocal".
 
+    Currently this is only implemented as a linear layer with a mask - see
+    'nupic.research.frameworks.continuous_learning.dendrite_layers'
+
+    :param dendrites_per_neuron: the number of dendrite segments per unit
+    """
     def __init__(
         self,
-        out_dim=10,
-        dpc=3,
+        dendrites_per_neuron=3,
     ):
         super(DKWinnersBase, self).__init__()
 
         self.n = 0
         self.k = 0
         self.k_inference = 0
-        self.dpc = dpc,
+        self.dendrites_per_neuron = dendrites_per_neuron,
 
     def extra_repr(self):
         return (
-            "n={0}, dpc={1},".format(
-                self.n, self.dpc,
+            "n={0}, dendrites_per_neuron={1},".format(
+                self.n, self.dendrites_per_neuron,
             )
         )
 
@@ -53,20 +62,21 @@ class DKWinners(DKWinnersBase):
         self,
         n,
         out_dim,
-        dpc,
+        dendrites_per_neuron,
     ):
         super(DKWinners, self).__init__(
             out_dim=out_dim,
-            dpc=dpc,
+            dendrites_per_neuron=dendrites_per_neuron,
         )
         self.n = n
-        self.k = out_dim  # int(round(n * percent_on))
+        self.k = out_dim
 
-        if type(self.dpc) == tuple:
-            self.dpc = self.dpc[0]
+        if type(self.dendrites_per_neuron) == tuple:
+            # Unexplained bug - need to fix
+            self.dendrites_per_neuron = self.dendrites_per_neuron[0]
 
     def forward(self, x):
-        x = DendriteKWinners.apply(x, self.k, self.dpc)
+        x = DendriteKWinners.apply(x, self.k, self.dendrites_per_neuron)
         return x
 
 
@@ -76,17 +86,14 @@ class DendriteKWinners2d(DKWinnersBase):
         self,
         channels,
         k=1,
-        local=False
     ):
         super(DendriteKWinners2d, self).__init__()
 
         self.channels = channels
-        self.local = local
-        if local:
-            self.k = k
-            self.kwinner_function = DendriteKWinners2dLocal.apply
-        else:
-            self.kwinner_function = DendriteKWinners2dGlobal.apply
+
+        self.k = k
+        # local only
+        self.kwinner_function = DendriteKWinners2dLocal.apply
 
     def forward(self, x):
         if self.n == 0:
@@ -128,11 +135,11 @@ class DendriteKWinners2dLocal(torch.autograd.Function):
 
 class DendriteKWinners(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, out_dim, dpc):
+    def forward(ctx, x, out_dim, dendrites_per_neuron):
 
         k = out_dim
         boosted = x.detach()
-
+        dpc = dendrites_per_neuron  # for flake8 reasons
         # Create a mask that takes the most active out of the N dendrites for each unit
         mask = torch.zeros(boosted.shape[0], out_dim, dpc)
         for k in range(out_dim):

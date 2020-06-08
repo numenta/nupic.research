@@ -23,7 +23,6 @@ import logging
 import os
 import tempfile
 import time
-from functools import partial
 
 import numpy as np
 import torch
@@ -31,16 +30,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from exp_lesparse import LeSparseNet
+from exp_lesparse import LeSparseNet  # temporary LeSparseNet for experimentation
 from nupic.research.frameworks.continuous_learning.utils import train_model
-
-# from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
-from exp_lesparse import LeSparseNet
-from fb_sparsenet import FBNet
-
-from exp_lesparse import LeSparseNet
-from nupic.research.frameworks.continuous_learning.utils import train_model
-
 from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
@@ -126,31 +117,6 @@ class ContinuousSpeechExperiment(object):
                     "consolidated_sparse_weights", False),
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
-
-
-        elif self.model_type == "fb_CNN":
-            model = FBNet(input_shape=config.get("input_shape", (1, 32, 32)),
-                          cnn_out_channels=config["cnn_out_channels"],
-                          cnn_pct_on=config["cnn_percent_on"],
-                          cnn_weight_sparsity=config["cnn_weight_sparsity"],
-                          linear_n=config["linear_n"],
-                          linear_pct_on=config["linear_percent_on"],
-                          linear_weight_sparsity=config["weight_sparsity"],
-                          num_classes=self.num_classes,
-                          boost_strength=config["boost_strength"],
-                          boost_strength_factor=config["boost_strength_factor"],
-                          duty_cycle_period=config["duty_cycle_period"],
-                          k_inference_factor=config["k_inference_factor"],
-                          use_batch_norm=config["use_batch_norm"],
-                          dropout=config.get("dropout", 0.0),
-                          activation_fct_before_max_pool=config.get(
-                "activation_fct_before_max_pool", False),
-                consolidated_sparse_weights=config.get(
-                "consolidated_sparse_weights", False),
-                use_kwinners_local=config.get(
-                "use_kwinner_local", False),
-            )
-            self.combine_xy = True
 
         else:
             raise RuntimeError("Unknown model type: " + self.model_type)
@@ -441,7 +407,8 @@ class ContinuousSpeechExperiment(object):
         data_loader = DataLoader(
             dataset,
             batch_size=self.batch_size,
-            shuffle=True
+            shuffle=True,
+            drop_last=True,
         )
         f.flush()
 
@@ -469,7 +436,8 @@ class ContinuousSpeechExperiment(object):
             qualifiers=[""],
         )
         self.validation_loader = DataLoader(
-            validation_dataset, batch_size=self.batch_size, shuffle=False
+            validation_dataset, batch_size=self.batch_size, shuffle=False,
+            drop_last=True,
         )
 
         self.gen_test_dataset = PreprocessedDataset(
@@ -480,7 +448,8 @@ class ContinuousSpeechExperiment(object):
         )
 
         self.gen_test_loader = DataLoader(
-            self.gen_test_dataset, batch_size=self.batch_size, shuffle=True
+            self.gen_test_dataset, batch_size=self.batch_size, shuffle=True,
+            drop_last=True,
         )
 
         self.train_dataset = PreprocessedDataset(
@@ -491,7 +460,8 @@ class ContinuousSpeechExperiment(object):
         )
 
         self.full_train_loader = DataLoader(
-            self.train_dataset, batch_size=self.batch_size, shuffle=True
+            self.train_dataset, batch_size=self.batch_size, shuffle=True,
+            drop_last=True,
         )
 
         self.test_loader = []
@@ -505,7 +475,8 @@ class ContinuousSpeechExperiment(object):
             )
 
             self.test_loader.append(DataLoader(
-                test_dataset, batch_size=self.batch_size, shuffle=False
+                test_dataset, batch_size=self.batch_size, shuffle=False,
+                drop_last=True,
             ))
 
 

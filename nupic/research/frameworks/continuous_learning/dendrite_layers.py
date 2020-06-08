@@ -24,9 +24,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from nupic.torch.modules import SparseWeights  # , KWinnersBase, KWinners
-from nupic.torch.modules.k_winners import KWinners2d
-from dend_kwinners import DendriteKWinners2d
+from nupic.research.frameworks.continuous_learning.dend_kwinners import (
+    DendriteKWinners2d,
+)
+from nupic.torch.modules import SparseWeights
 
 
 class DendriteInput(nn.Module):
@@ -65,8 +66,9 @@ class DendriteInput(nn.Module):
         return torch.clamp(x, min=self.threshold)
 
     def forward(self, x):
+        """ Note this only returns the linear output """
         out = self.linear(x)
-        return out  # self.act_fun(out)
+        return out
 
 
 class DendriteOutput(nn.Module):
@@ -125,17 +127,21 @@ class DendriteLayer(nn.Module):
 
 
     """
+
     def __init__(self,
                  in_dim,
                  out_dim,
                  dendrites_per_neuron,
                  weight_sparsity=0.2,
+                 act_fun_type=None,
                  ):
         super(DendriteLayer, self).__init__()
 
         self.dendrites_per_neuron = dendrites_per_neuron
         self.n_dendrites = out_dim * self.dendrites_per_neuron
         self.out_dim = out_dim
+
+        self.act_fun_type = act_fun_type
 
         self.input = DendriteInput(
             in_dim=in_dim,
@@ -144,26 +150,49 @@ class DendriteLayer(nn.Module):
         )
         self.output = DendriteOutput(out_dim, self.dendrites_per_neuron)
 
-        self.act_fun = DendriteKWinners2d(
-            channels=self.out_dim,
-            k=1,
-            local=True,
-        )
-        self.act_fun.k = 1
+        if self.act_fun_type == "kwinner":
+            self.act_fun = DendriteKWinners2d(
+                channels=self.out_dim,
+                k=1,
+                local=True,
+            )
+            self.act_fun.k = 1
+        else:
+            self.act_fun = torch.sigmoid
 
     def forward(self, x, y=None):
+        if self.act_fun_type is None:
+            return self.forward_kwinner(x, y)
+        else:
+            return self.forward_sigmoid(x, y)
+
+    def forward_kwinner(self, x, y=None):
         batch_size = x.shape[0]
         out0 = self.input(x)
-        out0 = F.relu(out0)
-        if y is not None:
-            out0 = F.relu(out0) * y
-        with torch.no_grad():
-            out0_ = out0.reshape(batch_size, self.dendrites_per_neuron, self.out_dim, 1)
 
-        out1 = self.act_fun(out0_)
+        if y is not None:
+            out0 = out0 * y
+
+        with torch.no_grad():
+            out0 = out0.reshape(batch_size, self.dendrites_per_neuron, self.out_dim, 1)
+
+        out1 = self.act_fun(out0)
+
         with torch.no_grad():
             out1_ = torch.squeeze(out1)
         out1_ = out1_.reshape(batch_size, self.out_dim * self.dendrites_per_neuron)
 
         out2 = self.output(out1_)
+        return out2
+
+    def forward_sigmoid(self, x, y=None):
+        out0 = self.input(x)
+        if y is not None:
+            out1_pre = out0 * y
+        else:
+            out1_pre = out0
+
+        out1 = self.act_fun(out1_pre)
+
+        out2 = self.output(out1)
         return out2
