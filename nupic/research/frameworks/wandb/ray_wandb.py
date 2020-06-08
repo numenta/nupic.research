@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import ast
 import json
 import numbers
 import os
@@ -179,8 +180,9 @@ class WandbLogger(wandb.ray.WandbLogger):
 
     def on_result(self, result):
         """
-        The following is copied from the parent class; however, the config values are
-        saved as the repr's so that they are all yaml serializable. See for details:
+        The following is copied from the parent class; however, non-serializable
+        config values are saved as the repr's so that they are all yaml
+        serializable. See for details:
             - https://github.com/wandb/client/issues/586
         """
 
@@ -188,7 +190,13 @@ class WandbLogger(wandb.ray.WandbLogger):
         if config and self._config is None:
             for k in config.keys():
                 if wandb.config.get(k) is None:
-                    wandb.config[k] = repr(config[k])
+                    s = repr(config[k])
+                    try:
+                        ast.literal_eval(s)
+                        wandb.config[k] = config[k]
+                    except (ValueError, SyntaxError):
+                        # Non-serializable
+                        wandb.config[k] = s
             self._config = config
 
         tmp = result.copy()
