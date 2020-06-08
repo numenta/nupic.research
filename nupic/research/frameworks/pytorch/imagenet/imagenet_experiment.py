@@ -20,17 +20,16 @@
 import copy
 import io
 import logging
-import multiprocessing
+import math
 import sys
 import time
 from collections import defaultdict
 from pprint import pformat
 
 import numpy as np
-import ray.services
-import ray.util.sgd.utils as ray_utils
 import torch
 import torch.distributed as dist
+from torch import multiprocessing
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
@@ -45,6 +44,8 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_optimizer,
     create_train_dataset,
     create_validation_dataset,
+    get_free_port,
+    get_node_ip_address,
 )
 from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
@@ -139,6 +140,10 @@ class ImagenetExperiment:
             - epochs: Number of epochs to train
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
+            - log_timestep_freq: Configures mixins and subclasses that log every
+                                 timestep to only log every nth timestep (in
+                                 addition to the final timestep of each epoch).
+                                 Set to 0 to log only at the end of each epoch.
             - progress: Show progress during training
             - name: Experiment name. Used as logger name
             - log_level: Python Logging level
@@ -270,8 +275,7 @@ class ImagenetExperiment:
 
         # CUDA runtime does not support the fork start method.
         # See https://pytorch.org/docs/stable/notes/multiprocessing.html
-        if torch.cuda.is_available():
-            multiprocessing.set_start_method("spawn")
+        multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
         self.train_loader = self.create_train_dataloader(config)
@@ -303,6 +307,7 @@ class ImagenetExperiment:
         # timestep after that training batch, since it was performed on the
         # subsequent version of the parameters.
         self.current_timestep = 0
+        self.log_timestep_freq = config.get("log_timestep_freq", 1)
 
         # A list of [(timestep, result), ...] for the current epoch.
         self.extra_val_results = []
@@ -435,6 +440,7 @@ class ImagenetExperiment:
         )
 
     def run_epoch(self):
+        timestep_begin = self.current_timestep
         self.pre_epoch()
         self.train_epoch()
         self.post_epoch()
@@ -451,7 +457,8 @@ class ImagenetExperiment:
             }
 
         ret.update(
-            timestep=self.current_timestep,
+            timestep_begin=timestep_begin,
+            timestep_end=self.current_timestep,
             learning_rate=self.get_lr()[0],
             extra_val_results=self.extra_val_results,
         )
@@ -472,7 +479,8 @@ class ImagenetExperiment:
     def pre_batch(self, model, batch_idx):
         pass
 
-    def post_batch(self, model, loss, batch_idx, num_images, time_string):
+    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
+                   num_images, time_string):
         # Update 1cycle learning rate after every batch
         if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
@@ -491,17 +499,20 @@ class ImagenetExperiment:
             self.logger.debug("End of batch for rank: %s. Epoch: %s, Batch: %s/%s, "
                               "loss: %s, Learning rate: %s num_images: %s",
                               self.rank, self.current_epoch, current_batch,
-                              total_batches, loss, self.get_lr(), num_images)
+                              total_batches, error_loss, self.get_lr(),
+                              num_images)
             self.logger.debug("Timing: %s", time_string)
 
-    def post_batch_wrapper(self, model, loss, batch_idx, *args, **kwargs):
+    def post_batch_wrapper(self, model, error_loss, complexity_loss, batch_idx,
+                           *args, **kwargs):
         """
         Perform the post_batch updates, then maybe validate.
 
         This method exists because post_batch is designed to be overridden, and
         validation needs to wait until after all post_batch overrides have run.
         """
-        self.post_batch(model, loss, batch_idx, *args, **kwargs)
+        self.post_batch(model, error_loss, complexity_loss, batch_idx,
+                        *args, **kwargs)
         self.current_timestep += 1
         validate = (batch_idx in self.additional_batches_to_validate
                     and self.current_epoch in self.epochs_to_validate)
@@ -602,13 +613,13 @@ class ImagenetExperiment:
         removed so that the result can be printed to the console.
         """
         keys = ["total_correct", "total_tested", "mean_loss", "mean_accuracy",
-                "learning_rate", "timestep"]
+                "learning_rate"]
         return {key: result[key]
                 for key in keys
                 if key in result}
 
     @classmethod
-    def expand_result_to_time_series(cls, result):
+    def expand_result_to_time_series(cls, result, config):
         """
         Given the result of a run_epoch call, returns a mapping from timesteps to
         results. The mapping is stored as a dict so that subclasses and mixins
@@ -628,7 +639,7 @@ class ImagenetExperiment:
             "complexity_loss": "complexity_loss",
         }
         val_results = (result["extra_val_results"]
-                       + [(result["timestep"], result)])
+                       + [(result["timestep_end"], result)])
         for timestep, val_result in val_results:
             result_by_timestep[timestep].update({
                 k2: val_result[k1]
@@ -725,6 +736,39 @@ class ImagenetExperiment:
         """
         return self.current_epoch >= self.epochs
 
+    def should_log_batch(self, train_batch_idx):
+        """
+        Returns true if the current timestep should be logged, either because it's a
+        logged timestep or the final training batch of an epoch.
+        """
+        return (train_batch_idx == self.total_batches - 1
+                or (self.log_timestep_freq > 0
+                    and (self.current_timestep % self.log_timestep_freq) == 0))
+
+    @classmethod
+    def get_recorded_timesteps(cls, result, config):
+        """
+        Given an epoch result dict and config, returns a list of timestep numbers
+        that are supposed to be logged for that epoch.
+        """
+        log_timestep_freq = config.get("log_timestep_freq", 1)
+        timestep_end = result["timestep_end"]
+        if log_timestep_freq == 0:
+            ret = [timestep_end - 1]
+        else:
+            # Find first logged timestep in range
+            logged_begin = int(math.ceil(result["timestep_begin"]
+                                         / log_timestep_freq)
+                               * log_timestep_freq)
+
+            ret = list(range(logged_begin, timestep_end, log_timestep_freq))
+
+            last_batch_timestep = timestep_end - 1
+            if last_batch_timestep % log_timestep_freq != 0:
+                ret.append(last_batch_timestep)
+
+        return ret
+
     def get_lr(self):
         """
         Returns the current learning rate
@@ -746,12 +790,12 @@ class ImagenetExperiment:
         return [p["weight_decay"] for p in self.optimizer.param_groups]
 
     def get_node_ip(self):
-        """Returns the IP address of the current ray node."""
-        return ray.services.get_node_ip_address()
+        """Returns the IP address of the current node."""
+        return get_node_ip_address()
 
     def get_free_port(self):
-        """Returns free TCP port in the current ray node"""
-        return ray_utils.find_free_port()
+        """Returns free TCP port in the current node"""
+        return get_free_port()
 
     @classmethod
     def get_execution_order(cls):

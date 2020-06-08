@@ -23,6 +23,7 @@ import os
 
 import ray
 import torch
+from ray.tune.suggest.variant_generator import format_vars, generate_variants
 from ray.tune.trial_runner import _TuneFunctionDecoder
 
 
@@ -183,3 +184,26 @@ def register_torch_serializers():
         ray.register_custom_serializer(
             tensor_type, serializer=serializer, deserializer=deserializer
         )
+
+
+def generate_trial_variants(config):
+    """
+    Generate configuration for each trial variant evaluating 'ray.tune'
+    functions (grid_search, sample_from, ...) into its final values.
+
+    :param config: Ray tune configuration with 'ray.tune' functions
+    :return: list of dict for each trial configuration variant
+    """
+    trials = []
+    num_samples = config["num_samples"]
+    for i in range(num_samples):
+        for variables, variant in generate_variants(config):
+            # Update experiment tag with variant vars
+            if len(variables) > 0:
+                variant["experiment_tag"] = f"{i}_{format_vars(variables)}"
+            else:
+                variant["experiment_tag"] = str(i)
+
+            trials.append(variant)
+
+    return trials

@@ -26,36 +26,24 @@ class LogEveryLoss:
     """
     Include the training loss for every batch in the result dict.
 
-    This class must be placed earlier in the mixin order than other mixins that
-    modify the loss.
-
-    class MyExperiment(mixins.LogEveryLoss,
-                       ...
-                       mixins.RegularizeLoss,
-                       ImagenetExperiment):
-        pass
-
     These numbers are stored on the GPU until the end of the epoch. If every
     kilobyte of GPU memory is being used by the experiment, this could result in
-    running out of memory.
+    running out of memory. Adjust config["log_timestep_freq"] to reduce the
+    logging frequency.
     """
     def setup_experiment(self, config):
         super().setup_experiment(config)
         self.error_loss_history = []
         self.complexity_loss_history = []
 
-    def error_loss(self, *args, **kwargs):
-        loss = super().error_loss(*args, **kwargs)
-        if self.model.training:
-            self.error_loss_history.append(loss.detach().clone())
-        return loss
-
-    def complexity_loss(self, *args, **kwargs):
-        loss = super().complexity_loss(*args, **kwargs)
-        if loss is not None:
-            if self.model.training:
-                self.complexity_loss_history.append(loss.detach().clone())
-        return loss
+    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
+                   *args, **kwargs):
+        super().post_batch(model, error_loss, complexity_loss, batch_idx,
+                           *args, **kwargs)
+        if self.should_log_batch(batch_idx):
+            self.error_loss_history.append(error_loss.clone())
+            if complexity_loss is not None:
+                self.complexity_loss_history.append(complexity_loss.clone())
 
     def run_epoch(self):
         result = super().run_epoch()
@@ -88,19 +76,18 @@ class LogEveryLoss:
         return aggregated
 
     @classmethod
-    def expand_result_to_time_series(cls, result):
-        result_by_timestep = super().expand_result_to_time_series(result)
+    def expand_result_to_time_series(cls, result, config):
+        result_by_timestep = super().expand_result_to_time_series(result,
+                                                                  config)
 
-        end = result["timestep"]
-        start = end - len(result["error_loss_history"])
-        for t, loss in zip(range(start, end),
-                           result["error_loss_history"]):
+        recorded_timesteps = cls.get_recorded_timesteps(result, config)
+        for t, loss in zip(recorded_timesteps, result["error_loss_history"]):
             result_by_timestep[t].update(
                 train_loss=loss,
             )
 
         if "complexity_loss_history" in result:
-            for t, loss in zip(range(start, end),
+            for t, loss in zip(recorded_timesteps,
                                result["complexity_loss_history"]):
                 result_by_timestep[t].update(
                     complexity_loss=loss,
@@ -112,8 +99,7 @@ class LogEveryLoss:
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("LogEveryLoss: initialize")
-        eo["error_loss"].append("LogEveryLoss: copy loss")
-        eo["complexity_loss"].append("LogEveryLoss: copy loss")
+        eo["post_batch"].append("LogEveryLoss: record losses")
         eo["run_epoch"].append("LogEveryLoss: to result dict")
         eo["aggregate_results"].append("LogEveryLoss: Aggregate")
         eo["expand_result_to_time_series"].append(
