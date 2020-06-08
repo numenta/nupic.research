@@ -112,9 +112,11 @@ class ContinuousSpeechExperiment(object):
                 num_classes=self.num_classes,
                 k_inference_factor=config["k_inference_factor"],
                 activation_fct_before_max_pool=config.get(
-                    "activation_fct_before_max_pool", False),
+                    "activation_fct_before_max_pool", False
+                ),
                 consolidated_sparse_weights=config.get(
-                    "consolidated_sparse_weights", False),
+                    "consolidated_sparse_weights", False
+                ),
                 use_kwinners_local=config.get("use_kwinner_local", False),
             )
 
@@ -219,24 +221,32 @@ class ContinuousSpeechExperiment(object):
         if self.freeze_params == "output":
             fparams.append([self.model.linear2.module.weight, indices])
 
-        train_model(self.model, self.full_train_loader, self.optimizer, self.device,
-                    combine_data=self.combine_xy, freeze_params=fparams,
-                    batches_in_epoch=self.batches_in_epoch)
+        train_model(
+            self.model,
+            self.full_train_loader,
+            self.optimizer,
+            self.device,
+            combine_data=self.combine_xy,
+            freeze_params=fparams,
+            batches_in_epoch=self.batches_in_epoch,
+        )
 
         self.full_post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def train(self,
-              epoch,
-              training_classes,
-              freeze_params=None,
-              freeze_fun=None,
-              freeze_pct=90,
-              freeze_output=False,
-              layer_type="dense",
-              linear_number=2,
-              output_indices=None):
+    def train(
+        self,
+        epoch,
+        training_classes,
+        freeze_params=None,
+        freeze_fun=None,
+        freeze_pct=90,
+        freeze_output=False,
+        layer_type="dense",
+        linear_number=2,
+        output_indices=None,
+    ):
         """Train one epoch of this model by iterating through mini batches.
 
         An epoch ends after one pass through the training set, or if the
@@ -255,13 +265,22 @@ class ContinuousSpeechExperiment(object):
         f = self.combine_classes(training_classes)
         self.pre_epoch()
 
-        train_model(self.model, self.train_loader, self.optimizer,
-                    self.device, freeze_params=freeze_params,
-                    freeze_fun=freeze_fun, freeze_pct=freeze_pct,
-                    freeze_output=freeze_output, layer_type=layer_type,
-                    linear_number=linear_number, duty_cycles=self.get_duty_cycles(),
-                    output_indices=output_indices, combine_data=self.combine_xy,
-                    batches_in_epoch=self.batches_in_epoch)
+        train_model(
+            self.model,
+            self.train_loader,
+            self.optimizer,
+            self.device,
+            freeze_params=freeze_params,
+            freeze_fun=freeze_fun,
+            freeze_pct=freeze_pct,
+            freeze_output=freeze_output,
+            layer_type=layer_type,
+            linear_number=linear_number,
+            duty_cycles=self.get_duty_cycles(),
+            output_indices=output_indices,
+            combine_data=self.combine_xy,
+            batches_in_epoch=self.batches_in_epoch,
+        )
 
         self.post_epoch()
         self.logger.info("training duration: %s", time.time() - t0)
@@ -282,9 +301,11 @@ class ContinuousSpeechExperiment(object):
         self.model.apply(update_boost_strength)
 
     def get_duty_cycles(self):
-        dc_dictionary = {k[0]: k[1].duty_cycle
-                         for k in self.model.named_children()
-                         if "duty_cycle" in k[1].state_dict()}
+        dc_dictionary = {
+            k[0]: k[1].duty_cycle
+            for k in self.model.named_children()
+            if "duty_cycle" in k[1].state_dict()
+        }
 
         return dc_dictionary
 
@@ -302,11 +323,13 @@ class ContinuousSpeechExperiment(object):
         ret["mean_accuracy"] = 100.0 * ret["mean_accuracy"]
 
         entropy = self.entropy()
-        ret.update({
-            "entropy": float(entropy),
-            "total_samples": len(loader.sampler),
-            "non_zero_parameters": count_nonzero_params(self.model)[1],
-        })
+        ret.update(
+            {
+                "entropy": float(entropy),
+                "total_samples": len(loader.sampler),
+                "non_zero_parameters": count_nonzero_params(self.model)[1],
+            }
+        )
 
         return ret
 
@@ -321,21 +344,24 @@ class ContinuousSpeechExperiment(object):
             test_loader = self.validation_loader
 
         ret = evaluate_model(self.model, test_loader, self.device)
-        ret["mean_accuracy"] = 100. * ret["mean_accuracy"]
+        ret["mean_accuracy"] = 100.0 * ret["mean_accuracy"]
         entropy = self.entropy()
-        ret.update({
-            "entropy": float(entropy),
-            "total_samples": len(test_loader.sampler),
-            "non_zero_parameters": count_nonzero_params(self.model)[1],
-        })
+        ret.update(
+            {
+                "entropy": float(entropy),
+                "total_samples": len(test_loader.sampler),
+                "non_zero_parameters": count_nonzero_params(self.model)[1],
+            }
+        )
 
         return ret
 
     def update_accuracy(self):
         """Test on all classes after training on n classes"""
         self.running_accuracy.append(
-            np.array([np.round(self.test_class(k)["mean_accuracy"], 2)
-                      for k in range(11)])
+            np.array(
+                [np.round(self.test_class(k)["mean_accuracy"], 2) for k in range(11)]
+            )
         )
 
     def get_forgetting_curve(self):
@@ -345,9 +371,11 @@ class ContinuousSpeechExperiment(object):
             m, n = acc.shape
             acc_ = np.full((m, n), np.nan)
             for ind in np.arange(m):
-                acc_[:m - ind, 1 + shift * ind:1 + shift * (ind + 1)] =\
-                    acc[ind:, 1 + shift * ind:1 + shift * (ind + 1)]
+                acc_[: m - ind, 1 + shift * ind : 1 + shift * (ind + 1)] = acc[
+                    ind:, 1 + shift * ind : 1 + shift * (ind + 1)
+                ]
             return acc_
+
         return align_acc(acc)
 
     def get_auc(self):
@@ -401,14 +429,11 @@ class ContinuousSpeechExperiment(object):
         dataset = ClasswiseDataset(
             cachefilepath=os.path.split(f.name)[0],
             basename=os.path.split(f.name)[1],
-            qualifiers=["tmp"]
+            qualifiers=["tmp"],
         )
 
         data_loader = DataLoader(
-            dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=True,
+            dataset, batch_size=self.batch_size, shuffle=True, drop_last=True
         )
         f.flush()
 
@@ -431,12 +456,12 @@ class ContinuousSpeechExperiment(object):
         here: https://github.com/numenta/nupic.torch/tree/master/examples/gsc
         """
         validation_dataset = ClasswiseDataset(
-            cachefilepath=self.data_dir,
-            basename="data_valid",
-            qualifiers=[""],
+            cachefilepath=self.data_dir, basename="data_valid", qualifiers=[""]
         )
         self.validation_loader = DataLoader(
-            validation_dataset, batch_size=self.batch_size, shuffle=False,
+            validation_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
             drop_last=True,
         )
 
@@ -448,7 +473,9 @@ class ContinuousSpeechExperiment(object):
         )
 
         self.gen_test_loader = DataLoader(
-            self.gen_test_dataset, batch_size=self.batch_size, shuffle=True,
+            self.gen_test_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
             drop_last=True,
         )
 
@@ -456,12 +483,11 @@ class ContinuousSpeechExperiment(object):
             cachefilepath=self.test_data_dir,
             basename="gsc_train",
             qualifiers=range(30),
-            transform=self.subtract_label_transform()
+            transform=self.subtract_label_transform(),
         )
 
         self.full_train_loader = DataLoader(
-            self.train_dataset, batch_size=self.batch_size, shuffle=True,
-            drop_last=True,
+            self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True
         )
 
         self.test_loader = []
@@ -474,10 +500,14 @@ class ContinuousSpeechExperiment(object):
                 qualifiers=[class_ + 1],
             )
 
-            self.test_loader.append(DataLoader(
-                test_dataset, batch_size=self.batch_size, shuffle=False,
-                drop_last=True,
-            ))
+            self.test_loader.append(
+                DataLoader(
+                    test_dataset,
+                    batch_size=self.batch_size,
+                    shuffle=False,
+                    drop_last=True,
+                )
+            )
 
 
 class ClasswiseDataset(PreprocessedDataset):
@@ -491,8 +521,9 @@ class ClasswiseDataset(PreprocessedDataset):
         if qualifier == "tmp":
             file_name = os.path.join(self.path, self.basename)
         else:
-            file_name = os.path.join(self.path,
-                                     self.basename + "{}.npz".format(qualifier))
+            file_name = os.path.join(
+                self.path, self.basename + "{}.npz".format(qualifier)
+            )
         self.tensors = list(torch.load(file_name))
 
         return file_name

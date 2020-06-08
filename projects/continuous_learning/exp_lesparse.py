@@ -154,7 +154,7 @@ def add_sparse_linear_layer(
         if consolidated_sparse_weights:
             network.add_module(
                 "linear{}".format(suffix),
-                ConsolidatedSparseWeights(linear, weight_sparsity)
+                ConsolidatedSparseWeights(linear, weight_sparsity),
             )
         else:
             network.add_module(
@@ -164,8 +164,9 @@ def add_sparse_linear_layer(
         network.add_module("linear{}_linear".format(suffix), linear)
 
     if use_batch_norm:
-        network.add_module("linear{}_bn".format(suffix),
-                           nn.BatchNorm1d(linear_n, affine=False))
+        network.add_module(
+            "linear{}_bn".format(suffix), nn.BatchNorm1d(linear_n, affine=False)
+        )
 
     if 0 < percent_on < 1.0:
         network.add_module(
@@ -198,7 +199,7 @@ def add_sparse_dendrite_layer(
     k_inference_factor=1,
     boost_strength=1.5,
     boost_strength_factor=0.9,
-    duty_cycle_period=1000
+    duty_cycle_period=1000,
 ):
 
     dendrite_layer = DendriteLayer(
@@ -208,13 +209,12 @@ def add_sparse_dendrite_layer(
         weight_sparsity=weight_sparsity,
     )
 
-    network.add_module(
-        "dendrites{}".format(suffix),
-        dendrite_layer)
+    network.add_module("dendrites{}".format(suffix), dendrite_layer)
 
     if use_batch_norm:
-        network.add_module("dendrites{}_bn".format(suffix),
-                           nn.BatchNorm1d(out_dim, affine=False))
+        network.add_module(
+            "dendrites{}_bn".format(suffix), nn.BatchNorm1d(out_dim, affine=False)
+        )
 
     network.add_module(
         "linear{}_kwinners".format(suffix),
@@ -260,28 +260,29 @@ class LeSparseNet(nn.Sequential):
         channels instead of the whole input
     """
 
-    def __init__(self,
-                 input_shape=(1, 32, 32),
-                 cnn_out_channels=(64, 64),
-                 cnn_activity_percent_on=(0.1, 0.1),
-                 cnn_weight_percent_on=(1.0, 1.0),
-                 linear_n=(1000,),
-                 linear_activity_percent_on=(0.1,),
-                 linear_weight_percent_on=(0.4,),
-                 use_dendrites=False,
-                 dendrites_per_cell=5,
-                 num_classes=10,
-                 boost_strength=1.67,
-                 boost_strength_factor=0.9,
-                 duty_cycle_period=1000,
-                 k_inference_factor=1.5,
-                 use_batch_norm=True,
-                 dropout=0.0,
-                 activation_fct_before_max_pool=False,
-                 consolidated_sparse_weights=False,
-                 use_kwinners_local=False,
-                 use_softmax=True,
-                 ):
+    def __init__(
+        self,
+        input_shape=(1, 32, 32),
+        cnn_out_channels=(64, 64),
+        cnn_activity_percent_on=(0.1, 0.1),
+        cnn_weight_percent_on=(1.0, 1.0),
+        linear_n=(1000,),
+        linear_activity_percent_on=(0.1,),
+        linear_weight_percent_on=(0.4,),
+        use_dendrites=False,
+        dendrites_per_cell=5,
+        num_classes=10,
+        boost_strength=1.67,
+        boost_strength_factor=0.9,
+        duty_cycle_period=1000,
+        k_inference_factor=1.5,
+        use_batch_norm=True,
+        dropout=0.0,
+        activation_fct_before_max_pool=False,
+        consolidated_sparse_weights=False,
+        use_kwinners_local=False,
+        use_softmax=True,
+    ):
         super(LeSparseNet, self).__init__()
         # Add CNN Layers
         current_input_shape = input_shape
@@ -306,7 +307,7 @@ class LeSparseNet(nn.Sequential):
                 duty_cycle_period=duty_cycle_period,
                 activation_fct_before_max_pool=activation_fct_before_max_pool,
                 use_kwinners_local=use_kwinners_local,
-                consolidated_sparse_weights=csw
+                consolidated_sparse_weights=csw,
             )
 
             # Compute next layer input shape
