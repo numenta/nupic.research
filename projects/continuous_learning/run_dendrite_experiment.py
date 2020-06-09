@@ -38,6 +38,7 @@ with open(config_file) as cf:
 
 exp = "sparseCNN2"
 
+#  play with the config values here
 config = config_init[exp]
 config["name"] = exp
 config["use_dendrites"] = True
@@ -47,7 +48,13 @@ config["cnn_percent_on"] = (0.12, 0.07)
 config["cnn_weight_sparsity"] = (0.15, 0.05)
 config["dendrites_per_cell"] = 2
 config["batch_size"] = 64
-experiment = ContinuousSpeechExperiment(config=config)
+
+
+def get_experiment():
+    """ The experiment class here is
+    just to easily access the DataLoaders """
+    experiment = ContinuousSpeechExperiment(config=config)
+    return experiment
 
 
 def get_no_params(model):
@@ -63,6 +70,7 @@ def clear_labels(labels, n_classes=5):
 
 
 class ToyNetwork(nn.Module):
+    """ Toy network; here dpc is dendrites_per_neuron """
     def __init__(
         self,
         dpc=3,
@@ -115,6 +123,7 @@ class ToyNetwork(nn.Module):
 
 
 def train_full(categorical=False):
+    experiment = get_experiment()
     net = ToyNetwork(dpc=1, cnn_w_sparsity=0.1).cuda()
     opt = torch.optim.SGD(net.parameters(), lr=0.1)  # weight_decay=0.)
     criterion = F.nll_loss
@@ -133,7 +142,7 @@ def train_full(categorical=False):
     acc_ = evaluate_model(net, experiment.gen_test_loader, torch.device("cuda"))[
         "mean_accuracy"
     ]
-    print(np.round(acc_, 2))
+    print("Accuracy: {}".format(np.round(acc_, 2)))
     return acc_
 
 
@@ -145,6 +154,7 @@ def train_sequential(
     cat_w_sparsity=0.01,
     optim="Adam",
 ):
+    experiment = get_experiment()
 
     net = ToyNetwork(
         dpc=dpc,
@@ -206,5 +216,6 @@ def train_sequential(
     return full_acc
 
 
-train_sequential(categorical=False, dpc=2, cat_w_sparsity=0.1)
-train_sequential(categorical=True, dpc=2, cat_w_sparsity=0.1)
+if __name__ == "__main__":
+    train_sequential(categorical=False, dpc=2, cat_w_sparsity=0.1)
+    train_sequential(categorical=True, dpc=2, cat_w_sparsity=0.1)
