@@ -156,22 +156,25 @@ class DendriteLayer(nn.Module):
                 k=1,
                 local=True,
             )
-            self.act_fun.k = 1
         else:
             self.act_fun = torch.sigmoid
 
-    def forward(self, x, y=None):
+    def forward(self, x, cat_projection=None):
+        """ cat_proj here is an optional argument
+        for a categorical "feedback" projection to
+        the dendrite segments
+        """
         if self.act_fun_type is None:
-            return self.forward_kwinner(x, y)
+            return self.forward_kwinner(x, cat_projection)
         else:
-            return self.forward_sigmoid(x, y)
+            return self.forward_sigmoid(x, cat_projection)
 
-    def forward_kwinner(self, x, y=None):
+    def forward_kwinner(self, x, cat_projection=None):
         batch_size = x.shape[0]
         out0 = self.input(x)
 
-        if y is not None:
-            out0 = out0 * y
+        if cat_projection is not None:
+            out0 = out0 * cat_projection
 
         with torch.no_grad():
             out0 = out0.reshape(batch_size, self.dendrites_per_neuron, self.out_dim, 1)
@@ -185,10 +188,10 @@ class DendriteLayer(nn.Module):
         out2 = self.output(out1_)
         return out2
 
-    def forward_sigmoid(self, x, y=None):
+    def forward_sigmoid(self, x, cat_projection=None):
         out0 = self.input(x)
-        if y is not None:
-            out1_pre = out0 * y
+        if cat_projection is not None:
+            out1_pre = out0 * cat_projection
         else:
             out1_pre = out0
 

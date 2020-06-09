@@ -27,7 +27,9 @@ import torch.nn as nn
 
 
 class DKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
-    """ Just enough of the KWinnersBase to be able to put it into
+    """ For experimental use ; KWinnersBase for k=1, no duty cycles
+
+    Just enough of the KWinnersBase to be able to put it into
     an experiment - no concept of duty cycles here, the idea is to do
     a maxout (i.e. k-winner with k=1) on dendrites per neuron.
     It uses some awkward matrix reshaping to do this, adapted from
