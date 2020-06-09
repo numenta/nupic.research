@@ -19,13 +19,14 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 
-
 class CutMix(object):
     """
-    Adapts im
+    Applies CutMix (Mixup + CutOut) regularization approach
+    Paper: https://arxiv.org/pdf/1905.04899.pdf
     """
     def setup_experiment(self, config):
         """
@@ -33,85 +34,213 @@ class CutMix(object):
 
         :param config: Dictionary containing the configuration parameters
 
-            - teacher_model_class: Class for pretrained model to be used as teacher
-                                   in knowledge distillation.
-            - kd_factor_init: Determines the percentage of the target that comes
-                              from the teacher model. Value should be float
-                              between 0 and 1. Defaults to 1.
-            - kd_factor_end: KD factor at last epoch. Will calculate linear decay
-                             based on initial kd_factor_init and kd_factor_end.
-                             Value should be float between 0 and 1.
-                             If None, no decay is applied. Defaults to None.
+            - mixup_beta: Parameters for the beta distribution used in mixup to draw
+                          lambda, which defines the size of the bounding boxes.
+                          The combination ratio λ between two data points is sampled
+                          from the distribution Beta(mixup_beta, mixup_beta).
+                          If set to 1, λ is sampled from the uniform distribution.
+            - cutmix_prob: Probability to apply cutmix_prob at each batch.
         """
         super().setup_experiment(config)
 
-        # Teacher model and knowledge distillation variables
-        teacher_model_class = config.get("teacher_model_class", None)
-        assert teacher_model_class is not None, \
-            "teacher_model_class must be specified for KD experiments"
-        self.teacher_model = teacher_model_class()
+        # CutMix variables: fixate beta for now
+        self.mixup_beta = config.get("mixup_beta", 1.0)
+        self.cutmix_prob = config.get("cutmix_prob", 1.0)
+        self.lossfn = F.cross_entropy
 
-        self.teacher_model.eval()
-        self.teacher_model.to(self.device)
-        self.logger.info(f"KD teacher class: {teacher_model_class}")
-
-        # initalize Knowledge Distillation factor
-        self.kd_factor_init = config.get("kd_factor_init", 1)
-        assert 0 <= self.kd_factor_init <= 1, \
-            "kd_factor_init should be >= 0 and <= 1"
-        self.kd_factor_end = config.get("kd_factor_end", None)
-        if self.kd_factor_end is not None:
-            assert 0 <= self.kd_factor_end <= 1, \
-                "kd_factor_end should be >= 0 and <= 1"
-        else:
-            self.kd_factor = self.kd_factor_init
-        self.logger.info(f"KD factor: {self.kd_factor_init} {self.kd_factor_end}")
-
-    def _train_model(self):
-        """Private train model that has access to Experiment attributes
-        """
-        # calculates kd factor based on a linear decay
-        if self.kd_factor_end is not None:
-            self.kd_factor = linear_decay(first_epoch_value=self.kd_factor_init,
-                                          last_epoch_value=self.kd_factor_end,
-                                          current_epoch=self.current_epoch,
-                                          total_epochs=self.epochs)
-            self.logger.debug(
-                f"KD factor: {self.kd_factor:.3f} at epoch {self.current_epoch}")
-        super()._train_model()
-
-    def calculate_batch_loss(self, data, target, async_gpu=True):
+    def transform_data_to_device(self, data, target, device, non_blocking):
         """
         :param data: input to the training function, as specified by dataloader
         :param target: target to be matched by model, as specified by dataloader
-        :param async_gpu: define whether or not to use
-                          asynchronous GPU copies when the memory is pinned
+        :param device: identical to self.device
+        :param non_blocking: define whether or not to use
+                             asynchronous GPU copies when the memory is pinned
         """
-        # knowlege distillation training
-        output = self.model(data)
-        with torch.no_grad():
-            # target is linear combination of teacher and target softmaxes
-            softmax_output_teacher = F.softmax(self.teacher_model(data))
-            if self.kd_factor < 1:
-                target = target.to(self.device, non_blocking=async_gpu)
-                one_hot_target = F.one_hot(target, num_classes=output.shape[-1])
-                combined_target = (self.kd_factor * softmax_output_teacher
-                                   + (1 - self.kd_factor) * one_hot_target)
-                del target, one_hot_target
-            else:
-                combined_target = softmax_output_teacher
+        if not self.model.training:
+            return super().transform_data_to_device(data, target, device,
+                                                    non_blocking)
 
-        loss = soft_cross_entropy(output, combined_target)
+        data = data.to(self.device, non_blocking=non_blocking)
+        target = target.to(self.device, non_blocking=non_blocking)
 
-        del softmax_output_teacher, combined_target
-        return loss, output
+        # transform the data - generate mixed sample
+        lam = np.random.beta(self.mixup_beta, self.mixup_beta)
+        rand_index = torch.randperm(data.shape[0], device=self.device)
+        # draw and apply the bounding boxes to batch
+        bbx1, bby1, bbx2, bby2 = rand_bbox(data.shape, lam)
+        data[:, :, bbx1:bbx2, bby1:bby2] = data[rand_index, :, bbx1:bbx2, bby1:bby2]
+        # adjust lambda to exactly match pixel ratio
+        lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.shape[-1] * data.shape[-2]))
+
+        # no extra memory - just regular target, a vector with indexes and a scalar
+        return data, (target, rand_index, lam)
+
+    def error_loss(self, output, target, reduction="mean"):
+        """
+        :param output: output from the model
+        :param target: target to be matched by model
+        :param reduction: reduction to apply to the output ("sum" or "mean")
+
+        Can potentially replace only the error loss in cutmix
+        """
+        if not self.model.training or self.mixup_beta <= 0 or \
+                           np.random.rand(1) > self.cutmix_prob:
+            # Targets are from the dataloader
+            return super().error_loss(output, target, reduction=reduction)
+        else:
+            # unpack
+            target, rand_index, lam = target
+            # calculate first loss
+            loss_a = self.lossfn(output, target) * lam
+            # calculate second loss
+            # for each sample, pick a target from a random sample in batch
+            loss_b = self.lossfn(output, target[rand_index]) * (1. - lam)
+            return loss_a + loss_b
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].append("Knowledge Distillation initialization")
-        eo["calculate_batch_loss"] = [
-            "KnowledgeDistillation.calculate_batch_loss"
-        ]
-        eo["_train_model"].insert(0, "Update kd factor based on linear decay")
+        eo["setup_experiment"].append("Cutmix parameters")
+        eo["transform_data_to_device"].insert(0, "If not training: {")
+        eo["transform_data_to_device"].append(
+            "} else: { Compute Mixup targets }"
+        )
+        eo["error_loss"].insert(0, "If not training: {")
+        eo["error_loss"].append(
+            "} else: { Mixup composite loss }"
+        )
         return eo
+
+class CutMixKnowledgeDistillation(CutMix):
+    """
+    Applies CutMix (Mixup + CutOut) regularization approach
+    Paper: https://arxiv.org/pdf/1905.04899.pdf
+    """
+    def setup_experiment(self, config):
+        """
+        Add following variables to config
+
+        :param config: Dictionary containing the configuration parameters
+
+            - mixup_beta: Parameters for the beta distribution used in mixup to draw
+                          lambda, which defines the size of the bounding boxes.
+                          The combination ratio λ between two data points is sampled
+                          from the distribution Beta(mixup_beta, mixup_beta).
+                          If set to 1, λ is sampled from the uniform distribution.
+            - cutmix_prob: Probability to apply cutmix_prob at each batch.
+            - teacher_model_class: Class for pretrained model to be used as teacher
+                                   in knowledge distillation.
+        """
+        super().setup_experiment(config)
+
+        # CutMix variables
+        self.mixup_beta = config.get("mixup_beta", 1.0)
+        self.cutmix_prob = config.get("cutmix_prob", 1.0)
+
+        # Teacher model and knowledge distillation variables
+        self.lossfn = soft_cross_entropy
+        teacher_model_class = config.get("teacher_model_class", None)
+        assert teacher_model_class is not None, \
+            "teacher_model_class must be specified for KD experiments"
+        self.teacher_model = teacher_model_class()
+        self.teacher_model.eval()
+        self.teacher_model.to(self.device)
+        self.logger.info(f"KD teacher class: {teacher_model_class}")
+
+
+    def transform_data_to_device(self, data, target, device, non_blocking):
+        """
+        :param data: input to the training function, as specified by dataloader
+        :param target: target to be matched by model, as specified by dataloader
+        :param device: identical to self.device
+        :param non_blocking: define whether or not to use
+                             asynchronous GPU copies when the memory is pinned
+        """
+        if not self.model.training:
+            return super().transform_data_to_device(data, target, device,
+                                                    non_blocking)
+
+        data = data.to(self.device, non_blocking=non_blocking)
+
+        # transform the data - generate mixed sample
+        lam = np.random.beta(self.mixup_beta, self.mixup_beta)
+        rand_index = torch.randperm(data.shape[0], device=self.device)
+        # draw and apply the bounding boxes to batch
+        bbx1, bby1, bbx2, bby2 = rand_bbox(data.shape, lam)
+        data[:, :, bbx1:bbx2, bby1:bby2] = data[rand_index, :, bbx1:bbx2, bby1:bby2]
+        # adjust lambda to exactly match pixel ratio
+        lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.shape[-1] * data.shape[-2]))
+
+        # recalculate softmax target
+        with torch.no_grad():
+            target = F.softmax(self.teacher_model(data))
+
+        # no extra memory - just regular target, a vector with indexes and a scalar
+        return data, (target, rand_index, lam)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("Cutmix and Knowledge Distillation parameters")
+        eo["transform_data_to_device"].insert(0, "If not training: {")
+        eo["transform_data_to_device"].append(
+            "} else: { Compute Mixup targets using soft target from teacher }"
+        )
+        eo["error_loss"].insert(0, "If not training: {")
+        eo["error_loss"].append(
+            "} else: { Mixup composite loss }"
+        )
+        return eo
+
+
+def rand_bbox(shape, lam):
+    """
+    Defines random bounding boxes around the image
+    Lambda factor defines the size of the bounding box
+    from: https://github.com/clovaai/CutMix-PyTorch/blob/master/train.py
+    """
+
+    W = shape[2]
+    H = shape[3]
+    cut_rat = np.sqrt(1. - lam)
+    cut_w = np.int(W * cut_rat)
+    cut_h = np.int(H * cut_rat)
+
+    # uniform
+    cx = np.random.randint(W)
+    cy = np.random.randint(H)
+
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+    return bbx1, bby1, bbx2, bby2
+
+
+
+def soft_cross_entropy(output, target, reduction="mean"):
+    """ Cross entropy that accepts soft targets
+    Args:
+    :param output: predictions for neural network
+    :param targets: targets, can be soft
+    :param size_average: if false, sum is returned instead of mean
+
+    Examples::
+
+        output = torch.FloatTensor([[1.1, 2.8, 1.3], [1.1, 2.1, 4.8]])
+        output = torch.autograd.Variable(out, requires_grad=True)
+
+        target = torch.FloatTensor([[0.05, 0.9, 0.05], [0.05, 0.05, 0.9]])
+        target = torch.autograd.Variable(y1)
+        loss = cross_entropy(output, target)
+        loss.backward()
+
+    see: https://discuss.pytorch.org/t/cross-entropy-with-one-hot-targets/13580/5
+    """
+    if reduction == "mean":
+        return torch.mean(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
+    elif reduction == "sum":
+        return torch.sum(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
+    else:
+        raise ValueError(f"Unknown reduction: {reduction}")
