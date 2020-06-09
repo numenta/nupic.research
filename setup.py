@@ -21,10 +21,9 @@
 # ------------------------------------------------------------------------------
 from os import path
 
-from setuptools import setup, find_namespace_packages
+from setuptools import find_namespace_packages, setup
 
 import nupic.research
-
 
 ROOT = path.abspath(path.dirname(__file__))
 
