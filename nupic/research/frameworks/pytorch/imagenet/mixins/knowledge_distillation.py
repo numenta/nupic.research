@@ -22,7 +22,6 @@
 import torch
 import torch.nn.functional as F
 
-
 class KnowledgeDistillation(object):
     """
     Sets the network to learn from a teacher model
@@ -34,7 +33,8 @@ class KnowledgeDistillation(object):
         :param config: Dictionary containing the configuration parameters
 
             - teacher_model_class: Class for pretrained model to be used as teacher
-                                   in knowledge distillation.
+                                   in knowledge distillation. Can be one or list of
+                                   classes for knowledge distillation with ensemble.
             - kd_factor_init: Determines the percentage of the target that comes
                               from the teacher model. Value should be float
                               between 0 and 1. Defaults to 1.
@@ -49,11 +49,18 @@ class KnowledgeDistillation(object):
         teacher_model_class = config.get("teacher_model_class", None)
         assert teacher_model_class is not None, \
             "teacher_model_class must be specified for KD experiments"
-        self.teacher_model = teacher_model_class()
 
-        self.teacher_model.eval()
-        self.teacher_model.to(self.device)
-        self.logger.info(f"KD teacher class: {teacher_model_class}")
+        # convert into a list of teachers
+        if type(teacher_model_class) != list:
+            self.logger.info(f"KD single teacher class: {teacher_model_class}")
+            teacher_model_class = [teacher_model_class]
+
+        self.teacher_models = [
+            model().eval().to(self.device) for model in teacher_model_class
+        ]
+        if len(self.teacher_models) > 1:
+            self.logger.info(f"KD teacher is ensemble of "
+                             f"{len(self.teacher_models)} models")
 
         # initalize Knowledge Distillation factor
         self.kd_factor_init = config.get("kd_factor_init", 1)
@@ -92,9 +99,19 @@ class KnowledgeDistillation(object):
 
         data = data.to(self.device, non_blocking=non_blocking)
         with torch.no_grad():
-            # target is linear combination of teacher and target softmaxes
-            softmax_output_teacher = F.softmax(self.teacher_model(data))
+            # if ensemble, linearly combine outputs of softmax
+            num_models = len(self.teacher_models)
+            softmax_output_teacher = None
+            for teacher_model in self.teacher_models:
+                if softmax_output_teacher is None:
+                    softmax_output_teacher = (F.softmax(teacher_model(data))
+                                              / num_models)
+                else:
+                    softmax_output_teacher += (F.softmax(teacher_model(data))
+                                               / num_models)
+
             if self.kd_factor < 1:
+                # target is linear combination of teacher and target softmaxes
                 target = target.to(self.device, non_blocking=non_blocking)
                 one_hot_target = F.one_hot(target, num_classes=self.num_classes)
                 combined_target = (self.kd_factor * softmax_output_teacher
@@ -132,6 +149,125 @@ class KnowledgeDistillation(object):
         )
         return eo
 
+class KnowledgeDistillationCL(object):
+    """
+    Alternative version of knowledge distillation that combines the loss functions
+    instead of linearly combining the softmax outputs
+    """
+    def setup_experiment(self, config):
+        """
+        Add following variables to config
+
+        :param config: Dictionary containing the configuration parameters
+
+            - teacher_model_class: Class for pretrained model to be used as teacher
+                                   in knowledge distillation. Can be one or list of
+                                   classes for knowledge distillation with ensemble.
+            - kd_factor_init: Determines the percentage of the target that comes
+                              from the teacher model. Value should be float
+                              between 0 and 1. Defaults to 1.
+            - kd_factor_end: KD factor at last epoch. Will calculate linear decay
+                             based on initial kd_factor_init and kd_factor_end.
+                             Value should be float between 0 and 1.
+                             If None, no decay is applied. Defaults to None.
+        """
+        super().setup_experiment(config)
+
+        # Teacher model and knowledge distillation variables
+        teacher_model_class = config.get("teacher_model_class", None)
+        assert teacher_model_class is not None, \
+            "teacher_model_class must be specified for KD experiments"
+
+        # convert into a list of teachers
+        if type(teacher_model_class) != list:
+            self.logger.info(f"KD single teacher class: {teacher_model_class}")
+            teacher_model_class = [teacher_model_class]
+
+        self.teacher_models = [
+            model().eval().to(self.device) for model in teacher_model_class
+        ]
+        if len(self.teacher_models) > 1:
+            self.logger.info(f"KD teacher is ensemble of "
+                             f"{len(self.teacher_models)} models")
+
+        # initalize Knowledge Distillation factor
+        self.kd_factor_init = config.get("kd_factor_init", 1)
+        assert 0 <= self.kd_factor_init <= 1, \
+            "kd_factor_init should be >= 0 and <= 1"
+        self.kd_factor_end = config.get("kd_factor_end", None)
+        if self.kd_factor_end is not None:
+            assert 0 <= self.kd_factor_end <= 1, \
+                "kd_factor_end should be >= 0 and <= 1"
+        else:
+            self.kd_factor = self.kd_factor_init
+        self.logger.info(f"KD factor: {self.kd_factor_init} {self.kd_factor_end}")
+
+    def pre_epoch(self):
+        super().pre_epoch()
+        # calculates kd factor based on a linear decay
+        if self.kd_factor_end is not None:
+            self.kd_factor = linear_decay(first_epoch_value=self.kd_factor_init,
+                                          last_epoch_value=self.kd_factor_end,
+                                          current_epoch=self.current_epoch,
+                                          total_epochs=self.epochs)
+            self.logger.debug(
+                f"KD factor: {self.kd_factor:.3f} at epoch {self.current_epoch}")
+
+    def calculate_composite_loss(self, data, target, async_gpu=True):
+        """
+        :param data: input to the training function, as specified by dataloader
+        :param target: target to be matched by model, as specified by dataloader
+        :param async_gpu: define whether or not to use
+                          asynchronous GPU copies when the memory is pinned
+        """
+
+        output = self.model(data)
+
+        # combine several models
+        kd_error_loss = 0
+        for teacher_model in self.teacher_models:
+            with torch.no_grad():
+                soft_target = F.softmax(teacher_model(data))
+            kd_error_loss += soft_cross_entropy(output, soft_target)
+            del soft_target
+
+        # combine with regular target if kd_factor < 1
+        if self.kd_factor < 1:
+            target = target.to(self.device, non_blocking=async_gpu)
+            true_error_loss = self.error_loss(output, target)
+            error_loss = (self.kd_factor * kd_error_loss
+                          + (1 - self.kd_factor) * true_error_loss)
+        else:
+            error_loss = kd_error_loss
+
+        del data, target, output
+
+        # complexity loss
+        complexity_loss = (self.complexity_loss(self.model)
+                           if self.complexity_loss is not None
+                           else None)
+
+        return error_loss, complexity_loss
+
+    def transform_data_to_device(self, data, target, device, non_blocking):
+        """
+        Replace to remove target being moved to device
+        """
+        data = data.to(self.device, non_blocking=non_blocking)
+        return data, target
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("Knowledge Distillation initialization")
+        eo["pre_epoch"].append("Update kd factor based on linear decay")
+        eo["transform_data_to_device"] = [
+            "KnowledgeDistillationCL.transform_data_to_device"
+        ]
+        eo["calculate_composite_loss"] = [
+            "KnowledgeDistillationCL.calculate_composite_loss"
+        ]
+        return eo
 
 def soft_cross_entropy(output, target, reduction="mean"):
     """ Cross entropy that accepts soft targets
