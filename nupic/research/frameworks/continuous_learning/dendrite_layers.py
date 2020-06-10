@@ -24,8 +24,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from nupic.torch.modules import SparseWeights  # , KWinnersBase, KWinners
-from nupic.torch.modules.k_winners import KWinners2d
+from nupic.research.frameworks.continuous_learning.dend_kwinners import (
+    DendriteKWinners2d,
+)
+from nupic.torch.modules import SparseWeights
 
 
 class DendriteInput(nn.Module):
@@ -64,8 +66,9 @@ class DendriteInput(nn.Module):
         return torch.clamp(x, min=self.threshold)
 
     def forward(self, x):
+        """ Note this only returns the linear output """
         out = self.linear(x)
-        return out  # self.act_fun(out)
+        return out
 
 
 class DendriteOutput(nn.Module):
@@ -86,7 +89,7 @@ class DendriteOutput(nn.Module):
                                                       dendrites_per_unit * out_dim))
         self.bias = torch.nn.Parameter(torch.Tensor(out_dim))
         # for stability - will integrate separate weight init. later
-        nn.init.xavier_normal_(self.weight)
+        nn.init.kaiming_uniform_(self.weight)
         self.bias.data.fill_(0.)
 
     def forward(self, x):
@@ -124,21 +127,21 @@ class DendriteLayer(nn.Module):
 
 
     """
+
     def __init__(self,
                  in_dim,
                  out_dim,
                  dendrites_per_neuron,
                  weight_sparsity=0.2,
-                 k_inference_factor=1.,
-                 boost_strength=2.,
-                 boost_strength_factor=0.9,
-                 duty_cycle_period=1000,
+                 act_fun_type=None,
                  ):
         super(DendriteLayer, self).__init__()
 
         self.dendrites_per_neuron = dendrites_per_neuron
         self.n_dendrites = out_dim * self.dendrites_per_neuron
         self.out_dim = out_dim
+
+        self.act_fun_type = act_fun_type
 
         self.input = DendriteInput(
             in_dim=in_dim,
@@ -147,28 +150,52 @@ class DendriteLayer(nn.Module):
         )
         self.output = DendriteOutput(out_dim, self.dendrites_per_neuron)
 
-        self.act_fun = KWinners2d(
-            channels=self.out_dim,
-            percent_on=0.1,  # will be overwritten
-            k_inference_factor=k_inference_factor,  # will be overwritten
-            boost_strength=boost_strength,
-            boost_strength_factor=boost_strength_factor,
-            duty_cycle_period=duty_cycle_period,
-            local=True,
-        )
-        self.act_fun.k = 1
-        self.act_fun.k_inference = 1
+        if self.act_fun_type == "kwinner":
+            self.act_fun = DendriteKWinners2d(
+                channels=self.out_dim,
+                k=1,
+                local=True,
+            )
+        else:
+            self.act_fun = torch.sigmoid
 
-    def forward(self, x):
+    def forward(self, x, cat_projection=None):
+        """ cat_proj here is an optional argument
+        for a categorical "feedback" projection to
+        the dendrite segments
+        """
+        if self.act_fun_type is None:
+            return self.forward_kwinner(x, cat_projection)
+        else:
+            return self.forward_sigmoid(x, cat_projection)
+
+    def forward_kwinner(self, x, cat_projection=None):
         batch_size = x.shape[0]
         out0 = self.input(x)
-        with torch.no_grad():
-            out0_ = out0.reshape(batch_size, self.dpc, self.out_dim, 1)
 
-        out1 = self.act_fun(out0_)
+        if cat_projection is not None:
+            out0 = out0 * cat_projection
+
+        with torch.no_grad():
+            out0 = out0.reshape(batch_size, self.dendrites_per_neuron, self.out_dim, 1)
+
+        out1 = self.act_fun(out0)
+
         with torch.no_grad():
             out1_ = torch.squeeze(out1)
-        out1_ = out1_.reshape(batch_size, self.out_dim * self.dpc)
+        out1_ = out1_.reshape(batch_size, self.out_dim * self.dendrites_per_neuron)
 
         out2 = self.output(out1_)
+        return out2
+
+    def forward_sigmoid(self, x, cat_projection=None):
+        out0 = self.input(x)
+        if cat_projection is not None:
+            out1_pre = out0 * cat_projection
+        else:
+            out1_pre = out0
+
+        out1 = self.act_fun(out1_pre)
+
+        out2 = self.output(out1)
         return out2
