@@ -46,8 +46,13 @@ def train_sequential(experiment, print_acc=False):
         print("training on class {}".format(label))
 
         freeze_indices = np.hstack(  # class indices to freeze in output layer
-            [0, np.delete(train_labels,
-                          np.where(train_labels == label)[0], axis=0).flatten()])
+            [
+                0,
+                np.delete(
+                    train_labels, np.where(train_labels == label)[0], axis=0
+                ).flatten(),
+            ]
+        )
 
         for epoch in range(epochs):
             experiment.train(epoch, label, indices=freeze_indices)
@@ -125,13 +130,15 @@ class SparseCorrExperiment(object):
                 config["freeze_params"] = []
 
             if shuffled:
-                outputs, sh_outputs = self.run_experiment(config, sequential=sequential,
-                                                          shuffled=True)
+                outputs, sh_outputs = self.run_experiment(
+                    config, sequential=sequential, shuffled=True
+                )
                 [output[k].append(outputs[k]) for k in range(len(outputs))]
                 [sh_output[k].append(sh_outputs[k]) for k in range(len(sh_outputs))]
             else:
-                outputs = self.run_experiment(config, sequential=sequential,
-                                              shuffled=False)
+                outputs = self.run_experiment(
+                    config, sequential=sequential, shuffled=False
+                )
                 [output[k].append(outputs[k]) for k in range(len(outputs))]
 
         plot_metrics(output)
@@ -145,10 +152,10 @@ class SparseCorrExperiment(object):
     def act_fn_comparison(self, freeze_linear=False, sequential=False, shuffled=False):
         """ Compare k-winner and ReLU activations on sparse and dense weights. """
         self.reset_ents_dcs()
-        cnn_weight_sparsities = [(1., 1.), (0.5, 0.2)]
-        linear_weight_sparsities = [(1.,), (0.1,)]
-        cnn_percent_on = [(0.095, 0.125), (1., 1.)]
-        linear_percent_on = [(0.1,), (1.,)]
+        cnn_weight_sparsities = [(1.0, 1.0), (0.5, 0.2)]
+        linear_weight_sparsities = [(1.0,), (0.1,)]
+        cnn_percent_on = [(0.095, 0.125), (1.0, 1.0)]
+        linear_percent_on = [(0.1,), (1.0,)]
         exp = self.sparse_network
 
         odcorrs, dcorrs = [], []
@@ -191,11 +198,14 @@ class SparseCorrExperiment(object):
         else:
             return output
 
-    def layer_size_comparison(self, layer_sizes,
-                              compare_models=False,
-                              freeze_linear=False,
-                              sequential=False,
-                              shuffled=False):
+    def layer_size_comparison(
+        self,
+        layer_sizes,
+        compare_models=False,
+        freeze_linear=False,
+        sequential=False,
+        shuffled=False,
+    ):
         """Get metrics for specified layer sizes
         :param layer_sizes: list of desired CNN layer sizes
         :param compare_models (Boolean): will also run a dense CNN
@@ -234,23 +244,26 @@ class SparseCorrExperiment(object):
                 config["cnn_out_channels"] = (layer_sizes[ind], layer_sizes[ind])
                 config["cnn_weight_sparsity"] = (
                     curr_sparsity[0] * sparse_factor[ind],
-                    curr_sparsity[1] * sparse_factor[ind])
+                    curr_sparsity[1] * sparse_factor[ind],
+                )
                 config["cnn_percent_on"] = (
                     curr_percent_on[0] * sparse_factor[ind],
-                    curr_percent_on[1] * sparse_factor[ind])
+                    curr_percent_on[1] * sparse_factor[ind],
+                )
 
                 if shuffled:
                     outputs, sh_outputs = self.run_experiment(
-                        config, layer_sizes[ind], shuffled=shuffled)
+                        config, layer_sizes[ind], shuffled=shuffled
+                    )
                     [output[k].append(outputs[k]) for k in range(len(outputs))]
                     [sh_output[k].append(sh_outputs[k]) for k in range(len(sh_outputs))]
                 else:
                     outputs = self.run_experiment(
-                        config, layer_sizes[ind], shuffled=shuffled)
+                        config, layer_sizes[ind], shuffled=shuffled
+                    )
                     [output[k].append(outputs[k]) for k in range(len(outputs))]
 
-        leg = list(zip(np.repeat(experiments, len(layer_sizes)),
-                       3 * layer_sizes))
+        leg = list(zip(np.repeat(experiments, len(layer_sizes)), 3 * layer_sizes))
         plot_metrics(output, legend_=leg)
 
         if shuffled:
@@ -259,12 +272,15 @@ class SparseCorrExperiment(object):
         else:
             return output
 
-    def run_experiment(self, config,
-                       layer_size=None,
-                       sequential=False,
-                       shuffled=False,
-                       boosting=True,
-                       duty_cycle_period=1000):
+    def run_experiment(
+        self,
+        config,
+        layer_size=None,
+        sequential=False,
+        shuffled=False,
+        boosting=True,
+        duty_cycle_period=1000,
+    ):
 
         if not boosting:
             config["boost_strength"] = 0.0
@@ -304,12 +320,12 @@ def plot_duty_cycles(experiment):
 
             for idx in range(len(items)):
                 plt.subplot(2, 2, idx + 1)
-                ks = dc_flat[idx::len(items)]
+                ks = dc_flat[idx :: len(items)]
                 alpha = 0.12 / np.log(ks[0].shape[0])
                 plt.plot(ks, "k.", alpha=0.3)
                 plt.plot(ks, "k", alpha=alpha)
                 plt.xticks(np.arange(5), np.arange(1, 6))
-                plt.ylim((0., 0.2))
+                plt.ylim((0.0, 0.2))
                 plt.title(items[idx])
                 plt.xlabel("Training iteration")
                 plt.ylabel("Duty cycle")
@@ -324,7 +340,7 @@ def plot_entropies(experiment):
 
             for idx in range(len(items)):
                 plt.subplot(2, 2, idx + 1)
-                ks = ents_flat[idx::len(items)]
+                ks = ents_flat[idx :: len(items)]
                 plt.plot(ks, "k.", alpha=0.6)
                 plt.plot(ks, "k", alpha=0.2)
                 plt.xticks(np.arange(5), np.arange(1, 6))
