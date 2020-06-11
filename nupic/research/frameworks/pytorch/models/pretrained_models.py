@@ -61,6 +61,29 @@ def resnet50_swsl():
         "facebookresearch/semi-supervised-ImageNet1K-models", "resnet50_swsl"
     )
 
+def resnext50_32x4d_swsl():
+    """
+    From: https://github.com/facebookresearch/semi-supervised-ImageNet1K-models
+
+    Residual networks with grouped convolutional layers,
+    trained in semi-weakly supervised fashion.
+    ResNext: https://arxiv.org/pdf/1611.05431.pdf
+
+
+    "Semi-weakly" supervised (SWSL) ImageNet models are pre-trained on 940 million
+    public images with 1.5K hashtags matching with 1000 ImageNet1K synsets, followed
+    by fine-tuning on ImageNet1K dataset. In this case, the associated hashtags are
+    only used for building a better teacher model.
+
+    During training the student model, those hashtags are ingored and the student model
+    is pretrained with a subset of 64M images selected by the teacher model from the
+    same 940 million public image dataset.
+
+    Params 25M, GFLOPs 4, Top-1 acc 82.2, Top-5 acc 96.3
+    """
+    return torch.hub.load(
+        "facebookresearch/semi-supervised-ImageNet1K-models", "resnext50_32x4d_swsl"
+    )
 
 def resnext101_32x16d_wsl():
     """
@@ -110,3 +133,30 @@ def se_resnext50_32x4d():
     Params 27M, GFLOPs 4.25, Top-1 acc 79.076, Top-5 acc 94.434
     """
     return pretrainedmodels.se_resnext50_32x4d(num_classes=1000, pretrained="imagenet")
+
+
+def se_resnet50():
+    """
+    From: https://github.com/Cadene/pretrained-models.pytorch
+    From: https://github.com/hujie-frank/SENet
+
+    Residual networks with squeeze & excitation blocks
+    Squeeze and Excitation: https://arxiv.org/abs/1709.01507
+
+    Params ~25M, size 107MB, Top-1 acc 77.636, Top-5 acc 93.752
+    """
+    return pretrainedmodels.se_resnet50(num_classes=1000, pretrained="imagenet")
+
+
+def xception():
+    """
+    From: https://github.com/Cadene/pretrained-models.pytorch
+
+    Interpretation of Inception modules in convolutional neural networks as being
+    an intermediate step in-between regular convolution and the depthwise separable
+    convolution operation
+    https://arxiv.org/abs/1610.02357
+
+    Params 24M, size 87MB, Top-1 acc 79.000, Top-5 acc 94.500
+    """
+    return pretrainedmodels.xception(num_classes=1000, pretrained="imagenet")

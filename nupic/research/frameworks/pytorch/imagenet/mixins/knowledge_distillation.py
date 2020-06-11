@@ -225,10 +225,11 @@ class KnowledgeDistillationCL(object):
 
         # combine several models
         kd_error_loss = 0
+        num_models = len(self.teacher_models)
         for teacher_model in self.teacher_models:
             with torch.no_grad():
                 soft_target = F.softmax(teacher_model(data))
-            kd_error_loss += soft_cross_entropy(output, soft_target)
+            kd_error_loss += soft_cross_entropy(output, soft_target) / num_models
             del soft_target
 
         # combine with regular target if kd_factor < 1
@@ -253,6 +254,10 @@ class KnowledgeDistillationCL(object):
         """
         Replace to remove target being moved to device
         """
+        if not self.model.training:
+            return super().transform_data_to_device(data, target, device,
+                                                    non_blocking)
+
         data = data.to(self.device, non_blocking=non_blocking)
         return data, target
 
@@ -261,9 +266,10 @@ class KnowledgeDistillationCL(object):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("Knowledge Distillation initialization")
         eo["pre_epoch"].append("Update kd factor based on linear decay")
-        eo["transform_data_to_device"] = [
-            "KnowledgeDistillationCL.transform_data_to_device"
-        ]
+        eo["transform_data_to_device"].insert(0, "If not training: {")
+        eo["transform_data_to_device"].append(
+            "} else: { Return data only sent to device }"
+        )
         eo["calculate_composite_loss"] = [
             "KnowledgeDistillationCL.calculate_composite_loss"
         ]

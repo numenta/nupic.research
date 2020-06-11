@@ -103,18 +103,18 @@ class CompositeLoss():
             self.optimizer.step()
             t4 = time.time()
 
-            if self.post_batch is not None:
+            if self.post_batch_wrapper is not None:
                 time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
                                + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
                                                                 t4 - t3)
-                self.post_batch(model=self.model,
-                                error_loss=error_loss.detach(),
-                                complexity_loss=(complexity_loss.detach()
-                                                 if complexity_loss is not None
-                                                 else None),
-                                batch_idx=batch_idx,
-                                num_images=num_images,
-                                time_string=time_string)
+                self.post_batch_wrapper(model=self.model,
+                                        error_loss=error_loss.detach(),
+                                        complexity_loss=(complexity_loss.detach()
+                                                        if complexity_loss is not None
+                                                        else None),
+                                        batch_idx=batch_idx,
+                                        num_images=num_images,
+                                        time_string=time_string)
             del error_loss, complexity_loss
             t0 = time.time()
 
