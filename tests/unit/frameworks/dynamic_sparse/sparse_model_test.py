@@ -34,7 +34,7 @@ def count_params(network):
     total_params = 0
     for layer in network.modules():
         if has_params(layer):
-            nonzeros = torch.nonzero(layer.weight.data)
+            nonzeros = layer.weight.data.nonzero()
             total_params += len(nonzeros)
 
     return total_params
