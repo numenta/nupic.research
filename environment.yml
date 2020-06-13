@@ -13,7 +13,7 @@ dependencies:
   - defaults::pip
 
   # See nupic.torch requirements.txt
-  - pytorch=1.4
+  - pytorch=1.5
 
   # See requirements.txt
   - awscli
@@ -32,7 +32,7 @@ dependencies:
   - scikit-image
   - seaborn
   - tabulate
-  - torchvision=0.5.0
+  - torchvision=0.6.0
   - tqdm
   - h5py
 
