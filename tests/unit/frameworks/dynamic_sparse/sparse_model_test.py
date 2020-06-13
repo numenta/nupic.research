@@ -20,8 +20,6 @@
 
 import unittest
 
-import torch
-
 from nupic.research.frameworks.dynamic_sparse.models import SparseModel
 from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb, gsc_sparse_dsnn
 
