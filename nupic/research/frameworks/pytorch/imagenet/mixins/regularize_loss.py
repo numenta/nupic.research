@@ -49,8 +49,8 @@ class RegularizeLoss(object):
         self.num_reg_cycles = config.get("num_reg_cycles", 1)
         self.initial_reg_scalar = config.get("initial_reg_scalar", 1.0)
         self.final_reg_scalar = config.get("final_reg_scalar", 1.0)
-        self.pct_begin_ramp = config.get("pct_begin_reg_ramp", 0.0)
-        self.pct_end_ramp = config.get("pct_end_reg_ramp", 0.0)
+        self.pct_begin_reg_ramp = config.get("pct_begin_reg_ramp", 0.0)
+        self.pct_end_reg_ramp = config.get("pct_end_reg_ramp", 0.0)
         self.reg_coefficient = (
             1 / len(self.train_loader.dataset)
             if config.get("downscale_reg_with_training_set", False)
@@ -62,7 +62,8 @@ class RegularizeLoss(object):
         self.prev_model_complexity = None
 
         # Cache these floats
-        self.reg_ramp_window_length = self.pct_end_ramp - self.pct_begin_ramp
+        self.reg_ramp_window_length = (self.pct_end_reg_ramp
+                                       - self.pct_begin_reg_ramp)
         self.reg_ramp_amount = self.final_reg_scalar - self.initial_reg_scalar
 
         self.reg_scalar = self._compute_reg_scalar(0.0)
@@ -73,10 +74,11 @@ class RegularizeLoss(object):
         assert len(self._regularized_modules) > 0
 
     def _compute_reg_scalar(self, pct):
-        if pct < self.pct_begin_ramp:
+        if pct < self.pct_begin_reg_ramp:
             return self.initial_reg_scalar
-        elif pct < self.pct_end_ramp:
-            ramp_pct = (pct - self.pct_begin_ramp) / self.reg_ramp_window_length
+        elif pct < self.pct_end_reg_ramp:
+            ramp_pct = ((pct - self.pct_begin_reg_ramp)
+                        / self.reg_ramp_window_length)
             return (self.initial_reg_scalar
                     + ramp_pct * self.reg_ramp_amount)
         else:
@@ -122,9 +124,10 @@ class RegularizeLoss(object):
         result["reg_scalar_history"] = self.reg_scalar_history
         self.reg_scalar_history = []
 
-        result["model_complexity_history"] = torch.stack(
-            self.model_complexity_history).cpu().tolist()
-        self.model_complexity_history = []
+        if len(self.model_complexity_history) > 0:
+            result["model_complexity_history"] = torch.stack(
+                self.model_complexity_history).cpu().tolist()
+            self.model_complexity_history = []
 
         return result
 

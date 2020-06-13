@@ -48,9 +48,10 @@ class LogEveryLoss:
     def run_epoch(self):
         result = super().run_epoch()
 
-        log = torch.stack(self.error_loss_history)
-        result["error_loss_history"] = log.cpu().numpy().tolist()
-        self.error_loss_history = []
+        if len(self.error_loss_history) > 0:
+            log = torch.stack(self.error_loss_history)
+            result["error_loss_history"] = log.cpu().numpy().tolist()
+            self.error_loss_history = []
 
         if len(self.complexity_loss_history) > 0:
             log = torch.stack(self.complexity_loss_history)
@@ -64,11 +65,12 @@ class LogEveryLoss:
         aggregated = super().aggregate_results(results)
 
         k = "error_loss_history"
-        loss_by_process_and_batch = torch.Tensor(len(results),
-                                                 len(results[0][k]))
-        for rank, result in enumerate(results):
-            loss_by_process_and_batch[rank, :] = torch.tensor(result[k])
-        aggregated[k] = loss_by_process_and_batch.mean(dim=0).tolist()
+        if k in aggregated:
+            loss_by_process_and_batch = torch.Tensor(len(results),
+                                                     len(results[0][k]))
+            for rank, result in enumerate(results):
+                loss_by_process_and_batch[rank, :] = torch.tensor(result[k])
+            aggregated[k] = loss_by_process_and_batch.mean(dim=0).tolist()
 
         # "complexity_loss_history" doesn't need to be aggregated, since it's
         # the same on every process.
