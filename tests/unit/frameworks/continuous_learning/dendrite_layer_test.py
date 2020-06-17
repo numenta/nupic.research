@@ -76,7 +76,7 @@ class DendKWinnerTest(unittest.TestCase):
         dend_output = DendriteOutput(out_dim=10, dendrites_per_unit=3)
 
         x = torch.randn(8, 30)
-        target = torch.randn(8,).long()
+        target = torch.rand(8,).long()
 
         loss_fn = F.cross_entropy
 
