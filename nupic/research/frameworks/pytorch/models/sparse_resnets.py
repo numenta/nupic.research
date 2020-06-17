@@ -21,26 +21,20 @@
 
 # adapted from https://github.com/meliketoy/wide-resnet.pytorch/
 
-from collections import OrderedDict, namedtuple
+from functools import partial
 
 import torch.nn as nn
 
 import nupic.torch.modules as nupic_modules
+from nupic.research.frameworks.pytorch.models.resnets import BasicBlock, Bottleneck
+from nupic.research.frameworks.pytorch.models.resnets import ResNet as ResNetCore
+from nupic.research.frameworks.pytorch.models.resnets import cf_dict
 from nupic.research.frameworks.pytorch.sparse_layer_params import (
     LayerParams,
     auto_sparse_activation_params,
     auto_sparse_conv_params,
 )
-from nupic.torch.modules import Flatten, KWinners2d
-
-# Defines default convolutional params for different size conv layers
-ConvParams = namedtuple("ConvParams", ["kernel_size", "padding"])
-conv_types = {
-    "1x1": ConvParams(kernel_size=1, padding=0),
-    "3x3": ConvParams(kernel_size=3, padding=1),
-    "5x5": ConvParams(kernel_size=5, padding=2),
-    "7x7": ConvParams(kernel_size=7, padding=3),
-}
+from nupic.torch.modules import KWinners2d
 
 
 def default_resnet_params(
@@ -85,7 +79,9 @@ def default_resnet_params(
     # Set layers params by group type.
     if group_type == BasicBlock:
         params = dict(
-            conv3x3_1=layer_params, conv3x3_2=noact_layer_params, shortcut=layer_params
+            conv3x3_1=layer_params,
+            conv3x3_2=noact_layer_params,
+            shortcut=layer_params
         )
     elif group_type == Bottleneck:
         params = dict(
@@ -103,6 +99,76 @@ def default_resnet_params(
         filters512=[params] * number_layers[3],
         linear=noact_layer_params,
     )
+
+
+def as_kwarg(v):
+    return dict(layer_params=v)
+
+
+def format_as_conv_args(sparse_params, group_type, number_layers):
+    """
+    Take the dictionary and insert layer_params=value so that it works as a
+    kwarg.
+
+    By doing this here rather than in default_resnet_params, we preserve
+    compatibility with any existing code that is providing an alternate to
+    `default_resnet_params`.
+    """
+    result = {}
+    for group_key in ResNetCore.group_keys:
+        group_value = sparse_params[group_key]
+        if isinstance(group_value, (list, tuple)):
+            result[group_key] = [{k: as_kwarg(v)
+                                  for k, v in params.items()}
+                                 for params in group_value]
+        else:
+            result[group_key] = {k: as_kwarg(v)
+                                 for k, v in group_value.items()}
+
+    return dict(
+        stem=as_kwarg(sparse_params["stem"]),
+        linear=as_kwarg(sparse_params["linear"]),
+        **result)
+
+
+def format_as_activation_args(sparse_params, group_type, number_layers):
+    """
+    Take the dictionary that contains "conv1x1_1", etc, and convert it to one
+    that contains "act1", etc., and inserting layer_params=value so that it
+    works as a kwarg.
+
+    By doing this here rather than in default_resnet_params, we preserve
+    compatibility with any existing code that is providing an alternate to
+    `default_resnet_params`.
+    """
+    result = {}
+    if group_type == BasicBlock:
+        for name in ResNetCore.group_keys:
+            group_value = sparse_params[name]
+            if isinstance(group_value, (list, tuple)):
+                result[name] = [dict(act1=as_kwarg(params["conv3x3_1"]),
+                                     act2=as_kwarg(params["shortcut"]))
+                                for params in group_value]
+            else:
+                result[name] = dict(act1=as_kwarg(group_value["conv3x3_1"]),
+                                    act2=as_kwarg(group_value["shortcut"]))
+    elif group_type == Bottleneck:
+        for name in ResNetCore.group_keys:
+            group_value = sparse_params[name]
+            if isinstance(group_value, (list, tuple)):
+                result[name] = [dict(act1=as_kwarg(params["conv1x1_1"]),
+                                     act2=as_kwarg(params["conv3x3_2"]),
+                                     act3=as_kwarg(params["shortcut"]))
+                                for params in group_value]
+            else:
+                result[name] = dict(act1=as_kwarg(group_value["conv1x1_1"]),
+                                    act2=as_kwarg(group_value["conv3x3_2"]),
+                                    act3=as_kwarg(group_value["shortcut"]))
+
+    return dict(
+        stem=as_kwarg(sparse_params["stem"]),
+        linear=as_kwarg(sparse_params["linear"]),
+        **result)
 
 
 def linear_layer(input_size, output_size, layer_params, sparse_weights_type):
@@ -126,16 +192,16 @@ def linear_layer(input_size, output_size, layer_params, sparse_weights_type):
 
 
 def conv_layer(
-    conv_type,
     in_planes,
     out_planes,
+    kernel_size,
     layer_params,
     sparse_weights_type,
     stride=1,
+    padding=0,
     bias=False,
 ):
     """Basic conv layer, which accepts different sparse layer types."""
-    kernel_size, padding = conv_types[conv_type]
     layer = nn.Conv2d(
         in_planes,
         out_planes,
@@ -165,7 +231,7 @@ def conv_layer(
 def activation_layer(
     out,
     layer_params,
-    kernel_size=0,
+    kernel_size=1,
     base_activation=None,
 ):
     """Basic activation layer.
@@ -215,167 +281,12 @@ def activation_layer(
         return base_activation
 
 
-class BasicBlock(nn.Module):
-    """Default block for ResNets with < 50 layers."""
-
-    expansion = 1
-
-    def __init__(
-        self, in_planes, planes, sparse_weights_type, layer_params,
-        stride=1, base_activation=None, batch_norm_args=None
-    ):
-        super(BasicBlock, self).__init__()
-        batch_norm_args = batch_norm_args or {}
-
-        self.regular_path = nn.Sequential(OrderedDict([
-            ("conv1", conv_layer(
-                "3x3",
-                in_planes,
-                planes,
-                layer_params["conv3x3_1"],
-                sparse_weights_type=sparse_weights_type,
-                stride=stride,
-            )),
-            ("bn1", nn.BatchNorm2d(planes, **batch_norm_args)),
-            ("act1", activation_layer(
-                planes, layer_params["conv3x3_1"], base_activation=base_activation)),
-            ("conv2", conv_layer(
-                "3x3",
-                planes,
-                planes,
-                layer_params["conv3x3_2"],
-                sparse_weights_type=sparse_weights_type,
-            )),
-            ("bn2", nn.BatchNorm2d(planes, **batch_norm_args)),
-        ]))
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != planes:
-            self.shortcut = nn.Sequential(OrderedDict([
-                ("conv", conv_layer(
-                    "1x1",
-                    in_planes,
-                    planes,
-                    layer_params["shortcut"],
-                    sparse_weights_type=sparse_weights_type,
-                    stride=stride,
-                )),
-                ("bn", nn.BatchNorm2d(planes, **batch_norm_args)),
-            ]))
-
-        self.post_activation = activation_layer(
-            planes, layer_params["shortcut"], base_activation=base_activation)
-
-    def forward(self, x):
-        out = self.regular_path(x)
-        out += self.shortcut(x)
-        out = self.post_activation(out)
-        return out
-
-
-class Bottleneck(nn.Module):
-    """Default block for ResNets with >= 50 layers."""
-
-    expansion = 4
-
-    def __init__(
-        self, in_planes, planes, sparse_weights_type, layer_params,
-        stride=1, base_activation=None, batch_norm_args=None
-    ):
-        super(Bottleneck, self).__init__()
-        batch_norm_args = batch_norm_args or {}
-
-        self.regular_path = nn.Sequential(OrderedDict([
-            # 1st layer
-            ("conv1", conv_layer(
-                "1x1",
-                in_planes,
-                planes,
-                layer_params["conv1x1_1"],
-                sparse_weights_type=sparse_weights_type,
-            )),
-            ("bn1", nn.BatchNorm2d(planes, **batch_norm_args)),
-            ("act1", activation_layer(
-                planes, layer_params["conv1x1_1"],
-                kernel_size=1, base_activation=base_activation
-            )),
-            # 2nd layer
-            ("conv2", conv_layer(
-                "3x3",
-                planes,
-                planes,
-                layer_params["conv3x3_2"],
-                sparse_weights_type=sparse_weights_type,
-                stride=stride,
-            )),
-            ("bn2", nn.BatchNorm2d(planes, **batch_norm_args)),
-            ("act2", activation_layer(
-                planes, layer_params["conv3x3_2"],
-                kernel_size=3, base_activation=base_activation
-            )),
-            # 3rd layer
-            ("conv3", conv_layer(
-                "1x1",
-                planes,
-                self.expansion * planes,
-                layer_params["conv1x1_3"],
-                sparse_weights_type=sparse_weights_type,
-            )),
-            ("bn3", nn.BatchNorm2d(self.expansion * planes, **batch_norm_args)),
-        ]))
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion * planes:
-            self.shortcut = nn.Sequential(OrderedDict([
-                ("conv", conv_layer(
-                    "1x1",
-                    in_planes,
-                    self.expansion * planes,
-                    layer_params["shortcut"],
-                    sparse_weights_type=sparse_weights_type,
-                    stride=stride,
-                )),
-                ("bn", nn.BatchNorm2d(self.expansion * planes, **batch_norm_args)),
-            ]))
-
-        self.post_activation = activation_layer(
-            self.expansion * planes, layer_params["shortcut"],
-            kernel_size=1, base_activation=base_activation
-        )
-
-    def forward(self, x):
-        out = self.regular_path(x)
-        out += self.shortcut(x)
-        out = self.post_activation(out)
-        return out
-
-
-# Number of blocks per group for different size Resnets.
-cf_dict = {
-    "18": (BasicBlock, [2, 2, 2, 2]),
-    "34": (BasicBlock, [3, 4, 6, 3]),
-    "50": (Bottleneck, [3, 4, 6, 3]),
-    "101": (Bottleneck, [3, 4, 23, 3]),
-    "152": (Bottleneck, [3, 8, 36, 3]),
-}
-
-# URLs to access pretrained models
-model_urls = {
-    18: "https://download.pytorch.org/models/resnet18-5c106cde.pth",
-    34: "https://download.pytorch.org/models/resnet34-333f7ec4.pth",
-    50: "https://download.pytorch.org/models/resnet50-19c8e357.pth",
-    101: "https://download.pytorch.org/models/resnet101-5d3b4d8f.pth",
-    152: "https://download.pytorch.org/models/resnet152-b121ed2d.pth",
-}
-
-
-class ResNet(nn.Module):
-    """Based of torchvision Resnet @
-    https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py"""
+class SparseResNet(ResNetCore):
+    """
+    A bridge from the previous SparseResNet API to the current ResNet API
+    """
 
     def __init__(self, config=None):
-        super().__init__()
-
         # update config
         defaults = dict(
             depth=50,
@@ -408,9 +319,11 @@ class ResNet(nn.Module):
             if self.activation_params_func is None:
                 self.activation_params_func = auto_sparse_activation_params
 
+        group_type, number_layers = cf_dict[str(self.depth)]
         if not hasattr(self, "sparse_params"):
             self.sparse_params = self.resnet_params(
-                *cf_dict[str(self.depth)],
+                group_type,
+                number_layers,
                 layer_params_type=self.layer_params_type,
                 layer_params_kwargs=self.layer_params_kwargs,
                 linear_params_func=self.linear_params_func,
@@ -418,106 +331,41 @@ class ResNet(nn.Module):
                 activation_params_func=self.activation_params_func,
             )
 
-        self.in_planes = 64
-
-        block, num_blocks = self._config_layers()
-
         self.batch_norm_args = self.batch_norm_args or {}
 
-        self.features = nn.Sequential(OrderedDict([
-            # stem
-            ("stem", conv_layer(
-                "7x7",
-                3,
-                64,
-                self.sparse_params["stem"],
-                sparse_weights_type=self.conv_sparse_weights_type,
-                stride=2,
-            )),
-            ("bn_stem", nn.BatchNorm2d(64, **self.batch_norm_args)),
-            ("act_stem", activation_layer(
-                64, self.sparse_params["stem"],
-                kernel_size=7, base_activation=self.base_activation)),
-            ("pool_stem", nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
-            # groups 1 to 4
-            ("group1", self._make_group(
-                block, 64, num_blocks[0], self.sparse_params["filters64"], stride=1,
-                batch_norm_args=self.batch_norm_args
-            )),
-            ("group2", self._make_group(
-                block, 128, num_blocks[1], self.sparse_params["filters128"], stride=2,
-                batch_norm_args=self.batch_norm_args
-            )),
-            ("group3", self._make_group(
-                block, 256, num_blocks[2], self.sparse_params["filters256"], stride=2,
-                batch_norm_args=self.batch_norm_args
-            )),
-            ("group4", self._make_group(
-                block, 512, num_blocks[3], self.sparse_params["filters512"], stride=2,
-                batch_norm_args=self.batch_norm_args
-            )),
-            ("avg_pool", nn.AdaptiveAvgPool2d(1)),
-            ("flatten", Flatten()),
-        ]))
+        conv_args = format_as_conv_args(self.sparse_params, group_type,
+                                        number_layers)
+        act_args = format_as_activation_args(self.sparse_params, group_type,
+                                             number_layers)
 
-        # last output layer
-        self.classifier = linear_layer(
-            512 * block.expansion,
-            self.num_classes,
-            self.sparse_params["linear"],
-            self.linear_sparse_weights_type,
+        super().__init__(
+            depth=self.depth,
+            num_classes=self.num_classes,
+            conv_layer=partial(
+                conv_layer,
+                sparse_weights_type=self.conv_sparse_weights_type
+            ),
+            conv_args=conv_args,
+            norm_args=self.batch_norm_args,
+            act_layer=partial(
+                activation_layer,
+                base_activation=self.base_activation
+            ),
+            act_args=act_args,
+            linear_layer=partial(
+                linear_layer,
+                sparse_weights_type=self.linear_sparse_weights_type
+            ),
+            linear_args=as_kwarg(self.sparse_params["linear"]),
+            deprecated_compatibility_mode=True,
         )
-
-    def _config_layers(self):
-        depth_lst = [18, 34, 50, 101, 152]
-        assert (
-            self.depth in depth_lst
-        ), "Error : Resnet depth should be either 18, 34, 50, 101, 152"
-
-        return cf_dict[str(self.depth)]
-
-    def _make_group(self, block, planes, num_blocks,
-                    sparse_params, stride, batch_norm_args):
-        strides = [stride] + [1] * (num_blocks - 1)
-        layers = []
-
-        # allows sparse params to be defined per group
-        if type(sparse_params) == dict:
-            sparse_params = [sparse_params] * num_blocks
-
-        assert (
-            len(sparse_params) == num_blocks
-        ), "Length of sparse params {:d} should equal num of blocks{:d}".format(
-            len(sparse_params), num_blocks
-        )
-
-        for layer_params, stride in zip(sparse_params, strides):
-            layers.append(
-                block(
-                    self.in_planes,
-                    planes,
-                    layer_params=layer_params,
-                    sparse_weights_type=self.conv_sparse_weights_type,
-                    stride=stride,
-                    base_activation=self.base_activation,
-                    batch_norm_args=batch_norm_args
-                )
-            )
-            self.in_planes = planes * block.expansion
-
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        out = self.features(x)
-        out = self.classifier(out)
-        return out
 
 
 # convenience classes
 def build_resnet(depth, config=None):
     config = config or {}
     config["depth"] = depth
-    return ResNet(config)
+    return SparseResNet(config)
 
 
 def resnet18(config=None):

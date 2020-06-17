@@ -29,7 +29,7 @@ import sys
 import ray.tune as tune
 import torch
 
-import nupic.research.frameworks.pytorch.models.resnets
+import nupic.research.frameworks.pytorch.models.sparse_resnets
 from nupic.research.frameworks.pytorch.imagenet import (
     RezeroedKWinnersImagenetExperiment,
 )
@@ -76,7 +76,7 @@ DEFAULT = dict(
     epochs=90,
 
     # Model class. Must inherit from "torch.nn.Module"
-    model_class=nupic.research.frameworks.pytorch.models.resnets.resnet50,
+    model_class=nupic.research.frameworks.pytorch.models.sparse_resnets.resnet50,
     # model model class arguments passed to the constructor
     model_args=dict(),
 
