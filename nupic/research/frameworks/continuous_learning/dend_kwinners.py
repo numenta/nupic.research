@@ -40,35 +40,29 @@ class DKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
 
     :param dendrites_per_neuron: the number of dendrite segments per unit
     """
+
     def __init__(
-        self,
-        dendrites_per_neuron=3,
+        self, dendrites_per_neuron=3,
     ):
         super(DKWinnersBase, self).__init__()
 
         self.n = 0
         self.k = 0
         self.k_inference = 0
-        self.dendrites_per_neuron = dendrites_per_neuron,
+        self.dendrites_per_neuron = (dendrites_per_neuron,)
 
     def extra_repr(self):
-        return (
-            "n={0}, dendrites_per_neuron={1},".format(
-                self.n, self.dendrites_per_neuron,
-            )
+        return "n={0}, dendrites_per_neuron={1},".format(
+            self.n, self.dendrites_per_neuron,
         )
 
 
 class DKWinners(DKWinnersBase):
     def __init__(
-        self,
-        n,
-        out_dim,
-        dendrites_per_neuron,
+        self, n, out_dim, dendrites_per_neuron,
     ):
         super(DKWinners, self).__init__(
-            out_dim=out_dim,
-            dendrites_per_neuron=dendrites_per_neuron,
+            out_dim=out_dim, dendrites_per_neuron=dendrites_per_neuron,
         )
         self.n = n
         self.k = out_dim
@@ -83,11 +77,8 @@ class DKWinners(DKWinnersBase):
 
 
 class DendriteKWinners2d(DKWinnersBase):
-
     def __init__(
-        self,
-        channels,
-        k=1,
+        self, channels, k=1,
     ):
         super(DendriteKWinners2d, self).__init__()
 
@@ -100,8 +91,6 @@ class DendriteKWinners2d(DKWinnersBase):
     def forward(self, x):
         if self.n == 0:
             self.n = np.prod(x.shape[1:])
-            if not self.local:
-                self.k = int(round(self.n * self.percent_on))
 
         x = self.kwinner_function(x, self.k)
 
@@ -109,16 +98,19 @@ class DendriteKWinners2d(DKWinnersBase):
 
 
 class DendriteKWinners2dLocal(torch.autograd.Function):
+    """ x needs to be shaped as
+    (batch_size, no. units, dendrites per unit, 1)
+    """
+
     @staticmethod
     def forward(ctx, x, k):
 
-        batch_size, channels, h, w = x.shape
+        # batch_size, channels, h, w = x.shape
         boosted = x.detach()
 
-        # Select top K channels from the boosted values
-        topk, indices = boosted.topk(k=k, dim=1)
+        topk, indices = boosted.topk(k=k, dim=2)
         res = torch.zeros_like(x)
-        res.scatter_(1, indices, x.gather(1, indices))
+        res.scatter_(2, indices, x.gather(2, indices))
 
         ctx.save_for_backward(indices)
         return res
@@ -129,9 +121,9 @@ class DendriteKWinners2dLocal(torch.autograd.Function):
         In the backward pass, we set the gradient to 1 for the winning units,
         and 0 for the others.
         """
-        indices, = ctx.saved_tensors
+        (indices,) = ctx.saved_tensors
         grad_x = torch.zeros_like(grad_output, requires_grad=False)
-        grad_x.scatter_(1, indices, grad_output.gather(1, indices))
+        grad_x.scatter_(2, indices, grad_output.gather(2, indices))
         return grad_x, None, None, None, None
 
 
@@ -145,8 +137,8 @@ class DendriteKWinners(torch.autograd.Function):
         # Create a mask that takes the most active out of the N dendrites for each unit
         mask = torch.zeros(boosted.shape[0], out_dim, dpc)
         for k in range(out_dim):
-            ind = torch.argmax(boosted[:, k * (dpc - 1):k * (dpc - 1) + dpc], dim=1)
-            mask[:, k, ind].fill_(1.)
+            ind = torch.argmax(boosted[:, k * (dpc - 1) : k * (dpc - 1) + dpc], dim=1)
+            mask[:, k, ind].fill_(1.0)
 
         mask = mask.reshape(boosted.shape[0], out_dim * dpc).cuda()  # reshape
         res = mask * x
@@ -158,7 +150,7 @@ class DendriteKWinners(torch.autograd.Function):
         """In the backward pass, we set the gradient to 1 for the winning
         units, and 0 for the others.
         """
-        mask, = ctx.saved_tensors
+        (mask,) = ctx.saved_tensors
         grad_x = grad_output * mask
         grad_x.requires_grad_(True)
         return grad_x, None, None, None, None
