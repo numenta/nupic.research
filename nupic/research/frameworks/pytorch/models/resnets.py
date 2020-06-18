@@ -208,32 +208,32 @@ class ResNet(nn.Module):
         :param linear_layer:
             A linear layer that receives the arguments of a nn.Linear and custom
             linear_args
-        :type conv_layer: callable
+        :type linear_layer: callable
 
         :param linear_args:
             A dictionary specifying extra kwargs for the linear_layer, possibly
             assigning different args to each layer.
-        :type conv_args: dict or None
+        :type linear_args: dict or None
 
         :param act_layer:
             An activation layer that receives the number of input channels and
             custom linear_args
-        :type conv_layer: callable
+        :type act_layer: callable
 
         :param act_args:
             A dictionary specifying extra kwargs for the act_layer, possibly
             assigning different args to each layer.
-        :type conv_args: dict or None
+        :type act_args: dict or None
 
         :param norm_layer:
             A normalization layer that receives the arguments of nn.BatchNorm2d
             and custom norm_args
-        :type conv_layer: callable
+        :type norm_layer: callable
 
         :param norm_args:
             A dictionary specifying extra kwargs for the norm_layer, possibly
             assigning different args to each layer.
-        :type conv_args: dict or None
+        :type norm_args: dict or None
 
         :param deprecated_compatibility_mode:
             Enables behavior required by SparseResNet
