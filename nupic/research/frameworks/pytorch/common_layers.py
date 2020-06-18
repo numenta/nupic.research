@@ -37,8 +37,12 @@ from nupic.research.frameworks.pytorch.modules import (
 from nupic.torch.modules import KWinners2d, SparseWeights, SparseWeights2d
 
 
+def always_dense(*args, **kwargs):
+    return 1.0
+
+
 def relu_maybe_kwinners2d(channels,
-                          density_fn,
+                          density_fn=always_dense,
                           k_inference_factor=1.0,
                           boost_strength=1.0,
                           boost_strength_factor=0.9,
@@ -60,7 +64,8 @@ def relu_maybe_kwinners2d(channels,
     return layer
 
 
-def sparse_linear(in_features, out_features, density_fn, bias=True):
+def sparse_linear(in_features, out_features, bias=True,
+                  density_fn=always_dense):
     """
     Get a nn.Linear, possibly wrapped in a SparseWeights
     """
@@ -71,8 +76,8 @@ def sparse_linear(in_features, out_features, density_fn, bias=True):
     return layer
 
 
-def sparse_conv2d(in_channels, out_channels, kernel_size, density_fn, stride=1,
-                  padding=0, dilation=1, groups=1, bias=True):
+def sparse_conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
+                  dilation=1, groups=1, bias=True, density_fn=always_dense):
     """
     Get a nn.Conv2d, possibly wrapped in a SparseWeights2d
     """
@@ -85,24 +90,32 @@ def sparse_conv2d(in_channels, out_channels, kernel_size, density_fn, stride=1,
     return layer
 
 
-def masked_linear(in_features, out_features, density_fn, bias=True):
+def masked_linear(in_features, out_features, bias=True, density_fn=always_dense):
     """
     Get a MaskedLinear, initialized with a particular density
     """
-    layer = MaskedLinear(in_features, out_features, bias=bias)
     density = density_fn(in_features, out_features)
-    maskedlinear_init(layer, density)
+    if density < 1.0:
+        layer = MaskedLinear(in_features, out_features, bias=bias)
+        maskedlinear_init(layer, density)
+    else:
+        layer = nn.Linear(in_features, out_features, bias=bias)
     return layer
 
 
-def masked_conv2d(in_channels, out_channels, kernel_size, density_fn, stride=1,
-                  padding=0, dilation=1, groups=1, bias=True):
+def masked_conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
+                  dilation=1, groups=1, bias=True, density_fn=always_dense):
     """
     Get a MaskedConv2d, initialized with a particular density
     """
-    layer = MaskedConv2d(in_channels, out_channels, kernel_size, stride=stride,
-                         padding=padding, dilation=dilation, groups=groups,
-                         bias=bias)
     density = density_fn(in_channels, out_channels, kernel_size)
-    maskedconv2d_init(layer, density)
+    if density < 1.0:
+        layer = MaskedConv2d(in_channels, out_channels, kernel_size, stride=stride,
+                             padding=padding, dilation=dilation, groups=groups,
+                             bias=bias)
+        maskedconv2d_init(layer, density)
+    else:
+        layer = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride,
+                          padding=padding, dilation=dilation, groups=groups,
+                          bias=bias)
     return layer
