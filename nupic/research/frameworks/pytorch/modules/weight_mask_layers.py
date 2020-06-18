@@ -19,11 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import math
+
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torch.nn.init
 from torch import nn
+from torch.nn import init
 from torch.nn.modules.utils import _pair as pair
 from torch.nn.parameter import Parameter
 
@@ -143,7 +145,12 @@ def maskedlinear_init(module, density):
     """
     Assign the same weight density for each out feature.
     """
-    torch.nn.init.kaiming_normal_(module.weight, mode="fan_out")
+    # Standard nn.Linear initialization.
+    init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+    if module.bias is not None:
+        fan_in, _ = init._calculate_fan_in_and_fan_out(module.weight)
+        bound = 1 / math.sqrt(fan_in)
+        init.uniform_(module.bias, -bound, bound)
 
     if density == 1:
         module.weight_mask[:] = 1
@@ -167,7 +174,12 @@ def maskedconv2d_init(module, density):
     This uses channel to channel density. It assumes
     mask_mode="channel_to_channel".
     """
-    torch.nn.init.kaiming_normal_(module.weight, mode="fan_out")
+    # Standard nn.Conv2d initialization.
+    init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+    if module.bias is not None:
+        fan_in, _ = init._calculate_fan_in_and_fan_out(module.weight)
+        bound = 1 / math.sqrt(fan_in)
+        init.uniform_(module.bias, -bound, bound)
 
     if density == 1:
         module.weight_mask[:] = 1
