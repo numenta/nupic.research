@@ -33,7 +33,10 @@ In Python console:
 from nupic.research.frameworks.pytorch.models import <model name>
 <model name>()
 
-Note: models larger than Resnet50 will not fit the GPU with the regular batch size
+Note:
+- models larger than Resnet50 will not fit the GPU with the regular batch size
+- if SSL certificate error, run in python console prior to downloading models:
+  import ssl; ssl._create_default_https_context = ssl._create_unverified_context
 """
 
 import pretrainedmodels

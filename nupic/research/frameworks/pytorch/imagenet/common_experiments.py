@@ -37,7 +37,6 @@ class KnowledgeDistillationImagenetExperiment(mixins.KnowledgeDistillation,
 
 
 class KnowledgeDistillationCLExperiment(mixins.KnowledgeDistillationCL,
-                                        mixins.CompositeLoss,
                                         RezeroedKWinnersImagenetExperiment):
     pass
 
