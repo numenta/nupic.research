@@ -161,7 +161,8 @@ def maskedlinear_init(module, density):
                            dtype=torch.bool)
         for out_feature in range(module.out_features):
             in_features = np.random.choice(module.in_features,
-                                           on_features_per_out_feature)
+                                           on_features_per_out_feature,
+                                           replace=False)
             mask[out_feature, in_features] = True
         module.weight_mask[:] = mask
         module.weight.data *= module.weight_mask
@@ -190,7 +191,8 @@ def maskedconv2d_init(module, density):
                            dtype=torch.bool)
         for out_channel in range(module.out_channels):
             in_channels = np.random.choice(module.in_channels,
-                                           on_channels_per_out_channel)
+                                           on_channels_per_out_channel,
+                                           replace=False)
             mask[out_channel, in_channels] = True
 
         # Expand the mask to shape (out_channels, in_channels, 1, 1) so that it
