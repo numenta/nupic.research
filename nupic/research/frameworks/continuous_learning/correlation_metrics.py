@@ -41,6 +41,7 @@ def register_act(experiment, dp_logs=True, shuffle=False):
     def get_act(name):
         def hook(model, input_, output):
             act[name] = output.detach().cpu().numpy()
+
         return hook
 
     cnt = 0
@@ -61,9 +62,12 @@ def register_act(experiment, dp_logs=True, shuffle=False):
     corr_mats, dot_mats = [], []
     shuffled_corr_mats, shuffled_dot_mats = [], []
     for key in all_keys:
-        mod_output = [np.vstack([outputs[n][key][k, :].flatten()
-                                 for k in range(experiment.batch_size)])
-                      for n in range(len(outputs))]
+        mod_output = [
+            np.vstack(
+                [outputs[n][key][k, :].flatten() for k in range(experiment.batch_size)]
+            )
+            for n in range(len(outputs))
+        ]
 
         m_len = mod_output[0].shape[1]
         iu = np.triu_indices(experiment.batch_size, 1)
@@ -74,10 +78,13 @@ def register_act(experiment, dp_logs=True, shuffle=False):
         for i in range(10):
             for j in range(10):
                 corr_mat[i, j] = np.corrcoef(mod_output[i], mod_output[j])[iu].mean()
-                dot_mat[i, j] = np.nanmean([np.dot(mod_output[i][x, :],
-                                                   mod_output[j][y, :]) / m_len
-                                            for x in range(experiment.batch_size)
-                                            for y in range(experiment.batch_size)])
+                dot_mat[i, j] = np.nanmean(
+                    [
+                        np.dot(mod_output[i][x, :], mod_output[j][y, :]) / m_len
+                        for x in range(experiment.batch_size)
+                        for y in range(experiment.batch_size)
+                    ]
+                )
 
         corr_mats.append(corr_mat)
         dot_mats.append(dot_mat)
@@ -85,24 +92,28 @@ def register_act(experiment, dp_logs=True, shuffle=False):
         if shuffle:
             shuff_corr_mat = np.zeros((10, 10))
             shuff_dot_mat = np.zeros((10, 10))
-            shuffled_outputs = [np.random.permutation(k.T).T
-                                for k in mod_output]
+            shuffled_outputs = [np.random.permutation(k.T).T for k in mod_output]
 
             for i in range(10):
                 for j in range(10):
                     shuff_corr_mat[i, j] = np.corrcoef(
-                        shuffled_outputs[i], shuffled_outputs[j])[iu].mean()
+                        shuffled_outputs[i], shuffled_outputs[j]
+                    )[iu].mean()
                     shuff_dot_mat[i, j] = np.nanmean(
-                        [np.dot(shuffled_outputs[i][x, :],
-                                shuffled_outputs[j][y, :]) / m_len
-                         for x in range(experiment.batch_size)
-                         for y in range(experiment.batch_size)])
+                        [
+                            np.dot(shuffled_outputs[i][x, :], shuffled_outputs[j][y, :])
+                            / m_len
+                            for x in range(experiment.batch_size)
+                            for y in range(experiment.batch_size)
+                        ]
+                    )
 
             shuffled_corr_mats.append(shuff_corr_mat)
             shuffled_dot_mats.append(shuff_dot_mat)
 
-            sh_offdiag_corrs = [np.nanmean(cc_[off_indices])
-                                for cc_ in shuffled_corr_mats]
+            sh_offdiag_corrs = [
+                np.nanmean(cc_[off_indices]) for cc_ in shuffled_corr_mats
+            ]
             sh_diag_corrs = [np.nanmean(np.diag(cc_)) for cc_ in shuffled_corr_mats]
 
         offdiag_corrs = [np.nanmean(cc[off_indices]) for cc in corr_mats]
@@ -116,37 +127,44 @@ def register_act(experiment, dp_logs=True, shuffle=False):
             return out
 
     if dp_logs:
-        offdiag_dotprods = [try_log(np.nanmean(dp[off_indices]) + 1e-9)
-                            for dp in dot_mats]
+        offdiag_dotprods = [
+            try_log(np.nanmean(dp[off_indices]) + 1e-9) for dp in dot_mats
+        ]
         diag_dotprods = [try_log(np.nanmean(np.diag(dp)) + 1e-9) for dp in dot_mats]
         if shuffle:
-            sh_offdiag_dotprods = [try_log(np.nanmean(dp_[off_indices]) + 1e-9)
-                                   for dp_ in shuffled_dot_mats]
-            sh_diag_dotprods = [try_log(np.nanmean(np.diag(dp_)) + 1e-9)
-                                for dp_ in shuffled_dot_mats]
+            sh_offdiag_dotprods = [
+                try_log(np.nanmean(dp_[off_indices]) + 1e-9)
+                for dp_ in shuffled_dot_mats
+            ]
+            sh_diag_dotprods = [
+                try_log(np.nanmean(np.diag(dp_)) + 1e-9) for dp_ in shuffled_dot_mats
+            ]
 
     else:
         offdiag_dotprods = [np.nanmean(dp[off_indices]) for dp in dot_mats]
         diag_dotprods = [np.nanmean(np.diag(dp)) for dp in dot_mats]
 
         if shuffle:
-            sh_offdiag_dotprods = [np.nanmean(dp_[off_indices])
-                                   for dp_ in shuffled_dot_mats]
+            sh_offdiag_dotprods = [
+                np.nanmean(dp_[off_indices]) for dp_ in shuffled_dot_mats
+            ]
             sh_diag_dotprods = [np.nanmean(np.diag(dp_)) for dp_ in shuffled_dot_mats]
 
     corrs_ = [offdiag_corrs, diag_corrs, offdiag_dotprods, diag_dotprods]
 
     if shuffle:
-        shuffled_corrs = [sh_offdiag_corrs, sh_diag_corrs,
-                          sh_offdiag_dotprods, sh_diag_dotprods]
+        shuffled_corrs = [
+            sh_offdiag_corrs,
+            sh_diag_corrs,
+            sh_offdiag_dotprods,
+            sh_diag_dotprods,
+        ]
         return corrs_, shuffled_corrs
     else:
         return corrs_
 
 
-def plot_metrics(metrics, order=None, savefig=False,
-                 savestring=None,
-                 legend_=None):
+def plot_metrics(metrics, order=None, savefig=False, savestring=None, legend_=None):
     """ Plot correlation metrics
     :param metrics: metrics to plot,
     :param order (optional): metric list indices to plot (i.e. modules),
@@ -163,8 +181,10 @@ def plot_metrics(metrics, order=None, savefig=False,
 
     metrics_list = np.array(metrics_list)
     metric_divider = len(metrics) / 2 - 1
-    ylim_ = [np.nanmin([np.nanmin(x) for x in metrics_list]) - 0.5,
-             np.nanmax([np.nanmax(x) for x in metrics_list]) + 0.5]
+    ylim_ = [
+        np.nanmin([np.nanmin(x) for x in metrics_list]) - 0.5,
+        np.nanmax([np.nanmax(x) for x in metrics_list]) + 0.5,
+    ]
 
     ylim_[ylim_ == -np.inf] = np.sort([np.nanmin(x) for x in metrics_list])[0] - 0.5
 
@@ -174,10 +194,20 @@ def plot_metrics(metrics, order=None, savefig=False,
         array_ = metrics_list[cnt]
         axis.plot(array_, "o", alpha=0.6)
 
-        module_keys = ["cnn1", "cnn1_actfn", "cnn2",
-                       "cnn2_actfn", "linear1", "linear1_actfn"]
-        metric_names = ["Pearson off-diag", "Pearson diag",
-                        "Dot product off-diag", "Dot product diag"]
+        module_keys = [
+            "cnn1",
+            "cnn1_actfn",
+            "cnn2",
+            "cnn2_actfn",
+            "linear1",
+            "linear1_actfn",
+        ]
+        metric_names = [
+            "Pearson off-diag",
+            "Pearson diag",
+            "Dot product off-diag",
+            "Dot product diag",
+        ]
         ylabels = ["Pearson correlation", "log norm. dot product"]
 
         axis.set_xticks(range(6))
@@ -191,8 +221,10 @@ def plot_metrics(metrics, order=None, savefig=False,
                 if array_.shape[1] == 2:
                     axis.legend(["Dense CNN", "Sparse CNN"], frameon=False)
                 else:
-                    axis.legend([int(64 / a) for a in [1, 1 / 2, 1 / 4, 1 / 8, 1 / 16]],
-                                frameon=False)
+                    axis.legend(
+                        [int(64 / a) for a in [1, 1 / 2, 1 / 4, 1 / 8, 1 / 16]],
+                        frameon=False,
+                    )
 
         axis.spines["top"].set_visible(False)
         axis.spines["right"].set_visible(False)
@@ -201,7 +233,7 @@ def plot_metrics(metrics, order=None, savefig=False,
             axis.set_ylim(ylim_)
             axis.set_xticklabels(module_keys, rotation=60)
         else:
-            axis.set_ylim((-0.06, 1.))
+            axis.set_ylim((-0.06, 1.0))
             axis.set_xticklabels("")
 
         cnt += 1
