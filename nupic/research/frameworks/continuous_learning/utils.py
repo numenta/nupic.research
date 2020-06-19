@@ -116,7 +116,6 @@ def train_model(
     optimizer,
     device,
     sample_fraction=None,
-    normalize_input=False,
     freeze_modules=None,
     module_inds=None,
     freeze_output=False,
@@ -130,7 +129,61 @@ def train_model(
     progress_bar=None,
     combine_data=False,
 ):
+    """Train the given model by iterating through mini batches. An epoch ends
+    after one pass through the training set, or if the number of mini batches
+    exceeds the parameter "batches_in_epoch".
 
+    :param model: pytorch model to be trained
+    :type model: torch.nn.Module
+    :param loader: train dataset loader
+    :type loader: :class:`torch.utils.data.DataLoader`
+    :param optimizer: Optimizer object used to train the model.
+           This function will train the model on every batch using this optimizer
+           and the :func:`torch.nn.functional.nll_loss` function
+    :param sample_fraction: Fraction of training set tensors
+           to train on (between 0. and 1.)
+    :param device: device to use ('cpu' or 'cuda')
+    :type device: :class:`torch.device
+    :param freeze_modules: Modules whose gradients to freeze at specifified
+           indices module_inds
+    :type freeze_modules: iterable
+    :param module_inds; Indices to freeze freeze_modules on
+    :type module_inds: list or tuple
+    :param freeze_output: Whether or not to freeze the gradients of the output layer
+           that don't correspond to the class currently trained on
+    :type freeze_output: Boolean
+    :param layer_type: type of model output layer: dense or k-winner
+    :type layer_type: string
+    :param linear_number: if k-winner, the index of the linear layer
+            (i.e. "linear1_kwinners", "linear2_kwinners", etc.)
+    :type linear_number: int
+    :param output_indices: class indices whose corresponding gradients
+            to freeze at the output layer
+    :type output_indices: list or tuple
+    :param criterion: loss function to use
+    :type criterion: function
+    :param batches_in_epoch: Max number of mini batches to train.
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
+    :param post_batch_callback: Callback function to be called after every batch
+                                with the following parameters: model, batch_idx
+    :type post_batch_callback: function
+    :param pre_batch_callback: Callback function to be called before every batch
+                               with the following parameters: model, batch_idx
+    :type pre_batch_callback: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
+    :param progress_bar: Optional :class:`tqdm` progress bar args.
+                         None for no progress bar
+    :type progress_bar: dict or None
+
+    :return: mean loss for epoch
+    :rtype: float
+    """
     model.train()
     # Use asynchronous GPU copies when the memory is pinned
     # See https://pytorch.org/docs/master/notes/cuda.html
@@ -152,9 +205,6 @@ def train_model(
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= max_batch_idx:
             break
-
-        if normalize_input:
-            data = norm_input(data)
 
         num_images = len(target)
         data = data.to(device, non_blocking=async_gpu)
@@ -179,7 +229,6 @@ def train_model(
 
         if freeze_modules is not None:
             cnt = 0
-            # with torch.no_grad():
             for module in freeze_modules:
                 freeze_grads(module, module_inds[cnt])
                 cnt += 1
@@ -193,7 +242,7 @@ def train_model(
             )
 
         t3 = time.time()
-        optimizer.step()  # step
+        optimizer.step()
         t4 = time.time()
 
         if post_batch_callback is not None:

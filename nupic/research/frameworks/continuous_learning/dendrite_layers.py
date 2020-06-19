@@ -149,8 +149,10 @@ class DendriteLayer(nn.Module):
         """
         if self.act_fun_type == "kwinner":
             return self.forward_kwinner(x, cat_projection)
-        else:
+        elif self.act_fun_type == "sigmoid":
             return self.forward_sigmoid(x, cat_projection)
+        else:
+            raise AssertionError("act_fun_type must be ''kwinner'' or ''sigmoid'' ")
 
     def forward_kwinner(self, x, cat_projection=1.0):  # cat_projection = 1.0 is cleaner
         """ cat_projection is scalar categorical input

@@ -105,7 +105,6 @@ class DendriteKWinners2dLocal(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, k):
 
-        # batch_size, channels, h, w = x.shape
         boosted = x.detach()
 
         topk, indices = boosted.topk(k=k, dim=2)
