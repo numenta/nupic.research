@@ -19,11 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import math
+
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torch.nn.init
 from torch import nn
+from torch.nn import init
 from torch.nn.modules.utils import _pair as pair
 from torch.nn.parameter import Parameter
 
@@ -143,7 +145,12 @@ def maskedlinear_init(module, density):
     """
     Assign the same weight density for each out feature.
     """
-    torch.nn.init.kaiming_normal_(module.weight, mode="fan_out")
+    # Standard nn.Linear initialization.
+    init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+    if module.bias is not None:
+        fan_in, _ = init._calculate_fan_in_and_fan_out(module.weight)
+        bound = 1 / math.sqrt(fan_in)
+        init.uniform_(module.bias, -bound, bound)
 
     if density == 1:
         module.weight_mask[:] = 1
@@ -154,7 +161,8 @@ def maskedlinear_init(module, density):
                            dtype=torch.bool)
         for out_feature in range(module.out_features):
             in_features = np.random.choice(module.in_features,
-                                           on_features_per_out_feature)
+                                           on_features_per_out_feature,
+                                           replace=False)
             mask[out_feature, in_features] = True
         module.weight_mask[:] = mask
         module.weight.data *= module.weight_mask
@@ -167,7 +175,12 @@ def maskedconv2d_init(module, density):
     This uses channel to channel density. It assumes
     mask_mode="channel_to_channel".
     """
-    torch.nn.init.kaiming_normal_(module.weight, mode="fan_out")
+    # Standard nn.Conv2d initialization.
+    init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+    if module.bias is not None:
+        fan_in, _ = init._calculate_fan_in_and_fan_out(module.weight)
+        bound = 1 / math.sqrt(fan_in)
+        init.uniform_(module.bias, -bound, bound)
 
     if density == 1:
         module.weight_mask[:] = 1
@@ -178,7 +191,8 @@ def maskedconv2d_init(module, density):
                            dtype=torch.bool)
         for out_channel in range(module.out_channels):
             in_channels = np.random.choice(module.in_channels,
-                                           on_channels_per_out_channel)
+                                           on_channels_per_out_channel,
+                                           replace=False)
             mask[out_channel, in_channels] = True
 
         # Expand the mask to shape (out_channels, in_channels, 1, 1) so that it
