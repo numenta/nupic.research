@@ -64,6 +64,7 @@ def resnet50_swsl():
         "facebookresearch/semi-supervised-ImageNet1K-models", "resnet50_swsl"
     )
 
+
 def resnext50_32x4d_swsl():
     """
     From: https://github.com/facebookresearch/semi-supervised-ImageNet1K-models
@@ -87,6 +88,7 @@ def resnext50_32x4d_swsl():
     return torch.hub.load(
         "facebookresearch/semi-supervised-ImageNet1K-models", "resnext50_32x4d_swsl"
     )
+
 
 def resnext101_32x16d_wsl():
     """

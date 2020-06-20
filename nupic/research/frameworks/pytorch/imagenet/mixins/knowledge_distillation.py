@@ -22,6 +22,7 @@
 import torch
 import torch.nn.functional as F
 
+
 class KnowledgeDistillation(object):
     """
     Sets the network to learn from a teacher model
@@ -35,12 +36,16 @@ class KnowledgeDistillation(object):
             - teacher_model_class: Class for pretrained model to be used as teacher
                                    in knowledge distillation. Can be one or list of
                                    classes for knowledge distillation with ensemble.
-            - kd_ensemble_weights: List of weights to apply to each teacher model during
-                                   distillation. In regular distillation, it is preferable
-                                   the total does not exceed 1. In distillation with composite
-                                   loss, if the total is > 1 the loss will be scaled out
+            - kd_ensemble_weights: List of weights to apply to each teacher model
+                                   during distillation.
+                                   If the total is > 1 the loss will be scaled out
                                    of proportion, acting in practice as a scaling factor
-                                   to the learning rate.
+                                   to the learning rate (the equivalence is true
+                                   in the composite loss model, and only approximate
+                                   for the regular distillation model. Scaling the
+                                   softmax out of proportion creates a target that
+                                   is impossible to reach, since the output distribution
+                                   can only sum to 1)
             - kd_factor_init: Determines the percentage of the target that comes
                               from the teacher model. Value should be float
                               between 0 and 1. Defaults to 1.
@@ -54,7 +59,7 @@ class KnowledgeDistillation(object):
                                    few points). If kd_temperature_end is also defined,
                                    this variable equals the temperature at the beginning
                                    of training. Defaults to 1.0
-            - kd_temperature_end: Determines the temperature T applied to softmax.
+            - kd_temperature_end: Determines the temperature applied to softmax.
                                   Will calculate linear decay based on
                                   kd_temperature_init and kd_temperature_end.
                                   If None, no decay is applied. Defaults to None.
@@ -131,7 +136,6 @@ class KnowledgeDistillation(object):
             self.logger.debug(
                 f"KD temperature: {self.kd_temperature:.3f} @ epoch{self.current_epoch}"
             )
-
 
     def transform_data_to_device(self, data, target, device, non_blocking):
         """
@@ -221,8 +225,8 @@ class KnowledgeDistillationCL(KnowledgeDistillation):
         # calculate and return soft targets for each model
         with torch.no_grad():
             soft_targets = []
-            for teacher_model in self.teacher_models:
-                soft_targets.append(F.softmax(teacher_model(data) / self.kd_temperature))
+            for tmodel in self.teacher_models:
+                soft_targets.append(F.softmax(tmodel(data) / self.kd_temperature))
 
         return data, (target, soft_targets)
 

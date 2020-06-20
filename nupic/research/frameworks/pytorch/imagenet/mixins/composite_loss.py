@@ -20,8 +20,10 @@
 # ----------------------------------------------------------------------
 
 import time
-from tqdm import tqdm
+
 import torch
+from tqdm import tqdm
+
 
 class CompositeLoss():
     """
@@ -105,13 +107,13 @@ class CompositeLoss():
 
             if self.post_batch_wrapper is not None:
                 time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
-                               + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                                t4 - t3)
+                               + "weight update: {:.3f}s").format(t1 - t0, t2 - t1,
+                                                                  t3 - t2, t4 - t3)
                 self.post_batch_wrapper(model=self.model,
                                         error_loss=error_loss.detach(),
                                         complexity_loss=(complexity_loss.detach()
-                                                        if complexity_loss is not None
-                                                        else None),
+                                                         if complexity_loss is not None
+                                                         else None),
                                         batch_idx=batch_idx,
                                         num_images=num_images,
                                         time_string=time_string)
