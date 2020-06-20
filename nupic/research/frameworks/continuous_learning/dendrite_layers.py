@@ -25,7 +25,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from nupic.research.frameworks.continuous_learning.dend_kwinners import (
-    DendriteKWinners2d,
+    DendriteKWinners2dLocal,
 )
 from nupic.torch.modules import SparseWeights
 
@@ -47,12 +47,9 @@ class DendriteInput(nn.Module):
     If weight_sparsity=1, it will default to a standard linear layer.
     """
 
-    def __init__(self,
-                 in_dim,
-                 n_dendrites,
-                 threshold=2,
-                 weight_sparsity=0.2,
-                 ):
+    def __init__(
+        self, in_dim, n_dendrites, threshold=2, weight_sparsity=0.2,
+    ):
         super(DendriteInput, self).__init__()
         self.threshold = threshold
         linear = nn.Linear(in_dim, n_dendrites)
@@ -61,9 +58,6 @@ class DendriteInput(nn.Module):
             self.linear = SparseWeights(linear, weight_sparsity)
         else:
             self.linear = linear
-
-    def dendrite_activation(self, x):
-        return torch.clamp(x, min=self.threshold)
 
     def forward(self, x):
         """ Note this only returns the linear output """
@@ -85,12 +79,13 @@ class DendriteOutput(nn.Module):
         super(DendriteOutput, self).__init__()
         self.dendrites_per_unit = dendrites_per_unit
         self.register_buffer("mask", self.dend_mask(out_dim))
-        self.weight = torch.nn.Parameter(torch.Tensor(out_dim,
-                                                      dendrites_per_unit * out_dim))
-        self.bias = torch.nn.Parameter(torch.Tensor(out_dim))
+        self.weight = torch.nn.Parameter(
+            torch.Tensor(out_dim, dendrites_per_unit * out_dim)
+        )
+        self.bias = torch.nn.Parameter(torch.Tensor(out_dim), requires_grad=True)
         # for stability - will integrate separate weight init. later
         nn.init.kaiming_uniform_(self.weight)
-        self.bias.data.fill_(0.)
+        self.bias.data.fill_(0.0)
 
     def forward(self, x):
         w = self.weight * self.mask
@@ -102,7 +97,7 @@ class DendriteOutput(nn.Module):
         """
         mask = torch.zeros(out_dim, out_dim)
         inds = np.diag_indices(out_dim)
-        mask[inds[0], inds[1]] = 1.
+        mask[inds[0], inds[1]] = 1.0
         out_mask = torch.repeat_interleave(mask, self.dendrites_per_unit, dim=0).T
         return out_mask
 
@@ -113,28 +108,25 @@ class DendriteLayer(nn.Module):
     activation function for the dendrite units
     (in this case a Kwinners2DLocal).
 
-    The parameters k_inference_factor through
-    duty_cycle_period are parameters for the KWinner2D
-    activation. See 'nupic.torch.modules.k_winners'
-    Note that "percent_on" will be overwritten in the
-    KWinner2D module to specify k=1.
-
     :param in_dim: input dimension for DendriteInput
 
     :param out_dim: output dimension for DendriteOutput
 
     :param dendrites_per_neuron: dendrites per downstream unit
 
+    :param weight_sparsity: DOC
 
+    :param act_fun_type
     """
 
-    def __init__(self,
-                 in_dim,
-                 out_dim,
-                 dendrites_per_neuron,
-                 weight_sparsity=0.2,
-                 act_fun_type=None,
-                 ):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        dendrites_per_neuron,
+        weight_sparsity=0.2,
+        act_fun_type="kwinner",
+    ):
         super(DendriteLayer, self).__init__()
 
         self.dendrites_per_neuron = dendrites_per_neuron
@@ -150,52 +142,41 @@ class DendriteLayer(nn.Module):
         )
         self.output = DendriteOutput(out_dim, self.dendrites_per_neuron)
 
-        if self.act_fun_type == "kwinner":
-            self.act_fun = DendriteKWinners2d(
-                channels=self.out_dim,
-                k=1,
-                local=True,
-            )
-        else:
-            self.act_fun = torch.sigmoid
-
-    def forward(self, x, cat_projection=None):
+    def forward(self, x, cat_projection=1.0):
         """ cat_proj here is an optional argument
         for a categorical "feedback" projection to
         the dendrite segments
         """
-        if self.act_fun_type is None:
+        if self.act_fun_type == "kwinner":
             return self.forward_kwinner(x, cat_projection)
-        else:
+        elif self.act_fun_type == "sigmoid":
             return self.forward_sigmoid(x, cat_projection)
+        else:
+            raise AssertionError("act_fun_type must be ''kwinner'' or ''sigmoid'' ")
 
-    def forward_kwinner(self, x, cat_projection=None):
+    def forward_kwinner(self, x, cat_projection=1.0):  # cat_projection = 1.0 is cleaner
+        """ cat_projection is scalar categorical input
+        """
         batch_size = x.shape[0]
         out0 = self.input(x)
 
-        if cat_projection is not None:
-            out0 = out0 * cat_projection
+        out0 = out0 * cat_projection  # will be identity without categorical projection
+        # if statements introduce bug potential and are slower on GPU
+        out0_ = out0.reshape(batch_size, self.out_dim, self.dendrites_per_neuron)
 
-        with torch.no_grad():
-            out0 = out0.reshape(batch_size, self.dendrites_per_neuron, self.out_dim, 1)
+        out1_ = DendriteKWinners2dLocal.apply(out0_, 1)
 
-        out1 = self.act_fun(out0)
+        out1_1 = out1_.reshape(batch_size, self.out_dim * self.dendrites_per_neuron)
 
-        with torch.no_grad():
-            out1_ = torch.squeeze(out1)
-        out1_ = out1_.reshape(batch_size, self.out_dim * self.dendrites_per_neuron)
-
-        out2 = self.output(out1_)
+        out2 = self.output(out1_1)
         return out2
 
-    def forward_sigmoid(self, x, cat_projection=None):
+    def forward_sigmoid(self, x, cat_projection=1.0):
         out0 = self.input(x)
-        if cat_projection is not None:
-            out1_pre = out0 * cat_projection
-        else:
-            out1_pre = out0
 
-        out1 = self.act_fun(out1_pre)
+        out1_pre = out0 * cat_projection
+
+        out1 = torch.sigmoid(out1_pre)
 
         out2 = self.output(out1)
         return out2

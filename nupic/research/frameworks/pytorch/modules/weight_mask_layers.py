@@ -19,9 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import math
+
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.nn import init
 from torch.nn.modules.utils import _pair as pair
 from torch.nn.parameter import Parameter
 
@@ -137,7 +141,71 @@ class MaskedConv2d(nn.Module):
         )
 
 
+def maskedlinear_init(module, density):
+    """
+    Assign the same weight density for each out feature.
+    """
+    # Standard nn.Linear initialization.
+    init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+    if module.bias is not None:
+        fan_in, _ = init._calculate_fan_in_and_fan_out(module.weight)
+        bound = 1 / math.sqrt(fan_in)
+        init.uniform_(module.bias, -bound, bound)
+
+    if density == 1:
+        module.weight_mask[:] = 1
+    else:
+        # Generate random connectivity.
+        on_features_per_out_feature = int(round(density * module.in_features))
+        mask = torch.zeros(module.out_features, module.in_features,
+                           dtype=torch.bool)
+        for out_feature in range(module.out_features):
+            in_features = np.random.choice(module.in_features,
+                                           on_features_per_out_feature,
+                                           replace=False)
+            mask[out_feature, in_features] = True
+        module.weight_mask[:] = mask
+        module.weight.data *= module.weight_mask
+
+
+def maskedconv2d_init(module, density):
+    """
+    Assign the same weight density for each out channel.
+
+    This uses channel to channel density. It assumes
+    mask_mode="channel_to_channel".
+    """
+    # Standard nn.Conv2d initialization.
+    init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+    if module.bias is not None:
+        fan_in, _ = init._calculate_fan_in_and_fan_out(module.weight)
+        bound = 1 / math.sqrt(fan_in)
+        init.uniform_(module.bias, -bound, bound)
+
+    if density == 1:
+        module.weight_mask[:] = 1
+    else:
+        # Generate random connectivity.
+        on_channels_per_out_channel = int(round(density * module.in_channels))
+        mask = torch.zeros(module.out_channels, module.in_channels,
+                           dtype=torch.bool)
+        for out_channel in range(module.out_channels):
+            in_channels = np.random.choice(module.in_channels,
+                                           on_channels_per_out_channel,
+                                           replace=False)
+            mask[out_channel, in_channels] = True
+
+        # Expand the mask to shape (out_channels, in_channels, 1, 1) so that it
+        # can be multiplied with the weight tensor.
+        module.weight_mask[:] = mask.view(
+            module.out_channels, module.in_channels, 1, 1
+        ).float()
+        module.weight.data *= module.weight_mask
+
+
 __all__ = [
     "MaskedLinear",
     "MaskedConv2d",
+    "maskedlinear_init",
+    "maskedconv2d_init",
 ]

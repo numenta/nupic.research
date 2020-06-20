@@ -39,7 +39,7 @@ class Profile:
         if self.use_cProfile:
             pr.disable()
             filepath = os.path.join(self.logdir,
-                                    f"profile-initialization.profile")
+                                    "profile-initialization.profile")
             pstats.Stats(pr).dump_stats(filepath)
             self.logger.info(f"Saved {filepath}")
 
