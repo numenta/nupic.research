@@ -71,31 +71,48 @@ class CutMix(object):
         data[:, :, bbx1:bbx2, bby1:bby2] = data[rand_index, :, bbx1:bbx2, bby1:bby2]
         # adjust lambda to exactly match pixel ratio
         lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.shape[-1] * data.shape[-2]))
+        # combine the targets, will require one hot
+        target = F.one_hot(target)
+        target_patches = F.one_hot(target[rand_index])
+        new_target = lam * target + (1. - lam) * target_patches
 
         # no extra memory - just regular target, a vector with indexes and a scalar
-        return data, (target, rand_index, lam)
+        # return data, (target, rand_index, lam)
+        # target is now soft
+        return data, new_target
 
     def error_loss(self, output, target, reduction="mean"):
         """
         :param output: output from the model
         :param target: target to be matched by model
         :param reduction: reduction to apply to the output ("sum" or "mean")
-
-        Can potentially replace only the error loss in cutmix
         """
-        if not self.model.training or self.mixup_beta <= 0 or \
-                           np.random.rand(1) > self.cutmix_prob:
+        if not self.model.training:
             # Targets are from the dataloader
             return super().error_loss(output, target, reduction=reduction)
-        else:
-            # unpack
-            target, rand_index, lam = target
-            # calculate first loss
-            loss_a = self.lossfn(output, target) * lam
-            # calculate second loss
-            # for each sample, pick a target from a random sample in batch
-            loss_b = self.lossfn(output, target[rand_index]) * (1. - lam)
-            return loss_a + loss_b
+
+        return soft_cross_entropy(output, target, reduction)
+
+    # def error_loss(self, output, target, reduction="mean"):
+    #     """
+    #     :param output: output from the model
+    #     :param target: target to be matched by model
+    #     :param reduction: reduction to apply to the output ("sum" or "mean")
+
+    #     Can potentially replace only the error loss in cutmix
+    #     """
+    #     if not self.model.training or self.mixup_beta <= 0 or \
+    #                        np.random.rand(1) > self.cutmix_prob:
+    #         # Targets are from the dataloader
+    #         return super().error_loss(output, target, reduction=reduction)
+    #     else:
+    #         # unpack
+    #         target, rand_index, lam = target
+    #         # calculate first loss
+    #         loss_a = self.lossfn(output, target) * lam
+    #         # calculate second loss, for the patches
+    #         loss_b = self.lossfn(output, target[rand_index]) * (1. - lam)
+    #         return loss_a + loss_b
 
     @classmethod
     def get_execution_order(cls):
