@@ -32,4 +32,3 @@ from .regularize_loss import RegularizeLoss
 from .rezero_weights import RezeroWeights
 from .update_boost_strength import UpdateBoostStrength
 from .composite_loss import CompositeLoss
-from .cutmix import CutMix, CutMixKnowledgeDistillation
