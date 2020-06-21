@@ -29,6 +29,7 @@ from torch import nn as nn
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
+from nupic.torch.compatibility import upgrade_to_masked_sparseweights
 
 
 def init_resnet50_batch_norm(model):
@@ -59,7 +60,7 @@ def init_resnet50_batch_norm(model):
 
 
 def create_model(model_class, model_args, init_batch_norm, device,
-                 checkpoint_file=None, init_hooks=None):
+                 checkpoint_file=None, detect_old_sparseweights=True):
     """
     Create imagenet experiment model with option to load state from checkpoint
 
@@ -87,6 +88,9 @@ def create_model(model_class, model_args, init_batch_norm, device,
             state = pickle.load(pickle_file)
         with io.BytesIO(state["model"]) as buffer:
             state_dict = deserialize_state_dict(buffer, device)
+
+        if detect_old_sparseweights:
+            state_dict = upgrade_to_masked_sparseweights(state_dict)
 
         # Make sure checkpoint is compatible with model
         if model.state_dict().keys() != state_dict.keys():
