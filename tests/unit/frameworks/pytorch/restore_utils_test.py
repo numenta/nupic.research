@@ -127,6 +127,9 @@ class RestoreUtilsTest1(unittest.TestCase):
 
         self.assertTrue(set(nonlinear_params) == set(expected_nonlinear_params))
 
+    @unittest.skip("This test checks for random exact numbers. It should test "
+                   "something more explicit and flexible to random seed "
+                   "variations.")
     def test_load_full(self):
 
         # Initialize model with new random seed.
@@ -139,22 +142,20 @@ class RestoreUtilsTest1(unittest.TestCase):
             tot_eq = (param1 == param2).sum().item()
             self.assertNotEqual(tot_eq, np.prod(param1.shape))
 
-        # These exact numbers are random.
-        #
-        # # Check output through the full network.
-        # out = full_forward(model, self.in_1)
-        # num_matches = out.isclose(self.out_full, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1)  # some correct
-        #
-        # # Check output through the lower network.
-        # out = lower_forward(model, self.in_1)
-        # num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1337)  # some correct
-        #
-        # # Check output through the lower network.
-        # out = upper_forward(model, self.in_2)
-        # num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1)  # some correct
+        # Check output through the full network.
+        out = full_forward(model, self.in_1)
+        num_matches = out.isclose(self.out_full, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1)  # some correct
+
+        # Check output through the lower network.
+        out = lower_forward(model, self.in_1)
+        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1337)  # some correct
+
+        # Check output through the lower network.
+        out = upper_forward(model, self.in_2)
+        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1)  # some correct
 
         # Restore full model.
         model = load_multi_state(model, restore_full_model=self.checkpoint_path)
@@ -187,6 +188,56 @@ class RestoreUtilsTest1(unittest.TestCase):
         num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
         self.assertEqual(num_matches, 20)  # all correct
 
+    def test_load_full_reduced(self):
+        """
+        A reduced version of test_load_full that is resilient to random seed
+        variations
+        """
+
+        # Initialize model with new random seed.
+        set_random_seed(33)
+        model = MNISTSparseCNN()
+        model.eval()
+
+        # Check output through the full network.
+        for param1, param2 in zip(model.parameters(), self.model.parameters()):
+            tot_eq = (param1 == param2).sum().item()
+            self.assertNotEqual(tot_eq, np.prod(param1.shape))
+
+        # Restore full model.
+        model = load_multi_state(model, restore_full_model=self.checkpoint_path)
+        model.eval()
+
+        # Check output through the full network.
+        for param1, param2 in zip(model.parameters(), self.model.parameters()):
+            tot_eq = (param1 == param2).sum().item()
+            self.assertEqual(tot_eq, np.prod(param1.shape))
+
+        for buffer1, buffer2 in zip(model.buffers(), self.model.buffers()):
+            if buffer1.dtype == torch.float16:
+                buffer1 = buffer1.float()
+                buffer2 = buffer2.float()
+
+            tot_eq = (buffer1 == buffer2).sum().item()
+            self.assertEqual(tot_eq, np.prod(buffer1.shape))
+
+        out = full_forward(model, self.in_1)
+        num_matches = out.isclose(self.out_full, atol=1e-2, rtol=0).sum().item()
+        self.assertEqual(num_matches, 20)  # all correct
+
+        # Check output through the lower network.
+        out = lower_forward(model, self.in_1)
+        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 2048)  # all correct
+
+        # Check output through the lower network.
+        out = upper_forward(model, self.in_2)
+        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 20)  # all correct
+
+    @unittest.skip("This test checks for random exact numbers. It should test "
+                   "something more explicit and flexible to random seed "
+                   "variations.")
     def test_load_nonlinear(self):
 
         # Initialize model with new random seed.
@@ -199,17 +250,15 @@ class RestoreUtilsTest1(unittest.TestCase):
             tot_eq = (param1 == param2).sum().item()
             self.assertNotEqual(tot_eq, np.prod(param1.shape))
 
-        # These exact numbers are random.
-        #
-        # # Check output through the lower network.
-        # out = lower_forward(model, self.in_1)
-        # num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1337)  # some correct
-        #
-        # # Check output through the lower network.
-        # out = upper_forward(model, self.in_2)
-        # num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1)  # some correct
+        # Check output through the lower network.
+        out = lower_forward(model, self.in_1)
+        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1337)  # some correct
+
+        # Check output through the lower network.
+        out = upper_forward(model, self.in_2)
+        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1)  # some correct
 
         # Restore full model.
         model = load_multi_state(model, restore_nonlinear=self.checkpoint_path)
@@ -220,14 +269,39 @@ class RestoreUtilsTest1(unittest.TestCase):
         num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
         self.assertEqual(num_matches, 2048)  # all correct
 
-        # These exact numbers are random, the test should test for something
-        # more explicit and flexible to random seed variations.
-        #
-        # # Check output through the lower network.
-        # out = upper_forward(model, self.in_2)
-        # num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1)
+        # Check output through the lower network.
+        out = upper_forward(model, self.in_2)
+        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1)
 
+    def test_load_nonlinear_reduced(self):
+        """
+        A reduced version of test_load_nonlinear that is resilient to random seed
+        variations
+        """
+
+        # Initialize model with new random seed.
+        set_random_seed(33)
+        model = MNISTSparseCNN()
+        model.eval()
+
+        # Check output through the full network.
+        for param1, param2 in zip(model.parameters(), self.model.parameters()):
+            tot_eq = (param1 == param2).sum().item()
+            self.assertNotEqual(tot_eq, np.prod(param1.shape))
+
+        # Restore full model.
+        model = load_multi_state(model, restore_nonlinear=self.checkpoint_path)
+        model.eval()
+
+        # Check output through the lower network.
+        out = lower_forward(model, self.in_1)
+        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 2048)  # all correct
+
+    @unittest.skip("This test checks for random exact numbers. It should test "
+                   "something more explicit and flexible to random seed "
+                   "variations.")
     def test_load_linear(self):
 
         # Initialize model with new random seed.
@@ -240,30 +314,49 @@ class RestoreUtilsTest1(unittest.TestCase):
             tot_eq = (param1 == param2).sum().item()
             self.assertNotEqual(tot_eq, np.prod(param1.shape))
 
-        # These exact numbers are random, the test should test for something
-        # more explicit and flexible to random seed variations.
-        #
-        # # Check output through the lower network.
-        # out = lower_forward(model, self.in_1)
-        # num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1337)  # some correct
-        #
-        # # Check output through the lower network.
-        # out = upper_forward(model, self.in_2)
-        # num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1)  # some correct
+        # Check output through the lower network.
+        out = lower_forward(model, self.in_1)
+        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1337)  # some correct
+
+        # Check output through the lower network.
+        out = upper_forward(model, self.in_2)
+        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1)  # some correct
 
         # Restore full model.
         model = load_multi_state(model, restore_linear=self.checkpoint_path)
         model.eval()
 
-        # These exact numbers are random, the test should test for something
-        # more explicit and flexible to random seed variations.
-        #
-        # # Check output through the lower network.
-        # out = lower_forward(model, self.in_1)
-        # num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
-        # self.assertEqual(num_matches, 1337)  # some correct
+        # Check output through the lower network.
+        out = lower_forward(model, self.in_1)
+        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 1337)  # some correct
+
+        # Check output through the lower network.
+        out = upper_forward(model, self.in_2)
+        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
+        self.assertEqual(num_matches, 20)  # all correct
+
+    def test_load_linear_reduced(self):
+        """
+        A reduced version of test_load_linear that is resilient to random seed
+        variations
+        """
+
+        # Initialize model with new random seed.
+        set_random_seed(33)
+        model = MNISTSparseCNN()
+        model.eval()
+
+        # Check output through the full network.
+        for param1, param2 in zip(model.parameters(), self.model.parameters()):
+            tot_eq = (param1 == param2).sum().item()
+            self.assertNotEqual(tot_eq, np.prod(param1.shape))
+
+        # Restore full model.
+        model = load_multi_state(model, restore_linear=self.checkpoint_path)
+        model.eval()
 
         # Check output through the lower network.
         out = upper_forward(model, self.in_2)
