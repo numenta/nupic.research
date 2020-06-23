@@ -33,7 +33,7 @@ from nupic.research.frameworks.pytorch.model_utils import serialize_state_dict
 
 
 class ResNetSerialization(unittest.TestCase):
-    def test_identical_v1(self):
+    def test_identical_sparse_resnet(self):
         model_args = dict(config=dict(
             num_classes=3,
             defaults_sparse=True,
