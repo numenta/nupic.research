@@ -28,12 +28,6 @@ defined by data.
 
 from torch import nn
 
-from nupic.research.frameworks.pytorch.modules import (
-    MaskedConv2d,
-    MaskedLinear,
-    maskedconv2d_init,
-    maskedlinear_init,
-)
 from nupic.torch.modules import KWinners2d, SparseWeights, SparseWeights2d
 
 
@@ -87,35 +81,4 @@ def sparse_conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
     density = density_fn(in_channels, out_channels, kernel_size)
     if density < 1.0:
         layer = SparseWeights2d(layer, weight_sparsity=density)
-    return layer
-
-
-def masked_linear(in_features, out_features, bias=True, density_fn=always_dense):
-    """
-    Get a MaskedLinear, initialized with a particular density
-    """
-    density = density_fn(in_features, out_features)
-    if density < 1.0:
-        layer = MaskedLinear(in_features, out_features, bias=bias)
-        maskedlinear_init(layer, density)
-    else:
-        layer = nn.Linear(in_features, out_features, bias=bias)
-    return layer
-
-
-def masked_conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
-                  dilation=1, groups=1, bias=True, density_fn=always_dense):
-    """
-    Get a MaskedConv2d, initialized with a particular density
-    """
-    density = density_fn(in_channels, out_channels, kernel_size)
-    if density < 1.0:
-        layer = MaskedConv2d(in_channels, out_channels, kernel_size, stride=stride,
-                             padding=padding, dilation=dilation, groups=groups,
-                             bias=bias)
-        maskedconv2d_init(layer, density)
-    else:
-        layer = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride,
-                          padding=padding, dilation=dilation, groups=groups,
-                          bias=bias)
     return layer
