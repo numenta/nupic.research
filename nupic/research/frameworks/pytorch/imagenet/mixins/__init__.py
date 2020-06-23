@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .constrain_parameters import ConstrainParameters
-from .knowledge_distillation import KnowledgeDistillation
+from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
 from .log_backprop_structure import LogBackpropStructure
 from .log_covariance import LogCovariance
 from .log_every_learning_rate import LogEveryLearningRate
@@ -31,3 +31,4 @@ from .profile_autograd import ProfileAutograd
 from .regularize_loss import RegularizeLoss
 from .rezero_weights import RezeroWeights
 from .update_boost_strength import UpdateBoostStrength
+from .composite_loss import CompositeLoss
