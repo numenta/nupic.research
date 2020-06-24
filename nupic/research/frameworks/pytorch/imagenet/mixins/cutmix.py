@@ -39,14 +39,13 @@ class CutMix(object):
                           The combination ratio λ between two data points is sampled
                           from the distribution Beta(mixup_beta, mixup_beta).
                           If set to 1, λ is sampled from the uniform distribution.
-            - cutmix_prob: Probability to apply cutmix_prob at each batch.
+            - cutmix_prob: Probability to apply cutmix at each batch.
         """
         super().setup_experiment(config)
 
         # CutMix variables: fixate beta for now
         self.mixup_beta = config.get("mixup_beta", 1.0)
         self.cutmix_prob = config.get("cutmix_prob", 1.0)
-        self.lossfn = F.cross_entropy
 
     def transform_data_to_device(self, data, target, device, non_blocking):
         """
@@ -72,13 +71,10 @@ class CutMix(object):
         # adjust lambda to exactly match pixel ratio
         lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.shape[-1] * data.shape[-2]))
         # combine the targets, will require one hot
-        target = F.one_hot(target)
-        target_patches = F.one_hot(target[rand_index])
-        new_target = lam * target + (1. - lam) * target_patches
+        ohe_target = F.one_hot(target, num_classes=self.num_classes)
+        ohe_target_patches = F.one_hot(target[rand_index], num_classes=self.num_classes)
+        new_target = lam * ohe_target + (1. - lam) * ohe_target_patches
 
-        # no extra memory - just regular target, a vector with indexes and a scalar
-        # return data, (target, rand_index, lam)
-        # target is now soft
         return data, new_target
 
     def error_loss(self, output, target, reduction="mean"):
@@ -93,38 +89,17 @@ class CutMix(object):
 
         return soft_cross_entropy(output, target, reduction)
 
-    # def error_loss(self, output, target, reduction="mean"):
-    #     """
-    #     :param output: output from the model
-    #     :param target: target to be matched by model
-    #     :param reduction: reduction to apply to the output ("sum" or "mean")
-
-    #     Can potentially replace only the error loss in cutmix
-    #     """
-    #     if not self.model.training or self.mixup_beta <= 0 or \
-    #                        np.random.rand(1) > self.cutmix_prob:
-    #         # Targets are from the dataloader
-    #         return super().error_loss(output, target, reduction=reduction)
-    #     else:
-    #         # unpack
-    #         target, rand_index, lam = target
-    #         # calculate first loss
-    #         loss_a = self.lossfn(output, target) * lam
-    #         # calculate second loss, for the patches
-    #         loss_b = self.lossfn(output, target[rand_index]) * (1. - lam)
-    #         return loss_a + loss_b
-
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("Cutmix parameters")
         eo["transform_data_to_device"].insert(0, "If not training: {")
         eo["transform_data_to_device"].append(
-            "} else: { Compute Mixup targets }"
+            "} else: { Compute Cutmix targets }"
         )
         eo["error_loss"].insert(0, "If not training: {")
         eo["error_loss"].append(
-            "} else: { Mixup composite loss }"
+            "} else: { Soft cross entropy loss }"
         )
         return eo
 
@@ -144,7 +119,7 @@ class CutMixKnowledgeDistillation(CutMix):
                           The combination ratio λ between two data points is sampled
                           from the distribution Beta(mixup_beta, mixup_beta).
                           If set to 1, λ is sampled from the uniform distribution.
-            - cutmix_prob: Probability to apply cutmix_prob at each batch.
+            - cutmix_prob: Probability to apply cutmix at each batch.
             - teacher_model_class: Class for pretrained model to be used as teacher
                                    in knowledge distillation.
         """
@@ -155,7 +130,6 @@ class CutMixKnowledgeDistillation(CutMix):
         self.cutmix_prob = config.get("cutmix_prob", 1.0)
 
         # Teacher model and knowledge distillation variables
-        self.lossfn = soft_cross_entropy
         teacher_model_class = config.get("teacher_model_class", None)
         assert teacher_model_class is not None, \
             "teacher_model_class must be specified for KD experiments"
@@ -190,10 +164,15 @@ class CutMixKnowledgeDistillation(CutMix):
 
         # recalculate softmax target
         with torch.no_grad():
-            target = F.softmax(self.teacher_model(data))
+            soft_target = F.softmax(self.teacher_model(data))
+
+        # combine the targets, will require one hot
+        soft_target_patches = F.one_hot(target[rand_index],
+                                        num_classes=self.num_classes)
+        new_target = lam * soft_target + (1. - lam) * soft_target_patches
 
         # no extra memory - just regular target, a vector with indexes and a scalar
-        return data, (target, rand_index, lam)
+        return data, new_target
 
     @classmethod
     def get_execution_order(cls):
@@ -201,7 +180,7 @@ class CutMixKnowledgeDistillation(CutMix):
         eo["setup_experiment"].append("Cutmix and Knowledge Distillation parameters")
         eo["transform_data_to_device"].insert(0, "If not training: {")
         eo["transform_data_to_device"].append(
-            "} else: { Compute Mixup targets using soft target from teacher }"
+            "} else: { Compute Cutmix targets using soft target from teacher }"
         )
         eo["error_loss"].insert(0, "If not training: {")
         eo["error_loss"].append(

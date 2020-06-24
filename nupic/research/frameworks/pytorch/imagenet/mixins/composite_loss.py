@@ -32,10 +32,6 @@ class CompositeLoss():
     """
 
     def train_epoch(self):
-        """Overwrites train model to use private train_model method"""
-        self._train_model()
-
-    def _train_model(self):
         """Private train model that has access to Experiment attributes"""
         self.model.train()
         # Use asynchronous GPU copies when the memory is pinned
@@ -147,6 +143,5 @@ class CompositeLoss():
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["train_epoch"] = ["CompositeLoss.train_epoch"]
-        eo["_train_model"] = ["CompositeLoss._train_model"]
         eo["calculate_composite_loss"] = ["CompositeLoss.calculate_composite_loss"]
         return eo
