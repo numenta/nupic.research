@@ -30,7 +30,7 @@ from nupic.research.frameworks.pytorch.model_utils import (
     serialize_state_dict,
     set_random_seed,
 )
-from nupic.research.frameworks.pytorch.models.resnets import resnet50
+from nupic.research.frameworks.pytorch.models.sparse_resnets import resnet50
 from nupic.torch.modules import rezero_weights
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
