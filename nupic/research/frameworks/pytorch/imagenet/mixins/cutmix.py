@@ -28,6 +28,19 @@ class CutMix(object):
     """
     Applies CutMix (Mixup + CutOut) regularization approach
     Paper: https://arxiv.org/pdf/1905.04899.pdf
+
+    Cutmix is considered to be a state of the art algorithm in regularization.
+    It combines two ideas:
+    - Mixup: mixes two classes by mixing both the input and the target.
+    Mixup linearly combines the inputs, and can distort the image to unrealistic
+    settings.
+    - Cutout: Also known as regional dropout, replaces patches of the image
+    by either black patches or patches with random noise.
+    Replacing a patch of the image incurs in loss of information.
+
+    Cutmix combine both methods, by replacing random patches in the image
+    with patches from other images in the dataset,
+    and combining the target labels accordingly.
     """
     def setup_experiment(self, config):
         """
