@@ -171,13 +171,16 @@ class TrainMNIST(tune.Trainable):
             loader=train_loader,
             optimizer=self.optimizer,
             device=self.device,
+            post_batch_callback=self._post_batch,
         )
-        self.model.apply(rezero_weights)
         self.model.apply(update_boost_strength)
 
         return evaluate_model(
             model=self.model, loader=self.test_loader, device=self.device
         )
+
+    def _post_batch(self, *args, **kwargs):
+        self.model.apply(rezero_weights)
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")

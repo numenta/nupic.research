@@ -72,6 +72,7 @@ def train_randomly(model, in_channels=1, num_samples=20):
         loss = F.nll_loss(output, targets)
         loss.backward()
         optimizer.step()
+        model.apply(rezero_weights)
 
 
 class RemoveBatchnormTest(unittest.TestCase):
@@ -134,7 +135,6 @@ class RemoveBatchnormTest(unittest.TestCase):
             sparse_weights=True,
         )
         train_randomly(model, in_channels=3)
-        model.apply(rezero_weights)
         model2 = remove_batchnorm(model)
 
         expected_modules = set(name for name, m in model.named_children()
