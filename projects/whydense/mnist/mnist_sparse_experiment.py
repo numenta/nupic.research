@@ -149,6 +149,7 @@ class MNISTSparseExperiment(object):
             optimizer=self.optimizer,
             device=self.device,
             batches_in_epoch=batches_in_epoch,
+            post_batch_callback=self.post_batch,
         )
         self.post_epoch()
         self.logger.info("training duration: %s", time.time() - t0)
@@ -206,8 +207,10 @@ class MNISTSparseExperiment(object):
         self.model.apply(update_boost_strength)
 
     def post_epoch(self):
-        self.model.apply(rezero_weights)
         self.lr_scheduler.step()
+
+    def post_batch(self, *args, **kwargs):
+        self.model.apply(rezero_weights)
 
     def run_noise_tests(self):
         """
