@@ -39,8 +39,8 @@ class RezeroWeights:
         if self.rank == 0:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(
                 self.model)
-            self.logger.debug("Params total/nnz %s / %s = %s ",
-                              params_sparse, nonzero_params_sparse2,
+            self.logger.debug("Params nnz/total %s / %s = %s ",
+                              nonzero_params_sparse2, params_sparse,
                               float(nonzero_params_sparse2) / params_sparse)
 
     @classmethod
@@ -65,7 +65,7 @@ class RezeroWeights:
             params_sparse, nonzero_params_sparse = count_nonzero_params(
                 self.model)
             self.logger.debug(
-                "Params nz/total %s / %s = %s",
+                "Params nnz/total %s / %s = %s",
                 nonzero_params_sparse,
                 params_sparse,
                 float(nonzero_params_sparse) / params_sparse)
