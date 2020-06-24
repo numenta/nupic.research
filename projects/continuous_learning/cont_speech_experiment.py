@@ -87,9 +87,7 @@ class ContinuousSpeechExperiment(object):
         self.validation = False
         self.load_datasets()
 
-        self.freeze_params = config["freeze_params"]
         self.running_accuracy = []
-        self.frozen_inds = None
         self.combine_xy = False
         self.boost_strength = config["boost_strength"]
 
@@ -239,9 +237,8 @@ class ContinuousSpeechExperiment(object):
         self,
         epoch,
         training_classes,
-        freeze_params=None,
-        freeze_fun=None,
-        freeze_pct=90,
+        freeze_modules=None,
+        module_inds=None,
         freeze_output=False,
         layer_type="dense",
         linear_number=2,
@@ -270,9 +267,8 @@ class ContinuousSpeechExperiment(object):
             self.train_loader,
             self.optimizer,
             self.device,
-            freeze_params=freeze_params,
-            freeze_fun=freeze_fun,
-            freeze_pct=freeze_pct,
+            freeze_modules=freeze_modules,
+            module_inds=module_inds,
             freeze_output=freeze_output,
             layer_type=layer_type,
             linear_number=linear_number,

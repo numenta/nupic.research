@@ -51,6 +51,16 @@ class RezeroWeights:
         model.apply(rezero_weights)
         return model
 
+    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
+                   *args, **kwargs):
+        super().post_batch(model, error_loss, complexity_loss, batch_idx,
+                           *args, **kwargs)
+
+        extra_validate = (batch_idx in self.additional_batches_to_validate
+                          and self.current_epoch in self.epochs_to_validate)
+        if extra_validate:
+            self.model.apply(rezero_weights)
+
     def post_epoch(self):
         super().post_epoch()
 
@@ -75,5 +85,6 @@ class RezeroWeights:
         eo = super().get_execution_order()
         eo["setup_experiment"].append("RezeroWeights logging")
         eo["create_model"].append("RezeroWeights")
+        eo["post_batch"].append("RezeroWeights if about to validate")
         eo["post_epoch"].append("RezeroWeights")
         return eo
