@@ -23,6 +23,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+
 class CutMix(object):
     """
     Applies CutMix (Mixup + CutOut) regularization approach
@@ -103,6 +104,7 @@ class CutMix(object):
         )
         return eo
 
+
 class CutMixKnowledgeDistillation(CutMix):
     """
     Applies CutMix (Mixup + CutOut) regularization approach
@@ -137,7 +139,6 @@ class CutMixKnowledgeDistillation(CutMix):
         self.teacher_model.eval()
         self.teacher_model.to(self.device)
         self.logger.info(f"KD teacher class: {teacher_model_class}")
-
 
     def transform_data_to_device(self, data, target, device, non_blocking):
         """
@@ -196,23 +197,22 @@ def rand_bbox(shape, lam):
     from: https://github.com/clovaai/CutMix-PyTorch/blob/master/train.py
     """
 
-    W = shape[2]
-    H = shape[3]
+    width = shape[2]
+    height = shape[3]
     cut_rat = np.sqrt(1. - lam)
-    cut_w = np.int(W * cut_rat)
-    cut_h = np.int(H * cut_rat)
+    cut_w = np.int(width * cut_rat)
+    cut_h = np.int(height * cut_rat)
 
     # uniform
-    cx = np.random.randint(W)
-    cy = np.random.randint(H)
+    cx = np.random.randint(width)
+    cy = np.random.randint(height)
 
-    bbx1 = np.clip(cx - cut_w // 2, 0, W)
-    bby1 = np.clip(cy - cut_h // 2, 0, H)
-    bbx2 = np.clip(cx + cut_w // 2, 0, W)
-    bby2 = np.clip(cy + cut_h // 2, 0, H)
+    bbx1 = np.clip(cx - cut_w // 2, 0, width)
+    bby1 = np.clip(cy - cut_h // 2, 0, height)
+    bbx2 = np.clip(cx + cut_w // 2, 0, width)
+    bby2 = np.clip(cy + cut_h // 2, 0, height)
 
     return bbx1, bby1, bbx2, bby2
-
 
 
 def soft_cross_entropy(output, target, reduction="mean"):
