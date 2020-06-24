@@ -82,3 +82,10 @@ def sparse_conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
     if density < 1.0:
         layer = SparseWeights2d(layer, weight_sparsity=density)
     return layer
+
+
+__all__ = [
+    "relu_maybe_kwinners2d",
+    "sparse_linear",
+    "sparse_conv2d",
+]
