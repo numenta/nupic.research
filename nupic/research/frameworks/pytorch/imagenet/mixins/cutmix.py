@@ -48,16 +48,24 @@ class CutMix(object):
 
         :param config: Dictionary containing the configuration parameters
 
+            - mixup_alpha: Parameter for the beta distribution used in mixup to draw
+                          lambda, which defines the size of the bounding boxes.
+                          The combination ratio λ between two data points is sampled
+                          from the distribution Beta(mixup_alpha, mixup_beta).
+                          If α and β are set to 1,
+                          λ is sampled from a uniform distribution.
             - mixup_beta: Parameters for the beta distribution used in mixup to draw
                           lambda, which defines the size of the bounding boxes.
                           The combination ratio λ between two data points is sampled
-                          from the distribution Beta(mixup_beta, mixup_beta).
-                          If set to 1, λ is sampled from the uniform distribution.
+                          from the distribution Beta(mixup_alpha, mixup_beta).
+                          If α and β are set to 1,
+                          λ is sampled from a uniform distribution.
             - cutmix_prob: Probability to apply cutmix at each batch.
         """
         super().setup_experiment(config)
 
         # CutMix variables: fixate beta for now
+        self.mixup_alpha = config.get("mixup_alpha", 1.0)
         self.mixup_beta = config.get("mixup_beta", 1.0)
         self.cutmix_prob = config.get("cutmix_prob", 1.0)
 
@@ -77,7 +85,7 @@ class CutMix(object):
         target = target.to(self.device, non_blocking=non_blocking)
 
         # transform the data - generate mixed sample
-        lam = np.random.beta(self.mixup_beta, self.mixup_beta)
+        lam = np.random.beta(self.mixup_alpha, self.mixup_beta)
         rand_index = torch.randperm(data.shape[0], device=self.device)
         # draw and apply the bounding boxes to batch
         bbx1, bby1, bbx2, bby2 = rand_bbox(data.shape, lam)
@@ -120,8 +128,8 @@ class CutMix(object):
 
 class CutMixKnowledgeDistillation(CutMix):
     """
-    Applies CutMix (Mixup + CutOut) regularization approach
-    Paper: https://arxiv.org/pdf/1905.04899.pdf
+    Applies CutMix (Mixup + CutOut) regularization approach,
+    combined with knowledge distillation.
     """
     def setup_experiment(self, config):
         """
@@ -129,11 +137,18 @@ class CutMixKnowledgeDistillation(CutMix):
 
         :param config: Dictionary containing the configuration parameters
 
+            - mixup_alpha: Parameter for the beta distribution used in mixup to draw
+                          lambda, which defines the size of the bounding boxes.
+                          The combination ratio λ between two data points is sampled
+                          from the distribution Beta(mixup_alpha, mixup_beta).
+                          If α and β are set to 1,
+                          λ is sampled from a uniform distribution.
             - mixup_beta: Parameters for the beta distribution used in mixup to draw
                           lambda, which defines the size of the bounding boxes.
                           The combination ratio λ between two data points is sampled
-                          from the distribution Beta(mixup_beta, mixup_beta).
-                          If set to 1, λ is sampled from the uniform distribution.
+                          from the distribution Beta(mixup_alpha, mixup_beta).
+                          If α and β are set to 1,
+                          λ is sampled from a uniform distribution.
             - cutmix_prob: Probability to apply cutmix at each batch.
             - teacher_model_class: Class for pretrained model to be used as teacher
                                    in knowledge distillation.
@@ -141,6 +156,7 @@ class CutMixKnowledgeDistillation(CutMix):
         super().setup_experiment(config)
 
         # CutMix variables
+        self.mixup_alpha = config.get("mixup_alpha", 1.0)
         self.mixup_beta = config.get("mixup_beta", 1.0)
         self.cutmix_prob = config.get("cutmix_prob", 1.0)
 
@@ -168,7 +184,7 @@ class CutMixKnowledgeDistillation(CutMix):
         data = data.to(self.device, non_blocking=non_blocking)
 
         # transform the data - generate mixed sample
-        lam = np.random.beta(self.mixup_beta, self.mixup_beta)
+        lam = np.random.beta(self.mixup_alpha, self.mixup_beta)
         rand_index = torch.randperm(data.shape[0], device=self.device)
         # draw and apply the bounding boxes to batch
         bbx1, bby1, bbx2, bby2 = rand_bbox(data.shape, lam)
