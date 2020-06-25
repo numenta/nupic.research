@@ -165,6 +165,9 @@ class ImagenetTrainable(Trainable):
                 # Check if we should stop the experiment
                 ret[DONE] = self._should_stop()
 
+                # Log result.
+                ray.get([w.log_result.remote(ret) for w in self.procs])
+
                 return ret
 
             err_msg = (f"{self._trial_info.trial_name}({self.iteration}): "

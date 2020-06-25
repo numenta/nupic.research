@@ -559,6 +559,15 @@ class ImagenetExperiment:
         target = target.to(self.device, non_blocking=non_blocking)
         return data, target
 
+    def log_result(self, result):
+        """
+        Logs results of the experiment.
+
+        :param result: dictionary of results
+        :type result: dict
+        """
+        pass
+
     @classmethod
     def aggregate_results(cls, results):
         """
@@ -822,6 +831,7 @@ class ImagenetExperiment:
             transform_data_to_device=[
                 "ImagenetExperiment.transform_data_to_device"
             ],
+            log_result=["ImagenetExperiment.log_result"],
             aggregate_results=["ImagenetExperiment.aggregate_results"],
             aggregate_validation_results=[
                 "ImagenetExperiment.aggregate_validation_results"
