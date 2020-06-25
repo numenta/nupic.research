@@ -3,17 +3,17 @@
 # platform: osx-64
 name: nupic.research
 channels:
-  - defaults
-  - conda-forge
   - pytorch
   - fastai
+  - defaults
+  - conda-forge
 
 dependencies:
-  - python=3.7
-  - pip
+  - defaults::python=3.7
+  - defaults::pip
 
   # See nupic.torch requirements.txt
-  - pytorch=1.3.1
+  - pytorch=1.5
 
   # See requirements.txt
   - awscli
@@ -32,7 +32,7 @@ dependencies:
   - scikit-image
   - seaborn
   - tabulate
-  - torchvision=0.4.2
+  - torchvision=0.6.0
   - tqdm
   - h5py
 

@@ -25,6 +25,8 @@ nupic.tensorflow @ git+https://github.com/numenta/nupic.tensorflow.git
 
 awscli
 ax-platform
+botorch
+gpytorch
 boto3
 elasticsearch
 jupyter
@@ -36,11 +38,14 @@ python-dateutil==2.8.0
 fastai
 pillow==6.0.0
 python-dotenv
-ray[all]==0.8.0
+ray[tune]==0.8.3
 requests
 scikit-image
 seaborn>=0.9.0
+sigopt
 tabulate
-torchvision==0.4.2
+torchvision==0.6.0
 tqdm
 h5py
+pretrainedmodels==0.7.4
+wandb==0.8.36

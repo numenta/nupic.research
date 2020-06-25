@@ -21,6 +21,11 @@ import glob
 import json
 import os
 
+import ray
+import torch
+from ray.tune.suggest.variant_generator import format_vars, generate_variants
+from ray.tune.trial_runner import _TuneFunctionDecoder
+
 
 def load_ray_tune_experiments(
     experiment_path, load_results=False
@@ -104,3 +109,101 @@ def load_ray_tune_experiment(
                 experiment["results"] = [json.loads(s) for s in rows]
 
     return experiment_state
+
+
+def get_last_checkpoint(results_dir):
+    """
+    Find the last checkpoint given the ray tune results directory
+
+    :param results_dir:  ray tune results directory
+    :return: checkpoint file or None when no checkpoints are found
+    """
+    # Get experiment states sorted by date
+    experiment_state_json = glob.glob(f"{results_dir}/experiment_state-*.json")
+    experiment_state_json.sort(key=os.path.getmtime, reverse=True)
+
+    for file_path in experiment_state_json:
+        with open(file_path, mode="r") as f:
+            experiment_state = json.load(f, cls=_TuneFunctionDecoder)
+
+        # Get newest checkpoint from last experiment
+        checkpoint = next(reversed(experiment_state["checkpoints"]))
+        newest_checkpoint = checkpoint["checkpoint_manager"].newest_checkpoint
+
+        # Update checkpoint location
+        checkpoint_file = newest_checkpoint.value
+        if checkpoint_file is not None:
+            checkpoint_file = checkpoint_file.replace(
+                checkpoint["local_dir"], str(results_dir))
+            return checkpoint_file
+
+    # No checkpoint available
+    return None
+
+
+def register_torch_serializers():
+    """
+    Registers ray custom serializer and deserializer for torch.tensor types. According
+    to the ray documentation:
+        "The serializer and deserializer are used when transferring objects of cls
+        across processes and nodes."
+
+    In particular, these are found handy when array-like logs (from a
+    tune.Trainable) are transfered across nodes.
+
+    Example:
+    ```
+    ray.init()
+    register_torch_serializers()
+    ```
+    """
+
+    # Register serializer and deserializer - needed when logging arrays and tensors.
+    def serializer(obj):
+        if obj.requires_grad:
+            obj = obj.detach()
+        if obj.is_cuda:
+            return obj.cpu().numpy()
+        else:
+            return obj.numpy()
+
+    for tensor_type in [
+        torch.FloatTensor,
+        torch.DoubleTensor,
+        torch.HalfTensor,
+        torch.ByteTensor,
+        torch.CharTensor,
+        torch.ShortTensor,
+        torch.IntTensor,
+        torch.LongTensor,
+        torch.Tensor,
+    ]:
+        def deserializer(serialized_obj):
+            return tensor_type(serialized_obj)  # cast to tensor_type
+
+        ray.register_custom_serializer(
+            tensor_type, serializer=serializer, deserializer=deserializer
+        )
+
+
+def generate_trial_variants(config):
+    """
+    Generate configuration for each trial variant evaluating 'ray.tune'
+    functions (grid_search, sample_from, ...) into its final values.
+
+    :param config: Ray tune configuration with 'ray.tune' functions
+    :return: list of dict for each trial configuration variant
+    """
+    trials = []
+    num_samples = config["num_samples"]
+    for i in range(num_samples):
+        for variables, variant in generate_variants(config):
+            # Update experiment tag with variant vars
+            if len(variables) > 0:
+                variant["experiment_tag"] = f"{i}_{format_vars(variables)}"
+            else:
+                variant["experiment_tag"] = str(i)
+
+            trials.append(variant)
+
+    return trials

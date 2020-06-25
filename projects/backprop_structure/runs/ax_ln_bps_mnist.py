@@ -22,9 +22,12 @@
 import os
 
 import numpy as np
+import torch.optim
 
+import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
+import nupic.research.frameworks.backprop_structure.networks as networks
 from nupic.research.frameworks.backprop_structure.ray_ax import (
     ax_optimize_accuracy_weightsparsity,
 )
@@ -51,31 +54,33 @@ class ExploratoryExperiment(mixins.ConstrainParameters,
                             mixins.LogStructure,
                             mixins.Regularize,
                             experiments.Supervised):
-    def __init__(self, lr, l0_strength, droprate_init, gamma, step_size,
+    def __init__(self, logdir, lr, l0_strength, droprate_init, gamma, step_size,
                  first_batch_size):
 
         step_size = int(step_size)
         first_batch_size = int(first_batch_size)
 
         super().__init__(
-            model_alg="mnist_lenet_backpropstructure",
-            model_params=dict(
+            logdir=logdir,
+
+            network_class=networks.mnist_lenet_backpropstructure,
+            network_args=dict(
                 l0_strength=l0_strength,
                 droprate_init=droprate_init,
                 decay_mean=True,
                 use_batch_norm=False,
             ),
 
-            dataset_name="MNIST",
-            dataset_params={},
+            dataset_class=datasets.MNIST,
+            dataset_args={},
 
-            optim_alg="Adam",
-            optim_params=dict(
+            optim_class=torch.optim.Adam,
+            optim_args=dict(
                 lr=lr,
             ),
 
-            lr_scheduler_alg="StepLR",
-            lr_scheduler_params=dict(
+            lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+            lr_scheduler_args=dict(
                 step_size=step_size,
                 gamma=gamma,
             ),

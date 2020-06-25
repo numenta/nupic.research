@@ -1,7 +1,7 @@
 Introduction
 ==============
 
-This repository contains the code for experimental algorithm work done internally at Numenta. A description of that research is [available here](https://www.numenta.com/neuroscience-research/).
+This repository contains the code for experimental algorithm work done internally at Numenta. A description of our core neuroscience research is [available here](https://www.numenta.com/neuroscience-research/). A description of how we are applying neuroscience research to machine learning (our current focus) is [available here](https://numenta.com/machine-intelligence-research).
 
 Open Research
 ==============
@@ -18,14 +18,14 @@ What you should understand about this repository
 ================================================
 
 - the code can change quickly and without warning as experiments are discarded and recreated
-- code will not be production-quality, buggy, or well documented
+- code will not be production-quality, bug free, or well documented
 - if we do work with external partners, that work will probably NOT be here
 - we might decide at some point to not do our research in the open anymore and instead delete the whole repository
 
 Papers
 ======
 
-If you are interested in scripts and code used in published papers, [this repository](https://github.com/numenta/htmpapers) contains reproducible code for selected Numenta papers.
+A list of our papers is [available here](https://numenta.com/neuroscience-research/research-publications/). If you are interested in the scripts and code used in published papers, [this repository](https://github.com/numenta/htmpapers) contains reproducible code for selected Numenta papers.
 
 Installation
 ============

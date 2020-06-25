@@ -21,22 +21,12 @@
 
 import torch
 
-from nupic.research.frameworks.backprop_structure.modules import (
-    BinaryGatedConv2d,
-    BinaryGatedLinear,
-    HardConcreteGatedConv2d,
-    HardConcreteGatedLinear,
-)
-
 
 def nonzero_counts(model, verbose):
     result = {}
 
     for layername, layer in model.named_modules():
-        if isinstance(layer, (BinaryGatedConv2d,
-                              BinaryGatedLinear,
-                              HardConcreteGatedConv2d,
-                              HardConcreteGatedLinear)):
+        if hasattr(layer, "get_inference_nonzeros"):
             num_inputs = 1.
             for d in layer.weight_size()[1:]:
                 num_inputs *= d
@@ -79,5 +69,5 @@ class LogStructure(object):
 
     def run_epoch(self, iteration):
         result = super().run_epoch(iteration)
-        result.update(nonzero_counts(self.model, self.log_verbose_structure))
+        result.update(nonzero_counts(self.network, self.log_verbose_structure))
         return result

@@ -24,10 +24,13 @@ import os
 import numpy as np
 import ray
 import torch
+import torch.optim
 from ray import tune
 
+import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
+import nupic.research.frameworks.backprop_structure.networks as networks
 from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
@@ -46,23 +49,23 @@ if __name__ == "__main__":
         experiments.as_ray_trainable(SupervisedNoiseBoosting),
         name=os.path.basename(__file__).replace(".py", ""),
         config=dict(
-            model_alg="gsc_lesparsenet",
-            model_params=dict(
+            network_class=networks.gsc_lesparsenet,
+            network_args=dict(
                 cnn_weight_percent_on=(1.0, 1.0),
                 linear_weight_percent_on=(1.0,),
             ),
 
-            dataset_name="PreprocessedGSC",
-            dataset_params={},
+            dataset_class=datasets.PreprocessedGSC,
+            dataset_args={},
 
-            optim_alg="SGD",
-            optim_params=dict(
+            optim_class=torch.optim.SGD,
+            optim_args=dict(
                 lr=0.01,
                 weight_decay=0.01,
             ),
 
-            lr_scheduler_alg="StepLR",
-            lr_scheduler_params=dict(
+            lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+            lr_scheduler_args=dict(
                 step_size=1,
                 gamma=0.9,
             ),
@@ -70,7 +73,7 @@ if __name__ == "__main__":
             training_iterations=30,
 
             use_tqdm=False,
-            batch_size_train=16,
+            batch_size_train=(16, 16),
             batch_size_test=1000,
 
             noise_test_at_end=True,

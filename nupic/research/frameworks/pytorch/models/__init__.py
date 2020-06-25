@@ -28,3 +28,12 @@ from .mobilenetv1 import (
 from .not_so_densenet import DenseNetCIFAR, NoSoDenseNetCIFAR
 from .resnet_models import ResNet, resnet9
 from .vgg_sparse_net import VGGSparseNet, vgg19_dense_net, vgg19_sparse_net
+from .pretrained_models import (
+    resnext101_32x48d_wsl,
+    resnext101_32x16d_wsl,
+    resnet50_swsl,
+    resnext50_32x4d_swsl,
+    se_resnet50,
+    se_resnext50_32x4d,
+    xception
+)

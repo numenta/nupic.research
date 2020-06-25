@@ -18,154 +18,33 @@
 #  http://numenta.org/licenses/
 #
 import copy
+import logging
 import os
+import pickle
+import time
 from pprint import pprint
 
 import ray
 import ray.resource_spec
-from ray import ray_constants
-from ray.tune import Trainable, TuneError, tune
-from ray.tune.ray_trial_executor import RESOURCE_REFRESH_PERIOD, RayTrialExecutor
+import ray.util.sgd.utils as ray_utils
+import torch
+from ray.exceptions import RayActorError
+from ray.tune import Trainable, tune
 from ray.tune.resources import Resources
+from ray.tune.result import DONE, RESULT_DUPLICATE
+from ray.tune.utils import warn_if_slow
 
-from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment
+from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
+    TrialsCollection,
+)
+from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
+from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
+from nupic.research.support.ray_utils import (
+    get_last_checkpoint,
+    register_torch_serializers,
+)
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
-
-
-def _get_resources_per_node():
-    """
-    Maps node id to available resources on that node
-    :return: dict with available :class:`Resources` for each node
-    """
-    def _is_node_key(k):
-        return k.startswith(ray.resource_spec.NODE_ID_PREFIX)
-
-    # Only consider active/alive nodes
-    nodes = filter(lambda node: node["Alive"], ray.nodes())
-    resources = map(lambda node: node["Resources"], nodes)
-
-    # Group resources by node
-    resources_by_node = {}
-    for item in resources:
-        node_id = next(filter(_is_node_key, item.keys()))
-
-        item = item.copy()
-        num_cpus = item.pop("CPU", 0)
-        num_gpus = item.pop("GPU", 0)
-        memory = ray_constants.from_memory_units(item.pop("memory", 0))
-        object_store_memory = ray_constants.from_memory_units(
-            item.pop("object_store_memory", 0))
-        custom_resources = item
-
-        resources_by_node[node_id] = Resources(
-            int(num_cpus),
-            int(num_gpus),
-            memory=int(memory),
-            object_store_memory=int(object_store_memory),
-            custom_resources=custom_resources)
-
-    return resources_by_node
-
-
-class AffinityExecutor(RayTrialExecutor):
-    """
-    Ray Trial Executor used to set node affinity to node trials.
-    This trial executor will update the trial configuration with one extra
-    parameter (__ray_node_affinity__) that can be used to launch extra workers
-    on the same node.
-    """
-
-    def __init__(self, queue_trials=False, reuse_actors=False, ray_auto_init=False,
-                 refresh_period=RESOURCE_REFRESH_PERIOD):
-        self._resources_by_node = {}
-        super().__init__(queue_trials, reuse_actors, ray_auto_init, refresh_period)
-
-    def _commit_resources(self, resources):
-        resources = copy.deepcopy(resources)
-        # Make sure "custom_resources" keys match "extra_custom_resources" keys
-        # because `RayTrialExecutor._commit_resources` will only commit
-        # resources from "extra_custom_resources" if the same resource key
-        # is present in the "custom_resources" dict
-        for k in resources.extra_custom_resources:
-            if k not in resources.custom_resources:
-                resources.custom_resources[k] = 0.0
-
-        super()._commit_resources(resources)
-
-    def _update_avail_resources(self, num_retries=5):
-        super()._update_avail_resources(num_retries)
-        self._resources_by_node = _get_resources_per_node()
-
-    def start_trial(self, trial, checkpoint=None):
-        # Reserve node before starting trial
-        resources = trial.resources
-
-        # Check for required GPUs first
-        required = resources.gpu_total()
-        if required > 0:
-            resource_attr = "gpu"
-        else:
-            # No GPU, just use CPU
-            resource_attr = "cpu"
-            required = resources.cpu_total()
-
-        # Compute nodes required to fulfill trial resources request
-        custom_resources = {}
-        for node_id, node_resource in self._resources_by_node.items():
-            # Compute resource remaining on each node
-            node_capacity = node_resource.get_res_total(node_id)
-            committed_capacity = self._committed_resources.get_res_total(node_id)
-            remaining_capacity = node_capacity - committed_capacity
-            node_procs = getattr(node_resource, resource_attr, 0)
-            available = node_procs * remaining_capacity
-
-            if available == 0:
-                continue
-
-            if required <= available:
-                custom_resources[node_id] = required / node_procs
-                required = 0
-                break
-            else:
-                custom_resources[node_id] = remaining_capacity
-                required -= available
-
-        if required > 0:
-            raise TuneError(f"Unable to start trial {trial.trial_id}. "
-                            f"Not enough nodes")
-
-        # Update trial node affinity configuration and
-        # extra_custom_resources requirement
-        trial.config.update(__ray_node_affinity__=custom_resources)
-        trial.resources.extra_custom_resources.update(custom_resources)
-        super().start_trial(trial, checkpoint)
-
-    def has_resources(self, resources):
-        if not super().has_resources(resources):
-            return False
-
-        # Check for required GPUs first
-        required = resources.gpu_total()
-        if required > 0:
-            resource_attr = "gpu"
-        else:
-            # No GPU, just use CPU
-            resource_attr = "cpu"
-            required = resources.cpu_total()
-
-        # Compute nodes required to fulfill trial resources request
-        for node_id, node_resource in self._resources_by_node.items():
-            node_capacity = node_resource.get_res_total(node_id)
-            committed_capacity = self._committed_resources.get_res_total(node_id)
-            remaining_capacity = node_capacity - committed_capacity
-            node_procs = getattr(node_resource, resource_attr, 0)
-            available = node_procs * remaining_capacity
-            required -= available
-            if required <= 0:
-                return True
-
-        return False
 
 
 class ImagenetTrainable(Trainable):
@@ -190,107 +69,328 @@ class ImagenetTrainable(Trainable):
         return resource
 
     def _setup(self, config):
-        num_gpus = config.get("num_gpus", 0)
-        num_cpus = config.get("num_cpus", 1)
+        self.experiment_class = config["experiment_class"]
 
-        # Determine the number of distributed processes based on the number
-        # GPUs and CPUs
-        if num_gpus > 0:
-            resource_attr = "gpu"
-            world_size = num_gpus
-            # Assign one GPU per remote process
-            num_gpus = 1
-            # Assign extra CPUs for dataloaders
-            num_cpus = config.get("workers", 0)
-        else:
-            resource_attr = "cpu"
-            world_size = num_cpus
-            # Assign one CPU per remote process
-            num_cpus = 1
+        config["logdir"] = self.logdir
 
-        # Check for node affinity
-        resources_by_node = _get_resources_per_node()
-        ray_node_affinity = config.get("__ray_node_affinity__", {})
-        node_resource = 0.0
-        committed_resource = 0.0
-        resources = {}
+        # Configure logging related stuff
+        log_format = config.get("log_format", logging.BASIC_FORMAT)
+        log_level = getattr(logging, config.get("log_level", "INFO").upper())
+        console = logging.StreamHandler()
+        console.setFormatter(logging.Formatter(log_format))
+        self.logger = logging.getLogger(config.get("name", type(self).__name__))
+        self.logger.setLevel(log_level)
+        self.logger.addHandler(console)
 
-        # Create one ray remote process for each experiment in the process group
-        self.procs = []
-        for _ in range(world_size):
-            if ray_node_affinity and node_resource <= 0:
-                node_id, node_resource = ray_node_affinity.popitem()
-                proc_per_node = getattr(resources_by_node[node_id], resource_attr, 0)
-                committed_resource = 1.0 / proc_per_node
-                resources = {node_id: committed_resource}
+        self.logger.debug(
+            f"_setup: trial={self._trial_info.trial_name}({self.iteration}), "
+            f"config={config}")
 
-            experiment = ray.remote(num_cpus=num_cpus, num_gpus=num_gpus,
-                                    resources=resources)(ImagenetExperiment)
-            self.procs.append(experiment.remote())
-            node_resource -= committed_resource
+        self._validate_immediately = -1 in config.get("epochs_to_validate", [])
 
-        # Use first process as head of the group
-        ip = ray.get(self.procs[0].get_node_ip.remote())
-        port = config.get("dist_port", 54321)
-        dist_url = "tcp://{}:{}".format(ip, port)
+        # Get checkpoint file to restore the training from
+        self.restore_checkpoint_file = config.pop("restore_checkpoint_file", None)
 
-        # Configure each process in the group
-        status = []
-        for i, w in enumerate(self.procs):
-            worker_config = copy.deepcopy(config)
-            worker_config["distributed"] = True
-            worker_config["dist_url"] = dist_url
-            worker_config["world_size"] = world_size
-            worker_config["rank"] = i
-            status.append(w.setup_experiment.remote(worker_config))
+        # Try to recover a trial at least this many times
+        self.max_retries = max(config.get("max_retries", 3), 0)
 
-        # Wait for remote functions to complete
-        ray.get(status)
+        # Create ray remote workers
+        self._create_workers(config)
+
+        # Load initial state from checkpoint file
+        self._restored = False
+        if self.restore_checkpoint_file is not None:
+            with open(self.restore_checkpoint_file, mode="rb") as f:
+                state = pickle.load(f)
+                self._restore(state)
+                self._restored = True
+
+        elif config.get("checkpoint_at_init", False):
+            # Save initialized model
+            self.save()
+
+        self._first_run = True
 
     def _train(self):
-        status = []
-        for w in self.procs:
-            status.append(w.run_epoch.remote(self.iteration))
+        self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
+        try:
+            # Check if restore checkpoint file fulfills the stop criteria on first run
+            initial_val_result = None
+            if self._first_run:
+                self._first_run = False
+                if self._restored and self._should_stop():
+                    self.logger.warning(
+                        f"Restored checkpoint file '{self.restore_checkpoint_file}' "
+                        f"fulfills stop criteria without additional training.")
+                    return {
+                        # do not train or log results, just stop
+                        RESULT_DUPLICATE: True,
+                        DONE: True
+                    }
 
-        # Wait for remote functions to complete
-        results = ray.get(status)
+                # This initial validation would be simpler if it were in the
+                # ImagenetExperiment, but doing it here makes it possible to log
+                # the validation results immediately rather than waiting until
+                # the end of the first epoch.
+                if self._iteration == 0 and self._validate_immediately:
+                    self.logger.debug("Validating before any training:")
+                    status = []
+                    for w in self.procs:
+                        status.append(w.validate.remote())
 
-        # Return the results from the first remote function
-        return copy.deepcopy(results[0])
+                    if ray_utils.check_for_failure(status):
+                        results = ray.get(status)
+                        initial_val_result = (
+                            self.experiment_class.aggregate_validation_results(
+                                results))
+                        self.logger.info(initial_val_result)
 
-    def _save(self, _):
+            status = []
+            for w in self.procs:
+                status.append(w.run_epoch.remote())
+
+            # Wait for remote functions and check for errors
+            # Aggregate the results from all processes
+            if ray_utils.check_for_failure(status):
+                results = ray.get(status)
+
+                ret = self.experiment_class.aggregate_results(results)
+                if initial_val_result is not None:
+                    ret["extra_val_results"].insert(0, (0, initial_val_result))
+                self.logger.info(
+                    self.experiment_class.get_printable_result(ret)
+                )
+                self._process_result(ret)
+
+                # Check if we should stop the experiment
+                ret[DONE] = self._should_stop()
+
+                return ret
+
+            err_msg = (f"{self._trial_info.trial_name}({self.iteration}): "
+                       f"One of the remote workers failed during training")
+            self.logger.error(err_msg)
+            raise RuntimeError(err_msg)
+        except Exception:
+            self._kill_workers()
+            raise
+
+    def _should_stop(self):
+        """
+        Whether or not we should stop the experiment
+        """
+        # Check if we should stop the experiment
+        stop_status = self.procs[0].should_stop.remote()
+        if ray_utils.check_for_failure([stop_status]):
+            return ray.get(stop_status)
+        else:
+            # Stop on failures
+            return True
+
+    def _save(self, _=None):
+        self.logger.debug(f"_save: {self._trial_info.trial_name}({self.iteration})")
         # All models are synchronized. Just save the state of first model
-        return ray.get(self.procs[0].get_state.remote())
+        with warn_if_slow("ImagenetExperiment.get_state.remote"):
+            return ray.get(self.procs[0].get_state.remote())
 
     def _restore(self, state):
         # Restore the state to every process
         state_id = ray.put(state)
         ray.get([w.set_state.remote(state_id) for w in self.procs])
 
-    def _stop(self):
+        # Update current iteration using experiment epoch
+        self._iteration = ray.get(self.procs[0].get_current_epoch.remote())
+
+        self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
+
+    def _create_workers(self, config):
+        """
+        Create one ray remote process for each GPU/process
+        """
+        num_gpus = config.get("num_gpus", 0)
+        num_cpus = config.get("num_cpus", 1)
+
+        # Determine the number of distributed processes based on the number
+        # GPUs and CPUs
+        if num_gpus > 0:
+            world_size = num_gpus
+            # Assign one GPU per remote process
+            num_gpus = 1
+            # Assign extra CPUs for dataloaders
+            num_cpus = config.get("workers", 0)
+        else:
+            world_size = num_cpus
+            # Assign one CPU per remote process
+            num_cpus = 1
+
+        self._process_config(config)
+
+        for i in range(1 + self.max_retries):
+            self.procs = []
+            for _ in range(world_size):
+                experiment = ray.remote(
+                    num_cpus=num_cpus, num_gpus=num_gpus)(self.experiment_class)
+                self.procs.append(experiment.remote())
+
+            # Use first process as head of the group
+            ip = ray.get(self.procs[0].get_node_ip.remote())
+            port = ray.get(self.procs[0].get_free_port.remote())
+            port = config.get("dist_port", port)
+            dist_url = "tcp://{}:{}".format(ip, port)
+
+            # Configure each process in the group
+            status = []
+            for rank, w in enumerate(self.procs):
+                worker_config = copy.deepcopy(config)
+                worker_config["distributed"] = True
+                worker_config["dist_url"] = dist_url
+                worker_config["world_size"] = world_size
+                worker_config["rank"] = rank
+                status.append(w.setup_experiment.remote(worker_config))
+                self.logger.debug(
+                    f"_create_workers: rank={rank}, "
+                    f"trial={self._trial_info.trial_name}({self.iteration})")
+
+            # Wait for remote function and check for errors
+            if ray_utils.check_for_failure(status):
+                return
+
+            # Remote function failed, kill workers and try again
+            self.logger.warning(f"Failed to create workers, "
+                                f"retrying {i + 1}/{self.max_retries}")
+            # Restart all workers on failure
+            self._kill_workers()
+
+            # Back off a few seconds
+            time.sleep(2 ** i)
+        else:
+            # Reached max failures
+            err_msg = f"Failed to create workers after {self.max_retries} retries"
+            self.logger.error(err_msg)
+            raise RuntimeError(err_msg)
+
+    def _kill_workers(self):
         for w in self.procs:
-            w.stop_experiment.remote()
-            w.__ray_terminate__.remote()
+            self.logger.warning(
+                f"Killing worker {w}, "
+                f"trial={self._trial_info.trial_name}({self.iteration})")
+            ray.kill(w)
+        self.procs = []
+
+    def _stop(self):
+        self.logger.debug(f"_stop: {self._trial_info.trial_name}({self.iteration})")
+        try:
+            status = [w.stop_experiment.remote() for w in self.procs]
+            # wait until all remote workers stop
+            ray.get(status)
+            for w in self.procs:
+                w.__ray_terminate__.remote()
+            self.procs = []
+        except RayActorError as ex:
+            self.logger.warning("Failed to shutdown gracefully", exc_info=ex)
+            self._kill_workers()
+
+    def _process_config(self, config):
+        pass
+
+    def _process_result(self, result):
+        pass
+
+
+class SigOptImagenetTrainable(ImagenetTrainable):
+    """
+    This class updates the config using SigOpt before the models and workers are
+    instantiated, and updates the result using SigOpt once training completes.
+    """
+
+    def _process_config(self, config):
+        """
+        :param config:
+            Dictionary configuration of the trainable
+
+            - sigopt_experiment_id: id of experiment
+            - sigopt_config: dict to specify configuration of sigopt experiment
+            - sigopt_experiment_class: class inherited from `SigoptExperiment` which
+                                       characterizes how the trainable will get and
+                                       utilize suggestions
+
+        """
+        # Update the config through SigOpt.
+        self.sigopt = None
+        if "sigopt_config" in config:
+            assert config.get("sigopt_experiment_id", None) is not None
+
+            # Check for user specified sigopt-experiment class.
+            experiment_class = config.get(
+                "sigopt_experiment_class", SigOptImagenetExperiment)
+
+            # Instantiate experiment.
+            self.sigopt = experiment_class(
+                experiment_id=config["sigopt_experiment_id"],
+                sigopt_config=config["sigopt_config"])
+
+            # Get suggestion and update config.
+            self.suggestion = self.sigopt.get_next_suggestion()
+            self.sigopt.update_config_with_suggestion(config, self.suggestion)
+            print("SigOpt suggestion: ", self.suggestion)
+            print("Config after Sigopt:")
+            pprint(config)
+            self.epochs = config["epochs"]
+
+            # Get names of performance metrics.
+            assert "metrics" in config["sigopt_config"]
+            self.metric_names = [
+                metric["name"] for metric in config["sigopt_config"]["metrics"]
+            ]
+            assert "mean_accuracy" in self.metric_names, \
+                "For now, we only update the observation if `mean_accuracy` is present."
+
+    def _process_result(self, result):
+        # Update sigopt with the new result once we're at the end
+        if self.sigopt is not None:
+            result["early_stop"] = result.get("early_stop", 0.0)
+            if self.iteration >= self.epochs - 1:
+                result["early_stop"] = 1.0
+                if result["mean_accuracy"] > 0.0:
+                    print("Updating observation with value=", result["mean_accuracy"])
+
+                    # Collect and report relevant metrics.
+                    values = [
+                        dict(name=name, value=result[name])
+                        for name in self.metric_names
+                    ]
+                    self.sigopt.update_observation(self.suggestion, values=values)
+                    print("Full results: ")
+                    pprint(result)
 
 
 def run(config):
     # Connect to ray
     address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
-    ray.init(address=address)
+    ray.init(address=address, local_mode=config.get("local_mode", False))
+
+    # Register serializer and deserializer - needed when logging arrays and tensors.
+    register_torch_serializers()
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-    kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
+
+    if "sigopt_config" in config:
+        kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
+                                         *tune.run.__defaults__]))
+    else:
+        imagenet_trainable = config.get("imagenet_trainable", ImagenetTrainable)
+        assert issubclass(imagenet_trainable, ImagenetTrainable)
+        kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
+
+    # Check if restoring experiment from last known checkpoint
+    if config.pop("restore", False):
+        result_dir = os.path.join(config["local_dir"], config["name"])
+        config["restore_checkpoint_file"] = get_last_checkpoint(result_dir)
 
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
-
-    # Update tune stop criteria with config epochs
-    stop = kwargs.get("stop", {}) or dict()
-    epochs = config.get("epochs", 1)
-    stop.update(training_iteration=epochs)
-    kwargs["stop"] = stop
 
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
@@ -298,9 +398,70 @@ def run(config):
     # Queue trials until the cluster scales up
     kwargs.update(queue_trials=True)
 
-    # Group trial into nodes as much as possible
-    kwargs.update(trial_executor=AffinityExecutor(queue_trials=True))
-
     pprint(kwargs)
     tune.run(**kwargs)
     ray.shutdown()
+
+
+def run_single_instance(config):
+
+    # get number of GPUs
+    config["num_gpus"] = torch.cuda.device_count()
+    config["workers"] = 4
+    config["log_level"] = "INFO"
+    config["reuse_actors"] = False
+    config["dist_port"] = get_free_port()
+
+    # Build kwargs for `tune.run` function using merged config and command line dict
+    kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
+    kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
+    # Update`tune.run` kwargs with config
+    kwargs.update(config)
+    kwargs["config"] = config
+    # Update tune stop criteria with config epochs
+    stop = kwargs.get("stop", {}) or dict()
+    epochs = config.get("epochs", 1)
+    stop.update(training_iteration=epochs)
+    kwargs["stop"] = stop
+    # Make sure to only select`tune.run` function arguments
+    kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
+    # pprint(kwargs)
+
+    # current torch distributed approach requires num_samples to be 1
+    num_samples = 1
+    if "num_samples" in kwargs:
+        num_samples = kwargs["num_samples"]
+        kwargs["num_samples"] = 1
+
+    trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
+    t_init = time.time()
+
+    for config in trials.retrieve():
+        t0 = time.time()
+        trials.report_progress()
+
+        # Connect to ray, no specific redis address
+        ray.init(load_code_from_local=True, webui_host="0.0.0.0")
+
+        config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
+        kwargs["config"] = config
+        tune.run(**kwargs)
+        print("**** ended training")
+
+        # report time elapsed
+        t1 = time.time()
+        print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
+        print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
+
+        ray.shutdown()
+
+        # save trials for later retrieval
+        trials.mark_completed(config, save=True)
+
+        # sleep to avoid interference between runs
+        time.sleep(2)
+
+        # error message when experiment ends
+
+    print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
+          " trials completed")

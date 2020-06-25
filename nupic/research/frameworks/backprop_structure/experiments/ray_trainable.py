@@ -25,10 +25,14 @@ from ray import tune
 def as_ray_trainable(experiment_class):
     class Cls(tune.Trainable):
         def _setup(self, config):
-            self.exp = experiment_class(**config)
+            self.exp = experiment_class(logdir=self.logdir,
+                                        **config)
 
         def _train(self):
             return self.exp.run_epoch(self.iteration)
+
+        def _stop(self):
+            return self.exp.on_finished()
 
         def _save(self, checkpoint_dir):
             return self.exp.save(checkpoint_dir)

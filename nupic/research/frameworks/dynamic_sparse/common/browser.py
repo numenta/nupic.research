@@ -45,6 +45,38 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 # ---------
+# Panda Utils
+# ---------
+
+
+# helper functions
+def mean_and_std(s):
+    return "{:.3f} ± {:.3f}".format(s.mean(), s.std())
+
+
+def round_mean(s):
+    return "{:.0f}".format(round(s.mean()))
+
+
+stats = ["min", "max", "mean", "std"]
+
+
+def agg(df, columns, metric="mean_accuracy_max", filter_by=None, decimals=3):
+    if filter_by is None:
+        return (
+            df.groupby(columns).agg(
+                {f"{metric}_epoch": round_mean, metric: stats, "seed": ["count"]}
+            )
+        ).round(decimals)
+    else:
+        return (
+            df[filter_by]
+            .groupby(columns)
+            .agg({f"{metric}_epoch": round_mean, metric: stats, "seed": ["count"]})
+        ).round(decimals)
+
+
+# ---------
 # Utils
 # ---------
 
@@ -111,7 +143,9 @@ def unpickle_within_dataframe(df, conditions):
 # ---------------------------
 
 
-def load(experiment_path, performance_metrics=None, raw_metrics=None):
+def load(
+    experiment_path, performance_metrics=None, raw_metrics=None, required_epochs=None
+):
     """Load a single experiment into a dataframe"""
     experiment_path = os.path.expanduser(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
@@ -121,8 +155,17 @@ def load(experiment_path, performance_metrics=None, raw_metrics=None):
     dataframes = []
     for exp_state, exp_name in experiment_states:
         progress, params = _read_experiment(exp_state, experiment_path)
-        dataframes.append(_get_value(
-            progress, params, exp_name, performance_metrics, raw_metrics=raw_metrics))
+        if len(progress) != 0:
+            dataframes.append(
+                _get_value(
+                    progress,
+                    params,
+                    exp_name,
+                    performance_metrics,
+                    raw_metrics=raw_metrics,
+                    required_epochs=required_epochs,
+                )
+            )
 
     # concats all dataframes if there are any and return
     if not dataframes:
@@ -130,10 +173,13 @@ def load(experiment_path, performance_metrics=None, raw_metrics=None):
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
 
-def load_many(experiment_paths, performance_metrics=None, raw_metrics=None):
+def load_many(
+    experiment_paths, performance_metrics=None, raw_metrics=None, required_epochs=None
+):
     """Load several experiments into a single dataframe"""
     dataframes = [
-        load(path, performance_metrics, raw_metrics) for path in experiment_paths
+        load(path, performance_metrics, raw_metrics, required_epochs)
+        for path in experiment_paths
     ]
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
@@ -167,7 +213,7 @@ def _read_experiment(experiment_state, experiment_path):
     return progress, params
 
 
-def _get_value(
+def _get_value(  # noqa: C901
     progress,
     params,
     exp_name,
@@ -175,6 +221,7 @@ def _get_value(
     full_metrics=None,
     raw_metrics=None,
     exp_substring="",
+    required_epochs=None,
 ):
     """
     For every experiment whose name matches exp_substring, scan the history
@@ -206,6 +253,12 @@ def _get_value(
     # populate stats
     stats = defaultdict(list)
     for e in exps:
+
+        # skip unfinished experiments
+        if required_epochs:
+            if progress[e]["training_iteration"].iloc[-1] != required_epochs:
+                continue
+
         # add relevant progress metrics
         stats["Experiment Name"].append(e)
         for m in performance_metrics:
@@ -268,6 +321,10 @@ def _get_value(
                 elif isinstance(v, list):
                     v = "-".join([str(v_i) for v_i in v])
                     stats[k].append(v)
+                # iterate through dictionaries to get keys inside
+                elif isinstance(v, dict):
+                    for k2, v2 in v.items():
+                        stats["_".join([k, k2])].append(v2)
                 # otherwise append the value as it is
                 else:
                     stats[k].append(v)

@@ -17,6 +17,11 @@
 #
 #  http://numenta.org/licenses/
 #
+
+"""
+Base Imagenet Experiment configuration.
+"""
+
 import copy
 import os
 import sys
@@ -24,11 +29,10 @@ import sys
 import ray.tune as tune
 import torch
 
-import nupic.research.frameworks.pytorch.models.resnets
-
-"""
-Base Imagenet Experiment configuration.
-"""
+import nupic.research.frameworks.pytorch.models.sparse_resnets
+from nupic.research.frameworks.pytorch.imagenet import (
+    RezeroedKWinnersImagenetExperiment,
+)
 
 # Batch size depends on the GPU memory.
 # On AWS P3 (Tesla V100) each GPU can hold 128 batches
@@ -37,6 +41,8 @@ BATCH_SIZE = 128
 # Default configuration based on Pytorch Imagenet training example.
 # See http://github.com/pytorch/examples/blob/master/imagenet/main.py
 DEFAULT = dict(
+    experiment_class=RezeroedKWinnersImagenetExperiment,
+
     # Results path
     local_dir=os.path.expanduser("~/nta/results/experiments/imagenet"),
     # Dataset location (directory path or HDF5 file with the raw images)
@@ -70,7 +76,7 @@ DEFAULT = dict(
     epochs=90,
 
     # Model class. Must inherit from "torch.nn.Module"
-    model_class=nupic.research.frameworks.pytorch.models.resnets.resnet50,
+    model_class=nupic.research.frameworks.pytorch.models.sparse_resnets.resnet50,
     # model model class arguments passed to the constructor
     model_args=dict(),
 
@@ -111,13 +117,23 @@ DEFAULT = dict(
     checkpoint_score_attr="training_iteration",
 
     # How many times to try to recover before stopping the trial
-    max_failures=-1,
+    max_failures=3,
+
+    # How many times to retry the epoch before stopping. This is useful when
+    # using distributed training with spot instances.
+    max_retries=3,
 
     # Python Logging level : "critical", "error", "warning", "info", "debug"
     log_level="debug",
 
     # Python Logging Format
     log_format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
+
+    # Ray tune verbosity. When set to the default value of 2 it will log
+    # iteration result dicts. This dict can flood the console if it contains
+    # large data structures, so default to verbose=1. The ImagenetTrainable logs
+    # a succinct version of the result dict.
+    verbose=1,
 )
 
 DEBUG = copy.deepcopy(DEFAULT)

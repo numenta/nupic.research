@@ -237,6 +237,7 @@ class TinyCIFARWeightInit(object):
             device=self.device,
             batches_in_epoch=batches_in_epoch,
             criterion=self.loss_function,
+            post_batch_callback=self._post_batch,
         )
         self._post_epoch(epoch)
         train_time = time.time() - t1
@@ -493,8 +494,14 @@ class TinyCIFARWeightInit(object):
         rate, rezero sparse weights, and update boost strengths.
         """
         self._adjust_learning_rate(self.optimizer, epoch)
-        self.model.apply(rezero_weights)
         self.model.apply(update_boost_strength)
+
+    def _post_batch(self, *args, **kwargs):
+        """
+        The set of actions to do after each batch of training: rezero sparse
+        weights
+        """
+        self.model.apply(rezero_weights)
 
     def _initialize_weights(self):
         if self.weight_init == "lsuv":

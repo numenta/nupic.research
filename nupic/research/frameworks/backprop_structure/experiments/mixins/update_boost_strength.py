@@ -23,6 +23,6 @@ from nupic.torch.modules import update_boost_strength
 
 
 class UpdateBoostStrength(object):
-    def _before_train_epoch(self):
-        super()._before_train_epoch()
-        self.model.apply(update_boost_strength)
+    def _before_train_epoch(self, *args, **kwargs):
+        super()._before_train_epoch(*args, **kwargs)
+        self.network.apply(update_boost_strength)

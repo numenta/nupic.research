@@ -22,6 +22,7 @@
 from copy import deepcopy
 
 from ray import tune
+from ray.tune.suggest.sigopt import SigOptSearch
 
 import nupic.research.frameworks.dynamic_sparse.models as models
 import nupic.research.frameworks.dynamic_sparse.networks as networks
@@ -30,7 +31,7 @@ from .datasets import load_dataset
 
 
 class RayTrainable(tune.Trainable):
-    """ray.tune trainable generic class Adaptable to any pytorch module."""
+    """ray.tune trainable generic class. Adaptable to any pytorch module."""
 
     def __init__(self, config=None, logger_creator=None):
         tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
@@ -87,6 +88,30 @@ class CustomTrainable(tune.Trainable):
 
 def base_experiment(config):
     tune.run(RayTrainable, **config)
+
+
+def sigopt_experiment(config):
+    """
+    Requires environment variable SIGOPT_KEY
+    """
+
+    exp_config = config["config"]
+    if "params_space" not in exp_config:
+        raise ValueError("SigOpt experiment require a params_space")
+    if "performance_metric" not in exp_config:
+        exp_config["performance_metric"] = "val_acc"
+
+    # define algorithm
+    algo = SigOptSearch(
+        exp_config["params_space"],
+        name=config["name"],
+        # manually define max concurrent
+        max_concurrent=5,
+        reward_attr=exp_config["performance_metric"],
+        # optimization_budget=100
+    )
+
+    tune.run(RayTrainable, search_alg=algo, **config)
 
 
 def iterative_pruning_experiment(config):

@@ -25,19 +25,21 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-import nupic.research.frameworks.backprop_structure.dataset_managers as dm
-import nupic.research.frameworks.backprop_structure.networks as networks
-
 
 class Supervised(object):
     def __init__(self,
-                 model_alg, model_params,
-                 dataset_name, dataset_params,
+                 network_class, network_args,
+                 dataset_class, dataset_args,
                  training_iterations,
-                 optim_alg, optim_params,
-                 lr_scheduler_alg, lr_scheduler_params,
                  batch_size_train, batch_size_test,
-                 use_tqdm=False, tqdm_mininterval=None):
+                 logdir,
+                 optim_class=None, optim_args=None,
+                 lr_scheduler_class=None, lr_scheduler_args=None,
+                 lr_step_every_batch=False,
+                 use_tqdm=False, tqdm_mininterval=None,
+                 parallel=False):
+        self.logdir = logdir
+
         (self.batch_size_train_first_epoch,
          self.batch_size_train) = batch_size_train
         self.batch_size_test = batch_size_test
@@ -48,22 +50,29 @@ class Supervised(object):
                                    if torch.cuda.is_available()
                                    else "cpu")
 
-        model_constructor = getattr(networks, model_alg)
-        self.model = model_constructor(**model_params)
-        self.model.to(self.device)
+        self.network = network_class(**network_args)
+        self.network.to(self.device)
 
-        dm_constructor = getattr(dm, dataset_name)
-        self.dataset_manager = dm_constructor(**dataset_params)
+        if parallel and torch.cuda.device_count() > 1:
+            self.network = nn.DataParallel(self.network)
+
+        self.dataset_manager = dataset_class(**dataset_args)
 
         self.training_iterations = training_iterations
 
-        optim_constructor = getattr(torch.optim, optim_alg)
-        self.optimizer = optim_constructor(self._get_parameters(),
-                                           **optim_params)
+        if optim_class is not None:
+            self.optimizer = optim_class(self._get_parameters(), **optim_args)
+        else:
+            # The caller or overrider is taking responsibility for setting the
+            # optimizer before calling run_epoch.
+            self.optimizer = None
 
-        sched_constructor = getattr(torch.optim.lr_scheduler, lr_scheduler_alg)
-        self.lr_scheduler = sched_constructor(self.optimizer,
-                                              **lr_scheduler_params)
+        if lr_scheduler_class is not None:
+            self.lr_scheduler = lr_scheduler_class(self.optimizer,
+                                                   **lr_scheduler_args)
+        else:
+            self.lr_scheduler = None
+        self.lr_step_every_batch = lr_step_every_batch
 
         self.loss_func = nn.CrossEntropyLoss()
 
@@ -76,7 +85,7 @@ class Supervised(object):
         )
 
     def test(self, loader):
-        self.model.eval()
+        self.network.eval()
         val_loss = 0
         num_val_batches = 0
         val_correct = 0
@@ -88,7 +97,7 @@ class Supervised(object):
 
             for data, target in batches:
                 data, target = data.to(self.device), target.to(self.device)
-                output = self.model(data)
+                output = self.network(data)
                 val_loss += self.loss_func(output, target).item()
                 # get the index of the max log-probability
                 pred = output.argmax(dim=1, keepdim=True)
@@ -102,8 +111,8 @@ class Supervised(object):
         }
 
     def run_epoch(self, iteration):
-        self.model.train()
-        self._before_train_epoch()
+        self.network.train()
+        self._before_train_epoch(iteration)
 
         batch_size = (self.batch_size_train_first_epoch
                       if iteration == 0
@@ -122,13 +131,9 @@ class Supervised(object):
         else:
             batches = train_loader
 
-        train_loss = 0.
-        train_correct = 0.
-        num_train_batches = 0
-
         for data, target in batches:
             data, target = data.to(self.device), target.to(self.device)
-            output = self.model(data)
+            output = self.network(data)
             loss = self.loss_func(output, target) + self._regularization()
 
             self.optimizer.zero_grad()
@@ -136,19 +141,15 @@ class Supervised(object):
             self.optimizer.step()
             self._after_optimizer_step()
 
-            with torch.no_grad():
-                train_loss += loss.item()
-                pred = output.argmax(dim=1, keepdim=True)
-                train_correct += pred.eq(target.view_as(pred)).sum().item()
-                num_train_batches += 1
+            if self.lr_scheduler is not None and self.lr_step_every_batch:
+                self.lr_scheduler.step()
 
-        self.lr_scheduler.step()
-        self._after_train_epoch()
+        if self.lr_scheduler is not None and not self.lr_step_every_batch:
+            self.lr_scheduler.step()
+        self._after_train_epoch(iteration)
 
         result = {
-            "mean_train_accuracy": train_correct / len(train_loader.dataset),
-            "mean_training_loss": train_loss / num_train_batches,
-            "lr": self.optimizer.state_dict()["param_groups"][0]["lr"],
+            "lr": self.optimizer.param_groups[0]["lr"],
             "done": iteration + 1 >= self.training_iterations,
         }
 
@@ -156,25 +157,28 @@ class Supervised(object):
         result.update(test_result)
         return result
 
+    def on_finished(self):
+        pass
+
     def save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-        torch.save(self.model.state_dict(), checkpoint_path)
+        torch.save(self.network.state_dict(), checkpoint_path)
         return checkpoint_path
 
     def restore(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-        self.model.load_state_dict(torch.load(checkpoint_path))
+        self.network.load_state_dict(torch.load(checkpoint_path))
 
     def _get_parameters(self):
-        return self.model.parameters()
+        return self.network.parameters()
 
     def _regularization(self):
         return 0
 
-    def _before_train_epoch(self):
+    def _before_train_epoch(self, iteration):
         pass
 
-    def _after_train_epoch(self):
+    def _after_train_epoch(self, iteration):
         pass
 
     def _after_optimizer_step(self):

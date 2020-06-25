@@ -19,23 +19,50 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import torch
-
-from nupic.research.frameworks.backprop_structure.modules import (
-    BinaryGatedConv2d,
-    BinaryGatedLinear,
-    HardConcreteGatedConv2d,
-    HardConcreteGatedLinear,
-)
-
 
 class Regularize(object):
+    def __init__(self, reg_schedule=None, downscale_reg_with_training_set=False,
+                 **kwargs):
+        """
+        @param reg_schedule (dict)
+        Mapping from epoch number to the reg_weight to use on that timestep and
+        afterward.
+
+        @param downscale_reg_with_training_set (bool)
+        If True, multiply the regularization term by (1 / size_of_training_set)
+        """
+        super().__init__(**kwargs)
+
+        if downscale_reg_with_training_set:
+            self.reg_coefficient = 1 / len(self.dataset_manager.get_train_dataset(0))
+        else:
+            self.reg_coefficient = 1
+
+        if reg_schedule is None:
+            self.reg_schedule = {}
+            self.reg_weight = 1.0
+        else:
+            self.reg_schedule = reg_schedule
+            self.reg_weight = reg_schedule[0]
+
     def _regularization(self):
-        reg = torch.tensor(0.).to(self.device)
-        for layer in self.model.modules():
-            if isinstance(layer, (BinaryGatedConv2d,
-                                  BinaryGatedLinear,
-                                  HardConcreteGatedConv2d,
-                                  HardConcreteGatedLinear)):
-                reg += layer.regularization()
-        return reg
+        reg = None  # Perform accumulation on the device.
+        for layer in self.network.modules():
+            if hasattr(layer, "regularization"):
+                if reg is None:
+                    reg = layer.regularization()
+                else:
+                    reg += layer.regularization()
+
+        if reg is None:
+            return 0
+        else:
+            return (self.reg_weight
+                    * self.reg_coefficient
+                    * reg)
+
+    def run_epoch(self, iteration):
+        if iteration in self.reg_schedule:
+            self.reg_weight = self.reg_schedule[iteration]
+
+        return super().run_epoch(iteration)

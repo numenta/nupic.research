@@ -22,9 +22,12 @@
 import os
 
 import numpy as np
+import torch.optim
 
+import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
+import nupic.research.frameworks.backprop_structure.networks as networks
 from nupic.research.frameworks.backprop_structure.ray_ax import ax_optimize_accuracy
 
 NUM_TRAINING_ITERATIONS = 30
@@ -46,14 +49,16 @@ PARAMETERS = [
 
 
 class ExploratoryExperiment(experiments.Supervised):
-    def __init__(self, lr, momentum, weight_decay, gamma, step_size,
+    def __init__(self, logdir, lr, momentum, weight_decay, gamma, step_size,
                  first_batch_size):
         step_size = int(step_size)
         first_batch_size = int(first_batch_size)
 
         super().__init__(
-            model_alg="mnist_lesparsenet",
-            model_params=dict(
+            logdir=logdir,
+
+            network_class=networks.mnist_lesparsenet,
+            network_args=dict(
                 cnn_activity_percent_on=(1.0, 1.0),
                 cnn_weight_percent_on=(1.0, 1.0),
                 linear_activity_percent_on=(1.0,),
@@ -61,18 +66,18 @@ class ExploratoryExperiment(experiments.Supervised):
                 use_batch_norm=False,
             ),
 
-            dataset_name="MNIST",
-            dataset_params={},
+            dataset_class=datasets.MNIST,
+            dataset_args={},
 
-            optim_alg="SGD",
-            optim_params=dict(
+            optim_class=torch.optim.SGD,
+            optim_args=dict(
                 lr=lr,
                 momentum=momentum,
                 weight_decay=weight_decay,
             ),
 
-            lr_scheduler_alg="StepLR",
-            lr_scheduler_params=dict(
+            lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+            lr_scheduler_args=dict(
                 step_size=step_size,
                 gamma=gamma,
             ),

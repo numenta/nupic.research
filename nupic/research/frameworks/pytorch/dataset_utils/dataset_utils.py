@@ -42,6 +42,24 @@ from torchvision.datasets.folder import (
 )
 from torchvision.transforms import RandomResizedCrop
 
+__all__ = [
+    "create_validation_data_sampler",
+    "select_subset",
+    "UnionDataset",
+    "split_dataset",
+    "PreprocessedDataset",
+    "CachedDatasetFolder",
+    "ProgressiveRandomResizedCrop",
+    "HDF5Dataset",
+]
+
+
+TENSOR_EXTENTIONS = [".pt", ".PT"]
+
+
+def is_tensor_file(filename):
+    return any([filename.endswith(extension) for extension in TENSOR_EXTENTIONS])
+
 
 def create_validation_data_sampler(dataset, ratio):
     """Create `torch.utils.data.Sampler` used to split the dataset into 2
@@ -175,7 +193,7 @@ def split_dataset(dataset, groupby):
 
 
 class PreprocessedDataset(Dataset):
-    def __init__(self, cachefilepath, basename, qualifiers):
+    def __init__(self, cachefilepath, basename, qualifiers, transform=None):
         """
         A Pytorch Dataset class representing a pre-generated processed dataset stored in
         an efficient compressed numpy format (.npz). The dataset is represented by
@@ -192,15 +210,23 @@ class PreprocessedDataset(Dataset):
 
         :param qualifiers: List of qualifiers for each preprocessed files in this
         dataset.
+
+        :param transform: transform to apply to dataset tensors (torchvision.transform)
         """
         self.path = cachefilepath
         self.basename = basename
         self.num_cycle = itertools.cycle(qualifiers)
         self.tensors = []
         self.load_next()
+        self.transform = transform
 
     def __getitem__(self, index):
-        return tuple(tensor[index] for tensor in self.tensors)
+        samples = tuple(tensor[index] for tensor in self.tensors)
+
+        if self.transform:
+            return self.transform(list(samples))
+        else:
+            return samples
 
     def __len__(self):
         return len(self.tensors[0])
@@ -346,15 +372,28 @@ class HDF5Dataset(VisionDataset):
         Number of classes used to Limit the dataset size. Not limited when None
     :param classes:
         Limit the dataset to images from the given classes.
+    :param load_as_images:
+        whether to use `Image.open` or `torch.load` when loading data
+    :param replicas_per_sample:
+        Number of replicas to create per sample in the batch.
+        (each replica is transformed independently)
+        Used in maxup.
+
     :param kwargs:
         Other argument passed to :class:`VisionDataset` constructor
     """
 
-    def __init__(self, hdf5_file, root, num_classes=None, classes=None, **kwargs):
+    def __init__(
+        self, hdf5_file, root,
+        num_classes=None, classes=None, load_as_images=True,
+        replicas_per_sample=1, **kwargs
+    ):
         assert h5py.is_hdf5(hdf5_file)
         super(HDF5Dataset, self).__init__(root=root, **kwargs)
 
+        self.replicas_per_sample = replicas_per_sample
         self._hdf5_file = hdf5_file
+        self._load_as_images = load_as_images
         with h5py.File(name=self._hdf5_file, mode="r") as hdf5:
             hdf5_root = hdf5[root]
             self._classes = {
@@ -378,7 +417,11 @@ class HDF5Dataset(VisionDataset):
                 self._images = []
                 for class_name in self._classes:
                     group = hdf5_root[class_name]
-                    files = filter(is_image_file, group)
+
+                    if self._load_as_images:
+                        files = filter(is_image_file, group)
+                    else:
+                        files = filter(is_tensor_file, group)
 
                     # Construct the absolute path name within the HDF5 file
                     path_names = map(
@@ -440,12 +483,20 @@ class HDF5Dataset(VisionDataset):
             image_data = image_file[()]
 
         # Convert image to RGB
-        image = Image.open(BytesIO(image_data))
-        sample = image.convert("RGB")
+        if self._load_as_images:
+            image = Image.open(BytesIO(image_data))
+            sample = image.convert("RGB")
+        else:
+            sample = torch.load(BytesIO(image_data))
 
-        # Apply transforms
         if self.transform is not None:
-            sample = self.transform(sample)
+            if self.replicas_per_sample > 1:
+                # add an extra dimension with size replicas_per_sample
+                sample = torch.stack([
+                    self.transform(sample) for _ in range(self.replicas_per_sample)
+                ])
+            else:
+                sample = self.transform(sample)
         if self.target_transform is not None:
             target = self.target_transform(target)
 

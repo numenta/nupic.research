@@ -21,10 +21,9 @@
 # ------------------------------------------------------------------------------
 from os import path
 
-from setuptools import setup, find_namespace_packages
+from setuptools import find_namespace_packages, setup
 
 import nupic.research
-
 
 ROOT = path.abspath(path.dirname(__file__))
 
@@ -55,7 +54,7 @@ setup(
     version=nupic.research.__version__,
     packages=find_namespace_packages(include=["nupic.*"]),
     install_requires=requirements,
-    python_requires=">=3.6, <4",
+    python_requires=">=3.7, <4",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU Affero General Public License v3 or later "

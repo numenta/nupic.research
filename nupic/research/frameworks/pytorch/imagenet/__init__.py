@@ -18,4 +18,6 @@
 #  http://numenta.org/licenses/
 #
 
+from .common_experiments import *
 from .imagenet_experiment import ImagenetExperiment
+from .auto_augment import ImageNetPolicy
