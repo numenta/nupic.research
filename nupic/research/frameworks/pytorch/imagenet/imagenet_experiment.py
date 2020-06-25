@@ -840,4 +840,5 @@ class ImagenetExperiment:
             expand_result_to_time_series=[
                 "ImagenetExperiment: validation results"
             ],
+            stop_experiment=["ImagenetExperiment.stop_experiment"]
         )
