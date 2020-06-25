@@ -73,7 +73,8 @@ class MNISTSparseExperiment(object):
         self.first_epoch_batch_size = config["first_epoch_batch_size"]
         self.validation = config.get("validation", 50000.0 / 60000.0)
         self.learning_rate_factor = config["learning_rate_factor"]
-        self.learning_schedule_step_size = config["learning_schedule_step_size"]
+        self.learning_schedule_step_size = config.get(
+            "learning_schedule_step_size", 1)
         self.lr_scheduler_params = config.get("lr_scheduler_params", None)
         self.num_classes = 10
 

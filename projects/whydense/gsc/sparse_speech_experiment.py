@@ -158,7 +158,7 @@ class SparseSpeechExperiment(object):
 
         if lr_scheduler == "StepLR":
             lr_scheduler_params = "{{'step_size': {}, 'gamma': {}}}".format(
-                params["learning_schedule_step_size"],
+                params.get("learning_schedule_step_size", 1),
                 params["learning_rate_factor"]
             )
 
