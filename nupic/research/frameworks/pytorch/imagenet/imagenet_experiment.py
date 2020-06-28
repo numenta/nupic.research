@@ -225,6 +225,7 @@ class ImagenetExperiment:
             self.progress = self.progress and self.rank == 0
 
         # Configure model
+        self.device = config.get("device", self.device)
         self.model = self.create_model(config, self.device)
         if self.rank == 0:
             self.logger.debug(self.model)
