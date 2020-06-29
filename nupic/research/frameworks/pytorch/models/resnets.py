@@ -31,6 +31,8 @@ from collections import OrderedDict
 from functools import partial
 
 import torch.nn as nn
+import torch.nn.quantized as nnq
+from torch.quantization import DeQuantStub, QuantStub, fuse_modules
 
 from nupic.torch.modules import Flatten
 
@@ -69,12 +71,28 @@ class BasicBlock(nn.Module):
             self.shortcut = nn.Identity()
 
         self.post_activation = act_layer(planes, **act_args["act2"])
+        self.quant_ops = nnq.FloatFunctional()
 
     def forward(self, x):
         out = self.regular_path(x)
-        out += self.shortcut(x)
+        out = self.quant_ops.add(out, self.shortcut(x))
         out = self.post_activation(out)
         return out
+
+    def fuse_model(self):
+        # Fuse Conv2d and BatchNorm2d modules in regular path
+        cnn_bn = [x[0] for x in self.regular_path.named_modules()
+                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
+        if cnn_bn:
+            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
+            fuse_modules(self.regular_path, modules_to_fuse, inplace=True)
+
+        # Fuse Conv2d and BatchNorm2d modules in shortcut
+        cnn_bn = [x[0] for x in self.shortcut.named_modules()
+                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
+        if cnn_bn:
+            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
+            fuse_modules(self.shortcut, modules_to_fuse, inplace=True)
 
 
 class Bottleneck(nn.Module):
@@ -122,12 +140,28 @@ class Bottleneck(nn.Module):
 
         self.post_activation = act_layer(self.expansion * planes,
                                          **act_args["act3"])
+        self.quant_ops = nnq.FloatFunctional()
 
     def forward(self, x):
         out = self.regular_path(x)
-        out += self.shortcut(x)
+        out = self.quant_ops.add(out, self.shortcut(x))
         out = self.post_activation(out)
         return out
+
+    def fuse_model(self):
+        # Fuse Conv2d and BatchNorm2d modules in regular path
+        cnn_bn = [x[0] for x in self.regular_path.named_modules()
+                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
+        if cnn_bn:
+            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
+            fuse_modules(self.regular_path, modules_to_fuse, inplace=True)
+
+        # Fuse Conv2d and BatchNorm2d modules in shortcut
+        cnn_bn = [x[0] for x in self.shortcut.named_modules()
+                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
+        if cnn_bn:
+            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
+            fuse_modules(self.shortcut, modules_to_fuse, inplace=True)
 
 
 # Number of blocks per group for different size Resnets.
@@ -302,6 +336,8 @@ class ResNet(nn.Module):
             num_classes,
             **linear_args
         )
+        self.quant = QuantStub()
+        self.dequant = DeQuantStub()
 
     def _make_group(self, block, planes, num_blocks, stride, conv_layer,
                     conv_args, act_layer, act_args, norm_layer, norm_args):
@@ -328,9 +364,20 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = self.features(x)
+        out = self.quant(x)
+        out = self.features(out)
         out = self.classifier(out)
+        out = self.dequant(out)
         return out
+
+    def fuse_model(self):
+        """Fuse conv/bn modules in resnet models to prepare for quantization.
+        Model is modified in place
+        """
+        fuse_modules(self.features, ["stem", "bn_stem"], inplace=True)
+        for m in self.features.modules():
+            if isinstance(m, (BasicBlock, Bottleneck)):
+                m.fuse_model()
 
 
 def expand_args(args, num_blocks_by_group, block_keys):
