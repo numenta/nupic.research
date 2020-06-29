@@ -32,8 +32,9 @@ from functools import partial
 
 import torch.nn as nn
 import torch.nn.quantized as nnq
+from torch.quantization import DeQuantStub, QuantStub, fuse_modules
+
 from nupic.torch.modules import Flatten
-from torch.quantization import QuantStub, DeQuantStub, fuse_modules
 
 
 class BasicBlock(nn.Module):
