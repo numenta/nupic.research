@@ -32,13 +32,13 @@ from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 def mnist_classwise_loader(
     data_dir="/home/ec2-user/nta/data/mnist",
     transform=None,
-    batch_size=32,
+    batch_size=64,
 ):
     """ Create DataLoader instances for the MNIST train and test sets.
         :param data_dir: Where your MNIST data lives.
         :param transform: Any transforms you'd like to apply to your data.
          Defaults to None.
-        :param batch_size: Desired batch_size
+        :param batch_size: Desired batch_size. Default is 64
     """
     std_transform = transforms.Lambda(lambda x: (x[0].float(), x[1].long()))
     if transform is not None:
@@ -63,7 +63,7 @@ def mnist_classwise_loader(
 
         train_loader.append(
             DataLoader(
-                train_dataset, batch_size=batch_size, shuffle=False, drop_last=True
+                train_dataset, batch_size=batch_size, shuffle=True, drop_last=True
             )
         )
 
@@ -76,7 +76,7 @@ def mnist_classwise_loader(
 
         test_loader.append(
             DataLoader(
-                test_dataset, batch_size=batch_size, shuffle=False, drop_last=True
+                test_dataset, batch_size=batch_size, shuffle=True, drop_last=True
             )
         )
 
