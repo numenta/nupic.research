@@ -23,7 +23,6 @@ import socket
 from contextlib import closing
 
 import h5py
-from torch.nn.modules.batchnorm import _BatchNorm
 from torch.optim.lr_scheduler import OneCycleLR
 from torchvision import transforms
 from torchvision.transforms import RandomResizedCrop
@@ -172,56 +171,6 @@ def create_validation_dataset(data_dir, val_dir, num_classes=1000):
         dataset = CachedDatasetFolder(root=os.path.join(data_dir, val_dir),
                                       num_classes=num_classes, transform=transform)
     return dataset
-
-
-def create_optimizer(model, optimizer_class, optimizer_args,
-                     batch_norm_weight_decay, bias_weight_decay):
-    """
-    Configure the optimizer with the option to ignore `weight_decay` from all
-    batch norm module parameters
-
-    :param model:
-        The model to get the parameters from
-
-    :param optimizer_class:
-        The optimizer class. Must inherit from torch.optim.Optimizer
-
-    :param optimizer_args:
-        The optimizer constructor arguments passed in addition to the model parameters
-
-    :param batch_norm_weight_decay:
-        Whether or not to apply weight decay to batch norm modules parameters.
-        If False, remove 'weight_decay' from batch norm parameters
-        See https://arxiv.org/abs/1807.11205
-
-    :param bias_weight_decay:
-        Whether or not to apply weight decay to bias modules parameters.
-        If False, remove 'weight_decay' from bias parameters
-
-    :return: Configured optimizer
-    """
-
-    # get pointers to batch norm layers, don't rely on name
-    bn_param_ptrs = set()
-    for m in model.modules():
-        if isinstance(m, _BatchNorm):
-            bn_param_ptrs.add(m.weight.data_ptr())
-            bn_param_ptrs.add(m.bias.data_ptr())
-
-    group_decay, group_no_decay = [], []
-    for name, param in model.named_parameters():
-        if not param.requires_grad:
-            continue
-        if param.data_ptr() in bn_param_ptrs and not batch_norm_weight_decay:
-            group_no_decay.append(param)
-        elif ".bias" in name and not bias_weight_decay:
-            group_no_decay.append(param)
-        else:
-            group_decay.append(param)
-    model_params = [dict(params=group_decay),
-                    dict(params=group_no_decay, weight_decay=.0)]
-
-    return optimizer_class(model_params, **optimizer_args)
 
 
 def create_lr_scheduler(optimizer, lr_scheduler_class, lr_scheduler_args,
