@@ -29,6 +29,8 @@ Based on:
     "Variational Dropout Sparsifies Deep Neural Networks." ICML (2017).
 """
 
+import math
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -39,67 +41,162 @@ from torch.nn.parameter import Parameter
 from nupic.research.frameworks.pytorch.modules import MaskedConv2d
 
 
-class VDropLinear(nn.Module):
-    def __init__(self, in_features, out_features, bias=True):
+class VDropCentralData(nn.Module):
+    """
+    Stores data for a set of variational dropout (VDrop) modules in large
+    central tensors. The VDrop modules access the data using views. This makes
+    it possible to operate on all of the data at once, (rather than e.g. 53
+    times with resnet50).
+
+    Usage:
+    1. Instantiate
+    2. Pass into multiple constructed VDropLinear and VDropConv2d modules
+    3. Call finalize
+
+    Before calling forward on the model, call "compute_forward_data".
+    After calling forward on the model, call "clear_forward_data".
+
+    The parameters are stored in terms of z_mu and z_var rather than w_mu and
+    w_var to support group variational dropout (e.g. to allow for pruning entire
+    channels.)
+    """
+    def __init__(self, z_logvar_init=-10):
         super().__init__()
-        self.weight = Parameter(torch.Tensor(out_features, in_features))
-        init.kaiming_normal_(self.weight, mode="fan_out")
+        self.z_chunk_sizes = []
+        self.z_logvar_init = z_logvar_init
+        self.z_logvar_min = min(z_logvar_init, -10)
+        self.z_logvar_max = 10.
+        self.epsilon = 1e-8
+        self.data_views = {}
+        self.modules = []
 
-        self.w_logvar = Parameter(torch.Tensor(out_features, in_features))
-        self.w_logvar.data.fill_(-10)
+        # Populated during register(), deleted during finalize()
+        self.all_z_mu = []
+        self.all_z_logvar = []
+        self.all_num_weights = []
 
+        # Populated during finalize()
+        self.z_mu = None
+        self.z_logvar = None
+        self.z_num_weights = None
+
+        self.threshold = 3
+
+    def extra_repr(self):
+        s = f"z_logvar_init={self.z_logvar_init}"
+        return s
+
+    def __getitem__(self, key):
+        return self.data_views[key]
+
+    def register(self, module, z_mu, z_logvar, num_weights_per_z=1):
+        self.all_z_mu.append(z_mu.flatten())
+        self.all_z_logvar.append(z_logvar.flatten())
+        self.all_num_weights.append(num_weights_per_z)
+
+        self.modules.append(module)
+        data_index = len(self.z_chunk_sizes)
+        self.z_chunk_sizes.append(z_mu.numel())
+
+        return data_index
+
+    def finalize(self):
+        self.z_mu = Parameter(torch.cat(self.all_z_mu))
+        self.z_logvar = Parameter(torch.cat(self.all_z_logvar))
+        self.z_num_weights = torch.tensor(
+            self.all_num_weights, dtype=torch.float
+        ).repeat_interleave(torch.tensor(self.z_chunk_sizes))
+        del self.all_z_mu
+        del self.all_z_logvar
+        del self.all_num_weights
+
+    def to(self, *args, **kwargs):
+        ret = super().to(*args, **kwargs)
+        self.z_num_weights = self.z_num_weights.to(*args, **kwargs)
+        return ret
+
+    def compute_forward_data(self):
+        if self.training:
+            self.data_views["z_mu"] = self.z_mu.split(self.z_chunk_sizes)
+            self.data_views["z_var"] = self.z_logvar.exp().split(
+                self.z_chunk_sizes)
+        else:
+            self.data_views["z_mu"] = (
+                self.z_mu
+                * (self.compute_z_logalpha() < self.threshold).float()
+            ).split(self.z_chunk_sizes)
+
+    def clear_forward_data(self):
+        self.data_views.clear()
+
+    def compute_z_logalpha(self):
+        return self.z_logvar - (self.z_mu.square() + self.epsilon).log()
+
+    def regularization(self):
+        return (vdrop_regularization(self.compute_z_logalpha())
+                * self.z_num_weights).sum()
+
+    def constrain_parameters(self):
+        self.z_logvar.data.clamp_(min=self.z_logvar_min,
+                                  max=self.z_logvar_max)
+
+
+class VDropLinear(nn.Module):
+    def __init__(self, in_features, out_features, central_data, bias=True):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+
+        # Store in a list to avoid having it registered as a module, otherwise
+        # it will appear multiple times in the state dict.
+        self.central_data = [central_data]
+
+        w_mu = torch.Tensor(self.out_features, self.in_features)
+        w_logvar = torch.Tensor(self.out_features, self.in_features)
         if bias:
             self.bias = Parameter(torch.Tensor(out_features))
-            self.bias.data.fill_(0)
         else:
             self.bias = None
 
-        self.threshold = 3
-        self.epsilon = 1e-8
+        w_logvar.data.fill_(central_data.z_logvar_init)
+        # Standard nn.Linear initialization.
+        init.kaiming_uniform_(w_mu, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(w_mu)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.bias, -bound, bound)
+
+        self.data_index = central_data.register(self, w_mu, w_logvar)
+
         self.tensor_constructor = (torch.FloatTensor
                                    if not torch.cuda.is_available()
                                    else torch.cuda.FloatTensor)
 
-    def constrain_parameters(self):
-        self.w_logvar.data.clamp_(min=-10., max=10.)
+    def extra_repr(self):
+        s = f"{self.in_features}, {self.out_features}, "
+        if self.bias is None:
+            s += ", bias=False"
+        return s
 
-    def compute_mask(self):
-        w_logalpha = self.w_logvar - (self.weight ** 2 + self.epsilon).log()
-        return (w_logalpha < self.threshold).float()
+    def get_w_mu(self):
+        return self.central_data[0]["z_mu"][self.data_index].view(
+            self.out_features, self.in_features)
+
+    def get_w_var(self):
+        return self.central_data[0]["z_var"][self.data_index].view(
+            self.out_features, self.in_features)
 
     def forward(self, x):
         if self.training:
-            return vdrop_linear_forward(x,
-                                        lambda: self.weight,
-                                        lambda: self.w_logvar.exp(),
-                                        self.bias, self.tensor_constructor,
-                                        self.epsilon)
+            return vdrop_linear_forward(x, self.get_w_mu, self.get_w_var,
+                                        self.bias, self.tensor_constructor)
         else:
-            return F.linear(x, self.weight * self.compute_mask(), self.bias)
-
-    def regularization(self):
-        w_logalpha = self.w_logvar - (self.weight ** 2 + self.epsilon).log()
-        return vdrop_regularization(w_logalpha).sum()
-
-    def get_inference_nonzeros(self):
-        return self.compute_mask().int().sum(dim=1)
-
-    def count_inference_flops(self):
-        # For each unit, multiply with its n inputs then do n - 1 additions.
-        # To capture the -1, subtract it, but only in cases where there is at
-        # least one weight.
-        nz_by_unit = self.get_inference_nonzeros()
-        multiplies = torch.sum(nz_by_unit)
-        adds = multiplies - torch.sum(nz_by_unit > 0)
-        return multiplies.item(), adds.item()
-
-    def weight_size(self):
-        return self.weight.size()
+            return F.linear(x, self.get_w_mu(), self.bias)
 
 
 class VDropConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True):
+    def __init__(self, in_channels, out_channels, kernel_size, central_data,
+                 stride=1, padding=0, dilation=1, groups=1, bias=True):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -109,26 +206,32 @@ class VDropConv2d(nn.Module):
         self.dilation = pair(dilation)
         self.groups = groups
 
-        self.weight = Parameter(torch.Tensor(out_channels,
-                                             in_channels // groups,
-                                             *self.kernel_size))
-        init.kaiming_normal_(self.weight, mode="fan_out")
+        # Store in a list to avoid having it registered as a module, otherwise
+        # it will appear multiple times in the state dict.
+        self.central_data = [central_data]
 
-        self.w_logvar = Parameter(torch.Tensor(out_channels,
-                                               in_channels // groups,
-                                               *self.kernel_size))
-        self.w_logvar.data.fill_(-10)
-
+        w_mu = torch.Tensor(out_channels,
+                            in_channels // groups,
+                            *self.kernel_size)
+        w_logvar = torch.Tensor(out_channels,
+                                in_channels // groups,
+                                *self.kernel_size)
         if bias:
             self.bias = Parameter(torch.Tensor(out_channels))
-            self.bias.data.fill_(0)
         else:
             self.bias = None
 
-        self.input_shape = None
+        w_logvar.data.fill_(central_data.z_logvar_init)
 
-        self.threshold = 3
-        self.epsilon = 1e-8
+        # Standard nn.Conv2d initialization.
+        init.kaiming_uniform_(w_mu, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(w_mu)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.bias, -bound, bound)
+
+        self.data_index = central_data.register(self, w_mu, w_logvar)
+
         self.tensor_constructor = (torch.FloatTensor
                                    if not torch.cuda.is_available()
                                    else torch.cuda.FloatTensor)
@@ -146,61 +249,23 @@ class VDropConv2d(nn.Module):
             s += ", bias=False"
         return s
 
-    def constrain_parameters(self):
-        self.w_logvar.data.clamp_(min=-10., max=10.)
+    def get_w_mu(self):
+        return self.central_data[0]["z_mu"][self.data_index].view(
+            self.out_channels, self.in_channels, *self.kernel_size)
 
-    def compute_mask(self):
-        w_logalpha = self.w_logvar - (self.weight ** 2 + self.epsilon).log()
-        return (w_logalpha < self.threshold).float()
+    def get_w_var(self):
+        return self.central_data[0]["z_var"][self.data_index].view(
+            self.out_channels, self.in_channels, *self.kernel_size)
 
     def forward(self, x):
-        if self.input_shape is None:
-            self.input_shape = x.size()
-
         if self.training:
-            return vdrop_conv_forward(x,
-                                      lambda: self.weight,
-                                      lambda: self.w_logvar.exp(),
+            return vdrop_conv_forward(x, self.get_w_mu, self.get_w_var,
                                       self.bias, self.stride, self.padding,
                                       self.dilation, self.groups,
-                                      self.tensor_constructor, self.epsilon)
+                                      self.tensor_constructor)
         else:
-            return F.conv2d(x, self.weight * self.compute_mask(), self.bias,
-                            self.stride, self.padding, self.dilation,
-                            self.groups)
-
-    def regularization(self):
-        w_logalpha = self.w_logvar - (self.weight ** 2 + self.epsilon).log()
-        return vdrop_regularization(w_logalpha).sum()
-
-    def get_inference_nonzeros(self):
-        mask = self.compute_mask().int()
-        return mask.sum(dim=tuple(range(1, len(mask.shape))))
-
-    def count_inference_flops(self):
-        # For each unit, multiply with its n inputs then do n - 1 additions.
-        # To capture the -1, subtract it, but only in cases where there is at
-        # least one weight.
-        nz_by_unit = self.get_inference_nonzeros()
-        multiplies_per_instance = torch.sum(nz_by_unit)
-        adds_per_instance = multiplies_per_instance - torch.sum(nz_by_unit > 0)
-
-        # for rows
-        instances = (
-            (self.input_shape[-2] - self.kernel_size[0]
-             + 2 * self.padding[0]) / self.stride[0]) + 1
-        # multiplying with cols
-        instances *= (
-            (self.input_shape[-1] - self.kernel_size[1] + 2 * self.padding[1])
-            / self.stride[1]) + 1
-
-        multiplies = multiplies_per_instance * instances
-        adds = adds_per_instance * instances
-
-        return multiplies.item(), adds.item()
-
-    def weight_size(self):
-        return self.weight.size()
+            return F.conv2d(x, self.get_w_mu(), self.bias, self.stride,
+                            self.padding, self.dilation, self.groups)
 
 
 class FixedVDropConv2d(MaskedConv2d):
@@ -342,6 +407,7 @@ def vdrop_regularization(logalpha):
 
 
 __all__ = [
+    "VDropCentralData",
     "VDropLinear",
     "VDropConv2d",
     "FixedVDropConv2d",
