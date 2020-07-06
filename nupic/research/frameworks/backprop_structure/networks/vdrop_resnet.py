@@ -17,10 +17,11 @@ class VDropResNet(ResNet):
     A subclass of ResNet that manages the vdrop_data.
     """
 
-    def __init__(self, conv_layer, linear_layer, z_logvar_init=-10, **kwargs):
+    def __init__(self, conv_layer, linear_layer, z_logvar_init=-10,
+                 vdrop_data_class=VDropCentralData, **kwargs):
         # Can't save the vdrop_data on the self until after nn.Module.__init__()
         # has been called.
-        vdrop_data = VDropCentralData(z_logvar_init)
+        vdrop_data = vdrop_data_class(z_logvar_init=z_logvar_init)
 
         if "vdrop_data" in inspect.signature(conv_layer).parameters:
             conv_layer = partial(conv_layer, vdrop_data=vdrop_data)
