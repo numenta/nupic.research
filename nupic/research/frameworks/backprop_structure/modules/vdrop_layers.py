@@ -141,6 +141,58 @@ class VDropCentralData(nn.Module):
                                   max=self.z_logvar_max)
 
 
+class MaskedVDropCentralData(VDropCentralData):
+    def __init__(self, restore_precision_on_prune=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.restore_precision_on_prune = restore_precision_on_prune
+
+        # Populated during register(), deleted during finalize()
+        self.all_z_mask = []
+
+        # Populated during finalize()
+        self.register_buffer("z_mask", None)
+
+        # Sentinel value to distinguish pruned weights from those that actually
+        # reached z_logvar_max. (This has no effect on the algorithm, it's just
+        # sometimes useful during analysis.)
+        self.pruned_logvar_sentinel = self.z_logvar_max - 0.00058
+
+    def register(self, module, z_mu, z_logvar, num_weights_per_z=1):
+        data_index = super().register(module, z_mu, z_logvar, num_weights_per_z)
+        self.all_z_mask.append(torch.ones(z_mu.numel(), dtype=torch.float16))
+        return data_index
+
+    def finalize(self):
+        super().finalize()
+        self.z_mask = torch.cat(self.all_z_mask)
+        del self.all_z_mask
+
+    def compute_forward_data(self):
+        if self.training:
+            self.data_views["z_mu"] = (self.z_mu
+                                       * self.z_mask).split(self.z_chunk_sizes)
+            self.data_views["z_var"] = (self.z_logvar.exp()
+                                        * self.z_mask).split(self.z_chunk_sizes)
+        else:
+            z_mu = self.z_mu * self.z_mask * (
+                (self.compute_z_logalpha() < self.threshold).float()
+            )
+            self.data_views["z_mu"] = z_mu.split(self.z_chunk_sizes)
+
+    def regularization(self):
+        return ((vdrop_regularization(self.compute_z_logalpha())
+                 * self.z_mask)
+                * self.z_num_weights).sum()
+
+    def masked_parameters(self):
+        """
+        Get information needed to zero momentum in the optimizer.
+        """
+        yield self.z_mu, self.z_mask
+        yield self.z_logvar, self.z_mask
+
+
 class VDropLinear(nn.Module):
     def __init__(self, in_features, out_features, central_data, bias=True):
         super().__init__()
@@ -408,6 +460,7 @@ def vdrop_regularization(logalpha):
 
 __all__ = [
     "VDropCentralData",
+    "MaskedVDropCentralData",
     "VDropLinear",
     "VDropConv2d",
     "FixedVDropConv2d",
