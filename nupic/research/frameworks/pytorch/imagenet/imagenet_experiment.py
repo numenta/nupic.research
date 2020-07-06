@@ -232,13 +232,10 @@ class ImagenetExperiment:
             self.logger.debug(self.model)
 
         # Configure optimizer
-        self.batch_norm_weight_decay = config.get("batch_norm_weight_decay",
-                                                  True)
-        self.bias_weight_decay = config.get("bias_weight_decay", True)
         group_decay, group_no_decay = [], []
         for module in self.model.modules():
             for name, param in module.named_parameters(recurse=False):
-                if self.should_decay_parameter(module, name, param):
+                if self.should_decay_parameter(module, name, param, config):
                     group_decay.append(param)
                 else:
                     group_no_decay.append(param)
@@ -422,11 +419,11 @@ class ImagenetExperiment:
             pin_memory=torch.cuda.is_available(),
         )
 
-    def should_decay_parameter(self, module, parameter_name, parameter):
+    def should_decay_parameter(self, module, parameter_name, parameter, config):
         if isinstance(module, _BatchNorm):
-            return self.batch_norm_weight_decay
+            return config.get("batch_norm_weight_decay", True)
         elif parameter_name == "bias":
-            return self.bias_weight_decay
+            return config.get("bias_weight_decay", True)
         else:
             return True
 
