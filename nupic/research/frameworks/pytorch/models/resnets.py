@@ -33,7 +33,6 @@ from itertools import zip_longest
 
 import torch.nn as nn
 import torch.nn.quantized as nnq
-from nupic.torch.modules.sparse_weights import SparseWeightsBase
 from torch.quantization import DeQuantStub, QuantStub, fuse_modules
 
 from nupic.torch.modules import Flatten
@@ -165,7 +164,7 @@ class Bottleneck(nn.Module):
         ]
 
         # Break the list into groups of 3 (cnn, bn, relu)
-        cnn_bn_relu = list(map(list, zip_longest(*[iter(submodule_names)]*3)))
+        cnn_bn_relu = list(map(list, zip_longest(*[iter(submodule_names)] * 3)))
 
         # 3rd Layer has no ReLU. Remove empty entry
         cnn_bn_relu[2].pop(-1)
@@ -415,7 +414,7 @@ class ResNet(nn.Module):
             modules_to_fuse.append("act_stem")
         else:
             act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
-                             if isinstance(v, nn.ReLU))
+                            if isinstance(v, nn.ReLU))
             modules_to_fuse.append(act_name)
 
         fuse_modules(self.features, modules_to_fuse, inplace=True)
