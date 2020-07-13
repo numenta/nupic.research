@@ -151,8 +151,8 @@ class Bottleneck(nn.Module):
 
     def fuse_model(self):
         """
-        Fuse Conv, BathcNorm and ReLU for the first 2 layers and for the 3rd and
-        shortcut lyers.
+        Fuse Conv, BatchNorm and ReLU for the first 2 layers and for the 3rd and
+        shortcut layers.
         The post activation ReLU will not be fused due to the extra addition
         """
         modules_to_fuse = []
@@ -388,7 +388,7 @@ class ResNet(nn.Module):
         return out
 
     def fuse_model(self):
-        """Fuse conv/bn modules in resnet models to prepare for quantization.
+        """Fuse conv/bn/relu modules in resnet models to prepare for quantization.
         Model is modified in place
         """
         # Fuse bottleneck layers
