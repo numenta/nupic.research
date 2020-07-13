@@ -36,7 +36,13 @@ class KnowledgeDistillationImagenetExperiment(mixins.KnowledgeDistillation,
     pass
 
 
+class KnowledgeDistillationCLExperiment(mixins.KnowledgeDistillationCL,
+                                        RezeroedKWinnersImagenetExperiment):
+    pass
+
+
 __all__ = [
     "RezeroedKWinnersImagenetExperiment",
-    "KnowledgeDistillationImagenetExperiment"
+    "KnowledgeDistillationImagenetExperiment",
+    "KnowledgeDistillationCLExperiment"
 ]

@@ -71,6 +71,7 @@ def clear_labels(labels, n_classes=5):
 
 class ToyNetwork(nn.Module):
     """ Toy network; here dpc is dendrites_per_neuron """
+
     def __init__(
         self,
         dpc=3,

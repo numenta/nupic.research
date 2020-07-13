@@ -22,25 +22,25 @@
 import logging
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
-from nupic.torch.modules import rezero_weights
+from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
 
 class RezeroWeights:
     """
-    Rezero the SparseWeights after every epoch.
-
-    Note that the SparseWeights rezeroes weights during the forward pass during
-    learning, so this mixin only needs to be applied on post_epoch rather than
-    post_batch.
+    Rezero the SparseWeights after every batch.
     """
     def setup_experiment(self, config):
         super().setup_experiment(config)
 
+        self._rezero_modules = [module
+                                for module in self.model.modules()
+                                if isinstance(module, SparseWeightsBase)]
+
         if self.rank == 0:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(
                 self.model)
-            self.logger.debug("Params total/nnz %s / %s = %s ",
-                              params_sparse, nonzero_params_sparse2,
+            self.logger.debug("Params nnz/total %s / %s = %s ",
+                              nonzero_params_sparse2, params_sparse,
                               float(nonzero_params_sparse2) / params_sparse)
 
     @classmethod
@@ -48,32 +48,33 @@ class RezeroWeights:
         model = super().create_model(config, device)
         # Some initialization strategies can destroy sparsity, so we call rezero
         # here.
-        model.apply(rezero_weights)
+        for module in model.modules():
+            if isinstance(module, SparseWeightsBase):
+                module.rezero_weights()
         return model
+
+    def post_batch(self, *args, **kwargs):
+        super().post_batch(*args, **kwargs)
+        for module in self._rezero_modules:
+            module.rezero_weights()
 
     def post_epoch(self):
         super().post_epoch()
 
-        count_nnz = self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0
-        if count_nnz:
-            params_sparse, nonzero_params_sparse1 = count_nonzero_params(
-                self.model)
-
-        self.model.apply(rezero_weights)
-
-        if count_nnz:
-            params_sparse, nonzero_params_sparse2 = count_nonzero_params(
+        if self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0:
+            params_sparse, nonzero_params_sparse = count_nonzero_params(
                 self.model)
             self.logger.debug(
-                "Params total/nnz before/nnz after %s %s / %s = %s",
-                params_sparse, nonzero_params_sparse1,
-                nonzero_params_sparse2,
-                float(nonzero_params_sparse2) / params_sparse)
+                "Params nnz/total %s / %s = %s",
+                nonzero_params_sparse,
+                params_sparse,
+                float(nonzero_params_sparse) / params_sparse)
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("RezeroWeights logging")
         eo["create_model"].append("RezeroWeights")
-        eo["post_epoch"].append("RezeroWeights")
+        eo["post_batch"].append("RezeroWeights")
+        eo["post_epoch"].append("RezeroWeights logging")
         return eo

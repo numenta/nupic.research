@@ -32,6 +32,7 @@ import torch.distributed as dist
 from torch import multiprocessing
 from torch.backends import cudnn
 from torch.nn import DataParallel
+from torch.nn.modules.batchnorm import _BatchNorm
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
@@ -41,13 +42,15 @@ from nupic.research.frameworks.pytorch.distributed_sampler import (
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
-    create_optimizer,
     create_train_dataset,
     create_validation_dataset,
     get_free_port,
     get_node_ip_address,
 )
-from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
+from nupic.research.frameworks.pytorch.imagenet.network_utils import (
+    create_model,
+    get_compatible_state_dict,
+)
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     aggregate_eval_results,
@@ -128,6 +131,7 @@ class ImagenetExperiment:
                               constructor
             - batch_norm_weight_decay: Whether or not to apply weight decay to
                                        batch norm modules parameters
+                                       See https://arxiv.org/abs/1807.11205
             - bias_weight_decay: Whether or not to apply weight decay to
                                        bias parameters
             - lr_scheduler_class: Learning rate scheduler class.
@@ -222,22 +226,26 @@ class ImagenetExperiment:
             self.progress = self.progress and self.rank == 0
 
         # Configure model
+        self.device = config.get("device", self.device)
         self.model = self.create_model(config, self.device)
         if self.rank == 0:
             self.logger.debug(self.model)
 
         # Configure optimizer
+        group_decay, group_no_decay = [], []
+        for module in self.model.modules():
+            for name, param in module.named_parameters(recurse=False):
+                if self.should_decay_parameter(module, name, param, config):
+                    group_decay.append(param)
+                else:
+                    group_no_decay.append(param)
+
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
-        batch_norm_weight_decay = config.get("batch_norm_weight_decay", True)
-        bias_weight_decay = config.get("bias_weight_decay", True)
-        self.optimizer = create_optimizer(
-            model=self.model,
-            optimizer_class=optimizer_class,
-            optimizer_args=optimizer_args,
-            batch_norm_weight_decay=batch_norm_weight_decay,
-            bias_weight_decay=bias_weight_decay,
-        )
+        self.optimizer = optimizer_class([dict(params=group_decay),
+                                          dict(params=group_no_decay,
+                                               weight_decay=0.)],
+                                         **optimizer_args)
 
         # Validate mixed precision requirements
         self.mixed_precision = config.get("mixed_precision", False)
@@ -410,6 +418,14 @@ class ImagenetExperiment:
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
         )
+
+    def should_decay_parameter(self, module, parameter_name, parameter, config):
+        if isinstance(module, _BatchNorm):
+            return config.get("batch_norm_weight_decay", True)
+        elif parameter_name == "bias":
+            return config.get("bias_weight_decay", True)
+        else:
+            return True
 
     def validate(self, loader=None):
         if loader is None:
@@ -690,6 +706,7 @@ class ImagenetExperiment:
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
+            state_dict = get_compatible_state_dict(self.model.module, state_dict)
             self.model.module.load_state_dict(state_dict)
 
         if "optimizer" in state:
@@ -815,6 +832,9 @@ class ImagenetExperiment:
             post_batch=["ImagenetExperiment.post_batch"],
             error_loss=["ImagenetExperiment.error_loss"],
             complexity_loss=["ImagenetExperiment.complexity_loss"],
+            should_decay_parameter=[
+                "ImagenetExperiment.should_decay_parameter"
+            ],
             transform_data_to_device=[
                 "ImagenetExperiment.transform_data_to_device"
             ],

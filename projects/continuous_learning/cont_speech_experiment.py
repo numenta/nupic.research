@@ -87,9 +87,7 @@ class ContinuousSpeechExperiment(object):
         self.validation = False
         self.load_datasets()
 
-        self.freeze_params = config["freeze_params"]
         self.running_accuracy = []
-        self.frozen_inds = None
         self.combine_xy = False
         self.boost_strength = config["boost_strength"]
 
@@ -229,6 +227,7 @@ class ContinuousSpeechExperiment(object):
             combine_data=self.combine_xy,
             freeze_params=fparams,
             batches_in_epoch=self.batches_in_epoch,
+            post_batch_callback=self.post_batch,
         )
 
         self.full_post_epoch()
@@ -239,9 +238,8 @@ class ContinuousSpeechExperiment(object):
         self,
         epoch,
         training_classes,
-        freeze_params=None,
-        freeze_fun=None,
-        freeze_pct=90,
+        freeze_modules=None,
+        module_inds=None,
         freeze_output=False,
         layer_type="dense",
         linear_number=2,
@@ -270,9 +268,8 @@ class ContinuousSpeechExperiment(object):
             self.train_loader,
             self.optimizer,
             self.device,
-            freeze_params=freeze_params,
-            freeze_fun=freeze_fun,
-            freeze_pct=freeze_pct,
+            freeze_modules=freeze_modules,
+            module_inds=module_inds,
             freeze_output=freeze_output,
             layer_type=layer_type,
             linear_number=linear_number,
@@ -280,6 +277,7 @@ class ContinuousSpeechExperiment(object):
             output_indices=output_indices,
             combine_data=self.combine_xy,
             batches_in_epoch=self.batches_in_epoch,
+            post_batch_callback=self.post_batch,
         )
 
         self.post_epoch()
@@ -287,13 +285,14 @@ class ContinuousSpeechExperiment(object):
         self.update_accuracy()
         f.close()
 
-    def post_epoch(self):
+    def post_batch(self, *args, **kwargs):
         self.model.apply(rezero_weights)
+
+    def post_epoch(self):
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
 
     def full_post_epoch(self):
-        self.model.apply(rezero_weights)
         self.lr_scheduler.step()
         self.full_train_loader.dataset.load_next()
 
