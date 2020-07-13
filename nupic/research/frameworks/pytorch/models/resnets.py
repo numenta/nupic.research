@@ -37,7 +37,6 @@ from torch.quantization import DeQuantStub, QuantStub, fuse_modules
 from nupic.torch.modules import Flatten
 
 
-
 class BasicBlock(nn.Module):
     """Default block for ResNets with < 50 layers."""
 
