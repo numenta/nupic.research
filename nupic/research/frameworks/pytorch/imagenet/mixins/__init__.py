@@ -33,3 +33,4 @@ from .rezero_weights import RezeroWeights
 from .update_boost_strength import UpdateBoostStrength
 from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .composite_loss import CompositeLoss
+from .quantization_aware import QuantizationAware

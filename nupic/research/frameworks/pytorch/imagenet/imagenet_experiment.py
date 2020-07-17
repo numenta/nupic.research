@@ -231,6 +231,9 @@ class ImagenetExperiment:
         if self.rank == 0:
             self.logger.debug(self.model)
 
+        # Apply any required transformations to the model
+        self.transform_model()
+
         # Configure optimizer
         group_decay, group_no_decay = [], []
         for module in self.model.modules():
@@ -418,6 +421,9 @@ class ImagenetExperiment:
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
         )
+
+    def transform_model(self, model, *args, **kwargs):
+        return model
 
     def should_decay_parameter(self, module, parameter_name, parameter, config):
         if isinstance(module, _BatchNorm):
