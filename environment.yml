@@ -3,59 +3,11 @@
 # platform: osx-64
 name: nupic.research
 channels:
-  - pytorch
-  - fastai
   - defaults
-  - conda-forge
 
 dependencies:
-  - defaults::python=3.7
-  - defaults::pip
-
-  # See nupic.torch requirements.txt
-  - pytorch=1.5
-
-  # See requirements.txt
-  - awscli
-  - boto3
-  - elasticsearch
-  - fastai
-  - jupyter
-  - librosa=0.7.1
-  - matplotlib
-  - numpy>=1.17
-  - pandas
-  - pillow=6.0.0
-  - python-dateutil=2.8.0
-  - python-dotenv
-  - requests
-  - scikit-image
-  - seaborn
-  - tabulate
-  - torchvision=0.6.0
-  - tqdm
-  - h5py
-
-  # ray[debug,dashboard]
-  - aiohttp
-  - psutil
-  - setproctitle
-
-  # See requirements-dev.txt
-  - black=19.3b0
-  - flake8=3.7.8
-  - flake8-black=0.1.1
-  - flake8-bugbear=19.8.0
-  - flake8-builtins=1.4.1
-  - flake8-comprehensions=2.2.0
-  - flake8-copyright=0.2.2
-  - flake8-mutable=1.2.0
-  - flake8-print=3.1.0
-  - flake8-quotes=2.1.0
-  - isort=4.3.21
-  - pep8-naming=0.8.2
-  - pytest=5.2.1
-  - pytest-runner=5.1
+  - python=3.7
+  - pip
 
   # Dependencies not available in conda
   - pip:
