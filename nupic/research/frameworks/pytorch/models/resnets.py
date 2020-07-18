@@ -497,7 +497,7 @@ def act_args_nested_dict(depth, args_from_modulename_fn):
     :type depth: int
 
     :param args_from_modulename_fn:
-      Takes a module's full name and returns conv_args for that module
+      Takes a module's full name and returns act_args for that module
     :type args_from_modulename_fn: callable
     """
     act_args = {
