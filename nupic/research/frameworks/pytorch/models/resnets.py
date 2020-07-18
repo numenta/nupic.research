@@ -446,6 +446,79 @@ def expand_args(args, num_blocks_by_group, block_keys):
     return args
 
 
+def conv_args_nested_dict(depth, args_from_modulename_fn):
+    """
+    Build a complete args dict via a callback function.
+
+    :param depth:
+      Number of layers in the resnet
+    :type depth: int
+
+    :param args_from_modulename_fn:
+      Takes a module's full name and returns conv_args for that module
+    :type args_from_modulename_fn: callable
+    """
+    conv_args = {
+        "stem": args_from_modulename_fn("features.stem"),
+    }
+
+    _, block_counts = cf_dict[str(depth)]
+    for group_num, group_key, num_blocks in zip(range(1, 5),
+                                                ResNet.group_keys,
+                                                block_counts):
+        group_name = f"group{group_num}"
+        all_block_args = []
+        for block_num in range(num_blocks):
+            block_args = dict()
+
+            if block_num == 0:
+                block_args["shortcut"] = args_from_modulename_fn(
+                    f"features.{group_name}.{block_num}.shortcut")
+
+            for conv_k, kname in [("conv1x1_1", "conv1"),
+                                  ("conv3x3_2", "conv2"),
+                                  ("conv1x1_3", "conv3")]:
+                block_args[conv_k] = args_from_modulename_fn(
+                    f"features.{group_name}.{block_num}.regular_path.{kname}"
+                )
+
+            all_block_args.append(block_args)
+
+        conv_args[group_key] = all_block_args
+    return conv_args
+
+
+def act_args_nested_dict(depth, args_from_modulename_fn):
+    """
+    Build a complete args dict via a callback function.
+
+    :param depth:
+      Number of layers in the resnet
+    :type depth: int
+
+    :param args_from_modulename_fn:
+      Takes a module's full name and returns conv_args for that module
+    :type args_from_modulename_fn: callable
+    """
+    act_args = {
+        "stem": args_from_modulename_fn("features.act_stem"),
+    }
+
+    _, block_counts = cf_dict[str(depth)]
+    act_args.update({
+        group_key: [
+            {k: args_from_modulename_fn(
+                f"features.group{group_num}.{block_num}.regular_path.{k}")
+             for k in ["act1", "act2", "act3"]}
+            for block_num in range(num_blocks)]
+        for group_num, group_key, num_blocks in zip(range(1, 5),
+                                                    ResNet.group_keys,
+                                                    block_counts)
+    })
+
+    return act_args
+
+
 resnet18 = partial(ResNet, depth=18)
 resnet34 = partial(ResNet, depth=34)
 resnet50 = partial(ResNet, depth=50)
