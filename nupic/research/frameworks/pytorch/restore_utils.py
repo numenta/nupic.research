@@ -32,7 +32,7 @@ from nupic.torch.modules.sparse_weights import SparseWeightsBase
 # ----------------
 
 
-def load_multi_state(
+def load_multi_state(  # noqa: C901
     model,
     restore_full_model=None,
     restore_linear=None,
