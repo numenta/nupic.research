@@ -183,7 +183,9 @@ class WandbLogger(wandb.ray.WandbLogger):
         if "result_to_time_series_fn" in env_config:
             self.result_to_time_series_fn = env_config["result_to_time_series_fn"]
         elif hasattr(experiment_class, "expand_result_to_time_series"):
-            self.result_to_time_series_fn = experiment_class.expand_result_to_time_series
+            self.result_to_time_series_fn = (
+                experiment_class.expand_result_to_time_series
+            )
 
     def on_result(self, result):
         """
