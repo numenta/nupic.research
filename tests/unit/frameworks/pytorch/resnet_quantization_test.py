@@ -25,22 +25,15 @@ import torch
 import torch.nn as nn
 import torch.nn.intrinsic as nni
 
-from nupic.research.frameworks.pytorch.models.sparse_resnets import (
-    resnet34, resnet50
-)
 from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
 from nupic.research.frameworks.pytorch.model_compare import compare_models
+from nupic.research.frameworks.pytorch.models.sparse_resnets import resnet34, resnet50
 
-TEST_MODEL_CLASS = [
-    resnet34, resnet50
-]
+TEST_MODEL_CLASS = [resnet34, resnet50]
 
 
 def _create_test_model(model_class):
-    model_args = dict(config=dict(
-        num_classes=3,
-        defaults_sparse=True,
-    ))
+    model_args = dict(config=dict(num_classes=3, defaults_sparse=True))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = create_model(
         model_class=model_class,
@@ -56,12 +49,14 @@ def test_fuse_model_conv_bn(model_class):
     original = _create_test_model(model_class=model_class)
 
     conv_layers = {
-       name for name, module in original.named_modules()
-       if isinstance(module, nn.Conv2d)
+        name
+        for name, module in original.named_modules()
+        if isinstance(module, nn.Conv2d)
     }
     bn_layers = {
-       name for name, module in original.named_modules()
-       if isinstance(module, nn.BatchNorm2d)
+        name
+        for name, module in original.named_modules()
+        if isinstance(module, nn.BatchNorm2d)
     }
 
     # Fuse conv and bn only
@@ -70,13 +65,16 @@ def test_fuse_model_conv_bn(model_class):
 
     # Check if BN layers were removed
     assert all(
-        isinstance(module, nn.Identity) for name, module in fused.named_modules()
-        if name in bn_layers)
+        isinstance(module, nn.Identity)
+        for name, module in fused.named_modules()
+        if name in bn_layers
+    )
 
     # Check if all Conv/BN were merged
     conv_bn_layers = {
-       name for name, module in fused.named_modules()
-       if isinstance(module, nni.ConvBn2d)
+        name
+        for name, module in fused.named_modules()
+        if isinstance(module, nni.ConvBn2d)
     }
     assert conv_layers == conv_bn_layers
 
@@ -89,18 +87,21 @@ def test_fuse_model_conv_bn_relu(model_class):
     original = _create_test_model(model_class=model_class)
 
     conv_layers = {
-       name for name, module in original.named_modules()
-       if isinstance(module, nn.Conv2d)
+        name
+        for name, module in original.named_modules()
+        if isinstance(module, nn.Conv2d)
     }
     bn_layers = {
-       name for name, module in original.named_modules()
-       if isinstance(module, nn.BatchNorm2d)
+        name
+        for name, module in original.named_modules()
+        if isinstance(module, nn.BatchNorm2d)
     }
 
     # Get all ReLU except for "post_activation"
     relu_layers = {
-       name for name, module in original.named_modules()
-       if isinstance(module, nn.ReLU) and "post_activation" not in name
+        name
+        for name, module in original.named_modules()
+        if isinstance(module, nn.ReLU) and "post_activation" not in name
     }
 
     # Fuse conv, bn and relu
@@ -109,13 +110,16 @@ def test_fuse_model_conv_bn_relu(model_class):
 
     # Check if BN+ReLU layers were removed
     assert all(
-        isinstance(module, nn.Identity) for name, module in fused.named_modules()
-        if name in bn_layers | relu_layers)
+        isinstance(module, nn.Identity)
+        for name, module in fused.named_modules()
+        if name in bn_layers | relu_layers
+    )
 
     # Check if all Conv/BN/Relu were merged
     conv_bn_layers = {
-       name for name, module in fused.named_modules()
-       if isinstance(module, (nni.ConvBn2d, nni.ConvBnReLU2d))
+        name
+        for name, module in fused.named_modules()
+        if isinstance(module, (nni.ConvBn2d, nni.ConvBnReLU2d))
     }
     assert conv_layers == conv_bn_layers
 
@@ -123,5 +127,5 @@ def test_fuse_model_conv_bn_relu(model_class):
     assert compare_models(original, fused, (3, 224, 224))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
