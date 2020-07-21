@@ -158,7 +158,8 @@ class WandbLogger(wandb.ray.WandbLogger):
         """
 
         # Auto format the group to be the name of the trial.
-        wandb_config = self.config["env_config"]["wandb"]
+        env_config = self.config["env_config"]
+        wandb_config = env_config["wandb"]
         if "group" not in wandb_config:
             wandb_config["group"] = (
                 "group_" + datetime.now().strftime("%Y-%m-%dT%H_%M_%S_%f%z")
@@ -175,8 +176,16 @@ class WandbLogger(wandb.ray.WandbLogger):
         if latest_run:
             save_wandb_config(wandb_config, run_dir=latest_run)
 
-        self.result_to_time_series_fn = self.config["env_config"].get(
-            "result_to_time_series_fn", None)
+        # Get result_to_time_series_fn.
+        experiment_class = self.config.get("experiment_class", None)
+        self.result_to_time_series_fn = None
+
+        if "result_to_time_series_fn" in env_config:
+            self.result_to_time_series_fn = env_config["result_to_time_series_fn"]
+        elif hasattr(experiment_class, "expand_result_to_time_series"):
+            self.result_to_time_series_fn = (
+                experiment_class.expand_result_to_time_series
+            )
 
     def on_result(self, result):
         """
