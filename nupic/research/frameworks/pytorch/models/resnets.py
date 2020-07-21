@@ -330,6 +330,8 @@ class ResNet(nn.Module):
             # by default.
             act_layer = discard_kernel_size(act_layer)
 
+        self.quant = QuantStub()
+
         features = [
             # stem
             ("stem", conv_layer(3, 64, kernel_size=7, stride=2,
@@ -375,7 +377,7 @@ class ResNet(nn.Module):
             num_classes,
             **linear_args
         )
-        self.quant = QuantStub()
+
         self.dequant = DeQuantStub()
 
     def _make_group(self, block, planes, num_blocks, stride, conv_layer,
