@@ -402,8 +402,9 @@ def run(config):
     kwargs.update(queue_trials=True)
 
     pprint(kwargs)
-    tune.run(**kwargs)
+    result = tune.run(**kwargs)
     ray.shutdown()
+    return result
 
 
 def run_single_instance(config):
