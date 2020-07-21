@@ -80,20 +80,38 @@ class BasicBlock(nn.Module):
         out = self.post_activation(out)
         return out
 
-    def fuse_model(self):
-        # Fuse Conv2d and BatchNorm2d modules in regular path
-        cnn_bn = [x[0] for x in self.regular_path.named_modules()
-                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
-        if cnn_bn:
-            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
-            fuse_modules(self.regular_path, modules_to_fuse, inplace=True)
+    def fuse_model(self, fuse_relu=False):
+        """
+        Fuse Conv, BatchNorm and optionally ReLU
+        :param fuse_relu: Whether or not to fuse ReLU with Conv/Bn
+        """
+        types_to_fuse = [nn.Conv2d, nn.BatchNorm2d]
+        if fuse_relu:
+            types_to_fuse.append(nn.ReLU)
 
-        # Fuse Conv2d and BatchNorm2d modules in shortcut
-        cnn_bn = [x[0] for x in self.shortcut.named_modules()
-                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
-        if cnn_bn:
-            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
-            fuse_modules(self.shortcut, modules_to_fuse, inplace=True)
+        # Create a list with all Conv2d, BatchNorm2d and ReLU submodule names
+        submodule_names = [
+            f"regular_path.{k}" for k, v in self.regular_path.named_modules()
+            if isinstance(v, tuple(types_to_fuse))
+        ]
+
+        # Break the list into groups of 2 or 3 (cnn, bn, relu)
+        group = 3 if fuse_relu else 2
+        modules_to_fuse = list(map(list, zip_longest(*[iter(submodule_names)] * group)))
+
+        # 2rd Layer has no ReLU. Remove empty entry
+        if fuse_relu:
+            modules_to_fuse[1].pop(-1)
+
+        # Collect shortcut Conv2d and BatchNorm2d submodule names
+        cnn_bn = [
+            f"shortcut.{k}" for k, v in self.shortcut.named_modules()
+            if isinstance(v, (nn.Conv2d, nn.BatchNorm2d))
+        ]
+        if len(cnn_bn) > 0:
+            modules_to_fuse.append(cnn_bn)
+
+        fuse_modules(self, modules_to_fuse=modules_to_fuse, inplace=True)
 
 
 class Bottleneck(nn.Module):
@@ -149,26 +167,30 @@ class Bottleneck(nn.Module):
         out = self.post_activation(out)
         return out
 
-    def fuse_model(self):
+    def fuse_model(self, fuse_relu=False):
         """
-        Fuse Conv, BatchNorm and ReLU for the first 2 layers and for the 3rd and
-        shortcut layers.
-        The post activation ReLU will not be fused due to the extra addition
-        """
-        modules_to_fuse = []
+        Fuse Conv, BatchNorm and optionally ReLU for the first 2 layers and for
+        the 3rd and shortcut layers. The post activation ReLU will not be fused
+        due to the extra addition
 
+        :param fuse_relu: Whether or not to fuse ReLU with Conv/Bn
+        """
         # Create a list with all Conv2d, BatchNorm2d and ReLU submodule names
+        types_to_fuse = [nn.Conv2d, nn.BatchNorm2d]
+        if fuse_relu:
+            types_to_fuse.append(nn.ReLU)
         submodule_names = [
             f"regular_path.{k}" for k, v in self.regular_path.named_modules()
-            if isinstance(v, (nn.Conv2d, nn.BatchNorm2d, nn.ReLU))
+            if isinstance(v, tuple(types_to_fuse))
         ]
 
-        # Break the list into groups of 3 (cnn, bn, relu)
-        cnn_bn_relu = list(map(list, zip_longest(*[iter(submodule_names)] * 3)))
+        # Break the list into groups of 2 or 3 (cnn, bn, relu)
+        group = 3 if fuse_relu else 2
+        modules_to_fuse = list(map(list, zip_longest(*[iter(submodule_names)] * group)))
 
         # 3rd Layer has no ReLU. Remove empty entry
-        cnn_bn_relu[2].pop(-1)
-        modules_to_fuse.extend(cnn_bn_relu)
+        if fuse_relu:
+            modules_to_fuse[2].pop(-1)
 
         # Collect shortcut Conv2d and BatchNorm2d submodule names
         cnn_bn = [
@@ -387,14 +409,16 @@ class ResNet(nn.Module):
         out = self.dequant(out)
         return out
 
-    def fuse_model(self):
-        """Fuse conv/bn/relu modules in resnet models to prepare for quantization.
+    def fuse_model(self, fuse_relu=False):
+        """Fuse conv/bn and optinally relu modules in resnet models to prepare
+         for quantization.
         Model is modified in place
+        :param fuse_relu: Whether or not to fuse ReLU with Conv/Bn
         """
         # Fuse bottleneck layers
         for m in self.features.modules():
             if isinstance(m, (BasicBlock, Bottleneck)):
-                m.fuse_model()
+                m.fuse_model(fuse_relu=fuse_relu)
 
         modules_to_fuse = []
 
@@ -403,19 +427,20 @@ class ResNet(nn.Module):
         if isinstance(stem, nn.Conv2d):
             modules_to_fuse.append("stem")
         else:
-            conv_name = next(f"stem.{k}" for k, v in stem.named_module()
+            conv_name = next(f"stem.{k}" for k, v in stem.named_modules()
                              if isinstance(v, nn.Conv2d))
             modules_to_fuse.append(conv_name)
 
         modules_to_fuse.append("bn_stem")
 
-        act_stem = self.features.act_stem
-        if isinstance(act_stem, nn.ReLU):
-            modules_to_fuse.append("act_stem")
-        else:
-            act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
-                            if isinstance(v, nn.ReLU))
-            modules_to_fuse.append(act_name)
+        if fuse_relu:
+            act_stem = self.features.act_stem
+            if isinstance(act_stem, nn.ReLU):
+                modules_to_fuse.append("act_stem")
+            else:
+                act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
+                                if isinstance(v, nn.ReLU))
+                modules_to_fuse.append(act_name)
 
         fuse_modules(self.features, modules_to_fuse, inplace=True)
 
