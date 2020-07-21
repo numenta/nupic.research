@@ -43,7 +43,7 @@ def relu_maybe_kwinners2d(channels,
 
     :param density:
         Either a density or a function that returns a density.
-    :type density: float or function
+    :type density: float or function(channels)
     """
     layer = nn.ReLU(inplace=True)
 
@@ -67,7 +67,7 @@ def sparse_linear(in_features, out_features, bias=True, density=1.0):
 
     :param density:
         Either a density or a function that returns a density.
-    :type density: float or function
+    :type density: float or function(in_features, out_features)
     """
     layer = nn.Linear(in_features, out_features, bias=bias)
 
@@ -86,7 +86,7 @@ def sparse_conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
 
     :param density:
         Either a density or a function that returns a density.
-    :type density: float or function
+    :type density: float or function(in_channels, out_channels, kernel_size)
     """
     layer = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride,
                       padding=padding, dilation=dilation, groups=groups,
