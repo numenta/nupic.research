@@ -48,4 +48,4 @@ torchvision==0.6.1
 tqdm
 h5py
 pretrainedmodels==0.7.4
-wandb==0.8.36
+wandb==0.9.3
