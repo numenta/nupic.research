@@ -78,8 +78,8 @@ class LogEveryLoss:
                 loss_by_process_and_batch[rank, :] = torch.tensor(result[k])
             aggregated[k] = loss_by_process_and_batch.mean(dim=0).tolist()
 
-        # "complexity_loss_history" and "learning_rate_history" doesn't need to be aggregated,
-        # since it's the same on every process.
+        # "complexity_loss_history" and "learning_rate_history" doesn't need to be
+        # aggregated, since it's the same on every process.
 
         return aggregated
 

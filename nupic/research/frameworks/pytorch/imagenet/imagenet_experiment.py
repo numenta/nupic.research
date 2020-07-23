@@ -328,8 +328,9 @@ class ImagenetExperiment:
         self.lr_scheduler = self.create_lr_scheduler(
             config, self.optimizer, self.total_batches)
         if self.lr_scheduler is not None:
+            lr_scheduler_class = self.lr_scheduler.__class__.__name__
             lr_scheduler_args = config.get("lr_scheduler_args", {})
-            self.logger.info("LR Scheduler class: " + self.lr_scheduler.__class__.__name__)
+            self.logger.info("LR Scheduler class: " + lr_scheduler_class)
             self.logger.info("LR Scheduler args:")
             self.logger.info(pformat(lr_scheduler_args))
             self.logger.info("steps_per_epoch=%s", self.total_batches)
