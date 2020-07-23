@@ -325,17 +325,14 @@ class ImagenetExperiment:
         self.extra_val_results = []
 
         # Configure learning rate scheduler
-        lr_scheduler_class = config.get("lr_scheduler_class", None)
-        if lr_scheduler_class is not None:
+        self.lr_scheduler = self.create_lr_scheduler(
+            config, self.optimizer, self.total_batches)
+        if self.lr_scheduler is not None:
             lr_scheduler_args = config.get("lr_scheduler_args", {})
+            self.logger.info("LR Scheduler class: " + self.lr_scheduler.__class__.__name__)
             self.logger.info("LR Scheduler args:")
             self.logger.info(pformat(lr_scheduler_args))
             self.logger.info("steps_per_epoch=%s", self.total_batches)
-            self.lr_scheduler = create_lr_scheduler(
-                optimizer=self.optimizer,
-                lr_scheduler_class=lr_scheduler_class,
-                lr_scheduler_args=lr_scheduler_args,
-                steps_per_epoch=self.total_batches)
 
         # Set train and validate methods.
         self.train_model = config.get("train_model_func", train_model)
@@ -372,6 +369,25 @@ class ImagenetExperiment:
             resize_buffers_for_checkpoint=config.get(
                 "resize_buffers_for_checkpoint", False),
         )
+
+    @classmethod
+    def create_lr_scheduler(cls, config, optimizer, total_batches):
+        """
+        Create lr scheduler from an ImagenetExperiment config
+        :param config:
+            - lr_scheduler_class: (optional) Class of lr-scheduler
+            - lr_scheduler_args: (optional) dict of args to pass to lr-class
+        :param optimizer: torch optimizer
+        :param total_batches: number of batches/steps in an epoch
+        """
+        lr_scheduler_class = config.get("lr_scheduler_class", None)
+        if lr_scheduler_class is not None:
+            lr_scheduler_args = config.get("lr_scheduler_args", {})
+            return create_lr_scheduler(
+                optimizer=optimizer,
+                lr_scheduler_class=lr_scheduler_class,
+                lr_scheduler_args=lr_scheduler_args,
+                steps_per_epoch=total_batches)
 
     @classmethod
     def create_train_dataloader(cls, config):
@@ -842,6 +858,7 @@ class ImagenetExperiment:
             create_validation_dataloader=[
                 "ImagenetExperiment.create_validation_dataloader"
             ],
+            create_lr_scheduler=["ImagenetExperiment.create_lr_scheduler"],
             validate=["ImagenetExperiment.validate"],
             train_epoch=["ImagenetExperiment.train_epoch"],
             run_epoch=["ImagenetExperiment.run_epoch"],
