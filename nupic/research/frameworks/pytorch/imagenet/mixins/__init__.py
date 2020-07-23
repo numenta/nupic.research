@@ -25,6 +25,7 @@ from .log_backprop_structure import LogBackpropStructure
 from .log_covariance import LogCovariance
 from .log_every_learning_rate import LogEveryLearningRate
 from .log_every_loss import LogEveryLoss
+from .lr_range_test import LRRangeTest
 from .maxup import MaxupStandard, MaxupPerSample
 from .profile import Profile
 from .profile_autograd import ProfileAutograd
