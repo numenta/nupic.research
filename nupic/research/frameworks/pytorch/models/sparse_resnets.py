@@ -186,9 +186,14 @@ def linear_layer(input_size, output_size, layer_params, sparse_weights_type):
 
     # Initialize sparse-weights module as specified.
     if weight_params is not None:
-        return sparse_weights_type(layer, **weight_params)
-    else:
-        return layer
+        sparse_weights_type = weight_params.pop(
+            "sparse_weights_type", sparse_weights_type)
+
+        if sparse_weights_type is not None:
+            return sparse_weights_type(layer, **weight_params)
+
+    # Default
+    return layer
 
 
 def conv_layer(
@@ -223,9 +228,14 @@ def conv_layer(
 
     # Initialize sparse-weights module as specified.
     if weight_params is not None:
-        return sparse_weights_type(layer, **weight_params)
-    else:
-        return layer
+        sparse_weights_type = weight_params.pop(
+            "sparse_weights_type", sparse_weights_type)
+
+        if sparse_weights_type is not None:
+            return sparse_weights_type(layer, **weight_params)
+
+    # Default
+    return layer
 
 
 def activation_layer(
