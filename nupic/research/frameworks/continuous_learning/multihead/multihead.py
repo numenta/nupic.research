@@ -145,7 +145,6 @@ def do_training(model, dataset_name, scenario, device, post_batch_callback=None)
                                     batch_size=TRAIN_BATCH_SIZE,
                                     shuffle=True)
         for train_dataset in train_datasets]
-    
     test_loaders = [
         torch.utils.data.DataLoader(test_dataset,
                                     batch_size=TEST_BATCH_SIZE,
