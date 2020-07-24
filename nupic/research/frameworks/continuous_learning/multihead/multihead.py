@@ -139,6 +139,7 @@ def do_training(model, dataset_name, scenario, device, post_batch_callback=None)
     :type post_batch_callback: function
     """
     train_datasets, test_datasets = get_datasets(dataset_name, scenario)
+    
     train_loaders = [
         torch.utils.data.DataLoader(train_dataset,
                                     batch_size=TRAIN_BATCH_SIZE,
