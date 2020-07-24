@@ -53,7 +53,7 @@ def init_resnet50_batch_norm(model):
             # initialized the last BatchNorm in each BasicBlock to 0
             *_, last_bn = filter(lambda x: isinstance(x, nn.BatchNorm2d),
                                  m.regular_path)
-            last_bn.weight = nn.Parameter(torch.zeros_like(last_bn.weight))
+            last_bn.weight.data.zero_()
         elif isinstance(m, nn.Linear):
             # initialized linear layers weights from a gaussian distribution
             m.weight.data.normal_(0, 0.01)
@@ -93,7 +93,11 @@ def create_model(model_class, model_args, init_batch_norm, device,
     model = model_class(**model_args)
     if init_batch_norm:
         init_resnet50_batch_norm(model)
-    model.to(device)
+    # model.to(device)
+    # can consider adding a callback here
+    # if it is required that the model is on device
+    # either that or seperating betwen creating the model and loading the checkpoint
+    # in that case, transform model can receive an argument
 
     # Load model parameters from checkpoint
     if checkpoint_file is not None:

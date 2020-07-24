@@ -29,6 +29,7 @@ https://github.com/meliketoy/wide-resnet.pytorch/ but with many modifications.
 
 from collections import OrderedDict
 from functools import partial
+from itertools import zip_longest
 
 import torch.nn as nn
 import torch.nn.quantized as nnq
@@ -60,6 +61,9 @@ class BasicBlock(nn.Module):
             ("bn2", norm_layer(planes, **norm_args["bn2"])),
         ]))
 
+        self.post_activation = act_layer(planes, **act_args["act2"])
+        self.quant_ops = nnq.FloatFunctional()
+
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(OrderedDict([
                 ("conv", conv_layer(in_planes, planes, kernel_size=1,
@@ -70,13 +74,11 @@ class BasicBlock(nn.Module):
         else:
             self.shortcut = nn.Identity()
 
-        self.post_activation = act_layer(planes, **act_args["act2"])
-        self.quant_ops = nnq.FloatFunctional()
-
     def forward(self, x):
         out = self.regular_path(x)
-        out = self.quant_ops.add(out, self.shortcut(x))
-        out = self.post_activation(out)
+        out = self.quant_ops.add_relu(out, self.shortcut(x))
+        # out = self.quant_ops.add(out, self.shortcut(x))
+        # out = self.post_activation(out)
         return out
 
     def fuse_model(self):
@@ -127,6 +129,10 @@ class Bottleneck(nn.Module):
             ("bn3", norm_layer(self.expansion * planes, **norm_args["bn3"])),
         ]))
 
+        # self.post_activation = act_layer(self.expansion * planes,
+        #                                  **act_args["act3"])
+        self.skip_add_relu = nnq.FloatFunctional()
+
         if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(OrderedDict([
                 ("conv", conv_layer(in_planes, self.expansion * planes,
@@ -138,30 +144,43 @@ class Bottleneck(nn.Module):
         else:
             self.shortcut = nn.Identity()
 
-        self.post_activation = act_layer(self.expansion * planes,
-                                         **act_args["act3"])
-        self.quant_ops = nnq.FloatFunctional()
-
     def forward(self, x):
         out = self.regular_path(x)
-        out = self.quant_ops.add(out, self.shortcut(x))
-        out = self.post_activation(out)
+        out = self.skip_add_relu.add_relu(out, self.shortcut(x))
+        # out = self.quant_ops.add(out, self.shortcut(x))
+        # out = self.post_activation(out)
         return out
 
     def fuse_model(self):
-        # Fuse Conv2d and BatchNorm2d modules in regular path
-        cnn_bn = [x[0] for x in self.regular_path.named_modules()
-                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
-        if cnn_bn:
-            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
-            fuse_modules(self.regular_path, modules_to_fuse, inplace=True)
+        """
+        Fuse Conv, BatchNorm and ReLU for the first 2 layers and for the 3rd and
+        shortcut layers.
+        The post activation ReLU will not be fused due to the extra addition
+        """
+        modules_to_fuse = []
 
-        # Fuse Conv2d and BatchNorm2d modules in shortcut
-        cnn_bn = [x[0] for x in self.shortcut.named_modules()
-                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
-        if cnn_bn:
-            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
-            fuse_modules(self.shortcut, modules_to_fuse, inplace=True)
+        # Create a list with all Conv2d, BatchNorm2d and ReLU submodule names
+        submodule_names = [
+            f"regular_path.{k}" for k, v in self.regular_path.named_modules()
+            if isinstance(v, (nn.Conv2d, nn.BatchNorm2d, nn.ReLU))
+        ]
+
+        # Break the list into groups of 3 (cnn, bn, relu)
+        cnn_bn_relu = list(map(list, zip_longest(*[iter(submodule_names)] * 3)))
+
+        # 3rd Layer has no ReLU. Remove empty entry
+        cnn_bn_relu[2].pop(-1)
+        modules_to_fuse.extend(cnn_bn_relu)
+
+        # Collect shortcut Conv2d and BatchNorm2d submodule names
+        cnn_bn = [
+            f"shortcut.{k}" for k, v in self.shortcut.named_modules()
+            if isinstance(v, (nn.Conv2d, nn.BatchNorm2d))
+        ]
+        if len(cnn_bn) > 0:
+            modules_to_fuse.append(cnn_bn)
+
+        fuse_modules(self, modules_to_fuse=modules_to_fuse, inplace=True)
 
 
 # Number of blocks per group for different size Resnets.
@@ -371,14 +390,36 @@ class ResNet(nn.Module):
         return out
 
     def fuse_model(self):
-        """Fuse conv/bn modules in resnet models to prepare for quantization.
+        """Fuse conv/bn/relu modules in resnet models to prepare for quantization.
         Model is modified in place
         """
-        fuse_modules(self.features, ["stem", "bn_stem"], inplace=True)
+        # Fuse bottleneck layers
         for m in self.features.modules():
             if isinstance(m, (BasicBlock, Bottleneck)):
                 m.fuse_model()
 
+        modules_to_fuse = []
+
+        # Fuse "stem" layer
+        stem = self.features.stem
+        if isinstance(stem, nn.Conv2d):
+            modules_to_fuse.append("stem")
+        else:
+            conv_name = next(f"stem.{k}" for k, v in stem.named_module()
+                             if isinstance(v, nn.Conv2d))
+            modules_to_fuse.append(conv_name)
+
+        modules_to_fuse.append("bn_stem")
+
+        act_stem = self.features.act_stem
+        if isinstance(act_stem, nn.ReLU):
+            modules_to_fuse.append("act_stem")
+        else:
+            act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
+                            if isinstance(v, nn.ReLU))
+            modules_to_fuse.append(act_name)
+
+        fuse_modules(self.features, modules_to_fuse, inplace=True)
 
 def expand_args(args, num_blocks_by_group, block_keys):
     """

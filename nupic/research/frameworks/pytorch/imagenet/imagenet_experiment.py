@@ -37,6 +37,8 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 
+import torchvision
+
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
 )
@@ -227,12 +229,18 @@ class ImagenetExperiment:
 
         # Configure model
         self.device = config.get("device", self.device)
+        # self.model = torchvision.models.quantization.__dict__['resnet50'](pretrained=False, quantize=False)
         self.model = self.create_model(config, self.device)
+        # from nupic.research.frameworks.pytorch.models.resnets import resnet50
+        # self.model = resnet50()
+
         if self.rank == 0:
             self.logger.debug(self.model)
 
         # Apply any required transformations to the model
         self.transform_model()
+        # send to device after transforming the model
+        # self.model.to(self.device)
 
         # Configure optimizer
         group_decay, group_no_decay = [], []
@@ -358,6 +366,12 @@ class ImagenetExperiment:
         :return:
                 Model instance
         """
+        # print(
+        #     config["model_class"],
+        #     config.get("model_args", {}),
+        #     config.get("init_batch_norm", False),
+        #     config.get("checkpoint_file", None)
+        # )
         return create_model(
             model_class=config["model_class"],
             model_args=config.get("model_args", {}),
@@ -825,6 +839,9 @@ class ImagenetExperiment:
         return dict(
             setup_experiment=["ImagenetExperiment.setup_experiment"],
             create_model=["ImagenetExperiment.create_model"],
+            # TODO: better if just replace create model
+            # and then move load checkpoint to a different function
+            transform_model=["ImagenetExperiment.transform_model"],
             create_train_dataloader=["ImagenetExperiment.create_train_dataloader"],
             create_validation_dataloader=[
                 "ImagenetExperiment.create_validation_dataloader"
