@@ -20,17 +20,19 @@
 import copy
 import io
 import logging
-import multiprocessing
+import math
 import sys
 import time
+from collections import defaultdict
 from pprint import pformat
 
-import ray.services
-import ray.util.sgd.utils as ray_utils
+import numpy as np
 import torch
 import torch.distributed as dist
+from torch import multiprocessing
 from torch.backends import cudnn
 from torch.nn import DataParallel
+from torch.nn.modules.batchnorm import _BatchNorm
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
@@ -40,11 +42,15 @@ from nupic.research.frameworks.pytorch.distributed_sampler import (
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
-    create_optimizer,
     create_train_dataset,
     create_validation_dataset,
+    get_free_port,
+    get_node_ip_address,
 )
-from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
+from nupic.research.frameworks.pytorch.imagenet.network_utils import (
+    create_model,
+    get_compatible_state_dict,
+)
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     aggregate_eval_results,
@@ -112,6 +118,8 @@ class ImagenetExperiment:
             - val_dir: Dataset validation data relative path
             - val_batch_size: Validation batch size
             - workers: how many data loading processes to use
+            - train_loader_drop_last: Whether to skip last batch if it is
+                                      smaller than the batch size
             - num_classes: Limit the dataset size to the given number of classes
             - model_class: Model class. Must inherit from "torch.nn.Module"
             - model_args: model model class arguments passed to the constructor
@@ -123,6 +131,7 @@ class ImagenetExperiment:
                               constructor
             - batch_norm_weight_decay: Whether or not to apply weight decay to
                                        batch norm modules parameters
+                                       See https://arxiv.org/abs/1807.11205
             - bias_weight_decay: Whether or not to apply weight decay to
                                        bias parameters
             - lr_scheduler_class: Learning rate scheduler class.
@@ -135,6 +144,10 @@ class ImagenetExperiment:
             - epochs: Number of epochs to train
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
+            - log_timestep_freq: Configures mixins and subclasses that log every
+                                 timestep to only log every nth timestep (in
+                                 addition to the final timestep of each epoch).
+                                 Set to 0 to log only at the end of each epoch.
             - progress: Show progress during training
             - name: Experiment name. Used as logger name
             - log_level: Python Logging level
@@ -158,6 +171,10 @@ class ImagenetExperiment:
             - checkpoint_file: if not None, will start from this model. The model
                                must have the same model_args and model_class as the
                                current experiment.
+            - resize_buffers_for_checkpoint: if True, this will resize the model
+                                             buffers to match those in the checkpoint.
+                                             This is helpful for loading buffers with
+                                             sparse levels not matching the model_args
             - checkpoint_at_init: boolean argument for whether to create a checkpoint
                                   of the initialized model. this differs from
                                   `checkpoint_at_start` for which the checkpoint occurs
@@ -166,6 +183,10 @@ class ImagenetExperiment:
             - epochs_to_validate: list of epochs to run validate(). A -1 asks
                                   to run validate before any training occurs.
                                   Default: last three epochs.
+            - extra_validations_per_epoch: number of additional validations to
+                                           perform mid-epoch. Additional
+                                           validations are distributed evenly
+                                           across training batches.
             - launch_time: time the config was created (via time.time). Used to report
                            wall clock time until the first batch is done.
                            Default: time.time() in this setup_experiment().
@@ -209,22 +230,26 @@ class ImagenetExperiment:
             self.progress = self.progress and self.rank == 0
 
         # Configure model
+        self.device = config.get("device", self.device)
         self.model = self.create_model(config, self.device)
         if self.rank == 0:
             self.logger.debug(self.model)
 
         # Configure optimizer
+        group_decay, group_no_decay = [], []
+        for module in self.model.modules():
+            for name, param in module.named_parameters(recurse=False):
+                if self.should_decay_parameter(module, name, param, config):
+                    group_decay.append(param)
+                else:
+                    group_no_decay.append(param)
+
         optimizer_class = config.get("optimizer_class", torch.optim.SGD)
         optimizer_args = config.get("optimizer_args", {})
-        batch_norm_weight_decay = config.get("batch_norm_weight_decay", True)
-        bias_weight_decay = config.get("bias_weight_decay", True)
-        self.optimizer = create_optimizer(
-            model=self.model,
-            optimizer_class=optimizer_class,
-            optimizer_args=optimizer_args,
-            batch_norm_weight_decay=batch_norm_weight_decay,
-            bias_weight_decay=bias_weight_decay,
-        )
+        self.optimizer = optimizer_class([dict(params=group_decay),
+                                          dict(params=group_no_decay,
+                                               weight_decay=0.)],
+                                         **optimizer_args)
 
         # Validate mixed precision requirements
         self.mixed_precision = config.get("mixed_precision", False)
@@ -252,11 +277,9 @@ class ImagenetExperiment:
             "loss_function", torch.nn.functional.cross_entropy
         )
 
-        # Configure data loaders
+        self.num_classes = config.get("num_classes", 1000)
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
-        self.epochs_to_validate = config.get("epochs_to_validate",
-                                             range(self.epochs - 3, self.epochs + 1))
         self.current_epoch = 0
 
         # Get initial batch size
@@ -264,13 +287,42 @@ class ImagenetExperiment:
 
         # CUDA runtime does not support the fork start method.
         # See https://pytorch.org/docs/stable/notes/multiprocessing.html
-        if torch.cuda.is_available():
-            multiprocessing.set_start_method("spawn")
+        multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
         self.train_loader = self.create_train_dataloader(config)
         self.val_loader = self.create_validation_dataloader(config)
         self.total_batches = len(self.train_loader)
+
+        self.epochs_to_validate = config.get("epochs_to_validate",
+                                             range(self.epochs - 3,
+                                                   self.epochs + 1))
+
+        extra_validations = config.get("extra_validations_per_epoch", 0)
+        batches_to_validate = np.linspace(
+            min(self.total_batches, self.batches_in_epoch),
+            0,
+            1 + extra_validations,
+            endpoint=False
+        )[::-1].round().astype("int").tolist()
+        self.additional_batches_to_validate = batches_to_validate[:-1]
+        if extra_validations > 0:
+            self.logger.info(
+                f"Extra validations per epoch: {extra_validations}, "
+                f"batch indices: {self.additional_batches_to_validate}")
+
+        # Used for logging. Conceptually, it is a version number for the model's
+        # parameters. By default, this is the elapsed number of batches that the
+        # model has been trained on. Experiments may also increment this on
+        # other events like model prunings. When validation is performed after a
+        # training batch, the validation results are assigned to the next
+        # timestep after that training batch, since it was performed on the
+        # subsequent version of the parameters.
+        self.current_timestep = 0
+        self.log_timestep_freq = config.get("log_timestep_freq", 1)
+
+        # A list of [(timestep, result), ...] for the current epoch.
+        self.extra_val_results = []
 
         # Configure learning rate scheduler
         lr_scheduler_class = config.get("lr_scheduler_class", None)
@@ -301,6 +353,10 @@ class ImagenetExperiment:
             - checkpoint_file: if not None, will start from this model. The
                                model must have the same model_args and
                                model_class as the current experiment.
+            - resize_buffers_for_checkpoint: if True, this will resize the model
+                                             buffers to match those in the checkpoint.
+                                             This is helpful for loading buffers with
+                                             sparse levels not matching the model_args
         :param device:
                 Pytorch device
 
@@ -312,7 +368,9 @@ class ImagenetExperiment:
             model_args=config.get("model_args", {}),
             init_batch_norm=config.get("init_batch_norm", False),
             device=device,
-            checkpoint_file=config.get("checkpoint_file", None)
+            checkpoint_file=config.get("checkpoint_file", None),
+            resize_buffers_for_checkpoint=config.get(
+                "resize_buffers_for_checkpoint", False),
         )
 
     @classmethod
@@ -342,6 +400,7 @@ class ImagenetExperiment:
             num_workers=config.get("workers", 0),
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
+            drop_last=config.get("train_loader_drop_last", True),
         )
 
     @classmethod
@@ -370,32 +429,27 @@ class ImagenetExperiment:
             pin_memory=torch.cuda.is_available(),
         )
 
+    def should_decay_parameter(self, module, parameter_name, parameter, config):
+        if isinstance(module, _BatchNorm):
+            return config.get("batch_norm_weight_decay", True)
+        elif parameter_name == "bias":
+            return config.get("bias_weight_decay", True)
+        else:
+            return True
+
     def validate(self, loader=None):
         if loader is None:
             loader = self.val_loader
 
-        if self.current_epoch in self.epochs_to_validate:
-            results = self.evaluate_model(
-                model=self.model,
-                loader=loader,
-                device=self.device,
-                criterion=self.loss_function,
-                batches_in_epoch=self.batches_in_epoch,
-            )
-        else:
-            results = {
-                "total_correct": 0,
-                "total_tested": 0,
-                "mean_loss": 0.0,
-                "mean_accuracy": 0.0,
-            }
-
-        results.update(
-            learning_rate=self.get_lr()[0],
+        return self.evaluate_model(
+            model=self.model,
+            loader=loader,
+            device=self.device,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
+            batches_in_epoch=self.batches_in_epoch,
+            transform_to_device_fn=self.transform_data_to_device,
         )
-        self.logger.info(results)
-
-        return results
 
     def train_epoch(self):
         self.train_model(
@@ -403,27 +457,44 @@ class ImagenetExperiment:
             loader=self.train_loader,
             optimizer=self.optimizer,
             device=self.device,
-            criterion=self.loss_function,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
-            post_batch_callback=self.post_batch,
+            post_batch_callback=self.post_batch_wrapper,
+            transform_to_device_fn=self.transform_data_to_device,
         )
 
     def run_epoch(self):
-        if -1 in self.epochs_to_validate and self.current_epoch == 0:
-            self.logger.debug("Validating before any training:")
-            self.validate()
+        timestep_begin = self.current_timestep
         self.pre_epoch()
         self.train_epoch()
         self.post_epoch()
         t1 = time.time()
-        ret = self.validate()
+
+        if self.current_epoch in self.epochs_to_validate:
+            ret = self.validate()
+        else:
+            ret = {
+                "total_correct": 0,
+                "total_tested": 0,
+                "mean_loss": 0.0,
+                "mean_accuracy": 0.0,
+            }
+
+        ret.update(
+            timestep_begin=timestep_begin,
+            timestep_end=self.current_timestep,
+            learning_rate=self.get_lr()[0],
+            extra_val_results=self.extra_val_results,
+        )
 
         if self.rank == 0:
             self.logger.debug("validate time: %s", time.time() - t1)
             self.logger.debug("---------- End of run epoch ------------")
             self.logger.debug("")
 
+        self.extra_val_results = []
         self.current_epoch += 1
         return ret
 
@@ -434,7 +505,8 @@ class ImagenetExperiment:
     def pre_batch(self, model, batch_idx):
         pass
 
-    def post_batch(self, model, loss, batch_idx, num_images, time_string):
+    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
+                   num_images, time_string):
         # Update 1cycle learning rate after every batch
         if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.lr_scheduler.step()
@@ -453,8 +525,29 @@ class ImagenetExperiment:
             self.logger.debug("End of batch for rank: %s. Epoch: %s, Batch: %s/%s, "
                               "loss: %s, Learning rate: %s num_images: %s",
                               self.rank, self.current_epoch, current_batch,
-                              total_batches, loss, self.get_lr(), num_images)
+                              total_batches, error_loss, self.get_lr(),
+                              num_images)
             self.logger.debug("Timing: %s", time_string)
+
+    def post_batch_wrapper(self, model, error_loss, complexity_loss, batch_idx,
+                           *args, **kwargs):
+        """
+        Perform the post_batch updates, then maybe validate.
+
+        This method exists because post_batch is designed to be overridden, and
+        validation needs to wait until after all post_batch overrides have run.
+        """
+        self.post_batch(model, error_loss, complexity_loss, batch_idx,
+                        *args, **kwargs)
+        self.current_timestep += 1
+        validate = (batch_idx in self.additional_batches_to_validate
+                    and self.current_epoch in self.epochs_to_validate)
+        if validate:
+            result = self.validate()
+            self.extra_val_results.append(
+                (self.current_timestep, result)
+            )
+            self.model.train()
 
     def post_epoch(self):
         self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s",
@@ -468,8 +561,26 @@ class ImagenetExperiment:
         self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s",
                           self.current_epoch, self.get_lr(), self.get_weight_decay())
 
-    def loss_function(self, output, target, **kwargs):
-        return self._loss_function(output, target, **kwargs)
+    def error_loss(self, output, target, reduction="mean"):
+        """
+        The error loss component of the loss function.
+        """
+        return self._loss_function(output, target, reduction=reduction)
+
+    def complexity_loss(self, model):
+        """
+        The model complexity component of the loss function.
+        """
+        pass
+
+    def transform_data_to_device(self, data, target, device, non_blocking):
+        """
+        This provides an extensibility point for performing any final
+        transformations on the data or targets.
+        """
+        data = data.to(self.device, non_blocking=non_blocking)
+        target = target.to(self.device, non_blocking=non_blocking)
+        return data, target
 
     @classmethod
     def aggregate_results(cls, results):
@@ -484,9 +595,85 @@ class ImagenetExperiment:
             A single result dict with results aggregated.
         :rtype: dict
         """
+        ret = cls.aggregate_validation_results(results)
+
+        extra_val_aggregated = []
+        for i in range(len(ret["extra_val_results"])):
+            timestep = ret["extra_val_results"][i][0]
+            val_results = [process_result["extra_val_results"][i][1]
+                           for process_result in results]
+            extra_val_aggregated.append(
+                (timestep, aggregate_eval_results(val_results))
+            )
+        ret["extra_val_results"] = extra_val_aggregated
+
+        return ret
+
+    @classmethod
+    def aggregate_validation_results(cls, results):
+        """
+        Aggregate multiple processes' "validate" results into a single result.
+
+        This method exists separately from "aggregate_results" to support
+        running validation outside of "run_epoch" and aggregating those results
+        without causing error. Subclasses / mixins implementing
+        "aggregate_results" may expect all results to have the extra data
+        appended during run_epoch.
+
+        :param results:
+            A list of return values from validate from different processes.
+        :type results: list
+
+        :return:
+            A single result dict with results aggregated.
+        :rtype: dict
+        """
         result = copy.deepcopy(results[0])
         result.update(aggregate_eval_results(results))
         return result
+
+    @classmethod
+    def get_printable_result(cls, result):
+        """
+        Return a stripped down version of result that has its large data structures
+        removed so that the result can be printed to the console.
+        """
+        keys = ["total_correct", "total_tested", "mean_loss", "mean_accuracy",
+                "learning_rate"]
+        return {key: result[key]
+                for key in keys
+                if key in result}
+
+    @classmethod
+    def expand_result_to_time_series(cls, result, config):
+        """
+        Given the result of a run_epoch call, returns a mapping from timesteps to
+        results. The mapping is stored as a dict so that subclasses and mixins
+        can easily add data to it.
+
+        Result keys are converted from Ray Tune requirements to better names,
+        and the keys are filtered to those that make useful charts.
+
+        :return: defaultdict mapping timesteps to result dicts
+        """
+        result_by_timestep = defaultdict(dict)
+
+        k_mapping = {
+            "mean_loss": "validation_loss",
+            "mean_accuracy": "validation_accuracy",
+            "learning_rate": "learning_rate",
+            "complexity_loss": "complexity_loss",
+        }
+        val_results = (result["extra_val_results"]
+                       + [(result["timestep_end"], result)])
+        for timestep, val_result in val_results:
+            result_by_timestep[timestep].update({
+                k2: val_result[k1]
+                for k1, k2 in k_mapping.items()
+                if k1 in val_result
+            })
+
+        return result_by_timestep
 
     def get_state(self):
         """
@@ -494,7 +681,8 @@ class ImagenetExperiment:
         :return: dictionary with "model", "optimizer" and "lr_scheduler" states
         """
         state = {
-            "current_epoch": self.current_epoch
+            "current_epoch": self.current_epoch,
+            "current_timestep": self.current_timestep,
         }
 
         # Save state into a byte array to avoid ray's GPU serialization issues
@@ -528,6 +716,7 @@ class ImagenetExperiment:
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
+            state_dict = get_compatible_state_dict(self.model.module, state_dict)
             self.model.module.load_state_dict(state_dict)
 
         if "optimizer" in state:
@@ -558,6 +747,11 @@ class ImagenetExperiment:
             else:
                 self.current_epoch = last_epoch
 
+        if "current_timestep" in state:
+            self.current_timestep = state["current_timestep"]
+        else:
+            self.current_timestep = self.total_batches * self.current_epoch
+
     def stop_experiment(self):
         if self.distributed:
             dist.destroy_process_group()
@@ -568,6 +762,39 @@ class ImagenetExperiment:
         number of epochs but customizable to any other stopping criteria
         """
         return self.current_epoch >= self.epochs
+
+    def should_log_batch(self, train_batch_idx):
+        """
+        Returns true if the current timestep should be logged, either because it's a
+        logged timestep or the final training batch of an epoch.
+        """
+        return (train_batch_idx == self.total_batches - 1
+                or (self.log_timestep_freq > 0
+                    and (self.current_timestep % self.log_timestep_freq) == 0))
+
+    @classmethod
+    def get_recorded_timesteps(cls, result, config):
+        """
+        Given an epoch result dict and config, returns a list of timestep numbers
+        that are supposed to be logged for that epoch.
+        """
+        log_timestep_freq = config.get("log_timestep_freq", 1)
+        timestep_end = result["timestep_end"]
+        if log_timestep_freq == 0:
+            ret = [timestep_end - 1]
+        else:
+            # Find first logged timestep in range
+            logged_begin = int(math.ceil(result["timestep_begin"]
+                                         / log_timestep_freq)
+                               * log_timestep_freq)
+
+            ret = list(range(logged_begin, timestep_end, log_timestep_freq))
+
+            last_batch_timestep = timestep_end - 1
+            if last_batch_timestep % log_timestep_freq != 0:
+                ret.append(last_batch_timestep)
+
+        return ret
 
     def get_lr(self):
         """
@@ -590,12 +817,12 @@ class ImagenetExperiment:
         return [p["weight_decay"] for p in self.optimizer.param_groups]
 
     def get_node_ip(self):
-        """Returns the IP address of the current ray node."""
-        return ray.services.get_node_ip_address()
+        """Returns the IP address of the current node."""
+        return get_node_ip_address()
 
     def get_free_port(self):
-        """Returns free TCP port in the current ray node"""
-        return ray_utils.find_free_port()
+        """Returns free TCP port in the current node"""
+        return get_free_port()
 
     @classmethod
     def get_execution_order(cls):
@@ -613,6 +840,20 @@ class ImagenetExperiment:
             post_epoch=["ImagenetExperiment.post_epoch"],
             pre_batch=["ImagenetExperiment.pre_batch"],
             post_batch=["ImagenetExperiment.post_batch"],
-            loss_function=["ImagenetExperiment.loss_function"],
+            error_loss=["ImagenetExperiment.error_loss"],
+            complexity_loss=["ImagenetExperiment.complexity_loss"],
+            should_decay_parameter=[
+                "ImagenetExperiment.should_decay_parameter"
+            ],
+            transform_data_to_device=[
+                "ImagenetExperiment.transform_data_to_device"
+            ],
             aggregate_results=["ImagenetExperiment.aggregate_results"],
+            aggregate_validation_results=[
+                "ImagenetExperiment.aggregate_validation_results"
+            ],
+            get_printable_result=["ImagenetExperiment.get_printable_result"],
+            expand_result_to_time_series=[
+                "ImagenetExperiment: validation results"
+            ],
         )

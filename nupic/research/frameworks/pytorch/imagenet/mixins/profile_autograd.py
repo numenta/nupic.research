@@ -19,6 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import os
+
 import torch.autograd
 
 
@@ -40,6 +42,9 @@ class ProfileAutograd:
         if self.profile_autograd and prof is not None:
             self.logger.info(prof.key_averages().table(
                 sort_by="self_cpu_time_total"))
+
+            prof.export_chrome_trace(os.path.join(
+                self.logdir, f"autograd{self.current_epoch}.trace"))
 
     @classmethod
     def get_execution_order(cls):

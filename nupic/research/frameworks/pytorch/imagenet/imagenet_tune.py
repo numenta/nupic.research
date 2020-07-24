@@ -39,7 +39,10 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
-from nupic.research.support.ray_utils import get_last_checkpoint
+from nupic.research.support.ray_utils import (
+    get_last_checkpoint,
+    register_torch_serializers,
+)
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -83,23 +86,28 @@ class ImagenetTrainable(Trainable):
             f"_setup: trial={self._trial_info.trial_name}({self.iteration}), "
             f"config={config}")
 
+        self._validate_immediately = -1 in config.get("epochs_to_validate", [])
+
+        # Get checkpoint file to restore the training from
+        self.restore_checkpoint_file = config.pop("restore_checkpoint_file", None)
+
         # Try to recover a trial at least this many times
         self.max_retries = max(config.get("max_retries", 3), 0)
 
         # Create ray remote workers
         self._create_workers(config)
 
-        # Save initialized model
-        if config.get("checkpoint_at_init", False):
-            self.save()
-
         # Load initial state from checkpoint file
-        self._checkpoint_file = config.get("checkpoint_file", None)
-        if self._checkpoint_file is not None:
-            with open(self._checkpoint_file, mode="rb") as f:
+        self._restored = False
+        if self.restore_checkpoint_file is not None:
+            with open(self.restore_checkpoint_file, mode="rb") as f:
                 state = pickle.load(f)
                 self._restore(state)
                 self._restored = True
+
+        elif config.get("checkpoint_at_init", False):
+            # Save initialized model
+            self.save()
 
         self._first_run = True
 
@@ -107,17 +115,35 @@ class ImagenetTrainable(Trainable):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
             # Check if restore checkpoint file fulfills the stop criteria on first run
+            initial_val_result = None
             if self._first_run:
                 self._first_run = False
                 if self._restored and self._should_stop():
                     self.logger.warning(
-                        f"Restored checkpoint file '{self._checkpoint_file}' fulfills "
-                        f"stop criteria without additional training.")
+                        f"Restored checkpoint file '{self.restore_checkpoint_file}' "
+                        f"fulfills stop criteria without additional training.")
                     return {
                         # do not train or log results, just stop
                         RESULT_DUPLICATE: True,
                         DONE: True
                     }
+
+                # This initial validation would be simpler if it were in the
+                # ImagenetExperiment, but doing it here makes it possible to log
+                # the validation results immediately rather than waiting until
+                # the end of the first epoch.
+                if self._iteration == 0 and self._validate_immediately:
+                    self.logger.debug("Validating before any training:")
+                    status = []
+                    for w in self.procs:
+                        status.append(w.validate.remote())
+
+                    if ray_utils.check_for_failure(status):
+                        results = ray.get(status)
+                        initial_val_result = (
+                            self.experiment_class.aggregate_validation_results(
+                                results))
+                        self.logger.info(initial_val_result)
 
             status = []
             for w in self.procs:
@@ -129,6 +155,11 @@ class ImagenetTrainable(Trainable):
                 results = ray.get(status)
 
                 ret = self.experiment_class.aggregate_results(results)
+                if initial_val_result is not None:
+                    ret["extra_val_results"].insert(0, (0, initial_val_result))
+                self.logger.info(
+                    self.experiment_class.get_printable_result(ret)
+                )
                 self._process_result(ret)
 
                 # Check if we should stop the experiment
@@ -338,6 +369,9 @@ def run(config):
     address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
     ray.init(address=address, local_mode=config.get("local_mode", False))
 
+    # Register serializer and deserializer - needed when logging arrays and tensors.
+    register_torch_serializers()
+
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
 
@@ -352,8 +386,7 @@ def run(config):
     # Check if restoring experiment from last known checkpoint
     if config.pop("restore", False):
         result_dir = os.path.join(config["local_dir"], config["name"])
-        checkpoint_file = get_last_checkpoint(result_dir)
-        config["checkpoint_file"] = checkpoint_file
+        config["restore_checkpoint_file"] = get_last_checkpoint(result_dir)
 
     # Update`tune.run` kwargs with config
     kwargs.update(config)
@@ -366,8 +399,9 @@ def run(config):
     kwargs.update(queue_trials=True)
 
     pprint(kwargs)
-    tune.run(**kwargs)
+    result = tune.run(**kwargs)
     ray.shutdown()
+    return result
 
 
 def run_single_instance(config):
