@@ -36,6 +36,7 @@ class Classifier(torch.nn.Module):
         super().__init__()
 
         self.is_sparse = is_sparse
+        
         self.flatten = Flatten()
 
         self.fc1 = torch.nn.Linear(input_size, n_hidden_units)
