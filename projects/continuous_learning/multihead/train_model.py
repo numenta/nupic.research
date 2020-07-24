@@ -43,14 +43,12 @@ if __name__ == "__main__":
 
     # identify training scenario, dataset, and model sparsity
     parser = argparse.ArgumentParser()
-
     parser.add_argument("--scenario", type=str, default="task",
                         choices=["task", "domain", "class"])
     parser.add_argument("--dataset", type=str, default="splitGSC",
                         choices=["splitMNIST", "splitGSC"])
     parser.add_argument("--sparse", action="store_true",
                         help="train a sparse classifier instead of a dense one")
-    
     args = parser.parse_args()
 
     # shape of the input to the classifier

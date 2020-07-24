@@ -57,7 +57,6 @@ def get_datasets(dataset_name, scenario, download=False):
     full_train_set = dataset_class("~/nta/continual-learning/datasets/mnist/",
                                    train=True, transform=dataset_transform,
                                    target_transform=None, download=download)
-
     full_test_set = dataset_class("~/nta/continual-learning/datasets/mnist/",
                                   train=False, transform=dataset_transform,
                                   target_transform=None, download=download)
