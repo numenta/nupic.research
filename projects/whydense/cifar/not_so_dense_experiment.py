@@ -146,6 +146,7 @@ class NotSoDenseExperiment(object):
             device=self.device,
             batches_in_epoch=self.batches_in_epoch,
             criterion=self.loss_function,
+            post_batch_callback=self.post_batch,
         )
         self.post_epoch()
         self.logger.info("training duration: %s", time.time() - t0)
@@ -177,9 +178,11 @@ class NotSoDenseExperiment(object):
         self.logger.info("learning rate: %s", self.scheduler.get_lr())
 
     def post_epoch(self):
-        self.model.apply(rezero_weights)
         self.model.apply(update_boost_strength)
         self.scheduler.step()
+
+    def post_batch(self, *args, **kwargs):
+        self.model.apply(rezero_weights)
 
 
 @click.command()

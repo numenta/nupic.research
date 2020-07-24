@@ -157,8 +157,9 @@ class SparseSpeechExperiment(object):
             return None
 
         if lr_scheduler == "StepLR":
-            lr_scheduler_params = (
-                "{'step_size': 1, 'gamma':" + str(params["learning_rate_factor"]) + "}"
+            lr_scheduler_params = "{{'step_size': {}, 'gamma': {}}}".format(
+                params.get("learning_schedule_step_size", 1),
+                params["learning_rate_factor"]
             )
 
         else:
@@ -213,13 +214,16 @@ class SparseSpeechExperiment(object):
 
         self.pre_epoch()
         train_model(self.model, self.train_loader, self.optimizer, self.device,
-                    batches_in_epoch=self.batches_in_epoch)
+                    batches_in_epoch=self.batches_in_epoch,
+                    post_batch_callback=self.post_batch)
         self.post_epoch()
 
         self.logger.info("training duration: %s", time.time() - t0)
 
-    def post_epoch(self):
+    def post_batch(self, *args, **kwargs):
         self.model.apply(rezero_weights)
+
+    def post_epoch(self):
         self.lr_scheduler.step()
         self.train_loader.dataset.load_next()
 

@@ -29,6 +29,8 @@ from torch import nn as nn
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
+from nupic.research.frameworks.pytorch.restore_utils import resize_model_buffers
+from nupic.torch.compatibility import upgrade_to_masked_sparseweights
 
 
 def init_resnet50_batch_norm(model):
@@ -58,8 +60,21 @@ def init_resnet50_batch_norm(model):
             m.weight.data.normal_(0, 0.01)
 
 
+def get_compatible_state_dict(model, state_dict):
+    """
+    Make sure checkpoint is compatible with model
+    """
+    state_dict = upgrade_to_masked_sparseweights(state_dict)
+
+    if model.state_dict().keys() != state_dict.keys():
+        state_dict = OrderedDict(
+            zip(model.state_dict().keys(), state_dict.values()))
+
+    return state_dict
+
+
 def create_model(model_class, model_args, init_batch_norm, device,
-                 checkpoint_file=None, init_hooks=None):
+                 checkpoint_file=None, resize_buffers_for_checkpoint=False):
     """
     Create imagenet experiment model with option to load state from checkpoint
 
@@ -73,6 +88,9 @@ def create_model(model_class, model_args, init_batch_norm, device,
         Model device
     :param checkpoint_file:
         Optional checkpoint file to load model state
+    :param resize_buffers_for_checkpoint:
+        Optional param with `checkpoint_file`. If True, this resizes the models buffers
+        to match those of the checkpoint before loading it.
 
     :return: Configured model
     """
@@ -88,10 +106,10 @@ def create_model(model_class, model_args, init_batch_norm, device,
         with io.BytesIO(state["model"]) as buffer:
             state_dict = deserialize_state_dict(buffer, device)
 
-        # Make sure checkpoint is compatible with model
-        if model.state_dict().keys() != state_dict.keys():
-            state_dict = OrderedDict(
-                zip(model.state_dict().keys(), state_dict.values()))
+        state_dict = get_compatible_state_dict(model, state_dict)
+
+        if resize_buffers_for_checkpoint:
+            resize_model_buffers(model, state_dict)
 
         model.load_state_dict(state_dict)
 

@@ -264,6 +264,7 @@ class TinyCIFAR(object):
             device=self.device,
             batches_in_epoch=batches_in_epoch,
             criterion=self.loss_function,
+            post_batch_callback=self._post_batch,
         )
 
         train_time = time.time() - t1
@@ -551,6 +552,9 @@ class TinyCIFAR(object):
 
         return ret
 
+    def _post_batch(self, *args, **kwargs):
+        self.model.apply(rezero_weights)
+
     def _post_epoch(self, epoch, metric):
         """
         The set of actions to do after each epoch of training:
@@ -559,7 +563,6 @@ class TinyCIFAR(object):
         3. and update boost strengths.
         """
         self._adjust_learning_rate(self.optimizer, epoch, metric)
-        self.model.apply(rezero_weights)
         self.model.apply(update_boost_strength)
 
     def _initialize_weights(self):

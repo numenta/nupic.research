@@ -32,12 +32,17 @@ class RezeroedKWinnersImagenetExperiment(mixins.RezeroWeights,
 
 
 class KnowledgeDistillationImagenetExperiment(mixins.KnowledgeDistillation,
-                                              mixins.ComplexLoss,
                                               RezeroedKWinnersImagenetExperiment):
+    pass
+
+
+class KnowledgeDistillationCLExperiment(mixins.KnowledgeDistillationCL,
+                                        RezeroedKWinnersImagenetExperiment):
     pass
 
 
 __all__ = [
     "RezeroedKWinnersImagenetExperiment",
-    "KnowledgeDistillationImagenetExperiment"
+    "KnowledgeDistillationImagenetExperiment",
+    "KnowledgeDistillationCLExperiment"
 ]
