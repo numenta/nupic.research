@@ -34,7 +34,7 @@ from ray.tune.utils import flatten_dict
 __all__ = [
     "log",
     "WandbLogger",
-    "auto_init",
+    "WorkerLogger",
 ]
 
 # Find directory of where wandb save its results.
@@ -43,24 +43,6 @@ if "WANDB_DIR" in os.environ:
 else:
     WANDB_DIR = None
 CONFIG_NAME = "ray_wandb_config.json"
-
-
-def auto_init():
-    """Auto init to last run."""
-    try:
-        latest_config = get_latest_run_config()
-        if latest_config:
-            wandb.init(**latest_config)
-        else:
-            warnings.warn("Unable to load and init wandb config from last run.")
-
-        # Save the config to the latest run directory.
-        latest_run_dir = get_latest_run_dir()
-        if latest_run_dir and latest_config:
-            save_wandb_config(latest_config, run_dir=latest_run_dir)
-
-    except FileNotFoundError:
-        print("Unable to init wandb from last run.")
 
 
 def log(log_dict, commit=False, step=None, sync=True, *args, **kwargs):
@@ -92,9 +74,6 @@ def log(log_dict, commit=False, step=None, sync=True, *args, **kwargs):
                  steps but defaults to not committing the specified step
     :param sync: If set to False, process calls to log in a separate thread
     """
-
-    if wandb.run is None:
-        auto_init()
 
     if wandb.run:
         wandb.log(log_dict, commit=commit, step=step, sync=sync, *args, **kwargs)
