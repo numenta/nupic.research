@@ -236,10 +236,10 @@ class WandbLogger(wandb.ray.WandbLogger):
 # Utils
 # ---------
 
-def get_latest_run_config():
+def get_latest_run_config(name=None):
 
-    latest_run = get_latest_run_dir()
-    if latest_run:
+    latest_run = get_latest_run_dir(name=name)
+    if not latest_run:
         return None
 
     latest_run = os.path.join(latest_run, CONFIG_NAME)
@@ -249,20 +249,44 @@ def get_latest_run_config():
     return ray_wandb_config
 
 
-def get_latest_run_dir():
+def get_latest_run_dir(name=None):
+    """
+    Gets the directory of where the latest wandb run is saved.
+
+    :param name: (optional) name of run; filters runs so they must match the name given
+    """
 
     if WANDB_DIR is None:
         return None
 
     all_subdirs = []
     for d in os.listdir(WANDB_DIR):
+
+        # Make sure run directory exists.
         d_full = os.path.join(WANDB_DIR, d)
-        if os.path.isdir(d_full):
+        if not os.path.isdir(d_full):
+            continue
+
+        # Validate name of run when specified.
+        run_metadata_path = os.path.join(d_full, "wandb-metadata.json")
+        if name and os.path.isfile(run_metadata_path):
+            with open(run_metadata_path, "r") as f:
+                try:
+                    run_metadata = json.load(f)
+                except json.JSONDecodeError:
+                    run_metadata = {}
+
+            d_name = run_metadata.get("name", False)
+            if d_name and d_name == name:
+                all_subdirs.append(d_full)
+
+        # If name is not given, add to list of run directories by default.
+        elif name is None:
             all_subdirs.append(d_full)
 
-    latest_run = max(all_subdirs, key=os.path.getmtime)
-
-    return latest_run
+    # Find latest run directory chronologically.
+    latest_run_dir = max(all_subdirs, key=os.path.getmtime)
+    return latest_run_dir
 
 
 def save_wandb_config(config, run_dir):
