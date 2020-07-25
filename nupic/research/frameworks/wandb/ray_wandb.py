@@ -141,6 +141,11 @@ class WandbLogger(wandb.ray.WandbLogger):
         env_config = self.config["env_config"]
         wandb_config = env_config["wandb"]
 
+        # Find latest run config upon resume.
+        resume = wandb_config.get("resume", False)
+        if resume and "id" not in wandb_config:
+            enable_run_resume(wandb_config)
+
         # This will invoke `wandb.init(**wandb_config)` and create a new run-directory.
         super()._init()
 
@@ -234,7 +239,6 @@ class WorkerLogger(object):
 
     def stop_experiment(self):
         """Finalize wandb logging."""
-        self.logger.info("Stopping experiment...")
         super().stop_experiment()
         if wandb.run:
             wandb.join()
@@ -253,17 +257,35 @@ class WorkerLogger(object):
 # Utils
 # ---------
 
-def get_latest_run_config(name=None):
+def enable_run_resume(wandb_config):
+    """
+    Finds and sets latest wandb run id to resume the corresponding run.
+    """
+    name = wandb_config.get("name", None)
+    run_id = wandb_config.get("id", None)
+    if name and not run_id:
+        run_id = get_latest_run_id(name=name) or None
+        if run_id is None:
+            warnings.warn(
+                "Couldn't find latest wandb run-id to resume."
+                "Ensure `WANDB_DIR` environment variable is set.")
 
-    latest_run = get_latest_run_dir(name=name)
-    if not latest_run:
+    wandb_config.update(id=run_id, resume=True)
+
+
+def get_latest_run_id(name=None):
+    """
+    Gets the config of the latest wandb run.
+
+    :param name: (optional) name of run; filters runs so they must match the name given
+    """
+
+    latest_run_dir = get_latest_run_dir(name=name)
+    if latest_run_dir is None:
         return None
 
-    latest_run = os.path.join(latest_run, CONFIG_NAME)
-    with open(latest_run, "r") as f:
-        ray_wandb_config = json.load(f)
-
-    return ray_wandb_config
+    run_id = latest_run_dir.split("-")[-1] or None  # None if empty string
+    return run_id
 
 
 def get_latest_run_dir(name=None):
@@ -304,9 +326,3 @@ def get_latest_run_dir(name=None):
     # Find latest run directory chronologically.
     latest_run_dir = max(all_subdirs, key=os.path.getmtime)
     return latest_run_dir
-
-
-def save_wandb_config(config, run_dir):
-    ray_wandb_config = os.path.join(run_dir, CONFIG_NAME)
-    with open(ray_wandb_config, "w") as f:
-        json.dump(config, f)
