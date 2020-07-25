@@ -140,21 +140,9 @@ class WandbLogger(wandb.ray.WandbLogger):
         # Auto format the group to be the name of the trial.
         env_config = self.config["env_config"]
         wandb_config = env_config["wandb"]
-        if "group" not in wandb_config:
-            wandb_config["group"] = (
-                "group_" + datetime.now().strftime("%Y-%m-%dT%H_%M_%S_%f%z")
-            )
 
         # This will invoke `wandb.init(**wandb_config)` and create a new run-directory.
         super()._init()
-
-        # Add unique run id to the config.
-        wandb_config["id"] = wandb.run.id
-
-        # Save the config to the latest run directory.
-        latest_run = get_latest_run_dir()
-        if latest_run:
-            save_wandb_config(wandb_config, run_dir=latest_run)
 
         # Get result_to_time_series_fn.
         experiment_class = self.config.get("experiment_class", None)
