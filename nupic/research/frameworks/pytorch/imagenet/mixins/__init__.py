@@ -31,6 +31,5 @@ from .profile_autograd import ProfileAutograd
 from .regularize_loss import RegularizeLoss
 from .rezero_weights import RezeroWeights
 from .update_boost_strength import UpdateBoostStrength
-from .wandb_logger import WandbLogger
 from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .composite_loss import CompositeLoss
