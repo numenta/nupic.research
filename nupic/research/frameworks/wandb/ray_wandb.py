@@ -26,6 +26,7 @@ import os
 import warnings
 from copy import deepcopy
 from datetime import datetime
+from pprint import pformat
 
 import wandb
 from ray.tune.utils import flatten_dict
@@ -230,6 +231,55 @@ class WandbLogger(wandb.ray.WandbLogger):
                     continue
                 metrics[key] = value
             wandb.log(metrics)
+
+
+class WorkerLogger(object):
+    """
+    This class serves an optional mixin for the Imagenet Experiment Class.
+    It's purpose is simply to initialize wandb on the worker nodes. This always
+    logging at the users discretion by direct calls to wandb, ideally through
+    the `log` function of this module.
+    """
+
+    def setup_experiment(self, config):
+        """
+        Init wandb from worker processes if desired. This is useful for debugging
+        purposes, such as logging directly from pytorch modules.
+
+        :param config:
+            - wandb_args: dict to pass to wandb.init
+                - name: name of run
+                - project: name of project
+                - id: (optional) can generate via wandb.util.generate_id()
+                - group: name of group; it's recommended to use this or `id`
+                         to keep results together
+            - wandb_for_worker_ranks: list of integers denoting the ranks of
+                                      processes to init wandb
+        """
+        super().setup_experiment(config)
+        for rank in config.get("wandb_for_worker_ranks", []):
+
+            wandb_args = config.get("wandb_args", {})
+            self.logger.info(f"Setting up wandb on rank {rank}")
+            self.logger.info(f"wandb_agrs:\n{pformat(wandb_args)}")
+            if self.rank == rank:
+                wandb.init(**wandb_args)
+
+    def stop_experiment(self):
+        """Finalize wandb logging."""
+        self.logger.info("Stopping experiment...")
+        super().stop_experiment()
+        if wandb.run:
+            wandb.join()
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append(
+            "WorkerLogger: setup wandb logging for specified workers")
+        eo["stop_experiment"].append(
+            "WorkerLogger: finalize wandb logging on worker nodes")
+        return eo
 
 
 # ---------
