@@ -25,7 +25,6 @@ import numbers
 import os
 import warnings
 from copy import deepcopy
-from datetime import datetime
 from pprint import pformat
 
 import wandb
