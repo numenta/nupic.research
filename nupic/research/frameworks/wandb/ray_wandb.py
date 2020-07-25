@@ -46,10 +46,13 @@ CONFIG_NAME = "ray_wandb_config.json"
 
 def log(log_dict, commit=False, step=None, sync=True, *args, **kwargs):
     """
-    This logs its arguments to Weights and Biases. Use this function along with the
-    `WandbLogger` which saves the wandb-configuration and associated run. Whenever the
-    run is unknown, `log` will automatically default to latest one - thereby defaulting
-    to the same run as the logger.
+    This logs its arguments to wandb only if a run has been initialized.
+
+    It's intended for use in conjunction with the `WorkerLogger` mixin which initializes
+    wandb on a specified set of workers. Generally, the ray based logger, `WandbLogger`,
+    is intended to log results on the head node, while this function (and the helper
+    mixin) serve to log other values on the worker nodes - for instance, grad norms of
+    pytroch modules.
 
     Example:
     ```
@@ -80,27 +83,43 @@ def log(log_dict, commit=False, step=None, sync=True, *args, **kwargs):
 
 class WandbLogger(wandb.ray.WandbLogger):
     """
-    This subclasses the ray integration from wandb, to achieve automatic grouping of
-    logs. For information on grouping and the parent class, see:
-        - https://docs.wandb.com/library/integrations/ray-tune
-        - https://docs.wandb.com/library/advanced/grouping
+    This subclasses the ray integration from wandb to
+        1) make resuming experiments easier
+        2) include more supported data types
+        3) support logging time-series formatted results
 
-    To use this class, pass it under `loggers` and add `env_config["wandb"]` to the
-    ray.tune config. For example,
+    As a `ray.tune.logger.Logger` this class will process all results returned from
+    training and automatically sync them to wandb.
 
+    To use this class, include it in your `tune.run` config under `loggers` and add
+    `env_config["wandb"]` to specify wandb params.
+
+    The main options include
+        wandb:
+            - name: Chosen name of run/experiment
+            - project: Name of wandb project to group all related runs
+            - group: Extra layer of naming to group runs under a project
+            - notes: A multi-line string associated with the run
+
+    All are optional, but name, project, and notes are recommended. For all wandb init
+    params, see https://docs.wandb.com/library/init.
+
+    Example usage:
     ```
     # Be sure to set `WANDB_API_KEY` in environment variables.
     from ray.tune.logger import DEFAULT_LOGGERS
     tune.run(
         MyTrianable,
-        loggers=DEFAULT_LOGGERS + [WandbLogger],
+        loggers=list(DEFAULT_LOGGERS) + [WandbLogger],
         config={
             "env_config": {
                 "wandb": {
                     "project": "my-project-name",
-                    "name": "my-exp-name"
-                    # "group": <optional and otherwise filled in with current datetime>
+                    "name": "my-exp-name",
+                    "group": "group-of-runs",
+                    "notes": "This experiments aims to ..."
                 },
+
                 # Optional
                 "result_to_time_series_fn":
                 MyExperiment.expand_result_to_time_series,
@@ -113,16 +132,15 @@ class WandbLogger(wandb.ray.WandbLogger):
     and returns a dictionary of {timestep: result}. If you provide this
     function, you convert from an epoch-based time series to your own
     timestep-based time series, logging multiple timesteps for each epoch.
-
-    Note, as a `ray.tune.logger.Logger` this class will process all results returned
-    from training. However, as of now, only numbers get synced to wandb (e.g. {acc: 1}).
-    For logging non-numerical values (such as plots), invoke `log` as defined within
-    this module.
     """
 
+    # Only the following types are able to be logged through this class.
+    # See https://docs.wandb.com/library/log for wandb data-types.
+    # Others types may be included later.
     accepted_types = (
         numbers.Number,
-        # wandb.Image,  # this seems to be have issues.
+        wandb.Image,
+        wandb.Histogram,
     )
 
     def _init(self):
@@ -206,10 +224,14 @@ class WandbLogger(wandb.ray.WandbLogger):
 
 class WorkerLogger(object):
     """
-    This class serves an optional mixin for the Imagenet Experiment Class.
-    It's purpose is simply to initialize wandb on the worker nodes. This always
-    logging at the users discretion by direct calls to wandb, ideally through
-    the `log` function of this module.
+    This class serves an optional mixin for the ImagenetExperiment Class.
+    It's purpose is simply to initialize wandb on the worker nodes. This allows
+    logging to be done outside of this class by direct calls to wandb. Note that
+    the `log` function of this python module is designed with that purpose in mind.
+
+    To keep all logs managed under the same run across the head and worker nodes, try
+    using `wandb.util.generate_id()` to get a unique run-id that can be passed to both
+    this mixin and the ray based `WandbLogger`.
     """
 
     def setup_experiment(self, config):
