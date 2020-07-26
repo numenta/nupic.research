@@ -22,6 +22,9 @@
 """
 This module provides example code to train a dense/sparse MLP in a continuous learning
 setup using the multihead setting.
+
+This implementation is based on the original continual learning benchmarks repository:
+https://github.com/GMvandeVen/continual-learning
 """
 
 import argparse
