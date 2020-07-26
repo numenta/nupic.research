@@ -21,7 +21,10 @@
 
 """
 Functions for training and testing a network with single/multiple heads in a continuous
-learning framework
+learning framework.
+
+This implementation is based on the original continual learning benchmarks repository:
+https://github.com/GMvandeVen/continual-learning
 """
 
 import torch
@@ -64,8 +67,8 @@ def train_head(model, loader, optimizer, criterion, device, active_classes=None,
     model.train()
     for data, target in tqdm(loader, desc="Train", leave=False):
         data, target = data.to(device), target.to(device)
-        if active_classes is not None:
-            target = target - active_classes[0]
+        # if active_classes is not None:
+        #     target = target - active_classes[0]
         optimizer.zero_grad()
         output = model(data)
 
@@ -106,8 +109,8 @@ def test(model, loader, criterion, device, allowed_classes=None):
     with torch.no_grad():
         for data, target in tqdm(loader, desc="Test", leave=False):
             data, target = data.to(device), target.to(device)
-            if allowed_classes is not None:
-                target = target - allowed_classes[0]
+            # if allowed_classes is not None:
+            #     target = target - allowed_classes[0]
             output = model(data)
 
             if allowed_classes is not None:
@@ -138,14 +141,13 @@ def do_training(model, dataset_name, scenario, device, post_batch_callback=None)
     :param post_batch_callback: function(model) to call after every batch
     :type post_batch_callback: function
     """
-    train_datasets, test_datasets = get_datasets(dataset_name, scenario)
+    train_datasets, test_datasets = get_datasets(dataset_name, scenario=scenario)
 
     train_loaders = [
         torch.utils.data.DataLoader(train_dataset,
                                     batch_size=TRAIN_BATCH_SIZE,
                                     shuffle=True)
         for train_dataset in train_datasets]
-
     test_loaders = [
         torch.utils.data.DataLoader(test_dataset,
                                     batch_size=TEST_BATCH_SIZE,
@@ -185,7 +187,12 @@ def do_training(model, dataset_name, scenario, device, post_batch_callback=None)
 def get_active_classes(task_num, scenario):
     """
     Return a list of label indices that are "active" during training under the given
-    scenario
+    scenario. In the <task> scenario, only the classes that are being trained are
+    active. In the <domain> scenario, there is only one output head, so the concept of
+    "active" classes is not relevant. In the <class> scenario, all tasks that the model
+    has previously observed are active. More information about active classes can be
+    found here: https://arxiv.org/abs/1904.07734
+
     :param task_num: the index of the task
     :type task_num: int
     :param scenario: continuous learning setup, one of {'task', 'domain', 'class'}

@@ -22,9 +22,13 @@
 """
 Dataset functionality for MNIST and Google Speech Commands in a continual learning
 framework.
+
+This implementation is based on the original continual learning benchmarks repository:
+https://github.com/GMvandeVen/continual-learning
 """
 
 import os
+import warnings
 
 import numpy as np
 from torch.utils.data import Dataset
@@ -54,10 +58,12 @@ def get_datasets(dataset_name, scenario, download=False):
     elif dataset_name == "splitMNIST":
         dataset_class = MNIST
 
-    full_train_set = dataset_class("~/nta/continual-learning/datasets/mnist/",
+    # In the following class initializations, the `root` directory may need to be
+    # modified based on where MNIST/GSC data is stored
+    full_train_set = dataset_class(".",
                                    train=True, transform=dataset_transform,
                                    target_transform=None, download=download)
-    full_test_set = dataset_class("~/nta/continual-learning/datasets/mnist/",
+    full_test_set = dataset_class(".",
                                   train=False, transform=dataset_transform,
                                   target_transform=None, download=download)
 
@@ -65,7 +71,7 @@ def get_datasets(dataset_name, scenario, download=False):
 
     for labels in [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]:
 
-        if scenario == "domain":
+        if scenario in ("task", "domain"):
             target_transform = transforms.Lambda(lambda y, x=labels[0]: y - x)
         else:
             target_transform = None
@@ -83,6 +89,15 @@ class GSC(Dataset):
 
     def __init__(self, root=".", train=True, transform=None, target_transform=None,
                  download=False):
+        # The `download` parameter is only for consistency with the torchvision API
+        # and will issue a warning if set to True
+        if download:
+            warnings.warn(
+                "Parameter `download` is deprecated is only for consistency with the\
+                torchvision API and will not be used.",
+                DeprecationWarning,
+            )
+
         super(GSC, self).__init__()
 
         self.transform = transform
@@ -131,12 +146,6 @@ class GSC(Dataset):
             # shift all labels to be at 0
             self.test_labels = self.test_labels - 2
 
-            # select subset of data
-            # inds = np.random.choice(np.arange(len(self.data)), size=10000,
-            #                         replace=False)
-            # self.data = self.data[inds]
-            # self.test_labels = self.test_labels[inds]
-
     def __getitem__(self, index):
         sound, target = self.data[index], int(self.targets[index]) if\
             hasattr(self, "targets") else int(self.test_labels[index])
@@ -154,37 +163,31 @@ class GSC(Dataset):
 
 
 class SubDataset(Dataset):
-    """ A subdataset class that divides a given dataset with labels into one with
-    specified labels. """
+    """ A SubDataset class that divides a given dataset with labels into one with
+    specified labels. Note that a SubDataset `target_transform` is separate from a
+    Dataset's `target_transform`. """
 
     def __init__(self, original_dataset, sub_labels, target_transform=None):
         super().__init__()
         self.dataset = original_dataset
-        self.sub_indeces = []
+        self.sub_indices = []
         for index in range(len(self.dataset)):
             if hasattr(original_dataset, "targets"):
                 if self.dataset.target_transform is None:
                     label = self.dataset.targets[index]
                 else:
                     label = self.dataset.target_transform(self.dataset.targets[index])
-            elif hasattr(self.dataset, "test_labels"):
-                if self.dataset.target_transform is None:
-                    label = self.dataset.test_labels[index]
-                else:
-                    label = self.dataset.target_transform(
-                        self.dataset.test_labels[index]
-                    )
             else:
                 label = self.dataset[index][1]
             if label in sub_labels:
-                self.sub_indeces.append(index)
+                self.sub_indices.append(index)
         self.target_transform = target_transform
 
     def __len__(self):
-        return len(self.sub_indeces)
+        return len(self.sub_indices)
 
     def __getitem__(self, index):
-        sample = self.dataset[self.sub_indeces[index]]
+        sample = self.dataset[self.sub_indices[index]]
         if self.target_transform:
             target = self.target_transform(sample[1])
             sample = (sample[0], target)

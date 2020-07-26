@@ -24,6 +24,7 @@ Dense/sparse MLP implementation
 """
 
 import torch
+import torch.nn.functional as F
 
 from nupic.torch.modules import Flatten, KWinners, SparseWeights
 
@@ -51,8 +52,8 @@ class Classifier(torch.nn.Module):
 
     def forward(self, x):
         output = self.fc1(self.flatten(x))
-        output = self.kw1(output) if self.is_sparse else output
+        output = self.kw1(output) if self.is_sparse else F.relu(output)
         output = self.fc2(output)
-        output = self.kw2(output) if self.is_sparse else output
+        output = self.kw2(output) if self.is_sparse else F.relu(output)
         output = self.fc3(output)
         return output
