@@ -36,7 +36,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 
-def get_datasets(dataset_name, scenario, download=False):
+def get_datasets(dataset_name, scenario, download=True):
     """
     Return the train and test datasets (in parallel lists) for each task in the
     continuous learning setup
