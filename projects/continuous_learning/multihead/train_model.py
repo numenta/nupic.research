@@ -31,7 +31,7 @@ import argparse
 
 import torch
 
-from model import Classifier
+from model import TwoLayerClassifier
 from nupic.research.frameworks.continuous_learning.multihead.multihead import (
     do_training,
 )
@@ -61,7 +61,8 @@ if __name__ == "__main__":
     }
 
     # initialize classifier
-    model = Classifier(is_sparse=args.sparse, input_size=input_sizes[args.dataset])
+    model = TwoLayerClassifier(is_sparse=args.sparse,
+                               input_size=input_sizes[args.dataset])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # training loop

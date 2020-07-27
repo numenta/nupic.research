@@ -36,12 +36,6 @@ from nupic.research.frameworks.continuous_learning.multihead.subdataset import (
     get_datasets,
 )
 
-SEED = 42
-LEARNING_RATE = 0.001
-EPOCHS = 30
-TRAIN_BATCH_SIZE = 64
-TEST_BATCH_SIZE = 1000
-
 
 def train_head(model, loader, optimizer, criterion, device, active_classes=None,
                post_batch_callback=None):
@@ -127,7 +121,8 @@ def test(model, loader, criterion, device, allowed_classes=None):
             "total_correct": total_correct}
 
 
-def do_training(model, dataset_name, scenario, device, post_batch_callback=None):
+def do_training(model, dataset_name, scenario, device, lr=0.001, epochs=30,
+                train_batch_size=64, test_batch_size=1000, post_batch_callback=None):
     """
     Train the model.
     :param model: pytorch model to be trained
@@ -138,28 +133,34 @@ def do_training(model, dataset_name, scenario, device, post_batch_callback=None)
     :type scenario: str
     :param device:
     :type device: torch.device
+    :param lr: learning rate for the optimizer
+    :type lr: float
+    :param epochs: number of epochs for which to train the classifier
+    :type epochs: int
+    :param train_batch_size: batch size during training
+    :type train_batch_size: int
+    :param test_batch_size: batch size during training
+    :type test_batch_size: int
     :param post_batch_callback: function(model) to call after every batch
     :type post_batch_callback: function
     """
     train_datasets, test_datasets = get_datasets(dataset_name, scenario=scenario)
 
     train_loaders = [
-        torch.utils.data.DataLoader(train_dataset,
-                                    batch_size=TRAIN_BATCH_SIZE,
+        torch.utils.data.DataLoader(train_dataset, batch_size=train_batch_size,
                                     shuffle=True)
         for train_dataset in train_datasets]
     test_loaders = [
-        torch.utils.data.DataLoader(test_dataset,
-                                    batch_size=TEST_BATCH_SIZE,
+        torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size,
                                     shuffle=True)
         for test_dataset in test_datasets]
 
     n_tasks = len(train_datasets)
 
     # optimizer for training model
-    adam = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999))
+    adam = optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
 
-    for epoch in range(EPOCHS):
+    for epoch in range(epochs):
 
         # Loop over all tasks
         for task_num, train_loader in enumerate(train_loaders, 1):
