@@ -49,7 +49,7 @@ class MultiHeadTest(unittest.TestCase):
         """
         Test all target values to be in {0, 1} in the task scenario.
         """
-        train_loaders, test_loaders = setup("splitMNIST", "task", True)
+        train_loaders, test_loaders = setup("splitMNIST", "task")
         for train_loader in train_loaders:
             for _data, target in train_loader:
                 self.assertLess(target.max().item(), 2)
@@ -63,7 +63,7 @@ class MultiHeadTest(unittest.TestCase):
         """
         Test all target values to be in {0, 1} in the domain scenario.
         """
-        train_loaders, test_loaders = setup("splitMNIST", "domain", True)
+        train_loaders, test_loaders = setup("splitMNIST", "domain")
         for train_loader in train_loaders:
             for _data, target in train_loader:
                 self.assertLess(target.max().item(), 2)
@@ -78,7 +78,7 @@ class MultiHeadTest(unittest.TestCase):
         Test all target values to be changing based on the task number in the class
         scenario.
         """
-        train_loaders, test_loaders = setup("splitMNIST", "class", True)
+        train_loaders, test_loaders = setup("splitMNIST", "class")
         for task_num, train_loader in enumerate(train_loaders):
             min_target, max_target = 2 * task_num, 2 * task_num + 1
             for _data, target in train_loader:
