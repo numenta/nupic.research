@@ -61,8 +61,9 @@ if __name__ == "__main__":
     }
 
     # initialize classifier
-    model = TwoLayerClassifier(is_sparse=args.sparse,
-                               input_size=input_sizes[args.dataset])
+    model = TwoLayerClassifier(input_size=input_sizes[args.dataset],
+                               n_classes=2 if args.scenario == "domain" else 10,
+                               is_sparse=args.sparse)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # training loop
