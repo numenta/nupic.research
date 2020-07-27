@@ -34,7 +34,7 @@ from nupic.research.frameworks.continuous_learning.multihead.subdataset import (
 )
 
 
-def setup(dataset_name, scenario, sparse_classifier):
+def setup(dataset_name, scenario):
     train_datasets, test_datasets = get_datasets(dataset_name, scenario=scenario)
     train_loaders = [DataLoader(train_dataset, batch_size=256, shuffle=True)
                      for train_dataset in train_datasets]
