@@ -7,11 +7,7 @@
 # without explicit written authorization from Numenta Inc.#
 # ------------------------------------------------------------------------------
 
-import os
 from copy import deepcopy
-
-from pandas import DataFrame
-from ray.tune.utils import flatten_dict
 
 from nupic.research.frameworks.pytorch.imagenet import mixins
 from nupic.research.frameworks.pytorch.lr_scheduler import LinearLRScheduler
