@@ -43,14 +43,16 @@ class LRRangeTest(object):
                 - min_lr: starting learning rate
                 - max_lr: ending learning rate
         """
-        super().setup_experiment(config)
 
         # Ensure all epochs get validated.
         assert "epochs" in config
         config["epochs_to_validate"] = range(-1, config["epochs"])
+        config["lr_scheduler_step_every_batch"] = True
 
         # Save config for later - used to aggregate results.
         self._config = deepcopy(config)
+
+        super().setup_experiment(config)
 
     @classmethod
     def create_lr_scheduler(cls, config, optimizer, total_batches):
@@ -65,17 +67,11 @@ class LRRangeTest(object):
 
         return lr_scheduler_class(optimizer, **lr_scheduler_args)
 
-    def post_batch(self, *args, **kwargs):
-        """Increase lr after every batch."""
-        super().post_batch(*args, **kwargs)
-        self.lr_scheduler.step()
-
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].insert(0, cls.__name__ + ": initialize")
         eo["create_lr_scheduler"] = cls.__name__ + ": create_lr_scheduler"
-        eo["post_batch"].insert(0, cls.__name__ + ": linearly increase lr")
         return eo
 
 
