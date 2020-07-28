@@ -17,11 +17,14 @@ from nupic.research.frameworks.pytorch.imagenet import mixins
 from nupic.research.frameworks.pytorch.lr_scheduler import LinearLRScheduler
 
 
-class LRRangeTest(mixins.LogEveryLoss):
+class LRRangeTest(object):
     """
     Mixin for the LR-range test defined in section 4.1 of "A Disciplined Approach to
     Neural Network Hyper-Parameters"
         - https://arxiv.org/pdf/1803.09820.pdf
+
+    On usage: Make sure that the `required_mixins` are included in your experiment_class
+              See `create_lr_test_experiment` to automate this.
 
     Herein, a min_lr and max_lr are set, and training proceeds for a small number of
     epochs (1-3) while the learning rate is linearly increased. Generally, the point
@@ -33,6 +36,9 @@ class LRRangeTest(mixins.LogEveryLoss):
 
     # Use the following name when `save_lr_test_to_csv=True`.
     csv_save_name = "lr_range_test.csv"
+
+    # List the required mixins that should be accompanied with this class.
+    required_mixins = [mixins.LogEveryLoss, mixins.LogEveryLearningRate]
 
     def setup_experiment(self, config):
         """
@@ -109,3 +115,23 @@ class LRRangeTest(mixins.LogEveryLoss):
         eo["create_lr_scheduler"] = cls.__name__ + ": create_lr_scheduler"
         eo["post_batch"].insert(0, cls.__name__ + ": linearly increase lr")
         return eo
+
+
+def create_lr_test_experiment(experiment_class):
+    """
+    This is a helper function to LRRangeTest to ensure your experiment
+    class includes the required additional mixins. Specifically, you'll
+    want to be sure the lr and training loss are logged after every batch.
+    """
+    required_mixins = LRRangeTest.required_mixins + [LRRangeTest]
+    remaining_mixins = [
+        mixin
+        for mixin in required_mixins
+        if not issubclass(experiment_class, mixin)
+    ]
+
+    class Cls(*remaining_mixins, experiment_class):
+        pass
+
+    Cls.__name__ = f"{LRRangeTest.__name__}{experiment_class.__name__}"
+    return Cls
