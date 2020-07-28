@@ -47,6 +47,8 @@ class LRRangeTest(mixins.LogEveryLoss):
                 - min_lr: starting learning rate
                 - max_lr: ending learning rate
         """
+        super().setup_experiment(config)
+
         # Ensure all epochs get validated.
         assert "epochs" in config
         config["epochs_to_validate"] = range(-1, config["epochs"])
@@ -60,7 +62,6 @@ class LRRangeTest(mixins.LogEveryLoss):
 
         # Save config for later - used to aggregate results.
         self._config = deepcopy(config)
-        super().setup_experiment(config)
 
     @classmethod
     def create_lr_scheduler(cls, config, optimizer, total_batches):
@@ -77,8 +78,8 @@ class LRRangeTest(mixins.LogEveryLoss):
 
     def post_batch(self, *args, **kwargs):
         """Increase lr after every batch."""
-        self.lr_scheduler.step()
         super().post_batch(*args, **kwargs)
+        self.lr_scheduler.step()
 
     def log_result(self, result):
         """
