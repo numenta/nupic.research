@@ -35,14 +35,12 @@ class LogEveryLoss:
         super().setup_experiment(config)
         self.error_loss_history = []
         self.complexity_loss_history = []
-        self.learning_rate_history = []
 
     def post_batch(self, model, error_loss, complexity_loss, batch_idx,
                    *args, **kwargs):
         super().post_batch(model, error_loss, complexity_loss, batch_idx,
                            *args, **kwargs)
         if self.should_log_batch(batch_idx):
-            self.learning_rate_history.append(self.get_lr()[0])
             self.error_loss_history.append(error_loss.clone())
             if complexity_loss is not None:
                 self.complexity_loss_history.append(complexity_loss.clone())
@@ -60,10 +58,6 @@ class LogEveryLoss:
             result["complexity_loss_history"] = log.cpu().numpy().tolist()
             self.complexity_loss_history = []
 
-        if len(self.learning_rate_history) > 0:
-            result["learning_rate_history"] = self.learning_rate_history
-            self.learning_rate_history = []
-
         return result
 
     @classmethod
@@ -78,14 +72,15 @@ class LogEveryLoss:
                 loss_by_process_and_batch[rank, :] = torch.tensor(result[k])
             aggregated[k] = loss_by_process_and_batch.mean(dim=0).tolist()
 
-        # "complexity_loss_history" and "learning_rate_history" doesn't need to be
-        # aggregated, since it's the same on every process.
+        # "complexity_loss_history" doesn't need to be aggregated, since it's
+        # the same on every process.
 
         return aggregated
 
     @classmethod
     def expand_result_to_time_series(cls, result, config):
-        result_by_timestep = super().expand_result_to_time_series(result, config)
+        result_by_timestep = super().expand_result_to_time_series(result,
+                                                                  config)
 
         recorded_timesteps = cls.get_recorded_timesteps(result, config)
         for t, loss in zip(recorded_timesteps, result["error_loss_history"]):
@@ -93,12 +88,12 @@ class LogEveryLoss:
                 train_loss=loss,
             )
 
-        for log_name in ["complexity_loss_history", "learning_rate_history"]:
-            if log_name in result:
-                for t, log_hist in zip(recorded_timesteps, result[log_name]):
-                    result_by_timestep[t].update(
-                        {log_name.replace("_history", ""): log_hist},
-                    )
+        if "complexity_loss_history" in result:
+            for t, loss in zip(recorded_timesteps,
+                               result["complexity_loss_history"]):
+                result_by_timestep[t].update(
+                    complexity_loss=loss,
+                )
 
         return result_by_timestep
 
