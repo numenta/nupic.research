@@ -34,9 +34,6 @@ class LRRangeTest(object):
     times lower this amount for your min_lr.
     """
 
-    # Use the following name when `save_lr_test_to_csv=True`.
-    csv_save_name = "lr_range_test.csv"
-
     # List the required mixins that should be accompanied with this class.
     required_mixins = [mixins.LogEveryLoss, mixins.LogEveryLearningRate]
 
@@ -45,9 +42,6 @@ class LRRangeTest(object):
         :param config:
             - epochs: number of epochs in training (recommended 1-3)
             - epochs_to_validate: will be overridden to include all epochs
-            - save_lr_test_to_csv: whether to save results to csv; must be accompanied
-                                   by 'logdir'
-            - logdir: directory to save test results
             - lr_scheduler_class: automatically overridden to LinearLRScheduler
             - lr_scheduler_args: args for the linear-schedule
                 - min_lr: starting learning rate
@@ -58,12 +52,6 @@ class LRRangeTest(object):
         # Ensure all epochs get validated.
         assert "epochs" in config
         config["epochs_to_validate"] = range(-1, config["epochs"])
-
-        # Init saving of test results.
-        self.save_lr_test_to_csv = config.get("save_lr_test_to_csv", False)
-        if self.save_lr_test_to_csv:
-            assert self.logdir is not None, (
-                "The logdir must be specified to save the lt-range test resutls.")
 
         # Save config for later - used to aggregate results.
         self._config = deepcopy(config)
@@ -85,28 +73,6 @@ class LRRangeTest(object):
         """Increase lr after every batch."""
         super().post_batch(*args, **kwargs)
         self.lr_scheduler.step()
-
-    def log_result(self, result):
-        """
-        Logs results to csv with columns for timestep, learning_rate, train_loss,
-        and validation_accuracy.
-        """
-        super().log_result(result)
-
-        # Logging should only occur in the zero-ith process.
-        if not self.rank == 0 and self.save_lr_test_to_csv:
-            return
-
-        df = DataFrame()
-        df.index.name = "timestep"
-
-        time_series_dict = self.expand_result_to_time_series(result, self._config)
-        for t, d in sorted(time_series_dict.items(), key=lambda x: x[0]):
-            for key, value in flatten_dict(d, delimiter="/").items():
-                if key in ["train_loss", "learning_rate", "validation_accuracy"]:
-                    df.at[t, key] = value
-
-        df.to_csv(os.path.join(self.logdir, self.csv_save_name))
 
     @classmethod
     def get_execution_order(cls):
