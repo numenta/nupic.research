@@ -56,9 +56,8 @@ class LRRangeTest(mixins.LogEveryLoss):
         # Init saving of test results.
         self.save_lr_test_to_csv = config.get("save_lr_test_to_csv", False)
         if self.save_lr_test_to_csv:
-            assert "logdir" in config, (
+            assert self.logdir is not None, (
                 "The logdir must be specified to save the lt-range test resutls.")
-            self.logdir = config["logdir"]
 
         # Save config for later - used to aggregate results.
         self._config = deepcopy(config)
