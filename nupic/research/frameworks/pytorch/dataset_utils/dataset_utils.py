@@ -165,7 +165,7 @@ class UnionDataset(Dataset):
         return len(self.datasets[0])
 
 
-def split_dataset(dataset, groupby):
+def split_dataset(dataset, groupby, target_transform=None):
     """Split the given dataset into multiple datasets grouped by the given
     groupby function. For example::
 
@@ -178,6 +178,8 @@ def split_dataset(dataset, groupby):
 
     :param dataset: Source dataset to split
     :param groupby: Group by function. See :func:`itertools.groupby`
+    :param target_transform: PyTorch transformation to apply to target variables of
+                             each subset
     :return: List of datasets
     """
     # Split dataset based on the group by function and keep track of indices
@@ -189,7 +191,13 @@ def split_dataset(dataset, groupby):
     _, indices = list(
         zip(*(sorted(list(indices_by_group.items()), key=lambda x: x[0])))
     )
-    return [Subset(dataset, indices=i) for i in indices]
+    subsets = [Subset(dataset, indices=i) for i in indices]
+
+    # Apply target_transform, if defined
+    if target_transform is not None:
+        for s in subsets:
+            s.dataset.targets = target_transform(s.dataset.targets)
+    return subsets
 
 
 class PreprocessedDataset(Dataset):

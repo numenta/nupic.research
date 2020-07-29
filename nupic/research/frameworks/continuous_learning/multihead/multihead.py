@@ -30,11 +30,11 @@ https://github.com/GMvandeVen/continual-learning
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from torchvision import transforms
+from torchvision.datasets import MNIST
 from tqdm import tqdm
 
-from nupic.research.frameworks.continuous_learning.multihead.subdataset import (
-    get_datasets,
-)
+from nupic.research.frameworks.pytorch.dataset_utils.dataset_utils import split_dataset
 
 
 def train_head(model, loader, optimizer, criterion, device, active_classes=None,
@@ -121,14 +121,12 @@ def test(model, loader, criterion, device, allowed_classes=None):
             "total_correct": total_correct}
 
 
-def do_training(model, dataset_name, scenario, device, lr=0.001, epochs=30,
+def do_training(model, scenario, device, lr=0.001, epochs=30,
                 train_batch_size=64, test_batch_size=1000, post_batch_callback=None):
     """
     Train the model.
     :param model: pytorch model to be trained
     :type model: torch.nn.Module
-    :param dataset_name: name of the dataset on which to train model
-    :type dataset_name: str
     :param scenario: continuous learning setup, one of {'task', 'domain', 'class'}
     :type scenario: str
     :param device:
@@ -144,7 +142,20 @@ def do_training(model, dataset_name, scenario, device, lr=0.001, epochs=30,
     :param post_batch_callback: function(model) to call after every batch
     :type post_batch_callback: function
     """
-    train_datasets, test_datasets = get_datasets(dataset_name, scenario=scenario)
+    train_mnist = MNIST(root=".", train=True, transform=transforms.ToTensor())
+    test_mnist = MNIST(root=".", train=True, transform=transforms.ToTensor())
+
+    if scenario in ("task", "domain"):
+        target_transform = transforms.Lambda(lambda y: y % 2)
+    else:
+        target_transform = None
+
+    train_datasets = split_dataset(train_mnist,
+                                   groupby=lambda x: x[1] // 2,
+                                   target_transform=target_transform)
+    test_datasets = split_dataset(test_mnist,
+                                  groupby=lambda x: x[1] // 2,
+                                  target_transform=target_transform)
 
     train_loaders = [
         torch.utils.data.DataLoader(train_dataset, batch_size=train_batch_size,

@@ -44,12 +44,10 @@ def post_batch(model):
 
 if __name__ == "__main__":
 
-    # identify training scenario, dataset, and model sparsity
+    # identify training scenario and model sparsity
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", type=str, default="task",
                         choices=["task", "domain", "class"])
-    parser.add_argument("--dataset", type=str, default="splitGSC",
-                        choices=["splitMNIST", "splitGSC"])
     parser.add_argument("--sparse", action="store_true",
                         help="train a sparse classifier instead of a dense one")
     args = parser.parse_args()
@@ -61,11 +59,11 @@ if __name__ == "__main__":
     }
 
     # initialize classifier
-    model = TwoLayerClassifier(input_size=input_sizes[args.dataset],
+    model = TwoLayerClassifier(input_size=input_sizes["splitMNIST"],
                                n_classes=2 if args.scenario == "domain" else 10,
                                is_sparse=args.sparse)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # training loop
-    do_training(model, args.dataset, args.scenario, device,
+    do_training(model, args.scenario, device,
                 post_batch_callback=post_batch if args.sparse else None)
