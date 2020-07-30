@@ -71,9 +71,9 @@ def load_multi_state(  # noqa: C901
                       `param_map = {"features.weight": "features.new_weight"}`
                       where "features.weight" exists within the checkpoint and the model
                       has the attribute `model.features.new_weight`.
-    :param state_dict_transform: this is a callable that takes the state_dict and
-                                 transforms it in some way; useful for a custom
-                                 re-mapping such as parameters with new naming
+    :param state_dict_transform: this is a callable that takes the state_dict and model
+                                 and transforms the dict it in some way; useful for a
+                                 custom re-mapping such as parameters with new naming
                                  schemes or formats. The output should be a new
                                  state_dict.
 
@@ -112,7 +112,7 @@ def load_multi_state(  # noqa: C901
 
             # Apply custom transform.
             if state_dict_transform:
-                state_dict = state_dict_transform(state_dict)
+                state_dict = state_dict_transform(state_dict, model)
 
             # Load state.
             model.load_state_dict(state_dict, strict=strict)
@@ -156,7 +156,7 @@ def load_multi_state(  # noqa: C901
 
             # Apply custom transform.
             if state_dict_transform:
-                state_dict = state_dict_transform(state_dict)
+                state_dict = state_dict_transform(state_dict, model)
 
             # Load state.
             model.load_state_dict(linear_state, strict=False)
@@ -194,7 +194,7 @@ def load_multi_state(  # noqa: C901
 
             # Apply custom transform.
             if state_dict_transform:
-                state_dict = state_dict_transform(state_dict)
+                state_dict = state_dict_transform(state_dict, model)
 
             # Load state.
             model.load_state_dict(nonlinear_state, strict=False)
