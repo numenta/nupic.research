@@ -31,12 +31,12 @@ boto3
 elasticsearch
 jupyter
 librosa==0.7.1
-matplotlib==3.2.2
+matplotlib
 numpy
 pandas
 python-dateutil==2.8.0
 fastai
-pillow==6.0.0
+pillow
 python-dotenv
 ray[tune]==0.8.3
 requests
@@ -44,7 +44,7 @@ scikit-image
 seaborn>=0.9.0
 sigopt
 tabulate
-torchvision==0.6.1
+torchvision==0.7.0
 tqdm
 h5py
 pretrainedmodels==0.7.4
