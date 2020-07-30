@@ -540,7 +540,7 @@ def conv_args_nested_dict(depth, args_from_modulename_fn):
 
             if block_num == 0:
                 block_args["shortcut"] = args_from_modulename_fn(
-                    f"features.{group_name}.{block_num}.shortcut")
+                    f"features.{group_name}.{block_num}.shortcut.conv")
 
             for conv_k, kname in [("conv1x1_1", "conv1"),
                                   ("conv3x3_2", "conv2"),
