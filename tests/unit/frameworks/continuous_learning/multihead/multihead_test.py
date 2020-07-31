@@ -27,11 +27,14 @@ https://github.com/GMvandeVen/continual-learning
 
 import unittest
 
+import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+from nupic.torch.modules import Flatten
+
 from nupic.research.frameworks.continuous_learning.multihead.multihead import (
-    get_active_classes,
+    active_class_outputs, get_active_classes,
 )
 from nupic.research.frameworks.pytorch.dataset_utils.dataset_utils import split_dataset
 from nupic.research.frameworks.pytorch.test_utils.fake_data import (
@@ -43,17 +46,19 @@ def setup(scenario):
     fake_train_dataset = FakeDataPredefinedTargets(image_size=(1, 28, 28))
     fake_test_dataset = FakeDataPredefinedTargets(image_size=(1, 28, 28))
 
+    train_datasets = split_dataset(fake_train_dataset,
+                                   groupby=lambda x: x[1] // 2)
+    test_datasets = split_dataset(fake_test_dataset,
+                                  groupby=lambda x: x[1] // 2)
+
     if scenario in ("task", "domain"):
         target_transform = transforms.Lambda(lambda y: y % 2)
-    else:
-        target_transform = None
 
-    train_datasets = split_dataset(fake_train_dataset,
-                                   groupby=lambda x: x[1] // 2,
-                                   target_transform=target_transform)
-    test_datasets = split_dataset(fake_test_dataset,
-                                  groupby=lambda x: x[1] // 2,
-                                  target_transform=target_transform)
+        for train_set in train_datasets:
+            train_set.dataset.targets = target_transform(train_set.dataset.targets)
+
+        for test_set in test_datasets:
+            test_set.dataset.targets = target_transform(test_set.dataset.targets)
 
     train_loaders = [DataLoader(train_dataset, batch_size=256, shuffle=True)
                      for train_dataset in train_datasets]
@@ -61,6 +66,13 @@ def setup(scenario):
                     for test_dataset in test_datasets]
 
     return train_loaders, test_loaders
+
+
+def setup_model(in_features, out_features):
+    return torch.nn.Sequential(
+        Flatten(),
+        torch.nn.Linear(in_features, out_features)
+    )
 
 
 class MultiHeadTest(unittest.TestCase):
@@ -102,17 +114,52 @@ class MultiHeadTest(unittest.TestCase):
         for task_num, train_loader in enumerate(train_loaders):
             min_target, max_target = 2 * task_num, 2 * task_num + 1
             for _data, target in train_loader:
-                # print(target, min_target, max_target)
-                try:
-                    self.assertLess(target.max().item(), max_target + 1)
-                    self.assertGreaterEqual(target.min().item(), min_target)
-                except AssertionError:
-                    pass
+                self.assertLess(target.max().item(), max_target + 1)
+                self.assertGreaterEqual(target.min().item(), min_target)
         for task_num, test_loader in enumerate(test_loaders):
             min_target, max_target = 2 * task_num, 2 * task_num + 1
             for _data, target in test_loader:
                 self.assertLess(target.max().item(), max_target + 1)
                 self.assertGreaterEqual(target.min().item(), min_target)
+
+    def test_active_class_outputs_task(self):
+        """
+        Test the multihead output size for the task scenario.
+        """
+        model = setup_model(784, 10)
+        train_loaders, test_loaders = setup("task")
+        for data, _target in train_loaders[1]:
+            output = active_class_outputs(model, data, [2, 3])
+            self.assertEqual(output.shape[1], 2)
+        for data, _target in test_loaders[1]:
+            output = active_class_outputs(model, data, [2, 3])
+            self.assertEqual(output.shape[1], 2)
+
+    def test_active_class_outputs_domain(self):
+        """
+        Test the multihead output size for the domain scenario.
+        """
+        model = setup_model(784, 2)
+        train_loaders, test_loaders = setup("domain")
+        for data, _target in train_loaders[1]:
+            output = active_class_outputs(model, data, None)
+            self.assertEqual(output.shape[1], 2)
+        for data, _target in test_loaders[1]:
+            output = active_class_outputs(model, data, None)
+            self.assertEqual(output.shape[1], 2)
+
+    def test_active_class_outputs_class(self):
+        """
+        Test the multihead output size for the class scenario.
+        """
+        model = setup_model(784, 10)
+        train_loaders, test_loaders = setup("task")
+        for data, _target in train_loaders[2]:
+            output = active_class_outputs(model, data, [0, 1, 2, 3, 4, 5])
+            self.assertEqual(output.shape[1], 6)
+        for data, _target in test_loaders[2]:
+            output = active_class_outputs(model, data, [0, 1, 2, 3, 4, 5])
+            self.assertEqual(output.shape[1], 6)
 
     def test_get_active_classes_task(self):
         """

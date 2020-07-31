@@ -165,7 +165,7 @@ class UnionDataset(Dataset):
         return len(self.datasets[0])
 
 
-def split_dataset(dataset, groupby, target_transform=None):
+def split_dataset(dataset, groupby):
     """Split the given dataset into multiple datasets grouped by the given
     groupby function. For example::
 
@@ -191,13 +191,7 @@ def split_dataset(dataset, groupby, target_transform=None):
     _, indices = list(
         zip(*(sorted(list(indices_by_group.items()), key=lambda x: x[0])))
     )
-    subsets = [Subset(dataset, indices=i) for i in indices]
-
-    # Apply target_transform, if defined
-    if target_transform is not None:
-        for s in subsets:
-            s.dataset.targets = target_transform(s.dataset.targets)
-    return subsets
+    return [Subset(dataset, indices=i) for i in indices]
 
 
 class PreprocessedDataset(Dataset):

@@ -61,15 +61,11 @@ def train_head(model, loader, optimizer, criterion, device, active_classes=None,
     model.train()
     for data, target in tqdm(loader, desc="Train", leave=False):
         data, target = data.to(device), target.to(device)
-        # if active_classes is not None:
-        #     target = target - active_classes[0]
         optimizer.zero_grad()
-        output = model(data)
 
         # compute loss only for 'active' output units, and only backpropogate
         # errors for these units when calling loss.backward()
-        if active_classes is not None:
-            output = output[:, active_classes]
+        output = active_class_outputs(model, data, active_classes)
 
         loss = criterion(output, target)
         loss.backward()
@@ -103,8 +99,6 @@ def test(model, loader, criterion, device, allowed_classes=None):
     with torch.no_grad():
         for data, target in tqdm(loader, desc="Test", leave=False):
             data, target = data.to(device), target.to(device)
-            # if allowed_classes is not None:
-            #     target = target - allowed_classes[0]
             output = model(data)
 
             if allowed_classes is not None:
@@ -145,18 +139,22 @@ def do_training(model, scenario, device, lr=0.001, epochs=30,
     train_mnist = MNIST(root=".", train=True, transform=transforms.ToTensor())
     test_mnist = MNIST(root=".", train=True, transform=transforms.ToTensor())
 
+    train_datasets = split_dataset(train_mnist,
+                                   groupby=lambda x: x[1] // 2)
+    test_datasets = split_dataset(test_mnist,
+                                  groupby=lambda x: x[1] // 2)
+
+    # apply transformation to target variables, depending on the scenario
     if scenario in ("task", "domain"):
         target_transform = transforms.Lambda(lambda y: y % 2)
-    else:
-        target_transform = None
 
-    train_datasets = split_dataset(train_mnist,
-                                   groupby=lambda x: x[1] // 2,
-                                   target_transform=target_transform)
-    test_datasets = split_dataset(test_mnist,
-                                  groupby=lambda x: x[1] // 2,
-                                  target_transform=target_transform)
+        for train_set in train_datasets:
+            train_set.dataset.targets = target_transform(train_set.dataset.targets)
 
+        for test_set in test_datasets:
+            test_set.dataset.targets = target_transform(test_set.dataset.targets)
+
+    # data loaders
     train_loaders = [
         torch.utils.data.DataLoader(train_dataset, batch_size=train_batch_size,
                                     shuffle=True)
@@ -194,6 +192,24 @@ def do_training(model, scenario, device, lr=0.001, epochs=30,
                 print("\ttask {}/{}: {}".format(i + 1, n_tasks, results))
 
             print("Epoch {}: {}".format(epoch, results))
+
+
+def active_class_outputs(model, inputs, active_classes):
+    """
+    Computes the output using the given model and input data, and and returns the
+    output for "active" classes only.
+    :param model: pytorch model to be used to compute outputs
+    :type model: torch.nn.Module
+    :param inputs: input batch to model
+    :type inputs: pytorch tensor
+    :param active_classes: list of int specifying the "active" classes
+    :type active_classes: list of int
+    """
+    output = model(inputs)
+    if active_classes is not None:
+        return output[:, active_classes]
+    else:
+        return output
 
 
 def get_active_classes(task_num, scenario):
