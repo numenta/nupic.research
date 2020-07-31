@@ -156,7 +156,7 @@ def load_multi_state(  # noqa: C901
 
             # Apply custom transform.
             if state_dict_transform:
-                state_dict = state_dict_transform(state_dict, model)
+                linear_state = state_dict_transform(linear_state, model)
 
             # Load state.
             model.load_state_dict(linear_state, strict=False)
@@ -194,7 +194,7 @@ def load_multi_state(  # noqa: C901
 
             # Apply custom transform.
             if state_dict_transform:
-                state_dict = state_dict_transform(state_dict, model)
+                nonlinear_state = state_dict_transform(nonlinear_state, model)
 
             # Load state.
             model.load_state_dict(nonlinear_state, strict=False)
