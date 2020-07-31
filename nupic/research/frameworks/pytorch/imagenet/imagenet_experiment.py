@@ -719,7 +719,12 @@ class ImagenetExperiment:
 
         if self.lr_scheduler is not None:
             with io.BytesIO() as buffer:
-                serialize_state_dict(buffer, self.lr_scheduler.state_dict())
+                state_dict = self.lr_scheduler.state_dict()
+                if "anneal_func" in state_dict:
+                    # FIXME: This is a workaround for a PyTorch bug.
+                    # https://github.com/pytorch/pytorch/issues/42376
+                    del state_dict["anneal_func"]
+                serialize_state_dict(buffer, state_dict)
                 state["lr_scheduler"] = buffer.getvalue()
 
         if self.mixed_precision:
