@@ -38,7 +38,7 @@ from nupic.research.frameworks.pytorch.test_utils.fake_data import FakeDataLoade
 from nupic.torch.modules import Flatten
 
 
-def setup(scenario):
+def setup_dataloaders():
     train_loaders = [FakeDataLoader(batch_size=256, image_size=(1, 28, 28))
                      for n in range(5)]
     test_loaders = [FakeDataLoader(batch_size=256, image_size=(1, 28, 28))
@@ -60,7 +60,7 @@ class MultiHeadTest(unittest.TestCase):
         Test the multihead output size for the task scenario.
         """
         model = setup_model(784, 10)
-        train_loaders, test_loaders = setup("task")
+        train_loaders, test_loaders = setup_dataloaders()
         for data, _target in train_loaders[1]:
             output = active_class_outputs(model, data, [2, 3])
             self.assertEqual(output.shape[1], 2)
@@ -73,7 +73,7 @@ class MultiHeadTest(unittest.TestCase):
         Test the multihead output size for the domain scenario.
         """
         model = setup_model(784, 2)
-        train_loaders, test_loaders = setup("domain")
+        train_loaders, test_loaders = setup_dataloaders()
         for data, _target in train_loaders[1]:
             output = active_class_outputs(model, data, None)
             self.assertEqual(output.shape[1], 2)
@@ -86,7 +86,7 @@ class MultiHeadTest(unittest.TestCase):
         Test the multihead output size for the class scenario.
         """
         model = setup_model(784, 10)
-        train_loaders, test_loaders = setup("task")
+        train_loaders, test_loaders = setup_dataloaders()
         for data, _target in train_loaders[2]:
             output = active_class_outputs(model, data, [0, 1, 2, 3, 4, 5])
             self.assertEqual(output.shape[1], 6)

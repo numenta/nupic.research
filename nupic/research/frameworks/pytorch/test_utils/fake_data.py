@@ -19,8 +19,8 @@
 # ----------------------------------------------------------------------
 
 from torch.utils.data import DataLoader
-from torchvision import transforms
 from torchvision.datasets import FakeData
+from torchvision.transforms import ToTensor
 
 __all__ = [
     "FakeDataLoader",
@@ -40,7 +40,7 @@ class FakeDataLoader(DataLoader):
         transform=None, target_transform=None, random_offset=0,
     ):
         if transform is None:
-            transform = transforms.ToTensor()
+            transform = ToTensor()
         self.fake_dataset = FakeData(
             size=dataset_size, image_size=image_size, num_classes=num_classes,
             transform=transform, target_transform=target_transform,
