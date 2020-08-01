@@ -28,43 +28,21 @@ https://github.com/GMvandeVen/continual-learning
 import unittest
 
 import torch
-from torch.utils.data import DataLoader
-from torchvision import transforms
-
-from nupic.torch.modules import Flatten
 
 from nupic.research.frameworks.continuous_learning.multihead.multihead import (
-    active_class_outputs, get_active_classes,
+    active_class_outputs,
+    get_active_classes,
+    get_target_transform,
 )
-from nupic.research.frameworks.pytorch.dataset_utils.dataset_utils import split_dataset
-from nupic.research.frameworks.pytorch.test_utils.fake_data import (
-    FakeDataPredefinedTargets,
-)
+from nupic.research.frameworks.pytorch.test_utils.fake_data import FakeDataLoader
+from nupic.torch.modules import Flatten
 
 
 def setup(scenario):
-    fake_train_dataset = FakeDataPredefinedTargets(image_size=(1, 28, 28))
-    fake_test_dataset = FakeDataPredefinedTargets(image_size=(1, 28, 28))
-
-    train_datasets = split_dataset(fake_train_dataset,
-                                   groupby=lambda x: x[1] // 2)
-    test_datasets = split_dataset(fake_test_dataset,
-                                  groupby=lambda x: x[1] // 2)
-
-    if scenario in ("task", "domain"):
-        target_transform = transforms.Lambda(lambda y: y % 2)
-
-        for train_set in train_datasets:
-            train_set.dataset.targets = target_transform(train_set.dataset.targets)
-
-        for test_set in test_datasets:
-            test_set.dataset.targets = target_transform(test_set.dataset.targets)
-
-    train_loaders = [DataLoader(train_dataset, batch_size=256, shuffle=True)
-                     for train_dataset in train_datasets]
-    test_loaders = [DataLoader(test_dataset, batch_size=500, shuffle=True)
-                    for test_dataset in test_datasets]
-
+    train_loaders = [FakeDataLoader(batch_size=256, image_size=(1, 28, 28))
+                     for n in range(5)]
+    test_loaders = [FakeDataLoader(batch_size=256, image_size=(1, 28, 28))
+                    for n in range(5)]
     return train_loaders, test_loaders
 
 
@@ -76,51 +54,6 @@ def setup_model(in_features, out_features):
 
 
 class MultiHeadTest(unittest.TestCase):
-
-    def test_task_scenario(self):
-        """
-        Test all target values to be in {0, 1} in the task scenario.
-        """
-        train_loaders, test_loaders = setup("task")
-        for train_loader in train_loaders:
-            for _data, target in train_loader:
-                self.assertLess(target.max().item(), 2)
-                self.assertGreaterEqual(target.min().item(), 0)
-        for test_loader in test_loaders:
-            for _data, target in test_loader:
-                self.assertLess(target.max().item(), 2)
-                self.assertGreaterEqual(target.min().item(), 0)
-
-    def test_domain_scenario(self):
-        """
-        Test all target values to be in {0, 1} in the domain scenario.
-        """
-        train_loaders, test_loaders = setup("domain")
-        for train_loader in train_loaders:
-            for _data, target in train_loader:
-                self.assertLess(target.max().item(), 2)
-                self.assertGreaterEqual(target.min().item(), 0)
-        for test_loader in test_loaders:
-            for _data, target in test_loader:
-                self.assertLess(target.max().item(), 2)
-                self.assertGreaterEqual(target.min().item(), 0)
-
-    def test_class_scenario(self):
-        """
-        Test all target values to be changing based on the task number in the class
-        scenario.
-        """
-        train_loaders, test_loaders = setup("class")
-        for task_num, train_loader in enumerate(train_loaders):
-            min_target, max_target = 2 * task_num, 2 * task_num + 1
-            for _data, target in train_loader:
-                self.assertLess(target.max().item(), max_target + 1)
-                self.assertGreaterEqual(target.min().item(), min_target)
-        for task_num, test_loader in enumerate(test_loaders):
-            min_target, max_target = 2 * task_num, 2 * task_num + 1
-            for _data, target in test_loader:
-                self.assertLess(target.max().item(), max_target + 1)
-                self.assertGreaterEqual(target.min().item(), min_target)
 
     def test_active_class_outputs_task(self):
         """
@@ -183,6 +116,54 @@ class MultiHeadTest(unittest.TestCase):
         """
         active_classes = get_active_classes(2, "class")
         self.assertEqual(active_classes, [0, 1, 2, 3])
+
+    def test_get_target_transform_task(self):
+        """
+        Test the target transform to ensure it is correctly transforming dataset target
+        variables for the task scenario.
+        """
+        target_transform = get_target_transform("task")
+        targets_task_1 = torch.randint(0, 2, (10,))
+        targets_task_2 = torch.randint(2, 4, (10,))
+        if target_transform is not None:
+            targets_task_1 = target_transform(targets_task_1)
+            targets_task_2 = target_transform(targets_task_2)
+        self.assertLess(targets_task_1.max().item(), 2)
+        self.assertGreaterEqual(targets_task_1.min().item(), 0)
+        self.assertLess(targets_task_2.max().item(), 2)
+        self.assertGreaterEqual(targets_task_2.min().item(), 0)
+
+    def test_get_target_transform_domain(self):
+        """
+        Test the target transform to ensure it is correctly transforming dataset target
+        variables for the domain scenario.
+        """
+        target_transform = get_target_transform("domain")
+        targets_task_1 = torch.randint(0, 2, (10,))
+        targets_task_2 = torch.randint(2, 4, (10,))
+        if target_transform is not None:
+            targets_task_1 = target_transform(targets_task_1)
+            targets_task_2 = target_transform(targets_task_2)
+        self.assertLess(targets_task_1.max().item(), 2)
+        self.assertGreaterEqual(targets_task_1.min().item(), 0)
+        self.assertLess(targets_task_2.max().item(), 2)
+        self.assertGreaterEqual(targets_task_2.min().item(), 0)
+
+    def test_get_target_transform_class(self):
+        """
+        Test the target transform to ensure it is correctly transforming dataset target
+        variables for the class scenario.
+        """
+        target_transform = get_target_transform("class")
+        targets_task_1 = torch.randint(0, 2, (10,))
+        targets_task_2 = torch.randint(2, 4, (10,))
+        if target_transform is not None:
+            targets_task_1 = target_transform(targets_task_1)
+            targets_task_2 = target_transform(targets_task_2)
+        self.assertLess(targets_task_1.max().item(), 2)
+        self.assertGreaterEqual(targets_task_1.min().item(), 0)
+        self.assertLess(targets_task_2.max().item(), 4)
+        self.assertGreaterEqual(targets_task_2.min().item(), 2)
 
 
 if __name__ == "__main__":

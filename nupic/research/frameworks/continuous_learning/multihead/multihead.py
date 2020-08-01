@@ -145,9 +145,9 @@ def do_training(model, scenario, device, lr=0.001, epochs=30,
                                   groupby=lambda x: x[1] // 2)
 
     # apply transformation to target variables, depending on the scenario
-    if scenario in ("task", "domain"):
-        target_transform = transforms.Lambda(lambda y: y % 2)
+    target_transform = get_target_transform(scenario)
 
+    if target_transform is not None:
         for train_set in train_datasets:
             train_set.dataset.targets = target_transform(train_set.dataset.targets)
 
@@ -192,6 +192,20 @@ def do_training(model, scenario, device, lr=0.001, epochs=30,
                 print("\ttask {}/{}: {}".format(i + 1, n_tasks, results))
 
             print("Epoch {}: {}".format(epoch, results))
+
+
+def get_target_transform(scenario):
+    """
+    Returns the appropriate pytorch transform to apply to dataset target variables
+    based on the continual learning scenario.
+    :param scenario: continuous learning setup, one of {'task', 'domain', 'class'}
+    :type scenario: str
+    """
+    if scenario in ("task", "domain"):
+        target_transform = transforms.Lambda(lambda y: y % 2)
+    else:
+        target_transform = None
+    return target_transform
 
 
 def active_class_outputs(model, inputs, active_classes):
