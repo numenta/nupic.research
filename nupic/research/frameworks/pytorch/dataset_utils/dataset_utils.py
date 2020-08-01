@@ -178,6 +178,8 @@ def split_dataset(dataset, groupby):
 
     :param dataset: Source dataset to split
     :param groupby: Group by function. See :func:`itertools.groupby`
+    :param target_transform: PyTorch transformation to apply to target variables of
+                             each subset
     :return: List of datasets
     """
     # Split dataset based on the group by function and keep track of indices
