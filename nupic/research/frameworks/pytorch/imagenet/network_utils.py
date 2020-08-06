@@ -29,6 +29,7 @@ from torch import nn as nn
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
+from nupic.research.frameworks.pytorch.restore_utils import resize_model_buffers
 from nupic.torch.compatibility import upgrade_to_masked_sparseweights
 
 
@@ -73,7 +74,7 @@ def get_compatible_state_dict(model, state_dict):
 
 
 def create_model(model_class, model_args, init_batch_norm, device,
-                 checkpoint_file=None):
+                 checkpoint_file=None, resize_buffers_for_checkpoint=False):
     """
     Create imagenet experiment model with option to load state from checkpoint
 
@@ -87,6 +88,9 @@ def create_model(model_class, model_args, init_batch_norm, device,
         Model device
     :param checkpoint_file:
         Optional checkpoint file to load model state
+    :param resize_buffers_for_checkpoint:
+        Optional param with `checkpoint_file`. If True, this resizes the models buffers
+        to match those of the checkpoint before loading it.
 
     :return: Configured model
     """
@@ -100,11 +104,12 @@ def create_model(model_class, model_args, init_batch_norm, device,
     # in that case, transform model can receive an argument
 
     if checkpoint_file is not None:
-        _restore_checkpoint(model, device, checkpoint_file=checkpoint_file)
+        _restore_checkpoint(model, device, checkpoint_file=checkpoint_file,
+            resize_buffers=resize_buffers_for_checkpoint)
 
     return model
 
-def _restore_checkpoint(model, device, checkpoint_file=None):
+def _restore_checkpoint(model, device, checkpoint_file=None, resize_buffers=False):
     """Load model parameters from checkpoint"""
 
     if checkpoint_file is not None:
@@ -114,4 +119,8 @@ def _restore_checkpoint(model, device, checkpoint_file=None):
             state_dict = deserialize_state_dict(buffer, device)
 
         state_dict = get_compatible_state_dict(model, state_dict)
+
+        if resize_buffers:
+            resize_model_buffers(model, state_dict)
+
         model.load_state_dict(state_dict)

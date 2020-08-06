@@ -47,10 +47,8 @@ class BasicBlock(nn.Module):
     norm_keys = ["bn1", "bn2", "shortcut"]
 
     def __init__(self, in_planes, planes, stride, conv_layer, conv_args,
-                 act_layer, act_args, norm_layer, norm_args, fuse_relu):
+                 act_layer, act_args, norm_layer, norm_args):
         super(BasicBlock, self).__init__()
-
-        self.fuse_relu = fuse_relu
 
         self.regular_path = nn.Sequential(OrderedDict([
             ("conv1", conv_layer(in_planes, planes, kernel_size=3, stride=stride,
@@ -63,11 +61,8 @@ class BasicBlock(nn.Module):
             ("bn2", norm_layer(planes, **norm_args["bn2"])),
         ]))
 
-        if self.fuse_relu:
-            self.skip_add_relu = nnq.FloatFunctional()
-        else:
-            self.quant_ops = nnq.FloatFunctional()
-            self.post_activation = act_layer(planes, **act_args["act2"])
+        self.quant_ops = nnq.FloatFunctional()
+        self.post_activation = act_layer(planes, **act_args["act2"])
 
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(OrderedDict([
@@ -81,19 +76,15 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         out = self.regular_path(x)
-        if self.fuse_relu:
-            out = self.skip_add_relu.add_relu(out, self.shortcut(x))
-        else:
-            out = self.quant_ops.add(out, self.shortcut(x))
-            out = self.post_activation(out)
+        out = self.quant_ops.add_relu(out, self.shortcut(x))
+        out = self.post_activation(out)
         return out
 
-def fuse_model(self, fuse_relu):
+    def fuse_model(self, fuse_relu=False):
         """
         Fuse Conv, BatchNorm and optionally ReLU
         :param fuse_relu: Whether or not to fuse ReLU with Conv/Bn
         """
-        # Create a list with all Conv2d, BatchNorm2d and ReLU submodule names
         types_to_fuse = [nn.Conv2d, nn.BatchNorm2d]
         if fuse_relu:
             types_to_fuse.append(nn.ReLU)
@@ -123,7 +114,6 @@ def fuse_model(self, fuse_relu):
         fuse_modules(self, modules_to_fuse=modules_to_fuse, inplace=True)
 
 
-
 class Bottleneck(nn.Module):
     """Default block for ResNets with >= 50 layers."""
 
@@ -133,10 +123,8 @@ class Bottleneck(nn.Module):
     norm_keys = ["bn1", "bn2", "bn3", "shortcut"]
 
     def __init__(self, in_planes, planes, stride, conv_layer, conv_args,
-                 act_layer, act_args, norm_layer, norm_args, fuse_relu):
+                 act_layer, act_args, norm_layer, norm_args):
         super().__init__()
-
-        self.fuse_relu = fuse_relu
 
         self.regular_path = nn.Sequential(OrderedDict([
             # 1st layer
@@ -158,13 +146,9 @@ class Bottleneck(nn.Module):
             ("bn3", norm_layer(self.expansion * planes, **norm_args["bn3"])),
         ]))
 
-
-        if self.fuse_relu:
-            self.skip_add_relu = nnq.FloatFunctional()
-        else:
-            self.quant_ops = nnq.FloatFunctional()
-            self.post_activation = act_layer(self.expansion * planes,
-                                             **act_args["act3"])
+        self.quant_ops = nnq.FloatFunctional()
+        self.post_activation = act_layer(self.expansion * planes,
+                                            **act_args["act3"])
 
         if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(OrderedDict([
@@ -179,14 +163,11 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         out = self.regular_path(x)
-        if self.fuse_relu:
-            out = self.skip_add_relu.add_relu(out, self.shortcut(x))
-        else:
-            out = self.quant_ops.add(out, self.shortcut(x))
-            out = self.post_activation(out)
+        out = self.quant_ops.add_relu(out, self.shortcut(x))
+        out = self.post_activation(out)
         return out
 
-    def fuse_model(self, fuse_relu):
+    def fuse_model(self, fuse_relu=False):
         """
         Fuse Conv, BatchNorm and optionally ReLU for the first 2 layers and for
         the 3rd and shortcut layers. The post activation ReLU will not be fused
@@ -286,7 +267,7 @@ class ResNet(nn.Module):
                  norm_layer=nn.BatchNorm2d,
                  norm_args=None,
                  deprecated_compatibility_mode=False,
-                 fuse_relu=None):
+                 ):
         """
         :param conv_layer:
             A conv2d layer that receives the arguments of a nn.Conv2d and custom
@@ -344,13 +325,13 @@ class ResNet(nn.Module):
         act_args = expand_args(act_args, num_blocks, block.act_keys)
         linear_args = linear_args or {}
 
-        self.fuse_relu = fuse_relu
-
         if not deprecated_compatibility_mode:
             # Previous models expect to receive the kernel size in the
             # activation layer. Do this in the Bottleneck code, but discard it
             # by default.
             act_layer = discard_kernel_size(act_layer)
+
+        self.quant = QuantStub()
 
         features = [
             # stem
@@ -397,7 +378,7 @@ class ResNet(nn.Module):
             num_classes,
             **linear_args
         )
-        self.quant = QuantStub()
+
         self.dequant = DeQuantStub()
 
     def _make_group(self, block, planes, num_blocks, stride, conv_layer,
@@ -420,8 +401,7 @@ class ResNet(nn.Module):
             layers.append(block(self.in_planes, planes, stride=stride,
                                 conv_layer=conv_layer, conv_args=ca,
                                 act_layer=act_layer, act_args=aa,
-                                norm_layer=norm_layer, norm_args=na,
-                                fuse_relu=self.fuse_relu))
+                                norm_layer=norm_layer, norm_args=na))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
@@ -433,14 +413,11 @@ class ResNet(nn.Module):
         return out
 
     def fuse_model(self, fuse_relu=False):
-        """Fuse conv/bn and optionally relu modules in resnet models to prepare
+        """Fuse conv/bn and optinally relu modules in resnet models to prepare
          for quantization.
         Model is modified in place
         :param fuse_relu: Whether or not to fuse ReLU with Conv/Bn
         """
-        # Override external call if defined
-        if self.fuse_relu is not None:
-            fuse_relu = self.fuse_relu
         # Fuse bottleneck layers
         for m in self.features.modules():
             if isinstance(m, (BasicBlock, Bottleneck)):
@@ -467,6 +444,8 @@ class ResNet(nn.Module):
                 act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
                                 if isinstance(v, nn.ReLU))
                 modules_to_fuse.append(act_name)
+
+        fuse_modules(self.features, modules_to_fuse, inplace=True)
 
         fuse_modules(self.features, modules_to_fuse, inplace=True)
 
@@ -534,6 +513,79 @@ def expand_args(args, num_blocks_by_group, block_keys):
         args[group] = group_args
 
     return args
+
+
+def conv_args_nested_dict(depth, args_from_modulename_fn):
+    """
+    Build a complete args dict via a callback function.
+
+    :param depth:
+      Number of layers in the resnet
+    :type depth: int
+
+    :param args_from_modulename_fn:
+      Takes a module's full name and returns conv_args for that module
+    :type args_from_modulename_fn: callable
+    """
+    conv_args = {
+        "stem": args_from_modulename_fn("features.stem"),
+    }
+
+    _, block_counts = cf_dict[str(depth)]
+    for group_num, group_key, num_blocks in zip(range(1, 5),
+                                                ResNet.group_keys,
+                                                block_counts):
+        group_name = f"group{group_num}"
+        all_block_args = []
+        for block_num in range(num_blocks):
+            block_args = dict()
+
+            if block_num == 0:
+                block_args["shortcut"] = args_from_modulename_fn(
+                    f"features.{group_name}.{block_num}.shortcut.conv")
+
+            for conv_k, kname in [("conv1x1_1", "conv1"),
+                                  ("conv3x3_2", "conv2"),
+                                  ("conv1x1_3", "conv3")]:
+                block_args[conv_k] = args_from_modulename_fn(
+                    f"features.{group_name}.{block_num}.regular_path.{kname}"
+                )
+
+            all_block_args.append(block_args)
+
+        conv_args[group_key] = all_block_args
+    return conv_args
+
+
+def act_args_nested_dict(depth, args_from_modulename_fn):
+    """
+    Build a complete args dict via a callback function.
+
+    :param depth:
+      Number of layers in the resnet
+    :type depth: int
+
+    :param args_from_modulename_fn:
+      Takes a module's full name and returns act_args for that module
+    :type args_from_modulename_fn: callable
+    """
+    act_args = {
+        "stem": args_from_modulename_fn("features.act_stem"),
+    }
+
+    _, block_counts = cf_dict[str(depth)]
+    act_args.update({
+        group_key: [
+            {k: args_from_modulename_fn(
+                f"features.group{group_num}.{block_num}.regular_path.{k}")
+             for k in ["act1", "act2", "act3"]}
+            for block_num in range(num_blocks)]
+        for group_num, group_key, num_blocks in zip(range(1, 5),
+                                                    ResNet.group_keys,
+                                                    block_counts)
+    })
+
+    return act_args
 
 
 resnet18 = partial(ResNet, depth=18)
