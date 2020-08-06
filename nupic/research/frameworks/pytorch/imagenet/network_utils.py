@@ -99,7 +99,14 @@ def create_model(model_class, model_args, init_batch_norm, device,
     # either that or seperating betwen creating the model and loading the checkpoint
     # in that case, transform model can receive an argument
 
-    # Load model parameters from checkpoint
+    if checkpoint_file is not None:
+        _restore_checkpoint(model, device, checkpoint_file=checkpoint_file)
+
+    return model
+
+def _restore_checkpoint(model, device, checkpoint_file=None):
+    """Load model parameters from checkpoint"""
+
     if checkpoint_file is not None:
         with open(checkpoint_file, "rb") as pickle_file:
             state = pickle.load(pickle_file)
@@ -108,5 +115,3 @@ def create_model(model_class, model_args, init_batch_norm, device,
 
         state_dict = get_compatible_state_dict(model, state_dict)
         model.load_state_dict(state_dict)
-
-    return model

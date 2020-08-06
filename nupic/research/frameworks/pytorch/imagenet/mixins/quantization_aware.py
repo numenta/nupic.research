@@ -41,9 +41,9 @@ from torch.quantization.observer import _ObserverBase
 from torch.nn.modules.linear import Identity
 from nupic.hardware.frameworks.quantization import QATKWINNER_MODULE_MAPPING
 
-QUANTIZED_MODULE_MAPPING = dict(DEFAULT_QAT_MODULE_MAPPING)
-QUANTIZED_MODULE_MAPPING.update(QATKWINNER_MODULE_MAPPING)
-QCONFIG_PROPAGATE_WHITE_LIST = (
+QAT_QUANTIZED_MODULE_MAPPING = dict(DEFAULT_QAT_MODULE_MAPPING)
+QAT_QUANTIZED_MODULE_MAPPING.update(QATKWINNER_MODULE_MAPPING)
+QAT_QCONFIG_PROPAGATE_WHITE_LIST = (
     set(DEFAULT_QCONFIG_PROPAGATE_WHITE_LIST)
     | set(QATKWINNER_MODULE_MAPPING.keys())
 )
@@ -63,49 +63,36 @@ class QuantizationAware(object):
         """
         Setup experiment for quantization
         """
-        self.quantize_weights_per_channel = config.get("quantize_weights_per_channel", False)
+
+        # extra variables
+        self.quantize_weights_per_channel = config.get("quantize_weights_per_channel", True)
+        # update model args with fuse relu
+        if "config" in config["model_args"]:
+            config["model_args"]["config"]["fuse_relu"] = config.get("fuse_relu", True)
+        else:
+            model_args_config = dict(fuse_relu=config.get("fuse_relu", True))
+            config["model_args"]["config"] = model_args_config
+
+        print(config["model_args"])
+
         super().setup_experiment(config)
 
         # make an internal copy without data distributed parallel
         # required to save quantized model later
-        self.model_without_ddp = self.model.module
+         # self.model_without_ddp = self.model.module
 
     def transform_model(self):
         """Prepare model for quantization"""
 
-        # fuse models
-        self.model.fuse_model()
-
-        # set qconfig
-        if self.quantize_weights_per_channel:
-            qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
-        else:
-            qconfig = QConfig(
-                activation=FakeQuantize.with_args(observer=MovingAverageMinMaxObserver,
-                                                  quant_min=0,
-                                                  quant_max=255,
-                                                  reduce_range=True),
-                weight=default_weight_fake_quant
-            )
-        self.model.qconfig = qconfig
-
-        # equivalent to quantize.prepare, inplace. require for custom white list
-        # propagate qconfig and add observers
-        _propagate_qconfig_helper(self.model, qconfig_dict={},
-                                white_list=QCONFIG_PROPAGATE_WHITE_LIST)
-        if not any(hasattr(m, 'qconfig') and m.qconfig for m in self.model.modules()):
-            warnings.warn("None of the submodule got qconfig applied. Make sure you "
-                        "passed correct configuration through `qconfig_dict` or "
-                        "by assigning the `.qconfig` attribute directly on submodules")
-        add_observer_(self.model)
-
-        # convert modules to their QAT versions. should be sent to device after
-        convert(self.model, QUANTIZED_MODULE_MAPPING, inplace=True)
+        # prepare model for qat
+        _prepare_for_qat(self.model, self.quantize_weights_per_channel)
         self.model.to(self.device)
 
         # enable observers and fake quantizers to prepare for training
         self.model.apply(enable_observer)
         self.model.apply(enable_fake_quant)
+        self.observer_disabled = False
+        self.batch_norm_frozen = False
 
         # DEBUG
         # for name, module in self.model.named_modules():
@@ -117,39 +104,23 @@ class QuantizationAware(object):
         #         module.register_forward_pre_hook(debug_pre_fwd(name, module.__class__))
         #         module.register_forward_hook(debug_post_fwd(name, module.__class__))
 
+    def pre_batch(self, model, batch_idx):
 
-    # def pre_epoch(self):
+        # freeze observer parameters for the last 500 batches of last epoch
+        if (not self.observer_disabled
+            and self.current_epoch == self.epochs
+            and self.batch_idx > (.95 * self.total_batches)):
+                self.logger.info(f"Freezing observer at epoch {self.current_epoch} and batch {self.batch_idx}")
+                self.model.apply(disable_observer)
+                self.observer_disabled = True
 
-    #     # does it suffice to do at last epoch?
-    #     # will have to explore parameters
-    #     # if self.current_epoch == (self.epochs):
-    #     #     self.logger.info("Freezing parameters")
-    #     #     # freeze quantization parameters
-    #     #     self.model.apply(disable_observer)
-    #     #     # freeze batch norm parameters
-    #     #     self.model.apply(nni.qat.freeze_bn_stats)
-    #     super().pre_epoch()
-
-    # def validate(self, loader=None):
-    #     if loader is None:
-    #         loader = self.val_loader
-
-    #     # create a quantized version for evaluation
-    #     # quantized_model = convert(
-    #     #     # why call eval here as well?
-    #     #     self.model.eval(), QUANTIZED_MODULE_MAPPING, inplace=False
-    #     # )
-    #     # quantized_model.eval()
-
-    #     return self.evaluate_model(
-    #         model=self.model, # quantized model only in CPU?
-    #         loader=loader,
-    #         device=self.device,
-    #         criterion=self.error_loss,
-    #         complexity_loss_fn=self.complexity_loss,
-    #         batches_in_epoch=self.batches_in_epoch,
-    #         transform_to_device_fn=self.transform_data_to_device,
-    #     )
+        # freeze BN parameters for the last 200 batches of last epoch
+        if (not self.batch_norm_frozen
+            and self.current_epoch == self.epochs
+            and self.batch_idx > (.98 * self.total_batches)):
+                self.logger.info(f"Freezing BN parameters at epoch {self.current_epoch} and batch {self.batch_idx}")
+                self.model.apply(nni.qat.freeze_bn_stats)
+                self.batch_norm_frozen = True
 
     @classmethod
     def get_execution_order(cls):
@@ -157,6 +128,39 @@ class QuantizationAware(object):
         eo["setup_experiment"].append("Initialize extra variables for QAT")
         eo["transform_model"].append("Prepare model for Quantization")
         return eo
+
+def _prepare_for_qat(model, quantize_weights_per_channel):
+    """Prepares model for quantization aware training"""
+
+    # fuse models
+    model.fuse_model()
+
+    # set qconfig
+    if quantize_weights_per_channel:
+        qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
+    else:
+        print("Quantizating weights per tensor")
+        qconfig = QConfig(
+            activation=FakeQuantize.with_args(observer=MovingAverageMinMaxObserver,
+                                                quant_min=0,
+                                                quant_max=255,
+                                                reduce_range=True),
+            weight=default_weight_fake_quant
+        )
+    model.qconfig = qconfig
+
+    # equivalent to quantize.prepare, inplace. require for custom white list
+    # propagate qconfig and add observers
+    _propagate_qconfig_helper(model, qconfig_dict={},
+                            white_list=QAT_QCONFIG_PROPAGATE_WHITE_LIST)
+    if not any(hasattr(m, 'qconfig') and m.qconfig for m in model.modules()):
+        warnings.warn("None of the submodule got qconfig applied. Make sure you "
+                    "passed correct configuration through `qconfig_dict` or "
+                    "by assigning the `.qconfig` attribute directly on submodules")
+    add_observer_(model)
+
+    # convert modules to their QAT versions. should be sent to device after
+    convert(model, QAT_QUANTIZED_MODULE_MAPPING, inplace=True)
 
 
 def debug_pre_fwd(name, class_name):
@@ -291,3 +295,7 @@ if __name__ == "__main__":
     # need to investigate
     # sparse resnet with create model?
 
+"""
+default_weight_fake_quant = FakeQuantize.with_args(observer=MovingAverageMinMaxObserver, quant_min=-128, quant_max=127,
+                                                   dtype=torch.qint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+"""

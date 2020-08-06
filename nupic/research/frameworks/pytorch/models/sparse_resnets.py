@@ -302,7 +302,8 @@ class SparseResNet(ResNetCore):
             linear_params_func=None,
             conv_params_func=None,
             activation_params_func=None,
-            batch_norm_args=None
+            batch_norm_args=None,
+            fuse_relu=None,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -359,6 +360,7 @@ class SparseResNet(ResNetCore):
             ),
             linear_args=as_kwarg(self.sparse_params["linear"]),
             deprecated_compatibility_mode=True,
+            fuse_relu=self.fuse_relu,
         )
 
 

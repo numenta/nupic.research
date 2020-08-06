@@ -47,8 +47,10 @@ class BasicBlock(nn.Module):
     norm_keys = ["bn1", "bn2", "shortcut"]
 
     def __init__(self, in_planes, planes, stride, conv_layer, conv_args,
-                 act_layer, act_args, norm_layer, norm_args):
+                 act_layer, act_args, norm_layer, norm_args, fuse_relu):
         super(BasicBlock, self).__init__()
+
+        self.fuse_relu = fuse_relu
 
         self.regular_path = nn.Sequential(OrderedDict([
             ("conv1", conv_layer(in_planes, planes, kernel_size=3, stride=stride,
@@ -61,8 +63,11 @@ class BasicBlock(nn.Module):
             ("bn2", norm_layer(planes, **norm_args["bn2"])),
         ]))
 
-        self.post_activation = act_layer(planes, **act_args["act2"])
-        self.quant_ops = nnq.FloatFunctional()
+        if self.fuse_relu:
+            self.skip_add_relu = nnq.FloatFunctional()
+        else:
+            self.quant_ops = nnq.FloatFunctional()
+            self.post_activation = act_layer(planes, **act_args["act2"])
 
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(OrderedDict([
@@ -76,25 +81,47 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         out = self.regular_path(x)
-        out = self.quant_ops.add_relu(out, self.shortcut(x))
-        # out = self.quant_ops.add(out, self.shortcut(x))
-        # out = self.post_activation(out)
+        if self.fuse_relu:
+            out = self.skip_add_relu.add_relu(out, self.shortcut(x))
+        else:
+            out = self.quant_ops.add(out, self.shortcut(x))
+            out = self.post_activation(out)
         return out
 
-    def fuse_model(self):
-        # Fuse Conv2d and BatchNorm2d modules in regular path
-        cnn_bn = [x[0] for x in self.regular_path.named_modules()
-                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
-        if cnn_bn:
-            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
-            fuse_modules(self.regular_path, modules_to_fuse, inplace=True)
+def fuse_model(self, fuse_relu):
+        """
+        Fuse Conv, BatchNorm and optionally ReLU
+        :param fuse_relu: Whether or not to fuse ReLU with Conv/Bn
+        """
+        # Create a list with all Conv2d, BatchNorm2d and ReLU submodule names
+        types_to_fuse = [nn.Conv2d, nn.BatchNorm2d]
+        if fuse_relu:
+            types_to_fuse.append(nn.ReLU)
 
-        # Fuse Conv2d and BatchNorm2d modules in shortcut
-        cnn_bn = [x[0] for x in self.shortcut.named_modules()
-                  if isinstance(x[1], (nn.Conv2d, nn.BatchNorm2d))]
-        if cnn_bn:
-            modules_to_fuse = list(zip(cnn_bn[::2], cnn_bn[1::2]))
-            fuse_modules(self.shortcut, modules_to_fuse, inplace=True)
+        # Create a list with all Conv2d, BatchNorm2d and ReLU submodule names
+        submodule_names = [
+            f"regular_path.{k}" for k, v in self.regular_path.named_modules()
+            if isinstance(v, tuple(types_to_fuse))
+        ]
+
+        # Break the list into groups of 2 or 3 (cnn, bn, relu)
+        group = 3 if fuse_relu else 2
+        modules_to_fuse = list(map(list, zip_longest(*[iter(submodule_names)] * group)))
+
+        # 2rd Layer has no ReLU. Remove empty entry
+        if fuse_relu:
+            modules_to_fuse[1].pop(-1)
+
+        # Collect shortcut Conv2d and BatchNorm2d submodule names
+        cnn_bn = [
+            f"shortcut.{k}" for k, v in self.shortcut.named_modules()
+            if isinstance(v, (nn.Conv2d, nn.BatchNorm2d))
+        ]
+        if len(cnn_bn) > 0:
+            modules_to_fuse.append(cnn_bn)
+
+        fuse_modules(self, modules_to_fuse=modules_to_fuse, inplace=True)
+
 
 
 class Bottleneck(nn.Module):
@@ -106,8 +133,10 @@ class Bottleneck(nn.Module):
     norm_keys = ["bn1", "bn2", "bn3", "shortcut"]
 
     def __init__(self, in_planes, planes, stride, conv_layer, conv_args,
-                 act_layer, act_args, norm_layer, norm_args):
+                 act_layer, act_args, norm_layer, norm_args, fuse_relu):
         super().__init__()
+
+        self.fuse_relu = fuse_relu
 
         self.regular_path = nn.Sequential(OrderedDict([
             # 1st layer
@@ -129,9 +158,13 @@ class Bottleneck(nn.Module):
             ("bn3", norm_layer(self.expansion * planes, **norm_args["bn3"])),
         ]))
 
-        # self.post_activation = act_layer(self.expansion * planes,
-        #                                  **act_args["act3"])
-        self.skip_add_relu = nnq.FloatFunctional()
+
+        if self.fuse_relu:
+            self.skip_add_relu = nnq.FloatFunctional()
+        else:
+            self.quant_ops = nnq.FloatFunctional()
+            self.post_activation = act_layer(self.expansion * planes,
+                                             **act_args["act3"])
 
         if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(OrderedDict([
@@ -146,31 +179,37 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         out = self.regular_path(x)
-        out = self.skip_add_relu.add_relu(out, self.shortcut(x))
-        # out = self.quant_ops.add(out, self.shortcut(x))
-        # out = self.post_activation(out)
+        if self.fuse_relu:
+            out = self.skip_add_relu.add_relu(out, self.shortcut(x))
+        else:
+            out = self.quant_ops.add(out, self.shortcut(x))
+            out = self.post_activation(out)
         return out
 
-    def fuse_model(self):
+    def fuse_model(self, fuse_relu):
         """
-        Fuse Conv, BatchNorm and ReLU for the first 2 layers and for the 3rd and
-        shortcut layers.
-        The post activation ReLU will not be fused due to the extra addition
-        """
-        modules_to_fuse = []
+        Fuse Conv, BatchNorm and optionally ReLU for the first 2 layers and for
+        the 3rd and shortcut layers. The post activation ReLU will not be fused
+        due to the extra addition
 
+        :param fuse_relu: Whether or not to fuse ReLU with Conv/Bn
+        """
         # Create a list with all Conv2d, BatchNorm2d and ReLU submodule names
+        types_to_fuse = [nn.Conv2d, nn.BatchNorm2d]
+        if fuse_relu:
+            types_to_fuse.append(nn.ReLU)
         submodule_names = [
             f"regular_path.{k}" for k, v in self.regular_path.named_modules()
-            if isinstance(v, (nn.Conv2d, nn.BatchNorm2d, nn.ReLU))
+            if isinstance(v, tuple(types_to_fuse))
         ]
 
-        # Break the list into groups of 3 (cnn, bn, relu)
-        cnn_bn_relu = list(map(list, zip_longest(*[iter(submodule_names)] * 3)))
+        # Break the list into groups of 2 or 3 (cnn, bn, relu)
+        group = 3 if fuse_relu else 2
+        modules_to_fuse = list(map(list, zip_longest(*[iter(submodule_names)] * group)))
 
         # 3rd Layer has no ReLU. Remove empty entry
-        cnn_bn_relu[2].pop(-1)
-        modules_to_fuse.extend(cnn_bn_relu)
+        if fuse_relu:
+            modules_to_fuse[2].pop(-1)
 
         # Collect shortcut Conv2d and BatchNorm2d submodule names
         cnn_bn = [
@@ -246,7 +285,8 @@ class ResNet(nn.Module):
                  act_args=None,
                  norm_layer=nn.BatchNorm2d,
                  norm_args=None,
-                 deprecated_compatibility_mode=False):
+                 deprecated_compatibility_mode=False,
+                 fuse_relu=None):
         """
         :param conv_layer:
             A conv2d layer that receives the arguments of a nn.Conv2d and custom
@@ -303,6 +343,8 @@ class ResNet(nn.Module):
         norm_args = expand_args(norm_args, num_blocks, block.norm_keys)
         act_args = expand_args(act_args, num_blocks, block.act_keys)
         linear_args = linear_args or {}
+
+        self.fuse_relu = fuse_relu
 
         if not deprecated_compatibility_mode:
             # Previous models expect to receive the kernel size in the
@@ -378,7 +420,8 @@ class ResNet(nn.Module):
             layers.append(block(self.in_planes, planes, stride=stride,
                                 conv_layer=conv_layer, conv_args=ca,
                                 act_layer=act_layer, act_args=aa,
-                                norm_layer=norm_layer, norm_args=na))
+                                norm_layer=norm_layer, norm_args=na,
+                                fuse_relu=self.fuse_relu))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
@@ -389,14 +432,19 @@ class ResNet(nn.Module):
         out = self.dequant(out)
         return out
 
-    def fuse_model(self):
-        """Fuse conv/bn/relu modules in resnet models to prepare for quantization.
+    def fuse_model(self, fuse_relu=False):
+        """Fuse conv/bn and optionally relu modules in resnet models to prepare
+         for quantization.
         Model is modified in place
+        :param fuse_relu: Whether or not to fuse ReLU with Conv/Bn
         """
+        # Override external call if defined
+        if self.fuse_relu is not None:
+            fuse_relu = self.fuse_relu
         # Fuse bottleneck layers
         for m in self.features.modules():
             if isinstance(m, (BasicBlock, Bottleneck)):
-                m.fuse_model()
+                m.fuse_model(fuse_relu=fuse_relu)
 
         modules_to_fuse = []
 
@@ -405,19 +453,20 @@ class ResNet(nn.Module):
         if isinstance(stem, nn.Conv2d):
             modules_to_fuse.append("stem")
         else:
-            conv_name = next(f"stem.{k}" for k, v in stem.named_module()
+            conv_name = next(f"stem.{k}" for k, v in stem.named_modules()
                              if isinstance(v, nn.Conv2d))
             modules_to_fuse.append(conv_name)
 
         modules_to_fuse.append("bn_stem")
 
-        act_stem = self.features.act_stem
-        if isinstance(act_stem, nn.ReLU):
-            modules_to_fuse.append("act_stem")
-        else:
-            act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
-                            if isinstance(v, nn.ReLU))
-            modules_to_fuse.append(act_name)
+        if fuse_relu:
+            act_stem = self.features.act_stem
+            if isinstance(act_stem, nn.ReLU):
+                modules_to_fuse.append("act_stem")
+            else:
+                act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
+                                if isinstance(v, nn.ReLU))
+                modules_to_fuse.append(act_name)
 
         fuse_modules(self.features, modules_to_fuse, inplace=True)
 

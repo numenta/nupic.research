@@ -136,7 +136,7 @@ def train_model(
         loss = (error_loss + complexity_loss
                 if complexity_loss is not None
                 else error_loss)
-        print(f"Debugging loss: {loss:.4f}")
+        # print(f"Debugging loss: {loss:.4f}")
         t2 = time.time()
         if use_amp:
             with amp.scale_loss(loss, optimizer) as scaled_loss:

@@ -52,6 +52,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
 from nupic.research.frameworks.pytorch.imagenet.network_utils import (
     create_model,
     get_compatible_state_dict,
+    _restore_checkpoint
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
@@ -229,18 +230,22 @@ class ImagenetExperiment:
 
         # Configure model
         self.device = config.get("device", self.device)
-        # self.model = torchvision.models.quantization.__dict__['resnet50'](pretrained=False, quantize=False)
         self.model = self.create_model(config, self.device)
-        # from nupic.research.frameworks.pytorch.models.resnets import resnet50
-        # self.model = resnet50()
 
-        if self.rank == 0:
-            self.logger.debug(self.model)
+        # will need to restore checkpoint before model
+        # how to do this? will have to change create model, since that changes the order
+        # of restore checkpoint
+        # maybe I can move that into the create model function
+        # and leave the restore checkpoint here
+        checkpoint_file = config.get("checkpoint_file", None)
+        if checkpoint_file:
+            self._restore_checkpoint(self.model, self.device, checkpoint_file)
 
         # Apply any required transformations to the model
         self.transform_model()
-        # send to device after transforming the model
-        # self.model.to(self.device)
+
+        if self.rank == 0:
+            self.logger.debug(self.model)
 
         # Configure optimizer
         group_decay, group_no_decay = [], []
@@ -349,6 +354,11 @@ class ImagenetExperiment:
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
     @classmethod
+    def _restore_checkpoint(cls, model, device, checkpoint_file):
+        """Load model parameters from checkpoint"""
+        _restore_checkpoint(model, device, checkpoint_file)
+
+    @classmethod
     def create_model(cls, config, device):
         """
         Create imagenet model from an ImagenetExperiment config
@@ -377,7 +387,6 @@ class ImagenetExperiment:
             model_args=config.get("model_args", {}),
             init_batch_norm=config.get("init_batch_norm", False),
             device=device,
-            checkpoint_file=config.get("checkpoint_file", None)
         )
 
     @classmethod
@@ -436,8 +445,8 @@ class ImagenetExperiment:
             pin_memory=torch.cuda.is_available(),
         )
 
-    def transform_model(self, model, *args, **kwargs):
-        return model
+    def transform_model(self):
+        self.model.to(self.device)
 
     def should_decay_parameter(self, module, parameter_name, parameter, config):
         if isinstance(module, _BatchNorm):
