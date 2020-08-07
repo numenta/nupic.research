@@ -153,3 +153,38 @@ class ComposedLRScheduler(_LRScheduler):
                 group.pop("initial_lr", None)
 
             self.lr_scheduler = lr_scheduler_class(self.optimizer, **lr_scheduler_args)
+
+
+class LinearLRScheduler(_LRScheduler):
+    """
+    Linearly ramps up the learning rate from min_lr to max_lr. Useful for test
+    scenarios such as the LR-range test (https://arxiv.org/pdf/1803.09820.pdf)
+
+    :param min_lr: starting learning rate
+    :param max_lr: ending learning rate
+    :param epochs: number of epochs in training
+    :param steps_per_epoch: number of optimizer steps in each epoch
+    """
+    def __init__(
+        self, optimizer, min_lr, max_lr, epochs, steps_per_epoch, last_epoch=-1
+    ):
+
+        self.min_lr = min_lr
+        self.max_lr = max_lr
+
+        self.total_steps = epochs * steps_per_epoch
+
+        super().__init__(optimizer, last_epoch=last_epoch)
+
+    @property
+    def current_step(self):
+        return self.last_epoch
+
+    def get_lr(self):
+        """
+        Return a linear interpolation between min_lr and max_lr given the current and
+        total number of steps.
+        """
+        lr_slope = (self.max_lr - self.min_lr) / (self.total_steps - 1)
+        lr_delta = lr_slope * self.current_step
+        return [self.min_lr + lr_delta]

@@ -37,28 +37,54 @@ def relu_maybe_kwinners2d(channels,
                           boost_strength=1.0,
                           boost_strength_factor=0.9,
                           duty_cycle_period=1000,
-                          local=True):
+                          local=True,
+                          inplace=True,
+                          break_ties=False,
+                          compatibility_mode=True,
+                          explicit_relu=False):
     """
     Get a nn.ReLU, possible followed by a KWinners2d
 
     :param density:
         Either a density or a function that returns a density.
     :type density: float or function(channels)
-    """
-    layer = nn.ReLU(inplace=True)
 
+    :param compatibility_mode:
+       Insert an nn.Sequential and nn.Identity to maintain compatibility with
+       old checkpoints.
+    :type compatibility_mode: bool
+
+    :param explicit_relu:
+       Slower, but useful if you need to fuse the relu for quantization.
+    :type explicit_relu: bool
+    """
     if callable(density):
         density = density(channels)
 
-    if density < 1.0:
-        layer = nn.Sequential(
-            layer,
+    if density == 1.0:
+        return nn.ReLU(inplace=inplace)
+
+    if explicit_relu:
+        return nn.Sequential(
+            nn.ReLU(inplace=inplace),
             KWinners2d(channels, percent_on=density,
+                       k_inference_factor=k_inference_factor,
                        boost_strength=boost_strength,
-                       boost_strength_factor=boost_strength_factor,
-                       local=local, k_inference_factor=k_inference_factor)
-        )
-    return layer
+                       boost_strength_factor=boost_strength_factor, local=local,
+                       break_ties=break_ties, inplace=False))
+
+    layer = KWinners2d(channels, percent_on=density,
+                       k_inference_factor=k_inference_factor,
+                       boost_strength=boost_strength,
+                       boost_strength_factor=boost_strength_factor, local=local,
+                       break_ties=break_ties, inplace=inplace, relu=True)
+
+    if compatibility_mode:
+        # Preserve compatibility with old checkpoints that used an explicit
+        # nn.ReLU before the KWinners.
+        return nn.Sequential(nn.Identity(), layer)
+    else:
+        return layer
 
 
 def sparse_linear(in_features, out_features, bias=True, density=1.0):
