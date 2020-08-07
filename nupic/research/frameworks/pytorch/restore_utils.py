@@ -50,8 +50,6 @@ def load_state_from_checkpoint(
     :param subset: List of param names to accompany `strict=True`. This enables a user
                    define a set of params that will only be loaded and must be present
                    in both the model and the checkpoint
-    :param include_buffers: whether to load the models buffers as well; doesn't work
-                            with restore_full_model.
     :param resize_buffers: whether to resize the models buffers before loading the
                            state; this ensures the model has the same buffer sizes as
                            those saved within the checkpoint prior to loading.
@@ -63,10 +61,10 @@ def load_state_from_checkpoint(
                       where "features.weight" exists within the checkpoint and the model
                       has the attribute `model.features.new_weight`.
     :param state_dict_transform: this is a callable that takes the state_dict and
-                                 transforms it in some way; useful for a custom
-                                 re-mapping such as parameters with new naming
-                                 schemes or formats. The output should be a new
-                                 state_dict.
+                                 and the model and transforms the state_dict in some
+                                 way; useful for a custom re-mapping such as parameters
+                                 with new naming schemes or formats (e.g. backwards
+                                 compatibility). The output should be new state_dict.
     """
 
     assert os.path.isfile(chekpoint_path), (
@@ -113,11 +111,11 @@ def load_state_from_checkpoint(
         state_dict = new_state_dict
         strict = False  # we now only care about the subset
 
-    # Resize the linear buffers.
+    # Resize the buffers of the model to match those in the state_dict.
     if resize_buffers:
         resize_model_buffers(model, state_dict)  # done in place
 
-    # Apply custom transform.
+    # Apply any custom transformation.
     if state_dict_transform:
         state_dict = state_dict_transform(state_dict, model)
 
