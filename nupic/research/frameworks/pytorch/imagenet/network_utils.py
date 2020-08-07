@@ -17,8 +17,6 @@
 #
 #  http://numenta.org/licenses/
 #
-import io
-import pickle
 from collections import OrderedDict
 
 import torch
@@ -28,7 +26,6 @@ from torch import nn as nn
 
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
-from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
 from nupic.research.frameworks.pytorch.restore_utils import load_state_from_checkpoint
 from nupic.torch.compatibility import upgrade_to_masked_sparseweights
 
