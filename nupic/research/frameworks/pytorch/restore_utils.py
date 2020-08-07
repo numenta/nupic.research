@@ -77,7 +77,8 @@ def load_state_from_checkpoint(
     state_dict = get_state_dict(chekpoint_path)
 
     assert state_dict is not None, (
-        "Couldn't load the state_dict. Maybe check it's in the right format."
+        "Couldn't load the state_dict. "
+        "Maybe check it's in the right format ({'model': <state_dict>})"
     )
 
     # Remap param names in state_dict.
