@@ -60,7 +60,7 @@ def init_resnet50_batch_norm(model):
             m.weight.data.normal_(0, 0.01)
 
 
-def get_compatible_state_dict(model, state_dict):
+def get_compatible_state_dict(state_dict, model):
     """
     Make sure checkpoint is compatible with model
     """

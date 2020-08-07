@@ -738,7 +738,7 @@ class ImagenetExperiment:
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-            state_dict = get_compatible_state_dict(self.model.module, state_dict)
+            state_dict = get_compatible_state_dict(state_dict, self.model.module)
             self.model.module.load_state_dict(state_dict)
 
         if "optimizer" in state:
