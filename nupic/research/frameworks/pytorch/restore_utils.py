@@ -32,13 +32,11 @@ from nupic.torch.modules.sparse_weights import SparseWeightsBase
 # ----------------
 
 
-def load_multi_state(  # noqa: C901
+def load_state_from_checkpoint(
     model,
-    restore_full_model=None,
-    restore_linear=None,
-    restore_nonlinear=None,
+    chekpoint_path,
     strict=True,
-    include_buffers=True,
+    subset=None,
     resize_buffers=False,
     param_map=None,
     state_dict_transform=None,
@@ -47,18 +45,11 @@ def load_multi_state(  # noqa: C901
     A function for flexible loading of torch.nn.Module's.
 
     :param model: model to load state; instance of torch.nn.Module
-    :param restore_full_model: path to checkpoint; loads full model, supersedes
-                               restore_linear and restore_nonlinear
-    :param restore_linear: path to checkpoint; loads linear state (including
-                           SparseWeights params), may be used in conjunction with
-                           restore_nonlinear.
-    :param restore_nonlinear: path to checkpoint; loads non-linear state (the difference
-                              between all-state and linear-state), may be used in
-                              conjunction with restore_linear.
-    :param strict: similar to `strict` of pytorch's `load_state_dict`; If True, the
-                   loadable state of models params must be a subset (<=) of the
-                   state stored within the checkpoint. If False, the overlap between
-                   the model's loadable state and checkpoint's save state will be loaded
+    :param chekpoint_path: path to checkpoint
+    :param strict: similar to `strict` of pytorch's `load_state_dict`
+    :param subset: List of param names to accompany `strict=True`. This enables a user
+                   define a set of params that will only be loaded and must be present
+                   in both the model and the checkpoint
     :param include_buffers: whether to load the models buffers as well; doesn't work
                             with restore_full_model.
     :param resize_buffers: whether to resize the models buffers before loading the
@@ -76,6 +67,87 @@ def load_multi_state(  # noqa: C901
                                  re-mapping such as parameters with new naming
                                  schemes or formats. The output should be a new
                                  state_dict.
+    """
+
+    assert os.path.isfile(chekpoint_path), (
+        "Double check the checkpoint exists and is a file."
+    )
+
+    # Load the state dict from the checkpoint.
+    state_dict = get_state_dict(chekpoint_path)
+
+    assert state_dict is not None, (
+        "Couldn't load the state_dict. Maybe check it's in the right format."
+    )
+
+    # Remap param names in state_dict.
+    if param_map:
+        state_dict = remap_state_dict(state_dict, param_map)
+
+    # Check all desired params are present.
+    if strict and subset:
+
+        # Ensure subset is present in the checkpoint's state.
+        assert set(subset) <= set(state_dict.keys()), "".join([
+            "Found params in the subset which are not present in the checkpoint: ",
+            f"'{chekpoint_path}'"
+            "Params not present include:"
+            f"\n {set(subset) - set(state_dict.keys())}"
+        ])
+
+        # Ensure subset is present in the model's state.
+        model_params = model.state_dict()
+        assert set(subset) <= set(model_params.keys()), "".join([
+            "Found params in the subset which are not present in the model: ",
+            f"'{chekpoint_path}'"
+            "Params not present include:"
+            f"\n {set(subset) - set(model_params.keys())}"
+        ])
+
+        # Retrieve the subset of params.
+        new_state_dict = {
+            param_name: state_dict[param_name]
+            for param_name in subset
+        }
+        state_dict = new_state_dict
+        strict = False  # we now only care about the subset
+
+    # Resize the linear buffers.
+    if resize_buffers:
+        resize_model_buffers(model, state_dict)  # done in place
+
+    # Apply custom transform.
+    if state_dict_transform:
+        state_dict = state_dict_transform(state_dict, model)
+
+    # Load state.
+    model.load_state_dict(state_dict, strict=strict)
+
+    return model
+
+
+def load_multi_state(  # noqa: C901
+    model,
+    restore_full_model=None,
+    restore_linear=None,
+    restore_nonlinear=None,
+    strict=True,
+    include_buffers=True,
+    resize_buffers=False,
+    param_map=None,
+    state_dict_transform=None,
+):
+    """
+    A function for flexible loading of torch.nn.Module's.
+
+    :param restore_full_model: path to checkpoint; loads full model, supersedes
+                               restore_linear and restore_nonlinear
+    :param restore_linear: path to checkpoint; loads linear state (including
+                           SparseWeights params), may be used in conjunction with
+                           restore_nonlinear.
+    :param restore_nonlinear: path to checkpoint; loads non-linear state (the difference
+                              between all-state and linear-state), may be used in
+                              conjunction with restore_linear.
 
     Example:
     ```
@@ -98,24 +170,14 @@ def load_multi_state(  # noqa: C901
 
     # Case 1: Full model state specified.
     if restore_full_model:
-        state_dict = get_state_dict(restore_full_model)
-
-        if state_dict:
-
-            # Remap param names in state_dict.
-            if param_map:
-                state_dict = remap_state_dict(state_dict, param_map)
-
-            # Resize the linear buffers.
-            if resize_buffers:
-                resize_model_buffers(model, state_dict)  # done in place
-
-            # Apply custom transform.
-            if state_dict_transform:
-                state_dict = state_dict_transform(state_dict)
-
-            # Load state.
-            model.load_state_dict(state_dict, strict=strict)
+        load_state_from_checkpoint(
+            model,
+            restore_full_model,
+            strict=strict,
+            resize_buffers=resize_buffers,
+            param_map=param_map,
+            state_dict_transform=state_dict_transform,
+        )
 
         return model
 
@@ -124,83 +186,29 @@ def load_multi_state(  # noqa: C901
     nonlinear_params = get_nonlinear_param_names(model, include_buffers=include_buffers)
 
     # Case 2a:  Linear param states
-    linear_state = dict()
     if restore_linear:
-        state_dict = get_state_dict(restore_linear)
 
-        if state_dict:
-
-            # Remap param names in state_dict.
-            if param_map:
-                state_dict = remap_state_dict(state_dict, param_map)
-
-            # Check all desired linear params are present.
-            if strict:
-                assert set(linear_params) <= set(state_dict.keys()), "".join([
-                    "Found linear params in the model ",
-                    "which are not present in the checkpoint '{}'.\n".format(
-                        restore_linear),
-                    "Params not present include:\n {}".format(
-                        set(linear_params) - set(state_dict.keys()))
-                ])
-
-            # Get and load desired linear params.
-            linear_state = {
-                param_name: state_dict[param_name]
-                for param_name in linear_params
-            }
-
-            # Resize the linear buffers.
-            if resize_buffers:
-                resize_model_buffers(model, linear_state)  # done in place
-
-            # Apply custom transform.
-            if state_dict_transform:
-                state_dict = state_dict_transform(state_dict)
-
-            # Load state.
-            model.load_state_dict(linear_state, strict=False)
+        load_state_from_checkpoint(
+            model,
+            restore_linear,
+            strict=True,  # the subset must be present
+            subset=linear_params,
+            resize_buffers=resize_buffers,
+            param_map=param_map,
+            state_dict_transform=state_dict_transform,
+        )
 
     # Case 2b:  Non-Linear param states
-    nonlinear_state = dict()
     if restore_nonlinear:
-        state_dict = get_state_dict(restore_nonlinear)
-
-        if state_dict:
-
-            # Remap param names in state_dict.
-            if param_map:
-                state_dict = remap_state_dict(state_dict, param_map)
-
-            # Check all desired nonlinear params are present.
-            if strict:
-                assert set(nonlinear_params) <= set(state_dict.keys()), "".join([
-                    "Found nonlinear params in the model ",
-                    "which are not present in the checkpoint '{}'.\n".format(
-                        restore_nonlinear),
-                    "Params not present include:\n {}".format(
-                        set(nonlinear_params) - set(state_dict.keys()))
-                ])
-
-            # Get and load desired nonlinear params.
-            nonlinear_state = {
-                param_name: state_dict[param_name]
-                for param_name in nonlinear_params
-            }
-
-            # Resize the linear buffers.
-            if resize_buffers:
-                resize_model_buffers(model, nonlinear_state)  # done in place
-
-            # Apply custom transform.
-            if state_dict_transform:
-                state_dict = state_dict_transform(state_dict)
-
-            # Load state.
-            model.load_state_dict(nonlinear_state, strict=False)
-
-    # Validate results / quick sanity-check.
-    assert set(linear_state.keys()).isdisjoint(nonlinear_state.keys())
+        load_state_from_checkpoint(
+            model,
+            restore_nonlinear,
+            strict=True,  # the subset must be present
+            subset=nonlinear_params,
+            resize_buffers=resize_buffers,
+            param_map=param_map,
+            state_dict_transform=state_dict_transform,
+        )
 
     return model
 
