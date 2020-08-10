@@ -125,7 +125,7 @@ def load_state_from_checkpoint(
     return model
 
 
-def load_multi_state(  # noqa: C901
+def load_multi_state(
     model,
     restore_full_model=None,
     restore_linear=None,
