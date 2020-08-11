@@ -50,8 +50,6 @@ QAT_QCONFIG_PROPAGATE_WHITE_LIST = (
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.models.sparse_resnets import resnet50 as sparse_resnet50
 
-# from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
-
 
 class QuantizationAware(object):
     """
@@ -62,24 +60,29 @@ class QuantizationAware(object):
     def setup_experiment(self, config):
         """
         Setup experiment for quantization
+        Add following variables to config
+
+        :param config: Dictionary containing the configuration parameters
+
+            - quantize_weights_per_channel: Whether to quantize weights per channel.
+                                            Defaults to True. If False, quantizer per
+                                            tensor
+            - when_disable_observers: Determiners At which point during the last epoch to disable
+                                      observers. Float from 0 to 1, 0 being the first batch
+                                      and 1 being the last batch
+                                      Defaults to .95
+            - when_disable_batch_norm: Determiners At which point during the last epoch to disable
+                                       batch norm. Float from 0 to 1, 0 being the first batch
+                                       and 1 being the last batch
+                                       Defaults to .98
         """
 
         # extra variables
         self.quantize_weights_per_channel = config.get("quantize_weights_per_channel", True)
-        # update model args with fuse relu
-        if "config" in config["model_args"]:
-            config["model_args"]["config"]["fuse_relu"] = config.get("fuse_relu", True)
-        else:
-            model_args_config = dict(fuse_relu=config.get("fuse_relu", True))
-            config["model_args"]["config"] = model_args_config
-
-        print(config["model_args"])
+        self.when_disable_observers = config.get("when_disable_observers", .95)
+        self.when_freeze_batch_norm = config.get("when_freeze_batch_norm", .98)
 
         super().setup_experiment(config)
-
-        # make an internal copy without data distributed parallel
-        # required to save quantized model later
-         # self.model_without_ddp = self.model.module
 
     def transform_model(self):
         """Prepare model for quantization"""
@@ -93,16 +96,6 @@ class QuantizationAware(object):
         self.model.apply(enable_fake_quant)
         self.observer_disabled = False
         self.batch_norm_frozen = False
-
-        # DEBUG
-        # for name, module in self.model.named_modules():
-        #     if not(
-        #             isinstance(module, _ObserverBase)
-        #             or isinstance(module, FakeQuantize)
-        #             or isinstance(module, Identity)
-        #     ):
-        #         module.register_forward_pre_hook(debug_pre_fwd(name, module.__class__))
-        #         module.register_forward_hook(debug_post_fwd(name, module.__class__))
 
     def pre_batch(self, model, batch_idx):
 
@@ -205,97 +198,3 @@ def debug_post_fwd(name, class_name):
 
     return print_internals
 
-
-def test_script_default_qat(model_class=None):
-    """Tests default implementation of QAT network"""
-    # create the network
-    model = model_class()
-    # print(model)
-    # import pdb; pdb.set_trace()
-
-    # quantize the network
-    device = torch.device("cuda")
-    model.fuse_model()
-    qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
-    model.qconfig = qconfig
-    torch.quantization.prepare_qat(model, inplace=True)
-    model.to(device)
-
-    # prepare for training
-    model.apply(enable_observer)
-    model.apply(enable_fake_quant)
-
-    # do a forward pass
-    for i in range(10000):
-        output = model(torch.randn(32, 3, 224, 224, device=device))
-        print(f"Finished {i}")
-
-def test_script_qat_create_model():
-    """Tests default implementation of QAT network
-       using create model function"""
-
-    device = torch.device("cuda")
-    # create the network
-    model = create_model(
-        model_class=sparse_resnet50,
-        model_args={},
-        init_batch_norm=False,
-        device=device,
-        checkpoint_file=None
-    )
-    # the issue is that I'm sending the model to device
-    # before quantizing
-    # it has to be done after
-
-    # quantize the network
-    model.fuse_model()
-    qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
-    model.qconfig = qconfig
-    torch.quantization.prepare_qat(model, inplace=True)
-    model.to(device)
-
-    # prepare for training
-    model.apply(enable_observer)
-    model.apply(enable_fake_quant)
-
-    # do a forward pass
-    model(torch.randn(20, 3, 224, 224, device=device))
-
-
-if __name__ == "__main__":
-    # test_script_default_qat(model_class=resnet50)
-    # regular resnet runs with no errors
-
-    for _ in range(3):
-
-        # sparse dense works
-        test_script_default_qat(model_class=sparse_resnet50)
-        print("Sparse Resnet worked")
-
-        # # regular dense works
-        # try:
-        #     test_script_default_qat(model_class=resnet50)
-        #     print("Dense Resnet worked")
-        # except:
-        #     print("Dense Resnet failed")
-
-        # # regular dense works
-        # try:
-        #     test_script_qat_create_model()
-        #     print("Create model script worked")
-        # except Exception as e:
-        #     print("Create model script failed")
-        #     print(e)
-
-
-
-
-
-    # sparse resnet? doesn't work, so the issue is with sparse resnet
-    # need to investigate
-    # sparse resnet with create model?
-
-"""
-default_weight_fake_quant = FakeQuantize.with_args(observer=MovingAverageMinMaxObserver, quant_min=-128, quant_max=127,
-                                                   dtype=torch.qint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
-"""

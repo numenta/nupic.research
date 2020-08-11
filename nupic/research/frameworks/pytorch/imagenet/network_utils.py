@@ -92,23 +92,16 @@ def create_model(model_class, model_args, init_batch_norm, device,
     model = model_class(**model_args)
     if init_batch_norm:
         init_resnet50_batch_norm(model)
-    # model.to(device)
-    # can consider adding a callback here
-    # if it is required that the model is on device
-    # either that or seperating betwen creating the model and loading the checkpoint
-    # in that case, transform model can receive an argument
 
     if checkpoint_file is not None:
-        _restore_checkpoint(model, device, checkpoint_file=checkpoint_file)
+        restore_checkpoint(model, device, checkpoint_file=checkpoint_file)
 
     return model
 
-def _restore_checkpoint(model, device, checkpoint_file=None):
+def restore_checkpoint(model, device, checkpoint_file=None):
     """Load model parameters from checkpoint"""
 
     if checkpoint_file is not None:
         load_ckpt_args = load_checkpoint_args or {}
         load_ckpt_args.setdefault("state_dict_transform", get_compatible_state_dict)
         load_state_from_checkpoint(model, checkpoint_file, **load_ckpt_args)
-
-    return model
