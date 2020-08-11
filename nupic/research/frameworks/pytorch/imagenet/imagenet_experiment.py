@@ -383,22 +383,13 @@ class ImagenetExperiment:
         :return:
                 Model instance
         """
-        # print(
-        #     config["model_class"],
-        #     config.get("model_args", {}),
-        #     config.get("init_batch_norm", False),
-        #     config.get("checkpoint_file", None)
-        # )
         return create_model(
             model_class=config["model_class"],
             model_args=config.get("model_args", {}),
             init_batch_norm=config.get("init_batch_norm", False),
             device=device,
-<<<<<<< HEAD
-=======
             checkpoint_file=config.get("checkpoint_file", None),
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
->>>>>>> 3d99c37f4edd85af5ef8d388662fa80f5449dee6
         )
 
     @classmethod
