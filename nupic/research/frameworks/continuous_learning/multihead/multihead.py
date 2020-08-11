@@ -169,10 +169,10 @@ def do_training(model, scenario, device, lr=0.001, epochs=30,
     # optimizer for training model
     adam = optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
 
-    for epoch in range(epochs):
+    # Loop over all tasks
+    for task_num, train_loader in enumerate(train_loaders, 1):
 
-        # Loop over all tasks
-        for task_num, train_loader in enumerate(train_loaders, 1):
+        for epoch in range(epochs):
 
             print("Epoch {}".format(epoch))
             train_head(model=model, loader=train_loader, optimizer=adam,
