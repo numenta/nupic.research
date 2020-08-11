@@ -17,8 +17,6 @@
 #
 #  http://numenta.org/licenses/
 #
-import io
-import pickle
 from collections import OrderedDict
 
 import torch
@@ -28,8 +26,7 @@ from torch import nn as nn
 
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
-from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
-from nupic.research.frameworks.pytorch.restore_utils import resize_model_buffers
+from nupic.research.frameworks.pytorch.restore_utils import load_state_from_checkpoint
 from nupic.torch.compatibility import upgrade_to_masked_sparseweights
 
 
@@ -60,7 +57,7 @@ def init_resnet50_batch_norm(model):
             m.weight.data.normal_(0, 0.01)
 
 
-def get_compatible_state_dict(model, state_dict):
+def get_compatible_state_dict(state_dict, model):
     """
     Make sure checkpoint is compatible with model
     """
@@ -74,7 +71,7 @@ def get_compatible_state_dict(model, state_dict):
 
 
 def create_model(model_class, model_args, init_batch_norm, device,
-                 checkpoint_file=None, resize_buffers_for_checkpoint=False):
+                 checkpoint_file=None, load_checkpoint_args=None):
     """
     Create imagenet experiment model with option to load state from checkpoint
 
@@ -88,9 +85,7 @@ def create_model(model_class, model_args, init_batch_norm, device,
         Model device
     :param checkpoint_file:
         Optional checkpoint file to load model state
-    :param resize_buffers_for_checkpoint:
-        Optional param with `checkpoint_file`. If True, this resizes the models buffers
-        to match those of the checkpoint before loading it.
+    :param load_checkpoint_args: additional args for load_state_from_checkpoint
 
     :return: Configured model
     """
@@ -113,6 +108,7 @@ def _restore_checkpoint(model, device, checkpoint_file=None, resize_buffers=Fals
     """Load model parameters from checkpoint"""
 
     if checkpoint_file is not None:
+<<<<<<< HEAD
         with open(checkpoint_file, "rb") as pickle_file:
             state = pickle.load(pickle_file)
         with io.BytesIO(state["model"]) as buffer:
@@ -124,3 +120,10 @@ def _restore_checkpoint(model, device, checkpoint_file=None, resize_buffers=Fals
             resize_model_buffers(model, state_dict)
 
         model.load_state_dict(state_dict)
+=======
+        load_ckpt_args = load_checkpoint_args or {}
+        load_ckpt_args.setdefault("state_dict_transform", get_compatible_state_dict)
+        load_state_from_checkpoint(model, checkpoint_file, **load_ckpt_args)
+
+    return model
+>>>>>>> 3d99c37f4edd85af5ef8d388662fa80f5449dee6

@@ -370,3 +370,70 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
+
+
+def get_module_attr(module, name):
+    """
+    Get model attribute of torch.nn.Module given its name.
+    Ex:
+    ```
+    name = "features.stem.weight"
+    weight = get_module_attr(net, name)
+    ```
+    """
+
+    # Split off the last sub-name.
+    # Ex. "features.stem.weight" -> ("features.stem", "weight")
+    parent_name, sub_name = (name.split(".", 1) + [None])[0:2]
+
+    if sub_name is not None:
+        parent_module = _get_sub_module(module, parent_name)
+        sub_module = get_module_attr(parent_module, sub_name)
+        return sub_module
+    else:
+        sub_module = _get_sub_module(module, parent_name)
+        return sub_module
+
+
+def set_module_attr(module, name, value):
+    """
+    Set model attribute of torch.nn.Module given its name.
+    Ex:
+    ```
+    name = "features.stem.weight"
+    weight = Parameter(...)
+    set_module_attr(net, name, weight)
+    ```
+    """
+
+    # Split name: pytorch convention uses "." for each child module.
+    all_names = name.split(".")
+
+    # Get all names except the last.
+    # Ex. "features.stem.weight" -> "features.stem"
+    parents_names = all_names[:-1]
+
+    if not parents_names:
+        setattr(module, name, value)
+
+    else:
+        # Get the parent module of the last child module.
+        parent_name = ".".join(parents_names)
+        parent_module = get_module_attr(module, parent_name)
+
+        # Set the new value of the last child module.
+        child_name = all_names[-1]
+        setattr(parent_module, child_name, value)
+
+
+def _get_sub_module(module, name):
+    """
+    Gets a submodule either by name or index - pytorch either uses names for module
+    attributes (e.g. "module.classifier") or indices for sequential models
+    (e.g. `module[0]`).
+    ```
+    """
+    if name.isdigit():
+        return module[int(name)]
+    else:
+        return getattr(module, name)

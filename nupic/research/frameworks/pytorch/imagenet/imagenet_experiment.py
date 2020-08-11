@@ -176,10 +176,7 @@ class ImagenetExperiment:
             - checkpoint_file: if not None, will start from this model. The model
                                must have the same model_args and model_class as the
                                current experiment.
-            - resize_buffers_for_checkpoint: if True, this will resize the model
-                                             buffers to match those in the checkpoint.
-                                             This is helpful for loading buffers with
-                                             sparse levels not matching the model_args
+            - load_checkpoint_args: args to be passed to `load_state_from_checkpoint`
             - checkpoint_at_init: boolean argument for whether to create a checkpoint
                                   of the initialized model. this differs from
                                   `checkpoint_at_start` for which the checkpoint occurs
@@ -379,10 +376,7 @@ class ImagenetExperiment:
             - checkpoint_file: if not None, will start from this model. The
                                model must have the same model_args and
                                model_class as the current experiment.
-            - resize_buffers_for_checkpoint: if True, this will resize the model
-                                             buffers to match those in the checkpoint.
-                                             This is helpful for loading buffers with
-                                             sparse levels not matching the model_args
+            - load_checkpoint_args: args to be passed to `load_state_from_checkpoint`
         :param device:
                 Pytorch device
 
@@ -400,6 +394,11 @@ class ImagenetExperiment:
             model_args=config.get("model_args", {}),
             init_batch_norm=config.get("init_batch_norm", False),
             device=device,
+<<<<<<< HEAD
+=======
+            checkpoint_file=config.get("checkpoint_file", None),
+            load_checkpoint_args=config.get("load_checkpoint_args", {}),
+>>>>>>> 3d99c37f4edd85af5ef8d388662fa80f5449dee6
         )
 
     @classmethod
@@ -771,7 +770,7 @@ class ImagenetExperiment:
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-            state_dict = get_compatible_state_dict(self.model.module, state_dict)
+            state_dict = get_compatible_state_dict(state_dict, self.model.module)
             self.model.module.load_state_dict(state_dict)
 
         if "optimizer" in state:
