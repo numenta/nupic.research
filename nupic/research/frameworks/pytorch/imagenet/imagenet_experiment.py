@@ -50,7 +50,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
 from nupic.research.frameworks.pytorch.imagenet.network_utils import (
     create_model,
     get_compatible_state_dict,
-    restore_checkpoint
+    restore_checkpoint,
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
@@ -235,8 +235,8 @@ class ImagenetExperiment:
 
         checkpoint_file = config.get("checkpoint_file", None)
         if checkpoint_file:
-            checkpoint_file=config.get("checkpoint_file", None),
-            load_checkpoint_args=config.get("load_checkpoint_args", {}),
+            checkpoint_file = config.get("checkpoint_file", None)
+            load_checkpoint_args = config.get("load_checkpoint_args", {})
             self.restore_checkpoint(self.model, checkpoint_file, load_checkpoint_args)
 
         # Send to device after loading checkpoint
@@ -359,7 +359,8 @@ class ImagenetExperiment:
         restore_checkpoint(model, checkpoint_file, load_checkpoint_args)
 
     @classmethod
-    def create_model(cls, config, device=None, checkpoint_file=None, load_checkpoint_args=None):
+    def create_model(cls, config, device=None, checkpoint_file=None,
+                     load_checkpoint_args=None):
         """
         Create imagenet model from an ImagenetExperiment config
         :param config:

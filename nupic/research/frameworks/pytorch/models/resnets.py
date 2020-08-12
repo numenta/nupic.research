@@ -157,8 +157,7 @@ class Bottleneck(nn.Module):
         else:
             self.shortcut = nn.Identity()
 
-        self.post_activation = act_layer(self.expansion * planes,
-                                            **act_args["act3"])
+        self.post_activation = act_layer(self.expansion * planes, **act_args["act3"])
         self.quant_ops = nnq.FloatFunctional()
 
     def forward(self, x):
@@ -266,8 +265,7 @@ class ResNet(nn.Module):
                  act_args=None,
                  norm_layer=nn.BatchNorm2d,
                  norm_args=None,
-                 deprecated_compatibility_mode=False,
-                 ):
+                 deprecated_compatibility_mode=False):
         """
         :param conv_layer:
             A conv2d layer that receives the arguments of a nn.Conv2d and custom
@@ -446,6 +444,7 @@ class ResNet(nn.Module):
                 modules_to_fuse.append(act_name)
 
         fuse_modules(self.features, modules_to_fuse, inplace=True)
+
 
 def expand_args(args, num_blocks_by_group, block_keys):
     """

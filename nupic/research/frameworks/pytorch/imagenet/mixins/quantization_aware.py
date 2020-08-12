@@ -21,25 +21,20 @@
 
 import torch
 import torch.nn.intrinsic as nni
-import functools
-
-from torch.quantization.quantize import _propagate_qconfig_helper, add_observer_
+from nupic.hardware.frameworks.quantization import QATKWINNER_MODULE_MAPPING
 from torch.quantization import (
     DEFAULT_QAT_MODULE_MAPPING,
     DEFAULT_QCONFIG_PROPAGATE_WHITE_LIST,
-    convert,
-    disable_observer,
-    enable_observer,
-    enable_fake_quant,
     FakeQuantize,
-    QConfig,
-    default_weight_fake_quant,
     MovingAverageMinMaxObserver,
+    QConfig,
+    convert,
+    default_weight_fake_quant,
+    disable_observer,
+    enable_fake_quant,
+    enable_observer,
 )
-
-from torch.quantization.observer import _ObserverBase
-from torch.nn.modules.linear import Identity
-from nupic.hardware.frameworks.quantization import QATKWINNER_MODULE_MAPPING
+from torch.quantization.quantize import _propagate_qconfig_helper, add_observer_
 
 QAT_QUANTIZED_MODULE_MAPPING = dict(DEFAULT_QAT_MODULE_MAPPING)
 QAT_QUANTIZED_MODULE_MAPPING.update(QATKWINNER_MODULE_MAPPING)
@@ -47,8 +42,6 @@ QAT_QCONFIG_PROPAGATE_WHITE_LIST = (
     set(DEFAULT_QCONFIG_PROPAGATE_WHITE_LIST)
     | set(QATKWINNER_MODULE_MAPPING.keys())
 )
-from nupic.research.frameworks.pytorch.models.resnets import resnet50
-from nupic.research.frameworks.pytorch.models.sparse_resnets import resnet50 as sparse_resnet50
 
 
 class QuantizationAware(object):
@@ -67,18 +60,20 @@ class QuantizationAware(object):
             - quantize_weights_per_channel: Whether to quantize weights per channel.
                                             Defaults to True. If False, quantizer per
                                             tensor
-            - when_disable_observers: Determiners At which point during the last epoch to disable
-                                      observers. Float from 0 to 1, 0 being the first batch
-                                      and 1 being the last batch
+            - when_disable_observers: Determiners At which point during the last epoch
+                                      to disable observers. Float from 0 to 1, 0 being
+                                      the first batch and 1 being the last batch
                                       Defaults to .95
-            - when_disable_batch_norm: Determiners At which point during the last epoch to disable
-                                       batch norm. Float from 0 to 1, 0 being the first batch
-                                       and 1 being the last batch
+            - when_disable_batch_norm: Determiners At which point during the last epoch
+                                       to  disable batch norm. Float from 0 to 1, 0
+                                       being the first batch and 1 being the last batch
                                        Defaults to .98
         """
 
         # extra variables
-        self.quantize_weights_per_channel = config.get("quantize_weights_per_channel", True)
+        self.quantize_weights_per_channel = config.get(
+            "quantize_weights_per_channel", True
+        )
         self.when_disable_observers = config.get("when_disable_observers", .95)
         self.when_freeze_batch_norm = config.get("when_freeze_batch_norm", .98)
         self.fuse_relu = config.get("fuse_relu", False)
@@ -102,19 +97,21 @@ class QuantizationAware(object):
 
         # freeze observer parameters for the last 500 batches of last epoch
         if (not self.observer_disabled
-            and self.current_epoch == self.epochs
-            and self.batch_idx > (self.when_disable_observers * self.total_batches)):
-                self.logger.info(f"Freezing observer at epoch {self.current_epoch} and batch {self.batch_idx}")
-                self.model.apply(disable_observer)
-                self.observer_disabled = True
+           and self.current_epoch == self.epochs
+           and self.batch_idx > (self.when_disable_observers * self.total_batches)):
+            self.logger.info(f"Freezing observer at epoch {self.current_epoch} "
+                             "and batch {self.batch_idx}")
+            self.model.apply(disable_observer)
+            self.observer_disabled = True
 
         # freeze BN parameters for the last 200 batches of last epoch
         if (not self.batch_norm_frozen
-            and self.current_epoch == self.epochs
-            and self.batch_idx > (self.when_freeze_batch_norm * self.total_batches)):
-                self.logger.info(f"Freezing BN parameters at epoch {self.current_epoch} and batch {self.batch_idx}")
-                self.model.apply(nni.qat.freeze_bn_stats)
-                self.batch_norm_frozen = True
+           and self.current_epoch == self.epochs
+           and self.batch_idx > (self.when_freeze_batch_norm * self.total_batches)):
+            self.logger.info(f"Freezing BN parameters at epoch {self.current_epoch}"
+                             "and batch {self.batch_idx}")
+            self.model.apply(nni.qat.freeze_bn_stats)
+            self.batch_norm_frozen = True
 
     @classmethod
     def get_execution_order(cls):
@@ -123,6 +120,7 @@ class QuantizationAware(object):
         eo["transform_model"].append("Prepare model for Quantization")
         eo["pre_batch"].append("Freezes observers and batch norm parameters in QAT")
         return eo
+
 
 def _prepare_for_qat(model, quantize_weights_per_channel, fuse_relu):
     """Prepares model for quantization aware training"""
@@ -137,9 +135,9 @@ def _prepare_for_qat(model, quantize_weights_per_channel, fuse_relu):
         print("Quantizating weights per tensor")
         qconfig = QConfig(
             activation=FakeQuantize.with_args(observer=MovingAverageMinMaxObserver,
-                                                quant_min=0,
-                                                quant_max=255,
-                                                reduce_range=True),
+                                              quant_min=0,
+                                              quant_max=255,
+                                              reduce_range=True),
             weight=default_weight_fake_quant
         )
     model.qconfig = qconfig
@@ -147,11 +145,11 @@ def _prepare_for_qat(model, quantize_weights_per_channel, fuse_relu):
     # equivalent to quantize.prepare, inplace. require for custom white list
     # propagate qconfig and add observers
     _propagate_qconfig_helper(model, qconfig_dict={},
-                            white_list=QAT_QCONFIG_PROPAGATE_WHITE_LIST)
-    if not any(hasattr(m, 'qconfig') and m.qconfig for m in model.modules()):
-        warnings.warn("None of the submodule got qconfig applied. Make sure you "
-                    "passed correct configuration through `qconfig_dict` or "
-                    "by assigning the `.qconfig` attribute directly on submodules")
+                              white_list=QAT_QCONFIG_PROPAGATE_WHITE_LIST)
+    if not any(hasattr(m, "qconfig") and m.qconfig for m in model.modules()):
+        print("None of the submodule got qconfig applied. Make sure you "
+              "passed correct configuration through `qconfig_dict` or "
+              "by assigning the `.qconfig` attribute directly on submodules")
     add_observer_(model)
 
     # convert modules to their QAT versions. should be sent to device after
@@ -179,6 +177,7 @@ def debug_pre_fwd(name, class_name):
 
     return print_internals
 
+
 def debug_post_fwd(name, class_name):
     """
     Hook is attached to the operations at the computational graph
@@ -199,4 +198,3 @@ def debug_post_fwd(name, class_name):
         print(name, f"OUTPUT nans: {nan_ratio:.2f}, mean: {mean:.8f}, std: {std:.8f}")
 
     return print_internals
-

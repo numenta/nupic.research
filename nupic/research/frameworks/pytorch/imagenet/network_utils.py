@@ -102,6 +102,7 @@ def create_model(model_class, model_args, init_batch_norm, device=None,
 
     return model
 
+
 def restore_checkpoint(model, checkpoint_file, load_checkpoint_args):
     """Load model parameters from checkpoint"""
     load_ckpt_args = load_checkpoint_args or {}
