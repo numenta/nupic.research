@@ -81,6 +81,7 @@ class QuantizationAware(object):
         self.quantize_weights_per_channel = config.get("quantize_weights_per_channel", True)
         self.when_disable_observers = config.get("when_disable_observers", .95)
         self.when_freeze_batch_norm = config.get("when_freeze_batch_norm", .98)
+        self.fuse_relu = config.get("fuse_relu", False)
 
         super().setup_experiment(config)
 
@@ -88,7 +89,7 @@ class QuantizationAware(object):
         """Prepare model for quantization"""
 
         # prepare model for qat
-        _prepare_for_qat(self.model, self.quantize_weights_per_channel)
+        _prepare_for_qat(self.model, self.quantize_weights_per_channel, self.fuse_relu)
         self.model.to(self.device)
 
         # enable observers and fake quantizers to prepare for training
@@ -102,7 +103,7 @@ class QuantizationAware(object):
         # freeze observer parameters for the last 500 batches of last epoch
         if (not self.observer_disabled
             and self.current_epoch == self.epochs
-            and self.batch_idx > (.95 * self.total_batches)):
+            and self.batch_idx > (self.when_disable_observers * self.total_batches)):
                 self.logger.info(f"Freezing observer at epoch {self.current_epoch} and batch {self.batch_idx}")
                 self.model.apply(disable_observer)
                 self.observer_disabled = True
@@ -110,7 +111,7 @@ class QuantizationAware(object):
         # freeze BN parameters for the last 200 batches of last epoch
         if (not self.batch_norm_frozen
             and self.current_epoch == self.epochs
-            and self.batch_idx > (.98 * self.total_batches)):
+            and self.batch_idx > (self.when_freeze_batch_norm * self.total_batches)):
                 self.logger.info(f"Freezing BN parameters at epoch {self.current_epoch} and batch {self.batch_idx}")
                 self.model.apply(nni.qat.freeze_bn_stats)
                 self.batch_norm_frozen = True
@@ -122,11 +123,11 @@ class QuantizationAware(object):
         eo["transform_model"].append("Prepare model for Quantization")
         return eo
 
-def _prepare_for_qat(model, quantize_weights_per_channel):
+def _prepare_for_qat(model, quantize_weights_per_channel, fuse_relu):
     """Prepares model for quantization aware training"""
 
     # fuse models
-    model.fuse_model()
+    model.fuse_model(fuse_relu=fuse_relu)
 
     # set qconfig
     if quantize_weights_per_channel:

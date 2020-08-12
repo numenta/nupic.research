@@ -37,7 +37,8 @@ from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
 def load_state_from_checkpoint(
     model,
-    chekpoint_path,
+    checkpoint_path,
+    device=None,
     strict=True,
     subset=None,
     resize_buffers=False,
@@ -48,7 +49,7 @@ def load_state_from_checkpoint(
     A function for flexible loading of torch.nn.Module's.
 
     :param model: model to load state; instance of torch.nn.Module
-    :param chekpoint_path: path to checkpoint
+    :param checkpoint_path: path to checkpoint
     :param strict: similar to `strict` of pytorch's `load_state_dict`
     :param subset: List of param names to accompany `strict=True`. This enables a user
                    define a set of params that will only be loaded and must be present
@@ -68,14 +69,15 @@ def load_state_from_checkpoint(
                                  way; useful for a custom re-mapping such as parameters
                                  with new naming schemes or formats (e.g. backwards
                                  compatibility). The output should be new state_dict.
+    :param device: device to load the model
     """
 
-    assert os.path.isfile(chekpoint_path), (
+    assert os.path.isfile(checkpoint_path), (
         "Double check the checkpoint exists and is a file."
     )
 
     # Load the state dict from the checkpoint.
-    state_dict = get_state_dict(chekpoint_path)
+    state_dict = get_state_dict(checkpoint_path, device)
 
     assert state_dict is not None, (
         "Couldn't load the state_dict. "
@@ -92,7 +94,7 @@ def load_state_from_checkpoint(
         # Ensure subset is present in the checkpoint's state.
         assert set(subset) <= set(state_dict.keys()), "".join([
             "Found params in the subset which are not present in the checkpoint: ",
-            f"'{chekpoint_path}'"
+            f"'{checkpoint_path}'"
             "Params not present include:"
             f"\n {set(subset) - set(state_dict.keys())}"
         ])
@@ -101,7 +103,7 @@ def load_state_from_checkpoint(
         model_params = model.state_dict()
         assert set(subset) <= set(model_params.keys()), "".join([
             "Found params in the subset which are not present in the model: ",
-            f"'{chekpoint_path}'"
+            f"'{checkpoint_path}'"
             "Params not present include:"
             f"\n {set(subset) - set(model_params.keys())}"
         ])
@@ -220,7 +222,7 @@ def load_multi_state(
 # -------------------
 
 
-def get_state_dict(checkpoint_path):
+def get_state_dict(checkpoint_path, device=None):
 
     checkpoint_path = os.path.expanduser(checkpoint_path)
     with open(checkpoint_path, "rb") as loaded_state:
@@ -228,7 +230,7 @@ def get_state_dict(checkpoint_path):
 
     if "model" in checkpoint_dict:
         with io.BytesIO(checkpoint_dict["model"]) as buffer:
-            state_dict = deserialize_state_dict(buffer)
+            state_dict = deserialize_state_dict(buffer, device)
         return state_dict
     else:
         return None

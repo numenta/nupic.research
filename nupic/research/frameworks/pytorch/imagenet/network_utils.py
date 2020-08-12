@@ -70,7 +70,7 @@ def get_compatible_state_dict(state_dict, model):
     return state_dict
 
 
-def create_model(model_class, model_args, init_batch_norm, device,
+def create_model(model_class, model_args, init_batch_norm, device=None,
                  checkpoint_file=None, load_checkpoint_args=None):
     """
     Create imagenet experiment model with option to load state from checkpoint
@@ -93,15 +93,17 @@ def create_model(model_class, model_args, init_batch_norm, device,
     if init_batch_norm:
         init_resnet50_batch_norm(model)
 
+    # backwards compatibility
+    if device is not None:
+        model.to(device)
+
     if checkpoint_file is not None:
-        restore_checkpoint(model, device, checkpoint_file=checkpoint_file)
+        restore_checkpoint(model, checkpoint_file, load_checkpoint_args)
 
     return model
 
-def restore_checkpoint(model, device, checkpoint_file=None):
+def restore_checkpoint(model, checkpoint_file, load_checkpoint_args):
     """Load model parameters from checkpoint"""
-
-    if checkpoint_file is not None:
-        load_ckpt_args = load_checkpoint_args or {}
-        load_ckpt_args.setdefault("state_dict_transform", get_compatible_state_dict)
-        load_state_from_checkpoint(model, checkpoint_file, **load_ckpt_args)
+    load_ckpt_args = load_checkpoint_args or {}
+    load_ckpt_args.setdefault("state_dict_transform", get_compatible_state_dict)
+    load_state_from_checkpoint(model, checkpoint_file, **load_ckpt_args)

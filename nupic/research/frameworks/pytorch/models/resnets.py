@@ -76,7 +76,7 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         out = self.regular_path(x)
-        out = self.quant_ops.add_relu(out, self.shortcut(x))
+        out = self.quant_ops.add(out, self.shortcut(x))
         out = self.post_activation(out)
         return out
 
@@ -163,7 +163,7 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         out = self.regular_path(x)
-        out = self.quant_ops.add_relu(out, self.shortcut(x))
+        out = self.quant_ops.add(out, self.shortcut(x))
         out = self.post_activation(out)
         return out
 
@@ -444,8 +444,6 @@ class ResNet(nn.Module):
                 act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
                                 if isinstance(v, nn.ReLU))
                 modules_to_fuse.append(act_name)
-
-        fuse_modules(self.features, modules_to_fuse, inplace=True)
 
         fuse_modules(self.features, modules_to_fuse, inplace=True)
 
