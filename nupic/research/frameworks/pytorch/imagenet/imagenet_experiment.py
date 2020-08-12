@@ -37,8 +37,6 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 
-import torchvision
-
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
 )
@@ -384,8 +382,8 @@ class ImagenetExperiment:
             model_args=config.get("model_args", {}),
             init_batch_norm=config.get("init_batch_norm", False),
             device=device,
-            checkpoint_file=None,
-            load_checkpoint_args=None,
+            checkpoint_file=checkpoint_file,
+            load_checkpoint_args=load_checkpoint_args,
         )
 
     @classmethod
@@ -870,8 +868,7 @@ class ImagenetExperiment:
         return dict(
             setup_experiment=["ImagenetExperiment.setup_experiment"],
             create_model=["ImagenetExperiment.create_model"],
-            # TODO: better if just replace create model
-            # and then move load checkpoint to a different function
+            restore_checkpoint=["ImagenetExperiment.restore_checkpoint"],
             transform_model=["ImagenetExperiment.transform_model"],
             create_train_dataloader=["ImagenetExperiment.create_train_dataloader"],
             create_validation_dataloader=[

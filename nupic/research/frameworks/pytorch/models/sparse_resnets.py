@@ -312,11 +312,11 @@ class SparseResNet(ResNetCore):
             linear_params_func=None,
             conv_params_func=None,
             activation_params_func=None,
-            batch_norm_args=None,
+            batch_norm_args=None
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
-        # sparse_weights_type is ignored if layers_params are not defined
+        # sparse weights types ignored if layers_params are not defined
         if isinstance(self.linear_sparse_weights_type, str):
             self.linear_sparse_weights_type = getattr(
                 nupic_modules, self.linear_sparse_weights_type)

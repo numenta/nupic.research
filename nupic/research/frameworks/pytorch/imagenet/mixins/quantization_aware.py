@@ -121,6 +121,7 @@ class QuantizationAware(object):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("Initialize extra variables for QAT")
         eo["transform_model"].append("Prepare model for Quantization")
+        eo["pre_batch"].append("Freezes observers and batch norm parameters in QAT")
         return eo
 
 def _prepare_for_qat(model, quantize_weights_per_channel, fuse_relu):

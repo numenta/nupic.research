@@ -61,9 +61,6 @@ class BasicBlock(nn.Module):
             ("bn2", norm_layer(planes, **norm_args["bn2"])),
         ]))
 
-        self.quant_ops = nnq.FloatFunctional()
-        self.post_activation = act_layer(planes, **act_args["act2"])
-
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(OrderedDict([
                 ("conv", conv_layer(in_planes, planes, kernel_size=1,
@@ -73,6 +70,9 @@ class BasicBlock(nn.Module):
             ]))
         else:
             self.shortcut = nn.Identity()
+
+        self.post_activation = act_layer(planes, **act_args["act2"])
+        self.quant_ops = nnq.FloatFunctional()
 
     def forward(self, x):
         out = self.regular_path(x)
@@ -146,10 +146,6 @@ class Bottleneck(nn.Module):
             ("bn3", norm_layer(self.expansion * planes, **norm_args["bn3"])),
         ]))
 
-        self.quant_ops = nnq.FloatFunctional()
-        self.post_activation = act_layer(self.expansion * planes,
-                                            **act_args["act3"])
-
         if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(OrderedDict([
                 ("conv", conv_layer(in_planes, self.expansion * planes,
@@ -160,6 +156,10 @@ class Bottleneck(nn.Module):
             ]))
         else:
             self.shortcut = nn.Identity()
+
+        self.post_activation = act_layer(self.expansion * planes,
+                                            **act_args["act3"])
+        self.quant_ops = nnq.FloatFunctional()
 
     def forward(self, x):
         out = self.regular_path(x)
