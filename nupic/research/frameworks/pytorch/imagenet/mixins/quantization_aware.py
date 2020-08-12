@@ -21,7 +21,6 @@
 
 import torch
 import torch.nn.intrinsic as nni
-from nupic.hardware.frameworks.quantization import QATKWINNER_MODULE_MAPPING
 from torch.quantization import (
     DEFAULT_QAT_MODULE_MAPPING,
     DEFAULT_QCONFIG_PROPAGATE_WHITE_LIST,
@@ -35,6 +34,8 @@ from torch.quantization import (
     enable_observer,
 )
 from torch.quantization.quantize import _propagate_qconfig_helper, add_observer_
+
+from nupic.hardware.frameworks.quantization import QATKWINNER_MODULE_MAPPING
 
 QAT_QUANTIZED_MODULE_MAPPING = dict(DEFAULT_QAT_MODULE_MAPPING)
 QAT_QUANTIZED_MODULE_MAPPING.update(QATKWINNER_MODULE_MAPPING)
