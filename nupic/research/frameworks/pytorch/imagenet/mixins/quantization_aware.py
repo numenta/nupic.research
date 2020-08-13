@@ -35,7 +35,7 @@ from torch.quantization import (
 )
 from torch.quantization.quantize import _propagate_qconfig_helper, add_observer_
 
-from nupic.hardware.frameworks.quantization import QATKWINNER_MODULE_MAPPING
+from nupic.research.frameworks.quantization import QATKWINNER_MODULE_MAPPING
 
 QAT_QUANTIZED_MODULE_MAPPING = dict(DEFAULT_QAT_MODULE_MAPPING)
 QAT_QUANTIZED_MODULE_MAPPING.update(QATKWINNER_MODULE_MAPPING)
@@ -85,7 +85,7 @@ class QuantizationAware(object):
         """Prepare model for quantization"""
 
         # prepare model for qat
-        _prepare_for_qat(self.model, self.quantize_weights_per_channel, self.fuse_relu)
+        prepare_for_qat(self.model, self.quantize_weights_per_channel, self.fuse_relu)
         self.model.to(self.device)
 
         # enable observers and fake quantizers to prepare for training
@@ -123,7 +123,7 @@ class QuantizationAware(object):
         return eo
 
 
-def _prepare_for_qat(model, quantize_weights_per_channel, fuse_relu):
+def prepare_for_qat(model, quantize_weights_per_channel, fuse_relu):
     """Prepares model for quantization aware training"""
 
     # fuse models
