@@ -37,7 +37,7 @@ from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
 def load_state_from_checkpoint(
     model,
-    chekpoint_path,
+    checkpoint_path,
     device=None,
     strict=True,
     subset=None,
@@ -49,7 +49,7 @@ def load_state_from_checkpoint(
     A function for flexible loading of torch.nn.Module's.
 
     :param model: model to load state; instance of torch.nn.Module
-    :param chekpoint_path: path to checkpoint
+    :param checkpoint_path: path to checkpoint
     :param device: PyTorch device that the state dict will be mapped to
     :param strict: similar to `strict` of pytorch's `load_state_dict`
     :param subset: List of param names to accompany `strict=True`. This enables a user
@@ -72,12 +72,12 @@ def load_state_from_checkpoint(
                                  compatibility). The output should be new state_dict.
     """
 
-    assert os.path.isfile(chekpoint_path), (
+    assert os.path.isfile(checkpoint_path), (
         "Double check the checkpoint exists and is a file."
     )
 
     # Load the state dict from the checkpoint.
-    state_dict = get_state_dict(chekpoint_path, device)
+    state_dict = get_state_dict(checkpoint_path, device)
 
     assert state_dict is not None, (
         "Couldn't load the state_dict. "
@@ -94,7 +94,7 @@ def load_state_from_checkpoint(
         # Ensure subset is present in the checkpoint's state.
         assert set(subset) <= set(state_dict.keys()), "".join([
             "Found params in the subset which are not present in the checkpoint: ",
-            f"'{chekpoint_path}'"
+            f"'{checkpoint_path}'"
             "Params not present include:"
             f"\n {set(subset) - set(state_dict.keys())}"
         ])
@@ -103,7 +103,7 @@ def load_state_from_checkpoint(
         model_params = model.state_dict()
         assert set(subset) <= set(model_params.keys()), "".join([
             "Found params in the subset which are not present in the model: ",
-            f"'{chekpoint_path}'"
+            f"'{checkpoint_path}'"
             "Params not present include:"
             f"\n {set(subset) - set(model_params.keys())}"
         ])
