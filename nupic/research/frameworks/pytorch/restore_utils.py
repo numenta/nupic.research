@@ -38,6 +38,7 @@ from nupic.torch.modules.sparse_weights import SparseWeightsBase
 def load_state_from_checkpoint(
     model,
     chekpoint_path,
+    device=None,
     strict=True,
     subset=None,
     resize_buffers=False,
@@ -49,6 +50,7 @@ def load_state_from_checkpoint(
 
     :param model: model to load state; instance of torch.nn.Module
     :param chekpoint_path: path to checkpoint
+    :param device: PyTorch device that the state dict will be mapped to
     :param strict: similar to `strict` of pytorch's `load_state_dict`
     :param subset: List of param names to accompany `strict=True`. This enables a user
                    define a set of params that will only be loaded and must be present
@@ -75,7 +77,7 @@ def load_state_from_checkpoint(
     )
 
     # Load the state dict from the checkpoint.
-    state_dict = get_state_dict(chekpoint_path)
+    state_dict = get_state_dict(chekpoint_path, device)
 
     assert state_dict is not None, (
         "Couldn't load the state_dict. "
@@ -220,7 +222,7 @@ def load_multi_state(
 # -------------------
 
 
-def get_state_dict(checkpoint_path):
+def get_state_dict(checkpoint_path, device=None):
 
     checkpoint_path = os.path.expanduser(checkpoint_path)
     with open(checkpoint_path, "rb") as loaded_state:
@@ -228,7 +230,7 @@ def get_state_dict(checkpoint_path):
 
     if "model" in checkpoint_dict:
         with io.BytesIO(checkpoint_dict["model"]) as buffer:
-            state_dict = deserialize_state_dict(buffer)
+            state_dict = deserialize_state_dict(buffer, device)
         return state_dict
     else:
         return None
