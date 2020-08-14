@@ -142,14 +142,10 @@ class SupervisedTrainable(Trainable):
                             f"Pre-Experiment Result: {pre_experiment_result}"
                         )
 
-            status = []
-            for w in self.procs:
-                status.append(w.run_epoch.remote())
+            results = self._run_iteration()
 
-            # Wait for remote functions and check for errors
             # Aggregate the results from all processes
-            if ray_utils.check_for_failure(status):
-                results = ray.get(status)
+            if results is not None:
 
                 # Aggregate results from iteration.
                 ret = self.experiment_class.aggregate_results(results)
@@ -288,6 +284,16 @@ class SupervisedTrainable(Trainable):
 
     def _process_config(self, config):
         pass
+
+    def _run_iteration(self):
+        """Run one epoch of training on each process."""
+        status = []
+        for w in self.procs:
+            status.append(w.run_epoch.remote())
+
+        # Wait for remote functions and check for errors
+        if ray_utils.check_for_failure(status):
+            return ray.get(status)
 
     def _process_result(self, result, pre_experiment_result=None):
 
