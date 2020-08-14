@@ -408,9 +408,9 @@ def run(config):
         kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
                                          *tune.run.__defaults__]))
     else:
-        supervised_trainable = config.get("supervised_trainable", SupervisedTrainable)
-        assert issubclass(supervised_trainable, SupervisedTrainable)
-        kwargs = dict(zip(kwargs_names, [supervised_trainable, *tune.run.__defaults__]))
+        ray_trainable = config.get("ray_trainable", SupervisedTrainable)
+        assert issubclass(ray_trainable, BaseTrainable)
+        kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
 
     # Check if restoring experiment from last known checkpoint
     if config.pop("restore", False):
