@@ -98,6 +98,6 @@ def create_model(model_class, model_args, init_batch_norm, device,
     if checkpoint_file is not None:
         load_ckpt_args = load_checkpoint_args or {}
         load_ckpt_args.setdefault("state_dict_transform", get_compatible_state_dict)
-        load_state_from_checkpoint(model, checkpoint_file, **load_ckpt_args)
+        load_state_from_checkpoint(model, checkpoint_file, device, **load_ckpt_args)
 
     return model
