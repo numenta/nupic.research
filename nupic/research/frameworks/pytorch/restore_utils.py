@@ -50,6 +50,7 @@ def load_state_from_checkpoint(
 
     :param model: model to load state; instance of torch.nn.Module
     :param checkpoint_path: path to checkpoint
+    :param device: PyTorch device that the state dict will be mapped to
     :param strict: similar to `strict` of pytorch's `load_state_dict`
     :param subset: List of param names to accompany `strict=True`. This enables a user
                    define a set of params that will only be loaded and must be present
@@ -69,7 +70,6 @@ def load_state_from_checkpoint(
                                  way; useful for a custom re-mapping such as parameters
                                  with new naming schemes or formats (e.g. backwards
                                  compatibility). The output should be new state_dict.
-    :param device: device to load the model to
     """
 
     assert os.path.isfile(checkpoint_path), (
