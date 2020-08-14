@@ -47,7 +47,7 @@ from nupic.research.support.ray_utils import (
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
-class ImagenetTrainable(Trainable):
+class SupervisedTrainable(Trainable):
     """
     Trainable class used to train resnet50 on Imagenet dataset using ray
     """
@@ -297,7 +297,7 @@ class ImagenetTrainable(Trainable):
         pass
 
 
-class SigOptImagenetTrainable(ImagenetTrainable):
+class SigOptImagenetTrainable(SupervisedTrainable):
     """
     This class updates the config using SigOpt before the models and workers are
     instantiated, and updates the result using SigOpt once training completes.
@@ -379,9 +379,9 @@ def run(config):
         kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
                                          *tune.run.__defaults__]))
     else:
-        imagenet_trainable = config.get("imagenet_trainable", ImagenetTrainable)
-        assert issubclass(imagenet_trainable, ImagenetTrainable)
-        kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
+        supervised_trainable = config.get("supervised_trainable", SupervisedTrainable)
+        assert issubclass(supervised_trainable, SupervisedTrainable)
+        kwargs = dict(zip(kwargs_names, [supervised_trainable, *tune.run.__defaults__]))
 
     # Check if restoring experiment from last known checkpoint
     if config.pop("restore", False):
@@ -415,7 +415,7 @@ def run_single_instance(config):
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-    kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
+    kwargs = dict(zip(kwargs_names, [SupervisedTrainable, *tune.run.__defaults__]))
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
