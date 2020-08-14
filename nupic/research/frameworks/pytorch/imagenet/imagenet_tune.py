@@ -17,6 +17,8 @@
 #
 #  http://numenta.org/licenses/
 #
+
+import abc
 import copy
 import logging
 import os
@@ -47,9 +49,11 @@ from nupic.research.support.ray_utils import (
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
-class SupervisedTrainable(Trainable):
+class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
     """
-    Trainable class used to train resnet50 on Imagenet dataset using ray
+    Trainable class used to train arbitrary experiments with ray. Whatever
+    the case, it's expected to proceed over well-defined iterations. Thus,
+    `_run_iteration` must be overridden.
     """
 
     @classmethod
@@ -284,6 +288,21 @@ class SupervisedTrainable(Trainable):
 
     def _process_config(self, config):
         pass
+
+    @abc.abstractmethod
+    def _run_iteration(self):
+        """Run one iteration of the experiment"""
+        raise NotImplementedError
+
+    def _process_result(self, result, pre_experiment_result=None):
+        pass
+
+
+class SupervisedTrainable(BaseTrainable):
+    """
+    Trainable class used to train supervised machine learning experiments
+    with ray.
+    """
 
     def _run_iteration(self):
         """Run one epoch of training on each process."""
