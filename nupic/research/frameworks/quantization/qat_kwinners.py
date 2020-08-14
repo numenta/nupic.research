@@ -19,9 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import numpy as np
-
-import nupic.torch.functions as F
 from nupic.torch.modules import KWinners, KWinners2d
 
 __all__ = [
@@ -42,7 +39,7 @@ class QATKWinners(KWinners):
     _FLOAT_MODULE = KWinners
 
     def __init__(self, n, percent_on, k_inference_factor, boost_strength_factor,
-                 duty_cycle_period, qconfig):
+                 duty_cycle_period, break_ties, relu, inplace, qconfig):
 
         super().__init__(
             n=n,
@@ -50,18 +47,15 @@ class QATKWinners(KWinners):
             k_inference_factor=k_inference_factor,
             boost_strength_factor=boost_strength_factor,
             duty_cycle_period=duty_cycle_period,
+            break_ties=break_ties,
+            relu=relu,
+            inplace=inplace,
         )
         self.qconfig = qconfig
         self.activation_post_process = qconfig.activation()
 
     def forward(self, x):
-        if self.training:
-            x = F.KWinners.apply(x, self.duty_cycle, self.k, self.boost_strength)
-            self.update_duty_cycle(x)
-        else:
-            x = F.KWinners.apply(x, self.duty_cycle, self.k_inference,
-                                 self.boost_strength)
-
+        x = super().forward(x)
         return self.activation_post_process(x)
 
     @classmethod
@@ -85,6 +79,9 @@ class QATKWinners(KWinners):
             k_inference_factor=mod.k_inference_factor,
             boost_strength_factor=mod.boost_strength_factor,
             duty_cycle_period=mod.duty_cycle_period,
+            break_ties=mod.break_ties,
+            relu=mod.relu,
+            inplace=mod.inplace,
             qconfig=qconfig
         )
         qat_kwinners.boost_strength = mod.boost_strength
@@ -103,7 +100,8 @@ class QATKWinners2d(KWinners2d):
     _FLOAT_MODULE = KWinners2d
 
     def __init__(self, channels, percent_on, k_inference_factor,
-                 boost_strength_factor, duty_cycle_period, local, qconfig):
+                 boost_strength_factor, duty_cycle_period, local,
+                 break_ties, relu, inplace, qconfig):
 
         super().__init__(
             channels=channels,
@@ -111,26 +109,17 @@ class QATKWinners2d(KWinners2d):
             k_inference_factor=k_inference_factor,
             boost_strength_factor=boost_strength_factor,
             duty_cycle_period=duty_cycle_period,
-            local=local
+            local=local,
+            break_ties=break_ties,
+            relu=relu,
+            inplace=inplace,
         )
 
         self.qconfig = qconfig
         self.activation_post_process = qconfig.activation()
 
     def forward(self, x):
-        if self.n == 0:
-            self.n = np.prod(x.shape[1:])
-            if not self.local:
-                self.k = int(round(self.n * self.percent_on))
-                self.k_inference = int(round(self.n * self.percent_on_inference))
-
-        if self.training:
-            x = self.kwinner_function(x, self.duty_cycle, self.k, self.boost_strength)
-            self.update_duty_cycle(x)
-        else:
-            x = self.kwinner_function(x, self.duty_cycle, self.k_inference,
-                                      self.boost_strength)
-
+        x = super().forward(x)
         return self.activation_post_process(x)
 
     @classmethod
@@ -155,6 +144,9 @@ class QATKWinners2d(KWinners2d):
             boost_strength_factor=mod.boost_strength_factor,
             duty_cycle_period=mod.duty_cycle_period,
             local=mod.local,
+            break_ties=mod.break_ties,
+            relu=mod.relu,
+            inplace=mod.inplace,
             qconfig=qconfig
         )
         qat_kwinners.boost_strength = mod.boost_strength

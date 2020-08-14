@@ -231,11 +231,10 @@ class ImagenetExperiment:
 
         # Configure model
         self.device = config.get("device", self.device)
-        self.model = self.create_model(config)
+        self.model = self.create_model(config, from_checkpoint=False)
 
         checkpoint_file = config.get("checkpoint_file", None)
         if checkpoint_file:
-            checkpoint_file = config.get("checkpoint_file", None)
             load_checkpoint_args = config.get("load_checkpoint_args", {})
             self.restore_checkpoint(self.model, checkpoint_file, load_checkpoint_args)
 
@@ -359,8 +358,7 @@ class ImagenetExperiment:
         restore_checkpoint(model, checkpoint_file, load_checkpoint_args)
 
     @classmethod
-    def create_model(cls, config, device=None, checkpoint_file=None,
-                     load_checkpoint_args=None):
+    def create_model(cls, config, device=None, from_checkpoint=True):
         """
         Create imagenet model from an ImagenetExperiment config
         :param config:
@@ -373,7 +371,9 @@ class ImagenetExperiment:
                                model_class as the current experiment.
             - load_checkpoint_args: args to be passed to `load_state_from_checkpoint`
         :param device:
-                Pytorch device
+            Pytorch device
+        :param from_checkpoint:
+            Whether or not to restore checkpoint. Boolean.
 
         :return:
                 Model instance
@@ -383,8 +383,9 @@ class ImagenetExperiment:
             model_args=config.get("model_args", {}),
             init_batch_norm=config.get("init_batch_norm", False),
             device=device,
-            checkpoint_file=checkpoint_file,
-            load_checkpoint_args=load_checkpoint_args,
+            checkpoint_file=config.get("checkpoint_file", None),
+            load_checkpoint_args=config.get("load_checkpoint_args", {}),
+            from_checkpoint=from_checkpoint,
         )
 
     @classmethod

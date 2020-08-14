@@ -44,8 +44,8 @@ class RezeroWeights:
                               float(nonzero_params_sparse2) / params_sparse)
 
     @classmethod
-    def create_model(cls, config):
-        model = super().create_model(config)
+    def create_model(cls, config, device=None, from_checkpoint=True):
+        model = super().create_model(config, device, from_checkpoint)
         # Some initialization strategies can destroy sparsity, so we call rezero
         # here.
         for module in model.modules():
