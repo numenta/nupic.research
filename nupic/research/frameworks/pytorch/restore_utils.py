@@ -69,7 +69,7 @@ def load_state_from_checkpoint(
                                  way; useful for a custom re-mapping such as parameters
                                  with new naming schemes or formats (e.g. backwards
                                  compatibility). The output should be new state_dict.
-    :param device: device to load the model
+    :param device: device to load the model to
     """
 
     assert os.path.isfile(checkpoint_path), (
