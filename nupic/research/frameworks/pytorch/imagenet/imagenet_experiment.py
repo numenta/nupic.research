@@ -42,8 +42,6 @@ from nupic.research.frameworks.pytorch.distributed_sampler import (
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
-    create_train_dataset,
-    create_validation_dataset,
     get_free_port,
     get_node_ip_address,
 )
@@ -291,8 +289,15 @@ class ImagenetExperiment:
         multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
-        self.train_loader = self.create_train_dataloader(config)
-        self.val_loader = self.create_validation_dataloader(config)
+        dataset_class = config.get("dataset", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+        dataset_args = config.get("dataset_args", {})
+        self.dataset = dataset_class(**dataset_args)
+        train_set = self.dataset.get_train_dataset()
+        val_set = self.dataset.get_val_dataset()
+        self.train_loader = self.create_train_dataloader(train_set, config)
+        self.val_loader = self.create_validation_dataloader(val_set, config)
         self.total_batches = len(self.train_loader)
 
         self.epochs_to_validate = config.get("epochs_to_validate",
@@ -392,20 +397,11 @@ class ImagenetExperiment:
                 steps_per_epoch=total_batches)
 
     @classmethod
-    def create_train_dataloader(cls, config):
+    def create_train_dataloader(cls, dataset, config):
         """
         This method is a classmethod so that it can be used directly by analysis
         tools, while also being easily overrideable.
         """
-        dataset = create_train_dataset(
-            data_dir=config["data"],
-            train_dir=config.get("train_dir", "train"),
-            num_classes=config.get("num_classes", 1000),
-            use_auto_augment=config.get("use_auto_augment", False),
-            sample_transform=config.get("sample_transform", None),
-            target_transform=config.get("target_transform", None),
-            replicas_per_sample=config.get("replicas_per_sample", 1),
-        )
 
         if config.get("distributed", False):
             sampler = DistributedSampler(dataset)
@@ -422,16 +418,11 @@ class ImagenetExperiment:
         )
 
     @classmethod
-    def create_validation_dataloader(cls, config):
+    def create_validation_dataloader(cls, dataset, config):
         """
         This method is a classmethod so that it can be used directly by analysis
         tools, while also being easily overrideable.
         """
-        dataset = create_validation_dataset(
-            data_dir=config["data"],
-            val_dir=config.get("val_dir", "val"),
-            num_classes=config.get("num_classes", 1000),
-        )
 
         if config.get("distributed", False):
             sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
