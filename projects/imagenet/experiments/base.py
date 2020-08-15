@@ -131,7 +131,7 @@ DEFAULT = dict(
 
     # Ray tune verbosity. When set to the default value of 2 it will log
     # iteration result dicts. This dict can flood the console if it contains
-    # large data structures, so default to verbose=1. The ImagenetTrainable logs
+    # large data structures, so default to verbose=1. The SupervisedTrainable logs
     # a succinct version of the result dict.
     verbose=1,
 )
