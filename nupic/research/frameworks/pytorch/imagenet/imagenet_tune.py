@@ -428,16 +428,17 @@ def run_single_instance(config):
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
     # pprint(kwargs)
 
-    # current torch distributed approach requires num_samples to be 1
-    num_samples = 1
-    if "num_samples" in kwargs:
-        num_samples = kwargs["num_samples"]
-        kwargs["num_samples"] = 1
-
-    # only run trial collection when more than one sample
+    # only run trial collection if specifically requested
     if config.get("use_trial_collection", False):
+        # current torch distributed approach requires num_samples to be 1
+        num_samples = 1
+        if "num_samples" in kwargs:
+            num_samples = kwargs["num_samples"]
+            kwargs["num_samples"] = 1
+
         trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
         t_init = time.time()
+        
         for config in trials.retrieve():
             t0 = time.time()
             trials.report_progress()
