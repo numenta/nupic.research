@@ -438,7 +438,7 @@ def run_single_instance(config):
 
         trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
         t_init = time.time()
-        
+
         for config in trials.retrieve():
             t0 = time.time()
             trials.report_progress()
