@@ -231,6 +231,8 @@ class ImagenetExperiment:
         # Configure model
         self.device = config.get("device", self.device)
         self.model = self.create_model(config, self.device)
+        self.transform_model()
+
         if self.rank == 0:
             self.logger.debug(self.model)
 
@@ -356,7 +358,7 @@ class ImagenetExperiment:
                                model_class as the current experiment.
             - load_checkpoint_args: args to be passed to `load_state_from_checkpoint`
         :param device:
-                Pytorch device
+            Pytorch device
 
         :return:
                 Model instance
@@ -444,6 +446,10 @@ class ImagenetExperiment:
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
         )
+
+    def transform_model(self):
+        """Placeholder for any model transformation required prior to training"""
+        pass
 
     def should_decay_parameter(self, module, parameter_name, parameter, config):
         if isinstance(module, _BatchNorm):
@@ -849,6 +855,7 @@ class ImagenetExperiment:
         return dict(
             setup_experiment=["ImagenetExperiment.setup_experiment"],
             create_model=["ImagenetExperiment.create_model"],
+            transform_model=["ImagenetExperiment.transform_model"],
             create_train_dataloader=["ImagenetExperiment.create_train_dataloader"],
             create_validation_dataloader=[
                 "ImagenetExperiment.create_validation_dataloader"
