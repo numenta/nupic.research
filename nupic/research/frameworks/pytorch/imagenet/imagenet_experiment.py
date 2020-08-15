@@ -50,7 +50,6 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
 from nupic.research.frameworks.pytorch.imagenet.network_utils import (
     create_model,
     get_compatible_state_dict,
-    restore_checkpoint,
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
@@ -231,15 +230,7 @@ class ImagenetExperiment:
 
         # Configure model
         self.device = config.get("device", self.device)
-        self.model = self.create_model(config, from_checkpoint=False)
-
-        checkpoint_file = config.get("checkpoint_file", None)
-        if checkpoint_file:
-            load_checkpoint_args = config.get("load_checkpoint_args", {})
-            self.restore_checkpoint(self.model, checkpoint_file, load_checkpoint_args)
-
-        # Send to device after loading checkpoint
-        self.transform_model()
+        self.model = self.create_model(config, self.device)
 
         if self.rank == 0:
             self.logger.debug(self.model)
@@ -358,7 +349,7 @@ class ImagenetExperiment:
         restore_checkpoint(model, checkpoint_file, load_checkpoint_args)
 
     @classmethod
-    def create_model(cls, config, device=None, from_checkpoint=True):
+    def create_model(cls, config, device=None):
         """
         Create imagenet model from an ImagenetExperiment config
         :param config:
@@ -372,8 +363,6 @@ class ImagenetExperiment:
             - load_checkpoint_args: args to be passed to `load_state_from_checkpoint`
         :param device:
             Pytorch device
-        :param from_checkpoint:
-            Whether or not to restore checkpoint. Boolean.
 
         :return:
                 Model instance
@@ -385,7 +374,6 @@ class ImagenetExperiment:
             device=device,
             checkpoint_file=config.get("checkpoint_file", None),
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
-            from_checkpoint=from_checkpoint,
         )
 
     @classmethod
@@ -870,8 +858,6 @@ class ImagenetExperiment:
         return dict(
             setup_experiment=["ImagenetExperiment.setup_experiment"],
             create_model=["ImagenetExperiment.create_model"],
-            restore_checkpoint=["ImagenetExperiment.restore_checkpoint"],
-            transform_model=["ImagenetExperiment.transform_model"],
             create_train_dataloader=["ImagenetExperiment.create_train_dataloader"],
             create_validation_dataloader=[
                 "ImagenetExperiment.create_validation_dataloader"

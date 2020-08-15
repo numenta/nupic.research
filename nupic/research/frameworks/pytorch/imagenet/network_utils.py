@@ -71,7 +71,7 @@ def get_compatible_state_dict(state_dict, model):
 
 
 def create_model(model_class, model_args, init_batch_norm, device=None,
-                 checkpoint_file=None, load_checkpoint_args=None, from_checkpoint=True):
+                 checkpoint_file=None, load_checkpoint_args=None):
     """
     Create imagenet experiment model with option to load state from checkpoint
 
@@ -87,8 +87,6 @@ def create_model(model_class, model_args, init_batch_norm, device=None,
         Optional checkpoint file to load model state
     :param load_checkpoint_args:
         Additional args for load_state_from_checkpoint
-    :param from_checkpoint:
-        Whether or not to create model from checkpoint. Boolean, defaults to True.
 
     :return: Configured model
     """
@@ -99,7 +97,7 @@ def create_model(model_class, model_args, init_batch_norm, device=None,
     if device is not None:
         model.to(device)
 
-    if from_checkpoint and checkpoint_file is not None:
+    if checkpoint_file is not None:
         restore_checkpoint(model, checkpoint_file, load_checkpoint_args)
 
     return model

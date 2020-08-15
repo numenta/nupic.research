@@ -35,6 +35,10 @@ from torch.quantization import (
 )
 from torch.quantization.quantize import _propagate_qconfig_helper, add_observer_
 
+from nupic.research.frameworks.pytorch.imagenet.network_utils import (
+    create_model,
+    restore_checkpoint
+)
 from nupic.research.frameworks.quantization import QATKWINNER_MODULE_MAPPING
 
 QAT_QUANTIZED_MODULE_MAPPING = dict(DEFAULT_QAT_MODULE_MAPPING)
@@ -81,8 +85,18 @@ class QuantizationAware(object):
 
         super().setup_experiment(config)
 
-    def transform_model(self):
-        """Prepare model for quantization"""
+    def create_model(self, device):
+        """Create model and prepare for quantization"""
+
+        # load model and restore checkpoint
+        model =  create_model(
+            model_class=config["model_class"],
+            model_args=config.get("model_args", {}),
+            init_batch_norm=config.get("init_batch_norm", False),
+            checkpoint_file=config.get("checkpoint_file", None),
+            load_checkpoint_args=config.get("load_checkpoint_args", {}),
+            device=None,
+        )
 
         # prepare model for qat
         prepare_for_qat(self.model, self.quantize_weights_per_channel, self.fuse_relu)
@@ -93,6 +107,9 @@ class QuantizationAware(object):
         self.model.apply(enable_fake_quant)
         self.observer_disabled = False
         self.batch_norm_frozen = False
+
+        # send to device
+        self.model.to(device)
 
     def pre_batch(self, model, batch_idx):
 
@@ -118,7 +135,7 @@ class QuantizationAware(object):
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("Initialize extra variables for QAT")
-        eo["transform_model"].append("Prepare model for Quantization")
+        eo["create_model"].append("Prepare model for Quantization")
         eo["pre_batch"].append("Freezes observers and batch norm parameters in QAT")
         return eo
 
