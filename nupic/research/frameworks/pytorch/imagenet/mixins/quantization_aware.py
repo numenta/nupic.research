@@ -89,7 +89,7 @@ class QuantizationAware(object):
         """Create model and prepare for quantization"""
 
         # load model and restore checkpoint
-        model =  create_model(
+        model = create_model(
             model_class=config["model_class"],
             model_args=config.get("model_args", {}),
             init_batch_norm=config.get("init_batch_norm", False),
@@ -107,9 +107,6 @@ class QuantizationAware(object):
         self.model.apply(enable_fake_quant)
         self.observer_disabled = False
         self.batch_norm_frozen = False
-
-        # send to device
-        self.model.to(device)
 
     def pre_batch(self, model, batch_idx):
 

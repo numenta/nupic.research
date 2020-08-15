@@ -344,12 +344,7 @@ class ImagenetExperiment:
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
     @classmethod
-    def restore_checkpoint(cls, model, checkpoint_file, load_checkpoint_args):
-        """Load model parameters from checkpoint"""
-        restore_checkpoint(model, checkpoint_file, load_checkpoint_args)
-
-    @classmethod
-    def create_model(cls, config, device=None):
+    def create_model(cls, config, device):
         """
         Create imagenet model from an ImagenetExperiment config
         :param config:
@@ -450,9 +445,6 @@ class ImagenetExperiment:
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
         )
-
-    def transform_model(self):
-        self.model.to(self.device)
 
     def should_decay_parameter(self, module, parameter_name, parameter, config):
         if isinstance(module, _BatchNorm):
