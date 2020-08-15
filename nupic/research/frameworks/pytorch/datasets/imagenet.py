@@ -28,8 +28,8 @@ from torchvision.transforms import RandomResizedCrop
 from nupic.research.frameworks.pytorch.dataset_utils import (
     CachedDatasetFolder,
     HDF5Dataset,
+    ImageNetPolicy,
 )
-from nupic.research.frameworks.pytorch.imagenet.auto_augment import ImageNetPolicy
 
 IMAGENET_NUM_CLASSES = {
     10: [

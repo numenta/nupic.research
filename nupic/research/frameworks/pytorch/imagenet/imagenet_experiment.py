@@ -410,7 +410,10 @@ class SupervisedExperiment:
 
         train_loader = cls.create_train_dataloader(train_set, config)
         val_loader = cls.create_validation_dataloader(val_set, config)
-        test_loader = cls.create_validation_dataloader(test_set, config)
+        test_loader = None
+        if test_set is not None:
+            test_loader = cls.create_validation_dataloader(test_set, config)
+
         return train_loader, val_loader, test_loader
 
     @classmethod

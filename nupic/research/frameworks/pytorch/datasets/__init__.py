@@ -20,3 +20,4 @@
 # ----------------------------------------------------------------------
 
 from .imagenet import ImagenetDataset
+from .common import TorchvisionDataset
