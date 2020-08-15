@@ -26,10 +26,7 @@ from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
 from nupic.research.frameworks.pytorch.dataset_utils import HDF5DataSaver
-from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
-    create_train_dataset,
-    create_validation_dataset,
-)
+from nupic.research.frameworks.pytorch.datasets.imagenet import ImagenetDataset
 
 __all__ = [
     "TempFakeSavedData",
@@ -104,7 +101,7 @@ class TempFakeSavedData(object):
         self.batch_size = batch_size
         self.train_num_classes = len(self.classes["train"])
         self.val_num_classes = len(self.classes["val"])
-        self.train_dataset = create_train_dataset(
+        self.train_dataset = ImagenetDataset.create_train_dataset(
             self.dataset_path, "train", num_classes=self.train_num_classes,
         )
         self.train_dataloader = DataLoader(
@@ -113,7 +110,7 @@ class TempFakeSavedData(object):
             shuffle=True,
             num_workers=num_workers)
 
-        self.val_dataset = create_validation_dataset(
+        self.val_dataset = ImagenetDataset.create_validation_dataset(
             self.dataset_path, "val", num_classes=self.val_num_classes
         )
         self.val_dataloader = DataLoader(
