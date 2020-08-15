@@ -428,41 +428,40 @@ def run_single_instance(config):
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
     # pprint(kwargs)
 
-    # current torch distributed approach requires num_samples to be 1
-    num_samples = 1
-    if "num_samples" in kwargs:
-        num_samples = kwargs["num_samples"]
-        kwargs["num_samples"] = 1
+    # only run trial collection if specifically requested
+    if config.get("use_trial_collection", False):
+        # current torch distributed approach requires num_samples to be 1
+        num_samples = 1
+        if "num_samples" in kwargs:
+            num_samples = kwargs["num_samples"]
+            kwargs["num_samples"] = 1
 
-    trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
-    t_init = time.time()
+        trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
+        t_init = time.time()
 
-    for config in trials.retrieve():
-        t0 = time.time()
-        trials.report_progress()
+        for config in trials.retrieve():
+            t0 = time.time()
+            trials.report_progress()
+            run_trial_single_instance(config, kwargs)
+            # report time elapsed
+            t1 = time.time()
+            print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
+            print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
+            # save trials for later retrieval
+            ray.shutdown()
+            trials.mark_completed(config, save=True)
 
-        # Connect to ray, no specific redis address
-        ray.init(load_code_from_local=True, webui_host="0.0.0.0")
-
-        config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
-        kwargs["config"] = config
-        tune.run(**kwargs)
-        print("**** ended training")
-
-        # report time elapsed
-        t1 = time.time()
-        print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
-        print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
-
+        print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
+              " trials completed")
+    else:
+        run_trial_single_instance(config, kwargs),
         ray.shutdown()
 
-        # save trials for later retrieval
-        trials.mark_completed(config, save=True)
 
-        # sleep to avoid interference between runs
-        time.sleep(2)
-
-        # error message when experiment ends
-
-    print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
-          " trials completed")
+def run_trial_single_instance(config, kwargs):
+    # Connect to ray, no specific redis address
+    ray.init(load_code_from_local=True, webui_host="0.0.0.0")
+    config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
+    kwargs["config"] = config
+    tune.run(**kwargs)
+    print("**** Trial ended")
