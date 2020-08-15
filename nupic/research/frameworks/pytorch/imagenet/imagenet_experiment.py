@@ -37,6 +37,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 
+from nupic.research.frameworks.pytorch.datasets import ImagenetDataset
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
 )
@@ -64,14 +65,17 @@ try:
 except ImportError:
     amp = None
 
-__all__ = ["ImagenetExperiment"]
+__all__ = [
+    "SupervisedExperiment",
+    "ImagenetExperiment",
+]
 
 
 # Improves performance when using fixed size images (224) and CNN
 cudnn.benchmark = True
 
 
-class ImagenetExperiment:
+class SupervisedExperiment:
     """
     Experiment class used to train Sparse and dense versions of Resnet50 v1.5
     models on Imagenet dataset
@@ -867,41 +871,70 @@ class ImagenetExperiment:
     @classmethod
     def get_execution_order(cls):
         return dict(
-            setup_experiment=["ImagenetExperiment.setup_experiment"],
-            create_model=["ImagenetExperiment.create_model"],
-            transform_model=["ImagenetExperiment.transform_model"],
-            create_loaders=["ImagenetExperiment.create_loaders"],
-            create_train_dataloader=["ImagenetExperiment.create_train_dataloader"],
+            setup_experiment=["SupervisedExperiment.setup_experiment"],
+            create_model=["SupervisedExperiment.create_model"],
+            transform_model=["SupervisedExperiment.transform_model"],
+            create_loaders=["SupervisedExperiment.create_loaders"],
+            create_train_dataloader=["SupervisedExperiment.create_train_dataloader"],
             create_validation_dataloader=[
-                "ImagenetExperiment.create_validation_dataloader"
+                "SupervisedExperiment.create_validation_dataloader"
             ],
-            create_lr_scheduler=["ImagenetExperiment.create_lr_scheduler"],
-            pre_experiment=["ImagenetExperiment.pre_experiment"],
-            validate=["ImagenetExperiment.validate"],
-            train_epoch=["ImagenetExperiment.train_epoch"],
-            run_epoch=["ImagenetExperiment.run_epoch"],
-            pre_epoch=["ImagenetExperiment.pre_epoch"],
-            post_epoch=["ImagenetExperiment.post_epoch"],
-            pre_batch=["ImagenetExperiment.pre_batch"],
-            post_batch=["ImagenetExperiment.post_batch"],
-            error_loss=["ImagenetExperiment.error_loss"],
-            complexity_loss=["ImagenetExperiment.complexity_loss"],
+            create_lr_scheduler=["SupervisedExperiment.create_lr_scheduler"],
+            pre_experiment=["SupervisedExperiment.pre_experiment"],
+            validate=["SupervisedExperiment.validate"],
+            train_epoch=["SupervisedExperiment.train_epoch"],
+            run_epoch=["SupervisedExperiment.run_epoch"],
+            pre_epoch=["SupervisedExperiment.pre_epoch"],
+            post_epoch=["SupervisedExperiment.post_epoch"],
+            pre_batch=["SupervisedExperiment.pre_batch"],
+            post_batch=["SupervisedExperiment.post_batch"],
+            error_loss=["SupervisedExperiment.error_loss"],
+            complexity_loss=["SupervisedExperiment.complexity_loss"],
             should_decay_parameter=[
-                "ImagenetExperiment.should_decay_parameter"
+                "SupervisedExperiment.should_decay_parameter"
             ],
             transform_data_to_device=[
-                "ImagenetExperiment.transform_data_to_device"
+                "SupervisedExperiment.transform_data_to_device"
             ],
-            aggregate_results=["ImagenetExperiment.aggregate_results"],
+            aggregate_results=["SupervisedExperiment.aggregate_results"],
             aggregate_validation_results=[
-                "ImagenetExperiment.aggregate_validation_results"
+                "SupervisedExperiment.aggregate_validation_results"
             ],
             aggregate_pre_experiment_results=[
-                "ImagenetExperiment.aggregate_pre_experiment_results"
+                "SupervisedExperiment.aggregate_pre_experiment_results"
             ],
-            get_printable_result=["ImagenetExperiment.get_printable_result"],
+            get_printable_result=["SupervisedExperiment.get_printable_result"],
             expand_result_to_time_series=[
-                "ImagenetExperiment: validation results"
+                "SupervisedExperiment: validation results"
             ],
-            stop_experiment=["ImagenetExperiment.stop_experiment"]
+            stop_experiment=["SupervisedExperiment.stop_experiment"]
         )
+
+
+class ImagenetExperiment(SupervisedExperiment):
+
+    @classmethod
+    def create_loaders(cls, config):
+        dataset = ImagenetDataset
+        dataset_args = {}
+        config.setdefault("dataset", dataset)
+        config.setdefault("dataset_args", dataset_args)
+
+        dataset_args.update(
+            data=config["data"],
+            train_dir=config.get("train_dir", "train"),
+            val_dir=config.get("val_dir", "val"),
+            num_classes=config.get("num_classes", 1000),
+            use_auto_augment=config.get("use_auto_augment", False),
+            sample_transform=config.get("sample_transform", None),
+            target_transform=config.get("target_transform", None),
+            replicas_per_sample=config.get("replicas_per_sample", 1),
+        )
+
+        return super().create_loaders(config)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["create_loaders"].insert(0, "ImagenetExperiment.create_loaders")
+        return eo
