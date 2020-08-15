@@ -17,8 +17,6 @@
 #
 #  http://numenta.org/licenses/
 #
-
-import abc
 import copy
 import logging
 import os
@@ -49,11 +47,9 @@ from nupic.research.support.ray_utils import (
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
-class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
+class ImagenetTrainable(Trainable):
     """
-    Trainable class used to train arbitrary experiments with ray. Whatever
-    the case, it's expected to proceed over well-defined iterations. Thus,
-    `_run_iteration` must be overridden.
+    Trainable class used to train resnet50 on Imagenet dataset using ray
     """
 
     @classmethod
@@ -90,6 +86,8 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
             f"_setup: trial={self._trial_info.trial_name}({self.iteration}), "
             f"config={config}")
 
+        self._validate_immediately = -1 in config.get("epochs_to_validate", [])
+
         # Get checkpoint file to restore the training from
         self.restore_checkpoint_file = config.pop("restore_checkpoint_file", None)
 
@@ -117,7 +115,7 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
             # Check if restore checkpoint file fulfills the stop criteria on first run
-            pre_experiment_result = None
+            initial_val_result = None
             if self._first_run:
                 self._first_run = False
                 if self._restored and self._should_stop():
@@ -130,33 +128,39 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
                         DONE: True
                     }
 
-                # Run any pre-experiment functionality such as pre-training validation.
-                # The results are aggregated here so they may be immediately logged
-                # as opposed to waiting till the end of the iteration.
-                if self._iteration == 0:
+                # This initial validation would be simpler if it were in the
+                # ImagenetExperiment, but doing it here makes it possible to log
+                # the validation results immediately rather than waiting until
+                # the end of the first epoch.
+                if self._iteration == 0 and self._validate_immediately:
+                    self.logger.debug("Validating before any training:")
                     status = []
                     for w in self.procs:
-                        status.append(w.pre_experiment.remote())
+                        status.append(w.validate.remote())
 
-                    agg_pre_exp = self.experiment_class.aggregate_pre_experiment_results
                     if ray_utils.check_for_failure(status):
                         results = ray.get(status)
-                        pre_experiment_result = agg_pre_exp(results)
-                        self.logger.info(
-                            f"Pre-Experiment Result: {pre_experiment_result}"
-                        )
+                        initial_val_result = (
+                            self.experiment_class.aggregate_validation_results(
+                                results))
+                        self.logger.info(initial_val_result)
 
-            results = self._run_iteration()
+            status = []
+            for w in self.procs:
+                status.append(w.run_epoch.remote())
 
+            # Wait for remote functions and check for errors
             # Aggregate the results from all processes
-            if results is not None:
+            if ray_utils.check_for_failure(status):
+                results = ray.get(status)
 
-                # Aggregate results from iteration.
                 ret = self.experiment_class.aggregate_results(results)
-
-                self._process_result(ret, pre_experiment_result)
-                printable_result = self.experiment_class.get_printable_result(ret)
-                self.logger.info(f"End Iteration Result: {printable_result}")
+                if initial_val_result is not None:
+                    ret["extra_val_results"].insert(0, (0, initial_val_result))
+                self.logger.info(
+                    self.experiment_class.get_printable_result(ret)
+                )
+                self._process_result(ret)
 
                 # Check if we should stop the experiment
                 ret[DONE] = self._should_stop()
@@ -289,39 +293,11 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
     def _process_config(self, config):
         pass
 
-    @abc.abstractmethod
-    def _run_iteration(self):
-        """Run one iteration of the experiment"""
-        raise NotImplementedError
-
-    def _process_result(self, result, pre_experiment_result=None):
+    def _process_result(self, result):
         pass
 
 
-class SupervisedTrainable(BaseTrainable):
-    """
-    Trainable class used to train supervised machine learning experiments
-    with ray.
-    """
-
-    def _run_iteration(self):
-        """Run one epoch of training on each process."""
-        status = []
-        for w in self.procs:
-            status.append(w.run_epoch.remote())
-
-        # Wait for remote functions and check for errors
-        if ray_utils.check_for_failure(status):
-            return ray.get(status)
-
-    def _process_result(self, result, pre_experiment_result=None):
-
-        # Aggregate initial validation results (before any training).
-        if pre_experiment_result is not None:
-            result["extra_val_results"].insert(0, (0, pre_experiment_result))
-
-
-class SigOptImagenetTrainable(SupervisedTrainable):
+class SigOptImagenetTrainable(ImagenetTrainable):
     """
     This class updates the config using SigOpt before the models and workers are
     instantiated, and updates the result using SigOpt once training completes.
@@ -369,13 +345,8 @@ class SigOptImagenetTrainable(SupervisedTrainable):
             assert "mean_accuracy" in self.metric_names, \
                 "For now, we only update the observation if `mean_accuracy` is present."
 
-    def _process_result(self, result, pre_experiment_result=None):
-        """
-        Update sigopt with the new result once we're at the end of training.
-        """
-
-        super()._process_result(result, pre_experiment_result=pre_experiment_result)
-
+    def _process_result(self, result):
+        # Update sigopt with the new result once we're at the end
         if self.sigopt is not None:
             result["early_stop"] = result.get("early_stop", 0.0)
             if self.iteration >= self.epochs - 1:
@@ -408,9 +379,9 @@ def run(config):
         kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
                                          *tune.run.__defaults__]))
     else:
-        ray_trainable = config.get("ray_trainable", SupervisedTrainable)
-        assert issubclass(ray_trainable, BaseTrainable)
-        kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
+        imagenet_trainable = config.get("imagenet_trainable", ImagenetTrainable)
+        assert issubclass(imagenet_trainable, ImagenetTrainable)
+        kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
 
     # Check if restoring experiment from last known checkpoint
     if config.pop("restore", False):
@@ -444,7 +415,7 @@ def run_single_instance(config):
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-    kwargs = dict(zip(kwargs_names, [SupervisedTrainable, *tune.run.__defaults__]))
+    kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
