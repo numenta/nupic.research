@@ -289,16 +289,10 @@ class ImagenetExperiment:
         multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
-        dataset_class = config.get("dataset", None)
-        if dataset_class is None:
-            raise ValueError("Must specify 'dataset_class' in config.")
-        dataset_args = config.get("dataset_args", {})
-        self.dataset = dataset_class(**dataset_args)
-        train_set = self.dataset.get_train_dataset()
-        val_set = self.dataset.get_val_dataset()
-        self.train_loader = self.create_train_dataloader(train_set, config)
-        self.val_loader = self.create_validation_dataloader(val_set, config)
-        self.total_batches = len(self.train_loader)
+        self.train_loader, self.val_loader, self.test_loader = (
+            self.create_loaders(config)
+        )
+        self.total_batches = len(self.train_loader,)
 
         self.epochs_to_validate = config.get("epochs_to_validate",
                                              range(self.epochs - 3,
@@ -395,6 +389,25 @@ class ImagenetExperiment:
                 lr_scheduler_class=lr_scheduler_class,
                 lr_scheduler_args=lr_scheduler_args,
                 steps_per_epoch=total_batches)
+
+    @classmethod
+    def create_loaders(cls, config):
+        """Create train, val, and test dataloaders."""
+
+        dataset_class = config.get("dataset", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+        dataset_args = config.get("dataset_args", {})
+        dataset = dataset_class(**dataset_args)
+
+        train_set = dataset.get_train_dataset()
+        val_set = dataset.get_val_dataset()
+        test_set = dataset.get_test_dataset()
+
+        train_loader = cls.create_train_dataloader(train_set, config)
+        val_loader = cls.create_validation_dataloader(val_set, config)
+        test_loader = cls.create_validation_dataloader(test_set, config)
+        return train_loader, val_loader, test_loader
 
     @classmethod
     def create_train_dataloader(cls, dataset, config):
@@ -857,6 +870,7 @@ class ImagenetExperiment:
             setup_experiment=["ImagenetExperiment.setup_experiment"],
             create_model=["ImagenetExperiment.create_model"],
             transform_model=["ImagenetExperiment.transform_model"],
+            create_loaders=["ImagenetExperiment.create_loaders"],
             create_train_dataloader=["ImagenetExperiment.create_train_dataloader"],
             create_validation_dataloader=[
                 "ImagenetExperiment.create_validation_dataloader"
