@@ -925,7 +925,7 @@ class ImagenetExperiment(SupervisedExperiment):
         config.setdefault("dataset_args", dataset_args)
 
         dataset_args.update(
-            data=config["data"],
+            data_path=config["data"],
             train_dir=config.get("train_dir", "train"),
             val_dir=config.get("val_dir", "val"),
             num_classes=config.get("num_classes", 1000),
