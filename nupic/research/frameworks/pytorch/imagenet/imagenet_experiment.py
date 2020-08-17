@@ -398,7 +398,7 @@ class SupervisedExperiment:
     def create_loaders(cls, config):
         """Create train, val, and test dataloaders."""
 
-        dataset_class = config.get("dataset", None)
+        dataset_class = config.get("dataset_class", None)
         if dataset_class is None:
             raise ValueError("Must specify 'dataset_class' in config.")
         dataset_args = config.get("dataset_args", {})
@@ -921,7 +921,7 @@ class ImagenetExperiment(SupervisedExperiment):
     def create_loaders(cls, config):
         dataset = ImagenetDataset
         dataset_args = {}
-        config.setdefault("dataset", dataset)
+        config.setdefault("dataset_class", dataset)
         config.setdefault("dataset_args", dataset_args)
 
         dataset_args.update(
