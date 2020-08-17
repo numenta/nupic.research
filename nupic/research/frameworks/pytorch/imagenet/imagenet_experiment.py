@@ -672,7 +672,8 @@ class SupervisedExperiment:
 
     @classmethod
     def aggregate_pre_experiment_results(cls, results):
-        return cls.aggregate_validation_results(results)
+        if all(results):
+            return cls.aggregate_validation_results(results)
 
     @classmethod
     def get_printable_result(cls, result):
