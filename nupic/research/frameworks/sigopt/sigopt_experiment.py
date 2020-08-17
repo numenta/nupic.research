@@ -26,7 +26,7 @@ from sigopt import Connection
 class SigOptExperiment:
     """
     Class used to wrap around the SigOpt API and designed to be used in any experiment
-    runner. A particular experiment runner, such as ImagenetTrainable, will want to
+    runner. A particular experiment runner, such as SupervisedTrainable, will want to
     subclass and redefine update_config_with_suggestion() to be specific to their
     config.
     """

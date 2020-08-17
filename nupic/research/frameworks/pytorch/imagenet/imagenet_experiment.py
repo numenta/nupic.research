@@ -459,6 +459,12 @@ class ImagenetExperiment:
         else:
             return True
 
+    def pre_experiment(self):
+        """Run validation before training."""
+        if -1 in self.epochs_to_validate:
+            self.logger.debug("Validating before any training:")
+            return self.validate()
+
     def validate(self, loader=None):
         if loader is None:
             loader = self.val_loader
@@ -652,6 +658,11 @@ class ImagenetExperiment:
         result = copy.deepcopy(results[0])
         result.update(aggregate_eval_results(results))
         return result
+
+    @classmethod
+    def aggregate_pre_experiment_results(cls, results):
+        if all(results):
+            return cls.aggregate_validation_results(results)
 
     @classmethod
     def get_printable_result(cls, result):
@@ -861,6 +872,7 @@ class ImagenetExperiment:
                 "ImagenetExperiment.create_validation_dataloader"
             ],
             create_lr_scheduler=["ImagenetExperiment.create_lr_scheduler"],
+            pre_experiment=["ImagenetExperiment.pre_experiment"],
             validate=["ImagenetExperiment.validate"],
             train_epoch=["ImagenetExperiment.train_epoch"],
             run_epoch=["ImagenetExperiment.run_epoch"],
@@ -879,6 +891,9 @@ class ImagenetExperiment:
             aggregate_results=["ImagenetExperiment.aggregate_results"],
             aggregate_validation_results=[
                 "ImagenetExperiment.aggregate_validation_results"
+            ],
+            aggregate_pre_experiment_results=[
+                "ImagenetExperiment.aggregate_pre_experiment_results"
             ],
             get_printable_result=["ImagenetExperiment.get_printable_result"],
             expand_result_to_time_series=[
