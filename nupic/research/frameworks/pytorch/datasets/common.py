@@ -37,12 +37,15 @@ DATASETS_STATS = {
 
 class TorchvisionDataset(object):
 
-    def __init__(self, data_dir, dataset_name="MNIST"):
+    def __init__(self, data_dir, dataset_name, sample_transform=None, target_transform=None):
 
         # TODO: calculate statistics for any torchvision dataset, if not available
         if dataset_name not in DATASETS_STATS.keys():
             raise ValueError(f"{dataset_name} not available.")
-        transform = self.base_transform(*DATASETS_STATS[dataset_name])
+
+        # defaults to base transform
+        if sample_transform is None:
+            transform = self.base_transform(*DATASETS_STATS[dataset_name])
 
         # TODO: rename data to dataset_dir
         dataset_class = getattr(datasets, dataset_name)
@@ -50,6 +53,7 @@ class TorchvisionDataset(object):
             root=os.path.expanduser(data_dir),
             train=True,
             transform=transform,
+            target_transform=target_transform,
             download=False,
         )
 
@@ -57,6 +61,7 @@ class TorchvisionDataset(object):
             root=os.path.expanduser(data_dir),
             train=False,
             transform=transform,
+            target_transform=target_transform,
             download=False,
         )
 
