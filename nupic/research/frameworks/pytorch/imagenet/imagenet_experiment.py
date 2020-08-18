@@ -921,8 +921,8 @@ class SupervisedExperiment:
             stop_experiment=[exp + ".stop_experiment"]
         )
 
-class ContinualLearningExperiment(SupervisedExperiment):
 
+class ContinualLearningExperiment(SupervisedExperiment):
 
     def setup_experiment(self, config):
 
@@ -935,7 +935,7 @@ class ContinualLearningExperiment(SupervisedExperiment):
         # task - we know the task, so the network is multihead
         # class - we don't know the task
         self.cl_experiment_type = config.get("cl_experiment_type", "class")
-        classes_per_task = int(np.floor(self.num_classes / self.num_tasks))
+        classes_per_task = math.floor(self.num_classes / self.num_tasks)
         if self.cl_experiment_type == "task":
             # override the target transform
             self.dataset_args["target_transform"] = (
@@ -952,7 +952,7 @@ class ContinualLearningExperiment(SupervisedExperiment):
     def run_task(self):
         """Run outer loop over tasks"""
         # configure the sampler to load only samples from current task
-        self.train_loader.sampler.set_active_task(self.current_task)
+        self.train_loader.sampler.set_active_tasks(self.current_task)
 
         # run task
         # TODO: return the results from run_epoch
@@ -962,25 +962,37 @@ class ContinualLearningExperiment(SupervisedExperiment):
         # validate
         tasks_results = []
         if self.cl_metric == "acc_at_first_task":
-            self.val_loader.sampler.set_active_task(0)
+            self.val_loader.sampler.set_active_tasks(0)
             ret = self.validate()
+            print(f"Average accuracy {ret['mean_accuracy']}")
+            tasks_results.append(ret)
+        elif self.cl_metric == "acc_at_current_task":
+            self.val_loader.sampler.set_active_tasks(self.current_task)
+            ret = self.validate()
+            print(f"Average accuracy {ret['mean_accuracy']}")
+            tasks_results.append(ret)
+        elif self.cl_metric == "average_acc":
+            self.val_loader.sampler.set_active_tasks(list(range(0, self.current_task+1)))
+            ret = self.validate()
+            print(f"Average accuracy {ret['mean_accuracy']}")
             tasks_results.append(ret)
         else:
             for task in range(0, self.current_task + 1):
-                self.val_loader.sampler.set_active_task(self.current_task)
+                self.val_loader.sampler.set_active_tasks(task)
+                # print("avg", np.mean(self.val_loader.sampler.task_indices[task]))
                 ret = self.validate()
                 print(f"Task {task}, average accuracy {ret['mean_accuracy']}")
                 tasks_results.append(ret)
-  
+
         # calculate some specific CL metric
         cl_ret = self.calculate_cl_metric(tasks_results)
 
         self.current_task += 1
-        print(cl_ret["mean_accuracy"])
+        # print(cl_ret["mean_accuracy"])
         return cl_ret
 
     def calculate_cl_metric(self, task_results):
-        """Function that can calculate any cl metric"""
+        """Calculate any continuous learning metric"""
         # TODO: refactor cl metrics into functions
         # TODO: allow for multiple CL functions
         ret = defaultdict(float)
@@ -1004,14 +1016,14 @@ class ContinualLearningExperiment(SupervisedExperiment):
 
     @classmethod
     def create_train_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config)
+        return cls.create_task_sampler(dataset, config, train=True)
 
     @classmethod
     def create_validation_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config)
+        return cls.create_task_sampler(dataset, config, train=False)
 
     @classmethod
-    def create_task_sampler(cls, dataset, config):
+    def create_task_sampler(cls, dataset, config, train):
         # assume dataloaders are already created
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
@@ -1024,14 +1036,14 @@ class ContinualLearningExperiment(SupervisedExperiment):
         num_tasks = config.get("num_tasks", 1)
 
         task_indices = defaultdict(list)
-        num_classes_per_task = int(np.floor(num_classes / num_tasks))
+        num_classes_per_task = math.floor(num_classes / num_tasks)
         for i in range(num_tasks):   # 1 to 5
             for j in range(num_classes_per_task):  # 1 to 200
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
 
         # change the sampler in the train loader
         distributed = config.get("distributed", False)
-        if distributed:
+        if distributed and train:
             sampler = TaskDistributedSampler(
                 dataset,
                 task_indices
