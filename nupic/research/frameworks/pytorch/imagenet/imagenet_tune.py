@@ -321,6 +321,23 @@ class SupervisedTrainable(BaseTrainable):
             result["extra_val_results"].insert(0, (0, pre_experiment_result))
 
 
+class ContinualLearningTrainable(SupervisedTrainable):
+    """
+    Trainable class used to train supervised machine learning experiments
+    with ray.
+    """
+
+    def _run_iteration(self):
+        """Run one epoch of training on each process."""
+        status = []
+        for w in self.procs:
+            status.append(w.run_task.remote())
+
+        # Wait for remote functions and check for errors
+        if ray_utils.check_for_failure(status):
+            return ray.get(status)
+
+
 class SigOptImagenetTrainable(SupervisedTrainable):
     """
     This class updates the config using SigOpt before the models and workers are
@@ -442,20 +459,28 @@ def run_single_instance(config):
     config["reuse_actors"] = False
     config["dist_port"] = get_free_port()
 
+    # set trainable
+    ray_trainable = config.get("ray_trainable", SupervisedTrainable)
+    assert issubclass(ray_trainable, BaseTrainable)
+
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-    kwargs = dict(zip(kwargs_names, [SupervisedTrainable, *tune.run.__defaults__]))
+    kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
     # Update tune stop criteria with config epochs
     stop = kwargs.get("stop", {}) or dict()
     epochs = config.get("epochs", 1)
-    stop.update(training_iteration=epochs)
+    num_tasks = config.get("num_tasks", None)
+    if num_tasks:
+        stop.update(training_iteration=num_tasks)        
+    else:
+        stop.update(training_iteration=epochs)
     kwargs["stop"] = stop
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
-    # pprint(kwargs)
+    # print(kwargs)
 
     # only run trial collection if specifically requested
     if config.get("use_trial_collection", False):
