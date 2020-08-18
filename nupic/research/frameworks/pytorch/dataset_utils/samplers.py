@@ -51,7 +51,7 @@ class TaskDistributedSampler(DistributedSampler):
 
         indices = self.task_indices[self.active_task]
         if self.shuffle:
-            indices = [indices[i] for i in torch.randperm(len(indices, generator=g))]
+            indices = [indices[i] for i in torch.randperm(len(indices), generator=g)]
 
         # add extra samples to make it evenly divisible
         indices += indices[:(self.total_size - len(indices))]

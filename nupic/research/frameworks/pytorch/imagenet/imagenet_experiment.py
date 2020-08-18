@@ -36,6 +36,7 @@ from torch.nn.modules.batchnorm import _BatchNorm
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
+from torchvision import transforms
 
 from nupic.research.frameworks.pytorch.dataset_utils import TaskRandomSampler, TaskDistributedSampler
 from nupic.research.frameworks.pytorch.datasets import ImagenetDataset
@@ -69,6 +70,7 @@ except ImportError:
 __all__ = [
     "SupervisedExperiment",
     "ImagenetExperiment",
+    "ContinualLearningExperiment"
 ]
 
 
@@ -423,6 +425,7 @@ class SupervisedExperiment:
             sampler = DistributedSampler(dataset)
         else:
             sampler = None
+        return sampler
 
     @classmethod
     def create_train_dataloader(cls, dataset, config):
@@ -448,6 +451,7 @@ class SupervisedExperiment:
             sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
         else:
             sampler = None
+        return sampler
 
     @classmethod
     def create_validation_dataloader(cls, dataset, config):
@@ -489,6 +493,7 @@ class SupervisedExperiment:
         if loader is None:
             loader = self.val_loader
 
+        # print(f"Validating {self.current_task}")
         return self.evaluate_model(
             model=self.model,
             loader=loader,
@@ -916,34 +921,110 @@ class SupervisedExperiment:
             stop_experiment=[exp + ".stop_experiment"]
         )
 
-class ContinuousLearningExperiment(SupervisedExperiment):
+class ContinualLearningExperiment(SupervisedExperiment):
+
+
+    def setup_experiment(self, config):
+
+        super().setup_experiment(config)
+        self.current_task = 0
+        self.cl_metric = config.get("cl_metric", "average_acc")
+
+        self.num_tasks = config.get("num_tasks", 1)
+        # applying target transform depending on type of CL task
+        # task - we know the task, so the network is multihead
+        # class - we don't know the task
+        self.cl_experiment_type = config.get("cl_experiment_type", "class")
+        classes_per_task = int(np.floor(self.num_classes / self.num_tasks))
+        if self.cl_experiment_type == "task":
+            # override the target transform
+            self.dataset_args["target_transform"] = (
+                transforms.Lambda(lambda y: y % classes_per_task)
+            )
+
+    def should_stop(self):
+        """
+        Whether or not the experiment should stop. Usually determined by the
+        number of epochs but customizable to any other stopping criteria
+        """
+        return self.current_task >= self.num_tasks
+
+    def run_task(self):
+        """Run outer loop over tasks"""
+        # configure the sampler to load only samples from current task
+        self.train_loader.sampler.set_active_task(self.current_task)
+
+        # run task
+        # TODO: return the results from run_epoch
+        for _ in range(self.epochs):
+            self.run_epoch()        
+
+        # validate
+        tasks_results = []
+        if self.cl_metric == "acc_at_first_task":
+            self.val_loader.sampler.set_active_task(0)
+            ret = self.validate()
+            tasks_results.append(ret)
+        else:
+            for task in range(0, self.current_task + 1):
+                self.val_loader.sampler.set_active_task(self.current_task)
+                ret = self.validate()
+                print(f"Task {task}, average accuracy {ret['mean_accuracy']}")
+                tasks_results.append(ret)
+  
+        # calculate some specific CL metric
+        cl_ret = self.calculate_cl_metric(tasks_results)
+
+        self.current_task += 1
+        print(cl_ret["mean_accuracy"])
+        return cl_ret
+
+    def calculate_cl_metric(self, task_results):
+        """Function that can calculate any cl metric"""
+        # TODO: refactor cl metrics into functions
+        # TODO: allow for multiple CL functions
+        ret = defaultdict(float)
+        for task_result in task_results:
+            ret["mean_accuracy"] += task_result["mean_accuracy"]
+            ret["mean_loss"] += task_result["mean_loss"]
+            ret["total_correct"] += task_result["total_correct"]
+            ret["total_tested"] += task_result["total_tested"]
+        ret["mean_accuracy"] /= len(task_results)
+        ret["mean_loss"] /= len(task_results)
+
+        # TODO: fix this
+        ret.update(
+            timestep_begin=0,
+            timestep_end=1,
+            learning_rate=self.get_lr()[0],
+            extra_val_results=[],
+        )
+
+        return ret
 
     @classmethod
     def create_train_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config, train=True)
+        return cls.create_task_sampler(dataset, config)
 
     @classmethod
     def create_validation_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config, train=False)
+        return cls.create_task_sampler(dataset, config)
 
     @classmethod
-    def create_task_sampler(cls, dataset, config, train):
+    def create_task_sampler(cls, dataset, config):
         # assume dataloaders are already created
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
-            
+
         # instantiate a new sampler
         num_classes = config.get("num_classes", None)
         assert num_classes is not None, "num_classes should be defined"
 
-        if train:
-            num_tasks = config.get("num_tasks_train", 1)
-        else:
-            num_tasks = config.get("num_tasks_val", 1)
+        num_tasks = config.get("num_tasks", 1)
 
         task_indices = defaultdict(list)
-        num_classes_per_task = np.floor(num_classes / num_tasks)
+        num_classes_per_task = int(np.floor(num_classes / num_tasks))
         for i in range(num_tasks):   # 1 to 5
             for j in range(num_classes_per_task):  # 1 to 200
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
