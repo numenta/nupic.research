@@ -408,6 +408,31 @@ class SigOptImagenetTrainable(SupervisedTrainable):
                     self.sigopt.update_observation(self.suggestion, values=values)
                     print("Full results: ")
                     pprint(result)
+                    
+
+class DebugTrainable(Trainable):
+    """Simple trainable compatible with experiment classes and configs. Used to debug."""
+
+    def __init__(self, config=None, logger_creator=None):
+        Trainable.__init__(self, config=config, logger_creator=logger_creator)
+
+    def _setup(self, config):
+        self.experiment_class = config.get("experiment_class")
+        self.experiment = self.experiment_class()
+        self.experiment.setup_experiment(config)
+
+    def _train(self):
+        ret = self.experiment.run_task()
+        printable_result = self.experiment_class.get_printable_result(ret)
+        print(f"End Iteration Result: {printable_result}")
+
+        return ret
+
+    def _save(self, checkpoint_dir):
+        return dict()
+
+    def _restore(self, checkpoint):
+        pass
 
 
 def run(config):
@@ -461,7 +486,7 @@ def run_single_instance(config):
 
     # set trainable
     ray_trainable = config.get("ray_trainable", SupervisedTrainable)
-    assert issubclass(ray_trainable, BaseTrainable)
+    # assert issubclass(ray_trainable, BaseTrainable)
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
