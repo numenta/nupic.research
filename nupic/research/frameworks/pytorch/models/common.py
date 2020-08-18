@@ -33,7 +33,9 @@ class StandardMLP(nn.Module):
         self.classifier = nn.Sequential(
             Flatten(),
             nn.Linear(int(np.prod(input_size)), 100),
+            nn.ReLU(),
             nn.Linear(100, 100),
+            nn.ReLU(),
             nn.Linear(100, num_classes)
         )
 
