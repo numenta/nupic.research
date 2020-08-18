@@ -23,6 +23,9 @@ import math
 
 import torch
 from torch.utils.data import DistributedSampler, Sampler
+import numpy as np
+
+from collections.abc import Iterable
 
 __all__ = [
     "TaskDistributedSampler",
@@ -36,12 +39,17 @@ class TaskDistributedSampler(DistributedSampler):
     ):
         super().__init__(dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle)
         self.task_indices = task_indices
-        self.set_active_task(0)
+        self.set_active_tasks(0)
 
-    def set_active_task(self, task_index):
-        self.active_task = task_index
-        self.task_length = len(self.task_indices[self.active_task])
-        self.num_samples = int(math.ceil(self.task_length * 1.0 / self.num_replicas))
+    def set_active_tasks(self, task_indices):
+        """Accepts index for task or list of indices"""
+        print(f"Training, setting active task to {task_indices}")
+        self.active_tasks = task_indices
+        if not isinstance(self.active_tasks, Iterable):
+            self.active_tasks = [task_indices]
+        self.indices = np.concatenate([self.task_indices[t] for t in self.active_tasks])
+        self.task_length = len(self.indices)
+        self.num_samples = math.ceil(self.task_length * 1.0 / self.num_replicas)
         self.total_size = self.num_samples * self.num_replicas
 
     def __iter__(self):
@@ -49,7 +57,7 @@ class TaskDistributedSampler(DistributedSampler):
         g = torch.Generator()
         g.manual_seed(self.epoch)
 
-        indices = self.task_indices[self.active_task]
+        indices = self.indices
         if self.shuffle:
             indices = [indices[i] for i in torch.randperm(len(indices), generator=g)]
 
@@ -81,14 +89,17 @@ class TaskRandomSampler(Sampler):
 
     def __init__(self, task_indices):
         self.task_indices = task_indices
-        self.active_task = 0
+        self.set_active_tasks(0)
 
-    def set_active_task(self, task_index):
-        self.active_task = task_index
+    def set_active_tasks(self, task_indices):
+        print(f"Validation, setting active task to {task_indices}")
+        self.active_tasks = task_indices
+        if not isinstance(self.active_tasks, Iterable):
+            self.active_tasks = [task_indices]
+        self.indices = np.concatenate([self.task_indices[t] for t in self.active_tasks])
 
     def __iter__(self):
-        indices = self.task_indices[self.active_task]
-        return (indices[i] for i in torch.randperm(len(indices)))
+        return (self.indices[i] for i in torch.randperm(len(self.indices)))
 
     def __len__(self):
         return len(self.indices)
