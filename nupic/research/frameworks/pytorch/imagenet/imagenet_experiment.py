@@ -37,6 +37,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 
+from nupic.research.frameworks.pytorch.dataset_utils import TaskRandomSampler, TaskDistributedSampler
 from nupic.research.frameworks.pytorch.datasets import ImagenetDataset
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
@@ -417,16 +418,20 @@ class SupervisedExperiment:
         return train_loader, val_loader, test_loader
 
     @classmethod
+    def create_train_sampler(cls, dataset, config):
+        if config.get("distributed", False):
+            sampler = DistributedSampler(dataset)
+        else:
+            sampler = None
+
+    @classmethod
     def create_train_dataloader(cls, dataset, config):
         """
         This method is a classmethod so that it can be used directly by analysis
         tools, while also being easily overrideable.
         """
 
-        if config.get("distributed", False):
-            sampler = DistributedSampler(dataset)
-        else:
-            sampler = None
+        sampler = cls.create_train_sampler(dataset, config)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("batch_size", 1),
@@ -438,16 +443,20 @@ class SupervisedExperiment:
         )
 
     @classmethod
+    def create_validation_sampler(cls, dataset, config):
+        if config.get("distributed", False):
+            sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
+        else:
+            sampler = None
+
+    @classmethod
     def create_validation_dataloader(cls, dataset, config):
         """
         This method is a classmethod so that it can be used directly by analysis
         tools, while also being easily overrideable.
         """
 
-        if config.get("distributed", False):
-            sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
-        else:
-            sampler = None
+        sampler = cls.create_validation_sampler(dataset, config)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("val_batch_size",
@@ -874,45 +883,93 @@ class SupervisedExperiment:
 
     @classmethod
     def get_execution_order(cls):
+        exp = "SupervisedExperiment"
         return dict(
-            setup_experiment=["SupervisedExperiment.setup_experiment"],
-            create_model=["SupervisedExperiment.create_model"],
-            transform_model=["SupervisedExperiment.transform_model"],
-            create_loaders=["SupervisedExperiment.create_loaders"],
-            create_train_dataloader=["SupervisedExperiment.create_train_dataloader"],
-            create_validation_dataloader=[
-                "SupervisedExperiment.create_validation_dataloader"
-            ],
-            create_lr_scheduler=["SupervisedExperiment.create_lr_scheduler"],
-            pre_experiment=["SupervisedExperiment.pre_experiment"],
-            validate=["SupervisedExperiment.validate"],
-            train_epoch=["SupervisedExperiment.train_epoch"],
-            run_epoch=["SupervisedExperiment.run_epoch"],
-            pre_epoch=["SupervisedExperiment.pre_epoch"],
-            post_epoch=["SupervisedExperiment.post_epoch"],
-            pre_batch=["SupervisedExperiment.pre_batch"],
-            post_batch=["SupervisedExperiment.post_batch"],
-            error_loss=["SupervisedExperiment.error_loss"],
-            complexity_loss=["SupervisedExperiment.complexity_loss"],
-            should_decay_parameter=[
-                "SupervisedExperiment.should_decay_parameter"
-            ],
-            transform_data_to_device=[
-                "SupervisedExperiment.transform_data_to_device"
-            ],
-            aggregate_results=["SupervisedExperiment.aggregate_results"],
-            aggregate_validation_results=[
-                "SupervisedExperiment.aggregate_validation_results"
-            ],
+            setup_experiment=[exp + ".setup_experiment"],
+            create_model=[exp + ".create_model"],
+            transform_model=[exp + ".transform_model"],
+            create_loaders=[exp + ".create_loaders"],
+            create_train_dataloader=[exp + ".create_train_dataloader"],
+            create_train_sampler=[exp + ".create_train_sampler"],
+            create_validation_dataloader=[exp + ".create_validation_dataloader"],
+            create_validation_sampler=[exp + ".create_validation_sampler"],
+            create_lr_scheduler=[exp + ".create_lr_scheduler"],
+            pre_experiment=[exp + ".pre_experiment"],
+            validate=[exp + ".validate"],
+            train_epoch=[exp + ".train_epoch"],
+            run_epoch=[exp + ".run_epoch"],
+            pre_epoch=[exp + ".pre_epoch"],
+            post_epoch=[exp + ".post_epoch"],
+            pre_batch=[exp + ".pre_batch"],
+            post_batch=[exp + ".post_batch"],
+            error_loss=[exp + ".error_loss"],
+            complexity_loss=[exp + ".complexity_loss"],
+            should_decay_parameter=[exp + ".should_decay_parameter"],
+            transform_data_to_device=[exp + ".transform_data_to_device"],
+            aggregate_results=[exp + ".aggregate_results"],
+            aggregate_validation_results=[exp + ".aggregate_validation_results"],
             aggregate_pre_experiment_results=[
-                "SupervisedExperiment.aggregate_pre_experiment_results"
+                exp + ".aggregate_pre_experiment_results"
             ],
-            get_printable_result=["SupervisedExperiment.get_printable_result"],
-            expand_result_to_time_series=[
-                "SupervisedExperiment: validation results"
-            ],
-            stop_experiment=["SupervisedExperiment.stop_experiment"]
+            get_printable_result=[exp + ".get_printable_result"],
+            expand_result_to_time_series=[exp + ": validation results"],
+            stop_experiment=[exp + ".stop_experiment"]
         )
+
+class ContinuousLearningExperiment(SupervisedExperiment):
+
+    @classmethod
+    def create_train_sampler(cls, dataset, config):
+        return cls.create_task_sampler(dataset, config, train=True)
+
+    @classmethod
+    def create_validation_sampler(cls, dataset, config):
+        return cls.create_task_sampler(dataset, config, train=False)
+
+    @classmethod
+    def create_task_sampler(cls, dataset, config, train):
+        # assume dataloaders are already created
+        class_indices = defaultdict(list)
+        for idx, (_, target) in enumerate(dataset):
+            class_indices[target].append(idx)
+            
+        # instantiate a new sampler
+        num_classes = config.get("num_classes", None)
+        assert num_classes is not None, "num_classes should be defined"
+
+        if train:
+            num_tasks = config.get("num_tasks_train", 1)
+        else:
+            num_tasks = config.get("num_tasks_val", 1)
+
+        task_indices = defaultdict(list)
+        num_classes_per_task = np.floor(num_classes / num_tasks)
+        for i in range(num_tasks):   # 1 to 5
+            for j in range(num_classes_per_task):  # 1 to 200
+                task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
+
+        # change the sampler in the train loader
+        distributed = config.get("distributed", False)
+        if distributed:
+            sampler = TaskDistributedSampler(
+                dataset,
+                task_indices
+            )
+        else:
+            sampler = TaskRandomSampler(task_indices)
+
+        return sampler
+
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        exp = "ContinualLearningExperiment"
+        eo["create_train_sampler"] = [exp + ".create_train_sampler"]
+        eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
+        eo["create_task_sampler"] = [exp + ".create_task_sampler"]
+        return eo
+
 
 
 class ImagenetExperiment(SupervisedExperiment):
