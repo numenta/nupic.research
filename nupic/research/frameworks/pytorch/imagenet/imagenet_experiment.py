@@ -500,7 +500,7 @@ class SupervisedExperiment:
             device=self.device,
             criterion=self.error_loss,
             complexity_loss_fn=self.complexity_loss,
-            batches_in_epoch=self.batches_in_epoch,
+            batches_in_epoch=sys.maxsize,
             transform_to_device_fn=self.transform_data_to_device,
         )
 
@@ -921,7 +921,6 @@ class SupervisedExperiment:
             stop_experiment=[exp + ".stop_experiment"]
         )
 
-
 class ContinualLearningExperiment(SupervisedExperiment):
 
     def setup_experiment(self, config):
@@ -930,17 +929,30 @@ class ContinualLearningExperiment(SupervisedExperiment):
         self.current_task = 0
         self.cl_metric = config.get("cl_metric", "average_acc")
 
-        self.num_tasks = config.get("num_tasks", 1)
         # applying target transform depending on type of CL task
         # task - we know the task, so the network is multihead
         # class - we don't know the task
         self.cl_experiment_type = config.get("cl_experiment_type", "class")
-        classes_per_task = math.floor(self.num_classes / self.num_tasks)
+
+        # defines how many classes should exist per task
+        self.num_tasks = config.get("num_tasks", 1)
+
+        self.num_classes = config.get("num_classes", None)
+        assert self.num_classes is not None, "num_classes should be defined"
+
+        self.num_classes_per_task = math.floor(self.num_classes / self.num_tasks)
+
         if self.cl_experiment_type == "task":
             # override the target transform
             self.dataset_args["target_transform"] = (
-                transforms.Lambda(lambda y: y % classes_per_task)
+                transforms.Lambda(lambda y: y % self.num_classes_per_task)
             )
+
+        self.freeze_after_first_task = config.get("freeze_after_first_task", False)
+        print("Debugging config")
+        for k in config:
+            if hasattr(self, k):
+                print(k, getattr(self, k))
 
     def should_stop(self):
         """
@@ -954,12 +966,17 @@ class ContinualLearningExperiment(SupervisedExperiment):
         # configure the sampler to load only samples from current task
         self.train_loader.sampler.set_active_tasks(self.current_task)
 
-        # run task
+        if self.freeze_after_first_task and self.current_task > 0:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = 1e-3
+
+        # run epochs, inner loop
         # TODO: return the results from run_epoch
         for _ in range(self.epochs):
-            self.run_epoch()        
+            self.run_epoch()
 
         # validate
+        # TODO: refactor this into a more functional approach
         tasks_results = []
         if self.cl_metric == "acc_at_first_task":
             self.val_loader.sampler.set_active_tasks(0)
@@ -967,6 +984,7 @@ class ContinualLearningExperiment(SupervisedExperiment):
             print(f"Average accuracy {ret['mean_accuracy']}")
             tasks_results.append(ret)
         elif self.cl_metric == "acc_at_current_task":
+            print("Validating...")
             self.val_loader.sampler.set_active_tasks(self.current_task)
             ret = self.validate()
             print(f"Average accuracy {ret['mean_accuracy']}")
@@ -1029,14 +1047,13 @@ class ContinualLearningExperiment(SupervisedExperiment):
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
 
-        # instantiate a new sampler
+        # defines how many classes should exist per task
+        num_tasks = config.get("num_tasks", 1)
         num_classes = config.get("num_classes", None)
         assert num_classes is not None, "num_classes should be defined"
-
-        num_tasks = config.get("num_tasks", 1)
+        num_classes_per_task = math.floor(num_classes / num_tasks)
 
         task_indices = defaultdict(list)
-        num_classes_per_task = math.floor(num_classes / num_tasks)
         for i in range(num_tasks):   # 1 to 5
             for j in range(num_classes_per_task):  # 1 to 200
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
