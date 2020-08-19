@@ -61,7 +61,7 @@ IMAGENET_NUM_CLASSES = {
 }
 
 
-class ImagenetDataset(object):
+class ImagenetDatasetManager(object):
 
     def __init__(
         self, data_path, train_dir="train", val_dir="val", num_classes=1000,
