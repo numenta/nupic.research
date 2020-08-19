@@ -21,3 +21,4 @@
 
 from .imagenet import ImagenetDataset
 from .common import TorchvisionDataset
+from .omniglot import OmniglotDataset
