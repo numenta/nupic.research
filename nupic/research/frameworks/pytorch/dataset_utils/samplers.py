@@ -92,11 +92,12 @@ class TaskRandomSampler(Sampler):
         self.set_active_tasks(0)
 
     def set_active_tasks(self, task_indices):
-        print(f"Validation, setting active task to {task_indices}")
+        print(f"Setting active task to {task_indices}")
         self.active_tasks = task_indices
         if not isinstance(self.active_tasks, Iterable):
             self.active_tasks = [task_indices]
         self.indices = np.concatenate([self.task_indices[t] for t in self.active_tasks])
+        print(self.indices)
 
     def __iter__(self):
         return (self.indices[i] for i in torch.randperm(len(self.indices)))
