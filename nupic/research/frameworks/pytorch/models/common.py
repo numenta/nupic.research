@@ -21,8 +21,6 @@
 import numpy as np
 import torch.nn as nn
 
-from nupic.torch.modules import Flatten
-
 
 class StandardMLP(nn.Module):
 
@@ -31,7 +29,7 @@ class StandardMLP(nn.Module):
         super().__init__()
 
         self.classifier = nn.Sequential(
-            Flatten(),
+            nn.Flatten(),
             nn.Linear(int(np.prod(input_size)), 100),
             nn.Linear(100, 100),
             nn.Linear(100, num_classes)
