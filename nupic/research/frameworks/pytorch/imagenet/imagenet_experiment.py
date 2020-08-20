@@ -1002,7 +1002,6 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
     def aggregate_results(cls, results):
         """Run validation in single GPU"""
         print("Aggregated results")
-        print(results)
         return results[0]
 
     @classmethod
@@ -1041,7 +1040,7 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         else:
             # TODO: implement a TaskDistributedUnpaddedSampler
             # TODO: implement the aggregate results
-            # TODO: after both above are implemented, remove this 
+            # TODO: after above are implemented, remove this if else
             sampler = TaskRandomSampler(task_indices)
 
         return sampler
@@ -1054,6 +1053,9 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         eo["create_train_sampler"] = [exp + ".create_train_sampler"]
         eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
         eo["create_task_sampler"] = [exp + ".create_task_sampler"]
+        eo["run_task"] = [exp + ".run_task"]
+        eo["should_stop"] = [exp + ".should_stop"]
+        eo["aggregate_results"] = [exp + ".aggregate_results"]
         return eo
 
 

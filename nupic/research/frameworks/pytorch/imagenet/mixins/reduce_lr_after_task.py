@@ -36,7 +36,7 @@ class ReduceLRAfterTask:
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = self.new_lr
 
-        super().run_task()
+        return super().run_task()
 
     @classmethod
     def get_execution_order(cls):

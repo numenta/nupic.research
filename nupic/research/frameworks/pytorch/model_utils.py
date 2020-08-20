@@ -112,12 +112,6 @@ def train_model(
         if batch_idx >= batches_in_epoch:
             break
 
-        # print(data.shape)
-        # print(target.shape)
-        # print(torch.equal(data[0], data[0]))
-        # print(torch.equal(data[0], data[-1]))
-        # print(torch.equal(data[1], data[-2]))
-
         num_images = len(target)
         if transform_to_device_fn is None:
             data = data.to(device, non_blocking=async_gpu)
@@ -134,15 +128,6 @@ def train_model(
         output = model(data)
         error_loss = criterion(output, target)
         pred = output.max(1, keepdim=True)[1]
-        # print("correct: ", pred.eq(target.view_as(pred)).sum().item())
-        # print("Predictions Training: ")
-        # print(list(zip(
-        #     pred.eq(target.view_as(pred)).tolist(), 
-        #     output.max(1, keepdim=True)[1][:, 0].tolist(), 
-        #     target.tolist()
-        # )))
-
-        # print(output)
 
         del data, target, output
 
@@ -263,14 +248,6 @@ def evaluate_model(
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
-
-            # print("correct: ", correct.item())
-            # print("Predictions Validation: ")
-            # print(list(zip(
-            #     pred.eq(target.view_as(pred)).tolist(), 
-            #     output.max(1, keepdim=True)[1][:, 0].tolist(), 
-            #     target.tolist()
-            # )))
 
             if post_batch_callback is not None:
                 post_batch_callback(batch_idx=batch_idx, target=target, output=output,
