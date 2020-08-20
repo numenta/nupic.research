@@ -35,46 +35,41 @@ DATASETS_STATS = {
 }
 
 
-class TorchvisionDatasetManager(object):
+def create_torchvision_dataset(data_dir, dataset_name="MNIST"):
+    """
+    Create train and val datsets from torchvision of `dataset_name`.
+    Returns None for test set.
+    """
 
-    def __init__(self, data_dir, dataset_name="MNIST"):
+    # TODO: calculate statistics for any torchvision dataset, if not available
+    if dataset_name not in DATASETS_STATS.keys():
+        raise ValueError(f"{dataset_name} not available.")
+    transform = base_transform(*DATASETS_STATS[dataset_name])
 
-        # TODO: calculate statistics for any torchvision dataset, if not available
-        if dataset_name not in DATASETS_STATS.keys():
-            raise ValueError(f"{dataset_name} not available.")
-        transform = self.base_transform(*DATASETS_STATS[dataset_name])
+    # TODO: rename data to dataset_dir
+    dataset_class = getattr(datasets, dataset_name)
+    train_dataset = dataset_class(
+        root=os.path.expanduser(data_dir),
+        train=True,
+        transform=transform,
+        download=False,
+    )
 
-        # TODO: rename data to dataset_dir
-        dataset_class = getattr(datasets, dataset_name)
-        self.train_dataset = dataset_class(
-            root=os.path.expanduser(data_dir),
-            train=True,
-            transform=transform,
-            download=False,
-        )
+    val_dataset = dataset_class(
+        root=os.path.expanduser(data_dir),
+        train=False,
+        transform=transform,
+        download=False,
+    )
 
-        self.val_dataset = dataset_class(
-            root=os.path.expanduser(data_dir),
-            train=False,
-            transform=transform,
-            download=False,
-        )
+    return train_dataset, val_dataset, None
 
-    def get_train_dataset(self):
-        return self.train_dataset
 
-    def get_val_dataset(self):
-        return self.val_dataset
-
-    def get_test_dataset(self):
-        return None
-
-    @classmethod
-    def base_transform(cls, stats_mean, stats_std):
-        """Convert to tensor and normalize"""
-        return transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(stats_mean, stats_std),
-            ]
-        )
+def base_transform(stats_mean, stats_std):
+    """Convert to tensor and normalize"""
+    return transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize(stats_mean, stats_std),
+        ]
+    )
