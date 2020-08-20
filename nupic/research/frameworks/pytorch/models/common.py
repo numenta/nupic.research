@@ -27,18 +27,24 @@ from nupic.torch.modules import Flatten
 
 class StandardMLP(nn.Module):
 
-    def __init__(self, input_size, num_classes):
+    def __init__(self, input_size, num_classes,
+                 hidden_sizes=[100,100]):
 
         super().__init__()
 
-        self.classifier = nn.Sequential(
+        layers = [
             Flatten(),
-            nn.Linear(int(np.prod(input_size)), 100),
-            nn.ReLU(),
-            nn.Linear(100, 100),
-            nn.ReLU(),
-            nn.Linear(100, num_classes)
-        )
+            nn.Linear(int(np.prod(input_size)), hidden_sizes[0]),
+            nn.ReLU()
+        ]
+        for idx in range(1, len(hidden_sizes)):
+            layers.extend([
+                nn.Linear(hidden_sizes[idx - 1], hidden_sizes[idx]),
+                nn.ReLU()
+            ])
+        layers.append(nn.Linear(hidden_sizes[-1], num_classes))
+
+        self.classifier = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.classifier(x)
