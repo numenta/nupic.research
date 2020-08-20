@@ -21,6 +21,7 @@
 
 import os
 
+from filelock import FileLock
 from torchvision import datasets, transforms
 
 DATASETS_STATS = {
@@ -39,10 +40,6 @@ def create_torchvision_dataset(data_dir, dataset_name="MNIST", download=False):
     """
     Create train and val datsets from torchvision of `dataset_name`.
     Returns None for test set.
-
-    Warning: If you set `download=True`, ensure you're only running on one worker.
-    There may be an error thrown if it's being downloaded via multi-processing to
-    the same directory.
     """
 
     # TODO: calculate statistics for any torchvision dataset, if not available
@@ -52,19 +49,23 @@ def create_torchvision_dataset(data_dir, dataset_name="MNIST", download=False):
 
     # TODO: rename data to dataset_dir
     dataset_class = getattr(datasets, dataset_name)
-    train_dataset = dataset_class(
-        root=os.path.expanduser(data_dir),
-        train=True,
-        transform=transform,
-        download=download,
-    )
+    data_dir = os.path.expanduser(data_dir)
 
-    val_dataset = dataset_class(
-        root=os.path.expanduser(data_dir),
-        train=False,
-        transform=transform,
-        download=download,
-    )
+    with FileLock(f"{data_dir}.lock"):
+
+        train_dataset = dataset_class(
+            root=data_dir,
+            train=True,
+            transform=transform,
+            download=download,
+        )
+
+        val_dataset = dataset_class(
+            root=data_dir,
+            train=False,
+            transform=transform,
+            download=False,
+        )
 
     return train_dataset, val_dataset, None
 
