@@ -35,7 +35,7 @@ DATASETS_STATS = {
 }
 
 
-class TorchvisionDataset(object):
+class TorchvisionDatasetManager(object):
 
     def __init__(self, data_dir, dataset_name, sample_transform=None, target_transform=None):
 

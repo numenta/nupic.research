@@ -38,8 +38,8 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import transforms
 
+from nupic.research.frameworks.pytorch.datasets import ImagenetDatasetManager
 from nupic.research.frameworks.pytorch.dataset_utils import TaskRandomSampler, TaskDistributedSampler
-from nupic.research.frameworks.pytorch.datasets import ImagenetDataset
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
 )
@@ -401,15 +401,15 @@ class SupervisedExperiment:
     def create_loaders(cls, config):
         """Create train, val, and test dataloaders."""
 
-        dataset_class = config.get("dataset_class", None)
-        if dataset_class is None:
-            raise ValueError("Must specify 'dataset_class' in config.")
+        dataset_manager_class = config.get("dataset_manager_class", None)
+        if dataset_manager_class is None:
+            raise ValueError("Must specify 'dataset_manager_class' in config.")
         dataset_args = config.get("dataset_args", {})
-        dataset = dataset_class(**dataset_args)
+        dataset_manager = dataset_manager_class(**dataset_args)
 
-        train_set = dataset.get_train_dataset()
-        val_set = dataset.get_val_dataset()
-        test_set = dataset.get_test_dataset()
+        train_set = dataset_manager.get_train_dataset()
+        val_set = dataset_manager.get_val_dataset()
+        test_set = dataset_manager.get_test_dataset()
 
         train_loader = cls.create_train_dataloader(train_set, config)
         val_loader = cls.create_validation_dataloader(val_set, config)
@@ -1086,9 +1086,9 @@ class ImagenetExperiment(SupervisedExperiment):
 
     @classmethod
     def create_loaders(cls, config):
-        dataset = ImagenetDataset
+        dataset_manager = ImagenetDatasetManager
         dataset_args = {}
-        config.setdefault("dataset_class", dataset)
+        config.setdefault("dataset_manager_class", dataset_manager)
         config.setdefault("dataset_args", dataset_args)
 
         dataset_args.update(
