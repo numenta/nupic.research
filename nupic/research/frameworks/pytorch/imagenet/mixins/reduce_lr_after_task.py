@@ -19,20 +19,28 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .constrain_parameters import ConstrainParameters
-from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
-from .log_backprop_structure import LogBackpropStructure
-from .log_covariance import LogCovariance
-from .log_every_learning_rate import LogEveryLearningRate
-from .log_every_loss import LogEveryLoss
-from .lr_range_test import LRRangeTest, create_lr_test_experiment
-from .maxup import MaxupStandard, MaxupPerSample
-from .profile import Profile
-from .profile_autograd import ProfileAutograd
-from .regularize_loss import RegularizeLoss
-from .rezero_weights import RezeroWeights
-from .update_boost_strength import UpdateBoostStrength
-from .cutmix import CutMix, CutMixKnowledgeDistillation
-from .composite_loss import CompositeLoss
-from .quantization_aware import QuantizationAware
-from .reduce_lr_after_task import ReduceLRAfterTask
+
+class ReduceLRAfterTask:
+    """
+    Freeze after params after task k.
+    """
+    def setup_experiment(self, config):
+        super().setup_experiment(config)
+        self.task_when_reduce_lr = config.get("task_when_reduce_lr", 0)
+        self.new_lr = config.get("new_lr", 1e-3)
+
+    def run_task(self):
+        """Run outer loop over tasks"""
+        # configure the sampler to load only samples from current task
+        if self.current_task >= self.task_when_reduce_lr:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = self.new_lr
+
+        super().run_task()
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].append("Freeze after task params")
+        eo["run_task"].insert(0, "Reduce LR for all weights")
+        return eo
