@@ -36,7 +36,7 @@ DATASETS_STATS = {
 }
 
 
-def create_torchvision_dataset(data_dir, dataset_name="MNIST", download=False):
+def create_torchvision_datasets(data_dir, dataset_name="MNIST", download=False):
     """
     Create train and val datsets from torchvision of `dataset_name`.
     Returns None for test set.

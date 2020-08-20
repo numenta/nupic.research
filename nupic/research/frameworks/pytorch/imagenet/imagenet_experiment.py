@@ -37,7 +37,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 
-from nupic.research.frameworks.pytorch.datasets import create_imagenet_dataset
+from nupic.research.frameworks.pytorch.datasets import create_imagenet_datasets
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
 )
@@ -918,7 +918,7 @@ class ImagenetExperiment(SupervisedExperiment):
 
     @classmethod
     def create_loaders(cls, config):
-        create_datasets = create_imagenet_dataset
+        create_datasets = create_imagenet_datasets
         dataset_args = {}
         config.setdefault("create_datasets_func", create_datasets)
         config.setdefault("dataset_args", dataset_args)

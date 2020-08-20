@@ -61,7 +61,7 @@ IMAGENET_NUM_CLASSES = {
 }
 
 
-def create_imagenet_dataset(
+def create_imagenet_datasets(
     data_path, train_dir="train", val_dir="val", num_classes=1000,
     use_auto_augment=False, sample_transform=None, target_transform=None,
     replicas_per_sample=1
