@@ -37,7 +37,12 @@ DATASETS_STATS = {
 
 class TorchvisionDatasetManager(object):
 
-    def __init__(self, data_dir, dataset_name, sample_transform=None, target_transform=None):
+    def __init__(self, data_dir, dataset_name=None, 
+                 sample_transform=None, target_transform=None):
+
+        if dataset_name is None:
+            raise ValueError(f"{dataset_name} has to be defined "
+                             "for TorchVision Datasets.")
 
         # TODO: calculate statistics for any torchvision dataset, if not available
         if dataset_name not in DATASETS_STATS.keys():

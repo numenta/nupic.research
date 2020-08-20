@@ -61,6 +61,7 @@ from nupic.research.frameworks.pytorch.model_utils import (
     set_random_seed,
     train_model,
 )
+from nupic.research.frameworks.pytorch.imagenet.evaluation_metrics import ContinualLearningMetrics
 
 try:
     from apex import amp
@@ -93,6 +94,7 @@ class SupervisedExperiment:
         self.val_loader = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batches_in_epoch = sys.maxsize
+        self.batches_in_epoch_val = sys.maxsize
         self.batch_size = 1
         self.epochs = 1
         self.distributed = False
@@ -151,6 +153,8 @@ class SupervisedExperiment:
             - epochs: Number of epochs to train
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
+            - batches_in_epoch_val: Number of batches per epoch in validation.
+                                   Useful for debugging
             - log_timestep_freq: Configures mixins and subclasses that log every
                                  timestep to only log every nth timestep (in
                                  addition to the final timestep of each epoch).
@@ -286,6 +290,7 @@ class SupervisedExperiment:
         self.num_classes = config.get("num_classes", 1000)
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
+        self.batches_in_epoch_val = config.get("batches_in_epoch_val", sys.maxsize)
         self.current_epoch = 0
 
         # Get initial batch size
@@ -500,7 +505,7 @@ class SupervisedExperiment:
             device=self.device,
             criterion=self.error_loss,
             complexity_loss_fn=self.complexity_loss,
-            batches_in_epoch=sys.maxsize,
+            batches_in_epoch=self.batches_in_epoch_val,
             transform_to_device_fn=self.transform_data_to_device,
         )
 
@@ -921,18 +926,15 @@ class SupervisedExperiment:
             stop_experiment=[exp + ".stop_experiment"]
         )
 
-class ContinualLearningExperiment(SupervisedExperiment):
+class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment):
 
     def setup_experiment(self, config):
 
         super().setup_experiment(config)
-        self.current_task = 0
-        self.cl_metric = config.get("cl_metric", "average_acc")
+        # override epochs to validate to not validate within the inner loop over epochs
+        self.epochs_to_validate = []
 
-        # applying target transform depending on type of CL task
-        # task - we know the task, so the network is multihead
-        # class - we don't know the task
-        self.cl_experiment_type = config.get("cl_experiment_type", "class")
+        self.current_task = 0
 
         # defines how many classes should exist per task
         self.num_tasks = config.get("num_tasks", 1)
@@ -942,17 +944,22 @@ class ContinualLearningExperiment(SupervisedExperiment):
 
         self.num_classes_per_task = math.floor(self.num_classes / self.num_tasks)
 
+        # applying target transform depending on type of CL task
+        # task - we know the task, so the network is multihead
+        # class - we don't know the task
+        self.cl_experiment_type = config.get("cl_experiment_type", "class")
         if self.cl_experiment_type == "task":
             # override the target transform
             self.dataset_args["target_transform"] = (
                 transforms.Lambda(lambda y: y % self.num_classes_per_task)
             )
 
-        self.freeze_after_first_task = config.get("freeze_after_first_task", False)
-        print("Debugging config")
-        for k in config:
-            if hasattr(self, k):
-                print(k, getattr(self, k))
+        # whitelist evaluation metrics
+        self.evaluation_metrics = config.get("evaluation_metrics", ["eval_all_visited_tasks"])
+        for metric in self.evaluation_metrics:
+            if not hasattr(self, metric):
+                raise ValueError(f"Metric {metric} not available.")
+
 
     def should_stop(self):
         """
@@ -964,63 +971,21 @@ class ContinualLearningExperiment(SupervisedExperiment):
     def run_task(self):
         """Run outer loop over tasks"""
         # configure the sampler to load only samples from current task
+        print("Training...")
         self.train_loader.sampler.set_active_tasks(self.current_task)
-
-        if self.freeze_after_first_task and self.current_task > 0:
-            for param_group in self.optimizer.param_groups:
-                param_group['lr'] = 1e-3
 
         # run epochs, inner loop
         # TODO: return the results from run_epoch
         for _ in range(self.epochs):
             self.run_epoch()
 
-        # validate
-        # TODO: refactor this into a more functional approach
-        tasks_results = []
-        if self.cl_metric == "acc_at_first_task":
-            self.val_loader.sampler.set_active_tasks(0)
-            ret = self.validate()
-            print(f"Average accuracy {ret['mean_accuracy']}")
-            tasks_results.append(ret)
-        elif self.cl_metric == "acc_at_current_task":
-            print("Validating...")
-            self.val_loader.sampler.set_active_tasks(self.current_task)
-            ret = self.validate()
-            print(f"Average accuracy {ret['mean_accuracy']}")
-            tasks_results.append(ret)
-        elif self.cl_metric == "average_acc":
-            self.val_loader.sampler.set_active_tasks(list(range(0, self.current_task+1)))
-            ret = self.validate()
-            print(f"Average accuracy {ret['mean_accuracy']}")
-            tasks_results.append(ret)
-        else:
-            for task in range(0, self.current_task + 1):
-                self.val_loader.sampler.set_active_tasks(task)
-                # print("avg", np.mean(self.val_loader.sampler.task_indices[task]))
-                ret = self.validate()
-                print(f"Task {task}, average accuracy {ret['mean_accuracy']}")
-                tasks_results.append(ret)
-
-        # calculate some specific CL metric
-        cl_ret = self.calculate_cl_metric(tasks_results)
-
-        self.current_task += 1
-        # print(cl_ret["mean_accuracy"])
-        return cl_ret
-
-    def calculate_cl_metric(self, task_results):
-        """Calculate any continuous learning metric"""
-        # TODO: refactor cl metrics into functions
-        # TODO: allow for multiple CL functions
-        ret = defaultdict(float)
-        for task_result in task_results:
-            ret["mean_accuracy"] += task_result["mean_accuracy"]
-            ret["mean_loss"] += task_result["mean_loss"]
-            ret["total_correct"] += task_result["total_correct"]
-            ret["total_tested"] += task_result["total_tested"]
-        ret["mean_accuracy"] /= len(task_results)
-        ret["mean_loss"] /= len(task_results)
+        ret = {}
+        for metric in self.evaluation_metrics:
+            eval_function = getattr(self, metric)
+            temp_ret = eval_function()
+            print(temp_ret)
+            for k, v in temp_ret.items():
+                ret[f"{metric}__{k}"] = v
 
         # TODO: fix this
         ret.update(
@@ -1030,7 +995,15 @@ class ContinualLearningExperiment(SupervisedExperiment):
             extra_val_results=[],
         )
 
+        self.current_task += 1
         return ret
+
+    @classmethod
+    def aggregate_results(cls, results):
+        """Run validation in single GPU"""
+        print("Aggregated results")
+        print(results)
+        return results[0]
 
     @classmethod
     def create_train_sampler(cls, dataset, config):
@@ -1066,6 +1039,9 @@ class ContinualLearningExperiment(SupervisedExperiment):
                 task_indices
             )
         else:
+            # TODO: implement a TaskDistributedUnpaddedSampler
+            # TODO: implement the aggregate results
+            # TODO: after both above are implemented, remove this 
             sampler = TaskRandomSampler(task_indices)
 
         return sampler

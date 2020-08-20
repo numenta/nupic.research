@@ -23,21 +23,24 @@ import os
 
 from torchvision import datasets, transforms
 
-class OmniglotDataset(object):
+class OmniglotDatasetManager(object):
 
     def __init__(self, data_dir, sample_transform=None, target_transform=None):
         """
         Regular Torchvision dataset. 
+        Each classes contains 20 samples. 
+        Omniglot contains characters from 50 different languages
 
-        background (bool, optional): If True, creates dataset from the "background" set, otherwise
-            creates from the "evaluation" set. This terminology is defined by the authors.
+        background (bool, optional): 
+            If True, creates dataset from the "background" set, otherwise
+            creates from the "evaluation" set.
+            Background contains 964 classes, and evaluation 659 classes, all unique
         """
 
         # defaults to base transform
         if sample_transform is None:
             transform = self.base_transform()
 
-        # TODO: rename data to dataset_dir
         dataset_class = datasets.Omniglot
         self.train_dataset = dataset_class(
             root=os.path.expanduser(data_dir),
@@ -47,13 +50,8 @@ class OmniglotDataset(object):
             download=False,
         )
 
-        self.val_dataset = dataset_class(
-            root=os.path.expanduser(data_dir),
-            background=True,
-            transform=transform,
-            target_transform=target_transform,
-            download=False,
-        )
+        # no train and val in omniglot
+        self.val_dataset = self.train_dataset
 
     def get_train_dataset(self):
         return self.train_dataset
@@ -67,8 +65,4 @@ class OmniglotDataset(object):
     @classmethod
     def base_transform(cls):
         """Convert to tensor. Omniglot is already normalized"""
-        return transforms.Compose(
-            [
-                transforms.ToTensor(),
-            ]
-        )
+        return transforms.ToTensor()
