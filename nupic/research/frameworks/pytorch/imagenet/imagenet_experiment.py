@@ -77,8 +77,7 @@ cudnn.benchmark = True
 
 class SupervisedExperiment:
     """
-    Experiment class used to train Sparse and dense versions of Resnet50 v1.5
-    models on Imagenet dataset
+    General experiment class used to train neural networks in supervised learning tasks.
     """
 
     def __init__(self):
@@ -912,6 +911,10 @@ class SupervisedExperiment:
 
 
 class ImagenetExperiment(SupervisedExperiment):
+    """
+    Experiment class used to train Sparse and dense versions of Resnet50 v1.5
+    models on Imagenet dataset
+    """
 
     @classmethod
     def create_loaders(cls, config):
