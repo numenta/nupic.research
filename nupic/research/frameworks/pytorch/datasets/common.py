@@ -35,10 +35,14 @@ DATASETS_STATS = {
 }
 
 
-def create_torchvision_dataset(data_dir, dataset_name="MNIST"):
+def create_torchvision_dataset(data_dir, dataset_name="MNIST", download=False):
     """
     Create train and val datsets from torchvision of `dataset_name`.
     Returns None for test set.
+
+    Warning: If you set `download=True`, ensure you're only running on one worker.
+    There may be an error thrown if it's being downloaded via multi-processing to
+    the same directory.
     """
 
     # TODO: calculate statistics for any torchvision dataset, if not available
@@ -52,14 +56,14 @@ def create_torchvision_dataset(data_dir, dataset_name="MNIST"):
         root=os.path.expanduser(data_dir),
         train=True,
         transform=transform,
-        download=False,
+        download=download,
     )
 
     val_dataset = dataset_class(
         root=os.path.expanduser(data_dir),
         train=False,
         transform=transform,
-        download=False,
+        download=download,
     )
 
     return train_dataset, val_dataset, None
