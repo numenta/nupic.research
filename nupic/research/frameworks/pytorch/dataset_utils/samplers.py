@@ -41,16 +41,16 @@ class TaskDistributedSampler(DistributedSampler):
         self.task_indices = task_indices
         self.set_active_tasks(0)
 
-    def set_active_tasks(self, task_indices):
+    def set_active_tasks(self, tasks):
         """Accepts index for task or list of indices"""
-        print(f"Training, setting active task to {task_indices}")
-        self.active_tasks = task_indices
+        # print(f"Setting active task to {tasks}")
+        self.active_tasks = tasks
         if not isinstance(self.active_tasks, Iterable):
-            self.active_tasks = [task_indices]
+            self.active_tasks = [tasks]
         self.indices = np.concatenate([self.task_indices[t] for t in self.active_tasks])
-        self.task_length = len(self.indices)
-        self.num_samples = math.ceil(self.task_length * 1.0 / self.num_replicas)
+        self.num_samples = math.ceil(len(self.indices) * 1.0 / self.num_replicas)
         self.total_size = self.num_samples * self.num_replicas
+        # print(self.indices[:100])
 
     def __iter__(self):
         # deterministically shuffle based on epoch
@@ -60,6 +60,8 @@ class TaskDistributedSampler(DistributedSampler):
         indices = self.indices
         if self.shuffle:
             indices = [indices[i] for i in torch.randperm(len(indices), generator=g)]
+        # print("inside one iteration")
+        # print(indices[:100])
 
         # add extra samples to make it evenly divisible
         indices += indices[:(self.total_size - len(indices))]
@@ -91,13 +93,13 @@ class TaskRandomSampler(Sampler):
         self.task_indices = task_indices
         self.set_active_tasks(0)
 
-    def set_active_tasks(self, task_indices):
-        print(f"Setting active task to {task_indices}")
-        self.active_tasks = task_indices
+    def set_active_tasks(self, tasks):
+        # print(f"Setting active task to {tasks}")
+        self.active_tasks = tasks
         if not isinstance(self.active_tasks, Iterable):
-            self.active_tasks = [task_indices]
+            self.active_tasks = [tasks]
         self.indices = np.concatenate([self.task_indices[t] for t in self.active_tasks])
-        print(self.indices)
+        # print(self.indices[:100])
 
     def __iter__(self):
         return (self.indices[i] for i in torch.randperm(len(self.indices)))
