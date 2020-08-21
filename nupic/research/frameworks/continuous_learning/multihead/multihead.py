@@ -34,7 +34,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 from tqdm import tqdm
 
-from nupic.research.frameworks.pytorch.dataset_utils.dataset_utils import split_dataset
+from nupic.research.frameworks.pytorch.dataset_utils import split_dataset
 
 
 def train_head(model, loader, optimizer, criterion, device, active_classes=None,
