@@ -1057,6 +1057,87 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         return eo
 
 
+class MetaContinualLearningExperiment(SupervisedExperiment):
+
+    def setup_experiment(self, config):
+
+        self.epochs_to_validate = []
+        self.num_tasks_train = config.get("num_tasks_train", 200)
+        self.num_tasks_test = config.get("num_tasks_test", 1000)
+
+        # optimizer for outer loop
+        meta_optimizer_class = config.get("meta_optimizer_class", torch.optim.Adam)
+        meta_optimizer_args = config.get("meta_optimizer_args", {})
+        self.meta_optimizer = meta_optimizer_class(
+            self.model.parameters(), **meta_optimizer_args
+        )
+
+
+
+    def run_meta_epoch(self):
+
+        tasks_train = np.random.choice(958, self.num_tasks_train, replace=False)
+
+        # copy weights
+        adaptation_params = self.copy_adaptation_params()
+
+        test_data, test_targets = [], []
+
+        for task in tasks_train:
+            self.run_task(task)
+
+            # collect test data
+            data, target = next(self.train_loader)
+            test_data.append(data)
+            test_targets.append(targets)
+
+        test_data = torch.stack(test_data)
+        test_targets = torch.stack(test_targets)
+
+        test_output = self.model(test_data)
+        test_loss = self.loss_func(test_output, test_target)
+        test_loss.backward()
+
+        # restore weights before calling `step`
+        self.set_adaptation_params(adaptation_params)
+
+        self.meta_optimizer.step()
+
+        # report statistics
+        test_pred = test_output.max(1, keepdim=True)[1]
+        test_correct += test_pred.eq(test_target.view_as(test_pred)).sum()
+        test_total = test_output.shape[0]
+        result = {
+            "total_correct": test_correct,
+            "total_tested": test_total,
+            "mean_loss": test_loss,
+            "mean_accuracy": test_correct / test_total if total > 0 else 0,
+        }
+        return result
+
+
+    def run_task(self, task):
+        self.train_loader.sampler.set_active_tasks(task)
+
+        for _ in range(self.epochs):
+            self.run_epoch()
+
+
+    def copy_adaptation_params(self):
+        for param in self.model.adaptation.parameters():
+            adaptation_params.append(param.data.clone().detach())
+        return adaptation_params
+
+
+    def set_adaptation_params(self, adaptation_params):
+        for idx, param in enumerate(adaptation_params):
+            self.model.adaptation[idx].data = param
+
+
+    def validate(self, output, target):
+        pred = output.max(1, keepdim=True)[1]
+        correct += pred.eq(target.view_as(pred)).sum()
+
 
 class ImagenetExperiment(SupervisedExperiment):
 
