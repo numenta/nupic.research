@@ -92,7 +92,7 @@ class ImagenetExperimentUtilsTest(unittest.TestCase):
     def setUp(self):
         set_random_seed(42)
 
-    def test_creaate_model_from_checkpoint(self):
+    def test_create_model_from_checkpoint(self):
         model1 = _create_test_model()
 
         # Save model checkpoint only, ignoring optimizer and other imagenet
