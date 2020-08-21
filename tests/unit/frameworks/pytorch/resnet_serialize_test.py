@@ -44,7 +44,7 @@ class ResNetSerialization(unittest.TestCase):
         model = create_model(
             model_class=model_class,
             model_args=model_args,
-            init_batch_norm=False,
+            init_model_fn=None,
             device=device,
         )
 
@@ -60,7 +60,7 @@ class ResNetSerialization(unittest.TestCase):
             model2 = create_model(
                 model_class=model_class,
                 model_args=model_args,
-                init_batch_norm=False,
+                init_model_fn=None,
                 device=device,
                 checkpoint_file=checkpoint_file.name
             )
@@ -77,7 +77,7 @@ class ResNetSerialization(unittest.TestCase):
         model = create_model(
             model_class=model_class,
             model_args=model_args,
-            init_batch_norm=False,
+            init_model_fn=None,
             device=device,
         )
 
@@ -93,7 +93,7 @@ class ResNetSerialization(unittest.TestCase):
             model2 = create_model(
                 model_class=model_class,
                 model_args=model_args,
-                init_batch_norm=False,
+                init_model_fn=None,
                 device=device,
                 checkpoint_file=checkpoint_file.name
             )

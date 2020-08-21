@@ -49,6 +49,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
 from nupic.research.frameworks.pytorch.imagenet.network_utils import (
     create_model,
     get_compatible_state_dict,
+    init_resnet50_batch_norm,
 )
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
@@ -124,8 +125,8 @@ class SupervisedExperiment:
             - num_classes: Limit the dataset size to the given number of classes
             - model_class: Model class. Must inherit from "torch.nn.Module"
             - model_args: model model class arguments passed to the constructor
-            - init_batch_norm: Whether or not to Initialize running batch norm
-                               mean to 0.
+            - init_model_fn: Initialization function to apply to the modules
+                             via model.apply
             - optimizer_class: Optimizer class.
                                Must inherit from "torch.optim.Optimizer"
             - optimizer_args: Optimizer class class arguments passed to the
@@ -353,8 +354,8 @@ class SupervisedExperiment:
         :param config:
             - model_class: Model class. Must inherit from "torch.nn.Module"
             - model_args: model model class arguments passed to the constructor
-            - init_batch_norm: Whether or not to Initialize running batch norm
-                               mean to 0.
+            - init_model_fn: Initialization function to apply to the modules
+                             via model.apply
             - checkpoint_file: if not None, will start from this model. The
                                model must have the same model_args and
                                model_class as the current experiment.
@@ -368,7 +369,7 @@ class SupervisedExperiment:
         return create_model(
             model_class=config["model_class"],
             model_args=config.get("model_args", {}),
-            init_batch_norm=config.get("init_batch_norm", False),
+            init_model_fn=config.get("init_model_fn", None),
             device=device,
             checkpoint_file=config.get("checkpoint_file", None),
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
@@ -915,6 +916,19 @@ class ImagenetExperiment(SupervisedExperiment):
     Experiment class used to train Sparse and dense versions of Resnet50 v1.5
     models on Imagenet dataset
     """
+
+    @classmethod
+    def create_model(cls, config, device):
+        """
+        Additional params include
+        :param config:
+            - init_batch_norm: Whether or not to Initialize running batch norm
+                               mean to 0.
+        """
+        init_batch_norm = config.get("init_batch_norm", False)
+        if init_batch_norm:
+            config["init_model_fn"] = init_resnet50_batch_norm
+        return super().create_model(config, device)
 
     @classmethod
     def create_loaders(cls, config):

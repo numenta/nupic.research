@@ -38,7 +38,7 @@ def _create_test_model(model_class):
     model = create_model(
         model_class=model_class,
         model_args=model_args,
-        init_batch_norm=False,
+        init_model_fn=None,
         device=device,
     )
     return model

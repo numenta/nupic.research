@@ -50,7 +50,7 @@ def _create_test_model(checkpoint_file=None):
     Create standard resnet50 model to be used in tests.
     """
     model = create_model(model_class=resnet50, model_args=TEST_MODEL_ARGS,
-                         init_batch_norm=False, checkpoint_file=checkpoint_file,
+                         init_model_fn=None, checkpoint_file=checkpoint_file,
                          device="cpu")
 
     # Simulate imagenet experiment by changing the weights
@@ -110,7 +110,7 @@ class ImagenetExperimentUtilsTest(unittest.TestCase):
             # Load model from checkpoint
             model2 = create_model(
                 model_class=resnet50, model_args=TEST_MODEL_ARGS,
-                init_batch_norm=False, device="cpu",
+                init_model_fn=None, device="cpu",
                 checkpoint_file=checkpoint_file.name)
 
         self.assertTrue(compare_models(model1, model2, (3, 32, 32)))

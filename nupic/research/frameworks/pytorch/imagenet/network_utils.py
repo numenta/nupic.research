@@ -69,7 +69,7 @@ def get_compatible_state_dict(state_dict, model):
     return state_dict
 
 
-def create_model(model_class, model_args, init_batch_norm, device=None,
+def create_model(model_class, model_args, init_model_fn=None, device=None,
                  checkpoint_file=None, load_checkpoint_args=None):
     """
     Create imagenet experiment model with option to load state from checkpoint
@@ -78,8 +78,8 @@ def create_model(model_class, model_args, init_batch_norm, device=None,
             The model class. Must inherit from torch.nn.Module
     :param model_args:
         The model constructor arguments
-    :param init_batch_norm:
-        Whether or not to initialize batch norm modules
+    :param init_model_fn:
+        Initialization function to apply to the modules
     :param device:
         Model device
     :param checkpoint_file:
@@ -90,8 +90,8 @@ def create_model(model_class, model_args, init_batch_norm, device=None,
     :return: Configured model
     """
     model = model_class(**model_args)
-    if init_batch_norm:
-        model.apply(init_resnet50_batch_norm)
+    if init_model_fn is not None:
+        model.apply(init_model_fn)
 
     if device is not None:
         model.to(device)
