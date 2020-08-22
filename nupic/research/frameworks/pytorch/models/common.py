@@ -22,8 +22,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from nupic.torch.modules import Flatten
-
 
 class StandardMLP(nn.Module):
 

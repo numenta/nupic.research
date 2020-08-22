@@ -38,8 +38,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.datasets import ImagenetDatasetManager
-from nupic.research.frameworks.pytorch.dataset_utils import TaskRandomSampler, TaskDistributedSampler
+from nupic.research.frameworks.pytorch.datasets import create_imagenet_datasets
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
 )
@@ -81,8 +80,7 @@ cudnn.benchmark = True
 
 class SupervisedExperiment:
     """
-    Experiment class used to train Sparse and dense versions of Resnet50 v1.5
-    models on Imagenet dataset
+    General experiment class used to train neural networks in supervised learning tasks.
     """
 
     def __init__(self):
@@ -406,15 +404,11 @@ class SupervisedExperiment:
     def create_loaders(cls, config):
         """Create train, val, and test dataloaders."""
 
-        dataset_manager_class = config.get("dataset_manager_class", None)
-        if dataset_manager_class is None:
-            raise ValueError("Must specify 'dataset_manager_class' in config.")
+        create_datasets = config.get("create_datasets_func", None)
+        if create_datasets is None:
+            raise ValueError("Must specify 'create_datasets_func' in config.")
         dataset_args = config.get("dataset_args", {})
-        dataset_manager = dataset_manager_class(**dataset_args)
-
-        train_set = dataset_manager.get_train_dataset()
-        val_set = dataset_manager.get_val_dataset()
-        test_set = dataset_manager.get_test_dataset()
+        train_set, val_set, test_set = create_datasets(**dataset_args)
 
         train_loader = cls.create_train_dataloader(train_set, config)
         val_loader = cls.create_validation_dataloader(val_set, config)
@@ -1061,12 +1055,16 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 
 
 class ImagenetExperiment(SupervisedExperiment):
+    """
+    Experiment class used to train Sparse and dense versions of Resnet50 v1.5
+    models on Imagenet dataset
+    """
 
     @classmethod
     def create_loaders(cls, config):
-        dataset_manager = ImagenetDatasetManager
+        create_datasets = create_imagenet_datasets
         dataset_args = {}
-        config.setdefault("dataset_manager_class", dataset_manager)
+        config.setdefault("create_datasets_func", create_datasets)
         config.setdefault("dataset_args", dataset_args)
 
         dataset_args.update(

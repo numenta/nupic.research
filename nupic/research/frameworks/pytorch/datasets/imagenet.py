@@ -61,144 +61,138 @@ IMAGENET_NUM_CLASSES = {
 }
 
 
-class ImagenetDatasetManager(object):
+def create_imagenet_datasets(
+    data_path, train_dir="train", val_dir="val", num_classes=1000,
+    use_auto_augment=False, sample_transform=None, target_transform=None,
+    replicas_per_sample=1
+):
+    """
+    Create train and val set of Imagenet dataset. Returns None for test set.
+    """
 
-    def __init__(
-        self, data_path, train_dir="train", val_dir="val", num_classes=1000,
-        use_auto_augment=False, sample_transform=None, target_transform=None,
-        replicas_per_sample=1
-    ):
+    train_dataset = create_train_dataset(
+        data_path=data_path,
+        train_dir=train_dir,
+        num_classes=num_classes,
+        use_auto_augment=use_auto_augment,
+        sample_transform=sample_transform,
+        target_transform=target_transform,
+        replicas_per_sample=replicas_per_sample,
+    )
 
-        self.train_dataset = self.create_train_dataset(
-            data_path=data_path,
-            train_dir=train_dir,
-            num_classes=num_classes,
-            use_auto_augment=use_auto_augment,
-            sample_transform=sample_transform,
-            target_transform=target_transform,
-            replicas_per_sample=replicas_per_sample,
-        )
+    val_dataset = create_validation_dataset(
+        data_path=data_path,
+        val_dir=val_dir,
+        num_classes=num_classes,
+    )
 
-        self.val_dataset = self.create_validation_dataset(
-            data_path=data_path,
-            val_dir=val_dir,
-            num_classes=num_classes,
-        )
+    return train_dataset, val_dataset, None
 
-    def get_train_dataset(self):
-        return self.train_dataset
 
-    def get_val_dataset(self):
-        return self.val_dataset
+def create_train_dataset(
+    data_path, train_dir, num_classes=1000, use_auto_augment=False,
+    sample_transform=None, target_transform=None, replicas_per_sample=1
+):
+    """
+    Configure Imagenet training dataset
 
-    def get_test_dataset(self):
-        return None
+    Creates :class:`CachedDatasetFolder` :class:`HDF5Dataset` pre-configured
+    for the training cycle
 
-    @classmethod
-    def create_train_dataset(
-        cls, data_path, train_dir, num_classes=1000, use_auto_augment=False,
-        sample_transform=None, target_transform=None, replicas_per_sample=1
-    ):
-        """
-        Configure Imagenet training dataset
+    :param data_path: The directory or hdf5 file containing the dataset
+    :param train_dir: The directory or hdf5 group containing the training data
+    :param num_classes: Limit the dataset size to the given number of classes
+    :param sample_transform: List of transforms acting on the samples
+                             to be added to the defaults below
+    :param target_transform: List of transforms acting on the targets
+    :param replicas_per_sample: Number of replicas to create per sample
+                                in the batch (each replica is transformed
+                                independently). Used in maxup.
 
-        Creates :class:`CachedDatasetFolder` :class:`HDF5Dataset` pre-configured
-        for the training cycle
-
-        :param data_path: The directory or hdf5 file containing the dataset
-        :param train_dir: The directory or hdf5 group containing the training data
-        :param num_classes: Limit the dataset size to the given number of classes
-        :param sample_transform: List of transforms acting on the samples
-                                 to be added to the defaults below
-        :param target_transform: List of transforms acting on the targets
-        :param replicas_per_sample: Number of replicas to create per sample
-                                    in the batch (each replica is transformed
-                                    independently). Used in maxup.
-
-        :return: CachedDatasetFolder or HDF5Dataset
-        """
-        if use_auto_augment:
-            transform = transforms.Compose(
-                transforms=[
-                    RandomResizedCrop(224),
-                    transforms.RandomHorizontalFlip(),
-                    ImageNetPolicy(),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
-                        inplace=True
-                    ),
-                ],
-            )
-        else:
-            transform = transforms.Compose(
-                transforms=[
-                    RandomResizedCrop(224),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
-                        inplace=True
-                    ),
-                ],
-            )
-
+    :return: CachedDatasetFolder or HDF5Dataset
+    """
+    if use_auto_augment:
         transform = transforms.Compose(
-            transforms=[transform] + (sample_transform or []))
-
-        if h5py.is_hdf5(data_path):
-            # Use fixed Imagenet classes if mapping is available
-            if num_classes in IMAGENET_NUM_CLASSES:
-                classes = IMAGENET_NUM_CLASSES[num_classes]
-                dataset = HDF5Dataset(hdf5_file=data_path, root=train_dir,
-                                      classes=classes, transform=transform,
-                                      target_transform=target_transform,
-                                      replicas_per_sample=replicas_per_sample)
-            else:
-                dataset = HDF5Dataset(hdf5_file=data_path, root=train_dir,
-                                      num_classes=num_classes, transform=transform,
-                                      target_transform=target_transform,
-                                      replicas_per_sample=replicas_per_sample)
-        else:
-            dataset = CachedDatasetFolder(root=os.path.join(data_path, train_dir),
-                                          num_classes=num_classes, transform=transform,
-                                          target_transform=target_transform)
-        return dataset
-
-    @classmethod
-    def create_validation_dataset(cls, data_path, val_dir, num_classes=1000):
-        """
-        Configure Imagenet validation dataloader
-
-        Creates :class:`CachedDatasetFolder` or :class:`HDF5Dataset` pre-configured
-        for the validation cycle.
-
-        :param data_path: The directory or hdf5 file containing the dataset
-        :param val_dir: The directory containing or hdf5 group the validation data
-        :param num_classes: Limit the dataset size to the given number of classes
-        :return: CachedDatasetFolder or HDF5Dataset
-        """
-
-        transform = transforms.Compose(
-            [
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
+            transforms=[
+                RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                ImageNetPolicy(),
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
                     inplace=True
                 ),
-            ]
+            ],
         )
-        if h5py.is_hdf5(data_path):
-            if num_classes in IMAGENET_NUM_CLASSES:
-                classes = IMAGENET_NUM_CLASSES[num_classes]
-                dataset = HDF5Dataset(hdf5_file=data_path, root=val_dir,
-                                      classes=classes, transform=transform)
-            else:
-                dataset = HDF5Dataset(hdf5_file=data_path, root=val_dir,
-                                      num_classes=num_classes, transform=transform)
+    else:
+        transform = transforms.Compose(
+            transforms=[
+                RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
+                    inplace=True
+                ),
+            ],
+        )
+
+    transform = transforms.Compose(
+        transforms=[transform] + (sample_transform or []))
+
+    if h5py.is_hdf5(data_path):
+        # Use fixed Imagenet classes if mapping is available
+        if num_classes in IMAGENET_NUM_CLASSES:
+            classes = IMAGENET_NUM_CLASSES[num_classes]
+            dataset = HDF5Dataset(hdf5_file=data_path, root=train_dir,
+                                  classes=classes, transform=transform,
+                                  target_transform=target_transform,
+                                  replicas_per_sample=replicas_per_sample)
         else:
-            dataset = CachedDatasetFolder(root=os.path.join(data_path, val_dir),
-                                          num_classes=num_classes, transform=transform)
-        return dataset
+            dataset = HDF5Dataset(hdf5_file=data_path, root=train_dir,
+                                  num_classes=num_classes, transform=transform,
+                                  target_transform=target_transform,
+                                  replicas_per_sample=replicas_per_sample)
+    else:
+        dataset = CachedDatasetFolder(root=os.path.join(data_path, train_dir),
+                                      num_classes=num_classes, transform=transform,
+                                      target_transform=target_transform)
+    return dataset
+
+
+def create_validation_dataset(data_path, val_dir, num_classes=1000):
+    """
+    Configure Imagenet validation dataloader
+
+    Creates :class:`CachedDatasetFolder` or :class:`HDF5Dataset` pre-configured
+    for the validation cycle.
+
+    :param data_path: The directory or hdf5 file containing the dataset
+    :param val_dir: The directory containing or hdf5 group the validation data
+    :param num_classes: Limit the dataset size to the given number of classes
+    :return: CachedDatasetFolder or HDF5Dataset
+    """
+
+    transform = transforms.Compose(
+        [
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],
+                inplace=True
+            ),
+        ]
+    )
+    if h5py.is_hdf5(data_path):
+        if num_classes in IMAGENET_NUM_CLASSES:
+            classes = IMAGENET_NUM_CLASSES[num_classes]
+            dataset = HDF5Dataset(hdf5_file=data_path, root=val_dir,
+                                  classes=classes, transform=transform)
+        else:
+            dataset = HDF5Dataset(hdf5_file=data_path, root=val_dir,
+                                  num_classes=num_classes, transform=transform)
+    else:
+        dataset = CachedDatasetFolder(root=os.path.join(data_path, val_dir),
+                                      num_classes=num_classes, transform=transform)
+    return dataset
