@@ -61,32 +61,33 @@ IMAGENET_NUM_CLASSES = {
 }
 
 
-def create_imagenet_datasets(
+def imagenet(
     data_path, train_dir="train", val_dir="val", num_classes=1000,
     use_auto_augment=False, sample_transform=None, target_transform=None,
-    replicas_per_sample=1
+    replicas_per_sample=1, train=True
 ):
     """
-    Create train and val set of Imagenet dataset. Returns None for test set.
+    Create train and val set of Imagenet dataset.
     """
 
-    train_dataset = create_train_dataset(
-        data_path=data_path,
-        train_dir=train_dir,
-        num_classes=num_classes,
-        use_auto_augment=use_auto_augment,
-        sample_transform=sample_transform,
-        target_transform=target_transform,
-        replicas_per_sample=replicas_per_sample,
-    )
+    if train:
+        dataset = create_train_dataset(
+            data_path=data_path,
+            train_dir=train_dir,
+            num_classes=num_classes,
+            use_auto_augment=use_auto_augment,
+            sample_transform=sample_transform,
+            target_transform=target_transform,
+            replicas_per_sample=replicas_per_sample,
+        )
+    else:
+        dataset = create_validation_dataset(
+            data_path=data_path,
+            val_dir=val_dir,
+            num_classes=num_classes,
+        )
 
-    val_dataset = create_validation_dataset(
-        data_path=data_path,
-        val_dir=val_dir,
-        num_classes=num_classes,
-    )
-
-    return train_dataset, val_dataset, None
+    return dataset
 
 
 def create_train_dataset(
