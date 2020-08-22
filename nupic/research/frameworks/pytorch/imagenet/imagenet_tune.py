@@ -411,7 +411,7 @@ class SigOptImagenetTrainable(SupervisedTrainable):
 
 
 class DebugTrainable(Trainable):
-    """Simple trainable compatible with experiment class and config. Used to debug."""
+    """Simple trainable compatible with experiment class and config. For debugging."""
 
     def __init__(self, config=None, logger_creator=None):
         Trainable.__init__(self, config=config, logger_creator=logger_creator)

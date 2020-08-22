@@ -47,13 +47,14 @@ def torchvisiondataset(root, dataset_name, train=True, download=True,
     Returns None for test set.
     """
 
+    root = os.path.expanduser(root)
     dataset_class = getattr(datasets, dataset_name)
     if transform is None:
         if dataset_name in DATASETS_STATS.keys():
             transform = base_transform(*DATASETS_STATS[dataset_name])
         else:
             try:
-                dataset_stats = calculate_statistics(dataset_class)
+                dataset_stats = calculate_statistics(dataset_class, root)
                 transform = base_transform(*dataset_stats)
             except Exception:
                 print(f"Can't calculate statistics for {dataset_name}. "
@@ -61,7 +62,7 @@ def torchvisiondataset(root, dataset_name, train=True, download=True,
 
     with FileLock(f"{root}.lock"):
         dataset = dataset_class(
-            root=os.path.expanduser(root),
+            root=root,
             train=train,
             transform=transform,
             target_transform=target_transform,
@@ -118,14 +119,13 @@ def calculate_statistics(dataset_class, root):
     """
     Calculate statistics for small datasets, that can fit in memory.
 
-    When adapting for larger datasets, careful with batching -
+    When adapting to larger datasets, careful with batching -
     average of standard deviations for each batch is not equal
     to the standard deviation of the dataset.
 
     See discussion in:
     https://discuss.pytorch.org/t/about-normalization-using-pre-trained-vgg16-networks
     """
-    root = os.path.expanduser(root)
     with FileLock(f"{root}.lock"):
         dataset = dataset_class(root=root, train=True, download=True)
 
