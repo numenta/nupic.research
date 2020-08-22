@@ -34,7 +34,7 @@ class ReduceLRAfterTask:
         # configure the sampler to load only samples from current task
         if self.current_task >= self.task_when_reduce_lr:
             for param_group in self.optimizer.param_groups:
-                param_group['lr'] = self.new_lr
+                param_group["lr"] = self.new_lr
 
         return super().run_task()
 

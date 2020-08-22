@@ -37,4 +37,4 @@ from .pretrained_models import (
     se_resnext50_32x4d,
     xception
 )
-from .common import StandardMLP, StandardCNN
+from .common_models import StandardMLP, SmallCNN

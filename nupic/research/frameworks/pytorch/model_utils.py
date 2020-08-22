@@ -127,7 +127,6 @@ def train_model(
         optimizer.zero_grad()
         output = model(data)
         error_loss = criterion(output, target)
-        pred = output.max(1, keepdim=True)[1]
 
         del data, target, output
 

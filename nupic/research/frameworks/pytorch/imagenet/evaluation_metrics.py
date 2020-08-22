@@ -19,12 +19,14 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+
 class ContinualLearningMetrics(object):
     """
     Mixin that encapsulates different continual learning metrics.
     Currently covers basic methods.
     To include: forgetting ratio, backward transfer, forward transfer.
-    """    
+    """
+
     def eval_current_task(self):
         """
         Evaluates accuracy at current task only. Used for debugging.
@@ -56,7 +58,7 @@ class ContinualLearningMetrics(object):
     def eval_individual_tasks(self):
         """
         Most common scenario in continual learning.
-        Evaluates all tasks seen so far, and report accuracy individually.        
+        Evaluates all tasks seen so far, and report accuracy individually.
         """
         task_results = {}
         for task_id in range(0, self.current_task + 1):
@@ -64,4 +66,3 @@ class ContinualLearningMetrics(object):
             for k, v in self.validate().items():
                 task_results[f"task{task_id}__{k}"] = v
         return task_results
-
