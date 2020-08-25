@@ -58,42 +58,45 @@ class SaveFinalCheckpoint(object):
         assert self.logdir
         assert "copy_checkpoint_dir" in config
 
-        self.copy_ckpt_path = config["copy_checkpoint_dir"]
-
         # Set default formatting.
+        self.copy_checkpoint_dir = config["copy_checkpoint_dir"]
         self.name = config.get("name", "unknown_name")
         self.wandb_project = "unknown_project"
         self.trainable_id = "unknown_id"
 
         # Retrieve project name if any - this may or may not be used.
-        if "{wandb_project}" in self.copy_ckpt_path:
+        if "{wandb_project}" in self.copy_checkpoint_dir:
             wandb_args = config.get("wandb_args", {})
             self.wandb_project = wandb_args.get("project", "unknown_project")
 
         # Retrieve run_id - this may or may not be used.
-        if "{trainable_id}" in self.copy_ckpt_path:
+        if "{trainable_id}" in self.copy_checkpoint_dir:
             self.trainable_id = self.logdir.split("-")[-1]  # e.g. 45xrhk_mc2
+
+        # Set up to directory that will contain the copied checkpoint.
+        self.setup_copy_dir()
+
+    def setup_copy_dir(self):
+        base_path = self.copy_checkpoint_dir.split("{")[0]
+        assert os.path.exists(base_path), (
+            "Can't copy to directory ({base_path}) which does not exists.")
+
+        copy_ckpt_path = self.copy_checkpoint_dir.replace("{name}", self.name)
+        copy_ckpt_path = copy_ckpt_path.replace("{wandb_project}", self.wandb_project)
+        copy_ckpt_path = copy_ckpt_path.replace("{trainable_id}", self.trainable_id)
+        self.copy_ckpt_path = Path(copy_ckpt_path)
+
+        # Create the save directory and parents as needed.
+        self.logger.info(f"Making dir for final checkpoint: {str(self.copy_ckpt_path)}")
+        self.copy_ckpt_path.mkdir(exist_ok=True, parents=True)
 
     def stop_experiment(self):
         """
         Copy over last checkpoint to specified directory.
         """
         super().stop_experiment()
-        print("saving final checkpoint", self.rank, type(self.rank), self.rank != 0)
         if self.rank != 0:
             return
-
-        base_path = self.copy_ckpt_path.split("{")[0]
-        if not os.path.exists(base_path):
-            return
-
-        copy_ckpt_path = self.copy_ckpt_path.replace("{name}", self.name)
-        copy_ckpt_path = copy_ckpt_path.replace("{wandb_project}", self.wandb_project)
-        copy_ckpt_path = copy_ckpt_path.replace("{trainable_id}", self.trainable_id)
-        copy_ckpt_path = Path(copy_ckpt_path)
-
-        # Create the save directory and parents as needed.
-        copy_ckpt_path.mkdir(exist_ok=True, parents=True)
 
         # Find the latest checkpoint.
         log_path = Path(self.logdir)
@@ -108,7 +111,7 @@ class SaveFinalCheckpoint(object):
 
         # Copy over checkpoint.
         try:
-            copy_latest_checkpoint = copy_ckpt_path / latest_checkpoint.name
+            copy_latest_checkpoint = self.copy_ckpt_path / latest_checkpoint.name
             copytree(src=latest_checkpoint, dst=copy_latest_checkpoint)
             self.logger.info(
                 f"Copied over checkpoint from "
