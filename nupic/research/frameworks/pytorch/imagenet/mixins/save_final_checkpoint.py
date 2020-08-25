@@ -25,7 +25,7 @@ from pathlib import Path
 from shutil import copytree
 
 
-class SaveFinalCheckPoint(object):
+class SaveFinalCheckpoint(object):
     """
     Experiment mixin to save a copy of the final checkpoint from `logdir` upon
     `stop_experiment`.
@@ -123,8 +123,8 @@ class SaveFinalCheckPoint(object):
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].append("SaveFinalCheckPoint: Get path to copy into.")
+        eo["setup_experiment"].append("SaveFinalCheckpoint: Setup copy dir.")
         eo["stop_experiment"].append(
-            "SaveFinalCheckPoint: Copy final checkpoint to specified directory."
+            "SaveFinalCheckpoint: Copy final checkpoint to specified directory."
         )
         return eo
