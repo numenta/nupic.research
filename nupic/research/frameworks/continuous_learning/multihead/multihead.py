@@ -30,11 +30,11 @@ https://github.com/GMvandeVen/continual-learning
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from torchvision import transforms
+from torchvision.datasets import MNIST
 from tqdm import tqdm
 
-from nupic.research.frameworks.continuous_learning.multihead.subdataset import (
-    get_datasets,
-)
+from nupic.research.frameworks.pytorch.dataset_utils import split_dataset
 
 
 def train_head(model, loader, optimizer, criterion, device, active_classes=None,
@@ -61,15 +61,11 @@ def train_head(model, loader, optimizer, criterion, device, active_classes=None,
     model.train()
     for data, target in tqdm(loader, desc="Train", leave=False):
         data, target = data.to(device), target.to(device)
-        # if active_classes is not None:
-        #     target = target - active_classes[0]
         optimizer.zero_grad()
-        output = model(data)
 
         # compute loss only for 'active' output units, and only backpropogate
         # errors for these units when calling loss.backward()
-        if active_classes is not None:
-            output = output[:, active_classes]
+        output = active_class_outputs(model, data, active_classes)
 
         loss = criterion(output, target)
         loss.backward()
@@ -103,8 +99,6 @@ def test(model, loader, criterion, device, allowed_classes=None):
     with torch.no_grad():
         for data, target in tqdm(loader, desc="Test", leave=False):
             data, target = data.to(device), target.to(device)
-            # if allowed_classes is not None:
-            #     target = target - allowed_classes[0]
             output = model(data)
 
             if allowed_classes is not None:
@@ -121,14 +115,12 @@ def test(model, loader, criterion, device, allowed_classes=None):
             "total_correct": total_correct}
 
 
-def do_training(model, dataset_name, scenario, device, lr=0.001, epochs=30,
+def do_training(model, scenario, device, lr=0.001, epochs=30,
                 train_batch_size=64, test_batch_size=1000, post_batch_callback=None):
     """
     Train the model.
     :param model: pytorch model to be trained
     :type model: torch.nn.Module
-    :param dataset_name: name of the dataset on which to train model
-    :type dataset_name: str
     :param scenario: continuous learning setup, one of {'task', 'domain', 'class'}
     :type scenario: str
     :param device:
@@ -144,8 +136,25 @@ def do_training(model, dataset_name, scenario, device, lr=0.001, epochs=30,
     :param post_batch_callback: function(model) to call after every batch
     :type post_batch_callback: function
     """
-    train_datasets, test_datasets = get_datasets(dataset_name, scenario=scenario)
+    train_mnist = MNIST(root=".", train=True, transform=transforms.ToTensor())
+    test_mnist = MNIST(root=".", train=True, transform=transforms.ToTensor())
 
+    train_datasets = split_dataset(train_mnist,
+                                   groupby=lambda x: x[1] // 2)
+    test_datasets = split_dataset(test_mnist,
+                                  groupby=lambda x: x[1] // 2)
+
+    # apply transformation to target variables, depending on the scenario
+    target_transform = get_target_transform(scenario)
+
+    if target_transform is not None:
+        for train_set in train_datasets:
+            train_set.dataset.targets = target_transform(train_set.dataset.targets)
+
+        for test_set in test_datasets:
+            test_set.dataset.targets = target_transform(test_set.dataset.targets)
+
+    # data loaders
     train_loaders = [
         torch.utils.data.DataLoader(train_dataset, batch_size=train_batch_size,
                                     shuffle=True)
@@ -160,10 +169,10 @@ def do_training(model, dataset_name, scenario, device, lr=0.001, epochs=30,
     # optimizer for training model
     adam = optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
 
-    for epoch in range(epochs):
+    # Loop over all tasks
+    for task_num, train_loader in enumerate(train_loaders, 1):
 
-        # Loop over all tasks
-        for task_num, train_loader in enumerate(train_loaders, 1):
+        for epoch in range(epochs):
 
             print("Epoch {}".format(epoch))
             train_head(model=model, loader=train_loader, optimizer=adam,
@@ -183,6 +192,38 @@ def do_training(model, dataset_name, scenario, device, lr=0.001, epochs=30,
                 print("\ttask {}/{}: {}".format(i + 1, n_tasks, results))
 
             print("Epoch {}: {}".format(epoch, results))
+
+
+def get_target_transform(scenario):
+    """
+    Returns the appropriate pytorch transform to apply to dataset target variables
+    based on the continual learning scenario.
+    :param scenario: continuous learning setup, one of {'task', 'domain', 'class'}
+    :type scenario: str
+    """
+    if scenario in ("task", "domain"):
+        target_transform = transforms.Lambda(lambda y: y % 2)
+    else:
+        target_transform = None
+    return target_transform
+
+
+def active_class_outputs(model, inputs, active_classes):
+    """
+    Computes the output using the given model and input data, and and returns the
+    output for "active" classes only.
+    :param model: pytorch model to be used to compute outputs
+    :type model: torch.nn.Module
+    :param inputs: input batch to model
+    :type inputs: pytorch tensor
+    :param active_classes: list of int specifying the "active" classes
+    :type active_classes: list of int
+    """
+    output = model(inputs)
+    if active_classes is not None:
+        return output[:, active_classes]
+    else:
+        return output
 
 
 def get_active_classes(task_num, scenario):

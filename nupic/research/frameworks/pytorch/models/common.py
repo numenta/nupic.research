@@ -1,5 +1,5 @@
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions apply:
 #
@@ -18,5 +18,22 @@
 #  http://numenta.org/licenses/
 #
 
-from .common_experiments import *
-from .imagenet_experiment import *
+import numpy as np
+import torch.nn as nn
+
+
+class StandardMLP(nn.Module):
+
+    def __init__(self, input_size, num_classes):
+
+        super().__init__()
+
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(int(np.prod(input_size)), 100),
+            nn.Linear(100, 100),
+            nn.Linear(100, num_classes)
+        )
+
+    def forward(self, x):
+        return self.classifier(x)

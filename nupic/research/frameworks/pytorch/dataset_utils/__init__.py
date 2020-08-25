@@ -18,5 +18,6 @@
 #  http://numenta.org/licenses/
 #
 
-from .dataset_utils import *
+from .common import *
 from .hdf5_utils import *
+from .auto_augment import ImageNetPolicy

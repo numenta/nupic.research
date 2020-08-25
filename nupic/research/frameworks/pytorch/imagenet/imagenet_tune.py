@@ -17,6 +17,8 @@
 #
 #  http://numenta.org/licenses/
 #
+
+import abc
 import copy
 import logging
 import os
@@ -47,9 +49,11 @@ from nupic.research.support.ray_utils import (
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
-class ImagenetTrainable(Trainable):
+class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
     """
-    Trainable class used to train resnet50 on Imagenet dataset using ray
+    Trainable class used to train arbitrary experiments with ray. Whatever
+    the case, it's expected to proceed over well-defined iterations. Thus,
+    `_run_iteration` must be overridden.
     """
 
     @classmethod
@@ -86,8 +90,6 @@ class ImagenetTrainable(Trainable):
             f"_setup: trial={self._trial_info.trial_name}({self.iteration}), "
             f"config={config}")
 
-        self._validate_immediately = -1 in config.get("epochs_to_validate", [])
-
         # Get checkpoint file to restore the training from
         self.restore_checkpoint_file = config.pop("restore_checkpoint_file", None)
 
@@ -115,7 +117,7 @@ class ImagenetTrainable(Trainable):
         self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
             # Check if restore checkpoint file fulfills the stop criteria on first run
-            initial_val_result = None
+            pre_experiment_result = None
             if self._first_run:
                 self._first_run = False
                 if self._restored and self._should_stop():
@@ -128,39 +130,33 @@ class ImagenetTrainable(Trainable):
                         DONE: True
                     }
 
-                # This initial validation would be simpler if it were in the
-                # ImagenetExperiment, but doing it here makes it possible to log
-                # the validation results immediately rather than waiting until
-                # the end of the first epoch.
-                if self._iteration == 0 and self._validate_immediately:
-                    self.logger.debug("Validating before any training:")
+                # Run any pre-experiment functionality such as pre-training validation.
+                # The results are aggregated here so they may be immediately logged
+                # as opposed to waiting till the end of the iteration.
+                if self._iteration == 0:
                     status = []
                     for w in self.procs:
-                        status.append(w.validate.remote())
+                        status.append(w.pre_experiment.remote())
 
+                    agg_pre_exp = self.experiment_class.aggregate_pre_experiment_results
                     if ray_utils.check_for_failure(status):
                         results = ray.get(status)
-                        initial_val_result = (
-                            self.experiment_class.aggregate_validation_results(
-                                results))
-                        self.logger.info(initial_val_result)
+                        pre_experiment_result = agg_pre_exp(results)
+                        self.logger.info(
+                            f"Pre-Experiment Result: {pre_experiment_result}"
+                        )
 
-            status = []
-            for w in self.procs:
-                status.append(w.run_epoch.remote())
+            results = self._run_iteration()
 
-            # Wait for remote functions and check for errors
             # Aggregate the results from all processes
-            if ray_utils.check_for_failure(status):
-                results = ray.get(status)
+            if results is not None:
 
+                # Aggregate results from iteration.
                 ret = self.experiment_class.aggregate_results(results)
-                if initial_val_result is not None:
-                    ret["extra_val_results"].insert(0, (0, initial_val_result))
-                self.logger.info(
-                    self.experiment_class.get_printable_result(ret)
-                )
-                self._process_result(ret)
+
+                self._process_result(ret, pre_experiment_result)
+                printable_result = self.experiment_class.get_printable_result(ret)
+                self.logger.info(f"End Iteration Result: {printable_result}")
 
                 # Check if we should stop the experiment
                 ret[DONE] = self._should_stop()
@@ -293,11 +289,39 @@ class ImagenetTrainable(Trainable):
     def _process_config(self, config):
         pass
 
-    def _process_result(self, result):
+    @abc.abstractmethod
+    def _run_iteration(self):
+        """Run one iteration of the experiment"""
+        raise NotImplementedError
+
+    def _process_result(self, result, pre_experiment_result=None):
         pass
 
 
-class SigOptImagenetTrainable(ImagenetTrainable):
+class SupervisedTrainable(BaseTrainable):
+    """
+    Trainable class used to train supervised machine learning experiments
+    with ray.
+    """
+
+    def _run_iteration(self):
+        """Run one epoch of training on each process."""
+        status = []
+        for w in self.procs:
+            status.append(w.run_epoch.remote())
+
+        # Wait for remote functions and check for errors
+        if ray_utils.check_for_failure(status):
+            return ray.get(status)
+
+    def _process_result(self, result, pre_experiment_result=None):
+
+        # Aggregate initial validation results (before any training).
+        if pre_experiment_result is not None:
+            result["extra_val_results"].insert(0, (0, pre_experiment_result))
+
+
+class SigOptImagenetTrainable(SupervisedTrainable):
     """
     This class updates the config using SigOpt before the models and workers are
     instantiated, and updates the result using SigOpt once training completes.
@@ -345,8 +369,13 @@ class SigOptImagenetTrainable(ImagenetTrainable):
             assert "mean_accuracy" in self.metric_names, \
                 "For now, we only update the observation if `mean_accuracy` is present."
 
-    def _process_result(self, result):
-        # Update sigopt with the new result once we're at the end
+    def _process_result(self, result, pre_experiment_result=None):
+        """
+        Update sigopt with the new result once we're at the end of training.
+        """
+
+        super()._process_result(result, pre_experiment_result=pre_experiment_result)
+
         if self.sigopt is not None:
             result["early_stop"] = result.get("early_stop", 0.0)
             if self.iteration >= self.epochs - 1:
@@ -379,9 +408,9 @@ def run(config):
         kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
                                          *tune.run.__defaults__]))
     else:
-        imagenet_trainable = config.get("imagenet_trainable", ImagenetTrainable)
-        assert issubclass(imagenet_trainable, ImagenetTrainable)
-        kwargs = dict(zip(kwargs_names, [imagenet_trainable, *tune.run.__defaults__]))
+        ray_trainable = config.get("ray_trainable", SupervisedTrainable)
+        assert issubclass(ray_trainable, BaseTrainable)
+        kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
 
     # Check if restoring experiment from last known checkpoint
     if config.pop("restore", False):
@@ -415,7 +444,7 @@ def run_single_instance(config):
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-    kwargs = dict(zip(kwargs_names, [ImagenetTrainable, *tune.run.__defaults__]))
+    kwargs = dict(zip(kwargs_names, [SupervisedTrainable, *tune.run.__defaults__]))
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
@@ -428,41 +457,40 @@ def run_single_instance(config):
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
     # pprint(kwargs)
 
-    # current torch distributed approach requires num_samples to be 1
-    num_samples = 1
-    if "num_samples" in kwargs:
-        num_samples = kwargs["num_samples"]
-        kwargs["num_samples"] = 1
+    # only run trial collection if specifically requested
+    if config.get("use_trial_collection", False):
+        # current torch distributed approach requires num_samples to be 1
+        num_samples = 1
+        if "num_samples" in kwargs:
+            num_samples = kwargs["num_samples"]
+            kwargs["num_samples"] = 1
 
-    trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
-    t_init = time.time()
+        trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
+        t_init = time.time()
 
-    for config in trials.retrieve():
-        t0 = time.time()
-        trials.report_progress()
+        for config in trials.retrieve():
+            t0 = time.time()
+            trials.report_progress()
+            run_trial_single_instance(config, kwargs)
+            # report time elapsed
+            t1 = time.time()
+            print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
+            print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
+            # save trials for later retrieval
+            ray.shutdown()
+            trials.mark_completed(config, save=True)
 
-        # Connect to ray, no specific redis address
-        ray.init(load_code_from_local=True, webui_host="0.0.0.0")
-
-        config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
-        kwargs["config"] = config
-        tune.run(**kwargs)
-        print("**** ended training")
-
-        # report time elapsed
-        t1 = time.time()
-        print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
-        print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
-
+        print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
+              " trials completed")
+    else:
+        run_trial_single_instance(config, kwargs),
         ray.shutdown()
 
-        # save trials for later retrieval
-        trials.mark_completed(config, save=True)
 
-        # sleep to avoid interference between runs
-        time.sleep(2)
-
-        # error message when experiment ends
-
-    print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
-          " trials completed")
+def run_trial_single_instance(config, kwargs):
+    # Connect to ray, no specific redis address
+    ray.init(load_code_from_local=True, webui_host="0.0.0.0")
+    config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
+    kwargs["config"] = config
+    tune.run(**kwargs)
+    print("**** Trial ended")

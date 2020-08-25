@@ -17,8 +17,6 @@
 #
 #  http://numenta.org/licenses/
 #
-import io
-import pickle
 from collections import OrderedDict
 
 import torch
@@ -28,7 +26,6 @@ from torch import nn as nn
 
 import nupic.research
 import nupic.research.frameworks.pytorch.models.resnets
-from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
 from nupic.research.frameworks.pytorch.restore_utils import load_state_from_checkpoint
 from nupic.torch.compatibility import upgrade_to_masked_sparseweights
 
@@ -54,7 +51,7 @@ def init_resnet50_batch_norm(model):
             # initialized the last BatchNorm in each BasicBlock to 0
             *_, last_bn = filter(lambda x: isinstance(x, nn.BatchNorm2d),
                                  m.regular_path)
-            last_bn.weight = nn.Parameter(torch.zeros_like(last_bn.weight))
+            last_bn.weight.data.zero_()
         elif isinstance(m, nn.Linear):
             # initialized linear layers weights from a gaussian distribution
             m.weight.data.normal_(0, 0.01)
@@ -73,7 +70,7 @@ def get_compatible_state_dict(state_dict, model):
     return state_dict
 
 
-def create_model(model_class, model_args, init_batch_norm, device,
+def create_model(model_class, model_args, init_batch_norm, device=None,
                  checkpoint_file=None, load_checkpoint_args=None):
     """
     Create imagenet experiment model with option to load state from checkpoint
@@ -88,19 +85,26 @@ def create_model(model_class, model_args, init_batch_norm, device,
         Model device
     :param checkpoint_file:
         Optional checkpoint file to load model state
-    :param load_checkpoint_args: additional args for load_state_from_checkpoint
+    :param load_checkpoint_args:
+        Additional args for load_state_from_checkpoint
 
     :return: Configured model
     """
     model = model_class(**model_args)
     if init_batch_norm:
         init_resnet50_batch_norm(model)
-    model.to(device)
 
-    # Load model parameters from checkpoint
+    if device is not None:
+        model.to(device)
+
     if checkpoint_file is not None:
-        load_ckpt_args = load_checkpoint_args or {}
-        load_ckpt_args.setdefault("state_dict_transform", get_compatible_state_dict)
-        load_state_from_checkpoint(model, checkpoint_file, **load_ckpt_args)
+        restore_checkpoint(model, checkpoint_file, load_checkpoint_args, device)
 
     return model
+
+
+def restore_checkpoint(model, checkpoint_file, load_checkpoint_args, device=None):
+    """Load model parameters from checkpoint"""
+    load_ckpt_args = load_checkpoint_args or {}
+    load_ckpt_args.setdefault("state_dict_transform", get_compatible_state_dict)
+    load_state_from_checkpoint(model, checkpoint_file, device, **load_ckpt_args)

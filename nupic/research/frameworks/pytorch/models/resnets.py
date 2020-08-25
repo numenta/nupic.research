@@ -157,8 +157,7 @@ class Bottleneck(nn.Module):
         else:
             self.shortcut = nn.Identity()
 
-        self.post_activation = act_layer(self.expansion * planes,
-                                         **act_args["act3"])
+        self.post_activation = act_layer(self.expansion * planes, **act_args["act3"])
         self.quant_ops = nnq.FloatFunctional()
 
     def forward(self, x):
@@ -440,7 +439,7 @@ class ResNet(nn.Module):
             if isinstance(act_stem, nn.ReLU):
                 modules_to_fuse.append("act_stem")
             else:
-                act_name = next(f"act_stem.{k}" for k, v in act_stem.named_module()
+                act_name = next(f"act_stem.{k}" for k, v in act_stem.named_modules()
                                 if isinstance(v, nn.ReLU))
                 modules_to_fuse.append(act_name)
 

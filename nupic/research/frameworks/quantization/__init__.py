@@ -1,5 +1,5 @@
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions apply:
 #
@@ -17,6 +17,4 @@
 #
 #  http://numenta.org/licenses/
 #
-
-from .common_experiments import *
-from .imagenet_experiment import *
+from .qat_kwinners import *
