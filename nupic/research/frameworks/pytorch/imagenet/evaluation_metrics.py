@@ -19,32 +19,50 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+
 class ContinualLearningMetrics(object):
     """
-    Mixin that encapsulates all continual learning metrics
+    Mixin that encapsulates different continual learning metrics.
+    Currently covers basic methods.
+    To include: forgetting ratio, backward transfer, forward transfer.
     """
+
     def eval_current_task(self):
+        """
+        Evaluates accuracy at current task only. Used for debugging.
+        """
         self.val_loader.sampler.set_active_tasks(self.current_task)
         return self.validate()
 
     def eval_first_task(self):
+        """
+        Evaluates accuracy at first task only. Used for debugging.
+        """
         self.val_loader.sampler.set_active_tasks(0)
         return self.validate()
 
     def eval_all_visited_tasks(self):
-        self.val_loader.sampler.set_active_tasks(range(0, self.current_task+1))
+        """
+        Evaluates all tasks seen so far jointly. Equivalent to average accuracy
+        """
+        self.val_loader.sampler.set_active_tasks(range(0, self.current_task + 1))
         return self.validate()
 
     def eval_all_tasks(self):
-        self.val_loader.sampler.set_active_tasks(range(0, self.num_tasks+1))
+        """
+        Evaluates all tasks, including visited and not visited tasks.
+        """
+        self.val_loader.sampler.set_active_tasks(range(0, self.num_tasks))
         return self.validate()
 
     def eval_individual_tasks(self):
+        """
+        Most common scenario in continual learning.
+        Evaluates all tasks seen so far, and report accuracy individually.
+        """
         task_results = {}
         for task_id in range(0, self.current_task + 1):
             self.val_loader.sampler.set_active_tasks(task_id)
-            ret = self.validate()
-            for k, v in ret:
+            for k, v in self.validate().items():
                 task_results[f"task{task_id}__{k}"] = v
         return task_results
-

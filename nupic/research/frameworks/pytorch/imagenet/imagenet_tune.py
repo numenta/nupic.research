@@ -408,10 +408,10 @@ class SigOptImagenetTrainable(SupervisedTrainable):
                     self.sigopt.update_observation(self.suggestion, values=values)
                     print("Full results: ")
                     pprint(result)
-                    
+
 
 class DebugTrainable(Trainable):
-    """Simple trainable compatible with experiment classes and configs. Used to debug."""
+    """Simple trainable compatible with experiment class and config. For debugging."""
 
     def __init__(self, config=None, logger_creator=None):
         Trainable.__init__(self, config=config, logger_creator=logger_creator)
@@ -499,7 +499,7 @@ def run_single_instance(config):
     epochs = config.get("epochs", 1)
     num_tasks = config.get("num_tasks", None)
     if num_tasks:
-        stop.update(training_iteration=num_tasks)        
+        stop.update(training_iteration=num_tasks)
     else:
         stop.update(training_iteration=epochs)
     kwargs["stop"] = stop

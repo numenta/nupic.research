@@ -38,10 +38,16 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.datasets import ImagenetDatasetManager
-from nupic.research.frameworks.pytorch.dataset_utils import TaskRandomSampler, TaskDistributedSampler
+from nupic.research.frameworks.pytorch import datasets
+from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
+    TaskDistributedSampler,
+    TaskRandomSampler,
+)
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
+)
+from nupic.research.frameworks.pytorch.imagenet.evaluation_metrics import (
+    ContinualLearningMetrics,
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
@@ -61,7 +67,6 @@ from nupic.research.frameworks.pytorch.model_utils import (
     set_random_seed,
     train_model,
 )
-from nupic.research.frameworks.pytorch.imagenet.evaluation_metrics import ContinualLearningMetrics
 
 try:
     from apex import amp
@@ -81,8 +86,7 @@ cudnn.benchmark = True
 
 class SupervisedExperiment:
     """
-    Experiment class used to train Sparse and dense versions of Resnet50 v1.5
-    models on Imagenet dataset
+    General experiment class used to train neural networks in supervised learning tasks.
     """
 
     def __init__(self):
@@ -301,7 +305,7 @@ class SupervisedExperiment:
         multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
-        self.train_loader, self.val_loader, self.test_loader = (
+        self.train_loader, self.val_loader = (
             self.create_loaders(config)
         )
         self.total_batches = len(self.train_loader,)
@@ -404,25 +408,22 @@ class SupervisedExperiment:
 
     @classmethod
     def create_loaders(cls, config):
-        """Create train, val, and test dataloaders."""
+        """Create train and val dataloaders."""
 
-        dataset_manager_class = config.get("dataset_manager_class", None)
-        if dataset_manager_class is None:
-            raise ValueError("Must specify 'dataset_manager_class' in config.")
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+
         dataset_args = config.get("dataset_args", {})
-        dataset_manager = dataset_manager_class(**dataset_args)
-
-        train_set = dataset_manager.get_train_dataset()
-        val_set = dataset_manager.get_val_dataset()
-        test_set = dataset_manager.get_test_dataset()
+        dataset_args.update(train=True)
+        train_set = dataset_class(**dataset_args)
+        dataset_args.update(train=False)
+        val_set = dataset_class(**dataset_args)
 
         train_loader = cls.create_train_dataloader(train_set, config)
         val_loader = cls.create_validation_dataloader(val_set, config)
-        test_loader = None
-        if test_set is not None:
-            test_loader = cls.create_validation_dataloader(test_set, config)
 
-        return train_loader, val_loader, test_loader
+        return train_loader, val_loader
 
     @classmethod
     def create_train_sampler(cls, dataset, config):
@@ -926,6 +927,7 @@ class SupervisedExperiment:
             stop_experiment=[exp + ".stop_experiment"]
         )
 
+
 class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment):
 
     def setup_experiment(self, config):
@@ -955,11 +957,12 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
             )
 
         # whitelist evaluation metrics
-        self.evaluation_metrics = config.get("evaluation_metrics", ["eval_all_visited_tasks"])
+        self.evaluation_metrics = config.get(
+            "evaluation_metrics", ["eval_all_visited_tasks"]
+        )
         for metric in self.evaluation_metrics:
             if not hasattr(self, metric):
                 raise ValueError(f"Metric {metric} not available.")
-
 
     def should_stop(self):
         """
@@ -1002,7 +1005,6 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
     def aggregate_results(cls, results):
         """Run validation in single GPU"""
         print("Aggregated results")
-        print(results)
         return results[0]
 
     @classmethod
@@ -1041,11 +1043,10 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         else:
             # TODO: implement a TaskDistributedUnpaddedSampler
             # TODO: implement the aggregate results
-            # TODO: after both above are implemented, remove this 
+            # TODO: after above are implemented, remove this if else
             sampler = TaskRandomSampler(task_indices)
 
         return sampler
-
 
     @classmethod
     def get_execution_order(cls):
@@ -1054,6 +1055,9 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         eo["create_train_sampler"] = [exp + ".create_train_sampler"]
         eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
         eo["create_task_sampler"] = [exp + ".create_task_sampler"]
+        eo["run_task"] = [exp + ".run_task"]
+        eo["should_stop"] = [exp + ".should_stop"]
+        eo["aggregate_results"] = [exp + ".aggregate_results"]
         return eo
 
 
@@ -1140,12 +1144,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
 
 class ImagenetExperiment(SupervisedExperiment):
+    """
+    Experiment class used to train Sparse and dense versions of Resnet50 v1.5
+    models on Imagenet dataset
+    """
 
     @classmethod
     def create_loaders(cls, config):
-        dataset_manager = ImagenetDatasetManager
         dataset_args = {}
-        config.setdefault("dataset_manager_class", dataset_manager)
+        config.setdefault("dataset_class", datasets.imagenet)
         config.setdefault("dataset_args", dataset_args)
 
         dataset_args.update(

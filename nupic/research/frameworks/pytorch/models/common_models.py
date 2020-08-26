@@ -19,47 +19,50 @@
 #
 
 import numpy as np
-import torch
 import torch.nn as nn
-
-from nupic.torch.modules import Flatten
 
 
 class StandardMLP(nn.Module):
 
-    def __init__(self, input_size, num_classes):
+    def __init__(self, input_size, num_classes,
+                 hidden_sizes=(100, 100)):
 
         super().__init__()
 
-        self.classifier = nn.Sequential(
-            Flatten(),
-            nn.Linear(int(np.prod(input_size)), 100),
-            nn.ReLU(),
-            nn.Linear(100, 100),
-            nn.ReLU(),
-            nn.Linear(100, num_classes)
-        )
+        layers = [
+            nn.Flatten(),
+            nn.Linear(int(np.prod(input_size)), hidden_sizes[0]),
+            nn.ReLU()
+        ]
+        for idx in range(1, len(hidden_sizes)):
+            layers.extend([
+                nn.Linear(hidden_sizes[idx - 1], hidden_sizes[idx]),
+                nn.ReLU()
+            ])
+        layers.append(nn.Linear(hidden_sizes[-1], num_classes))
+
+        self.classifier = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.classifier(x)
 
 
-class StandardCNN(nn.Module):
+class SmallCNN(nn.Module):
 
     def __init__(self, num_classes, **kwargs):
 
         super().__init__()
 
-        self.features = nn.Sequential(  
-            *self.conv_block(1, 8, 5), # 105 -> 53
-            *self.conv_block(8, 16, 3), # 53 - 27
-            *self.conv_block(16, 32, 3), # 27 - 14
-            *self.conv_block(32, 64, 3), # 14 - 7
-            *self.conv_block(64, 128, 3), # 7 - 4
+        self.features = nn.Sequential(
+            *self.conv_block(1, 8, 5),  # 105 -> 53
+            *self.conv_block(8, 16, 3),  # 53 - 27
+            *self.conv_block(16, 32, 3),  # 27 - 14
+            *self.conv_block(32, 64, 3),  # 14 - 7
+            *self.conv_block(64, 128, 3),  # 7 - 4
             nn.AdaptiveAvgPool2d(1),
         )
         self.classifier = nn.Sequential(
-            Flatten(),
+            nn.Flatten(),
             nn.Linear(128, 100),
             nn.Linear(100, num_classes),
         )
@@ -74,7 +77,7 @@ class StandardCNN(nn.Module):
         return [
             nn.Conv2d(in_channels, out_channels, kernel_size),
             nn.BatchNorm2d(out_channels),
-            nn.MaxPool2d(2, 2),        
+            nn.MaxPool2d(2, 2),
             nn.ReLU(),
         ]
 

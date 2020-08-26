@@ -19,6 +19,5 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .imagenet import ImagenetDatasetManager
-from .common import TorchvisionDatasetManager
-from .omniglot import OmniglotDatasetManager
+from .torchvision_factory import torchvisiondataset, omniglot
+from .imagenet_factory import imagenet
