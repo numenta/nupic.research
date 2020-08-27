@@ -32,7 +32,7 @@ class SaveFinalCheckpoint(object):
 
     :param config:
 
-        - copy_checkpoint_dir: (optional) name of directory to save a copy of the final
+        - copy_checkpoint_dir: name of directory to save a copy of the final
                                checkpoint. The string may contain:
                                     * {name} - name of experiment; taken from config
                                     * {wandb_project} - taken from wandb_args
