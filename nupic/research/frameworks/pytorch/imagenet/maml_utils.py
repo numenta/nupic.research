@@ -23,6 +23,7 @@
 
 import torch
 
+
 def clone_module(module):
     """
 
@@ -78,21 +79,21 @@ def clone_module(module):
     clone._modules = clone._modules.copy()
 
     # Second, re-write all parameters
-    if hasattr(clone, '_parameters'):
+    if hasattr(clone, "_parameters"):
         for param_key in module._parameters:
             if module._parameters[param_key] is not None:
                 cloned = module._parameters[param_key].clone()
                 clone._parameters[param_key] = cloned
 
     # Third, handle the buffers if necessary
-    if hasattr(clone, '_buffers'):
+    if hasattr(clone, "_buffers"):
         for buffer_key in module._buffers:
             if clone._buffers[buffer_key] is not None and \
                     clone._buffers[buffer_key].requires_grad:
                 clone._buffers[buffer_key] = module._buffers[buffer_key].clone()
 
     # Then, recurse for each submodule
-    if hasattr(clone, '_modules'):
+    if hasattr(clone, "_modules"):
         for module_key in clone._modules:
             clone._modules[module_key] = clone_module(module._modules[module_key])
 
