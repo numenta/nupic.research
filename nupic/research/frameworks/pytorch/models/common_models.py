@@ -81,8 +81,37 @@ class SmallCNN(nn.Module):
             nn.ReLU(),
         ]
 
-# if __name__ == "__main__":
-#     model = StandardCNN(num_classes=10)
-#     output = model(torch.rand(10, 1,105,105))
-#     pred = output.max(1, keepdim=True)[0]
-#     print(pred[:, 0].tolist())
+
+class OMLNetwork(nn.Module):
+
+    def __init__(self, num_classes, **kwargs):
+
+        super().__init__()
+
+        self.representation = nn.Sequential(
+            *self.conv_block(1, 8, 5),  # 105 -> 53
+            *self.conv_block(8, 16, 3),  # 53 - 27
+            *self.conv_block(16, 32, 3),  # 27 - 14
+            *self.conv_block(32, 64, 3),  # 14 - 7
+            *self.conv_block(64, 128, 3),  # 7 - 4
+            nn.AdaptiveAvgPool2d(1),
+        )
+        self.adaptation = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(128, 100),
+            nn.Linear(100, num_classes),
+        )
+
+    def forward(self, x):
+        x = self.representation(x)
+        x = self.adaptation(x)
+        return x
+
+    @classmethod
+    def conv_block(cls, in_channels, out_channels, kernel_size):
+        return [
+            nn.Conv2d(in_channels, out_channels, kernel_size),
+            nn.BatchNorm2d(out_channels),
+            nn.MaxPool2d(2, 2),
+            nn.ReLU(),
+        ]
