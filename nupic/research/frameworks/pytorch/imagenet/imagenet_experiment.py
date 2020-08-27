@@ -77,7 +77,8 @@ except ImportError:
 __all__ = [
     "SupervisedExperiment",
     "ImagenetExperiment",
-    "ContinualLearningExperiment"
+    "ContinualLearningExperiment",
+    "MetaContinualLearningExperiment"
 ]
 
 
@@ -1065,148 +1066,191 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def setup_experiment(self, config):
+        super().setup_experiment(config)
 
         self.epochs_to_validate = []
         self.num_tasks_train = config.get("num_tasks_train", 200)
         self.num_tasks_test = config.get("num_tasks_test", 1000)
 
-        # TODO: Refactor to be self.model.get_representation_params()
-        # have to cover the cases where adaptation and representation are intertwined
-        # have to cover the cases there is only adaptation
-        self.representation_net = self.model.representation
-        # TODO: Refactor to be self.model.get_adaptation_params()
-        self.adaptation_net = self.model.adaptation
-
-        self.num_tasks_per_metaepoch = config.get("num_tasks_per_metaepoch", 5)
+        self.num_tasks_per_epoch = config.get("num_tasks_per_epoch", 5)
 
         self.adaptation_learning_rate = config.get("adaptation_learning_rate", 0.01)
 
-        # we will just use part of the data for training
+        # Only part of the data is used for inner loop training
         self.batch_size = config.get("batch_size", 5)
         self.num_batches_train = config.get("num_batches_train", 1)
-        self.num_batches_meta_train = config.get("num_batches_meta_train", 1)
-        # self.num_batches_validation = config.get("num_batches_validation", 3)
+        self.num_batches_meta_train = config.get("num_batches_meta_train_test", 1)
 
-    @classmethod
-    def adapt(cls, adaptation_net, loss, lr):
+    def transform_model(self):
         """
-        **Description**
-
-        Takes a gradient step on the loss and updates the cloned parameters in place.
-
-        **Arguments**
-
-        * **loss** (Tensor) - Loss to minimize upon update.
+        TODO: Refactor to self.model.get_representation_params()
+        and self.model_get_adaptation_params()
+        have to cover the cases where adaptation and representation are intertwined
+        have to cover the cases there is only adaptation
         """
+        self.representation_net = self.model.representation
+        self.adaptation_net = self.model.adaptation
 
-        gradients = torch.autograd.grad(
-            loss, adaptation_net,
-            retain_graph=True, create_graph=True
+    def run_epoch(self):
+
+        self.optimizer.zero_grad()
+
+        # copy weights
+        cloned_adaptation_net = self.clone_adaptation_net()
+
+        # collect the data to be used for the outer loop
+        meta_train_test_data, meta_train_test_target = [], []
+
+        # out of all tasks possible, choose num_tasks_per_epoch tasks
+        tasks_train = np.random.choice(
+            self.num_tasks_train, self.num_tasks_per_epoch, replace=False
         )
-        # Update the module
-        self.weight_update(adaptation_net, self.lr, gradients)
 
-    @classmethod
-    def weight_update(cls, adaptation_net, lr, grads):
-        """Equivalent to maml_update"""
-        if grads is not None:
-            params = list(adaptation_net.parameters())
-            for p, g in zip(params, grads):
-                if g is not None:
-                    p.add_(g, alpha=-lr)
+        # Inner loop
+        for task in tasks_train:
+            # Returns all data that was not used for the inner loop training
+            eval_data, eval_targets = self.run_task(task, cloned_adaptation_net)
+            num_indices_test = self.num_batches_meta_train_test * self.batch_size
+            meta_train_test_data.append(eval_data[:num_indices_test])
+            meta_train_test_target.append(eval_targets[:num_indices_test])
 
+        # Meta train refers to meta training testing
+        meta_train_test_data = torch.stack(meta_train_test_data)
+        meta_train_test_target = torch.stack(meta_train_test_target)
+
+        # TODO: Add the replay/remember set to meta_train_testdata and meta_train_test
+        # need to sample from all tasks
+
+        output = self.adaptation_net(self.representation_net(meta_train_test_data))
+        loss = self.loss_func(output, meta_train_test_target)
+        loss.backward()
+        self.optimizer.step()
+
+        # Report statistics for the outer loop
+        pred = output.max(1, keepdim=True)[1]
+        correct = pred.eq(meta_train_test_target.view_as(pred)).sum()
+        total = output.shape[0]
+        results = {
+            "total_correct": correct,
+            "total_tested": total,
+            "mean_loss": loss,
+            "mean_accuracy": correct / total if total > 0 else 0,
+        }
+        self.logger.debug(results)
+
+        # TODO: fix this
+        results.update(
+            timestep_begin=0,
+            timestep_end=1,
+            learning_rate=self.get_lr()[0],
+            extra_val_results=[],
+        )
+
+        self.current_epoch += 1
+
+        return results
 
     def run_task(self, task, cloned_adaptation_net):
         self.train_loader.sampler.set_active_tasks(task)
 
-        # 100 samples for a task
-        # 20 samples for training
-        # 80 samples for validate
-
-        evaluation_data, evaluation_labels = [], []
-        for idx, (data, target) in enumerate(self.train_loader()):  # batch samples
+        eval_data, eval_target = [], []
+        print("In running task")
+        for idx, (data, target) in enumerate(self.train_loader):
+            data = data.to(self.device)
+            target = target.to(self.device)
             if idx < self.num_batches_train:
-                train_loss = self.loss_function(
-                    cloned_adaptation_net(self.representation_params(data)), target
+                train_loss = self._loss_function(
+                    cloned_adaptation_net(self.representation_net(data)), target
                 )
                 # Update in place
                 self.adapt(
                     cloned_adaptation_net, train_loss, self.adaptation_learning_rate
                 )
             else:
-                evaluation_data.append(data)
-                evaluation_labels.append(data)
+                eval_data.append(data)
+                eval_target.append(data)
 
-        # should we call backward here?
+        # TODO: should we call backward here?
 
-        evaluation_data = torch.stack(evaluation_data)
-        evaluation_labels = torch.stack(evaluation_labels)
+        eval_data = torch.stack(eval_data)
+        eval_target = torch.stack(eval_target)
 
         # Evaluate the adapted model
         with torch.no_grad():
-            predictions = cloned_adaptation_net(self.representation_params(evaluation_data))
-            valid_error = self.loss_function(predictions, evaluation_labels)
-            valid_error /= len(evaluation_data)
-            self.logger.info("Valid error inner loop: ", valid_error)
+            preds = cloned_adaptation_net(self.representation_net(eval_data))
+            valid_error = self._loss_function(preds, eval_target)
+            valid_error /= len(eval_data)
+            self.logger.info("Valid error meta train training: ", valid_error)
 
             # calculate accuracy
-            predictions = predictions.argmax(dim=1).view(targets.shape)
-            valid_accuracy = predictions == targets).sum().float() / targets.size(0)
-            self.logger.info("Valid accuracy inner loop: ", valid_accuracy)
+            preds = preds.argmax(dim=1).view(eval_target.shape)
+            valid_accuracy = (preds == eval_target).sum().float() / eval_target.size(0)
+            self.logger.info("Valid accuracy meta train training: ", valid_accuracy)
 
-        return evaluation_data, evaluation_labels
+        return eval_data, eval_target
 
+    @classmethod
+    def adapt(cls, adaptation_net, loss, lr):
+        """
+        Takes a gradient step on the loss and updates the cloned parameters in place.
+        """
 
-    def run_meta_epoch(self):
+        gradients = torch.autograd.grad(
+            loss, adaptation_net.parameters(),
+            retain_graph=True, create_graph=True
+        )
+        if gradients is not None:
+            params = list(adaptation_net.parameters())
+            for p, g in zip(params, gradients):
+                if g is not None:
+                    p.add_(g, alpha=-lr)
 
-        self.optimizer.zero_grad()
-        meta_train_error = 0.0
-        meta_train_accuracy = 0.0
-        meta_valid_error = 0.0
-        meta_valid_accuracy = 0.0
-
-        # out of all tasks possible, choose num_tasks_per_metaepoch tasks
-        tasks_train = np.random.choice(self.num_tasks_train, self.num_tasks_per_metaepoch, replace=False)
-
-        # copy weights
-        cloned_adaptation_net = self.clone_adaptation_net()
-
-        # collect the data to be used for the outer loop
-        test_data, test_targets = [], []
-
-        # Inner loop
-        for task in tasks_train:
-            # Returns all data that was not used for the inner loop training
-            evaluation_data, evaluation_targets = self.run_task(task, cloned_adaptation_net)
-            num_indices_test = self.num_batches_meta_train * self.batch_size
-            test_data.append(evaluation_data[:num_indices_test])
-            test_targets.append(evaluation_targets[:num_indices_test])
-
-        test_data = torch.stack(test_data)
-        test_targets = torch.stack(test_targets)
-
-        # TODO: Add the replay/remember set to test_data and test_targets
-        # need to sample from all tasks
-
-        test_output = self.adaptation_net(self.representation_net(test_data))
-        test_loss = self.loss_func(test_output, test_target)
-        test_loss.backward()
-        self.optimizer.step()
-
-        # report statistics
-        test_pred = test_output.max(1, keepdim=True)[1]
-        test_correct += test_pred.eq(test_target.view_as(test_pred)).sum()
-        test_total = test_output.shape[0]
-        result = {
-            "total_correct": test_correct,
-            "total_tested": test_total,
-            "mean_loss": test_loss,
-            "mean_accuracy": test_correct / test_total if total > 0 else 0,
-        }
-        return result
 
     def clone_adaptation_net(self):
         return clone_module(self.adaptation_net)
+
+    @classmethod
+    def aggregate_results(cls, results):
+        """Run validation in single GPU"""
+        print("Aggregated results")
+        return results[0]
+
+    @classmethod
+    def create_train_sampler(cls, dataset, config):
+        return cls.create_task_sampler(dataset, config, train=True)
+
+    @classmethod
+    def create_validation_sampler(cls, dataset, config):
+        return cls.create_task_sampler(dataset, config, train=False)
+
+    @classmethod
+    def create_task_sampler(cls, dataset, config, train):
+        """In meta continuous learning paradigm, one task equals one class"""
+        # assume dataloaders are already created
+        print("Creating task sampler")
+        class_indices = defaultdict(list)
+        for idx, (_, target) in enumerate(dataset):
+            class_indices[target].append(idx)
+        print(f"Classes available {len(class_indices)}")
+
+        # change the sampler in the train loader
+        distributed = config.get("distributed", False)
+        if distributed and train:
+            sampler = TaskDistributedSampler(
+                dataset,
+                class_indices
+            )
+        else:
+            sampler = TaskRandomSampler(class_indices)
+
+        return sampler
+
+    def should_stop(self):
+        """
+        Whether or not the experiment should stop. Usually determined by the
+        number of epochs but customizable to any other stopping criteria
+        """
+        return self.current_task >= self.num_tasks
 
 class ImagenetExperiment(SupervisedExperiment):
     """

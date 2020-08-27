@@ -95,9 +95,9 @@ class OMLNetwork(nn.Module):
             *self.conv_block(32, 64, 3),  # 14 - 7
             *self.conv_block(64, 128, 3),  # 7 - 4
             nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
         )
         self.adaptation = nn.Sequential(
-            nn.Flatten(),
             nn.Linear(128, 100),
             nn.Linear(100, num_classes),
         )
