@@ -441,7 +441,7 @@ def _get_sub_module(module, name):
         return getattr(module, name)
 
 
-def is_match(pattern, string):
+def _is_match(pattern, string):
 
     try:
         r = re.compile(pattern)
@@ -508,9 +508,9 @@ def filter_params(
             accepted_named_params.append((name, param))
             continue
 
-        # Case 3: The name matches on of the allowed patterns.
+        # Case 3: The name matches one of the allowed patterns.
         for pattern in accepted_patterns:
-            if is_match(pattern, name):
+            if _is_match(pattern, name):
                 accepted_named_params.append((name, param))
                 continue
 
