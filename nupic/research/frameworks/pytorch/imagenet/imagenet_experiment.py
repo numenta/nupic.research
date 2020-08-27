@@ -49,12 +49,12 @@ from nupic.research.frameworks.pytorch.distributed_sampler import (
 from nupic.research.frameworks.pytorch.imagenet.evaluation_metrics import (
     ContinualLearningMetrics,
 )
-from nupic.research.frameworks.pytorch.imagenet.maml_utils import clone_module
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
     get_free_port,
     get_node_ip_address,
 )
+from nupic.research.frameworks.pytorch.imagenet.maml_utils import clone_module
 from nupic.research.frameworks.pytorch.imagenet.network_utils import (
     create_model,
     get_compatible_state_dict,
@@ -1205,7 +1205,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 if g is not None:
                     p.add_(g, alpha=-lr)
 
-
     def clone_adaptation_net(self):
         return clone_module(self.adaptation_net)
 
@@ -1251,6 +1250,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         number of epochs but customizable to any other stopping criteria
         """
         return self.current_task >= self.num_tasks
+
 
 class ImagenetExperiment(SupervisedExperiment):
     """
