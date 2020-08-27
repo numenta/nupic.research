@@ -28,7 +28,8 @@ from shutil import copytree
 class SaveFinalCheckpoint(object):
     """
     Experiment mixin to save a copy of the final checkpoint from `logdir` upon
-    `stop_experiment`.
+    `stop_experiment`. It's assumed the checkpoints are formatted as
+    `checkpoint_{digit}` where `digit` is as integer number.
 
     :param config:
 
@@ -105,8 +106,14 @@ class SaveFinalCheckpoint(object):
         checkpoint_paths = []
         for path in log_path.iterdir():
             if "checkpoint" in path.name:
-                num = int(path.name.split("_")[1])
-                checkpoint_paths.append((num, path))
+                num = path.name.split("_")[-1]
+                if num.isdigit():
+                    num = int(num)
+                    checkpoint_paths.append((num, path))
+
+        if not checkpoint_paths:
+            self.logger.warning("No checkpoints found, nothing to copy and save.")
+            return
 
         checkpoint_paths = sorted(checkpoint_paths, key=itemgetter(0))
         latest_checkpoint = checkpoint_paths[-1][1]  # path of latest
