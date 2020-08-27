@@ -24,7 +24,7 @@
 import torch
 
 
-def clone_module(module):
+def clone_module(module, keep_as_reference=None):
     """
 
     [[Source]](https://github.com/learnables/learn2learn/blob/master/learn2learn/utils.py)
@@ -41,6 +41,8 @@ def clone_module(module):
     **Arguments**
 
     * **module** (Module) - Module to be cloned.
+    * **keep_as_reference** (list) - list of parameters to keep as a reference instead
+                                     of cloning
 
     **Return**
 
@@ -78,12 +80,18 @@ def clone_module(module):
     clone._buffers = clone._buffers.copy()
     clone._modules = clone._modules.copy()
 
+    keep_as_reference = keep_as_reference or []
+
     # Second, re-write all parameters
     if hasattr(clone, "_parameters"):
         for param_key in module._parameters:
             if module._parameters[param_key] is not None:
-                cloned = module._parameters[param_key].clone()
-                clone._parameters[param_key] = cloned
+                param = module._parameters[param_key]
+                if param_key not in keep_as_reference:
+                    # Clone param
+                    param = param.clone()
+
+                clone._parameters[param_key] = param  # reference or clone
 
     # Third, handle the buffers if necessary
     if hasattr(clone, "_buffers"):
