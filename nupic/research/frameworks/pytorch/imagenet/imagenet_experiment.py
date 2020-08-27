@@ -1079,6 +1079,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Only part of the data is used for inner loop training
         self.batch_size = config.get("batch_size", 5)
         self.num_batches_train = config.get("num_batches_train", 1)
+        #       maybe slow vs fast adaptation
+        # TODO: Is this the best name?
         self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
 
     def transform_model(self):
@@ -1174,6 +1176,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # TODO: should we call backward here?
 
+        # TODO: This may be quite memory intensive for large datasets.
         eval_data = torch.cat(eval_data)
         eval_target = torch.cat(eval_target)
 
@@ -1208,6 +1211,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                     p.add_(g, alpha=-lr)
 
     def clone_adaptation_net(self):
+        # TODO: Have this accept a frozen_params arg
         return clone_module(self.adaptation_net)
 
     @classmethod
