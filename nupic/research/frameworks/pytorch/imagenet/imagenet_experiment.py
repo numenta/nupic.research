@@ -1079,7 +1079,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Only part of the data is used for inner loop training
         self.batch_size = config.get("batch_size", 5)
         self.num_batches_train = config.get("num_batches_train", 1)
-        self.num_batches_meta_train = config.get("num_batches_meta_train_test", 1)
+        self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
 
     def transform_model(self):
         """
@@ -1115,25 +1115,25 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             meta_train_test_target.append(eval_targets[:num_indices_test])
 
         # Meta train refers to meta training testing
-        meta_train_test_data = torch.stack(meta_train_test_data)
-        meta_train_test_target = torch.stack(meta_train_test_target)
+        meta_train_test_data = torch.cat(meta_train_test_data)
+        meta_train_test_target = torch.cat(meta_train_test_target)
 
         # TODO: Add the replay/remember set to meta_train_testdata and meta_train_test
         # need to sample from all tasks
 
         output = self.adaptation_net(self.representation_net(meta_train_test_data))
-        loss = self.loss_func(output, meta_train_test_target)
+        loss = self._loss_function(output, meta_train_test_target)
         loss.backward()
         self.optimizer.step()
 
         # Report statistics for the outer loop
         pred = output.max(1, keepdim=True)[1]
-        correct = pred.eq(meta_train_test_target.view_as(pred)).sum()
+        correct = pred.eq(meta_train_test_target.view_as(pred)).sum().item()
         total = output.shape[0]
         results = {
             "total_correct": correct,
             "total_tested": total,
-            "mean_loss": loss,
+            "mean_loss": loss.item(),
             "mean_accuracy": correct / total if total > 0 else 0,
         }
         self.logger.debug(results)
@@ -1168,24 +1168,24 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 )
             else:
                 eval_data.append(data)
-                eval_target.append(data)
+                eval_target.append(target)
 
         # TODO: should we call backward here?
 
-        eval_data = torch.stack(eval_data)
-        eval_target = torch.stack(eval_target)
+        eval_data = torch.cat(eval_data)
+        eval_target = torch.cat(eval_target)
 
         # Evaluate the adapted model
         with torch.no_grad():
             preds = cloned_adaptation_net(self.representation_net(eval_data))
             valid_error = self._loss_function(preds, eval_target)
             valid_error /= len(eval_data)
-            self.logger.info("Valid error meta train training: ", valid_error)
+            self.logger.info(f"Valid error meta train training: {valid_error}")
 
             # calculate accuracy
             preds = preds.argmax(dim=1).view(eval_target.shape)
             valid_accuracy = (preds == eval_target).sum().float() / eval_target.size(0)
-            self.logger.info("Valid accuracy meta train training: ", valid_accuracy)
+            self.logger.info(f"Valid accuracy meta train training: {valid_accuracy}")
 
         return eval_data, eval_target
 
@@ -1243,13 +1243,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             sampler = TaskRandomSampler(class_indices)
 
         return sampler
-
-    def should_stop(self):
-        """
-        Whether or not the experiment should stop. Usually determined by the
-        number of epochs but customizable to any other stopping criteria
-        """
-        return self.current_task >= self.num_tasks
 
 
 class ImagenetExperiment(SupervisedExperiment):
