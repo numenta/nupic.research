@@ -327,6 +327,8 @@ class ContinualLearningTrainable(SupervisedTrainable):
     with ray.
     """
 
+    stop_condition = "num_tasks"
+
     def _run_iteration(self):
         """Run one epoch of training on each process."""
         status = []
@@ -494,14 +496,15 @@ def run_single_instance(config):
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
+
     # Update tune stop criteria with config epochs
     stop = kwargs.get("stop", {}) or dict()
-    epochs = config.get("epochs", 1)
-    num_tasks = config.get("num_tasks", None)
-    if num_tasks:
-        stop.update(training_iteration=num_tasks)
-    else:
-        stop.update(training_iteration=epochs)
+
+    stop_condition = getattr(ray_trainable, "stop_condition", "epochs")
+    stop_iteration = config.get(stop_condition, None)
+    if stop_iteration:
+        stop.update(training_iteration=stop_iteration)
+
     kwargs["stop"] = stop
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
