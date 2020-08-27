@@ -1126,6 +1126,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         loss.backward()
         self.optimizer.step()
 
+        # TODO: Delete the cloned network, we should right?
+
         # Report statistics for the outer loop
         pred = output.max(1, keepdim=True)[1]
         correct = pred.eq(meta_train_test_target.view_as(pred)).sum().item()
