@@ -36,7 +36,9 @@ class SaveFinalCheckpoint(object):
                                checkpoint. The string may contain:
                                     * {name} - name of experiment; taken from config
                                     * {wandb_project} - taken from wandb_args
-                                    * {trainable_id} - inferred from logdir
+                                    * {trainable_id} - inferred from logdir; must be
+                                      the ray default log creator when applying this
+                                      option
 
     Example
     ```
