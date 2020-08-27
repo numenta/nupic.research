@@ -1083,27 +1083,22 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # TODO: Is this the best name?
         self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
 
-    def transform_model(self):
-        """
-        TODO: Refactor to self.model.get_representation_params()
-        and self.model_get_adaptation_params()
-        have to cover the cases where adaptation and representation are intertwined
-        have to cover the cases there is only adaptation
-        """
-        self.representation_net = self.model.representation
-        self.adaptation_net = self.model.adaptation
-
     def run_epoch(self):
 
         self.optimizer.zero_grad()
 
-        # copy weights
-        cloned_adaptation_net = self.clone_adaptation_net()
+        # Clone model - clone fast params, keep a reference of the fast params.
+        slow_params = self.get_slow_params()
+        cloned_adaptation_net = self.clone_model(keep_as_reference=slow_params)
 
-        # collect the data to be used for the outer loop
+        # Freeze the slow params.
+        for param in slow_params:
+            param.requires_grad = False
+
+        # Collect the data to be used for the outer loop
         meta_train_test_data, meta_train_test_target = [], []
 
-        # out of all tasks possible, choose num_tasks_per_epoch tasks
+        # Out of all tasks possible, choose num_tasks_per_epoch tasks
         tasks_train = np.random.choice(
             self.num_tasks_train, self.num_tasks_per_epoch, replace=False
         )
@@ -1123,7 +1118,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # TODO: Add the replay/remember set to meta_train_testdata and meta_train_test
         # need to sample from all tasks
 
-        output = self.adaptation_net(self.representation_net(meta_train_test_data))
+        # Unfreeze the slow params.
+        for param in slow_params:
+            param.requires_grad = True
+
+        # Take step for outer loop.
+        output = self.model(meta_train_test_data)
         loss = self._loss_function(output, meta_train_test_target)
         loss.backward()
         self.optimizer.step()
@@ -1164,7 +1164,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             target = target.to(self.device)
             if idx < self.num_batches_train:
                 train_loss = self._loss_function(
-                    cloned_adaptation_net(self.representation_net(data)), target
+                    cloned_adaptation_net(data), target
                 )
                 # Update in place
                 self.adapt(
@@ -1210,9 +1210,14 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 if g is not None:
                     p.add_(g, alpha=-lr)
 
-    def clone_adaptation_net(self):
+    def clone_model(self, keep_as_reference=None):
         # TODO: Have this accept a frozen_params arg
-        return clone_module(self.adaptation_net)
+        return clone_module(self.model, keep_as_reference=keep_as_reference)
+
+    def get_slow_params(self):
+        # TODO: Maybe there's a way to generalize this.
+        assert hasattr(self.model, "slow_params")
+        return self.model.slow_params
 
     @classmethod
     def aggregate_results(cls, results):
@@ -1281,3 +1286,9 @@ class ImagenetExperiment(SupervisedExperiment):
         eo = super().get_execution_order()
         eo["create_loaders"].insert(0, "ImagenetExperiment.create_loaders")
         return eo
+
+
+class OMLforResnet(MetaContinualLearningExperiment):
+
+    def get_slow_params(self):
+        return [...]
