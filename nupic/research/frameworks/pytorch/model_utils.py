@@ -21,6 +21,7 @@
 import gzip
 import pickle
 import random
+import re
 import sys
 import time
 
@@ -438,3 +439,79 @@ def _get_sub_module(module, name):
         return module[int(name)]
     else:
         return getattr(module, name)
+
+
+def is_match(pattern, string):
+
+    try:
+        r = re.compile(pattern)
+    except re.error as msg:
+        raise Exception(f"In valid regex '{pattern}': {msg}")
+
+    match = r.match(string)
+    if match is not None:
+        return True
+    else:
+        return False
+
+
+def filter_params(
+    model,
+    accepted_modules=None,
+    accepted_names=None,
+    accepted_patterns=None,
+):
+    """
+    This iterates through all a models parameters and returns a list of tuples (name,
+    param) for those matches any one of the following conditions
+        1. The param belongs to a module within 'accepted_modules'
+        2. The param has a name contained in 'accepted_names'
+        3. The param matches a regex pattern contained in 'accepted_patterns'
+
+    The regex macthing uses re.match which identifies whether zero or more characters at
+    the beginning of the param name match the regular expression pattern given.
+
+    Example:
+    ```
+    model = resnet50()
+    filter_params(
+        model,
+        accepted_modules=torch.nn.Linear,
+        accepted_names=["features.stem.weight"],
+        accepted_patterns=["features.*bn\\d"]
+    )
+    ```
+    """
+
+    accepted_names = accepted_names or []
+    accepted_patterns = accepted_patterns or []
+    assert isinstance(accepted_names, list)
+    assert isinstance(accepted_patterns, list)
+
+    # Identify parameter pointers for all matching modules.
+    accepted_data_ptrs = []
+    for module in model.modules():
+        if isinstance(module, accepted_modules):
+            for param in module.parameters():
+                accepted_data_ptrs.append(param.data_ptr())
+
+    accepted_named_params = []
+    for name, param in model.named_parameters():
+
+        # Case 1: The module matches
+        if param.data_ptr() in accepted_data_ptrs:
+            accepted_named_params.append((name, param))
+            continue
+
+        # Case 2: The name is in the white-list.
+        if name in accepted_names:
+            accepted_named_params.append((name, param))
+            continue
+
+        # Case 3: The name matches on of the allowed patterns.
+        for pattern in accepted_patterns:
+            if is_match(pattern, name):
+                accepted_named_params.append((name, param))
+                continue
+
+    return accepted_named_params
