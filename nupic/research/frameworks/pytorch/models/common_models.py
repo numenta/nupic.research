@@ -102,6 +102,14 @@ class OMLNetwork(nn.Module):
             nn.Linear(100, num_classes),
         )
 
+    @property
+    def fast_params(self):
+        return self.adaptation.parameters()
+
+    @property
+    def slow_params(self):
+        return self.representation.parameters()
+
     def forward(self, x):
         x = self.representation(x)
         x = self.adaptation(x)
