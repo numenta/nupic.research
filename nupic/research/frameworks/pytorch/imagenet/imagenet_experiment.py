@@ -1193,7 +1193,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return eval_data, eval_target
 
     @classmethod
-    def update_params(cls, params, loss, lr):
+    def update_params(cls, params, loss, lr, distributed=False):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
@@ -1202,6 +1202,19 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             loss, params,
             retain_graph=True, create_graph=True
         )
+
+        def average_gradients(model):
+            size = float(dist.get_world_size())
+            for param in model.parameters():
+                dist.all_reduce(param.grad.data, op=dist.reduce_op.SUM)
+                param.grad.data /= size
+
+        if distributed:
+            size = float(dist.get_world_size())
+            for grad in gradients:
+                dist.all_reduce(grad.data, op=dist.reduce_op.SUM)
+                grad.data /= size
+
         if gradients is not None:
             params = list(params)
             for p, g in zip(params, gradients):
@@ -1211,7 +1224,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     def adapt(self, cloned_adaptation_net, train_loss):
         fast_params = self.get_fast_params(cloned_adaptation_net)
         lr = self.adaptation_learning_rate
-        self.update_params(fast_params, train_loss, lr)
+        self.update_params(fast_params, train_loss, lr, distributed=self.distributed)
 
     def clone_model(self, keep_as_reference=None):
         """
