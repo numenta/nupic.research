@@ -283,11 +283,7 @@ class SupervisedExperiment:
                 self.model, self.optimizer, **amp_args)
             self.logger.info("Using mixed precision")
 
-        # Apply DistributedDataParallel after all other model mutations
-        if self.distributed:
-            self.model = DistributedDataParallel(self.model)
-        else:
-            self.model = DataParallel(self.model)
+        self.model = self.distribute_model(self.model)
 
         self._loss_function = config.get(
             "loss_function", torch.nn.functional.cross_entropy
@@ -388,6 +384,16 @@ class SupervisedExperiment:
             checkpoint_file=config.get("checkpoint_file", None),
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
         )
+
+    def distribute_model(self, model):
+
+        # Apply DistributedDataParallel after all other model mutations
+        if self.distributed:
+            model = DistributedDataParallel(model)
+        else:
+            model = DataParallel(model)
+
+        return model
 
     @classmethod
     def create_lr_scheduler(cls, config, optimizer, total_batches):
