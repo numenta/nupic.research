@@ -1251,7 +1251,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         specified `keep_as_reference` via reference.
         """
 
-        model = clone_model(self.model.module, keep_as_reference=None)
+        model = clone_model(self.model.module, keep_as_reference=keep_as_reference)
 
         # Apply DistributedDataParallel after all other model clone
         if self.distributed:
