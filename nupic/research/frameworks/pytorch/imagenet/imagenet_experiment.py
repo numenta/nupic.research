@@ -1089,6 +1089,19 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # TODO: Is this the best name?
         self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
 
+    def distribute_model(self, model):
+
+        # Apply DistributedDataParallel after all other model mutations
+        if self.distributed:
+            # This may cause the model to run slower; however we need to keep track of
+            # the unused parameters as they include those that were cloned for previous
+            # tasks.
+            model = DistributedDataParallel(model, find_unused_parameters=True)
+        else:
+            model = DataParallel(model)
+
+        return model
+
     def run_epoch(self):
 
         self.optimizer.zero_grad()
