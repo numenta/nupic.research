@@ -1263,13 +1263,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return model
 
     def get_slow_params(self):
-        # TODO: Maybe there's a way to generalize this.
-        assert hasattr(self.model.module, "slow_params")
+        # TODO: Maybe there's a better way to manage params.
         return self.model.module.slow_params
 
     def get_fast_params(self, cloned_adaptation_net):
-        # TODO: Maybe there's a way to generalize this.
-        return list(cloned_adaptation_net.module.adaptation.parameters())
+        # TODO: Maybe there's a better way to manage params.
+        if hasattr(self.model, "module"):
+            return self.model.module.fast_params
+        else:
+            return self.model.fast_params
 
     @classmethod
     def aggregate_results(cls, results):
