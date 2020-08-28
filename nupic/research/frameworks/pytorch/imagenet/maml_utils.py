@@ -21,7 +21,11 @@
 # These are extracted from:
 # https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
 
+from copy import deepcopy
+
 import torch
+
+from nupic.research.frameworks.pytorch.model_utils import get_parent_module
 
 
 def clone_module(module, keep_as_reference=None):
@@ -90,7 +94,6 @@ def clone_module(module, keep_as_reference=None):
                 if param_key not in keep_as_reference:
                     # Clone param
                     param = param.clone()
-
                 clone._parameters[param_key] = param  # reference or clone
 
     # Third, handle the buffers if necessary
@@ -110,3 +113,38 @@ def clone_module(module, keep_as_reference=None):
     # https://github.com/learnables/learn2learn/issues/139
     clone = clone._apply(lambda x: x)
     return clone
+
+
+def clone_model(model, keep_as_reference=None):
+    """
+    Clones a model by creating a deepcopy and then for each param either
+        1) cloning it from the original to the copied model
+        2) passing a reference of it from the original to the copied model
+
+    :param keep_as_reference: which params to pass as a reference
+    :type keep_as_reference: list of names
+    """
+
+    try:
+        new_model = deepcopy(model)
+    except RuntimeError as err:
+        raise Exception(
+            f"Received RuntimeError: {err}\n"
+            "Make sure no operations (such as clone) have been taken on the params. "
+            "You can't deepcopy non-leaf tensors."
+        )
+
+    keep_as_reference = keep_as_reference or []
+    for (name, old_param) in model.named_parameters():
+        if name in keep_as_reference:
+            # Keep param as reference.
+            new_param = old_param
+        else:
+            # Clone param.
+            new_param = old_param.clone()
+
+        parent_module = get_parent_module(new_model, name)
+        base_name = name.split(".")[-1]
+        parent_module._parameters[base_name] = new_param
+
+    return new_model
