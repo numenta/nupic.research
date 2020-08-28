@@ -54,7 +54,7 @@ from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     get_free_port,
     get_node_ip_address,
 )
-from nupic.research.frameworks.pytorch.imagenet.maml_utils import clone_module
+from nupic.research.frameworks.pytorch.imagenet.maml_utils import clone_model
 from nupic.research.frameworks.pytorch.imagenet.network_utils import (
     create_model,
     get_compatible_state_dict,
@@ -1251,7 +1251,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         specified `keep_as_reference` via reference.
         """
 
-        model = clone_module(self.model.module, keep_as_reference=keep_as_reference)
+        model = clone_model(self.model.module, keep_as_reference=None)
 
         # Apply DistributedDataParallel after all other model clone
         if self.distributed:
