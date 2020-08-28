@@ -1106,11 +1106,11 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.optimizer.zero_grad()
 
-        # Clone model - clone fast params, keep a reference of the fast params.
-        slow_params = self.get_slow_params()
-        cloned_adaptation_net = self.clone_model(keep_as_reference=slow_params)
+        # Clone model - clone fast params and the slow params. The latter will be frozen
+        cloned_adaptation_net = self.clone_model()
 
         # Freeze the slow params.
+        slow_params = self.get_slow_params()
         for param in slow_params:
             param.requires_grad = False
 
@@ -1251,7 +1251,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         specified `keep_as_reference` via reference.
         """
 
-        model = clone_model(self.model.module, keep_as_reference=keep_as_reference)
+        # TODO: Pass the names of the slow_params, which can just be kept through
+        # reference and frozen.
+        model = clone_model(self.model.module, keep_as_reference=None)
 
         if not self.distributed:
             model = DataParallel(model)
