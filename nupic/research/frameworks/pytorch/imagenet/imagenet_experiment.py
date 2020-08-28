@@ -1167,9 +1167,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                     cloned_adaptation_net(data), target
                 )
                 # Update in place
-                self.adapt(
-                    cloned_adaptation_net, train_loss, self.adaptation_learning_rate
-                )
+                self.adapt(cloned_adaptation_net, train_loss)
             else:
                 eval_data.append(data)
                 eval_target.append(target)
@@ -1182,7 +1180,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # Evaluate the adapted model
         with torch.no_grad():
-            preds = cloned_adaptation_net(self.representation_net(eval_data))
+            preds = cloned_adaptation_net(eval_data)
             valid_error = self._loss_function(preds, eval_target)
             valid_error /= len(eval_data)
             self.logger.info(f"Valid error meta train training: {valid_error}")
@@ -1195,29 +1193,49 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return eval_data, eval_target
 
     @classmethod
-    def adapt(cls, adaptation_net, loss, lr):
+    def update_params(cls, params, loss, lr):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
 
         gradients = torch.autograd.grad(
-            loss, adaptation_net.parameters(),
+            loss, params,
             retain_graph=True, create_graph=True
         )
         if gradients is not None:
-            params = list(adaptation_net.parameters())
+            params = list(params)
             for p, g in zip(params, gradients):
                 if g is not None:
                     p.add_(g, alpha=-lr)
 
+    def adapt(self, cloned_adaptation_net, train_loss):
+        fast_params = self.get_fast_params(cloned_adaptation_net)
+        lr = self.adaptation_learning_rate
+        self.update_params(fast_params, train_loss, lr)
+
     def clone_model(self, keep_as_reference=None):
-        # TODO: Have this accept a frozen_params arg
-        return clone_module(self.model, keep_as_reference=keep_as_reference)
+        """
+        Clones self.model by cloning some of the params and keeping those listed
+        specified `keep_as_reference` via reference.
+        """
+
+        model = clone_module(self.model.module, keep_as_reference=keep_as_reference)
+
+        # Apply DistributedDataParallel after all other model clone
+        if self.distributed:
+            model = DistributedDataParallel(model)
+        else:
+            model = DataParallel(model)
+        return model
 
     def get_slow_params(self):
         # TODO: Maybe there's a way to generalize this.
-        assert hasattr(self.model, "slow_params")
-        return self.model.slow_params
+        assert hasattr(self.model.module, "slow_params")
+        return self.model.module.slow_params
+
+    def get_fast_params(self, cloned_adaptation_net):
+        # TODO: Maybe there's a way to generalize this.
+        return list(cloned_adaptation_net.module.adaptation.parameters())
 
     @classmethod
     def aggregate_results(cls, results):
