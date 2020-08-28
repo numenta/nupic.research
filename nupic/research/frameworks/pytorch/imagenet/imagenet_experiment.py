@@ -1253,11 +1253,13 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         model = clone_model(self.model.module, keep_as_reference=keep_as_reference)
 
-        # Apply DistributedDataParallel after all other model clone
-        if self.distributed:
-            model = DistributedDataParallel(model)
-        else:
+        if not self.distributed:
             model = DataParallel(model)
+        else:
+            # Instead of using DistributedDataParallel, the grads will be reduced
+            # manually since we won't call loss.backward()
+            model
+
         return model
 
     def get_slow_params(self):
