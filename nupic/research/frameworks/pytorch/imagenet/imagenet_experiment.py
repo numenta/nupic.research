@@ -1141,8 +1141,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         for param in slow_params:
             param.requires_grad = True
 
-        # Take step for outer loop.
-        output = self.model(meta_train_test_data)
+        # Take step for outer loop. This will backprop through to the original
+        # slow and fast params.
+        output = cloned_adaptation_net(meta_train_test_data)
         loss = self._loss_function(output, meta_train_test_target)
         loss.backward()
         self.optimizer.step()
