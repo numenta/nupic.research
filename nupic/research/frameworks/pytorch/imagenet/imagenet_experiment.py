@@ -1130,12 +1130,17 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             meta_train_test_data.append(eval_data[:num_indices_test])
             meta_train_test_target.append(eval_targets[:num_indices_test])
 
+        # Remember set: sample from all tasks
+        tasks_remember = np.random.choice(self.num_tasks_train, 64, replace=True)
+
+        for task in tasks_remember:
+            data, target = self.sample_example_from_task(task)
+            meta_train_test_data.append(data)
+            meta_train_test_target.append(target)
+
         # Meta train refers to meta training testing
         meta_train_test_data = torch.cat(meta_train_test_data)
         meta_train_test_target = torch.cat(meta_train_test_target)
-
-        # TODO: Add the replay/remember set to meta_train_testdata and meta_train_test
-        # need to sample from all tasks
 
         # Unfreeze the slow params.
         for param in slow_params:
@@ -1192,8 +1197,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 eval_data.append(data)
                 eval_target.append(target)
 
-        # TODO: should we call backward here?
-
         # TODO: This may be quite memory intensive for large datasets.
         eval_data = torch.cat(eval_data)
         eval_target = torch.cat(eval_target)
@@ -1211,6 +1214,13 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.logger.info(f"Valid accuracy meta train training: {valid_accuracy}")
 
         return eval_data, eval_target
+
+    def sample_example_from_task(self, task):
+        self.train_loader.sampler.set_active_tasks(task)
+
+        # TODO make sure self.train_loader randomly orders all 20 examples for task
+        data, target = next(iter(self.train_loader))
+        return data[0], target[0]
 
     @classmethod
     def update_params(cls, params, loss, lr, distributed=False):
