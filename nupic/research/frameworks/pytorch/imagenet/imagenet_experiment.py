@@ -1082,12 +1082,38 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.adaptation_learning_rate = config.get("adaptation_learning_rate", 0.01)
 
+        self.remember_loader = self.create_remember_loader(config)
+        self.remember_loader.sampler.set_active_tasks(np.arange(self.num_tasks_train))
+
         # Only part of the data is used for inner loop training
         self.batch_size = config.get("batch_size", 5)
         self.num_batches_train = config.get("num_batches_train", 1)
         #       maybe slow vs fast adaptation
         # TODO: Is this the best name?
         self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
+
+    @classmethod
+    def create_remember_loader(cls, config):
+        """Create train and val dataloaders."""
+
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+
+        dataset_args = config.get("dataset_args", {})
+
+        dataset_args.update(train=False)
+        dataset = dataset_class(**dataset_args)
+
+        sampler = cls.create_task_sampler(dataset, config, train=False)
+
+        return DataLoader(
+            dataset=dataset,
+            batch_size=64,
+            sampler=sampler,
+            num_workers=config.get("workers", 0),
+            # pin_memory=torch.cuda.is_available(),
+        )
 
     def distribute_model(self, model):
 
@@ -1131,12 +1157,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             meta_train_test_target.append(eval_targets[:num_indices_test])
 
         # Remember set: sample from all tasks
-        tasks_remember = np.random.choice(self.num_tasks_train, 64, replace=True)
-
-        for task in tasks_remember:
-            data, target = self.sample_example_from_task(task)
-            meta_train_test_data.append(data)
-            meta_train_test_target.append(target)
+        remember_data, remember_targets = next(iter(self.remember_loader))
+        remember_data = remember_data.to(self.device)
+        remember_targets = remember_targets.to(self.device)
+        
+        meta_train_test_data.append(remember_data)
+        meta_train_test_target.append(remember_targets)
 
         # Meta train refers to meta training testing
         meta_train_test_data = torch.cat(meta_train_test_data)
@@ -1214,13 +1240,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.logger.info(f"Valid accuracy meta train training: {valid_accuracy}")
 
         return eval_data, eval_target
-
-    def sample_example_from_task(self, task):
-        self.train_loader.sampler.set_active_tasks(task)
-
-        # TODO make sure self.train_loader randomly orders all 20 examples for task
-        data, target = next(iter(self.train_loader))
-        return data[0], target[0]
 
     @classmethod
     def update_params(cls, params, loss, lr, distributed=False):
