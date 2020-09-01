@@ -32,6 +32,14 @@ from nupic.research.frameworks.pytorch.imagenet import mixins
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
 from nupic.research.frameworks.wandb import ray_wandb
 
+__all__ = [
+    "MAIN_PARSER",
+    "RAY_PARSER",
+    "process_args",
+    "insert_experiment_mixin",
+]
+
+
 MAIN_PARSER = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     argument_default=argparse.SUPPRESS,
