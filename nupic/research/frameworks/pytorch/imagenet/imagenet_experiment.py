@@ -1083,8 +1083,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.remember_loader = self.create_remember_loader(config)
         self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
 
-        open('temp.txt', 'a').write('num_tasks_test: {}, num_classes: {}\n'.format(self.num_tasks_test, self.num_classes))
-
         # Only part of the data is used for inner loop training
         self.batch_size = config.get("batch_size", 5)
         self.num_batches_train = config.get("num_batches_train", 1)
@@ -1180,13 +1178,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.optimizer.step()
 
         # Report statistics for the outer loop
-        open('temp.txt', 'a').write('{}  {}\n'.format(meta_train_test_target.max().item(), meta_train_test_target.max().item()))
         pred = output.max(1, keepdim=True)[1]
         correct = pred.eq(meta_train_test_target.view_as(pred)).sum().item()
         total = output.shape[0]
-        t1, t2 = [str(x.item()) for x in pred], [str(x.item()) for x in meta_train_test_target]
-        t1, t2 = ','.join(t1), ','.join(t2)
-        open('temp.txt', 'a').write('{}\n{}\n\n'.format(t1, t2))
         results = {
             "total_correct": correct,
             "total_tested": total,
@@ -1229,8 +1223,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eval_data = torch.cat(eval_data)
         eval_target = torch.cat(eval_target)
 
-        open('temp.txt', 'a').write('{}  {}\n'.format(target.max().item(), target.max().item()))
-
         # Evaluate the adapted model
         with torch.no_grad():
             preds = cloned_adaptation_net(eval_data)
@@ -1241,9 +1233,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             # calculate accuracy
             preds = preds.argmax(dim=1).view(eval_target.shape)
             valid_accuracy = (preds == eval_target).sum().float() / eval_target.size(0)
-            t1, t2 = [str(x.item()) for x in preds], [str(x.item()) for x in eval_target]
-            t1, t2 = ','.join(t1), ','.join(t2)
-            open('temp.txt', 'a').write('{}\n{}\n\n'.format(t1, t2))
             self.logger.info(f"Valid accuracy meta train training: {valid_accuracy}")
 
         return eval_data, eval_target
