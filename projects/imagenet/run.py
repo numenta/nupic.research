@@ -23,14 +23,13 @@ import copy
 from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.imagenet import imagenet_tune
 from nupic.research.frameworks.pytorch.imagenet.parser_utils import (
-    MAIN_PARSER,
-    RAY_PARSER,
+    DEFAULT_PARSERS,
     process_args,
 )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        parents=[MAIN_PARSER, RAY_PARSER],
+        parents=DEFAULT_PARSERS,
     )
     parser.add_argument("-e", "--experiment", dest="name", default="default",
                         help="Experiment to run", choices=CONFIGS.keys())
