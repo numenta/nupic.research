@@ -33,8 +33,11 @@ from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExp
 from nupic.research.frameworks.wandb import ray_wandb
 
 __all__ = [
+    "DEFAULT_PARSERS",
     "MAIN_PARSER",
     "RAY_PARSER",
+    "SIGOPT_PARSER",
+    "WANDB_PARSER",
     "process_args",
     "insert_experiment_mixin",
 ]
@@ -76,12 +79,6 @@ MAIN_PARSER.add_argument("--profile", action="store_true",
                          help="Enable cProfile tracing")
 MAIN_PARSER.add_argument("--profile-autograd", action="store_true",
                          help="Enable torch.autograd.profiler.profile during training")
-MAIN_PARSER.add_argument("--wandb", action="store_true",
-                         help="Enable logging through wandb.")
-MAIN_PARSER.add_argument("--wandb_resume", action="store_true",
-                         help="Resume logging through wandb.")
-MAIN_PARSER.add_argument("-t", "--create_sigopt", action="store_true",
-                         help="Create a new sigopt experiment using the config")
 
 
 RAY_PARSER = argparse.ArgumentParser(
@@ -100,6 +97,34 @@ RAY_PARSER.add_argument("-a", "--redis-address",
                         default="{}:6379".format(
                             socket.gethostbyname(socket.gethostname())
                         ))
+
+
+SIGOPT_PARSER = argparse.ArgumentParser(
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    argument_default=argparse.SUPPRESS,
+    add_help=False,
+)
+SIGOPT_PARSER.add_argument("-t", "--create_sigopt", action="store_true",
+                           help="Create a new sigopt experiment using the config")
+
+
+WANDB_PARSER = argparse.ArgumentParser(
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    argument_default=argparse.SUPPRESS,
+    add_help=False,
+)
+WANDB_PARSER.add_argument("--wandb", action="store_true",
+                          help="Enable logging through wandb.")
+WANDB_PARSER.add_argument("--wandb_resume", action="store_true",
+                          help="Resume logging through wandb.")
+
+
+DEFAULT_PARSERS = [
+    MAIN_PARSER,
+    RAY_PARSER,
+    SIGOPT_PARSER,
+    WANDB_PARSER,
+]
 
 
 def process_args(args, config):
