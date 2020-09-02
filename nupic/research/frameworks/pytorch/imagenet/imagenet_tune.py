@@ -505,7 +505,7 @@ def run_single_instance(config):
     kwargs["stop"] = stop
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
-    # print(kwargs)
+    pprint(kwargs)
 
     # only run trial collection if specifically requested
     if config.get("use_trial_collection", False):
