@@ -1140,7 +1140,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # Collect the data to be used for the outer loop
         meta_train_test_data, meta_train_test_target = [], []
-        
+
         # Out of all tasks possible, choose num_tasks_per_epoch tasks
         tasks_train = np.random.choice(
             self.num_classes, self.num_tasks_per_epoch, replace=False
