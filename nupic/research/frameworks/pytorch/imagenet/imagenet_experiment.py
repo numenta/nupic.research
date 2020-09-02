@@ -283,7 +283,11 @@ class SupervisedExperiment:
                 self.model, self.optimizer, **amp_args)
             self.logger.info("Using mixed precision")
 
-        self.model = self.distribute_model(self.model)
+        # Apply DistributedDataParallel after all other model mutations
+        if self.distributed:
+            self.model = DistributedDataParallel(self.model)
+        else:
+            self.model = DataParallel(self.model)
 
         self._loss_function = config.get(
             "loss_function", torch.nn.functional.cross_entropy
@@ -384,16 +388,6 @@ class SupervisedExperiment:
             checkpoint_file=config.get("checkpoint_file", None),
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
         )
-
-    def distribute_model(self, model):
-
-        # Apply DistributedDataParallel after all other model mutations
-        if self.distributed:
-            model = DistributedDataParallel(model)
-        else:
-            model = DataParallel(model)
-
-        return model
 
     @classmethod
     def create_lr_scheduler(cls, config, optimizer, total_batches):
@@ -1114,19 +1108,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             num_workers=config.get("workers", 0),
             pin_memory=torch.cuda.is_available(),
         )
-
-    def distribute_model(self, model):
-
-        # Apply DistributedDataParallel after all other model mutations
-        if self.distributed:
-            # This may cause the model to run slower; however we need to keep track of
-            # the unused parameters as they include those that were cloned for previous
-            # tasks.
-            model = DistributedDataParallel(model, find_unused_parameters=True)
-        else:
-            model = DataParallel(model)
-
-        return model
 
     def run_epoch(self):
 
