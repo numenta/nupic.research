@@ -22,6 +22,7 @@
 from nupic.research.frameworks.pytorch.imagenet import mixins
 from nupic.research.frameworks.pytorch.imagenet.imagenet_experiment import (
     ImagenetExperiment,
+    SupervisedExperiment,
 )
 
 
@@ -41,8 +42,16 @@ class KnowledgeDistillationCLExperiment(mixins.KnowledgeDistillationCL,
     pass
 
 
+class RezeroedKWinnersGSCExperiment(mixins.RezeroWeights,
+                                    mixins.UpdateBoostStrength,
+                                    mixins.LoadPreprocessedData,
+                                    SupervisedExperiment):
+    pass
+
+
 __all__ = [
     "RezeroedKWinnersImagenetExperiment",
     "KnowledgeDistillationImagenetExperiment",
-    "KnowledgeDistillationCLExperiment"
+    "KnowledgeDistillationCLExperiment",
+    "RezeroedKWinnersGSCExperiment",
 ]
