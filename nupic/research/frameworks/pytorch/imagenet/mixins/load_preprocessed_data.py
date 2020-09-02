@@ -19,21 +19,29 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .constrain_parameters import ConstrainParameters
-from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
-from .load_preprocessed_data import LoadPreprocessedData
-from .log_backprop_structure import LogBackpropStructure
-from .log_covariance import LogCovariance
-from .log_every_learning_rate import LogEveryLearningRate
-from .log_every_loss import LogEveryLoss
-from .lr_range_test import LRRangeTest, create_lr_test_experiment
-from .maxup import MaxupStandard, MaxupPerSample
-from .profile import Profile
-from .profile_autograd import ProfileAutograd
-from .regularize_loss import RegularizeLoss
-from .rezero_weights import RezeroWeights
-from .update_boost_strength import UpdateBoostStrength
-from .cutmix import CutMix, CutMixKnowledgeDistillation
-from .composite_loss import CompositeLoss
-from .quantization_aware import QuantizationAware
-from .reduce_lr_after_task import ReduceLRAfterTask
+from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
+
+
+class LoadPreprocessedData(object):
+    """
+    This mixin helps manage preprocessed by ensuring the next set is loaded
+    following every epoch in preparation for the next.
+    """
+
+    def setup_experiment(self, config):
+        super().setup_experiment(config)
+        assert isinstance(self.train_loader.dataset, PreprocessedDataset), (
+            "The train dataset is not preprocessed; there's nothing to load."
+        )
+
+    def post_epoch(self):
+        super().post_epoch()
+        self.train_loader.dataset.load_next()
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        name = "LoadPreprocessedData"
+        eo["setup_experiment"].append(name + ": ensure the train set is preprocessed")
+        eo["post_epoch"].append(name + ": load the next set of preprocessed data")
+        return eo
