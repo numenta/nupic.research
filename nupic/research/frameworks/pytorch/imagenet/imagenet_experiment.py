@@ -1082,6 +1082,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.remember_loader = self.create_remember_loader(config)
         self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
+        num_tasks = len(self.remember_loader.sampler.task_indices)
+        self.logger.info(f"Number of tasks = {num_tasks}")
 
         # Only part of the data is used for inner loop training
         self.batch_size = config.get("batch_size", 5)
@@ -1205,7 +1207,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.train_loader.sampler.set_active_tasks(task)
 
         eval_data, eval_target = [], []
-        print("In running task")
         for idx, (data, target) in enumerate(self.train_loader):
             data = data.to(self.device)
             target = target.to(self.device)
@@ -1319,11 +1320,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     def create_task_sampler(cls, dataset, config, train):
         """In meta continuous learning paradigm, one task equals one class"""
         # assume dataloaders are already created
-        print("Creating task sampler")
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
-        print(f"Classes available {len(class_indices)}")
 
         # change the sampler in the train loader
         distributed = config.get("distributed", False)
