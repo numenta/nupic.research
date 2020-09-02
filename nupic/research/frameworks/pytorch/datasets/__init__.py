@@ -19,5 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .gsc_factory import download_gsc_data, preprocessed_gsc
 from .torchvision_factory import torchvisiondataset, omniglot
 from .imagenet_factory import imagenet
