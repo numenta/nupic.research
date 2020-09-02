@@ -1088,14 +1088,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     @classmethod
     def create_remember_loader(cls, config):
-        """Create train and val dataloaders."""
+        """
+        Create data loader for the remember-set. This will include all classes.
+        """
 
         dataset_class = config.get("dataset_class", None)
         if dataset_class is None:
             raise ValueError("Must specify 'dataset_class' in config.")
 
         dataset_args = config.get("dataset_args", {})
-
         dataset_args.update(train=False)
         dataset = dataset_class(**dataset_args)
 
@@ -1103,7 +1104,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         return DataLoader(
             dataset=dataset,
-            batch_size=64,
+            batch_size=config.get("remember_batch_size", 64),
             sampler=sampler,
             num_workers=config.get("workers", 0),
             pin_memory=torch.cuda.is_available(),
