@@ -489,7 +489,7 @@ def run_single_instance(config):
 
 def run_trial_single_instance(config, kwargs):
     # Connect to ray, no specific redis address
-    ray.init(load_code_from_local=True, webui_host="0.0.0.0")
+    ray.init(load_code_from_local=False, webui_host="0.0.0.0")
     config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
     kwargs["config"] = config
     tune.run(**kwargs)
