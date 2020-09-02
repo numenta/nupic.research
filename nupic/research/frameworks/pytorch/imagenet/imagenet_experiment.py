@@ -974,8 +974,10 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 
     def run_task(self):
         """Run outer loop over tasks"""
-        # configure the sampler to load only samples from current task
-        print("Training...")
+
+        timestep_begin = self.current_timestep
+
+        # Configure the sampler to load only samples from current task
         self.train_loader.sampler.set_active_tasks(self.current_task)
 
         # run epochs, inner loop
@@ -991,15 +993,15 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
             for k, v in temp_ret.items():
                 ret[f"{metric}__{k}"] = v
 
-        # TODO: fix this
         ret.update(
-            timestep_begin=0,
-            timestep_end=1,
+            timestep_begin=timestep_begin,
+            timestep_end=self.current_timestep,
             learning_rate=self.get_lr()[0],
-            extra_val_results=[],
+            extra_val_results=self.extra_val_results,
         )
 
         self.current_task += 1
+        self.extra_val_results = []
         return ret
 
     @classmethod
@@ -1112,6 +1114,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def run_epoch(self):
 
+        timestep_begin = self.current_timestep
         self.optimizer.zero_grad()
 
         # Clone model - clone fast params and the slow params. The latter will be frozen
@@ -1131,10 +1134,10 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         )
 
         # Inner loop
+        num_indices_test = self.num_batches_meta_train_test * self.batch_size
         for task in tasks_train:
             # Returns all data that was not used for the inner loop training
             eval_data, eval_targets = self.run_task(task, cloned_adaptation_net)
-            num_indices_test = self.num_batches_meta_train_test * self.batch_size
             meta_train_test_data.append(eval_data[:num_indices_test])
             meta_train_test_target.append(eval_targets[:num_indices_test])
 
@@ -1173,15 +1176,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         }
         self.logger.debug(results)
 
-        # TODO: fix this
         results.update(
-            timestep_begin=0,
-            timestep_end=1,
+            timestep_begin=timestep_begin,
+            timestep_end=self.current_timestep,
             learning_rate=self.get_lr()[0],
-            extra_val_results=[],
+            extra_val_results=self.extra_val_results,
         )
 
         self.current_epoch += 1
+        self.extra_val_results = []
 
         return results
 
