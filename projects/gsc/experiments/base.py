@@ -23,12 +23,15 @@ Base Imagenet Experiment configuration.
 """
 
 import os
+import sys
+from copy import deepcopy
 
 import torch
 
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
 from nupic.research.frameworks.pytorch.imagenet import RezeroedKWinnersGSCExperiment
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
+from nupic.torch.models.sparse_cnn import gsc_sparse_cnn
 
 # Batch size depends on the GPU memory.
 BATCH_SIZE = 16
@@ -149,8 +152,30 @@ DEFAULT = dict(
     verbose=1,
 )
 
+# This config is based off the example from `nupic.torch\examples\gsc\run_gsc_model.py`
+# That example model achieves an average of 96.003% acc while the config below
+# achieves 96.191% (both averaged over three trials) - so they are comparable.
+#
+DEFAULT_SPARSE_CNN = deepcopy(DEFAULT)
+DEFAULT_SPARSE_CNN.update(
+
+    # Model
+    model_class=gsc_sparse_cnn,
+    model_args=dict(),
+
+    # Loss
+    loss_function=torch.nn.functional.nll_loss,
+
+    # Batch size
+    batch_size=None,
+    batch_sizes=[4, 16],  # 4 for the first epoch and 16 for the remaining
+    val_batch_size=1000,
+    batches_in_epoch=sys.maxsize,
+    epochs_to_validate=range(0, 30),
+)
 
 # Export configurations in this file
 CONFIGS = dict(
     default_base=DEFAULT,
+    default_sparse_cnn=DEFAULT_SPARSE_CNN,
 )
