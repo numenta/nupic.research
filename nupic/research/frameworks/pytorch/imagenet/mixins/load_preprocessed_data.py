@@ -37,6 +37,7 @@ class LoadPreprocessedData(object):
     def post_epoch(self):
         super().post_epoch()
         self.train_loader.dataset.load_next()
+        self.logger.info("Loaded next set of preprocessed data.")
 
     @classmethod
     def get_execution_order(cls):
