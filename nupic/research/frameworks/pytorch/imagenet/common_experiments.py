@@ -45,6 +45,7 @@ class KnowledgeDistillationCLExperiment(mixins.KnowledgeDistillationCL,
 class RezeroedKWinnersGSCExperiment(mixins.RezeroWeights,
                                     mixins.UpdateBoostStrength,
                                     mixins.LoadPreprocessedData,
+                                    mixins.VaryBatchSize,
                                     SupervisedExperiment):
     pass
 
