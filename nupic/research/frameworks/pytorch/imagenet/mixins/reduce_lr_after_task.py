@@ -25,6 +25,15 @@ class ReduceLRAfterTask:
     Freeze after params after task k.
     """
     def setup_experiment(self, config):
+        """
+        Add following variables to config
+
+        :param config: Dictionary containing the configuration parameters
+
+            - task_when_reduce_lr: Task k after which point the learning rate is
+                                   reduced to avoid catastrophic forgetting.
+            - new_lr: New learning rate after the task.
+        """
         super().setup_experiment(config)
         self.task_when_reduce_lr = config.get("task_when_reduce_lr", 0)
         self.new_lr = config.get("new_lr", 1e-3)
