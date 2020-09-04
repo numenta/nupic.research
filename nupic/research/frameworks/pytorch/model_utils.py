@@ -127,6 +127,7 @@ def train_model(
         optimizer.zero_grad()
         output = model(data)
         error_loss = criterion(output, target)
+
         del data, target, output
 
         complexity_loss = (complexity_loss_fn(model)

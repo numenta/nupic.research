@@ -26,7 +26,7 @@ from torchvision.transforms import RandomResizedCrop
 
 import nupic.research.frameworks.pytorch.imagenet.auto_augment as aa
 from nupic.research.frameworks.pytorch.dataset_utils import HDF5Dataset
-from nupic.research.frameworks.pytorch.datasets.imagenet import (
+from nupic.research.frameworks.pytorch.datasets.imagenet_factory import (
     IMAGENET_NUM_CLASSES as IMAGENET_CLASS_SUBSETS,
 )
 

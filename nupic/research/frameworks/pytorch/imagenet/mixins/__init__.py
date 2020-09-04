@@ -36,3 +36,4 @@ from .update_boost_strength import UpdateBoostStrength
 from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .composite_loss import CompositeLoss
 from .quantization_aware import QuantizationAware
+from .reduce_lr_after_task import ReduceLRAfterTask

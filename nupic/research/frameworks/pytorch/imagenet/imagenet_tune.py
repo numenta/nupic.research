@@ -125,7 +125,7 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
                         f"Restored checkpoint file '{self.restore_checkpoint_file}' "
                         f"fulfills stop criteria without additional training.")
                     return {
-                        # do not train or log results, just stop
+                        # Do not train or log results, just stop
                         RESULT_DUPLICATE: True,
                         DONE: True
                     }
@@ -277,7 +277,7 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
         self.logger.debug(f"_stop: {self._trial_info.trial_name}({self.iteration})")
         try:
             status = [w.stop_experiment.remote() for w in self.procs]
-            # wait until all remote workers stop
+            # Wait until all remote workers stop
             ray.get(status)
             for w in self.procs:
                 w.__ray_terminate__.remote()
@@ -319,6 +319,23 @@ class SupervisedTrainable(BaseTrainable):
         # Aggregate initial validation results (before any training).
         if pre_experiment_result is not None:
             result["extra_val_results"].insert(0, (0, pre_experiment_result))
+
+
+class ContinualLearningTrainable(SupervisedTrainable):
+    """
+    Trainable class used to train supervised machine learning experiments
+    with ray.
+    """
+
+    def _run_iteration(self):
+        """Run one epoch of training on each process."""
+        status = []
+        for w in self.procs:
+            status.append(w.run_task.remote())
+
+        # Wait for remote functions and check for errors
+        if ray_utils.check_for_failure(status):
+            return ray.get(status)
 
 
 class SigOptImagenetTrainable(SupervisedTrainable):
@@ -393,6 +410,31 @@ class SigOptImagenetTrainable(SupervisedTrainable):
                     pprint(result)
 
 
+class DebugTrainable(Trainable):
+    """Simple trainable compatible with experiment class and config. For debugging."""
+
+    def __init__(self, config=None, logger_creator=None):
+        Trainable.__init__(self, config=config, logger_creator=logger_creator)
+
+    def _setup(self, config):
+        self.experiment_class = config.get("experiment_class")
+        self.experiment = self.experiment_class()
+        self.experiment.setup_experiment(config)
+
+    def _train(self):
+        ret = self.experiment.run_task()
+        printable_result = self.experiment_class.get_printable_result(ret)
+        print(f"End Iteration Result: {printable_result}")
+
+        return ret
+
+    def _save(self, checkpoint_dir):
+        return dict()
+
+    def _restore(self, checkpoint):
+        pass
+
+
 def run(config):
     # Connect to ray
     address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
@@ -435,31 +477,38 @@ def run(config):
 
 def run_single_instance(config):
 
-    # get number of GPUs
+    # Get number of GPUs
     config["num_gpus"] = torch.cuda.device_count()
     config["workers"] = 4
     config["log_level"] = "INFO"
     config["reuse_actors"] = False
     config["dist_port"] = get_free_port()
 
+    ray_trainable = config.get("ray_trainable", SupervisedTrainable)
+    assert issubclass(ray_trainable, Trainable)
+
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-    kwargs = dict(zip(kwargs_names, [SupervisedTrainable, *tune.run.__defaults__]))
+    kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
     # Update`tune.run` kwargs with config
     kwargs.update(config)
     kwargs["config"] = config
     # Update tune stop criteria with config epochs
     stop = kwargs.get("stop", {}) or dict()
     epochs = config.get("epochs", 1)
-    stop.update(training_iteration=epochs)
+    num_tasks = config.get("num_tasks", None)
+    if num_tasks:
+        stop.update(training_iteration=num_tasks)
+    else:
+        stop.update(training_iteration=epochs)
     kwargs["stop"] = stop
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
-    # pprint(kwargs)
+    # print(kwargs)
 
-    # only run trial collection if specifically requested
+    # Only run trial collection if specifically requested
     if config.get("use_trial_collection", False):
-        # current torch distributed approach requires num_samples to be 1
+        # Current torch distributed approach requires num_samples to be 1
         num_samples = 1
         if "num_samples" in kwargs:
             num_samples = kwargs["num_samples"]
@@ -472,11 +521,11 @@ def run_single_instance(config):
             t0 = time.time()
             trials.report_progress()
             run_trial_single_instance(config, kwargs)
-            # report time elapsed
+            # Report time elapsed
             t1 = time.time()
             print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
             print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
-            # save trials for later retrieval
+            # Save trials for later retrieval
             ray.shutdown()
             trials.mark_completed(config, save=True)
 

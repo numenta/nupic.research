@@ -36,10 +36,18 @@ from torch.nn.modules.batchnorm import _BatchNorm
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
+from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.datasets import create_imagenet_datasets
+from nupic.research.frameworks.pytorch import datasets
+from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
+    TaskDistributedSampler,
+    TaskRandomSampler,
+)
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
+)
+from nupic.research.frameworks.pytorch.imagenet.evaluation_metrics import (
+    ContinualLearningMetrics,
 )
 from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
     create_lr_scheduler,
@@ -68,6 +76,7 @@ except ImportError:
 __all__ = [
     "SupervisedExperiment",
     "ImagenetExperiment",
+    "ContinualLearningExperiment"
 ]
 
 
@@ -89,6 +98,7 @@ class SupervisedExperiment:
         self.val_loader = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batches_in_epoch = sys.maxsize
+        self.batches_in_epoch_val = sys.maxsize
         self.batch_size = 1
         self.epochs = 1
         self.distributed = False
@@ -147,6 +157,8 @@ class SupervisedExperiment:
             - epochs: Number of epochs to train
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
+            - batches_in_epoch_val: Number of batches per epoch in validation.
+                                   Useful for debugging
             - log_timestep_freq: Configures mixins and subclasses that log every
                                  timestep to only log every nth timestep (in
                                  addition to the final timestep of each epoch).
@@ -282,6 +294,7 @@ class SupervisedExperiment:
         self.num_classes = config.get("num_classes", 1000)
         self.epochs = config.get("epochs", 1)
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
+        self.batches_in_epoch_val = config.get("batches_in_epoch_val", sys.maxsize)
         self.current_epoch = 0
 
         # Get initial batch size
@@ -292,7 +305,7 @@ class SupervisedExperiment:
         multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
-        self.train_loader, self.val_loader, self.test_loader = (
+        self.train_loader, self.val_loader = (
             self.create_loaders(config)
         )
         self.total_batches = len(self.train_loader,)
@@ -395,21 +408,30 @@ class SupervisedExperiment:
 
     @classmethod
     def create_loaders(cls, config):
-        """Create train, val, and test dataloaders."""
+        """Create train and val dataloaders."""
 
-        create_datasets = config.get("create_datasets_func", None)
-        if create_datasets is None:
-            raise ValueError("Must specify 'create_datasets_func' in config.")
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+
         dataset_args = config.get("dataset_args", {})
-        train_set, val_set, test_set = create_datasets(**dataset_args)
+        dataset_args.update(train=True)
+        train_set = dataset_class(**dataset_args)
+        dataset_args.update(train=False)
+        val_set = dataset_class(**dataset_args)
 
         train_loader = cls.create_train_dataloader(train_set, config)
         val_loader = cls.create_validation_dataloader(val_set, config)
-        test_loader = None
-        if test_set is not None:
-            test_loader = cls.create_validation_dataloader(test_set, config)
 
-        return train_loader, val_loader, test_loader
+        return train_loader, val_loader
+
+    @classmethod
+    def create_train_sampler(cls, dataset, config):
+        if config.get("distributed", False):
+            sampler = DistributedSampler(dataset)
+        else:
+            sampler = None
+        return sampler
 
     @classmethod
     def create_train_dataloader(cls, dataset, config):
@@ -418,10 +440,7 @@ class SupervisedExperiment:
         tools, while also being easily overrideable.
         """
 
-        if config.get("distributed", False):
-            sampler = DistributedSampler(dataset)
-        else:
-            sampler = None
+        sampler = cls.create_train_sampler(dataset, config)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("batch_size", 1),
@@ -433,16 +452,21 @@ class SupervisedExperiment:
         )
 
     @classmethod
+    def create_validation_sampler(cls, dataset, config):
+        if config.get("distributed", False):
+            sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
+        else:
+            sampler = None
+        return sampler
+
+    @classmethod
     def create_validation_dataloader(cls, dataset, config):
         """
         This method is a classmethod so that it can be used directly by analysis
         tools, while also being easily overrideable.
         """
 
-        if config.get("distributed", False):
-            sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
-        else:
-            sampler = None
+        sampler = cls.create_validation_sampler(dataset, config)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("val_batch_size",
@@ -481,7 +505,7 @@ class SupervisedExperiment:
             device=self.device,
             criterion=self.error_loss,
             complexity_loss_fn=self.complexity_loss,
-            batches_in_epoch=self.batches_in_epoch,
+            batches_in_epoch=self.batches_in_epoch_val,
             transform_to_device_fn=self.transform_data_to_device,
         )
 
@@ -869,45 +893,172 @@ class SupervisedExperiment:
 
     @classmethod
     def get_execution_order(cls):
+        exp = "SupervisedExperiment"
         return dict(
-            setup_experiment=["SupervisedExperiment.setup_experiment"],
-            create_model=["SupervisedExperiment.create_model"],
-            transform_model=["SupervisedExperiment.transform_model"],
-            create_loaders=["SupervisedExperiment.create_loaders"],
-            create_train_dataloader=["SupervisedExperiment.create_train_dataloader"],
-            create_validation_dataloader=[
-                "SupervisedExperiment.create_validation_dataloader"
-            ],
-            create_lr_scheduler=["SupervisedExperiment.create_lr_scheduler"],
-            pre_experiment=["SupervisedExperiment.pre_experiment"],
-            validate=["SupervisedExperiment.validate"],
-            train_epoch=["SupervisedExperiment.train_epoch"],
-            run_epoch=["SupervisedExperiment.run_epoch"],
-            pre_epoch=["SupervisedExperiment.pre_epoch"],
-            post_epoch=["SupervisedExperiment.post_epoch"],
-            pre_batch=["SupervisedExperiment.pre_batch"],
-            post_batch=["SupervisedExperiment.post_batch"],
-            error_loss=["SupervisedExperiment.error_loss"],
-            complexity_loss=["SupervisedExperiment.complexity_loss"],
-            should_decay_parameter=[
-                "SupervisedExperiment.should_decay_parameter"
-            ],
-            transform_data_to_device=[
-                "SupervisedExperiment.transform_data_to_device"
-            ],
-            aggregate_results=["SupervisedExperiment.aggregate_results"],
-            aggregate_validation_results=[
-                "SupervisedExperiment.aggregate_validation_results"
-            ],
+            setup_experiment=[exp + ".setup_experiment"],
+            create_model=[exp + ".create_model"],
+            transform_model=[exp + ".transform_model"],
+            create_loaders=[exp + ".create_loaders"],
+            create_train_dataloader=[exp + ".create_train_dataloader"],
+            create_train_sampler=[exp + ".create_train_sampler"],
+            create_validation_dataloader=[exp + ".create_validation_dataloader"],
+            create_validation_sampler=[exp + ".create_validation_sampler"],
+            create_lr_scheduler=[exp + ".create_lr_scheduler"],
+            pre_experiment=[exp + ".pre_experiment"],
+            validate=[exp + ".validate"],
+            train_epoch=[exp + ".train_epoch"],
+            run_epoch=[exp + ".run_epoch"],
+            pre_epoch=[exp + ".pre_epoch"],
+            post_epoch=[exp + ".post_epoch"],
+            pre_batch=[exp + ".pre_batch"],
+            post_batch=[exp + ".post_batch"],
+            error_loss=[exp + ".error_loss"],
+            complexity_loss=[exp + ".complexity_loss"],
+            should_decay_parameter=[exp + ".should_decay_parameter"],
+            transform_data_to_device=[exp + ".transform_data_to_device"],
+            aggregate_results=[exp + ".aggregate_results"],
+            aggregate_validation_results=[exp + ".aggregate_validation_results"],
             aggregate_pre_experiment_results=[
-                "SupervisedExperiment.aggregate_pre_experiment_results"
+                exp + ".aggregate_pre_experiment_results"
             ],
-            get_printable_result=["SupervisedExperiment.get_printable_result"],
-            expand_result_to_time_series=[
-                "SupervisedExperiment: validation results"
-            ],
-            stop_experiment=["SupervisedExperiment.stop_experiment"]
+            get_printable_result=[exp + ".get_printable_result"],
+            expand_result_to_time_series=[exp + ": validation results"],
+            stop_experiment=[exp + ".stop_experiment"]
         )
+
+
+class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment):
+
+    def setup_experiment(self, config):
+
+        super().setup_experiment(config)
+        # Override epochs to validate to not validate within the inner loop over epochs
+        self.epochs_to_validate = []
+
+        self.current_task = 0
+
+        # Defines how many classes should exist per task
+        self.num_tasks = config.get("num_tasks", 1)
+
+        self.num_classes = config.get("num_classes", None)
+        assert self.num_classes is not None, "num_classes should be defined"
+
+        self.num_classes_per_task = math.floor(self.num_classes / self.num_tasks)
+
+        # Applying target transform depending on type of CL task
+        # Task - we know the task, so the network is multihead
+        # Class - we don't know the task, network has as many heads as classes
+        self.cl_experiment_type = config.get("cl_experiment_type", "class")
+        if self.cl_experiment_type == "task":
+            self.logger.info("Overriding target transform")
+            self.dataset_args["target_transform"] = (
+                transforms.Lambda(lambda y: y % self.num_classes_per_task)
+            )
+
+        # Whitelist evaluation metrics
+        self.evaluation_metrics = config.get(
+            "evaluation_metrics", ["eval_all_visited_tasks"]
+        )
+        for metric in self.evaluation_metrics:
+            if not hasattr(self, metric):
+                raise ValueError(f"Metric {metric} not available.")
+
+    def should_stop(self):
+        """
+        Whether or not the experiment should stop. Usually determined by the
+        number of epochs but customizable to any other stopping criteria
+        """
+        return self.current_task >= self.num_tasks
+
+    def run_task(self):
+        """Run outer loop over tasks"""
+        # configure the sampler to load only samples from current task
+        self.logger.info("Training...")
+        self.train_loader.sampler.set_active_tasks(self.current_task)
+
+        # Run epochs, inner loop
+        # TODO: return the results from run_epoch
+        for _ in range(self.epochs):
+            self.run_epoch()
+
+        ret = {}
+        for metric in self.evaluation_metrics:
+            eval_function = getattr(self, metric)
+            temp_ret = eval_function()
+            self.logger.debug(temp_ret)
+            for k, v in temp_ret.items():
+                ret[f"{metric}__{k}"] = v
+
+        # TODO: Fix aggregate results function to not
+        # require these parameters, in order to be more flexible
+        ret.update(
+            timestep_begin=0,
+            timestep_end=1,
+            learning_rate=self.get_lr()[0],
+            extra_val_results=[],
+        )
+
+        self.current_task += 1
+        return ret
+
+    @classmethod
+    def aggregate_results(cls, results):
+        """Run validation in single GPU"""
+        print("Aggregated results")
+        return results[0]
+
+    @classmethod
+    def create_train_sampler(cls, dataset, config):
+        return cls.create_task_sampler(dataset, config, train=True)
+
+    @classmethod
+    def create_validation_sampler(cls, dataset, config):
+        return cls.create_task_sampler(dataset, config, train=False)
+
+    @classmethod
+    def create_task_sampler(cls, dataset, config, train):
+        # Assume dataloaders are already created
+        class_indices = defaultdict(list)
+        for idx, (_, target) in enumerate(dataset):
+            class_indices[target].append(idx)
+
+        # Defines how many classes should exist per task
+        num_tasks = config.get("num_tasks", 1)
+        num_classes = config.get("num_classes", None)
+        assert num_classes is not None, "num_classes should be defined"
+        num_classes_per_task = math.floor(num_classes / num_tasks)
+
+        task_indices = defaultdict(list)
+        for i in range(num_tasks):
+            for j in range(num_classes_per_task):
+                task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
+
+        # Change the sampler in the train loader
+        distributed = config.get("distributed", False)
+        if distributed and train:
+            sampler = TaskDistributedSampler(
+                dataset,
+                task_indices
+            )
+        else:
+            # TODO: implement a TaskDistributedUnpaddedSampler
+            # mplement the aggregate results
+            # after above are implemented, remove this if else
+            sampler = TaskRandomSampler(task_indices)
+
+        return sampler
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        exp = "ContinualLearningExperiment"
+        eo["create_train_sampler"] = [exp + ".create_train_sampler"]
+        eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
+        eo["create_task_sampler"] = [exp + ".create_task_sampler"]
+        eo["run_task"] = [exp + ".run_task"]
+        eo["should_stop"] = [exp + ".should_stop"]
+        eo["aggregate_results"] = [exp + ".aggregate_results"]
+        return eo
 
 
 class ImagenetExperiment(SupervisedExperiment):
@@ -918,9 +1069,8 @@ class ImagenetExperiment(SupervisedExperiment):
 
     @classmethod
     def create_loaders(cls, config):
-        create_datasets = create_imagenet_datasets
         dataset_args = {}
-        config.setdefault("create_datasets_func", create_datasets)
+        config.setdefault("dataset_class", datasets.imagenet)
         config.setdefault("dataset_args", dataset_args)
 
         dataset_args.update(
