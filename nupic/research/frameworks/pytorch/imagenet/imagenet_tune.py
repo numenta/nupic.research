@@ -125,7 +125,7 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
                         f"Restored checkpoint file '{self.restore_checkpoint_file}' "
                         f"fulfills stop criteria without additional training.")
                     return {
-                        # do not train or log results, just stop
+                        # Do not train or log results, just stop
                         RESULT_DUPLICATE: True,
                         DONE: True
                     }
@@ -277,7 +277,7 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
         self.logger.debug(f"_stop: {self._trial_info.trial_name}({self.iteration})")
         try:
             status = [w.stop_experiment.remote() for w in self.procs]
-            # wait until all remote workers stop
+            # Wait until all remote workers stop
             ray.get(status)
             for w in self.procs:
                 w.__ray_terminate__.remote()
@@ -477,16 +477,15 @@ def run(config):
 
 def run_single_instance(config):
 
-    # get number of GPUs
+    # Get number of GPUs
     config["num_gpus"] = torch.cuda.device_count()
     config["workers"] = 4
     config["log_level"] = "INFO"
     config["reuse_actors"] = False
     config["dist_port"] = get_free_port()
 
-    # set trainable
     ray_trainable = config.get("ray_trainable", SupervisedTrainable)
-    # assert issubclass(ray_trainable, BaseTrainable)
+    assert issubclass(ray_trainable, Trainable)
 
     # Build kwargs for `tune.run` function using merged config and command line dict
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
@@ -507,9 +506,9 @@ def run_single_instance(config):
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
     # print(kwargs)
 
-    # only run trial collection if specifically requested
+    # Only run trial collection if specifically requested
     if config.get("use_trial_collection", False):
-        # current torch distributed approach requires num_samples to be 1
+        # Current torch distributed approach requires num_samples to be 1
         num_samples = 1
         if "num_samples" in kwargs:
             num_samples = kwargs["num_samples"]
@@ -522,11 +521,11 @@ def run_single_instance(config):
             t0 = time.time()
             trials.report_progress()
             run_trial_single_instance(config, kwargs)
-            # report time elapsed
+            # Report time elapsed
             t1 = time.time()
             print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
             print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
-            # save trials for later retrieval
+            # Save trials for later retrieval
             ray.shutdown()
             trials.mark_completed(config, save=True)
 

@@ -23,6 +23,7 @@ import os
 import sys
 
 import torch
+import warnings
 from filelock import FileLock
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -57,8 +58,11 @@ def torchvisiondataset(root, dataset_name, train=True, download=True,
                 dataset_stats = calculate_statistics(dataset_class, root)
                 transform = base_transform(*dataset_stats)
             except Exception:
-                print(f"Can't calculate statistics for {dataset_name}. "
-                      "Update DATASETS_STATS manually before proceeding")
+                warnings.warn(
+                    f"Can't calculate statistics for {dataset_name}. "
+                    "Update DATASETS_STATS manually before proceeding"
+                )
+                raise
 
     with FileLock(f"{root}.lock"):
         dataset = dataset_class(

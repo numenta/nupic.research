@@ -499,7 +499,6 @@ class SupervisedExperiment:
         if loader is None:
             loader = self.val_loader
 
-        # print(f"Validating {self.current_task}")
         return self.evaluate_model(
             model=self.model,
             loader=loader,
@@ -933,12 +932,12 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
     def setup_experiment(self, config):
 
         super().setup_experiment(config)
-        # override epochs to validate to not validate within the inner loop over epochs
+        # Override epochs to validate to not validate within the inner loop over epochs
         self.epochs_to_validate = []
 
         self.current_task = 0
 
-        # defines how many classes should exist per task
+        # Defines how many classes should exist per task
         self.num_tasks = config.get("num_tasks", 1)
 
         self.num_classes = config.get("num_classes", None)
@@ -946,17 +945,17 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 
         self.num_classes_per_task = math.floor(self.num_classes / self.num_tasks)
 
-        # applying target transform depending on type of CL task
-        # task - we know the task, so the network is multihead
-        # class - we don't know the task
+        # Applying target transform depending on type of CL task
+        # Task - we know the task, so the network is multihead
+        # Class - we don't know the task, network has as many heads as classes
         self.cl_experiment_type = config.get("cl_experiment_type", "class")
         if self.cl_experiment_type == "task":
-            # override the target transform
+            self.logger.info("Overriding target transform")
             self.dataset_args["target_transform"] = (
                 transforms.Lambda(lambda y: y % self.num_classes_per_task)
             )
 
-        # whitelist evaluation metrics
+        # Whitelist evaluation metrics
         self.evaluation_metrics = config.get(
             "evaluation_metrics", ["eval_all_visited_tasks"]
         )
@@ -974,10 +973,10 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
     def run_task(self):
         """Run outer loop over tasks"""
         # configure the sampler to load only samples from current task
-        print("Training...")
+        self.logger.info("Training...")
         self.train_loader.sampler.set_active_tasks(self.current_task)
 
-        # run epochs, inner loop
+        # Run epochs, inner loop
         # TODO: return the results from run_epoch
         for _ in range(self.epochs):
             self.run_epoch()
@@ -986,11 +985,12 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         for metric in self.evaluation_metrics:
             eval_function = getattr(self, metric)
             temp_ret = eval_function()
-            print(temp_ret)
+            self.logger.debug(temp_ret)
             for k, v in temp_ret.items():
                 ret[f"{metric}__{k}"] = v
 
-        # TODO: fix this
+        # TODO: Fix aggregate results function to not
+        # require these parameters, in order to be more flexible
         ret.update(
             timestep_begin=0,
             timestep_end=1,
@@ -1017,23 +1017,23 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 
     @classmethod
     def create_task_sampler(cls, dataset, config, train):
-        # assume dataloaders are already created
+        # Assume dataloaders are already created
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
 
-        # defines how many classes should exist per task
+        # Defines how many classes should exist per task
         num_tasks = config.get("num_tasks", 1)
         num_classes = config.get("num_classes", None)
         assert num_classes is not None, "num_classes should be defined"
         num_classes_per_task = math.floor(num_classes / num_tasks)
 
         task_indices = defaultdict(list)
-        for i in range(num_tasks):   # 1 to 5
-            for j in range(num_classes_per_task):  # 1 to 200
+        for i in range(num_tasks):
+            for j in range(num_classes_per_task):
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
 
-        # change the sampler in the train loader
+        # Change the sampler in the train loader
         distributed = config.get("distributed", False)
         if distributed and train:
             sampler = TaskDistributedSampler(
@@ -1042,8 +1042,8 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
             )
         else:
             # TODO: implement a TaskDistributedUnpaddedSampler
-            # TODO: implement the aggregate results
-            # TODO: after above are implemented, remove this if else
+            # mplement the aggregate results
+            # after above are implemented, remove this if else
             sampler = TaskRandomSampler(task_indices)
 
         return sampler
