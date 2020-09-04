@@ -21,9 +21,9 @@
 
 import os
 import sys
+import warnings
 
 import torch
-import warnings
 from filelock import FileLock
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
