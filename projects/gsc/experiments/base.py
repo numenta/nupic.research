@@ -40,7 +40,7 @@ BATCH_SIZE = 16
 # This is a replicates the config of `sparseCNN2` from
 #   `nupic.research\projects\whydense\gsc\experiments_v3.cfg`
 # This achieves 94.7073% accuracy
-DEFAULT = dict(
+DEFAULT_BASE = dict(
     experiment_class=RezeroedKWinnersGSCExperiment,
 
     # Results path
@@ -156,7 +156,7 @@ DEFAULT = dict(
 # That example model achieves an average of 96.003% acc while the config below
 # achieves 96.191% (both averaged over three trials) - so they are comparable.
 #
-DEFAULT_SPARSE_CNN = deepcopy(DEFAULT)
+DEFAULT_SPARSE_CNN = deepcopy(DEFAULT_BASE)
 DEFAULT_SPARSE_CNN.update(
 
     # Model
@@ -176,6 +176,6 @@ DEFAULT_SPARSE_CNN.update(
 
 # Export configurations in this file
 CONFIGS = dict(
-    default_base=DEFAULT,
+    default_base=DEFAULT_BASE,
     default_sparse_cnn=DEFAULT_SPARSE_CNN,
 )
