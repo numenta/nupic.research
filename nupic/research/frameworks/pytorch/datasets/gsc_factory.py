@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 
-def preprocessed_gsc(data_dir, train=True, download=True):
+def preprocessed_gsc(root, train=True, download=True):
     """
     Create train or validation dataset from preprocessed GSC data, downloading if
     necessary.
@@ -45,14 +45,14 @@ def preprocessed_gsc(data_dir, train=True, download=True):
     Otherwise, no new augmentations will be loaded, and the same exact samples
     will be reused.
 
-    :param path: path to store or load downloaded data
+    :param root: directory to store or load downloaded data
     :param train: whether to load train of validation data
     :param download: whether to download the data
     """
 
-    data_dir = os.path.expanduser(data_dir)
+    root = os.path.expanduser(root)
     if download:
-        download_gsc_data(data_dir)
+        download_gsc_data(root)
 
     if train:
         basename = "gsc_train"
@@ -62,7 +62,7 @@ def preprocessed_gsc(data_dir, train=True, download=True):
         qualifiers = [""]
 
     dataset = PreprocessedDataset(
-        cachefilepath=data_dir,
+        cachefilepath=root,
         basename=basename,
         qualifiers=qualifiers,
     )

@@ -49,7 +49,7 @@ DEFAULT = dict(
     # Dataset
     dataset_class=preprocessed_gsc,
     dataset_args=dict(
-        data_dir="~/nta/datasets/gsc_preprocessed",
+        root="~/nta/datasets/gsc_preprocessed",
         download=True,
     ),
 
