@@ -45,8 +45,12 @@ class KnowledgeDistillationCLExperiment(mixins.KnowledgeDistillationCL,
 class RezeroedKWinnersGSCExperiment(mixins.RezeroWeights,
                                     mixins.UpdateBoostStrength,
                                     mixins.LoadPreprocessedData,
-                                    mixins.VaryBatchSize,
                                     SupervisedExperiment):
+    pass
+
+
+class VariedRezeroedKWinnersGSCExperiment(mixins.VaryBatchSize,
+                                          RezeroedKWinnersGSCExperiment):
     pass
 
 
@@ -55,4 +59,5 @@ __all__ = [
     "KnowledgeDistillationImagenetExperiment",
     "KnowledgeDistillationCLExperiment",
     "RezeroedKWinnersGSCExperiment",
+    "VariedRezeroedKWinnersGSCExperiment",
 ]

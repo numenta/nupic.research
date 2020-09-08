@@ -29,7 +29,10 @@ from copy import deepcopy
 import torch
 
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
-from nupic.research.frameworks.pytorch.imagenet import RezeroedKWinnersGSCExperiment
+from nupic.research.frameworks.pytorch.imagenet import (
+    RezeroedKWinnersGSCExperiment,
+    VariedRezeroedKWinnersGSCExperiment,
+)
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.torch.models.sparse_cnn import gsc_sparse_cnn
 
@@ -65,7 +68,7 @@ DEFAULT_BASE = dict(
     # Validation batch size
     val_batch_size=BATCH_SIZE,
     # Number of batches per epoch. Useful for debugging
-    batches_in_epoch=5121,
+    batches_in_epoch=sys.maxsize,
 
     # Update this to stop training when accuracy reaches the metric value
     # For example, stop=dict(mean_accuracy=0.75),
@@ -152,12 +155,16 @@ DEFAULT_BASE = dict(
     verbose=1,
 )
 
+
 # This config is based off the example from `nupic.torch\examples\gsc\run_gsc_model.py`
 # That example model achieves an average of 96.003% acc while the config below
 # achieves 96.191% (both averaged over three trials) - so they are comparable.
 #
 DEFAULT_SPARSE_CNN = deepcopy(DEFAULT_BASE)
 DEFAULT_SPARSE_CNN.update(
+
+    # Enable a varied batch size.
+    experiment_class=VariedRezeroedKWinnersGSCExperiment,
 
     # Model
     model_class=gsc_sparse_cnn,
