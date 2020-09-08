@@ -31,7 +31,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         parents=DEFAULT_PARSERS,
     )
-    parser.add_argument("-e", "--experiment", dest="name", default="default",
+    parser.add_argument("-e", "--experiment", dest="name", default="default_base",
                         help="Experiment to run", choices=CONFIGS.keys())
 
     args = parser.parse_args()
