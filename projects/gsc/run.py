@@ -21,7 +21,7 @@ import argparse
 import copy
 
 from experiments import CONFIGS
-from nupic.research.frameworks.vernon import imagenet_tune
+from nupic.research.frameworks import vernon
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
 
 if __name__ == "__main__":
@@ -48,4 +48,4 @@ if __name__ == "__main__":
     if config is None:
         pass
     else:
-        imagenet_tune.run(config, use_single_instance=args.single_instance)
+        vernon.run_with_raytune(config, use_single_instance=args.single_instance)

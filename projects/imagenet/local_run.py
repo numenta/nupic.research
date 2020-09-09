@@ -32,7 +32,8 @@ from functools import partial
 
 import torch.multiprocessing as multiprocessing
 
-from nupic.research.frameworks.vernon import ImagenetExperiment, imagenet_run
+from nupic.research.frameworks import vernon
+from nupic.research.frameworks.vernon import ImagenetExperiment
 from nupic.research.frameworks.vernon.parser_utils import MAIN_PARSER, process_args
 
 multiprocessing.set_start_method("spawn", force=True)
@@ -112,9 +113,9 @@ def run_trial(config):
                            loggers=config.get("loggers", None))
     logger.last_timestamp = logger.start_timestamp = time.time()
 
-    result = imagenet_run.run(config=config,
-                              logger=partial(log_results, logger, config),
-                              on_checkpoint=partial(save_checkpoint, config))
+    result = vernon.run(config=config,
+                        logger=partial(log_results, logger, config),
+                        on_checkpoint=partial(save_checkpoint, config))
 
     logger.flush()
     logger.close()
@@ -140,7 +141,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # The spawned 'imagenet_run.run' process does not import 'ray' however some
+    # The spawned 'run' process does not import 'ray' however some
     # configurations in the experiment package import 'ray' and 'ray.tune'. When
     # 'ray' is imported after 'pickle' it throws an exception. We avoid this
     # exception by loading the configurations in "main" local context instead of
