@@ -47,7 +47,5 @@ if __name__ == "__main__":
 
     if config is None:
         pass
-    elif "single_instance" in args:
-        imagenet_tune.run_single_instance(config)
     else:
-        imagenet_tune.run(config)
+        imagenet_tune.run(config, use_single_instance=args.single_instance)

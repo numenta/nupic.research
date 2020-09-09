@@ -433,7 +433,11 @@ class DebugTrainable(Trainable):
         pass
 
 
-def run(config):
+def run(config, use_single_instance=False):
+
+    if use_single_instance:
+        return run_single_instance(config)
+
     # Connect to ray
     address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
     ray.init(address=address, local_mode=config.get("local_mode", False))
