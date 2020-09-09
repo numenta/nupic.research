@@ -19,6 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .gsc_factory import download_gsc_data, preprocessed_gsc
-from .torchvision_factory import torchvisiondataset, omniglot
-from .imagenet_factory import imagenet
+from .base import CONFIGS as BASE
+
+"""
+Import and collect all Imagenet experiment configurations into one CONFIG
+"""
+__all__ = ["CONFIGS"]
+
+# Collect all configurations
+CONFIGS = dict()
+CONFIGS.update(BASE)

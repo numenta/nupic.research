@@ -21,6 +21,7 @@
 
 from .constrain_parameters import ConstrainParameters
 from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
+from .load_preprocessed_data import LoadPreprocessedData
 from .log_backprop_structure import LogBackpropStructure
 from .log_covariance import LogCovariance
 from .log_every_learning_rate import LogEveryLearningRate
@@ -37,3 +38,4 @@ from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .composite_loss import CompositeLoss
 from .quantization_aware import QuantizationAware
 from .reduce_lr_after_task import ReduceLRAfterTask
+from .vary_batch_size import VaryBatchSize

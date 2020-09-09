@@ -478,7 +478,7 @@ def run(config):
 def run_single_instance(config):
 
     # Get number of GPUs
-    config["num_gpus"] = torch.cuda.device_count()
+    config.setdefault("num_gpus", torch.cuda.device_count())
     config["workers"] = 4
     config["log_level"] = "INFO"
     config["reuse_actors"] = False
@@ -504,7 +504,7 @@ def run_single_instance(config):
     kwargs["stop"] = stop
     # Make sure to only select`tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
-    # print(kwargs)
+    pprint(kwargs)
 
     # Only run trial collection if specifically requested
     if config.get("use_trial_collection", False):
