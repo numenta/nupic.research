@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 from nupic.research.frameworks.vernon import mixins
-from nupic.research.frameworks.vernon.imagenet_experiment import (
+from nupic.research.frameworks.vernon.handlers import (
     ImagenetExperiment,
     SupervisedExperiment,
 )
