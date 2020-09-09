@@ -26,6 +26,8 @@ import time
 from collections import defaultdict
 from pprint import pformat
 
+import os
+
 import numpy as np
 import torch
 import torch.distributed as dist
@@ -1072,12 +1074,16 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.epochs_to_validate = []
         self.num_tasks_test = config.get("num_tasks_test", 1000)
 
-        self.num_tasks_per_epoch = config.get("num_tasks_per_epoch", 5)
+        self.num_tasks_per_epoch = config.get("num_tasks_per_epoch", 1)
 
-        self.adaptation_learning_rate = config.get("adaptation_learning_rate", 0.01)
+        self.adaptation_learning_rate = config.get("adaptation_learning_rate", 0.03)
 
         self.remember_loader = self.create_remember_loader(config)
         self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
+
+        self.meta_test_train_loader = self.create_meta_test_loader(config, 32)
+        self.meta_test_test_loader = self.create_meta_test_loader(config, 32)
+
         num_tasks = len(self.remember_loader.sampler.task_indices)
         self.logger.info(f"Number of tasks = {num_tasks}")
 
@@ -1106,7 +1112,30 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         return DataLoader(
             dataset=dataset,
-            batch_size=config.get("remember_batch_size", 64),
+            batch_size=config.get("remember_batch_size", 5),
+            sampler=sampler,
+            num_workers=config.get("workers", 0),
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    def create_meta_test_loader(cls, config, batch_size):
+        """
+        Create data loader for the meta-test phase. This will include all classes.
+        """
+
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+
+        dataset_args = config.get("dataset_args", {})
+        dataset_args.update(train=False)
+        dataset = dataset_class(evaluation=True, **dataset_args)
+
+        sampler = cls.create_task_sampler(dataset, config, train=False)
+        
+        return DataLoader(
+            dataset=dataset,
+            batch_size=batch_size,
             sampler=sampler,
             num_workers=config.get("workers", 0),
             pin_memory=torch.cuda.is_available(),
@@ -1134,17 +1163,20 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         )
 
         # Inner loop
+        # TODO delete variable `num_indices_test` if we won't use it
         num_indices_test = self.num_batches_meta_train_test * self.batch_size
+
         for task in tasks_train:
             # Returns all data that was not used for the inner loop training
             eval_data, eval_targets = self.run_task(task, cloned_adaptation_net)
-            meta_train_test_data.append(eval_data[:num_indices_test])
-            meta_train_test_target.append(eval_targets[:num_indices_test])
+            meta_train_test_data.append(eval_data)
+            meta_train_test_target.append(eval_targets)
 
         # Remember set: sample from all tasks
-        remember_data, remember_targets = next(iter(self.remember_loader))
-        remember_data = remember_data.to(self.device)
-        remember_targets = remember_targets.to(self.device)
+        for remember_data, remember_targets in self.remember_loader:
+            remember_data = remember_data.to(self.device)
+            remember_targets = remember_targets.to(self.device)
+            break
 
         meta_train_test_data.append(remember_data)
         meta_train_test_target.append(remember_targets)
@@ -1163,6 +1195,16 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         loss = self._loss_function(output, meta_train_test_target)
         loss.backward()
         self.optimizer.step()
+
+        # meta testing
+        correct = 0
+        for img, target in self.remember_loader:
+            with torch.no_grad():
+                img = img.to(self.device)
+                target = target.to(self.device)
+                logits_q = self.model.module(img)
+                pred_q = torch.nn.functional.softmax(logits_q, dim=1).argmax(dim=1)
+                correct += torch.eq(pred_q, target).sum().item() / len(img)
 
         # Report statistics for the outer loop
         pred = output.max(1, keepdim=True)[1]
@@ -1185,6 +1227,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.current_epoch += 1
         self.extra_val_results = []
+
+        open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/acc.txt', 'a').write('done epoch {}\n'.format(self.current_epoch))
+
+        if self.should_stop():
+
+            # meta-training phase complete, perform meta-testing phase
+            for num_classes_learned in [10, 50, 100, 200, 600]:
+                accs = self.run_meta_testing_phase(num_classes_learned)
+                open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/acc.txt', 'a').write('{},{}\n'.format(num_classes_learned, np.mean(accs)))
 
         return results
 
@@ -1222,6 +1273,112 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.logger.info(f"Valid accuracy meta train training: {valid_accuracy}")
 
         return eval_data, eval_target
+
+    def run_meta_testing_phase(self, num_classes_learned):
+
+        avg_score = 0
+
+        lr_sweep_range = [1e-1, 1e-2, 1e-3, 1e-4]
+        lr_all = []
+
+        # grid search over lr
+        for lr_search_runs in range(0, 5):
+
+            # choose num_classes_learned random classes from the non-background set to train on
+            new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+            
+            max_acc = -1000
+            for lr in lr_sweep_range:
+
+                # reset fast weights
+                for param in self.get_fast_params(None):
+                    open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/temp.txt', 'a').write('{},  {}\n'.format(str(type(param)), str(hasattr(param, "shape"))))
+                    if len(param.shape) > 1:
+                        torch.nn.init.kaiming_normal_(param)
+                    else:
+                        torch.nn.init.zeros_(param)
+
+                for i, new_task in enumerate(new_tasks):
+
+                    self.meta_test_train_loader.sampler.set_active_tasks(new_task)
+
+                    opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
+
+                    for img, y in self.meta_test_train_loader:
+                        img = img.to(self.device)
+                        y = y.to(self.device)
+
+                        # open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/temp.txt', 'a').write('{},  {}\n'.format(str(type(self.model)), str(type(self.model.module))))
+
+                        pred = self.model.module(img)
+                        opt.zero_grad()
+                        loss = torch.nn.functional.cross_entropy(pred, y)
+                        loss.backward()
+                        opt.step()
+
+                correct = 0
+                for img, target in self.meta_test_train_loader:
+                    img = img.to(self.device)
+                    target = target.to(self.device)
+                    logits_q = self.model.module(img)
+                    pred_q = (logits_q).argmax(dim=1)
+                    correct += torch.eq(pred_q, target).sum().item() / len(img)
+
+                correct = 1.0 * correct / len(self.meta_test_train_loader)
+                if (correct > max_acc):
+                    max_acc = correct
+                    max_lr = lr
+
+            lr_all.append(max_lr)
+            
+        from scipy import stats
+        best_lr = float(stats.mode(lr_all)[0][0])
+
+        meta_test_accuracies = []
+        for current_run in range(0, 15):
+
+            # choose num_classes_learned random classes from the non-background set to test on
+            new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+            self.meta_test_test_loader.sampler.set_active_tasks(new_tasks)
+
+            # reset fast weights
+            for param in self.get_fast_params(None):
+                open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/temp.txt', 'a').write('{},  {}\n'.format(str(type(param)), str(hasattr(param, "shape"))))
+                if len(param.shape) > 1:
+                    torch.nn.init.kaiming_normal_(param)
+                else:
+                    torch.nn.init.zeros_(param)
+
+            for i, new_task in enumerate(new_tasks):
+
+                self.meta_test_train_loader.sampler.set_active_tasks(new_task)
+                lr = best_lr
+
+                # meta-training training
+                opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
+
+                for img, y in self.meta_test_train_loader:
+                    img = img.to(self.device)
+                    y = y.to(self.device)
+
+                    pred = self.model.module(img)
+                    opt.zero_grad()
+                    loss = torch.nn.functional.cross_entropy(pred, y)
+                    loss.backward()
+                    opt.step()
+
+            # meta-training testing
+            correct = 0
+            for img, target in self.meta_test_test_loader:
+                img = img.to(self.device)
+                target = target.to(self.device)
+                logits_q = self.model.module(img)
+                pred_q = (logits_q).argmax(dim=1)
+                correct += torch.eq(pred_q, target).sum().item() / len(img)
+
+            meta_test_accuracies.append(correct / len(self.meta_test_test_loader))
+
+        return meta_test_accuracies
 
     @classmethod
     def update_params(cls, params, loss, lr, distributed=False):
