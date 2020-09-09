@@ -33,10 +33,7 @@ from functools import partial
 import torch.multiprocessing as multiprocessing
 
 from nupic.research.frameworks.vernon import ImagenetExperiment, imagenet_run
-from nupic.research.frameworks.vernon.parser_utils import (
-    MAIN_PARSER,
-    process_args,
-)
+from nupic.research.frameworks.vernon.parser_utils import MAIN_PARSER, process_args
 
 multiprocessing.set_start_method("spawn", force=True)
 

@@ -28,8 +28,8 @@ from wandb import util
 from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers_2 import (
     DEFAULT_LOGGERS,
 )
-from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
+from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.wandb import ray_wandb
 
 __all__ = [

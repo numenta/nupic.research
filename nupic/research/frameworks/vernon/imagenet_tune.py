@@ -36,11 +36,9 @@ from ray.tune.resources import Resources
 from ray.tune.result import DONE, RESULT_DUPLICATE
 from ray.tune.utils import warn_if_slow
 
-from nupic.research.frameworks.vernon.experiment_search import (
-    TrialsCollection,
-)
-from nupic.research.frameworks.vernon.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
+from nupic.research.frameworks.vernon.experiment_search import TrialsCollection
+from nupic.research.frameworks.vernon.experiment_utils import get_free_port
 from nupic.research.support.ray_utils import (
     get_last_checkpoint,
     register_torch_serializers,

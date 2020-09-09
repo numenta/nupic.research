@@ -46,18 +46,6 @@ from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
 )
-from nupic.research.frameworks.vernon.evaluation_metrics import (
-    ContinualLearningMetrics,
-)
-from nupic.research.frameworks.vernon.experiment_utils import (
-    create_lr_scheduler,
-    get_free_port,
-    get_node_ip_address,
-)
-from nupic.research.frameworks.vernon.network_utils import (
-    create_model,
-    get_compatible_state_dict,
-)
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     aggregate_eval_results,
@@ -66,6 +54,16 @@ from nupic.research.frameworks.pytorch.model_utils import (
     serialize_state_dict,
     set_random_seed,
     train_model,
+)
+from nupic.research.frameworks.vernon.evaluation_metrics import ContinualLearningMetrics
+from nupic.research.frameworks.vernon.experiment_utils import (
+    create_lr_scheduler,
+    get_free_port,
+    get_node_ip_address,
+)
+from nupic.research.frameworks.vernon.network_utils import (
+    create_model,
+    get_compatible_state_dict,
 )
 
 try:
