@@ -21,8 +21,8 @@ import argparse
 import copy
 
 from experiments import CONFIGS
-from nupic.research.frameworks.pytorch.imagenet import imagenet_tune
-from nupic.research.frameworks.pytorch.imagenet.parser_utils import (
+from nupic.research.frameworks.vernon import imagenet_tune
+from nupic.research.frameworks.vernon.parser_utils import (
     DEFAULT_PARSERS,
     process_args,
 )

@@ -24,7 +24,7 @@ import os
 from torchvision import transforms
 from torchvision.transforms import RandomResizedCrop
 
-import nupic.research.frameworks.pytorch.imagenet.auto_augment as aa
+import nupic.research.frameworks.vernon.auto_augment as aa
 from nupic.research.frameworks.pytorch.dataset_utils import HDF5Dataset
 from nupic.research.frameworks.pytorch.datasets.imagenet_factory import (
     IMAGENET_NUM_CLASSES as IMAGENET_CLASS_SUBSETS,

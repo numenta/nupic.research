@@ -27,7 +27,7 @@ import torch
 
 import nupic.research.frameworks.pytorch.models.resnets
 import nupic.research.frameworks.pytorch.models.sparse_resnets
-from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
+from nupic.research.frameworks.vernon.network_utils import create_model
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.model_utils import serialize_state_dict
 

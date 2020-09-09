@@ -32,8 +32,8 @@ from functools import partial
 
 import torch.multiprocessing as multiprocessing
 
-from nupic.research.frameworks.pytorch.imagenet import ImagenetExperiment, imagenet_run
-from nupic.research.frameworks.pytorch.imagenet.parser_utils import (
+from nupic.research.frameworks.vernon import ImagenetExperiment, imagenet_run
+from nupic.research.frameworks.vernon.parser_utils import (
     MAIN_PARSER,
     process_args,
 )

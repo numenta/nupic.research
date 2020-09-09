@@ -29,7 +29,7 @@ from copy import deepcopy
 import torch
 
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
-from nupic.research.frameworks.pytorch.imagenet import (
+from nupic.research.frameworks.vernon import (
     RezeroedKWinnersGSCExperiment,
     VariedRezeroedKWinnersGSCExperiment,
 )

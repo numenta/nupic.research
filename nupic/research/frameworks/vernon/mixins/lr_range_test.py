@@ -9,7 +9,7 @@
 
 from copy import deepcopy
 
-from nupic.research.frameworks.pytorch.imagenet import mixins
+from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.pytorch.lr_scheduler import LinearLRScheduler
 
 

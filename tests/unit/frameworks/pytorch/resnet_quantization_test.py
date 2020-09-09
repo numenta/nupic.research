@@ -25,7 +25,7 @@ import torch
 import torch.nn as nn
 import torch.nn.intrinsic as nni
 
-from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
+from nupic.research.frameworks.vernon.network_utils import create_model
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.models.sparse_resnets import resnet34, resnet50
 

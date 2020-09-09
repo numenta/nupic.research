@@ -19,8 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.pytorch.imagenet import mixins
-from nupic.research.frameworks.pytorch.imagenet.imagenet_experiment import (
+from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon.imagenet_experiment import (
     ImagenetExperiment,
     SupervisedExperiment,
 )

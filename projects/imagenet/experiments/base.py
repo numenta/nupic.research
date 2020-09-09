@@ -30,7 +30,7 @@ import ray.tune as tune
 import torch
 
 import nupic.research.frameworks.pytorch.models.sparse_resnets
-from nupic.research.frameworks.pytorch.imagenet import (
+from nupic.research.frameworks.vernon import (
     RezeroedKWinnersImagenetExperiment,
 )
 
