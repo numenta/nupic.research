@@ -19,8 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .run import terminate_processes
-from .run_with_raytune import (
+from .trainables import (
     BaseTrainable,
     SupervisedTrainable,
     ContinualLearningTrainable,
