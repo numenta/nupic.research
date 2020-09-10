@@ -60,3 +60,11 @@ class SGDParams(object):
 
         if "weight_decay" in assignments:
             optimizer_args["weight_decay"] = assignments["weight_decay"]
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["update_config_with_suggestion"].append(
+            "SGDParams.update_config_with_suggestion"
+        )
+        return eo

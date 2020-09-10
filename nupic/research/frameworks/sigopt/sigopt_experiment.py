@@ -171,3 +171,11 @@ class SigOptExperiment:
         Given a SigOpt suggestion, update this config dict.
         """
         config.update(suggestion.assignments)
+
+    @classmethod
+    def get_execution_order(cls):
+        return dict(
+            update_config_with_suggestion=[
+                "SupervisedExperiment.update_config_with_suggestion"
+            ],
+        )

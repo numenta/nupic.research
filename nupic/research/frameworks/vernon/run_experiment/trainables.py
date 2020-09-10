@@ -24,7 +24,7 @@ import logging
 import os
 import pickle
 import time
-from pprint import pprint
+from pprint import pformat, pprint
 
 import ray
 import ray.resource_spec
@@ -360,6 +360,9 @@ class SigOptImagenetTrainable(SupervisedTrainable):
             self.sigopt = experiment_class(
                 experiment_id=config["sigopt_experiment_id"],
                 sigopt_config=config["sigopt_config"])
+
+            self.logger.info(
+                f"Sigopt execution order: {pformat(self.sigopt.get_execution_order())}")
 
             # Get suggestion and update config.
             self.suggestion = self.sigopt.get_next_suggestion()

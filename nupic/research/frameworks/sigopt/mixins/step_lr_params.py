@@ -54,3 +54,11 @@ class StepLRParams(object):
 
         if "step_size" in assignments:
             lr_scheduler_args["step_size"] = assignments["step_size"]
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["update_config_with_suggestion"].append(
+            "StepLRParams.update_config_with_suggestion"
+        )
+        return eo

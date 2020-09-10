@@ -122,3 +122,10 @@ class ImagenetParams(object):
             assignments.pop("max_lr", None)
 
         config.update(assignments)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        name = "ImagenetParams"
+        eo["update_config_with_suggestion"] = [name + ".update_config_with_suggestion"]
+        return eo

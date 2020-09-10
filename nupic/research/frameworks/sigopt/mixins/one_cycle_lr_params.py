@@ -89,3 +89,11 @@ class OneCycleLRParams(object):
                 # initial_lr = max_lr / div_factor
                 init_lr = assignments["init_lr"]
                 lr_scheduler_args["div_factor"] = max_lr / init_lr
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["update_config_with_suggestion"].append(
+            "OneCycleLRParams.update_config_with_suggestion"
+        )
+        return eo
