@@ -170,7 +170,14 @@ class SigOptExperiment:
         """
         Given a SigOpt suggestion, update this config dict.
         """
-        config.update(suggestion.assignments)
+        # For multi-task experiments where epoch is the task. Must have a metadata
+        # field called max_epochs.
+        if suggestion.task is not None and "epoch" in suggestion.task.name:
+            max_epochs = self.sigopt_config["metadata"]["max_epochs"]
+            epochs = int(max_epochs * suggestion.task.cost)
+            print("Suggested task/cost/epochs for this multitask experiment: ",
+                  suggestion.task.name, suggestion.task.cost, epochs)
+            config["epochs"] = epochs
 
     @classmethod
     def get_execution_order(cls):
