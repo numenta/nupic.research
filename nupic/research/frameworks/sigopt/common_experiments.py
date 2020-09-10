@@ -31,3 +31,15 @@ class SigOptImagenetExperiment(SigOptExperiment, mixins.ImagenetParams):
     to our ImagenetExperiment config.
     """
     pass
+
+
+class SigOptSDGOneCycleLRExperiment(SigOptExperiment,
+                                    mixins.SGDParams,
+                                    mixins.OneCycleLRParams):
+    """Tune hyper-parameters using SDG and OneCycleLR."""
+    pass
+
+
+class SigOptSDGStepLRExperiment(SigOptExperiment, mixins.SGDParams, mixins.StepLRParams):
+    """Tune hyper-parameters using SDG and StepLR."""
+    pass
