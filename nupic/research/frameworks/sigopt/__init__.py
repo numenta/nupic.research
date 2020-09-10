@@ -18,4 +18,5 @@
 #  http://numenta.org/licenses/
 #
 
-from .sigopt_experiment import SigOptExperiment, SigOptImagenetExperiment
+from .sigopt_experiment import SigOptExperiment
+from .common_experiments import SigOptImagenetExperiment

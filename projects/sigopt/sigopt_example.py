@@ -23,7 +23,7 @@ from pprint import pprint
 
 from sigopt.examples import franke_function
 
-from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
+from nupic.research.frameworks.sigopt import SigOptExperiment
 
 """
 Standalone example of SigOpt that uses SigOptExperiment. The example experiment uses
