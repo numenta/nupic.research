@@ -1094,14 +1094,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # TODO: Is this the best name?
         self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
 
-        # TODO modify these lines below or delete since they're already inherited
-        # from SupervisedExperiment
-        optimizer_class = config.get("optimizer_class", torch.optim.Adam)
-        optimizer_args = config.get("optimizer_args", {})
-
-        slow_params = self.get_slow_params()
-        self.optimizer = optimizer_class(params=slow_params, **optimizer_args)
-
     @classmethod
     def create_remember_loader(cls, config):
         """
@@ -1158,11 +1150,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Clone model - clone fast params and the slow params. The latter will be frozen
         cloned_adaptation_net = self.clone_model()
 
-        # Freeze the slow params.
-        fast_params = self.get_fast_params(None)
-        # for param in fast_params:
-        #     param.requires_grad = False
-
         # Collect the data to be used for the outer loop
         meta_train_test_data, meta_train_test_target = [], []
 
@@ -1193,11 +1180,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Meta train refers to meta training testing
         meta_train_test_data = torch.cat(meta_train_test_data)
         meta_train_test_target = torch.cat(meta_train_test_target)
-
-        # Unfreeze the slow params.
-        fast_params = self.get_fast_params(None)
-        # for param in fast_params:
-        #     param.requires_grad = True
 
         # Take step for outer loop. This will backprop through to the original
         # slow and fast params.
@@ -1411,7 +1393,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             params = list(params)
             for p, g in zip(params, gradients):
                 if g is not None:
-                    p = p - lr * g
+                    p.add_(g, alpha=-lr)
 
     def adapt(self, cloned_adaptation_net, train_loss):
         fast_params = self.get_fast_params(cloned_adaptation_net)
