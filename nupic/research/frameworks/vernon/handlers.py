@@ -1077,8 +1077,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.remember_loader = self.create_remember_loader(config)
         self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
 
-        self.meta_test_train_loader = self.create_meta_test_loader(config, train=True, batch_size=1)
-        self.meta_test_test_loader = self.create_meta_test_loader(config, train=False, batch_size=32)
+        self.meta_test_train_loader = self.create_meta_test_loader(
+            config, train=True, batch_size=1
+        )
+        self.meta_test_test_loader = self.create_meta_test_loader(
+            config, train=False, batch_size=32
+        )
 
         num_tasks = len(self.remember_loader.sampler.task_indices)
         self.logger.info(f"Number of tasks = {num_tasks}")
@@ -1090,11 +1094,13 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # TODO: Is this the best name?
         self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
 
-        # TODO modify these lines below or delete since they're already inherited from SupervisedExperiment
+        # TODO modify these lines below or delete since they're already inherited
+        # from SupervisedExperiment
         optimizer_class = config.get("optimizer_class", torch.optim.Adam)
         optimizer_args = config.get("optimizer_args", {})
 
-        self.optimizer = optimizer_class(params=self.get_slow_params(), **optimizer_args)
+        slow_params = self.get_slow_params()
+        self.optimizer = optimizer_class(params=slow_params, **optimizer_args)
 
     @classmethod
     def create_remember_loader(cls, config):
@@ -1120,6 +1126,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             pin_memory=torch.cuda.is_available(),
         )
 
+    @classmethod
     def create_meta_test_loader(cls, config, train, batch_size):
         """
         Create data loader for the meta-test phase. This will include all classes.
@@ -1134,7 +1141,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         dataset = dataset_class(evaluation=True, **dataset_args)
 
         sampler = cls.create_task_sampler(dataset, config, train, sequential=True)
-        
+
         return DataLoader(
             dataset=dataset,
             batch_size=batch_size,
@@ -1279,11 +1286,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         lr_sweep_range = [1e-1, 1e-2, 1e-3, 1e-4]
         lr_all = []
 
-        # grid search over lr
-        for lr_search_runs in range(0, 5):
-        
-            # choose num_classes_learned random classes from the non-background set to train on
-            new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+        # Grid search over lr
+        for _lr_search_runs in range(0, 5):
+
+            # Choose num_classes_learned random classes from the non-background set
+            # to train on.
+            all_classes = list(range(min(self.num_classes, 650)))
+            new_tasks = np.random.choice(
+                all_classes, num_classes_learned, replace=False
+            )
             self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
 
             max_acc = -1000
@@ -1323,15 +1334,19 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                     max_lr = lr
 
             lr_all.append(max_lr)
-            
+
         from scipy import stats
         best_lr = float(stats.mode(lr_all)[0][0])
 
         meta_test_accuracies = []
-        for current_run in range(0, 15):
+        for _current_run in range(0, 15):
 
-            # choose num_classes_learned random classes from the non-background set to test on
-            new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+            # Choose num_classes_learned random classes from the non-background set to
+            # test on
+            all_classes = list(range(min(self.num_classes, 650)))
+            new_tasks = np.random.choice(
+                all_classes, num_classes_learned, replace=False
+            )
             self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
             self.meta_test_test_loader.sampler.set_active_tasks(new_tasks)
 
