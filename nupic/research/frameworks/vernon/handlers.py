@@ -38,6 +38,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import transforms
 
+from nupic.research.frameworks.continual_learning.maml_utils import clone_model
 from nupic.research.frameworks.pytorch import datasets
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
     TaskDistributedSampler,
@@ -66,8 +67,6 @@ from nupic.research.frameworks.vernon.network_utils import (
     create_model,
     get_compatible_state_dict,
 )
-
-from nupic.research.frameworks.vernon.maml_utils import clone_model
 
 try:
     from apex import amp
