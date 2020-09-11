@@ -1216,7 +1216,13 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
             # meta-training phase complete, perform meta-testing phase
             for num_classes_learned in [10, 50, 100, 200, 600]:
+                if num_classes_learned > self.num_classes:
+                    break
+
                 accs = self.run_meta_testing_phase(num_classes_learned)
+                print("Accuracy for meta-testing phase over"
+                      f" {num_classes_learned} num classes.")
+                print(accs)
 
         return results
 
