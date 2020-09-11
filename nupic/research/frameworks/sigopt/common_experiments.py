@@ -45,3 +45,10 @@ class SigOptSDGStepLRExperiment(SigOptExperiment,
                                 mixins.StepLRParams):
     """Tune hyper-parameters using SDG and StepLR."""
     pass
+
+
+__all__ = [
+    "SigOptImagenetExperiment",
+    "SigOptSDGOneCycleLRExperiment",
+    "SigOptSDGStepLRExperiment",
+]

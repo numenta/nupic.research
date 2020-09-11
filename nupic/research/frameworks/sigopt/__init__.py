@@ -19,4 +19,4 @@
 #
 
 from .sigopt_experiment import SigOptExperiment
-from .common_experiments import SigOptImagenetExperiment
+from .common_experiments import *
