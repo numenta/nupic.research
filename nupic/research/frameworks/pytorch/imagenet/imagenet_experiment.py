@@ -44,6 +44,7 @@ from nupic.research.frameworks.pytorch import datasets
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
     TaskDistributedSampler,
     TaskRandomSampler,
+    TaskSequentialSampler,
 )
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
@@ -1081,18 +1082,24 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.remember_loader = self.create_remember_loader(config)
         self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
 
-        self.meta_test_train_loader = self.create_meta_test_loader(config, 32)
-        self.meta_test_test_loader = self.create_meta_test_loader(config, 32)
+        self.meta_test_train_loader = self.create_meta_test_loader(config, train=True, batch_size=1)
+        self.meta_test_test_loader = self.create_meta_test_loader(config, train=False, batch_size=32)
 
         num_tasks = len(self.remember_loader.sampler.task_indices)
         self.logger.info(f"Number of tasks = {num_tasks}")
 
         # Only part of the data is used for inner loop training
         self.batch_size = config.get("batch_size", 5)
-        self.num_batches_train = config.get("num_batches_train", 1)
+        self.num_batches_train = config.get("num_batches_train", 5)
         #       maybe slow vs fast adaptation
         # TODO: Is this the best name?
         self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
+
+        # TODO modify these lines below or delete since they're already inherited from SupervisedExperiment
+        optimizer_class = config.get("optimizer_class", torch.optim.Adam)
+        optimizer_args = config.get("optimizer_args", {})
+
+        self.optimizer = optimizer_class(params=self.get_slow_params(), **optimizer_args)
 
     @classmethod
     def create_remember_loader(cls, config):
@@ -1112,13 +1119,13 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         return DataLoader(
             dataset=dataset,
-            batch_size=config.get("remember_batch_size", 5),
+            batch_size=config.get("remember_batch_size", 15),
             sampler=sampler,
             num_workers=config.get("workers", 0),
             pin_memory=torch.cuda.is_available(),
         )
 
-    def create_meta_test_loader(cls, config, batch_size):
+    def create_meta_test_loader(cls, config, train, batch_size):
         """
         Create data loader for the meta-test phase. This will include all classes.
         """
@@ -1131,7 +1138,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         dataset_args.update(train=False)
         dataset = dataset_class(evaluation=True, **dataset_args)
 
-        sampler = cls.create_task_sampler(dataset, config, train=False)
+        sampler = cls.create_task_sampler(dataset, config, train, sequential=True)
         
         return DataLoader(
             dataset=dataset,
@@ -1150,9 +1157,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         cloned_adaptation_net = self.clone_model()
 
         # Freeze the slow params.
-        slow_params = self.get_slow_params()
-        for param in slow_params:
-            param.requires_grad = False
+        fast_params = self.get_fast_params(None)
+        # for param in fast_params:
+        #     param.requires_grad = False
 
         # Collect the data to be used for the outer loop
         meta_train_test_data, meta_train_test_target = [], []
@@ -1186,25 +1193,18 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         meta_train_test_target = torch.cat(meta_train_test_target)
 
         # Unfreeze the slow params.
-        for param in slow_params:
-            param.requires_grad = True
+        fast_params = self.get_fast_params(None)
+        # for param in fast_params:
+        #     param.requires_grad = True
 
         # Take step for outer loop. This will backprop through to the original
         # slow and fast params.
         output = cloned_adaptation_net(meta_train_test_data)
+        output = self.model(meta_train_test_data)
         loss = self._loss_function(output, meta_train_test_target)
         loss.backward()
-        self.optimizer.step()
 
-        # meta testing
-        correct = 0
-        for img, target in self.remember_loader:
-            with torch.no_grad():
-                img = img.to(self.device)
-                target = target.to(self.device)
-                logits_q = self.model.module(img)
-                pred_q = torch.nn.functional.softmax(logits_q, dim=1).argmax(dim=1)
-                correct += torch.eq(pred_q, target).sum().item() / len(img)
+        self.optimizer.step()
 
         # Report statistics for the outer loop
         pred = output.max(1, keepdim=True)[1]
@@ -1228,14 +1228,11 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.current_epoch += 1
         self.extra_val_results = []
 
-        open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/acc.txt', 'a').write('done epoch {}\n'.format(self.current_epoch))
-
         if self.should_stop():
 
             # meta-training phase complete, perform meta-testing phase
             for num_classes_learned in [10, 50, 100, 200, 600]:
                 accs = self.run_meta_testing_phase(num_classes_learned)
-                open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/acc.txt', 'a').write('{},{}\n'.format(num_classes_learned, np.mean(accs)))
 
         return results
 
@@ -1253,8 +1250,11 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 # Update in place
                 self.adapt(cloned_adaptation_net, train_loss)
             else:
-                eval_data.append(data)
-                eval_target.append(target)
+                if len(eval_data) < 5:
+                    eval_data.append(data)
+                    eval_target.append(target)
+                else:
+                    break
 
         # TODO: This may be quite memory intensive for large datasets.
         eval_data = torch.cat(eval_data)
@@ -1276,6 +1276,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def run_meta_testing_phase(self, num_classes_learned):
 
+        # self.model.load_state_dict(torch.load('/home/ec2-user/nta/nupic.hardware/projects/imagenet/oml.pt'))
+        # self.model.eval()
+
         avg_score = 0
 
         lr_sweep_range = [1e-1, 1e-2, 1e-3, 1e-4]
@@ -1283,38 +1286,33 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # grid search over lr
         for lr_search_runs in range(0, 5):
-
+        
             # choose num_classes_learned random classes from the non-background set to train on
             new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
-            
+            self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
+
             max_acc = -1000
             for lr in lr_sweep_range:
 
                 # reset fast weights
                 for param in self.get_fast_params(None):
-                    open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/temp.txt', 'a').write('{},  {}\n'.format(str(type(param)), str(hasattr(param, "shape"))))
                     if len(param.shape) > 1:
                         torch.nn.init.kaiming_normal_(param)
                     else:
                         torch.nn.init.zeros_(param)
 
-                for i, new_task in enumerate(new_tasks):
+                opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
 
-                    self.meta_test_train_loader.sampler.set_active_tasks(new_task)
+                for img, y in self.meta_test_train_loader:
 
-                    opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
+                    img = img.to(self.device)
+                    y = y.to(self.device)
 
-                    for img, y in self.meta_test_train_loader:
-                        img = img.to(self.device)
-                        y = y.to(self.device)
-
-                        # open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/temp.txt', 'a').write('{},  {}\n'.format(str(type(self.model)), str(type(self.model.module))))
-
-                        pred = self.model.module(img)
-                        opt.zero_grad()
-                        loss = torch.nn.functional.cross_entropy(pred, y)
-                        loss.backward()
-                        opt.step()
+                    pred = self.model.module(img)
+                    opt.zero_grad()
+                    loss = torch.nn.functional.cross_entropy(pred, y)
+                    loss.backward()
+                    opt.step()
 
                 correct = 0
                 for img, target in self.meta_test_train_loader:
@@ -1339,33 +1337,30 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
             # choose num_classes_learned random classes from the non-background set to test on
             new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+            self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
             self.meta_test_test_loader.sampler.set_active_tasks(new_tasks)
 
             # reset fast weights
             for param in self.get_fast_params(None):
-                open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/temp.txt', 'a').write('{},  {}\n'.format(str(type(param)), str(hasattr(param, "shape"))))
                 if len(param.shape) > 1:
                     torch.nn.init.kaiming_normal_(param)
                 else:
                     torch.nn.init.zeros_(param)
 
-            for i, new_task in enumerate(new_tasks):
+            lr = best_lr
 
-                self.meta_test_train_loader.sampler.set_active_tasks(new_task)
-                lr = best_lr
+            # meta-training training
+            opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
 
-                # meta-training training
-                opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
+            for img, y in self.meta_test_train_loader:
+                img = img.to(self.device)
+                y = y.to(self.device)
 
-                for img, y in self.meta_test_train_loader:
-                    img = img.to(self.device)
-                    y = y.to(self.device)
-
-                    pred = self.model.module(img)
-                    opt.zero_grad()
-                    loss = torch.nn.functional.cross_entropy(pred, y)
-                    loss.backward()
-                    opt.step()
+                pred = self.model.module(img)
+                opt.zero_grad()
+                loss = torch.nn.functional.cross_entropy(pred, y)
+                loss.backward()
+                opt.step()
 
             # meta-training testing
             correct = 0
@@ -1385,7 +1380,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
-
         gradients = torch.autograd.grad(
             loss, params,
             retain_graph=True, create_graph=True
@@ -1407,7 +1401,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             params = list(params)
             for p, g in zip(params, gradients):
                 if g is not None:
-                    p.add_(g, alpha=-lr)
+                    p = p - lr * g
 
     def adapt(self, cloned_adaptation_net, train_loss):
         fast_params = self.get_fast_params(cloned_adaptation_net)
@@ -1459,16 +1453,26 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return cls.create_task_sampler(dataset, config, train=False)
 
     @classmethod
-    def create_task_sampler(cls, dataset, config, train):
+    def create_task_sampler(cls, dataset, config, train, sequential=False):
         """In meta continuous learning paradigm, one task equals one class"""
         # assume dataloaders are already created
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
 
+        if sequential:
+            if train:
+                for target in class_indices:
+                    class_indices[target] = class_indices[target][:15]
+            else:
+                for target in class_indices:
+                    class_indices[target] = class_indices[target][:5]
+
         # change the sampler in the train loader
         distributed = config.get("distributed", False)
-        if distributed and train:
+        if sequential:
+            sampler = TaskSequentialSampler(class_indices)
+        elif distributed and train:
             sampler = TaskDistributedSampler(
                 dataset,
                 class_indices

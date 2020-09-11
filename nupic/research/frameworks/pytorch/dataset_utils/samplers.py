@@ -99,3 +99,27 @@ class TaskRandomSampler(Sampler):
 
     def __len__(self):
         return len(self.indices)
+
+
+class TaskSequentialSampler(Sampler):
+    r"""Samples elements in order from a given list of indices, without replacement.
+
+    Arguments:
+        indices (sequence): a sequence of indices
+    """
+
+    def __init__(self, task_indices, train=True):
+        self.task_indices = task_indices
+        self.set_active_tasks(0)
+
+    def set_active_tasks(self, tasks):
+        self.active_tasks = tasks
+        if not isinstance(self.active_tasks, Iterable):
+            self.active_tasks = [tasks]
+        self.indices = np.concatenate([self.task_indices[t] for t in self.active_tasks])
+
+    def __iter__(self):
+        return (self.indices[i] for i in range(len(self.indices)))
+
+    def __len__(self):
+        return len(self.indices)

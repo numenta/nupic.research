@@ -89,17 +89,22 @@ class OMLNetwork(nn.Module):
         super().__init__()
 
         self.representation = nn.Sequential(
-            *self.conv_block(1, 8, 5),  # 105 -> 53
-            *self.conv_block(8, 16, 3),  # 53 - 27
-            *self.conv_block(16, 32, 3),  # 27 - 14
-            *self.conv_block(32, 64, 3),  # 14 - 7
-            *self.conv_block(64, 128, 3),  # 7 - 4
-            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(in_channels=1, out_channels=256, kernel_size=3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=0),
+            nn.ReLU(),            
             nn.Flatten(),
         )
         self.adaptation = nn.Sequential(
-            nn.Linear(128, 100),
-            nn.Linear(100, num_classes),
+            nn.Linear(2304, num_classes),
         )
 
     @property
