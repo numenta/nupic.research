@@ -89,7 +89,7 @@ RAY_PARSER = argparse.ArgumentParser(
 RAY_PARSER.add_argument("-s", "--with-server", action="store_true",
                         help="Start Ray Tune API server")
 RAY_PARSER.add_argument("--single_instance", action="store_true",
-                        help="Uses single instance run method", default=False)
+                        help="Uses single instance run method")
 RAY_PARSER.add_argument("--local-mode", action="store_true",
                         help="Start ray in local mode. Useful for debugging")
 RAY_PARSER.add_argument("-a", "--redis-address",
