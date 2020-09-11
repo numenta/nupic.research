@@ -1063,7 +1063,6 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         return eo
 
 
-
 class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def setup_experiment(self, config):
