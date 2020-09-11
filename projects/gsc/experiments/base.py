@@ -19,7 +19,7 @@
 #
 
 """
-Base Imagenet Experiment configuration.
+Base GSC Experiment configuration.
 """
 
 import os
