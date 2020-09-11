@@ -42,6 +42,7 @@ from nupic.research.frameworks.pytorch import datasets
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
     TaskDistributedSampler,
     TaskRandomSampler,
+    TaskSequentialSampler,
 )
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
@@ -66,6 +67,8 @@ from nupic.research.frameworks.vernon.network_utils import (
     get_compatible_state_dict,
 )
 
+from nupic.research.frameworks.vernon.maml_utils import clone_model
+
 try:
     from apex import amp
 except ImportError:
@@ -74,7 +77,8 @@ except ImportError:
 __all__ = [
     "SupervisedExperiment",
     "ImagenetExperiment",
-    "ContinualLearningExperiment"
+    "ContinualLearningExperiment",
+    "MetaContinualLearningExperiment",
 ]
 
 
@@ -1059,6 +1063,423 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         return eo
 
 
+
+class MetaContinualLearningExperiment(SupervisedExperiment):
+
+    def setup_experiment(self, config):
+        super().setup_experiment(config)
+
+        self.epochs_to_validate = []
+        self.num_tasks_test = config.get("num_tasks_test", 1000)
+
+        self.num_tasks_per_epoch = config.get("num_tasks_per_epoch", 1)
+
+        self.adaptation_learning_rate = config.get("adaptation_learning_rate", 0.03)
+
+        self.remember_loader = self.create_remember_loader(config)
+        self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
+
+        self.meta_test_train_loader = self.create_meta_test_loader(config, train=True, batch_size=1)
+        self.meta_test_test_loader = self.create_meta_test_loader(config, train=False, batch_size=32)
+
+        num_tasks = len(self.remember_loader.sampler.task_indices)
+        self.logger.info(f"Number of tasks = {num_tasks}")
+
+        # Only part of the data is used for inner loop training
+        self.batch_size = config.get("batch_size", 5)
+        self.num_batches_train = config.get("num_batches_train", 5)
+        #       maybe slow vs fast adaptation
+        # TODO: Is this the best name?
+        self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
+
+        # TODO modify these lines below or delete since they're already inherited from SupervisedExperiment
+        optimizer_class = config.get("optimizer_class", torch.optim.Adam)
+        optimizer_args = config.get("optimizer_args", {})
+
+        self.optimizer = optimizer_class(params=self.get_slow_params(), **optimizer_args)
+
+    @classmethod
+    def create_remember_loader(cls, config):
+        """
+        Create data loader for the remember-set. This will include all classes.
+        """
+
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+
+        dataset_args = config.get("dataset_args", {})
+        dataset_args.update(train=False)
+        dataset = dataset_class(**dataset_args)
+
+        sampler = cls.create_task_sampler(dataset, config, train=False)
+
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("remember_batch_size", 15),
+            sampler=sampler,
+            num_workers=config.get("workers", 0),
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    def create_meta_test_loader(cls, config, train, batch_size):
+        """
+        Create data loader for the meta-test phase. This will include all classes.
+        """
+
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+
+        dataset_args = config.get("dataset_args", {})
+        dataset_args.update(train=False)
+        dataset = dataset_class(evaluation=True, **dataset_args)
+
+        sampler = cls.create_task_sampler(dataset, config, train, sequential=True)
+        
+        return DataLoader(
+            dataset=dataset,
+            batch_size=batch_size,
+            sampler=sampler,
+            num_workers=config.get("workers", 0),
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    def run_epoch(self):
+
+        timestep_begin = self.current_timestep
+        self.optimizer.zero_grad()
+
+        # Clone model - clone fast params and the slow params. The latter will be frozen
+        cloned_adaptation_net = self.clone_model()
+
+        # Freeze the slow params.
+        fast_params = self.get_fast_params(None)
+        # for param in fast_params:
+        #     param.requires_grad = False
+
+        # Collect the data to be used for the outer loop
+        meta_train_test_data, meta_train_test_target = [], []
+
+        # Out of all tasks possible, choose num_tasks_per_epoch tasks
+        tasks_train = np.random.choice(
+            self.num_classes, self.num_tasks_per_epoch, replace=False
+        )
+
+        # Inner loop
+        # TODO delete variable `num_indices_test` if we won't use it
+        num_indices_test = self.num_batches_meta_train_test * self.batch_size
+
+        for task in tasks_train:
+            # Returns all data that was not used for the inner loop training
+            eval_data, eval_targets = self.run_task(task, cloned_adaptation_net)
+            meta_train_test_data.append(eval_data)
+            meta_train_test_target.append(eval_targets)
+
+        # Remember set: sample from all tasks
+        for remember_data, remember_targets in self.remember_loader:
+            remember_data = remember_data.to(self.device)
+            remember_targets = remember_targets.to(self.device)
+            break
+
+        meta_train_test_data.append(remember_data)
+        meta_train_test_target.append(remember_targets)
+
+        # Meta train refers to meta training testing
+        meta_train_test_data = torch.cat(meta_train_test_data)
+        meta_train_test_target = torch.cat(meta_train_test_target)
+
+        # Unfreeze the slow params.
+        fast_params = self.get_fast_params(None)
+        # for param in fast_params:
+        #     param.requires_grad = True
+
+        # Take step for outer loop. This will backprop through to the original
+        # slow and fast params.
+        output = cloned_adaptation_net(meta_train_test_data)
+        output = self.model(meta_train_test_data)
+        loss = self._loss_function(output, meta_train_test_target)
+        loss.backward()
+
+        self.optimizer.step()
+
+        # Report statistics for the outer loop
+        pred = output.max(1, keepdim=True)[1]
+        correct = pred.eq(meta_train_test_target.view_as(pred)).sum().item()
+        total = output.shape[0]
+        results = {
+            "total_correct": correct,
+            "total_tested": total,
+            "mean_loss": loss.item(),
+            "mean_accuracy": correct / total if total > 0 else 0,
+        }
+        self.logger.debug(results)
+
+        results.update(
+            timestep_begin=timestep_begin,
+            timestep_end=self.current_timestep,
+            learning_rate=self.get_lr()[0],
+            extra_val_results=self.extra_val_results,
+        )
+
+        self.current_epoch += 1
+        self.extra_val_results = []
+
+        if self.should_stop():
+
+            # meta-training phase complete, perform meta-testing phase
+            for num_classes_learned in [10, 50, 100, 200, 600]:
+                accs = self.run_meta_testing_phase(num_classes_learned)
+
+        return results
+
+    def run_task(self, task, cloned_adaptation_net):
+        self.train_loader.sampler.set_active_tasks(task)
+
+        eval_data, eval_target = [], []
+        for idx, (data, target) in enumerate(self.train_loader):
+            data = data.to(self.device)
+            target = target.to(self.device)
+            if idx < self.num_batches_train:
+                train_loss = self._loss_function(
+                    cloned_adaptation_net(data), target
+                )
+                # Update in place
+                self.adapt(cloned_adaptation_net, train_loss)
+            else:
+                if len(eval_data) < 5:
+                    eval_data.append(data)
+                    eval_target.append(target)
+                else:
+                    break
+
+        # TODO: This may be quite memory intensive for large datasets.
+        eval_data = torch.cat(eval_data)
+        eval_target = torch.cat(eval_target)
+
+        # Evaluate the adapted model
+        with torch.no_grad():
+            preds = cloned_adaptation_net(eval_data)
+            valid_error = self._loss_function(preds, eval_target)
+            valid_error /= len(eval_data)
+            self.logger.info(f"Valid error meta train training: {valid_error}")
+
+            # calculate accuracy
+            preds = preds.argmax(dim=1).view(eval_target.shape)
+            valid_accuracy = (preds == eval_target).sum().float() / eval_target.size(0)
+            self.logger.info(f"Valid accuracy meta train training: {valid_accuracy}")
+
+        return eval_data, eval_target
+
+    def run_meta_testing_phase(self, num_classes_learned):
+
+        # self.model.load_state_dict(torch.load('/home/ec2-user/nta/nupic.hardware/projects/imagenet/oml.pt'))
+        # self.model.eval()
+
+        avg_score = 0
+
+        lr_sweep_range = [1e-1, 1e-2, 1e-3, 1e-4]
+        lr_all = []
+
+        # grid search over lr
+        for lr_search_runs in range(0, 5):
+        
+            # choose num_classes_learned random classes from the non-background set to train on
+            new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+            self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
+
+            max_acc = -1000
+            for lr in lr_sweep_range:
+
+                # reset fast weights
+                for param in self.get_fast_params(None):
+                    if len(param.shape) > 1:
+                        torch.nn.init.kaiming_normal_(param)
+                    else:
+                        torch.nn.init.zeros_(param)
+
+                opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
+
+                for img, y in self.meta_test_train_loader:
+
+                    img = img.to(self.device)
+                    y = y.to(self.device)
+
+                    pred = self.model.module(img)
+                    opt.zero_grad()
+                    loss = torch.nn.functional.cross_entropy(pred, y)
+                    loss.backward()
+                    opt.step()
+
+                correct = 0
+                for img, target in self.meta_test_train_loader:
+                    img = img.to(self.device)
+                    target = target.to(self.device)
+                    logits_q = self.model.module(img)
+                    pred_q = (logits_q).argmax(dim=1)
+                    correct += torch.eq(pred_q, target).sum().item() / len(img)
+
+                correct = 1.0 * correct / len(self.meta_test_train_loader)
+                if (correct > max_acc):
+                    max_acc = correct
+                    max_lr = lr
+
+            lr_all.append(max_lr)
+            
+        from scipy import stats
+        best_lr = float(stats.mode(lr_all)[0][0])
+
+        meta_test_accuracies = []
+        for current_run in range(0, 15):
+
+            # choose num_classes_learned random classes from the non-background set to test on
+            new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+            self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
+            self.meta_test_test_loader.sampler.set_active_tasks(new_tasks)
+
+            # reset fast weights
+            for param in self.get_fast_params(None):
+                if len(param.shape) > 1:
+                    torch.nn.init.kaiming_normal_(param)
+                else:
+                    torch.nn.init.zeros_(param)
+
+            lr = best_lr
+
+            # meta-training training
+            opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
+
+            for img, y in self.meta_test_train_loader:
+                img = img.to(self.device)
+                y = y.to(self.device)
+
+                pred = self.model.module(img)
+                opt.zero_grad()
+                loss = torch.nn.functional.cross_entropy(pred, y)
+                loss.backward()
+                opt.step()
+
+            # meta-training testing
+            correct = 0
+            for img, target in self.meta_test_test_loader:
+                img = img.to(self.device)
+                target = target.to(self.device)
+                logits_q = self.model.module(img)
+                pred_q = (logits_q).argmax(dim=1)
+                correct += torch.eq(pred_q, target).sum().item() / len(img)
+
+            meta_test_accuracies.append(correct / len(self.meta_test_test_loader))
+
+        return meta_test_accuracies
+
+    @classmethod
+    def update_params(cls, params, loss, lr, distributed=False):
+        """
+        Takes a gradient step on the loss and updates the cloned parameters in place.
+        """
+        gradients = torch.autograd.grad(
+            loss, params,
+            retain_graph=True, create_graph=True
+        )
+
+        def average_gradients(model):
+            size = float(dist.get_world_size())
+            for param in model.parameters():
+                dist.all_reduce(param.grad.data, op=dist.reduce_op.SUM)
+                param.grad.data /= size
+
+        if distributed:
+            size = float(dist.get_world_size())
+            for grad in gradients:
+                dist.all_reduce(grad.data, op=dist.reduce_op.SUM)
+                grad.data /= size
+
+        if gradients is not None:
+            params = list(params)
+            for p, g in zip(params, gradients):
+                if g is not None:
+                    p = p - lr * g
+
+    def adapt(self, cloned_adaptation_net, train_loss):
+        fast_params = self.get_fast_params(cloned_adaptation_net)
+        lr = self.adaptation_learning_rate
+        self.update_params(fast_params, train_loss, lr, distributed=self.distributed)
+
+    def clone_model(self, keep_as_reference=None):
+        """
+        Clones self.model by cloning some of the params and keeping those listed
+        specified `keep_as_reference` via reference.
+        """
+
+        # TODO: Pass the names of the slow_params, which can just be kept through
+        # reference and frozen.
+        model = clone_model(self.model.module, keep_as_reference=None)
+
+        if not self.distributed:
+            model = DataParallel(model)
+        else:
+            # Instead of using DistributedDataParallel, the grads will be reduced
+            # manually since we won't call loss.backward()
+            model
+
+        return model
+
+    def get_slow_params(self):
+        # TODO: Maybe there's a better way to manage params.
+        return self.model.module.slow_params
+
+    def get_fast_params(self, cloned_adaptation_net):
+        # TODO: Maybe there's a better way to manage params.
+        if hasattr(self.model, "module"):
+            return self.model.module.fast_params
+        else:
+            return self.model.fast_params
+
+    @classmethod
+    def aggregate_results(cls, results):
+        """Run validation in single GPU"""
+        print("Aggregated results")
+        return results[0]
+
+    @classmethod
+    def create_train_sampler(cls, dataset, config):
+        return cls.create_task_sampler(dataset, config, train=True)
+
+    @classmethod
+    def create_validation_sampler(cls, dataset, config):
+        return cls.create_task_sampler(dataset, config, train=False)
+
+    @classmethod
+    def create_task_sampler(cls, dataset, config, train, sequential=False):
+        """In meta continuous learning paradigm, one task equals one class"""
+        # assume dataloaders are already created
+        class_indices = defaultdict(list)
+        for idx, (_, target) in enumerate(dataset):
+            class_indices[target].append(idx)
+
+        if sequential:
+            if train:
+                for target in class_indices:
+                    class_indices[target] = class_indices[target][:15]
+            else:
+                for target in class_indices:
+                    class_indices[target] = class_indices[target][:5]
+
+        # change the sampler in the train loader
+        distributed = config.get("distributed", False)
+        if sequential:
+            sampler = TaskSequentialSampler(class_indices)
+        elif distributed and train:
+            sampler = TaskDistributedSampler(
+                dataset,
+                class_indices
+            )
+        else:
+            sampler = TaskRandomSampler(class_indices)
+
+        return sampler
+
+
 class ImagenetExperiment(SupervisedExperiment):
     """
     Experiment class used to train Sparse and dense versions of Resnet50 v1.5
@@ -1089,3 +1510,9 @@ class ImagenetExperiment(SupervisedExperiment):
         eo = super().get_execution_order()
         eo["create_loaders"].insert(0, "ImagenetExperiment.create_loaders")
         return eo
+
+
+class OMLforResnet(MetaContinualLearningExperiment):
+
+    def get_slow_params(self):
+        return [...]
