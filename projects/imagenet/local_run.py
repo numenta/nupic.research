@@ -30,27 +30,13 @@ import uuid
 from datetime import datetime
 from functools import partial
 
-import torch
 import torch.multiprocessing as multiprocessing
 
-from nupic.research.frameworks.pytorch.imagenet import (
-    ImagenetExperiment,
-    imagenet_run,
-    mixins,
-)
-from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptImagenetExperiment
+from nupic.research.frameworks import vernon
+from nupic.research.frameworks.vernon import ImagenetExperiment
+from nupic.research.frameworks.vernon.parser_utils import MAIN_PARSER, process_args
 
 multiprocessing.set_start_method("spawn", force=True)
-
-
-def insert_experiment_mixin(config, mixin):
-    experiment_class = config["experiment_class"]
-
-    class Cls(mixin, experiment_class):
-        pass
-
-    Cls.__name__ = f"{mixin.__name__}{experiment_class.__name__}"
-    config["experiment_class"] = Cls
 
 
 def create_trials(config):
@@ -127,9 +113,9 @@ def run_trial(config):
                            loggers=config.get("loggers", None))
     logger.last_timestamp = logger.start_timestamp = time.time()
 
-    result = imagenet_run.run(config=config,
-                              logger=partial(log_results, logger, config),
-                              on_checkpoint=partial(save_checkpoint, config))
+    result = vernon.run(config=config,
+                        logger=partial(log_results, logger, config),
+                        on_checkpoint=partial(save_checkpoint, config))
 
     logger.flush()
     logger.close()
@@ -143,18 +129,11 @@ def main(args):
     # Merge configuration with command line arguments
     config.update(vars(args))
 
-    if "profile" in args and args.profile:
-        insert_experiment_mixin(config, mixins.Profile)
-
-    if "profile_autograd" in args and args.profile_autograd:
-        insert_experiment_mixin(config, mixins.ProfileAutograd)
-
-    if "create_sigopt" in args:
-        s = SigOptImagenetExperiment()
-        s.create_experiment(config["sigopt_config"])
-        print(
-            "Created experiment: https://app.sigopt.com/experiment/"
-            + str(s.experiment_id))
+    config = process_args(args, config)
+    if config is None:
+        # This may return when a sigopt experiment is created.
+        print("Nothing to run (config=None).")
+        return
 
     results = []
     for trial in create_trials(config):
@@ -162,7 +141,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # The spawned 'imagenet_run.run' process does not import 'ray' however some
+    # The spawned 'run' process does not import 'ray' however some
     # configurations in the experiment package import 'ray' and 'ray.tune'. When
     # 'ray' is imported after 'pickle' it throws an exception. We avoid this
     # exception by loading the configurations in "main" local context instead of
@@ -170,41 +149,11 @@ if __name__ == "__main__":
     from experiments import CONFIGS
 
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        argument_default=argparse.SUPPRESS,
+        parents=[MAIN_PARSER],
         description=__doc__
     )
     parser.add_argument("-e", "--experiment", dest="name",
                         help="Experiment to run", choices=CONFIGS.keys())
-    parser.add_argument("-g", "--num-gpus", type=int,
-                        default=torch.cuda.device_count(),
-                        help="number of GPUs to use")
-    parser.add_argument("-n", "--num-cpus", type=int,
-                        default=torch.get_num_interop_threads(),
-                        help="number of CPUs to use when GPU is not available."),
-    parser.add_argument("-c", "--checkpoint-file", dest="restore_checkpoint_file",
-                        help="Resume experiment from specific checkpoint file")
-    parser.add_argument("-j", "--workers", type=int, default=6,
-                        help="Number of dataloaders workers")
-    parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
-                        help="Pytorch Distributed backend", default="nccl")
-    parser.add_argument("-p", "--progress", action="store_true",
-                        help="Show progress during training")
-    parser.add_argument("-l", "--log-level",
-                        choices=["critical", "error", "warning", "info", "debug"],
-                        help="Python Logging level")
-    parser.add_argument("-f", "--log-format",
-                        help="Python Logging Format")
-    parser.add_argument("-x", "--max-failures", type=int,
-                        help="How many times to try to recover before stopping")
-    parser.add_argument("--checkpoint-freq", type=int,
-                        help="How often to checkpoint (epochs)")
-    parser.add_argument("--profile", action="store_true",
-                        help="Enable torch.autograd.profiler.profile during training")
-    parser.add_argument("--profile-autograd", action="store_true",
-                        help="Enable torch.autograd.profiler.profile during training")
-    parser.add_argument("-t", "--create_sigopt", action="store_true",
-                        help="Create a new sigopt experiment using the config")
 
     args = parser.parse_args()
     if "name" not in args:

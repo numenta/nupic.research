@@ -19,30 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.pytorch.imagenet import mixins
-from nupic.research.frameworks.pytorch.imagenet.imagenet_experiment import (
-    ImagenetExperiment,
-)
+from .base import CONFIGS as BASE
 
+"""
+Import and collect all Imagenet experiment configurations into one CONFIG
+"""
+__all__ = ["CONFIGS"]
 
-class RezeroedKWinnersImagenetExperiment(mixins.RezeroWeights,
-                                         mixins.UpdateBoostStrength,
-                                         ImagenetExperiment):
-    pass
-
-
-class KnowledgeDistillationImagenetExperiment(mixins.KnowledgeDistillation,
-                                              RezeroedKWinnersImagenetExperiment):
-    pass
-
-
-class KnowledgeDistillationCLExperiment(mixins.KnowledgeDistillationCL,
-                                        RezeroedKWinnersImagenetExperiment):
-    pass
-
-
-__all__ = [
-    "RezeroedKWinnersImagenetExperiment",
-    "KnowledgeDistillationImagenetExperiment",
-    "KnowledgeDistillationCLExperiment"
-]
+# Collect all configurations
+CONFIGS = dict()
+CONFIGS.update(BASE)

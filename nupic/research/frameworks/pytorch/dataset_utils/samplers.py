@@ -47,11 +47,11 @@ class TaskDistributedSampler(DistributedSampler):
         if not isinstance(self.active_tasks, Iterable):
             self.active_tasks = [tasks]
         self.indices = np.concatenate([self.task_indices[t] for t in self.active_tasks])
-        self.num_samples = math.ceil(len(self.indices) * 1.0 / self.num_replicas)
+        self.num_samples = math.ceil(len(self.indices) / self.num_replicas)
         self.total_size = self.num_samples * self.num_replicas
 
     def __iter__(self):
-        # deterministically shuffle based on epoch
+        # Deterministically shuffle based on epoch
         g = torch.Generator()
         g.manual_seed(self.epoch)
 
@@ -59,11 +59,11 @@ class TaskDistributedSampler(DistributedSampler):
         if self.shuffle:
             indices = [indices[i] for i in torch.randperm(len(indices), generator=g)]
 
-        # add extra samples to make it evenly divisible
+        # Add extra samples to make it evenly divisible
         indices += indices[:(self.total_size - len(indices))]
         assert len(indices) == self.total_size
 
-        # subsample
+        # Subsample
         indices = indices[self.rank:self.total_size:self.num_replicas]
         assert len(indices) == self.num_samples
 

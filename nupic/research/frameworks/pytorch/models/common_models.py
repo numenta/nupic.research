@@ -47,7 +47,7 @@ class StandardMLP(nn.Module):
         return self.classifier(x)
 
 
-class SmallCNN(nn.Module):
+class OmniglotCNN(nn.Module):
 
     def __init__(self, num_classes, **kwargs):
 
