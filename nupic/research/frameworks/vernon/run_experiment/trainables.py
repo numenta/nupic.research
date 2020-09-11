@@ -329,7 +329,7 @@ class ContinualLearningTrainable(SupervisedTrainable):
             return ray.get(status)
 
 
-class SigOptImagenetTrainable(SupervisedTrainable):
+class SigOptSupervisedTrainable(SupervisedTrainable):
     """
     This class updates the config using SigOpt before the models and workers are
     instantiated, and updates the result using SigOpt once training completes.

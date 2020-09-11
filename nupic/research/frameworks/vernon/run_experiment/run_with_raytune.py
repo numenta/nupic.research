@@ -34,7 +34,7 @@ from nupic.research.support.ray_utils import (
     register_torch_serializers,
 )
 
-from .trainables import BaseTrainable, SigOptImagenetTrainable, SupervisedTrainable
+from .trainables import BaseTrainable, SigOptSupervisedTrainable, SupervisedTrainable
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -55,7 +55,7 @@ def run(config):
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
 
     if "sigopt_config" in config:
-        kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
+        kwargs = dict(zip(kwargs_names, [SigOptSupervisedTrainable,
                                          *tune.run.__defaults__]))
     else:
         ray_trainable = config.get("ray_trainable", SupervisedTrainable)
