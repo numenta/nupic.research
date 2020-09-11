@@ -48,4 +48,4 @@ if __name__ == "__main__":
     if config is None:
         pass
     else:
-        vernon.run_with_raytune(config, use_single_instance=args.single_instance)
+        vernon.run_with_raytune(config)

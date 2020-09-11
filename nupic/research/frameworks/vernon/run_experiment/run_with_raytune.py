@@ -39,9 +39,9 @@ from .trainables import BaseTrainable, SigOptImagenetTrainable, SupervisedTraina
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
-def run(config, use_single_instance=False):
+def run(config):
 
-    if use_single_instance:
+    if config.get("single_instance", False):
         return run_single_instance(config)
 
     # Connect to ray
