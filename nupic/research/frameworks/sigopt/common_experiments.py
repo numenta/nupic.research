@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import mixins
+from nupic.research.frameworks.sigopt import mixins
 
 from .sigopt_experiment import SigOptExperiment
 
@@ -40,6 +40,8 @@ class SigOptSDGOneCycleLRExperiment(SigOptExperiment,
     pass
 
 
-class SigOptSDGStepLRExperiment(SigOptExperiment, mixins.SGDParams, mixins.StepLRParams):
+class SigOptSDGStepLRExperiment(SigOptExperiment,
+                                mixins.SGDParams,
+                                mixins.StepLRParams):
     """Tune hyper-parameters using SDG and StepLR."""
     pass
