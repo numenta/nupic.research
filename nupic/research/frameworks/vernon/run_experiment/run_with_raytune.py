@@ -28,7 +28,7 @@ import torch
 from ray.tune import Trainable, tune
 
 from nupic.research.frameworks.vernon.experiment_utils import get_free_port
-from nupic.research.frameworks.vernon.search import TrialsCollection
+from nupic.research.frameworks.vernon.run_experiment.search import TrialsCollection
 from nupic.research.support.ray_utils import (
     get_last_checkpoint,
     register_torch_serializers,
