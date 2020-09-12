@@ -426,7 +426,6 @@ class DebugTrainable(Trainable):
 
     def _restore(self, checkpoint):
         pass
-<<<<<<< HEAD:nupic/research/frameworks/pytorch/imagenet/imagenet_tune.py
 
 
 def run(config):
@@ -539,5 +538,3 @@ def run_trial_single_instance(config, kwargs):
     kwargs["config"] = config
     tune.run(**kwargs)
     print("**** Trial ended")
-=======
->>>>>>> a48d5947ecb7851b1c221d8402c0d4f7649b887d:nupic/research/frameworks/vernon/run_experiment/trainables.py
