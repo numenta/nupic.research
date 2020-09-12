@@ -6,7 +6,7 @@ This repository contains the code for experimental algorithm work done internall
 Open Research
 ==============
 
-We are dramatically open with our research. We even release our day to day research code into this repository. It contains experimental algorithm code done internally at Numenta. It includes prototypes and experiments with different algorithm implementations.
+We are dramatically open with our research. We even release our day to day research code into this repository. It contains experimental algorithm code done internally at Numenta. It includes prototypes and experiments with different algorithm implementations. Many of our internal research meetings are recorded and [released on YouTube](https://www.youtube.com/c/NumentaTheory/videos).
 
 Please see this [blog entry](https://numenta.com/blog/2018/10/22/framework_for_intelligence_commitment_to_open_science/) for a discussion on our commitment to Open Science and Open Research.
 

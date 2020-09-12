@@ -19,28 +19,30 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
 
-class ReduceLRAfterTask:
+
+class LoadPreprocessedData(object):
     """
-    Freeze after params after task k.
+    This mixin helps manage preprocessed by ensuring the next set is loaded
+    following every epoch in preparation for the next.
     """
+
     def setup_experiment(self, config):
         super().setup_experiment(config)
-        self.task_when_reduce_lr = config.get("task_when_reduce_lr", 0)
-        self.new_lr = config.get("new_lr", 1e-3)
+        assert isinstance(self.train_loader.dataset, PreprocessedDataset), (
+            "The train dataset is not preprocessed; there's nothing to load."
+        )
 
-    def run_task(self):
-        """Run outer loop over tasks"""
-        # configure the sampler to load only samples from current task
-        if self.current_task >= self.task_when_reduce_lr:
-            for param_group in self.optimizer.param_groups:
-                param_group["lr"] = self.new_lr
-
-        return super().run_task()
+    def post_epoch(self):
+        super().post_epoch()
+        self.train_loader.dataset.load_next()
+        self.logger.info("Loaded next set of preprocessed data.")
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].append("Freeze after task params")
-        eo["run_task"].insert(0, "Reduce LR for all weights")
+        name = "LoadPreprocessedData"
+        eo["setup_experiment"].append(name + ": ensure the train set is preprocessed")
+        eo["post_epoch"].append(name + ": load the next set of preprocessed data")
         return eo

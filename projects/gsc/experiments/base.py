@@ -22,35 +22,39 @@
 Base Imagenet Experiment configuration.
 """
 
-import copy
 import os
 import sys
+from copy import deepcopy
 
-import ray.tune as tune
 import torch
 
-import nupic.research.frameworks.pytorch.models.sparse_resnets
-from nupic.research.frameworks.vernon import RezeroedKWinnersImagenetExperiment
+from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
+from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
+from nupic.research.frameworks.vernon import (
+    RezeroedKWinnersGSCExperiment,
+    VariedRezeroedKWinnersGSCExperiment,
+)
+from nupic.torch.models.sparse_cnn import gsc_sparse_cnn
 
 # Batch size depends on the GPU memory.
-# On AWS P3 (Tesla V100) each GPU can hold 128 batches
-BATCH_SIZE = 128
+BATCH_SIZE = 16
 
-# Default configuration based on Pytorch Imagenet training example.
-# See http://github.com/pytorch/examples/blob/master/imagenet/main.py
-DEFAULT = dict(
-    experiment_class=RezeroedKWinnersImagenetExperiment,
+# Default configuration based on Pytorch GSC training example.
+# This is a replicates the config of `sparseCNN2` from
+#   `nupic.research\projects\whydense\gsc\experiments_v3.cfg`
+# This achieves 94.7073% accuracy
+DEFAULT_BASE = dict(
+    experiment_class=RezeroedKWinnersGSCExperiment,
 
     # Results path
-    local_dir=os.path.expanduser("~/nta/results/experiments/imagenet"),
-    # Dataset location (directory path or HDF5 file with the raw images)
-    data=os.path.expanduser("~/nta/data/imagenet/imagenet.hdf5"),
-    # Dataset training data relative path
-    train_dir="train",
-    # Dataset validation data relative path
-    val_dir="val",
-    # Limit the dataset size to the given number of classes
-    num_classes=1000,
+    local_dir=os.path.expanduser("~/nta/results/experiments/gsc"),
+
+    # Dataset
+    dataset_class=preprocessed_gsc,
+    dataset_args=dict(
+        root="~/nta/datasets/gsc_preprocessed",
+        download=True,
+    ),
 
     # Seed
     seed=20,
@@ -71,40 +75,57 @@ DEFAULT = dict(
     stop=dict(),
 
     # Number of epochs
-    epochs=90,
+    epochs=30,
+
+    # Which epochs to run and report inference over the validation dataset.
+    # epochs_to_validate=range(-1, 30),  # defaults to the last 3 epochs
 
     # Model class. Must inherit from "torch.nn.Module"
-    model_class=nupic.research.frameworks.pytorch.models.sparse_resnets.resnet50,
-    # model model class arguments passed to the constructor
-    model_args=dict(),
+    model_class=LeSparseNet,
+
+    # Model class arguments passed to the constructor
+    model_args=dict(
+        input_shape=(1, 32, 32),
+        cnn_out_channels=(64, 64),
+        cnn_activity_percent_on=(0.095, 0.125),
+        cnn_weight_percent_on=(0.5, 0.2),
+        linear_n=(1000,),
+        linear_activity_percent_on=(0.1,),
+        linear_weight_percent_on=(0.1,),
+        boost_strength=1.5,
+        boost_strength_factor=0.9,
+        use_batch_norm=True,
+        dropout=0.0,
+        num_classes=12,
+        k_inference_factor=1.0,
+        activation_fct_before_max_pool=True,
+        consolidated_sparse_weights=False,
+        use_kwinners_local=False,
+    ),
 
     # Optimizer class. Must inherit from "torch.optim.Optimizer"
     optimizer_class=torch.optim.SGD,
+
     # Optimizer class class arguments passed to the constructor
     optimizer_args=dict(
-        lr=0.1,
-        weight_decay=1e-04,
-        momentum=0.9,
-        dampening=0,
-        nesterov=True
+        lr=0.01,
+        weight_decay=0.01,
+        momentum=0.0,
     ),
+
     # Whether or not to apply weight decay to batch norm modules parameters
     # If False, remove 'weight_decay' from batch norm parameters
     # See https://arxiv.org/abs/1807.11205
-    batch_norm_weight_decay=True,
+    batch_norm_weight_decay=False,
 
     # Learning rate scheduler class. Must inherit from "_LRScheduler"
     lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+
     # Learning rate scheduler class class arguments passed to the constructor
     lr_scheduler_args=dict(
-        # LR decayed by 10 every 30 epochs
-        gamma=0.1,
-        step_size=30,
+        gamma=0.9,
+        step_size=1,
     ),
-
-    # Whether or not to Initialize running batch norm mean to 0.
-    # See https://arxiv.org/pdf/1706.02677.pdf
-    init_batch_norm=False,
 
     # Loss function. See "torch.nn.functional"
     loss_function=torch.nn.functional.cross_entropy,
@@ -134,30 +155,34 @@ DEFAULT = dict(
     verbose=1,
 )
 
-DEBUG = copy.deepcopy(DEFAULT)
-DEBUG.update(
-    epochs=5,
-    num_classes=3,
-    model_args=dict(config=dict(num_classes=3, defaults_sparse=False)),
 
-    seed=tune.grid_search([42, 43])
+# This config is based off the example from `nupic.torch\examples\gsc\run_gsc_model.py`
+# That example model achieves an average of 96.003% acc while the config below
+# achieves 96.191% (both averaged over three trials) - so they are comparable.
+#
+DEFAULT_SPARSE_CNN = deepcopy(DEFAULT_BASE)
+DEFAULT_SPARSE_CNN.update(
 
+    # Enable a varied batch size.
+    experiment_class=VariedRezeroedKWinnersGSCExperiment,
+
+    # Model
+    model_class=gsc_sparse_cnn,
+    model_args=dict(),
+
+    # Loss
+    loss_function=torch.nn.functional.nll_loss,
+
+    # Batch size
+    batch_size=None,
+    batch_sizes=[4, 16],  # 4 for the first epoch and 16 for the remaining
+    val_batch_size=1000,
+    batches_in_epoch=sys.maxsize,
+    epochs_to_validate=range(0, 30),
 )
-
-DEBUG_SPARSE = copy.deepcopy(DEFAULT)
-DEBUG_SPARSE.update(
-    epochs=5,
-    num_classes=3,
-    model_args=dict(config=dict(num_classes=3, defaults_sparse=True)),
-
-    seed=tune.grid_search([42, 43])
-
-)
-
 
 # Export configurations in this file
 CONFIGS = dict(
-    default_base=DEFAULT,
-    debug_base=DEBUG,
-    debug_base_sparse=DEBUG_SPARSE,
+    default_base=DEFAULT_BASE,
+    default_sparse_cnn=DEFAULT_SPARSE_CNN,
 )

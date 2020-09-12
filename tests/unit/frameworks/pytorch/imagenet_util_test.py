@@ -24,13 +24,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from nupic.research.frameworks.pytorch.imagenet.network_utils import create_model
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.model_utils import (
     serialize_state_dict,
     set_random_seed,
 )
 from nupic.research.frameworks.pytorch.models.sparse_resnets import resnet50
+from nupic.research.frameworks.vernon.network_utils import create_model
 from nupic.torch.modules import rezero_weights
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"

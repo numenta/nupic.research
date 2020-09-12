@@ -29,22 +29,13 @@ from pprint import pprint
 import ray
 import ray.resource_spec
 import ray.util.sgd.utils as ray_utils
-import torch
 from ray.exceptions import RayActorError
-from ray.tune import Trainable, tune
+from ray.tune import Trainable
 from ray.tune.resources import Resources
 from ray.tune.result import DONE, RESULT_DUPLICATE
 from ray.tune.utils import warn_if_slow
 
-from nupic.research.frameworks.pytorch.imagenet.experiment_search import (
-    TrialsCollection,
-)
-from nupic.research.frameworks.pytorch.imagenet.experiment_utils import get_free_port
 from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
-from nupic.research.support.ray_utils import (
-    get_last_checkpoint,
-    register_torch_serializers,
-)
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -125,7 +116,7 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
                         f"Restored checkpoint file '{self.restore_checkpoint_file}' "
                         f"fulfills stop criteria without additional training.")
                     return {
-                        # do not train or log results, just stop
+                        # Do not train or log results, just stop
                         RESULT_DUPLICATE: True,
                         DONE: True
                     }
@@ -277,7 +268,7 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
         self.logger.debug(f"_stop: {self._trial_info.trial_name}({self.iteration})")
         try:
             status = [w.stop_experiment.remote() for w in self.procs]
-            # wait until all remote workers stop
+            # Wait until all remote workers stop
             ray.get(status)
             for w in self.procs:
                 w.__ray_terminate__.remote()
@@ -435,6 +426,7 @@ class DebugTrainable(Trainable):
 
     def _restore(self, checkpoint):
         pass
+<<<<<<< HEAD:nupic/research/frameworks/pytorch/imagenet/imagenet_tune.py
 
 
 def run(config):
@@ -547,3 +539,5 @@ def run_trial_single_instance(config, kwargs):
     kwargs["config"] = config
     tune.run(**kwargs)
     print("**** Trial ended")
+=======
+>>>>>>> a48d5947ecb7851b1c221d8402c0d4f7649b887d:nupic/research/frameworks/vernon/run_experiment/trainables.py

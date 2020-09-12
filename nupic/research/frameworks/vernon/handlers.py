@@ -26,8 +26,6 @@ import time
 from collections import defaultdict
 from pprint import pformat
 
-import os
-
 import numpy as np
 import torch
 import torch.distributed as dist
@@ -40,6 +38,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import transforms
 
+from nupic.research.frameworks.continual_learning.maml_utils import clone_model
 from nupic.research.frameworks.pytorch import datasets
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
     TaskDistributedSampler,
@@ -49,19 +48,6 @@ from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
 from nupic.research.frameworks.pytorch.distributed_sampler import (
     UnpaddedDistributedSampler,
 )
-from nupic.research.frameworks.pytorch.imagenet.evaluation_metrics import (
-    ContinualLearningMetrics,
-)
-from nupic.research.frameworks.pytorch.imagenet.experiment_utils import (
-    create_lr_scheduler,
-    get_free_port,
-    get_node_ip_address,
-)
-from nupic.research.frameworks.pytorch.imagenet.maml_utils import clone_model
-from nupic.research.frameworks.pytorch.imagenet.network_utils import (
-    create_model,
-    get_compatible_state_dict,
-)
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
     aggregate_eval_results,
@@ -70,6 +56,16 @@ from nupic.research.frameworks.pytorch.model_utils import (
     serialize_state_dict,
     set_random_seed,
     train_model,
+)
+from nupic.research.frameworks.vernon.evaluation_metrics import ContinualLearningMetrics
+from nupic.research.frameworks.vernon.experiment_utils import (
+    create_lr_scheduler,
+    get_free_port,
+    get_node_ip_address,
+)
+from nupic.research.frameworks.vernon.network_utils import (
+    create_model,
+    get_compatible_state_dict,
 )
 
 try:
@@ -81,7 +77,7 @@ __all__ = [
     "SupervisedExperiment",
     "ImagenetExperiment",
     "ContinualLearningExperiment",
-    "MetaContinualLearningExperiment"
+    "MetaContinualLearningExperiment",
 ]
 
 
@@ -504,7 +500,6 @@ class SupervisedExperiment:
         if loader is None:
             loader = self.val_loader
 
-        # print(f"Validating {self.current_task}")
         return self.evaluate_model(
             model=self.model,
             loader=loader,
@@ -938,29 +933,30 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
     def setup_experiment(self, config):
 
         super().setup_experiment(config)
-        # override epochs to validate to not validate within the inner loop over epochs
+        # Override epochs to validate to not validate within the inner loop over epochs
         self.epochs_to_validate = []
 
         self.current_task = 0
 
-        # defines how many classes should exist per task
+        # Defines how many classes should exist per task
         self.num_tasks = config.get("num_tasks", 1)
 
+        self.num_classes = config.get("num_classes", None)
         assert self.num_classes is not None, "num_classes should be defined"
 
         self.num_classes_per_task = math.floor(self.num_classes / self.num_tasks)
 
-        # applying target transform depending on type of CL task
-        # task - we know the task, so the network is multihead
-        # class - we don't know the task
+        # Applying target transform depending on type of CL task
+        # Task - we know the task, so the network is multihead
+        # Class - we don't know the task, network has as many heads as classes
         self.cl_experiment_type = config.get("cl_experiment_type", "class")
         if self.cl_experiment_type == "task":
-            # override the target transform
+            self.logger.info("Overriding target transform")
             self.dataset_args["target_transform"] = (
                 transforms.Lambda(lambda y: y % self.num_classes_per_task)
             )
 
-        # whitelist evaluation metrics
+        # Whitelist evaluation metrics
         self.evaluation_metrics = config.get(
             "evaluation_metrics", ["eval_all_visited_tasks"]
         )
@@ -977,13 +973,11 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 
     def run_task(self):
         """Run outer loop over tasks"""
-
-        timestep_begin = self.current_timestep
-
-        # Configure the sampler to load only samples from current task
+        # configure the sampler to load only samples from current task
+        self.logger.info("Training...")
         self.train_loader.sampler.set_active_tasks(self.current_task)
 
-        # run epochs, inner loop
+        # Run epochs, inner loop
         # TODO: return the results from run_epoch
         for _ in range(self.epochs):
             self.run_epoch()
@@ -992,19 +986,20 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         for metric in self.evaluation_metrics:
             eval_function = getattr(self, metric)
             temp_ret = eval_function()
-            print(temp_ret)
+            self.logger.debug(temp_ret)
             for k, v in temp_ret.items():
                 ret[f"{metric}__{k}"] = v
 
+        # TODO: Fix aggregate results function to not
+        # require these parameters, in order to be more flexible
         ret.update(
-            timestep_begin=timestep_begin,
-            timestep_end=self.current_timestep,
+            timestep_begin=0,
+            timestep_end=1,
             learning_rate=self.get_lr()[0],
-            extra_val_results=self.extra_val_results,
+            extra_val_results=[],
         )
 
         self.current_task += 1
-        self.extra_val_results = []
         return ret
 
     @classmethod
@@ -1023,23 +1018,23 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 
     @classmethod
     def create_task_sampler(cls, dataset, config, train):
-        # assume dataloaders are already created
+        # Assume dataloaders are already created
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
 
-        # defines how many classes should exist per task
+        # Defines how many classes should exist per task
         num_tasks = config.get("num_tasks", 1)
         num_classes = config.get("num_classes", None)
         assert num_classes is not None, "num_classes should be defined"
         num_classes_per_task = math.floor(num_classes / num_tasks)
 
         task_indices = defaultdict(list)
-        for i in range(num_tasks):   # 1 to 5
-            for j in range(num_classes_per_task):  # 1 to 200
+        for i in range(num_tasks):
+            for j in range(num_classes_per_task):
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
 
-        # change the sampler in the train loader
+        # Change the sampler in the train loader
         distributed = config.get("distributed", False)
         if distributed and train:
             sampler = TaskDistributedSampler(
@@ -1048,8 +1043,8 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
             )
         else:
             # TODO: implement a TaskDistributedUnpaddedSampler
-            # TODO: implement the aggregate results
-            # TODO: after above are implemented, remove this if else
+            # mplement the aggregate results
+            # after above are implemented, remove this if else
             sampler = TaskRandomSampler(task_indices)
 
         return sampler
@@ -1082,8 +1077,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.remember_loader = self.create_remember_loader(config)
         self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
 
-        self.meta_test_train_loader = self.create_meta_test_loader(config, train=True, batch_size=1)
-        self.meta_test_test_loader = self.create_meta_test_loader(config, train=False, batch_size=32)
+        self.meta_test_train_loader = self.create_meta_test_loader(
+            config, train=True, batch_size=1
+        )
+        self.meta_test_test_loader = self.create_meta_test_loader(
+            config, train=False, batch_size=32
+        )
 
         num_tasks = len(self.remember_loader.sampler.task_indices)
         self.logger.info(f"Number of tasks = {num_tasks}")
@@ -1119,6 +1118,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             pin_memory=torch.cuda.is_available(),
         )
 
+    @classmethod
     def create_meta_test_loader(cls, config, train, batch_size):
         """
         Create data loader for the meta-test phase. This will include all classes.
@@ -1133,7 +1133,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         dataset = dataset_class(evaluation=True, **dataset_args)
 
         sampler = cls.create_task_sampler(dataset, config, train, sequential=True)
-        
+
         return DataLoader(
             dataset=dataset,
             batch_size=batch_size,
@@ -1229,9 +1229,20 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         if self.should_stop():
 
             # meta-training phase complete, perform meta-testing phase
+<<<<<<< HEAD:nupic/research/frameworks/pytorch/imagenet/imagenet_experiment.py
             for num_classes_learned in [10, 20, 50, 100, 200, 600]:
                 accs = self.run_meta_testing_phase(num_classes_learned)
                 open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/acc.txt', 'a').write('{},{}\n'.format(num_classes_learned, np.mean(accs)))
+=======
+            for num_classes_learned in [10, 50, 100, 200, 600]:
+                if num_classes_learned > self.num_classes:
+                    break
+
+                accs = self.run_meta_testing_phase(num_classes_learned)
+                print("Accuracy for meta-testing phase over"
+                      f" {num_classes_learned} num classes.")
+                print(accs)
+>>>>>>> a48d5947ecb7851b1c221d8402c0d4f7649b887d:nupic/research/frameworks/vernon/handlers.py
 
         return results
 
@@ -1283,11 +1294,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         lr_sweep_range = [1e-1, 1e-2, 1e-3, 1e-4]
         lr_all = []
 
-        # grid search over lr
-        for lr_search_runs in range(0, 5):
-        
-            # choose num_classes_learned random classes from the non-background set to train on
-            new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+        # Grid search over lr
+        for _lr_search_runs in range(0, 5):
+
+            # Choose num_classes_learned random classes from the non-background set
+            # to train on.
+            all_classes = list(range(min(self.num_classes, 650)))
+            new_tasks = np.random.choice(
+                all_classes, num_classes_learned, replace=False
+            )
             self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
 
             max_acc = -1000
@@ -1327,15 +1342,19 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                     max_lr = lr
 
             lr_all.append(max_lr)
-            
+
         from scipy import stats
         best_lr = float(stats.mode(lr_all)[0][0])
 
         meta_test_accuracies = []
-        for current_run in range(0, 15):
+        for _current_run in range(0, 15):
 
-            # choose num_classes_learned random classes from the non-background set to test on
-            new_tasks = np.random.choice(list(range(min(self.num_classes, 650))), num_classes_learned, replace=False)
+            # Choose num_classes_learned random classes from the non-background set to
+            # test on
+            all_classes = list(range(min(self.num_classes, 650)))
+            new_tasks = np.random.choice(
+                all_classes, num_classes_learned, replace=False
+            )
             self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
             self.meta_test_test_loader.sampler.set_active_tasks(new_tasks)
 
