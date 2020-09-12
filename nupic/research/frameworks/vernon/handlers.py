@@ -1144,14 +1144,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def run_epoch(self):
 
-        open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/temp.txt', 'a').write(
-            '   '.join([str(round(param.data.detach().cpu().numpy().flatten()[0], 5)) for param in self.get_slow_params()]) + '\n\n'
-        )
-
-        open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/temp.txt', 'a').write(
-            '   '.join([str(round(param.data.detach().cpu().numpy().flatten()[0], 5)) for param in self.get_fast_params(None)]) + '\n\n--------\n\n'
-        )
-
         timestep_begin = self.current_timestep
         self.optimizer.zero_grad()
 
@@ -1223,26 +1215,19 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # save model
         torch.save(self.model.state_dict(), '/home/ec2-user/nta/nupic.hardware/projects/imagenet/oml.pt')
 
-        if self.current_epoch % 5 == 0:
-            open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/acc.txt', 'a').write('done epoch {}\n'.format(self.current_epoch))
-
         if self.should_stop():
 
             # meta-training phase complete, perform meta-testing phase
-<<<<<<< HEAD:nupic/research/frameworks/pytorch/imagenet/imagenet_experiment.py
             for num_classes_learned in [10, 20, 50, 100, 200, 600]:
-                accs = self.run_meta_testing_phase(num_classes_learned)
-                open('/home/ec2-user/nta/nupic.hardware/projects/imagenet/acc.txt', 'a').write('{},{}\n'.format(num_classes_learned, np.mean(accs)))
-=======
-            for num_classes_learned in [10, 50, 100, 200, 600]:
+
                 if num_classes_learned > self.num_classes:
                     break
 
                 accs = self.run_meta_testing_phase(num_classes_learned)
+
                 print("Accuracy for meta-testing phase over"
                       f" {num_classes_learned} num classes.")
                 print(accs)
->>>>>>> a48d5947ecb7851b1c221d8402c0d4f7649b887d:nupic/research/frameworks/vernon/handlers.py
 
         return results
 
