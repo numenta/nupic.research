@@ -68,6 +68,8 @@ from nupic.research.frameworks.vernon.network_utils import (
     get_compatible_state_dict,
 )
 
+import time
+
 try:
     from apex import amp
 except ImportError:
@@ -1075,7 +1077,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.adaptation_learning_rate = config.get("adaptation_learning_rate", 0.03)
 
         self.remember_loader = self.create_remember_loader(config)
-        self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
+        self.remember_loader.sampler.set_active_tasks(np.arange(int(self.num_classes/2)))
+        # self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes)) # uncomment this line (and comment out the previous one) for uniform sampling from all num_classes classes
 
         self.meta_test_train_loader = self.create_meta_test_loader(
             config, train=True, batch_size=1
@@ -1083,6 +1086,10 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.meta_test_test_loader = self.create_meta_test_loader(
             config, train=False, batch_size=32
         )
+
+        # for testing accuracy on all background examples during meta-training, to evaluate progress
+        self.tester = self.create_remember_loader(config, batch_size=5)
+        self.tester.sampler.set_active_tasks(np.arange(self.num_classes))
 
         num_tasks = len(self.remember_loader.sampler.task_indices)
         self.logger.info(f"Number of tasks = {num_tasks}")
@@ -1095,7 +1102,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.num_batches_meta_train_test = config.get("num_batches_meta_train_test", 1)
 
     @classmethod
-    def create_remember_loader(cls, config):
+    def create_remember_loader(cls, config, batch_size=None):
         """
         Create data loader for the remember-set. This will include all classes.
         """
@@ -1112,7 +1119,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         return DataLoader(
             dataset=dataset,
-            batch_size=config.get("remember_batch_size", 15),
+            batch_size=config.get("remember_batch_size", 15) if batch_size is None else batch_size,
             sampler=sampler,
             num_workers=config.get("workers", 0),
             pin_memory=torch.cuda.is_available(),
@@ -1144,6 +1151,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def run_epoch(self):
 
+        epoch_start_time = time.time()
+
         timestep_begin = self.current_timestep
         self.optimizer.zero_grad()
 
@@ -1155,7 +1164,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # Out of all tasks possible, choose num_tasks_per_epoch tasks
         tasks_train = np.random.choice(
-            self.num_classes, self.num_tasks_per_epoch, replace=False
+            np.arange(int(self.num_classes/2), self.num_classes), self.num_tasks_per_epoch, replace=False
+            # np.arange(self.num_classes), self.num_tasks_per_epoch, replace=False # uncomment this line (and comment out the previous one) for uniform sampling from all num_classes classes
         )
 
         # Inner loop
@@ -1212,8 +1222,22 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.current_epoch += 1
         self.extra_val_results = []
 
-        # save model
-        torch.save(self.model.state_dict(), '/home/ec2-user/nta/nupic.hardware/projects/imagenet/oml.pt')
+        ########## MODEL ACCURACY ON ALL 963 X 20 IMAGES ##########
+
+        pred_dist = []
+
+        if self.current_epoch % 30 == 3:
+            correct = 0
+            for img, target in self.tester:
+                with torch.no_grad():
+                    img = img.to(self.device)
+                    target = target.to(self.device)
+                    logits_q = self.model(img)
+                    pred_q = torch.nn.functional.softmax(logits_q, dim=1).argmax(dim=1)
+                    correct += torch.eq(pred_q, target).sum().item() / len(img)
+
+        ###########################################################
+
 
         if self.should_stop():
 
@@ -1228,6 +1252,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 print("Accuracy for meta-testing phase over"
                       f" {num_classes_learned} num classes.")
                 print(accs)
+
+        epoch_end_time = time.time()
+
 
         return results
 
@@ -1270,9 +1297,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return eval_data, eval_target
 
     def run_meta_testing_phase(self, num_classes_learned):
-
-        # self.model.load_state_dict(torch.load('/home/ec2-user/nta/nupic.hardware/projects/imagenet/oml.pt'))
-        # self.model.eval()
 
         avg_score = 0
 
