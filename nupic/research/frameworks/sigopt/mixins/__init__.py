@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .imagenet_params import ImagenetParams
 from .one_cycle_lr_params import OneCycleLRParams
 from .sgd_params import SGDParams
 from .step_lr_params import StepLRParams

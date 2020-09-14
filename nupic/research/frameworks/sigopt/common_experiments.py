@@ -24,15 +24,6 @@ from nupic.research.frameworks.sigopt import mixins
 from .sigopt_experiment import SigOptExperiment
 
 
-class SigOptImagenetExperiment(SigOptExperiment, mixins.ImagenetParams):
-    """
-    A subclass of SigOptExperiment used to sit between an experiment runner (such as
-    Ray) and the ImagenetExperiment class. update_config_with_suggestion() is specific
-    to our ImagenetExperiment config.
-    """
-    pass
-
-
 class SigOptSGDOneCycleLRExperiment(SigOptExperiment,
                                     mixins.SGDParams,
                                     mixins.OneCycleLRParams):
@@ -48,7 +39,6 @@ class SigOptSGDStepLRExperiment(SigOptExperiment,
 
 
 __all__ = [
-    "SigOptImagenetExperiment",
     "SigOptSGDOneCycleLRExperiment",
     "SigOptSGDStepLRExperiment",
 ]
