@@ -39,12 +39,12 @@ class ImagenetParams(object):
         :param suggestion:
             - assignments (all optional)
 
-                # SDG Params
+                # SGD Params
                 - log_lr
                 - momentum
                 - weight_decay
 
-                # OneCylceLR Params
+                # OneCycleLR Params
                 - momentum: identifies max_momentum
                 - pct_start: transformed to (pct_start/epochs + 0.5) / epochs
                 - cycle_momentum

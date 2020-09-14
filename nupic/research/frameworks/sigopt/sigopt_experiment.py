@@ -183,6 +183,6 @@ class SigOptExperiment:
     def get_execution_order(cls):
         return dict(
             update_config_with_suggestion=[
-                "SupervisedExperiment.update_config_with_suggestion"
+                "SigOptExperiment.update_config_with_suggestion"
             ],
         )

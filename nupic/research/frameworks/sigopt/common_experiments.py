@@ -33,22 +33,22 @@ class SigOptImagenetExperiment(SigOptExperiment, mixins.ImagenetParams):
     pass
 
 
-class SigOptSDGOneCycleLRExperiment(SigOptExperiment,
+class SigOptSGDOneCycleLRExperiment(SigOptExperiment,
                                     mixins.SGDParams,
                                     mixins.OneCycleLRParams):
-    """Tune hyper-parameters using SDG and OneCycleLR."""
+    """Tune hyper-parameters using SGD and OneCycleLR."""
     pass
 
 
-class SigOptSDGStepLRExperiment(SigOptExperiment,
+class SigOptSGDStepLRExperiment(SigOptExperiment,
                                 mixins.SGDParams,
                                 mixins.StepLRParams):
-    """Tune hyper-parameters using SDG and StepLR."""
+    """Tune hyper-parameters using SGD and StepLR."""
     pass
 
 
 __all__ = [
     "SigOptImagenetExperiment",
-    "SigOptSDGOneCycleLRExperiment",
-    "SigOptSDGStepLRExperiment",
+    "SigOptSGDOneCycleLRExperiment",
+    "SigOptSGDStepLRExperiment",
 ]

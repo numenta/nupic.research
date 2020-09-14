@@ -26,7 +26,7 @@ from copy import deepcopy
 
 import torch
 
-from nupic.research.frameworks.sigopt import SigOptSDGStepLRExperiment
+from nupic.research.frameworks.sigopt import SigOptSGDStepLRExperiment
 
 from .base import DEFAULT_SPARSE_CNN
 
@@ -41,7 +41,7 @@ SIGOPT_SPARSE_CNN_STEPLR.update(
         step_size=1,
     ),
 
-    sigopt_experiment_class=SigOptSDGStepLRExperiment,
+    sigopt_experiment_class=SigOptSGDStepLRExperiment,
 
     epochs=30,
     epochs_to_validate=range(0, 30),
