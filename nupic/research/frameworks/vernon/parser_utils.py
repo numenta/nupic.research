@@ -28,7 +28,7 @@ from wandb import util
 from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers_2 import (
     DEFAULT_LOGGERS,
 )
-from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
+from nupic.research.frameworks.sigopt import SigOptExperiment
 from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.wandb import ray_wandb
 
@@ -175,7 +175,7 @@ def process_args(args, config):
         insert_experiment_mixin(config, ray_wandb.WorkerLogger, prepend_name=False)
 
     if "create_sigopt" in args:
-        s = SigOptImagenetExperiment()
+        s = SigOptExperiment()
         s.create_experiment(config["sigopt_config"])
         print("Created experiment: https://app.sigopt.com/experiment/",
               s.experiment_id)

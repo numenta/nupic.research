@@ -35,7 +35,7 @@ from ray.tune.resources import Resources
 from ray.tune.result import DONE, RESULT_DUPLICATE
 from ray.tune.utils import warn_if_slow
 
-from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
+from nupic.research.frameworks.sigopt import SigOptExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -354,7 +354,8 @@ class SigOptSupervisedTrainable(SupervisedTrainable):
 
             # Check for user specified sigopt-experiment class.
             experiment_class = config.get(
-                "sigopt_experiment_class", SigOptImagenetExperiment)
+                "sigopt_experiment_class", SigOptExperiment)
+            assert issubclass(experiment_class, SigOptExperiment)
 
             # Instantiate experiment.
             self.sigopt = experiment_class(
