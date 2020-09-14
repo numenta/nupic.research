@@ -29,11 +29,11 @@ from copy import deepcopy
 import torch
 
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
-from nupic.research.frameworks.pytorch.imagenet import (
+from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
+from nupic.research.frameworks.vernon import (
     RezeroedKWinnersGSCExperiment,
     VariedRezeroedKWinnersGSCExperiment,
 )
-from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.torch.models.sparse_cnn import gsc_sparse_cnn
 
 # Batch size depends on the GPU memory.
