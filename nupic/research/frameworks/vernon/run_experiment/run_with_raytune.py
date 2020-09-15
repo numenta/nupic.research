@@ -138,12 +138,13 @@ def get_tune_kwargs(config):
 
     # Zip the kwargs along with the Ray trainable.
     if "sigopt_config" in config:
-        kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
-                                         *tune.run.__defaults__]))
+        default_trainable = SigOptImagenetTrainable
     else:
-        ray_trainable = config.get("ray_trainable", SupervisedTrainable)
-        assert issubclass(ray_trainable, Trainable)
-        kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
+        default_trainable = SupervisedTrainable
+
+    ray_trainable = config.get("ray_trainable", default_trainable)
+    assert issubclass(ray_trainable, Trainable)
+    kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
 
     # Check if restoring experiment from last known checkpoint
     if config.pop("restore", False):
