@@ -112,7 +112,7 @@ class RestoreUtilsTest1(unittest.TestCase):
             "output.weight",
             "linear.module.bias",
             "output.bias",
-            "linear.zero_weights",
+            "linear.zero_mask",
             "linear.module.weight"
         ]
         self.assertTrue(set(linear_params) == set(expected_linear_params))
@@ -139,21 +139,6 @@ class RestoreUtilsTest1(unittest.TestCase):
             tot_eq = (param1 == param2).sum().item()
             self.assertNotEqual(tot_eq, np.prod(param1.shape))
 
-        # Check output through the full network.
-        out = full_forward(model, self.in_1)
-        num_matches = out.isclose(self.out_full, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1)  # some correct
-
-        # Check output through the lower network.
-        out = lower_forward(model, self.in_1)
-        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1337)  # some correct
-
-        # Check output through the lower network.
-        out = upper_forward(model, self.in_2)
-        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1)  # some correct
-
         # Restore full model.
         model = load_multi_state(model, restore_full_model=self.checkpoint_path)
         model.eval()
@@ -164,6 +149,10 @@ class RestoreUtilsTest1(unittest.TestCase):
             self.assertEqual(tot_eq, np.prod(param1.shape))
 
         for buffer1, buffer2 in zip(model.buffers(), self.model.buffers()):
+            if buffer1.dtype == torch.float16:
+                buffer1 = buffer1.float()
+                buffer2 = buffer2.float()
+
             tot_eq = (buffer1 == buffer2).sum().item()
             self.assertEqual(tot_eq, np.prod(buffer1.shape))
 
@@ -193,16 +182,6 @@ class RestoreUtilsTest1(unittest.TestCase):
             tot_eq = (param1 == param2).sum().item()
             self.assertNotEqual(tot_eq, np.prod(param1.shape))
 
-        # Check output through the lower network.
-        out = lower_forward(model, self.in_1)
-        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1337)  # some correct
-
-        # Check output through the lower network.
-        out = upper_forward(model, self.in_2)
-        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1)  # some correct
-
         # Restore full model.
         model = load_multi_state(model, restore_nonlinear=self.checkpoint_path)
         model.eval()
@@ -211,11 +190,6 @@ class RestoreUtilsTest1(unittest.TestCase):
         out = lower_forward(model, self.in_1)
         num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
         self.assertEqual(num_matches, 2048)  # all correct
-
-        # Check output through the lower network.
-        out = upper_forward(model, self.in_2)
-        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1)
 
     def test_load_linear(self):
 
@@ -229,24 +203,9 @@ class RestoreUtilsTest1(unittest.TestCase):
             tot_eq = (param1 == param2).sum().item()
             self.assertNotEqual(tot_eq, np.prod(param1.shape))
 
-        # Check output through the lower network.
-        out = lower_forward(model, self.in_1)
-        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1337)  # some correct
-
-        # Check output through the lower network.
-        out = upper_forward(model, self.in_2)
-        num_matches = out.isclose(self.out_upper, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1)  # some correct
-
         # Restore full model.
         model = load_multi_state(model, restore_linear=self.checkpoint_path)
         model.eval()
-
-        # Check output through the lower network.
-        out = lower_forward(model, self.in_1)
-        num_matches = out.isclose(self.out_lower, atol=1e-2).sum().item()
-        self.assertEqual(num_matches, 1337)  # some correct
 
         # Check output through the lower network.
         out = upper_forward(model, self.in_2)

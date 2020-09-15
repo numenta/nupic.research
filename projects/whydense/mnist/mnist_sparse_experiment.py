@@ -73,6 +73,8 @@ class MNISTSparseExperiment(object):
         self.first_epoch_batch_size = config["first_epoch_batch_size"]
         self.validation = config.get("validation", 50000.0 / 60000.0)
         self.learning_rate_factor = config["learning_rate_factor"]
+        self.learning_schedule_step_size = config.get(
+            "learning_schedule_step_size", 1)
         self.lr_scheduler_params = config.get("lr_scheduler_params", None)
         self.num_classes = 10
 
@@ -149,6 +151,7 @@ class MNISTSparseExperiment(object):
             optimizer=self.optimizer,
             device=self.device,
             batches_in_epoch=batches_in_epoch,
+            post_batch_callback=self.post_batch,
         )
         self.post_epoch()
         self.logger.info("training duration: %s", time.time() - t0)
@@ -206,8 +209,10 @@ class MNISTSparseExperiment(object):
         self.model.apply(update_boost_strength)
 
     def post_epoch(self):
-        self.model.apply(rezero_weights)
         self.lr_scheduler.step()
+
+    def post_batch(self, *args, **kwargs):
+        self.model.apply(rezero_weights)
 
     def run_noise_tests(self):
         """
@@ -290,8 +295,9 @@ class MNISTSparseExperiment(object):
 
         lr_scheduler_params = self.lr_scheduler_params
         if name == "StepLR":
-            lr_scheduler_params = (
-                "{'step_size': 1, 'gamma':" + str(self.learning_rate_factor) + "}"
+            lr_scheduler_params = "{{'step_size': {}, 'gamma': {}}}".format(
+                self.learning_schedule_step_size,
+                self.learning_rate_factor
             )
         else:
             if lr_scheduler_params is None:

@@ -126,14 +126,17 @@ def train_model(
 
         optimizer.zero_grad()
         output = model(data)
-        loss = criterion(output, target)
+        error_loss = criterion(output, target)
+
         del data, target, output
 
-        if complexity_loss_fn is not None:
-            c_loss = complexity_loss_fn(model)
-            if c_loss is not None:
-                loss += c_loss
-            del c_loss
+        complexity_loss = (complexity_loss_fn(model)
+                           if complexity_loss_fn is not None
+                           else None)
+
+        loss = (error_loss + complexity_loss
+                if complexity_loss is not None
+                else error_loss)
 
         t2 = time.time()
         if use_amp:
@@ -141,6 +144,7 @@ def train_model(
                 scaled_loss.backward()
         else:
             loss.backward()
+        del loss
 
         if freeze_params is not None:
             with torch.no_grad():
@@ -157,9 +161,15 @@ def train_model(
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
                                                               t4 - t3)
-            post_batch_callback(model=model, loss=loss.detach(), batch_idx=batch_idx,
-                                num_images=num_images, time_string=time_string)
-        del loss
+            post_batch_callback(model=model,
+                                error_loss=error_loss.detach(),
+                                complexity_loss=(complexity_loss.detach()
+                                                 if complexity_loss is not None
+                                                 else None),
+                                batch_idx=batch_idx,
+                                num_images=num_images,
+                                time_string=time_string)
+        del error_loss, complexity_loss
         t0 = time.time()
 
     if progress_bar is not None:
@@ -361,3 +371,70 @@ def deserialize_state_dict(fileobj, device=None):
         # FIXME: Backward compatibility with old uncompressed checkpoints
         state_dict = torch.load(fileobj, map_location=device)
     return state_dict
+
+
+def get_module_attr(module, name):
+    """
+    Get model attribute of torch.nn.Module given its name.
+    Ex:
+    ```
+    name = "features.stem.weight"
+    weight = get_module_attr(net, name)
+    ```
+    """
+
+    # Split off the last sub-name.
+    # Ex. "features.stem.weight" -> ("features.stem", "weight")
+    parent_name, sub_name = (name.split(".", 1) + [None])[0:2]
+
+    if sub_name is not None:
+        parent_module = _get_sub_module(module, parent_name)
+        sub_module = get_module_attr(parent_module, sub_name)
+        return sub_module
+    else:
+        sub_module = _get_sub_module(module, parent_name)
+        return sub_module
+
+
+def set_module_attr(module, name, value):
+    """
+    Set model attribute of torch.nn.Module given its name.
+    Ex:
+    ```
+    name = "features.stem.weight"
+    weight = Parameter(...)
+    set_module_attr(net, name, weight)
+    ```
+    """
+
+    # Split name: pytorch convention uses "." for each child module.
+    all_names = name.split(".")
+
+    # Get all names except the last.
+    # Ex. "features.stem.weight" -> "features.stem"
+    parents_names = all_names[:-1]
+
+    if not parents_names:
+        setattr(module, name, value)
+
+    else:
+        # Get the parent module of the last child module.
+        parent_name = ".".join(parents_names)
+        parent_module = get_module_attr(module, parent_name)
+
+        # Set the new value of the last child module.
+        child_name = all_names[-1]
+        setattr(parent_module, child_name, value)
+
+
+def _get_sub_module(module, name):
+    """
+    Gets a submodule either by name or index - pytorch either uses names for module
+    attributes (e.g. "module.classifier") or indices for sequential models
+    (e.g. `module[0]`).
+    ```
+    """
+    if name.isdigit():
+        return module[int(name)]
+    else:
+        return getattr(module, name)
