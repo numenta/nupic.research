@@ -30,8 +30,11 @@ import uuid
 from datetime import datetime
 from functools import partial
 
+# FIXME: When 'ray' is imported after 'pickle' it throws an exception.
+import ray  # noqa: F401, I001
 import torch.multiprocessing as multiprocessing
 
+from experiments import CONFIGS
 from nupic.research.frameworks import vernon
 from nupic.research.frameworks.vernon import ImagenetExperiment
 from nupic.research.frameworks.vernon.parser_utils import MAIN_PARSER, process_args
@@ -141,15 +144,9 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # The spawned 'run' process does not import 'ray' however some
-    # configurations in the experiment package import 'ray' and 'ray.tune'. When
-    # 'ray' is imported after 'pickle' it throws an exception. We avoid this
-    # exception by loading the configurations in "main" local context instead of
-    # the global context
-    from experiments import CONFIGS
-
     parser = argparse.ArgumentParser(
         parents=[MAIN_PARSER],
+        argument_default=argparse.SUPPRESS,
         description=__doc__
     )
     parser.add_argument("-e", "--experiment", dest="name",
