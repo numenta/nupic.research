@@ -127,7 +127,7 @@ def get_tune_kwargs(config):
         - sigopt_config: (optional) used for running experiments with SigOpt and
                          the SigOptImagenetTrainable
         - restore: whether to restore from the latest checkpoint; defaults to False
-        - local_dir: needed with 'restore'; identifies to parent directory of
+        - local_dir: needed with 'restore'; identifies the parent directory of
                      experiment results.
         - name: needed with 'restore'; local_dir/name identifies the path to
                 the experiment checkpoints.
@@ -164,7 +164,7 @@ def get_tune_kwargs(config):
     # This may be `epochs` or `num_tasks`, for instance.
     stop_condition = getattr(ray_trainable, "stop_condition", "epochs")
     stop_iteration = config.get(stop_condition, None)
-    if stop_iteration:
+    if stop_iteration is not None:
         stop.update(training_iteration=stop_iteration)
 
     # Update the stop condition.
