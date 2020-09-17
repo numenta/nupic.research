@@ -1,9 +1,4 @@
-#  Copyright (C) 2020, Numenta, Inc. All rights reserved.
-#
-#  The information and source code contained herein is the
-#  exclusive property of Numenta Inc.  No part of this software
-#  may be used, reproduced, stored or distributed in any form,
-#  without explicit written authorization from Numenta Inc.
+# check licenses
 import copy
 
 import torch
@@ -38,7 +33,7 @@ simple_experiment_mnist = copy.deepcopy(DEFAULT)
 simple_experiment_mnist.update(
     # specific to continual learning
     distributed=False,
-    ray_trainable=SupervisedTrainable,
+    ray_trainable=False,
     experiment_class=SupervisedExperiment,
     evaluation_metrics=[
         "eval_current_task",
