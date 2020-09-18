@@ -107,6 +107,13 @@ class OMLNetwork(nn.Module):
             nn.Linear(2304, num_classes),
         )
 
+        # apply Kaiming initialization
+        for param in self.parameters():
+            if param.ndim > 1:
+                nn.init.kaiming_normal_(param)
+            else:
+                nn.init.zeros_(param)
+
     @property
     def fast_params(self):
         return self.adaptation.parameters()
@@ -119,6 +126,9 @@ class OMLNetwork(nn.Module):
         x = self.representation(x)
         x = self.adaptation(x)
         return x
+
+    def get_repr(self, x):
+        return self.representation(x)
 
     @classmethod
     def conv_block(cls, in_channels, out_channels, kernel_size):

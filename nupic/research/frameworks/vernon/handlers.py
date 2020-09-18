@@ -38,7 +38,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import transforms
 
-from nupic.research.frameworks.continual_learning.maml_utils import clone_model
+from nupic.research.frameworks.continual_learning.maml_utils import clone_model, clone_module
 from nupic.research.frameworks.pytorch import datasets
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
     TaskDistributedSampler,
@@ -67,8 +67,6 @@ from nupic.research.frameworks.vernon.network_utils import (
     create_model,
     get_compatible_state_dict,
 )
-
-import time
 
 try:
     from apex import amp
@@ -1078,7 +1076,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.remember_loader = self.create_remember_loader(config)
         self.remember_loader.sampler.set_active_tasks(np.arange(int(self.num_classes/2)))
-        # self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes)) # uncomment this line (and comment out the previous one) for uniform sampling from all num_classes classes
+        # self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
 
         self.meta_test_train_loader = self.create_meta_test_loader(
             config, train=True, batch_size=1
@@ -1151,8 +1149,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def run_epoch(self):
 
-        epoch_start_time = time.time()
-
         timestep_begin = self.current_timestep
         self.optimizer.zero_grad()
 
@@ -1165,7 +1161,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Out of all tasks possible, choose num_tasks_per_epoch tasks
         tasks_train = np.random.choice(
             np.arange(int(self.num_classes/2), self.num_classes), self.num_tasks_per_epoch, replace=False
-            # np.arange(self.num_classes), self.num_tasks_per_epoch, replace=False # uncomment this line (and comment out the previous one) for uniform sampling from all num_classes classes
+            # np.arange(self.num_classes), self.num_tasks_per_epoch, replace=False
         )
 
         # Inner loop
@@ -1222,23 +1218,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.current_epoch += 1
         self.extra_val_results = []
 
-        ########## MODEL ACCURACY ON ALL 963 X 20 IMAGES ##########
-
-        pred_dist = []
-
-        if self.current_epoch % 30 == 3:
-            correct = 0
-            for img, target in self.tester:
-                with torch.no_grad():
-                    img = img.to(self.device)
-                    target = target.to(self.device)
-                    logits_q = self.model(img)
-                    pred_q = torch.nn.functional.softmax(logits_q, dim=1).argmax(dim=1)
-                    correct += torch.eq(pred_q, target).sum().item() / len(img)
-
-        ###########################################################
-
-
         if self.should_stop():
 
             # meta-training phase complete, perform meta-testing phase
@@ -1253,16 +1232,18 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                       f" {num_classes_learned} num classes.")
                 print(accs)
 
-        epoch_end_time = time.time()
-
-
         return results
 
     def run_task(self, task, cloned_adaptation_net):
-        self.train_loader.sampler.set_active_tasks(task)
+        # TODO is this correct? their weight resetting during inner loop doesn't interfere
+        # with gradient steps, but it may in this case
+        self.reset_fast_param_class(task)
 
+        self.train_loader.sampler.set_active_tasks(task)
         eval_data, eval_target = [], []
+
         for idx, (data, target) in enumerate(self.train_loader):
+
             data = data.to(self.device)
             target = target.to(self.device)
             if idx < self.num_batches_train:
@@ -1318,7 +1299,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             for lr in lr_sweep_range:
 
                 # reset fast weights
-                for param in self.get_fast_params(None):
+                for param in list(self.get_fast_params(None)):
                     if len(param.shape) > 1:
                         torch.nn.init.kaiming_normal_(param)
                     else:
@@ -1368,7 +1349,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.meta_test_test_loader.sampler.set_active_tasks(new_tasks)
 
             # reset fast weights
-            for param in self.get_fast_params(None):
+            for param in list(self.get_fast_params(None)):
                 if len(param.shape) > 1:
                     torch.nn.init.kaiming_normal_(param)
                 else:
@@ -1402,8 +1383,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         return meta_test_accuracies
 
-    @classmethod
-    def update_params(cls, params, loss, lr, distributed=False):
+    # @classmethod
+    def update_params(self, params, loss, lr, distributed=False):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
@@ -1430,8 +1411,11 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 if g is not None:
                     p.add_(g, alpha=-lr)
 
+        cloned_fast_params = params[:]
+        original_fast_params = list(self.model.parameters())[-2:]
+
     def adapt(self, cloned_adaptation_net, train_loss):
-        fast_params = self.get_fast_params(cloned_adaptation_net)
+        fast_params = list(self.get_fast_params(cloned_adaptation_net))
         lr = self.adaptation_learning_rate
         self.update_params(fast_params, train_loss, lr, distributed=self.distributed)
 
@@ -1443,7 +1427,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # TODO: Pass the names of the slow_params, which can just be kept through
         # reference and frozen.
-        model = clone_model(self.model.module, keep_as_reference=None)
+        # model = clone_model(self.model.module, keep_as_reference=None)
+        model = clone_module(self.model.module, keep_as_reference=None)
 
         if not self.distributed:
             model = DataParallel(model)
@@ -1458,12 +1443,23 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # TODO: Maybe there's a better way to manage params.
         return self.model.module.slow_params
 
-    def get_fast_params(self, cloned_adaptation_net):
+    def get_fast_params(self, clone=None):
         # TODO: Maybe there's a better way to manage params.
-        if hasattr(self.model, "module"):
-            return self.model.module.fast_params
+        if clone is not None:
+            if hasattr(clone, "module"):
+                return clone.module.fast_params
+            else:
+                return clone.fast_params
         else:
-            return self.model.fast_params
+            if hasattr(self.model, "module"):
+                return self.model.module.fast_params
+            else:
+                return self.model.fast_params
+
+    def reset_fast_param_class(self, class_to_reset):
+        bias = list(self.model.parameters())[-1]
+        weight = list(self.model.parameters())[-2]
+        torch.nn.init.kaiming_normal_(weight[class_to_reset].unsqueeze(0))
 
     @classmethod
     def aggregate_results(cls, results):
