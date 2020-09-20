@@ -89,23 +89,27 @@ class OMLNetwork(nn.Module):
         super().__init__()
 
         self.representation = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=256, kernel_size=3, stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=0),
-            nn.ReLU(),            
+            *self.conv_block(1, 256, 3, 2, 0),
+            *self.conv_block(256, 256, 3, 1, 0),
+            *self.conv_block(256, 256, 3, 2, 0),
+            *self.conv_block(256, 256, 3, 1, 0),
+            *self.conv_block(256, 256, 3, 2, 0),
+            *self.conv_block(256, 256, 3, 2, 0),
             nn.Flatten(),
         )
         self.adaptation = nn.Sequential(
             nn.Linear(2304, num_classes),
         )
+
+    @classmethod
+    def conv_block(cls, in_channels, out_channels, kernel_size, stride, padding):
+        return [
+            nn.Conv2d(
+                in_channels=in_channels, out_channels=out_channels,
+                kernel_size=kernel_size, stride=stride, padding=padding
+            ),
+            nn.ReLU(),
+        ]
 
     @property
     def fast_params(self):
@@ -120,11 +124,36 @@ class OMLNetwork(nn.Module):
         x = self.adaptation(x)
         return x
 
-    @classmethod
-    def conv_block(cls, in_channels, out_channels, kernel_size):
-        return [
-            nn.Conv2d(in_channels, out_channels, kernel_size),
-            nn.BatchNorm2d(out_channels),
-            nn.MaxPool2d(2, 2),
-            nn.ReLU(),
+
+class MetaContinualLearningMLP(nn.Module):
+
+    def __init__(self, input_size, num_classes,
+                 hidden_sizes=(100, 100)):
+
+        super().__init__()
+
+        layers = [
+            nn.Flatten(),
+            nn.Linear(int(np.prod(input_size)), hidden_sizes[0]),
+            nn.ReLU()
         ]
+        for idx in range(1, len(hidden_sizes)):
+            layers.extend([
+                nn.Linear(hidden_sizes[idx - 1], hidden_sizes[idx]),
+                nn.ReLU()
+            ])
+        self.representation = nn.Sequential(*layers)
+        self.adaptation = nn.Linear(hidden_sizes[-1], num_classes)
+
+    @property
+    def slow_params(self):
+        return self.representation.parameters()
+
+    @property
+    def fast_params(self):
+        return self.adaptation.parameters()
+
+    def forward(self, x):
+        x = self.representation(x)
+        x = self.adaptation(x)
+        return x

@@ -24,7 +24,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from nupic.research.frameworks.continuous_learning.dend_kwinners import (
+from nupic.research.frameworks.continual_learning.dend_kwinners import (
     DendriteKWinners2dLocal,
 )
 from nupic.torch.modules import SparseWeights

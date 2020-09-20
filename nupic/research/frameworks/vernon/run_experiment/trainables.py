@@ -297,12 +297,15 @@ class SupervisedTrainable(BaseTrainable):
 
     def _run_iteration(self):
         """Run one epoch of training on each process."""
+        t0 = time.time()
+
         status = []
         for w in self.procs:
             status.append(w.run_epoch.remote())
 
         # Wait for remote functions and check for errors
         if ray_utils.check_for_failure(status):
+            print(f"Epoch Duration: {time.time()-t0:.1f}")
             return ray.get(status)
 
     def _process_result(self, result, pre_experiment_result=None):
