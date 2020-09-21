@@ -21,6 +21,9 @@
 
 import numpy as np
 import torch
+from torch.optim import Adam
+from torch.nn.init import kaiming_normal_, zeros_
+import torch.nn.functional as F
 from scipy import stats
 
 
@@ -93,30 +96,14 @@ class OnlineMetaLearning(object):
             for lr in lr_sweep_range:
 
                 # reset fast weights
-                for param in self.get_fast_params(None):
+                for param in self.get_fast_params():
                     if len(param.shape) > 1:
-                        torch.nn.init.kaiming_normal_(param)
+                        kaiming_normal_(param)
                     else:
-                        torch.nn.init.zeros_(param)
+                        zeros_(param)
 
-                opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
-
-                for data, target in self.test_train_loader:
-                    data = data.to(self.device)
-                    target = target.to(self.device)
-                    pred = self.model.module(data)
-                    opt.zero_grad()
-                    loss = torch.nn.functional.cross_entropy(pred, target)
-                    loss.backward()
-                    opt.step()
-
-                correct = 0
-                for data, target in self.test_test_loader:
-                    data = data.to(self.device)
-                    target = target.to(self.device)
-                    logits_q = self.model.module(data)
-                    pred_q = (logits_q).argmax(dim=1)
-                    correct += torch.eq(pred_q, target).sum().item() / len(data)
+                self.train(self.test_train_loader, lr)
+                correct = self.evaluate(self.test_test_loader)
 
                 correct = 1.0 * correct / len(self.test_train_loader)
                 if (correct > max_acc):
@@ -143,39 +130,44 @@ class OnlineMetaLearning(object):
             self.test_test_loader.sampler.set_active_tasks(new_tasks)
 
             # reset fast weights
-            for param in self.get_fast_params(None):
+            for param in self.get_fast_params():
                 if len(param.shape) > 1:
-                    torch.nn.init.kaiming_normal_(param)
+                    kaiming_normal_(param)
                 else:
-                    torch.nn.init.zeros_(param)
+                    zeros_(param)
 
             lr = self.find_best_lr(num_classes_learned)
 
             # meta-training training
-            opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
-
-            for data, target in self.test_train_loader:
-                data = data.to(self.device)
-                target = target.to(self.device)
-
-                pred = self.model.module(data)
-                opt.zero_grad()
-                loss = torch.nn.functional.cross_entropy(pred, target)
-                loss.backward()
-                opt.step()
+            self.train(self.test_train_loader)
 
             # meta-training testing
-            correct = 0
-            for data, target in self.test_test_loader:
-                data = data.to(self.device)
-                target = target.to(self.device)
-                logits_q = self.model.module(data)
-                pred_q = (logits_q).argmax(dim=1)
-                correct += torch.eq(pred_q, target).sum().item() / len(data)
+            correct = self.evaluate(self.test_test_loader, lr)
 
             meta_test_accuracies.append(correct / len(self.test_test_loader))
 
         return meta_test_accuracies
+
+    def train(self, train_loader, lr):
+        opt = Adam(self.get_fast_params(), lr=lr)
+        for data, target in train_loader:
+            data = data.to(self.device)
+            target = target.to(self.device)
+            pred = self.model.module(data)
+            opt.zero_grad()
+            loss = F.cross_entropy(pred, target)
+            loss.backward()
+            opt.step()
+
+    def evaluate(self, eval_loader):
+        correct = 0
+        for data, target in eval_loader:
+            data = data.to(self.device)
+            target = target.to(self.device)
+            logits_q = self.model.module(data)
+            pred_q = (logits_q).argmax(dim=1)
+            correct += torch.eq(pred_q, target).sum().item() / len(data)
+        return correct
 
     @classmethod
     def get_execution_order(cls):

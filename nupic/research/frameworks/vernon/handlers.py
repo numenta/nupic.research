@@ -38,7 +38,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import transforms
 
-from nupic.research.frameworks.continual_learning.maml_utils import clone_model, clone_module
+from nupic.research.frameworks.continual_learning.maml_utils import clone_model
 from nupic.research.frameworks.pytorch import datasets
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
     TaskDistributedSampler,
@@ -1063,17 +1063,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Simplify loading
         config["model_args"]["num_classes"] = config["num_classes"]
 
-<<<<<<< HEAD
-        self.num_tasks_per_epoch = config.get("num_tasks_per_epoch", 1)
-
-        self.adaptation_learning_rate = config.get("adaptation_learning_rate", 0.03)
-
-        self.remember_loader = self.create_remember_loader(config)
-        self.remember_loader.sampler.set_active_tasks(np.arange(int(self.num_classes/2)))
-        # self.remember_loader.sampler.set_active_tasks(np.arange(self.num_classes))
-=======
         super().setup_experiment(config)
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
 
         self.epochs_to_validate = []
         self.tasks_per_epoch = config.get("tasks_per_epoch", 1)
@@ -1082,32 +1072,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.train_fast_loader.sampler.num_classes
         )
 
-<<<<<<< HEAD
-        # for testing accuracy on all background examples during meta-training, to evaluate progress
-        self.tester = self.create_remember_loader(config, batch_size=5)
-        self.tester.sampler.set_active_tasks(np.arange(self.num_classes))
-
-        num_tasks = len(self.remember_loader.sampler.task_indices)
-        self.logger.info(f"Number of tasks = {num_tasks}")
-=======
         self.adaptation_lr = config.get("adaptation_lr", 0.03)
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
 
         self.batch_size = config.get("batch_size", 5)
         self.val_batch_size = config.get("val_batch_size", 15)
         self.slow_batch_size = config.get("slow_batch_size", 64)
         self.replay_batch_size = config.get("replay_batch_size", 64)
 
-<<<<<<< HEAD
-    @classmethod
-    def create_remember_loader(cls, config, batch_size=None):
-        """
-        Create data loader for the remember-set. This will include all classes.
-        """
-=======
     def create_loaders(self, config):
         """Create train and val dataloaders."""
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
 
         dataset_class = config.get("dataset_class", None)
         if dataset_class is None:
@@ -1124,18 +1097,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.train_slow_loader = self.create_slow_train_dataloader(main_set, config)
         self.train_replay_loader = self.create_replay_dataloader(main_set, config)
 
-<<<<<<< HEAD
-        return DataLoader(
-            dataset=dataset,
-            batch_size=config.get("remember_batch_size", 15) if batch_size is None else batch_size,
-            sampler=sampler,
-            num_workers=config.get("workers", 0),
-            pin_memory=torch.cuda.is_available(),
-        )
-=======
         # For pre/post epoch and batch processing slow loader is equiv to train loader
         self.train_loader = self.train_slow_loader
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
 
     @classmethod
     def create_train_sampler(cls, dataset, config):
@@ -1213,12 +1176,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         cloned_adaptation_net = self.clone_model()
 
         tasks_train = np.random.choice(
-<<<<<<< HEAD
-            np.arange(int(self.num_classes/2), self.num_classes), self.num_tasks_per_epoch, replace=False
-            # np.arange(self.num_classes), self.num_tasks_per_epoch, replace=False
-=======
             self.num_classes, self.tasks_per_epoch, replace=False
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
         )
         for task in tasks_train:
             self.run_task(task, cloned_adaptation_net)
@@ -1262,38 +1220,11 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.current_epoch += 1
         self.extra_val_results = []
 
-<<<<<<< HEAD
-        if self.should_stop():
-
-            # meta-training phase complete, perform meta-testing phase
-            for num_classes_learned in [10, 20, 50, 100, 200, 600]:
-
-                if num_classes_learned > self.num_classes:
-                    break
-
-                accs = self.run_meta_testing_phase(num_classes_learned)
-
-                print("Accuracy for meta-testing phase over"
-                      f" {num_classes_learned} num classes.")
-                print(accs)
-=======
         self.post_epoch()
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
 
         return results
 
     def run_task(self, task, cloned_adaptation_net):
-<<<<<<< HEAD
-        # TODO is this correct? their weight resetting during inner loop doesn't interfere
-        # with gradient steps, but it may in this case
-        self.reset_fast_param_class(task)
-
-        self.train_loader.sampler.set_active_tasks(task)
-        eval_data, eval_target = [], []
-
-        for idx, (data, target) in enumerate(self.train_loader):
-
-=======
         self.train_fast_loader.sampler.set_active_tasks(task)
         self.val_fast_loader.sampler.set_active_tasks(task)
 
@@ -1310,7 +1241,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Evaluate the adapted model
         with torch.no_grad():
             data, target = next(iter(self.val_fast_loader))
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
             data = data.to(self.device)
             target = target.to(self.device)
 
@@ -1320,126 +1250,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.logger.debug(f"Valid error meta train training: {valid_error}")
 
             # calculate accuracy
-<<<<<<< HEAD
-            preds = preds.argmax(dim=1).view(eval_target.shape)
-            valid_accuracy = (preds == eval_target).sum().float() / eval_target.size(0)
-            self.logger.info(f"Valid accuracy meta train training: {valid_accuracy}")
-
-        return eval_data, eval_target
-
-    def run_meta_testing_phase(self, num_classes_learned):
-
-        avg_score = 0
-
-        lr_sweep_range = [1e-1, 1e-2, 1e-3, 1e-4]
-        lr_all = []
-
-        # Grid search over lr
-        for _lr_search_runs in range(0, 5):
-
-            # Choose num_classes_learned random classes from the non-background set
-            # to train on.
-            all_classes = list(range(min(self.num_classes, 650)))
-            new_tasks = np.random.choice(
-                all_classes, num_classes_learned, replace=False
-            )
-            self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
-
-            max_acc = -1000
-            for lr in lr_sweep_range:
-
-                # reset fast weights
-                for param in list(self.get_fast_params(None)):
-                    if len(param.shape) > 1:
-                        torch.nn.init.kaiming_normal_(param)
-                    else:
-                        torch.nn.init.zeros_(param)
-
-                opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
-
-                for img, y in self.meta_test_train_loader:
-
-                    img = img.to(self.device)
-                    y = y.to(self.device)
-
-                    pred = self.model.module(img)
-                    opt.zero_grad()
-                    loss = torch.nn.functional.cross_entropy(pred, y)
-                    loss.backward()
-                    opt.step()
-
-                correct = 0
-                for img, target in self.meta_test_train_loader:
-                    img = img.to(self.device)
-                    target = target.to(self.device)
-                    logits_q = self.model.module(img)
-                    pred_q = (logits_q).argmax(dim=1)
-                    correct += torch.eq(pred_q, target).sum().item() / len(img)
-
-                correct = 1.0 * correct / len(self.meta_test_train_loader)
-                if (correct > max_acc):
-                    max_acc = correct
-                    max_lr = lr
-
-            lr_all.append(max_lr)
-
-        from scipy import stats
-        best_lr = float(stats.mode(lr_all)[0][0])
-
-        meta_test_accuracies = []
-        for _current_run in range(0, 15):
-
-            # Choose num_classes_learned random classes from the non-background set to
-            # test on
-            all_classes = list(range(min(self.num_classes, 650)))
-            new_tasks = np.random.choice(
-                all_classes, num_classes_learned, replace=False
-            )
-            self.meta_test_train_loader.sampler.set_active_tasks(new_tasks)
-            self.meta_test_test_loader.sampler.set_active_tasks(new_tasks)
-
-            # reset fast weights
-            for param in list(self.get_fast_params(None)):
-                if len(param.shape) > 1:
-                    torch.nn.init.kaiming_normal_(param)
-                else:
-                    torch.nn.init.zeros_(param)
-
-            lr = best_lr
-
-            # meta-training training
-            opt = torch.optim.Adam(self.get_fast_params(None), lr=lr)
-
-            for img, y in self.meta_test_train_loader:
-                img = img.to(self.device)
-                y = y.to(self.device)
-
-                pred = self.model.module(img)
-                opt.zero_grad()
-                loss = torch.nn.functional.cross_entropy(pred, y)
-                loss.backward()
-                opt.step()
-
-            # meta-training testing
-            correct = 0
-            for img, target in self.meta_test_test_loader:
-                img = img.to(self.device)
-                target = target.to(self.device)
-                logits_q = self.model.module(img)
-                pred_q = (logits_q).argmax(dim=1)
-                correct += torch.eq(pred_q, target).sum().item() / len(img)
-
-            meta_test_accuracies.append(correct / len(self.meta_test_test_loader))
-
-        return meta_test_accuracies
-=======
             preds = preds.argmax(dim=1).view(target.shape)
             valid_accuracy = (preds == target).sum().float() / target.size(0)
             self.logger.debug(f"Valid accuracy meta train training: {valid_accuracy}")
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
 
-    # @classmethod
-    def update_params(self, params, loss, lr, distributed=False):
+    @classmethod
+    def update_params(cls, params, loss, lr, distributed=False):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
@@ -1460,31 +1276,18 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 if g is not None:
                     p.add_(g, alpha=-lr)
 
-        cloned_fast_params = params[:]
-        original_fast_params = list(self.model.parameters())[-2:]
-
     def adapt(self, cloned_adaptation_net, train_loss):
-<<<<<<< HEAD
         fast_params = list(self.get_fast_params(cloned_adaptation_net))
-        lr = self.adaptation_learning_rate
-        self.update_params(fast_params, train_loss, lr, distributed=self.distributed)
-=======
-        fast_params = self.get_fast_params(cloned_adaptation_net)
         self.update_params(
             fast_params, train_loss, self.adaptation_lr, distributed=self.distributed
         )
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
 
     def clone_model(self, keep_as_reference=None):
         """
         Clones self.model by cloning some of the params and keeping those listed
         specified `keep_as_reference` via reference.
         """
-
-        # TODO: Pass the names of the slow_params, which can just be kept through
-        # reference and frozen.
-        # model = clone_model(self.model.module, keep_as_reference=None)
-        model = clone_module(self.model.module, keep_as_reference=None)
+        model = clone_model(self.model.module, keep_as_reference=None)
 
         if not self.distributed:
             model = DataParallel(model)
@@ -1496,11 +1299,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return model
 
     def get_slow_params(self):
-        # TODO: Maybe there's a better way to manage params.
         return self.model.module.slow_params
 
     def get_fast_params(self, clone=None):
-        # TODO: Maybe there's a better way to manage params.
         if clone is not None:
             if hasattr(clone, "module"):
                 return clone.module.fast_params
@@ -1511,11 +1312,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 return self.model.module.fast_params
             else:
                 return self.model.fast_params
-
-    def reset_fast_param_class(self, class_to_reset):
-        bias = list(self.model.parameters())[-1]
-        weight = list(self.model.parameters())[-2]
-        torch.nn.init.kaiming_normal_(weight[class_to_reset].unsqueeze(0))
 
     @classmethod
     def aggregate_results(cls, results):

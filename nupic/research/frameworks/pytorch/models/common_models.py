@@ -101,14 +101,13 @@ class OMLNetwork(nn.Module):
             nn.Linear(2304, num_classes),
         )
 
-<<<<<<< HEAD
         # apply Kaiming initialization
         for param in self.parameters():
             if param.ndim > 1:
                 nn.init.kaiming_normal_(param)
             else:
                 nn.init.zeros_(param)
-=======
+
     @classmethod
     def conv_block(cls, in_channels, out_channels, kernel_size, stride, padding):
         return [
@@ -118,7 +117,6 @@ class OMLNetwork(nn.Module):
             ),
             nn.ReLU(),
         ]
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
 
     @property
     def fast_params(self):
@@ -133,18 +131,6 @@ class OMLNetwork(nn.Module):
         x = self.adaptation(x)
         return x
 
-<<<<<<< HEAD
-    def get_repr(self, x):
-        return self.representation(x)
-
-    @classmethod
-    def conv_block(cls, in_channels, out_channels, kernel_size):
-        return [
-            nn.Conv2d(in_channels, out_channels, kernel_size),
-            nn.BatchNorm2d(out_channels),
-            nn.MaxPool2d(2, 2),
-            nn.ReLU(),
-=======
 
 class MetaContinualLearningMLP(nn.Module):
 
@@ -157,7 +143,6 @@ class MetaContinualLearningMLP(nn.Module):
             nn.Flatten(),
             nn.Linear(int(np.prod(input_size)), hidden_sizes[0]),
             nn.ReLU()
->>>>>>> d17fee14c615fbfaff743108f0f4405062916fa3
         ]
         for idx in range(1, len(hidden_sizes)):
             layers.extend([
