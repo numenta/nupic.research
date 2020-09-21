@@ -23,6 +23,26 @@ User-specified parameters
 ==============
 Given the flexibility of Vernon, there is a large number of experiment and model hyper-parameters that can be specified by the user. simple_experiment.py contains the minimal parameters to run a basic experiment, but additional parameters and their default values can be found under the main modules highlighted under 'Getting started'.
 
+Experiment class
+==============
+The experiment class API enables one to define a variety of requirements for training and evaluating a given model. The two main experiments provided are SupervisedExperiment and ContinualLearningExperiment. The former is the general experiment class used to train neural networks in supervised learning tasks, while the latter contains additional methods to replicate continual learning experiments such as those conducted in - ref - . In brief, while supervised-learning follows the pseudo-code structure of 
+- for epoch 1 to e:
+    - for batch 1 to b:
+        - gradient_step()
+- evaluate()
+continual learning follows:
+- for task 1 to t:
+- for epoch 1 to e:
+    - for batch 1 to b:
+        - gradient_step()
+- evaluate_task()
+- evaluate_all_previous_tasks()
+
+
+Mixins for advanced experiments
+==============
+
+
 About the name
 ==============
 Vernon is a reference to [Vernon Mountcastle](https://en.wikipedia.org/wiki/Vernon_Benjamin_Mountcastle), affectionately known as 'Mount Vernon' around Numenta, who first discovered and characterized the columnar organization of the neo-cortex.
