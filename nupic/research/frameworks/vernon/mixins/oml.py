@@ -21,10 +21,10 @@
 
 import numpy as np
 import torch
-from torch.optim import Adam
-from torch.nn.init import kaiming_normal_, zeros_
 import torch.nn.functional as F
 from scipy import stats
+from torch.nn.init import kaiming_normal_, zeros_
+from torch.optim import Adam
 
 
 class OnlineMetaLearning(object):
