@@ -27,28 +27,26 @@ from nupic.research.frameworks.vernon.handlers import SupervisedExperiment
 from nupic.research.frameworks.pytorch.models.common_models import StandardMLP
 import numpy as np
 
-
 mnist_MLP = dict(
-    dataset_class=datasets.MNIST, #Using a new data-set such as datasets.CIFAR10 is straightforward; simply 
-        #ensure that input-size is appropriately updated
+    dataset_class=datasets.MNIST,  # Using a new data-set such as datasets.CIFAR10 is straightforward; simply
+    # ensure that input-size is appropriately updated
     dataset_args=dict(
         root="~/nta/datasets",
-        download=True, #Download if not present in the directory
+        download=True,  # Download if not present in the directory
         transform=transforms.ToTensor(),
     ),
     model_class=StandardMLP,
-    model_args=dict(
-        input_size=(28,28),
-        num_classes=10,
-    ),
+    model_args=dict(input_size=(28, 28), num_classes=10),
     batch_size=32,
-    epochs=3, #Number of epochs to train the network
-    epochs_to_validate=np.arange(3), #A list of the epochs to evaluate accuracy on
+    epochs=3,  # Number of epochs to train the network
+    epochs_to_validate=np.arange(3),  # A list of the epochs to evaluate accuracy on
     num_classes=10,
-    distributed=False, #Whether or not to use Pytorch Distributed training to parallelize computations across processes and clusters of machines
-    experiment_class=SupervisedExperiment, #General experiment class used to train neural networks in supervised learning tasks
+    distributed=False,  # Whether or not to use Pytorch Distributed training to parallelize computations across processes and clusters of machines
+    experiment_class=SupervisedExperiment,  # General experiment class used to train neural networks in supervised learning tasks
     optimizer_class=torch.optim.Adam,
-    optimizer_args=dict(lr=1e-4), #Optimizer_args is used to initialize the optimizer, so any param that e.g. Adam takes as an argument can be included
+    optimizer_args=dict(
+        lr=1e-4
+    ),  # Optimizer_args is used to initialize the optimizer, so any param that e.g. Adam takes as an argument can be included
 )
 
 
@@ -67,4 +65,3 @@ def run_experiment(config):
 
 
 run_experiment(mnist_MLP)
-
