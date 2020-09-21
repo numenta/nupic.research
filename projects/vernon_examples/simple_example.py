@@ -17,18 +17,17 @@
 #
 #  http://numenta.org/licenses/
 #
-
+#
 # Below is a basic model/experiment config and the run function to evaluate it
+#
+import time
 
 import numpy as np
+import torch
+from torchvision import datasets, transforms
 
 from nupic.research.frameworks.vernon.handlers import SupervisedExperiment
 from nupic.research.frameworks.pytorch.models.common_models import StandardMLP
-
-from time import time
-
-import torch
-from torchvision import datasets, transforms
 
 mnist_mlp = dict(
     dataset_class=datasets.MNIST,  # Using a new data-set such as datasets.CIFAR10 is
@@ -44,7 +43,7 @@ mnist_mlp = dict(
     epochs=3,  # Number of epochs to train the network
     epochs_to_validate=np.arange(3),  # A list of the epochs to evaluate accuracy on
     num_classes=10,
-    distributed=False,  # Whether or not to use Pytorch Distributed training to 
+    distributed=False,  # Whether or not to use Pytorch Distributed training to
     # parallelize computations across processes and clusters of machines
     experiment_class=SupervisedExperiment,  # General experiment class used to train
     # neural networks in supervised learning tasks
@@ -61,7 +60,7 @@ def run_experiment(config):
     exp.setup_experiment(config)
     print(f"Training started....")
     while not exp.should_stop():
-        t0 = time()
+        t0 = time.time()
         # print(f"Starting epoch: {exp.get_current_epoch()}")
         result = exp.run_epoch()
         print(f"Finished Epoch: {exp.get_current_epoch()}")
