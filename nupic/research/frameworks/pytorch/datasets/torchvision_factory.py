@@ -83,10 +83,7 @@ def omniglot(root, train=True, download=True, evaluation=False,
     Each classes contains 20 samples.
     Omniglot contains characters from 50 different languages
 
-    No distinction between train and validation dataset,
-    `train` flag is ignored
-
-    background (bool, optional):
+    train (bool, optional):
         If True, creates dataset from the "background" set, otherwise
         creates from the "evaluation" set.
         Background contains 964 classes, and evaluation 659 classes, all unique
@@ -102,7 +99,7 @@ def omniglot(root, train=True, download=True, evaluation=False,
     with FileLock(f"{root}.lock"):
         dataset = dataset_class(
             root=root,
-            background=not evaluation,
+            background=train,
             transform=transform,
             target_transform=target_transform,
             download=download,

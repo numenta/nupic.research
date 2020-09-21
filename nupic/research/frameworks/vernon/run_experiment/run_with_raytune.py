@@ -28,7 +28,7 @@ import torch
 from ray.tune import Trainable, tune
 
 from nupic.research.frameworks.vernon.experiment_utils import get_free_port
-from nupic.research.frameworks.vernon.search import TrialsCollection
+from nupic.research.frameworks.vernon.run_experiment.search import TrialsCollection
 from nupic.research.support.ray_utils import (
     get_last_checkpoint,
     register_torch_serializers,
@@ -85,9 +85,8 @@ def run(config):
 
 def run_single_instance(config):
 
-    # Get number of GPUs
     config.setdefault("num_gpus", torch.cuda.device_count())
-    config["workers"] = 4
+    config["workers"] = config.get("workers", 4)
     config["log_level"] = "INFO"
     config["reuse_actors"] = False
     config["dist_port"] = get_free_port()
@@ -150,5 +149,6 @@ def run_trial_single_instance(config, kwargs):
     ray.init(load_code_from_local=False, webui_host="0.0.0.0")
     config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
     kwargs["config"] = config
+    print(config)
     tune.run(**kwargs)
     print("**** Trial ended")
