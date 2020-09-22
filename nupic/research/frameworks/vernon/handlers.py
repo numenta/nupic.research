@@ -305,7 +305,7 @@ class SupervisedExperiment:
         multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
-        self.create_loaders(config)
+        self.train_loader, self.val_loader = self.create_loaders(config)
         self.total_batches = len(self.train_loader,)
 
         self.epochs_to_validate = config.get("epochs_to_validate",
@@ -404,7 +404,8 @@ class SupervisedExperiment:
                 lr_scheduler_args=lr_scheduler_args,
                 steps_per_epoch=total_batches)
 
-    def create_loaders(self, config):
+    @classmethod
+    def create_loaders(cls, config):
         """Create train and val dataloaders."""
 
         dataset_class = config.get("dataset_class", None)
@@ -417,8 +418,10 @@ class SupervisedExperiment:
         dataset_args.update(train=False)
         val_set = dataset_class(**dataset_args)
 
-        self.train_loader = self.create_train_dataloader(train_set, config)
-        self.val_loader = self.create_validation_dataloader(val_set, config)
+        train_loader = cls.create_train_dataloader(train_set, config)
+        val_loader = cls.create_validation_dataloader(val_set, config)
+
+        return train_loader, val_loader
 
     @classmethod
     def create_train_sampler(cls, dataset, config):
@@ -1057,13 +1060,62 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 
 
 class MetaContinualLearningExperiment(SupervisedExperiment):
+    """
+    Experiment class for meta-continual learning (based on OML and ANML meta-continual
+    learning setups). There are 2 main phases in a meta-continual learning setup.
+
+        - meta-training: Meta-learning representations for continual learning over all
+        tasks
+        - meta-testing: Montinual learning of new tasks and model evaluation
+
+    More specifically, each phase is divided into its own training and testing phase,
+    hence we have 4 such phases.
+
+        - meta-training training: Train the inner loop learner (i.e., slow parameters)
+        for a specific task
+        - meta-training testing: Train the outer loop learner (i.e., fast parameters)
+        by minimizing the test loss
+
+        - meta-testing training: Train the inner loop learner continually on a sequence
+        of holdout tasks
+        - meta-testing testing: Evaluate the inner loop learner on the same tasks
+
+    The parameters for a model used in a meta-continual learning setup are broken down
+    into 2 groups:
+
+        - fast parameters: Used to update slow parameters via online learning during
+        meta-training training, and updated along with slow parameters during
+        meta-training testing
+        - slow parameters: Updated during the outer loop (meta-training testing)
+    """
 
     def setup_experiment(self, config):
+        """
+        Configure the experiment for training
+
+        :param config: Dictionary containing the configuration parameters, most of
+        which are defined in SupervisedExperiment, but some of which are specific to
+        MetaContinualLearningExperiment
+
+            - experiment_class: Class used to run experiments, specify
+            `MetaContinualLearningExperiment` for meta-continual learning
+            - adaptation_lr: Learning rate used to update the fast parameters during
+            the inner loop of the meta-training phase
+            - tasks_per_epoch: Number of different classes used for training during the
+            execution of the inner loop
+            - slow_batch_size: Number of examples in a single batch used to update the
+            slow parameters during the meta-training testing phase
+            - replay_batch_size: Number of examples in a single batch sampled from all
+            data, also used to train the slow parameters
+        """
 
         # Simplify loading
-        config["model_args"]["num_classes"] = config["num_classes"]
+        config["model_args"]["num_classes"] = config.get("num_classes", )
 
         super().setup_experiment(config)
+        self.train_slow_loader = self.train_loader
+        self.train_fast_loader, self.val_fast_loader, self.train_replay_loader = \
+            self.create_fast_slow_loaders(config)
 
         self.epochs_to_validate = []
         self.tasks_per_epoch = config.get("tasks_per_epoch", 1)
@@ -1079,8 +1131,11 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.slow_batch_size = config.get("slow_batch_size", 64)
         self.replay_batch_size = config.get("replay_batch_size", 64)
 
-    def create_loaders(self, config):
+    @classmethod
+    def create_loaders(cls, config):
         """Create train and val dataloaders."""
+
+        # TODO this method needs to (a) be a class method, and (b) return 2 dataloaders
 
         dataset_class = config.get("dataset_class", None)
         if dataset_class is None:
@@ -1092,13 +1147,38 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         main_set = dataset_class(**dataset_args)
 
         # All loaders share tasks and dataset, but different indices and batch sizes
-        self.train_fast_loader = self.create_train_dataloader(main_set, config)
-        self.val_fast_loader = self.create_validation_dataloader(main_set, config)
-        self.train_slow_loader = self.create_slow_train_dataloader(main_set, config)
-        self.train_replay_loader = self.create_replay_dataloader(main_set, config)
+        train_slow_loader = cls.create_slow_train_dataloader(main_set, config)
 
         # For pre/post epoch and batch processing slow loader is equiv to train loader
-        self.train_loader = self.train_slow_loader
+
+        # TODO modify return values? right now, it's returning the torch dataloader
+        # that will be stored in self.train_loader, and None (since there's no need)
+        # for an eval loader
+        return train_slow_loader, None
+
+    @classmethod
+    def create_fast_slow_loaders(cls, config):
+        """ Creates and returns
+
+        - a torch dataloader for inner loop updates to fast parameters  (i.e.,
+        meta-training training)
+        - a torch dataloader for evaluating the inner loop learner
+        - a torch dataloader for outer loop updates to slow parameters
+        """
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+
+        # Create datasets -> same, only initialize two of them
+        dataset_args = config.get("dataset_args", {})
+        dataset_args.update(train=True)
+        main_set = dataset_class(**dataset_args)
+
+        train_fast_loader = cls.create_train_dataloader(main_set, config)
+        val_fast_loader = cls.create_validation_dataloader(main_set, config)
+        train_replay_loader = cls.create_replay_dataloader(main_set, config)
+
+        return train_fast_loader, val_fast_loader, train_replay_loader
 
     @classmethod
     def create_train_sampler(cls, dataset, config):
@@ -1299,19 +1379,17 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return model
 
     def get_slow_params(self):
-        return self.model.module.slow_params
+        if hasattr(self.model, "module"):
+            return self.model.module.slow_params
+        else:
+            return self.model.slow_params
 
     def get_fast_params(self, clone=None):
-        if clone is not None:
-            if hasattr(clone, "module"):
-                return clone.module.fast_params
-            else:
-                return clone.fast_params
+        model = clone if clone is not None else self.module
+        if hasattr(model, "module"):
+            return model.module.fast_params
         else:
-            if hasattr(self.model, "module"):
-                return self.model.module.fast_params
-            else:
-                return self.model.fast_params
+            return model.fast_params
 
     @classmethod
     def aggregate_results(cls, results):
@@ -1342,7 +1420,7 @@ class ImagenetExperiment(SupervisedExperiment):
             replicas_per_sample=config.get("replicas_per_sample", 1),
         )
 
-        super().create_loaders(config)
+        return super().create_loaders(config)
 
     @classmethod
     def get_execution_order(cls):

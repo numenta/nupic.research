@@ -20,11 +20,11 @@
 # ----------------------------------------------------------------------
 
 import numpy as np
-import torch
-import torch.nn.functional as F
 from scipy import stats
 from torch.nn.init import kaiming_normal_, zeros_
 from torch.optim import Adam
+
+from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 
 
 class OnlineMetaLearning(object):
@@ -38,30 +38,33 @@ class OnlineMetaLearning(object):
 
         :param config: Dictionary containing the configuration parameters
 
-            - test: test
+            - run_meta_test: whether or not to run the meta-testing phase
         """
         self.run_meta_test = config.get("run_meta_test", False)
         super().setup_experiment(config)
 
     def create_loaders(self, config):
         super().create_loaders(config)
+
         # Only initialize test loader if needed
-        if self.run_meta_test:
-            dataset_class = config.get("dataset_class", None)
-            if dataset_class is None:
-                raise ValueError("Must specify 'dataset_class' in config.")
+        if not self.run_meta_test:
+            return
 
-            dataset_args = config.get("dataset_args", {})
-            dataset_args.update(train=False)
-            eval_set = dataset_class(**dataset_args)
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
 
-            self.test_train_loader = self.create_train_dataloader(eval_set, config)
-            self.test_test_loader = self.create_validation_dataloader(eval_set, config)
+        dataset_args = config.get("dataset_args", {})
+        dataset_args.update(train=False)
+        eval_set = dataset_class(**dataset_args)
 
-            self.num_classes_eval = min(
-                config.get("num_classes_eval", 50),
-                self.test_train_loader.sampler.num_classes
-            )
+        self.test_train_loader = self.create_train_dataloader(eval_set, config)
+        self.test_test_loader = self.create_validation_dataloader(eval_set, config)
+
+        self.num_classes_eval = min(
+            config.get("num_classes_eval", 50),
+            self.test_train_loader.sampler.num_classes
+        )
 
     def post_epoch(self):
         if self.should_stop() and self.run_meta_test:
@@ -70,6 +73,7 @@ class OnlineMetaLearning(object):
                 if num_classes_learned > self.num_classes:
                     break
 
+                # TODO log results in addition to simply priting them to stdout
                 accs = self.run_meta_testing_phase(num_classes_learned)
                 print("Accuracy for meta-testing phase over"
                       f" {num_classes_learned} num classes.")
@@ -77,8 +81,6 @@ class OnlineMetaLearning(object):
 
     def find_best_lr(self, num_classes_learned):
         """Adapted from original OML repo"""
-        # avg_score = 0
-
         lr_sweep_range = [1e-1, 1e-2, 1e-3, 1e-4]
         lr_all = []
 
@@ -102,8 +104,18 @@ class OnlineMetaLearning(object):
                     else:
                         zeros_(param)
 
-                self.train(self.test_train_loader, lr)
-                correct = self.evaluate(self.test_test_loader)
+                train_model(
+                    model=self.model.module,
+                    loader=self.test_train_loader,
+                    optimizer=Adam(self.get_fast_params(), lr=lr),
+                    device=self.device
+                )
+                results = evaluate_model(
+                    model=self.model.module,
+                    loader=self.test_test_loader,
+                    device=self.device
+                )
+                correct = results["total_correct"]
 
                 correct = 1.0 * correct / len(self.test_train_loader)
                 if (correct > max_acc):
@@ -138,36 +150,25 @@ class OnlineMetaLearning(object):
 
             lr = self.find_best_lr(num_classes_learned)
 
-            # meta-training training
-            self.train(self.test_train_loader)
+            # meta-testing training
+            train_model(
+                model=self.model.module,
+                loader=self.test_train_loader,
+                optimizer=Adam(self.get_fast_params(), lr=lr),
+                device=self.device
+            )
 
-            # meta-training testing
-            correct = self.evaluate(self.test_test_loader, lr)
+            # meta-testing testing
+            results = evaluate_model(
+                model=self.model.module,
+                loader=self.test_test_loader,
+                device=self.device
+            )
+            correct = results["total_correct"]
 
             meta_test_accuracies.append(correct / len(self.test_test_loader))
 
         return meta_test_accuracies
-
-    def train(self, train_loader, lr):
-        opt = Adam(self.get_fast_params(), lr=lr)
-        for data, target in train_loader:
-            data = data.to(self.device)
-            target = target.to(self.device)
-            pred = self.model.module(data)
-            opt.zero_grad()
-            loss = F.cross_entropy(pred, target)
-            loss.backward()
-            opt.step()
-
-    def evaluate(self, eval_loader):
-        correct = 0
-        for data, target in eval_loader:
-            data = data.to(self.device)
-            target = target.to(self.device)
-            logits_q = self.model.module(data)
-            pred_q = (logits_q).argmax(dim=1)
-            correct += torch.eq(pred_q, target).sum().item() / len(data)
-        return correct
 
     @classmethod
     def get_execution_order(cls):
