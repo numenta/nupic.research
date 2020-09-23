@@ -20,8 +20,6 @@
 #
 # Below is a basic model/experiment config and the run function to evaluate it
 #
-import time
-
 import numpy as np
 import torch
 from torchvision import datasets, transforms
@@ -60,11 +58,9 @@ def run_experiment(config):
     exp.setup_experiment(config)
     print(f"Training started....")
     while not exp.should_stop():
-        t0 = time.time()
         # print(f"Starting epoch: {exp.get_current_epoch()}")
         result = exp.run_epoch()
         print(f"Finished Epoch: {exp.get_current_epoch()}")
-        print(f"Epoch Duration: {time()-t0:.1f}")
         print(f"Accuracy: {result['mean_accuracy']:.4f}")
     print(f"....Training finished")
 
