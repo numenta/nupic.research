@@ -30,8 +30,11 @@ import uuid
 from datetime import datetime
 from functools import partial
 
+# FIXME: When 'ray' is imported after 'pickle' it throws an exception.
+import ray  # noqa: F401, I001
 import torch.multiprocessing as multiprocessing
 
+from experiments import CONFIGS
 from nupic.research.frameworks import vernon
 from nupic.research.frameworks.vernon import ImagenetExperiment
 from nupic.research.frameworks.vernon.parser_utils import MAIN_PARSER, process_args
@@ -49,6 +52,7 @@ def create_trials(config):
     :return: list of dict for each trial configuration variant
     """
     from nupic.research.support.ray_utils import generate_trial_variants
+
     trials = generate_trial_variants(config)
     timestamp = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -57,7 +61,8 @@ def create_trials(config):
 
         # Create local dir
         local_dir = os.path.join(
-            os.path.expanduser(variant["local_dir"]), variant["name"])
+            os.path.expanduser(variant["local_dir"]), variant["name"]
+        )
         variant["local_dir"] = local_dir
         os.makedirs(local_dir, exist_ok=True)
 
@@ -85,26 +90,13 @@ def save_checkpoint(config, epoch, checkpoint):
         pickle.dump(checkpoint, f)
 
 
-def log_results(logger, config, results):
-    # Update ray.tune fields
-    timestamp = results["timestamp"]
-    results["config"] = config
-    results["experiment_id"] = config["experiment_id"]
-    results["experiment_tag"] = config["experiment_tag"]
-    results["training_iteration"] = results.pop("epoch")
-    results["neg_mean_loss"] = results["mean_loss"]
-    results["timesteps_total"] = results.get("timestep", 0)
-    results["timestamp"] = int(timestamp)
-    results["date"] = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d_%H-%M-%S")
-    results["time_this_iter_s"] = timestamp - logger.last_timestamp
-    results["time_total_s"] = timestamp - logger.start_timestamp
-    logger.on_result(results)
-    logger.last_timestamp = timestamp
+def log_results(queue, results):
+    queue.put(results)
 
 
-def run_trial(config):
+def log_background_task(_, config, queue):
     """
-    Run a single trial configuration
+    Use background task to update logger files using ray.tune `UnifiedLogger`
     """
     # Configure ray.tune loggers
     from ray.tune.logger import UnifiedLogger
@@ -113,12 +105,53 @@ def run_trial(config):
                            loggers=config.get("loggers", None))
     logger.last_timestamp = logger.start_timestamp = time.time()
 
-    result = vernon.run(config=config,
-                        logger=partial(log_results, logger, config),
-                        on_checkpoint=partial(save_checkpoint, config))
+    # Wait for results
+    results = queue.get()
+    while results is not None:
+        # Update ray.tune fields
+        timestamp = results["timestamp"]
+        results["config"] = config
+        results["experiment_id"] = config["experiment_id"]
+        results["experiment_tag"] = config["experiment_tag"]
+        results["training_iteration"] = results.pop("epoch")
+        results["neg_mean_loss"] = results["mean_loss"]
+        results["timesteps_total"] = results.get("timestep", 0)
+        results["timestamp"] = int(timestamp)
+        results["date"] = datetime.fromtimestamp(timestamp).strftime(
+            "%Y-%m-%d_%H-%M-%S"
+        )
+        results["time_this_iter_s"] = timestamp - logger.last_timestamp
+        results["time_total_s"] = timestamp - logger.start_timestamp
+        logger.on_result(results)
+        logger.last_timestamp = timestamp
+
+        # Wait for next results
+        results = queue.get()
 
     logger.flush()
     logger.close()
+
+
+def run_trial(config):
+    """
+    Run a single trial configuration
+    """
+    queue = multiprocessing.SimpleQueue()
+    ctx = multiprocessing.spawn(log_background_task, args=(config, queue), join=False)
+    try:
+        result = vernon.run(
+            config=config,
+            logger=partial(log_results, queue),
+            on_checkpoint=partial(save_checkpoint, config),
+        )
+    except Exception as ex:
+        # Terminate background process on error
+        vernon.terminate_processes(ctx)
+        raise ex
+    finally:
+        # No more results
+        queue.put(None)
+
     return result
 
 
@@ -135,21 +168,14 @@ def main(args):
         print("Nothing to run (config=None).")
         return
 
-    results = []
     for trial in create_trials(config):
-        results.append(run_trial(trial))
+        run_trial(trial)
 
 
 if __name__ == "__main__":
-    # The spawned 'run' process does not import 'ray' however some
-    # configurations in the experiment package import 'ray' and 'ray.tune'. When
-    # 'ray' is imported after 'pickle' it throws an exception. We avoid this
-    # exception by loading the configurations in "main" local context instead of
-    # the global context
-    from experiments import CONFIGS
-
     parser = argparse.ArgumentParser(
         parents=[MAIN_PARSER],
+        argument_default=argparse.SUPPRESS,
         description=__doc__
     )
     parser.add_argument("-e", "--experiment", dest="name",

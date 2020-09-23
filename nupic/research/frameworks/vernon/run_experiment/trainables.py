@@ -318,6 +318,9 @@ class ContinualLearningTrainable(SupervisedTrainable):
     with ray.
     """
 
+    # This is used in the run_with_raytune function to clarify the stopping condition.
+    stop_condition = "num_tasks"
+
     def _run_iteration(self):
         """Run one epoch of training on each process."""
         status = []
