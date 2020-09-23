@@ -318,6 +318,8 @@ class ContinualLearningTrainable(SupervisedTrainable):
     with ray.
     """
 
+    stop_condition = "num_tasks"
+
     def _run_iteration(self):
         """Run one epoch of training on each process."""
         status = []
