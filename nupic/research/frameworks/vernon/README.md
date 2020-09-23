@@ -1,6 +1,6 @@
 Vernon
 ==============
-Vernon is a flexible framework to allow researchers to explore neural network models under a variety of learning paradigms including continuous, meta, and sparse learning. It is designed to be light-weight with a focus on mixin classes. 
+Vernon is a flexible framework to support different learning paradigms (unsupervised, supervised, continual, meta, etc.) using networks which are biologically inspired, including for example sparse neural networks. It is designed to be light-weight with a focus on mixin classes. 
 
 Vernon is the creation of researchers at Numenta; note therefore that all of the caveats specified in the nupic.research README still apply. 
 
@@ -9,13 +9,13 @@ Getting started
 To get started, the key modules to be aware of are
 - [handlers.py](./handlers.py) : contains classes to structure the desired experiment (such as supervised vs continual learning)
 - [run.py](./run_experiment/run.py) and [run_with_raytune.py](./run_experiment/run_with_raytune.py) : contain functions to run more advanced experiments
-- [common_models.py](../pytorch/models/common_models.py) in our PyTorch framework : contains some common models that you can use 
+- [common_models.py](../pytorch/models/common_models.py) in our PyTorch framework : contains some common models for use 
 
 Running a basic experiment
 ==============
 On your local machine you can run simple_experiment.py found under nupic.research/projects/vernon_examples/
 ```bash
-python ./simple_experiment.py
+python simple_experiment.py
 ```
 which contains both the config for a multi-layer perceptron trained on MNIST, and the simple run function to train and evaluate it. 
 
@@ -44,7 +44,7 @@ In contrast, continual learning follows the below structure, with the experiment
 
 Mixins for advanced experiments
 ==============
-Mixins enable one to specificlaly inherit desired features from a particular parent class, without creating a rigid relationship between the parent and child. In Vernon this enables one to flexibly define new experiments. Depending on the execution order of the defined experiment, this will determine the class properties that are inherited and therefore the experiment that will be performed. 
+Mixins enable one to specifically inherit desired features from a particular parent class, without creating a rigid relationship between the parent and child. In Vernon this enables one to flexibly define new experiments. Depending on the execution order of the defined experiment, this will determine the class properties that are inherited and therefore the experiment that will be performed. 
 
 As an example, one could define 
 ```python
