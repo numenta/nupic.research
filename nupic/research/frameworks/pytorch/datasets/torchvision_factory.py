@@ -76,8 +76,7 @@ def torchvisiondataset(root, dataset_name, train=True, download=True,
     return dataset
 
 
-def omniglot(root, train=True, download=True, evaluation=False,
-             transform=None, target_transform=None):
+def omniglot(root, train=True, download=True, transform=None, target_transform=None):
     """
     Omniglot Torchvision dataset.
     Each classes contains 20 samples.
@@ -88,8 +87,7 @@ def omniglot(root, train=True, download=True, evaluation=False,
         creates from the "evaluation" set.
         Background contains 964 classes, and evaluation 659 classes, all unique
     """
-
-    if not evaluation:
+    if train:
         transform = base_transform_with_resize(*DATASETS_STATS["Omniglot_bg"])
     else:
         transform = base_transform_with_resize(*DATASETS_STATS["Omniglot_eval"])

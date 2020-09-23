@@ -466,7 +466,7 @@ def _is_match(pattern, string):
     try:
         r = re.compile(pattern)
     except re.error as msg:
-        raise Exception(f"In valid regex '{pattern}': {msg}")
+        raise Exception(f"Invalid regex '{pattern}': {msg}")
 
     match = r.match(string)
     if match is not None:

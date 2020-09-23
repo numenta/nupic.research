@@ -1002,7 +1002,6 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
     @classmethod
     def aggregate_results(cls, results):
         """Run validation in single GPU"""
-        print("Aggregated results")
         return results[0]
 
     @classmethod
@@ -1062,14 +1061,15 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
 class MetaContinualLearningExperiment(SupervisedExperiment):
     """
     Experiment class for meta-continual learning (based on OML and ANML meta-continual
-    learning setups). There are 2 main phases in a meta-continual learning setup.
+    learning setups). There are 2 main phases in a meta-continual learning setup:
 
         - meta-training: Meta-learning representations for continual learning over all
         tasks
         - meta-testing: Montinual learning of new tasks and model evaluation
 
-    More specifically, each phase is divided into its own training and testing phase,
-    hence we have 4 such phases.
+    where learning a "task" corresponds to learning a single classification label. More
+    specifically, each phase is divided into its own training and testing phase, hence
+    we have 4 such phases.
 
         - meta-training training: Train the inner loop learner (i.e., slow parameters)
         for a specific task
@@ -1104,13 +1104,17 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             - tasks_per_epoch: Number of different classes used for training during the
             execution of the inner loop
             - slow_batch_size: Number of examples in a single batch used to update the
-            slow parameters during the meta-training testing phase
+            slow parameters during the meta-training testing phase, where the examples
+            are sampled from tasks_per_epoch difference tasks
             - replay_batch_size: Number of examples in a single batch sampled from all
-            data, also used to train the slow parameters
+            data, also used to train the slow parameters (the replay batch is used to
+            sample examples to update the slow parameters during meta-training testing
+            to prevent the learner from forgetting other tasks)
         """
-
-        # Simplify loading
-        config["model_args"]["num_classes"] = config.get("num_classes", )
+        if "num_classes" not in config["model_args"]:
+            # manually set `num_classes` in `model_args`
+            num_classes = config["num_classes"]
+            config["model_args"]["num_classes"] = num_classes
 
         super().setup_experiment(config)
         self.train_slow_loader = self.train_loader
@@ -1135,8 +1139,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     def create_loaders(cls, config):
         """Create train and val dataloaders."""
 
-        # TODO this method needs to (a) be a class method, and (b) return 2 dataloaders
-
         dataset_class = config.get("dataset_class", None)
         if dataset_class is None:
             raise ValueError("Must specify 'dataset_class' in config.")
@@ -1151,9 +1153,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # For pre/post epoch and batch processing slow loader is equiv to train loader
 
-        # TODO modify return values? right now, it's returning the torch dataloader
-        # that will be stored in self.train_loader, and None (since there's no need)
-        # for an eval loader
+        # note: modify return values? right now, it's returning the torch dataloader
+        # that will be stored in self.train_loader, and None (since there's no need
+        # for an eval loader)
         return train_slow_loader, None
 
     @classmethod
@@ -1394,8 +1396,28 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     @classmethod
     def aggregate_results(cls, results):
         """Run validation in single GPU"""
-        print("Aggregated results")
         return results[0]
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        exp = "MetaContinualLearningExperiment"
+        eo["create_loaders"] = [exp + ".create_loaders"]
+        eo["create_fast_slow_loaders"] = [exp + ".create_fast_slow_loaders"]
+        eo["create_train_sampler"] = [exp + ".create_train_sampler"]
+        eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
+        eo["create_replay_sampler"] = [exp + ".create_replay_sampler"]
+        eo["create_task_sampler"] = [exp + ".create_task_sampler"]
+        eo["create_slow_train_dataloader"] = [exp + ".create_slow_train_dataloader"]
+        eo["run_epoch"] = [exp + ".run_epoch"]
+        eo["run_task"] = [exp + ".run_task"]
+        eo["update_params"] = [exp + ".update_params"]
+        eo["adapt"] = [exp + ".adapt"]
+        eo["clone_model"] = [exp + ".clone_model"]
+        eo["get_slow_params"] = [exp + ".get_slow_params"]
+        eo["get_fast_params"] = [exp + ".get_fast_params"]
+        eo["aggregate_results"] = [exp + ".aggregate_results"]
+        return eo
 
 
 class ImagenetExperiment(SupervisedExperiment):
@@ -1404,7 +1426,8 @@ class ImagenetExperiment(SupervisedExperiment):
     models on Imagenet dataset
     """
 
-    def create_loaders(self, config):
+    @classmethod
+    def create_loaders(cls, config):
         dataset_args = {}
         config.setdefault("dataset_class", datasets.imagenet)
         config.setdefault("dataset_args", dataset_args)
