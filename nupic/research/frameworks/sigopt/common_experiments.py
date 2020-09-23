@@ -19,15 +19,26 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .base import CONFIGS as BASE
-from .test_sigopt import CONFIGS as TEST_SIGOPT
+from nupic.research.frameworks.sigopt import mixins
 
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
+from .sigopt_experiment import SigOptExperiment
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(BASE)
-CONFIGS.update(TEST_SIGOPT)
+
+class SigOptSGDOneCycleLRExperiment(mixins.SGDParams,
+                                    mixins.OneCycleLRParams,
+                                    SigOptExperiment):
+    """Tune hyper-parameters using SGD and OneCycleLR."""
+    pass
+
+
+class SigOptSGDStepLRExperiment(mixins.SGDParams,
+                                mixins.StepLRParams,
+                                SigOptExperiment):
+    """Tune hyper-parameters using SGD and StepLR."""
+    pass
+
+
+__all__ = [
+    "SigOptSGDOneCycleLRExperiment",
+    "SigOptSGDStepLRExperiment",
+]
