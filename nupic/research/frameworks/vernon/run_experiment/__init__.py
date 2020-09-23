@@ -23,6 +23,6 @@ from .trainables import (
     BaseTrainable,
     SupervisedTrainable,
     ContinualLearningTrainable,
-    SigOptImagenetTrainable,
+    SigOptSupervisedTrainable,
     DebugTrainable,
 )

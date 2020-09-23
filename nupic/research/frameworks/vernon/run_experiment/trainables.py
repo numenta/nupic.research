@@ -24,7 +24,7 @@ import logging
 import os
 import pickle
 import time
-from pprint import pprint
+from pprint import pformat, pprint
 
 import ray
 import ray.resource_spec
@@ -35,7 +35,7 @@ from ray.tune.resources import Resources
 from ray.tune.result import DONE, RESULT_DUPLICATE
 from ray.tune.utils import warn_if_slow
 
-from nupic.research.frameworks.sigopt import SigOptImagenetExperiment
+from nupic.research.frameworks.sigopt import SigOptExperiment
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -318,6 +318,9 @@ class ContinualLearningTrainable(SupervisedTrainable):
     with ray.
     """
 
+    # This is used in the run_with_raytune function to clarify the stopping condition.
+    stop_condition = "num_tasks"
+
     def _run_iteration(self):
         """Run one epoch of training on each process."""
         status = []
@@ -329,7 +332,7 @@ class ContinualLearningTrainable(SupervisedTrainable):
             return ray.get(status)
 
 
-class SigOptImagenetTrainable(SupervisedTrainable):
+class SigOptSupervisedTrainable(SupervisedTrainable):
     """
     This class updates the config using SigOpt before the models and workers are
     instantiated, and updates the result using SigOpt once training completes.
@@ -354,12 +357,16 @@ class SigOptImagenetTrainable(SupervisedTrainable):
 
             # Check for user specified sigopt-experiment class.
             experiment_class = config.get(
-                "sigopt_experiment_class", SigOptImagenetExperiment)
+                "sigopt_experiment_class", SigOptExperiment)
+            assert issubclass(experiment_class, SigOptExperiment)
 
             # Instantiate experiment.
             self.sigopt = experiment_class(
                 experiment_id=config["sigopt_experiment_id"],
                 sigopt_config=config["sigopt_config"])
+
+            self.logger.info(
+                f"Sigopt execution order: {pformat(self.sigopt.get_execution_order())}")
 
             # Get suggestion and update config.
             self.suggestion = self.sigopt.get_next_suggestion()
