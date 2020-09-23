@@ -19,15 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .base import CONFIGS as BASE
-from .test_sigopt import CONFIGS as TEST_SIGOPT
-
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
-
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(BASE)
-CONFIGS.update(TEST_SIGOPT)
+from .one_cycle_lr_params import OneCycleLRParams
+from .sgd_params import SGDParams
+from .step_lr_params import StepLRParams

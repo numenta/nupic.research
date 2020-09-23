@@ -34,7 +34,7 @@ from nupic.research.support.ray_utils import (
     register_torch_serializers,
 )
 
-from .trainables import SigOptImagenetTrainable, SupervisedTrainable
+from .trainables import SigOptSupervisedTrainable, SupervisedTrainable
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -53,6 +53,7 @@ def run(config):
 
     # Get ray.tune kwargs for the given config.
     kwargs = get_tune_kwargs(config)
+    pprint(kwargs)
 
     # Queue trials until the cluster scales up
     kwargs.update(queue_trials=True)
@@ -125,7 +126,7 @@ def get_tune_kwargs(config):
                               to decide which config parameter dictates the stop
                               training_iteration.
         - sigopt_config: (optional) used for running experiments with SigOpt and
-                         the SigOptImagenetTrainable
+                         the SigOptSupervisedTrainable
         - restore: whether to restore from the latest checkpoint; defaults to False
         - local_dir: needed with 'restore'; identifies the parent directory of
                      experiment results.
@@ -138,7 +139,7 @@ def get_tune_kwargs(config):
 
     # Zip the kwargs along with the Ray trainable.
     if "sigopt_config" in config:
-        default_trainable = SigOptImagenetTrainable
+        default_trainable = SigOptSupervisedTrainable
     else:
         default_trainable = SupervisedTrainable
 
