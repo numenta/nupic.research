@@ -37,8 +37,8 @@ SIGOPT_SPARSE_CNN_STEPLR.update(
 
     # Learning rate scheduler class class arguments passed to the constructor
     lr_scheduler_args=dict(
-        gamma=0.9,
-        step_size=1,
+        # gamma=<suggested by sigopt>,
+        # step_size=<suggested by sigopt>,
     ),
 
     sigopt_experiment_class=SigOptSGDStepLRExperiment,

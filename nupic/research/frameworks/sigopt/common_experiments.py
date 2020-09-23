@@ -24,16 +24,16 @@ from nupic.research.frameworks.sigopt import mixins
 from .sigopt_experiment import SigOptExperiment
 
 
-class SigOptSGDOneCycleLRExperiment(SigOptExperiment,
-                                    mixins.SGDParams,
-                                    mixins.OneCycleLRParams):
+class SigOptSGDOneCycleLRExperiment(mixins.SGDParams,
+                                    mixins.OneCycleLRParams,
+                                    SigOptExperiment):
     """Tune hyper-parameters using SGD and OneCycleLR."""
     pass
 
 
-class SigOptSGDStepLRExperiment(SigOptExperiment,
-                                mixins.SGDParams,
-                                mixins.StepLRParams):
+class SigOptSGDStepLRExperiment(mixins.SGDParams,
+                                mixins.StepLRParams,
+                                SigOptExperiment):
     """Tune hyper-parameters using SGD and StepLR."""
     pass
 
