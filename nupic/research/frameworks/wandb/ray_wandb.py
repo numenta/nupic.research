@@ -28,6 +28,7 @@ from copy import deepcopy
 from pprint import pformat
 
 import wandb
+from ray import tune
 from ray.tune.utils import flatten_dict
 
 __all__ = [
@@ -81,9 +82,9 @@ def log(log_dict, commit=False, step=None, sync=True, *args, **kwargs):
         wandb.log(log_dict, commit=commit, step=step, sync=sync, *args, **kwargs)
 
 
-class WandbLogger(wandb.ray.WandbLogger):
+class WandbLogger(tune.logger.Logger):
     """
-    This subclasses the ray integration from wandb to
+    This forks the wandb 0.9.7 ray WandbLogger to
         1) make resuming experiments easier
         2) include more supported data types
         3) support logging time-series formatted results
@@ -153,6 +154,7 @@ class WandbLogger(wandb.ray.WandbLogger):
                Thus, by saving the wandb-config, we can associate calls to `log` to the
                same `group` associated to this logger.
         """
+        self._config = None
 
         # Auto format the group to be the name of the trial.
         env_config = self.config["env_config"]
@@ -163,8 +165,8 @@ class WandbLogger(wandb.ray.WandbLogger):
         if resume and "id" not in wandb_config:
             enable_run_resume(wandb_config)
 
-        # This will invoke `wandb.init(**wandb_config)` and create a new run-directory.
-        super()._init()
+        # This will create a new run-directory.
+        wandb.init(**self.config.get("env_config", {}).get("wandb", {}))
 
         # Get result_to_time_series_fn.
         experiment_class = self.config.get("experiment_class", None)
@@ -220,6 +222,9 @@ class WandbLogger(wandb.ray.WandbLogger):
                     continue
                 metrics[key] = value
             wandb.log(metrics)
+
+    def close(self):
+        wandb.join()
 
 
 class WorkerLogger(object):
