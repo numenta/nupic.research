@@ -37,28 +37,33 @@ class DendriteSegments(torch.nn.Module):
     segments modeled by a linear transformation from a context vector to output value
     for each segment.
 
-    :param num_units: number of units i.e. neurons;
-                      each unit will have it's own set of dendrite segments
-    :param num_context: length of the context vector;
-                        the same context will be applied to each segment
-    :param num_segments: number of dendrite segments per unit
-    :param sparsity: sparsity of connections;
-                     this is over each linear transformation from
-                     num_context to num_segments
-
-    TODO: Should we include a bias?
+    TODO: Include a optional bias (dim num_segments)
     """
 
-    def __init__(self, num_units, num_segments, num_context, sparsity):
+    def __init__(self, num_units, num_segments, dim_context, sparsity, bias=None):
+        """
+        :param num_units: number of units i.e. neurons;
+                        each unit will have it's own set of dendrite segments
+        :param dim_context: length of the context vector;
+                            the same context will be applied to each segment
+        :param num_segments: number of dendrite segments per unit
+        :param sparsity: sparsity of connections;
+                        this is over each linear transformation from
+                        dim_context to num_segments
+        """
         super().__init__()
 
-        segment_weights = torch.zeros(num_units, num_segments, num_context)
+        # TODO: Use named dimensions.
+        segment_weights = torch.zeros(num_units, num_segments, dim_context)
         self.segment_weights = torch.nn.Parameter(segment_weights)
+        if bias:
+            pass
 
         # TODO: What initialization should we use?
         init.kaiming_uniform_(self.segment_weights, a=math.sqrt(5))
 
         # Create a random mask for each unit (dim=0)
+        # TODO: Need sparsity per unit per segment.
         zero_mask = random_mask(self.segment_weights.shape, sparsity=sparsity, dim=0)
 
         # Use float16 because pytorch distributed nccl doesn't support bools.
@@ -67,8 +72,10 @@ class DendriteSegments(torch.nn.Module):
         # Save params.
         self.num_units = num_units
         self.num_segments = num_segments
-        self.num_context = num_context
+        self.dim_context = dim_context
         self.sparsity = sparsity
+
+        self.rezero_weights()
 
     def rezero_weights(self):
         self.segment_weights.data[self.zero_mask.bool()] = 0
@@ -78,37 +85,13 @@ class DendriteSegments(torch.nn.Module):
         Matrix-multiply the context with the weight tensor for each dendrite segment.
         This is done for each unit and so the output is of length num_units.
         """
-        return apply_context(context, self.segment_weights)
 
-
-def apply_context(context, segment_weights):
-    """
-    Applies context vector to a set of weighted dendrite segments. This performs
-    as tensor multiplication of segment_weights x context.
-
-    :param context: context tensor of shape minibatch x num_context
-    :param segment_weights: dendrite segment weights of shape
-                            num_units x num_segments x num_context
-    """
-
-    assert len(context.shape) == 2, "Expected context of shape minibatch x num_context"
-    assert len(segment_weights.shape) == 3, (
-        "Expected segment-weights of shape num_units x num_segments x num_context."
-    )
-    assert context.shape[1] == segment_weights.shape[2], (
-        "The outter dims of 'context' and 'segment_weights should be equal.'"
-    )
-
-    # Matrix multiply using einsum:
-    #    * b => the batch dimension
-    #    * k => the context dimension; multiplication will be along this dimension
-    #    * ij => the units and segment dimensions, respectively
-    out = torch.einsum("ijk,bk->bij", segment_weights, context)
-
-    # TODO: Test if the following is faster
-    #       out = torch.tensordot(param, context.transpose(1, 0), dims=1)
-    #       out = out.permute(2, 0, 1)
-    return out
+        # Matrix multiply using einsum:
+        #    * b => the batch dimension
+        #    * k => the context dimension; multiplication will be along this dimension
+        #    * ij => the units and segment dimensions, respectively
+        # W^C * M^C * C -> num_units x num_segments
+        return torch.einsum("ijk,bk->bij", self.segment_weights, context)
 
 
 def random_mask(size, sparsity, dim=None, **kwargs):
@@ -156,12 +139,12 @@ def random_mask(size, sparsity, dim=None, **kwargs):
 if __name__ == "__main__":
 
     dendrite_segment = DendriteSegments(
-        num_units=10, num_segments=20, num_context=15, sparsity=0.7
+        num_units=10, num_segments=20, dim_context=15, sparsity=0.7
     )
     dendrite_segment.rezero_weights()
 
     batch_size = 8
-    context = torch.rand(batch_size, dendrite_segment.num_context)
+    context = torch.rand(batch_size, dendrite_segment.dim_context)
     out = dendrite_segment(context)
 
     print(f"out.shape={out.shape}")
