@@ -136,7 +136,7 @@ class SaveFinalCheckpoint(object):
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("SaveFinalCheckpoint: Resolve path to copy dir.")
-        eo["setup_copy_dir"].append("SaveFinalCheckpoint: Make copy dir if needed.")
+        eo["setup_copy_dir"] = "SaveFinalCheckpoint: Make copy dir if needed."
         eo["stop_experiment"].append(
             "SaveFinalCheckpoint: Copy final checkpoint to specified directory."
         )
