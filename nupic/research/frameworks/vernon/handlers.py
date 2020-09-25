@@ -305,7 +305,7 @@ class SupervisedExperiment:
         multiprocessing.set_start_method("spawn", force=True)
 
         # Configure data loaders
-        self.train_loader, self.val_loader = self.create_loaders(config)
+        self.create_loaders(config)
         self.total_batches = len(self.train_loader,)
 
         self.epochs_to_validate = config.get("epochs_to_validate",
@@ -404,27 +404,24 @@ class SupervisedExperiment:
                 lr_scheduler_args=lr_scheduler_args,
                 steps_per_epoch=total_batches)
 
-    @classmethod
-    def create_loaders(cls, config):
-        """Create train and val dataloaders."""
+    def create_loaders(self, config):
+        """Create and assign train and val dataloaders"""
 
+        self.train_loader = self.create_train_dataloader(config)
+        self.val_loader = self.create_validation_dataloader(config)
+
+    @classmethod
+    def load_dataset(cls, config, train=True):
         dataset_class = config.get("dataset_class", None)
         if dataset_class is None:
             raise ValueError("Must specify 'dataset_class' in config.")
 
         dataset_args = config.get("dataset_args", {})
-        dataset_args.update(train=True)
-        train_set = dataset_class(**dataset_args)
-        dataset_args.update(train=False)
-        val_set = dataset_class(**dataset_args)
-
-        train_loader = cls.create_train_dataloader(train_set, config)
-        val_loader = cls.create_validation_dataloader(val_set, config)
-
-        return train_loader, val_loader
+        dataset_args.update(train=train)
+        return dataset_class(**dataset_args)
 
     @classmethod
-    def create_train_sampler(cls, dataset, config):
+    def create_train_sampler(cls, config, dataset):
         if config.get("distributed", False):
             sampler = DistributedSampler(dataset)
         else:
@@ -432,13 +429,15 @@ class SupervisedExperiment:
         return sampler
 
     @classmethod
-    def create_train_dataloader(cls, dataset, config):
+    def create_train_dataloader(cls, config, dataset=None):
         """
         This method is a classmethod so that it can be used directly by analysis
         tools, while also being easily overrideable.
         """
+        if dataset is None:
+            dataset = cls.load_dataset(config, train=True)
 
-        sampler = cls.create_train_sampler(dataset, config)
+        sampler = cls.create_train_sampler(config, dataset)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("batch_size", 1),
@@ -450,7 +449,7 @@ class SupervisedExperiment:
         )
 
     @classmethod
-    def create_validation_sampler(cls, dataset, config):
+    def create_validation_sampler(cls, config, dataset):
         if config.get("distributed", False):
             sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
         else:
@@ -458,13 +457,15 @@ class SupervisedExperiment:
         return sampler
 
     @classmethod
-    def create_validation_dataloader(cls, dataset, config):
+    def create_validation_dataloader(cls, config, dataset=None):
         """
         This method is a classmethod so that it can be used directly by analysis
         tools, while also being easily overrideable.
         """
+        if dataset is None:
+            dataset = cls.load_dataset(config, train=False)
 
-        sampler = cls.create_validation_sampler(dataset, config)
+        sampler = cls.create_validation_sampler(config, dataset)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("val_batch_size",
@@ -1005,15 +1006,15 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         return results[0]
 
     @classmethod
-    def create_train_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config, train=True)
+    def create_train_sampler(cls, config, dataset):
+        return cls.create_task_sampler(config, dataset, train=True)
 
     @classmethod
-    def create_validation_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config, train=False)
+    def create_validation_sampler(cls, config, dataset):
+        return cls.create_task_sampler(config, dataset, train=False)
 
     @classmethod
-    def create_task_sampler(cls, dataset, config, train):
+    def create_task_sampler(cls, config, dataset, train):
         # Assume dataloaders are already created
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
@@ -1117,9 +1118,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             config["model_args"]["num_classes"] = num_classes
 
         super().setup_experiment(config)
-        self.train_slow_loader = self.train_loader
-        self.train_fast_loader, self.val_fast_loader, self.train_replay_loader = \
-            self.create_fast_slow_loaders(config)
 
         self.epochs_to_validate = []
         self.tasks_per_epoch = config.get("tasks_per_epoch", 1)
@@ -1135,67 +1133,34 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.slow_batch_size = config.get("slow_batch_size", 64)
         self.replay_batch_size = config.get("replay_batch_size", 64)
 
-    @classmethod
-    def create_loaders(cls, config):
+    def create_loaders(self, config):
         """Create train and val dataloaders."""
 
-        dataset_class = config.get("dataset_class", None)
-        if dataset_class is None:
-            raise ValueError("Must specify 'dataset_class' in config.")
-
-        # Create datasets -> same, only initialize two of them
-        dataset_args = config.get("dataset_args", {})
-        dataset_args.update(train=True)
-        main_set = dataset_class(**dataset_args)
+        main_set = self.load_dataset(config, train=True)
 
         # All loaders share tasks and dataset, but different indices and batch sizes
-        train_slow_loader = cls.create_slow_train_dataloader(main_set, config)
+        self.train_fast_loader = self.create_train_dataloader(config, main_set)
+        self.val_fast_loader = self.create_validation_dataloader(config, main_set)
+        self.train_slow_loader = self.create_slow_train_dataloader(config, main_set)
+        self.train_replay_loader = self.create_replay_dataloader(config, main_set)
 
         # For pre/post epoch and batch processing slow loader is equiv to train loader
-
-        # note: modify return values? right now, it's returning the torch dataloader
-        # that will be stored in self.train_loader, and None (since there's no need
-        # for an eval loader)
-        return train_slow_loader, None
+        self.train_loader = self.train_slow_loader
 
     @classmethod
-    def create_fast_slow_loaders(cls, config):
-        """ Creates and returns
-
-        - a torch dataloader for inner loop updates to fast parameters  (i.e.,
-        meta-training training)
-        - a torch dataloader for evaluating the inner loop learner
-        - a torch dataloader for outer loop updates to slow parameters
-        """
-        dataset_class = config.get("dataset_class", None)
-        if dataset_class is None:
-            raise ValueError("Must specify 'dataset_class' in config.")
-
-        # Create datasets -> same, only initialize two of them
-        dataset_args = config.get("dataset_args", {})
-        dataset_args.update(train=True)
-        main_set = dataset_class(**dataset_args)
-
-        train_fast_loader = cls.create_train_dataloader(main_set, config)
-        val_fast_loader = cls.create_validation_dataloader(main_set, config)
-        train_replay_loader = cls.create_replay_dataloader(main_set, config)
-
-        return train_fast_loader, val_fast_loader, train_replay_loader
+    def create_train_sampler(cls, config, dataset):
+        return cls.create_task_sampler(config, dataset, mode="train")
 
     @classmethod
-    def create_train_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config, mode="train")
+    def create_validation_sampler(cls, config, dataset):
+        return cls.create_task_sampler(config, dataset, mode="test")
 
     @classmethod
-    def create_validation_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config, mode="test")
+    def create_replay_sampler(cls, config, dataset):
+        return cls.create_task_sampler(config, dataset, mode="replay")
 
     @classmethod
-    def create_replay_sampler(cls, dataset, config):
-        return cls.create_task_sampler(dataset, config, mode="replay")
-
-    @classmethod
-    def create_task_sampler(cls, dataset, config, mode="replay"):
+    def create_task_sampler(cls, config, dataset, mode="replay"):
         """In meta continuous learning paradigm, one task equals one class"""
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
@@ -1224,8 +1189,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return sampler
 
     @classmethod
-    def create_slow_train_dataloader(cls, dataset, config):
-        sampler = cls.create_validation_sampler(dataset, config)
+    def create_slow_train_dataloader(cls, config, dataset):
+        sampler = cls.create_validation_sampler(config, dataset)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("slow_batch_size", 64),
@@ -1236,8 +1201,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         )
 
     @classmethod
-    def create_replay_dataloader(cls, dataset, config):
-        sampler = cls.create_replay_sampler(dataset, config)
+    def create_replay_dataloader(cls, config, dataset):
+        sampler = cls.create_replay_sampler(config, dataset)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("replay_batch_size", 64),
@@ -1426,8 +1391,7 @@ class ImagenetExperiment(SupervisedExperiment):
     models on Imagenet dataset
     """
 
-    @classmethod
-    def create_loaders(cls, config):
+    def create_loaders(self, config):
         dataset_args = {}
         config.setdefault("dataset_class", datasets.imagenet)
         config.setdefault("dataset_args", dataset_args)
@@ -1443,7 +1407,7 @@ class ImagenetExperiment(SupervisedExperiment):
             replicas_per_sample=config.get("replicas_per_sample", 1),
         )
 
-        return super().create_loaders(config)
+        super().create_loaders(config)
 
     @classmethod
     def get_execution_order(cls):

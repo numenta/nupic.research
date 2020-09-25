@@ -50,16 +50,10 @@ class OnlineMetaLearning(object):
         if not self.run_meta_test:
             return
 
-        dataset_class = config.get("dataset_class", None)
-        if dataset_class is None:
-            raise ValueError("Must specify 'dataset_class' in config.")
+        eval_set = self.load_dataset(config, train=False)
 
-        dataset_args = config.get("dataset_args", {})
-        dataset_args.update(train=False)
-        eval_set = dataset_class(**dataset_args)
-
-        self.test_train_loader = self.create_train_dataloader(eval_set, config)
-        self.test_test_loader = self.create_validation_dataloader(eval_set, config)
+        self.test_train_loader = self.create_train_dataloader(config, eval_set)
+        self.test_test_loader = self.create_validation_dataloader(config, eval_set)
 
         self.num_classes_eval = min(
             config.get("num_classes_eval", 50),

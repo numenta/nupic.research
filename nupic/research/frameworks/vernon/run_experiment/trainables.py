@@ -297,7 +297,6 @@ class SupervisedTrainable(BaseTrainable):
 
     def _run_iteration(self):
         """Run one epoch of training on each process."""
-        t0 = time.time()
 
         status = []
         for w in self.procs:
@@ -305,7 +304,6 @@ class SupervisedTrainable(BaseTrainable):
 
         # Wait for remote functions and check for errors
         if ray_utils.check_for_failure(status):
-            print(f"Epoch Duration: {time.time()-t0:.1f}")
             return ray.get(status)
 
     def _process_result(self, result, pre_experiment_result=None):
@@ -434,115 +432,3 @@ class DebugTrainable(Trainable):
 
     def _restore(self, checkpoint):
         pass
-
-
-def run(config):
-    # Connect to ray
-    address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
-    ray.init(address=address, local_mode=config.get("local_mode", False))
-
-    # Register serializer and deserializer - needed when logging arrays and tensors.
-    register_torch_serializers()
-
-    # Build kwargs for `tune.run` function using merged config and command line dict
-    kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-
-    if "sigopt_config" in config:
-        kwargs = dict(zip(kwargs_names, [SigOptImagenetTrainable,
-                                         *tune.run.__defaults__]))
-    else:
-        ray_trainable = config.get("ray_trainable", SupervisedTrainable)
-        assert issubclass(ray_trainable, BaseTrainable)
-        kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
-
-    # Check if restoring experiment from last known checkpoint
-    if config.pop("restore", False):
-        result_dir = os.path.join(config["local_dir"], config["name"])
-        config["restore_checkpoint_file"] = get_last_checkpoint(result_dir)
-
-    # Update`tune.run` kwargs with config
-    kwargs.update(config)
-    kwargs["config"] = config
-
-    # Make sure to only select`tune.run` function arguments
-    kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
-
-    # Queue trials until the cluster scales up
-    kwargs.update(queue_trials=True)
-
-    pprint(kwargs)
-    result = tune.run(**kwargs)
-    ray.shutdown()
-    return result
-
-
-def run_single_instance(config):
-
-    # get number of GPUs
-    config["num_gpus"] = 1#torch.cuda.device_count()
-    config["workers"] = 4
-    config["log_level"] = "INFO"
-    config["reuse_actors"] = False
-    config["dist_port"] = get_free_port()
-
-    # set trainable
-    ray_trainable = config.get("ray_trainable", SupervisedTrainable)
-    # assert issubclass(ray_trainable, BaseTrainable)
-
-    # Build kwargs for `tune.run` function using merged config and command line dict
-    kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
-    kwargs = dict(zip(kwargs_names, [ray_trainable, *tune.run.__defaults__]))
-    # Update`tune.run` kwargs with config
-    kwargs.update(config)
-    kwargs["config"] = config
-
-    # Update tune stop criteria with config epochs
-    stop = kwargs.get("stop", {}) or dict()
-
-    stop_condition = getattr(ray_trainable, "stop_condition", "epochs")
-    stop_iteration = config.get(stop_condition, None)
-    if stop_iteration:
-        stop.update(training_iteration=stop_iteration)
-
-    kwargs["stop"] = stop
-    # Make sure to only select`tune.run` function arguments
-    kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
-    # print(kwargs)
-
-    # only run trial collection if specifically requested
-    if config.get("use_trial_collection", False):
-        # current torch distributed approach requires num_samples to be 1
-        num_samples = 1
-        if "num_samples" in kwargs:
-            num_samples = kwargs["num_samples"]
-            kwargs["num_samples"] = 1
-
-        trials = TrialsCollection(kwargs["config"], num_samples, restore=True)
-        t_init = time.time()
-
-        for config in trials.retrieve():
-            t0 = time.time()
-            trials.report_progress()
-            run_trial_single_instance(config, kwargs)
-            # report time elapsed
-            t1 = time.time()
-            print(f"***** Time elapsed last trial: {t1-t0:.0f} seconds")
-            print(f"***** Time elapsed total: {t1-t_init:.0f} seconds")
-            # save trials for later retrieval
-            ray.shutdown()
-            trials.mark_completed(config, save=True)
-
-        print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
-              " trials completed")
-    else:
-        run_trial_single_instance(config, kwargs),
-        ray.shutdown()
-
-
-def run_trial_single_instance(config, kwargs):
-    # Connect to ray, no specific redis address
-    ray.init(load_code_from_local=True, webui_host="0.0.0.0")
-    config["dist_url"] = f"tcp://127.0.0.1:{get_free_port()}"
-    kwargs["config"] = config
-    tune.run(**kwargs)
-    print("**** Trial ended")
