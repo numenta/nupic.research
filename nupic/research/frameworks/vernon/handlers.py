@@ -1171,9 +1171,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             for c in class_indices:
                 class_indices[c] = class_indices[c][:fast_sample_size]
         elif mode == "test":
-            slow_sample_size = config.get("slow_sample_size", 15)
+            fast_sample_size = config.get("fast_sample_size", 5)
             for c in class_indices:
-                class_indices[c] = class_indices[c][slow_sample_size:]
+                class_indices[c] = class_indices[c][fast_sample_size:]
         elif mode == "replay":
             pass
 
@@ -1230,6 +1230,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # Concatenate slow and replay sets
         self.train_slow_loader.sampler.set_active_tasks(tasks_train)
+        self.train_replay_loader.sampler.set_active_tasks(list(range(self.num_classes)))
         slow_data, slow_target = next(iter(self.train_slow_loader))
         replay_data, replay_target = next(iter(self.train_replay_loader))
 
