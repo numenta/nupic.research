@@ -30,6 +30,7 @@ import numpy as np
 import torch
 from torch.nn import init
 
+torch.nn.Linear
 
 class DendriteSegments(torch.nn.Module):
     """
@@ -53,14 +54,23 @@ class DendriteSegments(torch.nn.Module):
         """
         super().__init__()
 
-        # TODO: Use named dimensions.
-        segment_weights = torch.zeros(num_units, num_segments, dim_context)
-        self.segment_weights = torch.nn.Parameter(segment_weights)
-        if bias:
-            pass
+        # Save params.
+        self.num_units = num_units
+        self.num_segments = num_segments
+        self.dim_context = dim_context
+        self.sparsity = sparsity
 
-        # TODO: What initialization should we use?
-        init.kaiming_uniform_(self.segment_weights, a=math.sqrt(5))
+        # TODO: Use named dimensions.
+        segment_weights = torch.Tensor(num_units, num_segments, dim_context)
+        self.segment_weights = torch.nn.Parameter(segment_weights)
+
+        # Create a bias per unit per segment.
+        if bias:
+            segment_biases = torch.Tensor(num_units, num_segments)
+            self.segment_biases = torch.nn.Parameter(segment_biases)
+        else:
+            self.register_parameter("segment_biases", None)
+        self.reset_parameters()
 
         # Create a random mask for each unit (dim=0)
         # TODO: Need sparsity per unit per segment.
@@ -69,13 +79,14 @@ class DendriteSegments(torch.nn.Module):
         # Use float16 because pytorch distributed nccl doesn't support bools.
         self.register_buffer("zero_mask", zero_mask.half())
 
-        # Save params.
-        self.num_units = num_units
-        self.num_segments = num_segments
-        self.dim_context = dim_context
-        self.sparsity = sparsity
-
         self.rezero_weights()
+
+    def reset_parameters(self):
+        """Initialize the linear transformation for each unit."""
+        for unit in range(self.num_units):
+            weight = self.segment_weights[unit, ...]
+            bias = self.segment_biases[unit, ...]
+            init_linear_(weight, bias)
 
     def rezero_weights(self):
         self.segment_weights.data[self.zero_mask.bool()] = 0
@@ -91,7 +102,23 @@ class DendriteSegments(torch.nn.Module):
         #    * k => the context dimension; multiplication will be along this dimension
         #    * ij => the units and segment dimensions, respectively
         # W^C * M^C * C -> num_units x num_segments
-        return torch.einsum("ijk,bk->bij", self.segment_weights, context)
+        output = torch.einsum("ijk,bk->bij", self.segment_weights, context)
+
+        if self.segment_biases is not None:
+            output += self.segment_biases
+        return output
+
+
+def init_linear_(weight, bias=None):
+    """
+    Performs the default initilization of a weight and bias parameter
+    of a linear layaer; done in-place.
+    """
+    init.kaiming_uniform_(weight, a=math.sqrt(5))
+    if bias is not None:
+        fan_in, _ = init._calculate_fan_in_and_fan_out(weight)
+        bound = 1 / math.sqrt(fan_in)
+        init.uniform_(bias, -bound, bound)
 
 
 def random_mask(size, sparsity, dim=None, **kwargs):
@@ -139,7 +166,7 @@ def random_mask(size, sparsity, dim=None, **kwargs):
 if __name__ == "__main__":
 
     dendrite_segment = DendriteSegments(
-        num_units=10, num_segments=20, dim_context=15, sparsity=0.7
+        num_units=10, num_segments=20, dim_context=15, sparsity=0.7, bias=True
     )
     dendrite_segment.rezero_weights()
 
