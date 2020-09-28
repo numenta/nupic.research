@@ -22,6 +22,7 @@ from .base import CONFIGS as BASE
 from .composed_lr import CONFIGS as COMPOSED_LR
 from .custom_super import CONFIGS as CUSTOM_SUPER
 from .default import CONFIGS as DEFAULT
+from .magnitude_pruning import CONFIGS as MAGNITUDE_PRUNING
 from .mixed_precision import CONFIGS as MIXED_PRECISION
 from .retrained_output_layer import CONFIGS as RETRAINED_OUTPUT_LAYER
 from .super_convergence import CONFIGS as SUPER_CONVERGENCE
@@ -38,6 +39,7 @@ CONFIGS.update(BASE)
 CONFIGS.update(COMPOSED_LR)
 CONFIGS.update(CUSTOM_SUPER)
 CONFIGS.update(DEFAULT)
+CONFIGS.update(MAGNITUDE_PRUNING)
 CONFIGS.update(MIXED_PRECISION)
 CONFIGS.update(SUPER_CONVERGENCE)
 CONFIGS.update(RETRAINED_OUTPUT_LAYER)
