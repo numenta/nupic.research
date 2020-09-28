@@ -25,20 +25,19 @@ a template for revision and further modifications.
 """
 
 import math
+from collections.abc import Iterable
+from itertools import product
 
 import numpy as np
 import torch
 from torch.nn import init
 
-torch.nn.Linear
 
 class DendriteSegments(torch.nn.Module):
     """
     This implements dendrite segments over a set of units. Each unit has a set of
     segments modeled by a linear transformation from a context vector to output value
     for each segment.
-
-    TODO: Include a optional bias (dim num_segments)
     """
 
     def __init__(self, num_units, num_segments, dim_context, sparsity, bias=None):
@@ -72,9 +71,12 @@ class DendriteSegments(torch.nn.Module):
             self.register_parameter("segment_biases", None)
         self.reset_parameters()
 
-        # Create a random mask for each unit (dim=0)
-        # TODO: Need sparsity per unit per segment.
-        zero_mask = random_mask(self.segment_weights.shape, sparsity=sparsity, dim=0)
+        # Create a random mask per unit per segment (dims[0, 1])
+        zero_mask = random_mask(
+            self.segment_weights.shape,
+            sparsity=sparsity,
+            dims=[0, 1]
+        )
 
         # Use float16 because pytorch distributed nccl doesn't support bools.
         self.register_buffer("zero_mask", zero_mask.half())
@@ -121,16 +123,18 @@ def init_linear_(weight, bias=None):
         init.uniform_(bias, -bound, bound)
 
 
-def random_mask(size, sparsity, dim=None, **kwargs):
+def random_mask(size, sparsity, dims=None, **kwargs):
     """
-    This creates a random off-mask (True => off) of 'size' with the
-    specified 'sparsity' level along 'dim'. If 'dim' is 1, for instance,
-    then `mask[:, d, ...]` has the desired sparsity for all d. If None,
-    the sparsity is applied over the whole tensor.
+    This creates a random off-mask (True => off) of 'size' with the specified 'sparsity'
+    level along 'dims'. If 'dims' is 1, for instance, then `mask[:, d, ...]` has the
+    desired sparsity for all d. If dims is a list, say [0, 1], then `mask[d1, d2, ...]`
+    will have the desired sparsity level for all d1 and d2. If None, the sparsity is
+    applied over the whole tensor.
 
     :param size: shape of tensor
     :param sparsity: fraction of non-zeros
-    :param dim: which dimension to apply the sparsity
+    :param dims: which dimensions to apply the sparsity
+    :type dims: int or iterable
     :param kwargs: keywords args passed to torch.ones;
                    helpful for specifying device, for instace
     """
@@ -140,17 +144,32 @@ def random_mask(size, sparsity, dim=None, **kwargs):
     # Start with all elements off.
     mask = torch.ones(size, **kwargs)
 
-    # Find sparse submasks along dim; recursively call 'random_mask'.
-    if dim is not None:
-        len_of_dim = mask.shape[dim]
-        for d in range(len_of_dim):
-            dim_slice = [slice(None)] * len(mask.shape)
-            dim_slice[dim] = d
+    # Find sparse submasks along dims; recursively call 'random_mask'.
+    if dims is not None:
+        if not isinstance(dims, Iterable):
+            dims = [dims]
+
+        # Loop all combinations that index through dims.
+        # The 1D case is equivalent to range.
+        dim_legths = [mask.shape[dim] for dim in dims]
+        dim_indices = product(*[range(l) for l in dim_legths])
+
+        for idxs in dim_indices:
+
+            # For example, this may yield a slice that gives
+            # `mask[dim_slice] == mask[:, 0, 0]` where `dims=[1, 2]`.
+            dim_slice = [
+                idxs[dims.index(d)] if d in dims else slice(None)
+                for d in range(len(mask.shape))
+            ]
+
+            # Assign the desired sparsity to the submask.
             sub_mask = mask[dim_slice]
             sub_mask[:] = random_mask(
                 sub_mask.shape,
-                sparsity, **kwargs, dim=None
+                sparsity, **kwargs, dims=None
             )
+
         return mask
 
     # Randomly choose indices to make non-zero ("nz").
