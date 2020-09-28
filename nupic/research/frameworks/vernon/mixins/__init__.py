@@ -28,8 +28,10 @@ from .log_every_learning_rate import LogEveryLearningRate
 from .log_every_loss import LogEveryLoss
 from .lr_range_test import LRRangeTest, create_lr_test_experiment
 from .maxup import MaxupStandard, MaxupPerSample
+from .multi_cycle_lr import MultiCycleLR
 from .profile import Profile
 from .profile_autograd import ProfileAutograd
+from .prune_low_magnitude import PruneLowMagnitude
 from .regularize_loss import RegularizeLoss
 from .rezero_weights import RezeroWeights
 from .save_final_checkpoint import SaveFinalCheckpoint
