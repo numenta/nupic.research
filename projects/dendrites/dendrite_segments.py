@@ -71,7 +71,7 @@ class DendriteSegments(torch.nn.Module):
             self.register_parameter("segment_biases", None)
         self.reset_parameters()
 
-        # Create a random mask per unit per segment (dims[0, 1])
+        # Create a random mask per unit per segment (dims=[0, 1])
         zero_mask = random_mask(
             self.segment_weights.shape,
             sparsity=sparsity,
