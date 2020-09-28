@@ -64,7 +64,7 @@ class OnlineMetaLearning(object):
         if self.should_stop() and self.run_meta_test:
             # meta-training phase complete, perform meta-testing phase
             for num_classes_learned in [10, 50, 100, 200, 600]:
-                if num_classes_learned > self.num_classes:
+                if num_classes_learned > self.num_classes_eval:
                     break
 
                 # TODO log results in addition to simply priting them to stdout
