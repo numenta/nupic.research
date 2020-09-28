@@ -1353,7 +1353,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             return self.model.slow_params
 
     def get_fast_params(self, clone=None):
-        model = clone if clone is not None else self.module
+        model = clone if clone is not None else self.model
         if hasattr(model, "module"):
             return model.module.fast_params
         else:
