@@ -33,14 +33,14 @@ from nupic.research.frameworks.dendrites import (
 class DendriteSegmentsTests(unittest.TestCase):
 
     def test_forward(self):
-        dendrite_segment = DendriteSegments(
+        dendrite_segments = DendriteSegments(
             num_units=10, num_segments=20, dim_context=15, sparsity=0.7, bias=True
         )
-        dendrite_segment.rezero_weights()
+        dendrite_segments.rezero_weights()
 
         batch_size = 8
-        context = torch.rand(batch_size, dendrite_segment.dim_context)
-        out = dendrite_segment(context)
+        context = torch.rand(batch_size, dendrite_segments.dim_context)
+        out = dendrite_segments(context)
         self.assertEqual(out.shape, (8, 10, 20))
 
 
