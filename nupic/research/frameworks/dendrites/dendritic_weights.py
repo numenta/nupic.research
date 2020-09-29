@@ -24,8 +24,6 @@ A simple implementation of dendrite weights. This combines the output from a (sp
 linear layer with the output from a set of dendritic segments.
 """
 
-import torch
-
 from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights
 
