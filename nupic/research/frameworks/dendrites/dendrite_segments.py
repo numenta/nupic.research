@@ -180,18 +180,3 @@ def random_mask(size, sparsity, dims=None, **kwargs):
     mask_flat[on_indices] = False
 
     return mask
-
-
-if __name__ == "__main__":
-
-    dendrite_segment = DendriteSegments(
-        num_units=10, num_segments=20, dim_context=15, sparsity=0.7, bias=True
-    )
-    dendrite_segment.rezero_weights()
-
-    batch_size = 8
-    context = torch.rand(batch_size, dendrite_segment.dim_context)
-    out = dendrite_segment(context)
-    out = out.max(dim=2).values
-
-    print(f"out.shape={out.shape}")
