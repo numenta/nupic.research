@@ -54,13 +54,6 @@ def conv_target_density(in_channels, out_channels, kernel_size):
 
 
 NUM_CLASSES = 1000
-INITIAL_EPOCHS = 20
-NUM_PRUNINGS = 5
-EPOCHS_BETWEEN_PRUNINGS = 5
-FINAL_EPOCHS = 10
-NUM_EPOCHS = (INITIAL_EPOCHS
-              + ((NUM_PRUNINGS - 1) * EPOCHS_BETWEEN_PRUNINGS)
-              + FINAL_EPOCHS)
 SUBSEQUENT_LR_SCHED_ARGS = dict(
     max_lr=6.0,
     pct_start=0.0625,
@@ -71,28 +64,17 @@ SUBSEQUENT_LR_SCHED_ARGS = dict(
     final_div_factor=1000.0
 )
 
-# 0.72368
-MAGPRUNE50 = copy.deepcopy(DEFAULT)
-MAGPRUNE50.update(dict(
-    name="MAGPRUNE50",
+MAGPRUNE_BASE = copy.deepcopy(DEFAULT)
+MAGPRUNE_BASE.update(dict(
     experiment_class=MagPruneExperiment,
-
-    wandb_args=dict(
-        project="magnitude-pruning",
-        name="50 epochs",
-    ),
-
     log_timestep_freq=10,
-
     num_classes=NUM_CLASSES,
     batch_size=128,
     val_batch_size=128,
-    epochs_to_validate=range(NUM_EPOCHS),
     extra_validations_per_epoch=1,
 
     seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
 
-    epochs=NUM_EPOCHS,
     model_class=resnet50,
     model_args=dict(
         num_classes=NUM_CLASSES,
@@ -115,7 +97,38 @@ MAGPRUNE50.update(dict(
 
     lr_scheduler_class=None,
     lr_scheduler_args=None,
-    multi_lr_scheduler_args=(
+
+    teacher_model_class=[resnet50_swsl],
+
+    init_batch_norm=True,
+    use_auto_augment=True,
+    checkpoint_at_end=True,
+
+    sync_to_driver=False,
+    checkpoint_freq=10,
+    keep_checkpoints_num=None,
+))
+
+# 0.72368
+INITIAL_EPOCHS = 20
+NUM_PRUNINGS = 5
+EPOCHS_BETWEEN_PRUNINGS = 5
+FINAL_EPOCHS = 10
+NUM_EPOCHS = (INITIAL_EPOCHS
+              + ((NUM_PRUNINGS - 1) * EPOCHS_BETWEEN_PRUNINGS)
+              + FINAL_EPOCHS)
+MAGPRUNE20_20_10 = copy.deepcopy(MAGPRUNE_BASE)
+MAGPRUNE20_20_10.update(dict(
+    name="MAGPRUNE20_20_10",
+    epochs_to_validate=range(NUM_EPOCHS),
+    epochs=NUM_EPOCHS,
+
+    wandb_args=dict(
+        project="magnitude-pruning",
+        name="20 epochs initial, 20 epochs doing 5 prunings, 10 final",
+    ),
+
+    multi_cycle_lr_args=(
         (0, dict(max_lr=6.0,
                  pct_start=0.2,
                  anneal_strategy="linear",
@@ -138,19 +151,56 @@ MAGPRUNE50.update(dict(
         (35, 4 / 5),
         (40, 5 / 5),
     ],
+))
 
-    teacher_model_class=[resnet50_swsl],
 
-    init_batch_norm=True,
-    use_auto_augment=True,
-    checkpoint_at_end=True,
+INITIAL_EPOCHS = 15
+NUM_PRUNINGS = 6
+EPOCHS_BETWEEN_PRUNINGS = 3
+FINAL_EPOCHS = 30
+NUM_EPOCHS = (INITIAL_EPOCHS
+              + ((NUM_PRUNINGS - 1) * EPOCHS_BETWEEN_PRUNINGS)
+              + FINAL_EPOCHS)
+MAGPRUNE15_15_30 = copy.deepcopy(MAGPRUNE_BASE)
+MAGPRUNE15_15_30.update(dict(
+    name="MAGPRUNE15_15_30",
+    epochs_to_validate=range(NUM_EPOCHS),
+    epochs=NUM_EPOCHS,
 
-    sync_to_driver=False,
-    checkpoint_freq=10,
-    keep_checkpoints_num=None,
+    wandb_args=dict(
+        project="magnitude-pruning",
+        name="15 epochs initial, 15 epochs doing 6 prunings, 30 final",
+    ),
+
+    multi_cycle_lr_args=(
+        (0, dict(max_lr=6.0,
+                 pct_start=0.2,
+                 anneal_strategy="linear",
+                 base_momentum=0.6,
+                 max_momentum=0.75,
+                 cycle_momentum=True,
+                 div_factor=6.0,
+                 final_div_factor=1000.0)),
+        (15, SUBSEQUENT_LR_SCHED_ARGS),
+        (18, SUBSEQUENT_LR_SCHED_ARGS),
+        (21, SUBSEQUENT_LR_SCHED_ARGS),
+        (24, SUBSEQUENT_LR_SCHED_ARGS),
+        (27, SUBSEQUENT_LR_SCHED_ARGS),
+        (30, SUBSEQUENT_LR_SCHED_ARGS),
+    ),
+
+    prune_schedule=[
+        (15, 1 / 6),
+        (18, 2 / 6),
+        (21, 3 / 6),
+        (24, 4 / 6),
+        (27, 5 / 6),
+        (30, 6 / 6),
+    ],
 ))
 
 
 CONFIGS = dict(
-    mag_prune_50=MAGPRUNE50,
+    mag_prune_20_20_10=MAGPRUNE20_20_10,
+    mag_prune_15_15_30=MAGPRUNE15_15_30,
 )
