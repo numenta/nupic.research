@@ -80,9 +80,6 @@ class SaveFinalCheckpoint(object):
         self.setup_copy_dir()
 
     def setup_copy_dir(self):
-        base_dir = os.path.dirname(self.copy_checkpoint_dir)
-        assert os.path.exists(base_dir), (
-            "Can't copy to directory ({base_dir}) which does not exists.")
 
         copy_ckpt_path = self.copy_checkpoint_dir.replace("{name}", self.name)
         copy_ckpt_path = copy_ckpt_path.replace("{wandb_project}", self.wandb_project)
