@@ -22,14 +22,22 @@
 import torch
 import torch.nn.functional as F
 from torch import autograd
-from torch.autograd import Variable
 
 
 class ElasticWeightConsolidation:
     """
-    Default implementation of elastic weight consolidation.
+    Online version of Elastic Weight Consolidation.
+    Diagonals of the Fisher information matrix is calculated at the end
+    of each task, and used for loss calculation as the subsequent task.
+
     Based on the implementation in:
     https://github.com/kuc2477/pytorch-ewc
+
+    TODO: Matches original implementation, but requires checking for correctness
+    and comparing to existing literature.
+
+    Original implementation only applied to domain task (permuted MNIST), not
+    to the task domain.
     """
     def setup_experiment(self, config):
         """
@@ -45,25 +53,21 @@ class ElasticWeightConsolidation:
         super().setup_experiment(config)
         self.ewc_lambda = config.get("ewc_lambda", 40)
         fischer_sampler_size = config.get("ewc_fisher_sample_size",
-                                          int(len(self.train_loader)*0.1))
+                                          int(len(self.train_loader) * 0.1))
         self.ewc_fisher_num_batches = fischer_sampler_size // self.batch_size
 
     def run_task(self):
         """Run outer loop over tasks"""
-
         ret = super().run_task()
         self.logger.info("Estimating diagonals of the fisher information matrix...")
-        #  self.estimate_fisher()
-        self.consolidate(self.estimate_fisher())
-
+        self.estimate_fisher()
         return ret
 
     def estimate_fisher(self):
-
+        """Estimate diagonal of the fisher of fisher information matrix.
+        Saves mean and diagonals as attributes to the parameter"""
         loglikelihoods = []
         for idx, (x, y) in enumerate(self.train_loader):
-            x = Variable(x).to(self.device)
-            y = Variable(y).to(self.device)
             loglikelihoods.append(
                 F.log_softmax(self.model(x))[range(self.batch_size), y.data]
             )
@@ -82,69 +86,36 @@ class ElasticWeightConsolidation:
         grads = [torch.stack(gs) for gs in grads]
         fisher_diagonals = [(g ** 2).mean(0) for g in grads]
 
-        # for param, fd in zip(self.model.parameters(), fisher_diagonals):
-        #     param.mean_ = param.data.clone()
-        #     param.fisher_ = fd.detach().data.clone()
-
-        param_names = [
-            n.replace(".", "__") for n, p in self.model.named_parameters()
-        ]
-        return {n: f.detach() for n, f in zip(param_names, fisher_diagonals)}
-
-    def consolidate(self, fisher):
-        for n, p in self.model.named_parameters():
-            n = n.replace(".", "__")
-            self.model.register_buffer("{}_mean".format(n), p.data.clone())
-            self.model.register_buffer(
-                "{}_fisher".format(n), fisher[n].data.clone()
-            )
+        for param, fd in zip(self.model.parameters(), fisher_diagonals):
+            param.mean_ = param.data.clone()
+            param.fisher_ = fd.detach().data.clone()
 
     def complexity_loss(self, model):
         """
         Defines the complexity loss to be applied.
         """
+        cp = super().complexity_loss(model)
         if self.current_task > 0:
-            return self.ewc_loss()
-        return None
+            ewc_loss = self.ewc_loss()
+        return cp + ewc_loss
 
     def ewc_loss(self):
+        """Note: lambda constant is not divided by 2 in this version"""
         losses = []
-        # for p in self.model.parameters():
-        #     # Wrap mean and fisher in variables.
-        #     mean = Variable(p.mean_)
-        #     fisher = Variable(p.fisher_)
-
-        #     # Calculate a ewc loss. (assumes the parameter's prior as
-        #     # gaussian distribution with the estimated mean and the
-        #     # estimated cramer-rao lower bound variance, which is
-        #     # equivalent to the inverse of fisher information)
-        #     losses.append((fisher * (p - mean)**2).sum())
-
-        # return (self.ewc_lambda / 2) * sum(losses)
-
-        for n, p in self.model.named_parameters():
-            # retrieve the consolidated mean and fisher information.
-            n = n.replace(".", "__")
-            mean = getattr(self.model, "{}_mean".format(n))
-            fisher = getattr(self.model, "{}_fisher".format(n))
-            # wrap mean and fisher in variables.
-            mean = Variable(mean)
-            fisher = Variable(fisher)
-            # calculate a ewc loss. (assumes the parameter's prior as
+        for p in self.model.parameters():
+            # Calculate a ewc loss. (assumes the parameter's prior as
             # gaussian distribution with the estimated mean and the
             # estimated cramer-rao lower bound variance, which is
             # equivalent to the inverse of fisher information)
-            losses.append((fisher * (p - mean) ** 2).sum())
+            losses.append((p.fisher_ * (p - p.mean_)**2).sum())
 
-        return (self.ewc_lambda / 2) * sum(losses)
-
-
+        return self.ewc_lambda * sum(losses)
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("Initialize EWC attributes")
-        eo["complexity_loss"].append("Return EWC loss")
-        eo["run_task"].append("Adds EWC loss")
+        eo["complexity_loss"].append("Adds EWC loss if task is greater than 0 ")
+        eo["run_task"].append("Estimate diagonals of Fisher matrix at end of task")
 
         return eo
