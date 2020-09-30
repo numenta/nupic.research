@@ -130,21 +130,27 @@ def train_model(
 
         del data, target, output
 
+        t2 = time.time()
+        if use_amp:
+            with amp.scale_loss(error_loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            error_loss.backward()
+
+        t3 = time.time()
+
+        # Compute and backpropagate the complexity loss. This happens after
+        # error loss has backpropagated, freeing its computation graph, so the
+        # two loss functions don't compete for memory.
         complexity_loss = (complexity_loss_fn(model)
                            if complexity_loss_fn is not None
                            else None)
-
-        loss = (error_loss + complexity_loss
-                if complexity_loss is not None
-                else error_loss)
-
-        t2 = time.time()
-        if use_amp:
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            loss.backward()
-        del loss
+        if complexity_loss is not None:
+            if use_amp:
+                with amp.scale_loss(complexity_loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                complexity_loss.backward()
 
         if freeze_params is not None:
             with torch.no_grad():
@@ -153,14 +159,15 @@ def train_model(
                     param_indices = param[1]
                     param_module.grad[param_indices, :] = 0.0
 
-        t3 = time.time()
-        optimizer.step()
         t4 = time.time()
+        optimizer.step()
+        t5 = time.time()
 
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
+                           "complexity loss forward/backward: {:.3f}s,"
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                              t4 - t3)
+                                                              t4 - t3, t5 - t4)
             post_batch_callback(model=model,
                                 error_loss=error_loss.detach(),
                                 complexity_loss=(complexity_loss.detach()
