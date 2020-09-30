@@ -80,9 +80,3 @@ class OmniglotCNN(nn.Module):
             nn.MaxPool2d(2, 2),
             nn.ReLU(),
         ]
-
-# if __name__ == "__main__":
-#     model = StandardCNN(num_classes=10)
-#     output = model(torch.rand(10, 1,105,105))
-#     pred = output.max(1, keepdim=True)[0]
-#     print(pred[:, 0].tolist())
