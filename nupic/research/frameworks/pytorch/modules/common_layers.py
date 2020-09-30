@@ -28,7 +28,13 @@ defined by data.
 
 from torch import nn
 
-from nupic.torch.modules import KWinners2d, SparseWeights, SparseWeights2d
+from nupic.torch.modules import (
+    KWinners2d,
+    PrunableSparseWeights,
+    PrunableSparseWeights2d,
+    SparseWeights,
+    SparseWeights2d,
+)
 
 
 def relu_maybe_kwinners2d(channels,
@@ -126,8 +132,54 @@ def sparse_conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
     return layer
 
 
+def prunable_linear(in_features, out_features, bias=True, target_density=1.0):
+    """
+    Get a nn.Linear, possibly wrapped in a PrunableSparseWeights
+
+    :param target_density:
+        Either a density or a function that returns a density.
+    :type target_density: float or function(in_features, out_features)
+    """
+    layer = nn.Linear(in_features, out_features, bias=bias)
+
+    if callable(target_density):
+        target_density = target_density(in_features, out_features)
+
+    if target_density < 1.0:
+        layer = PrunableSparseWeights(layer, sparsity=0.0)
+        layer._target_density = target_density
+
+    return layer
+
+
+def prunable_conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
+                    dilation=1, groups=1, bias=True, target_density=1.0):
+    """
+    Get a nn.Conv2d, possibly wrapped in a PrunableSparseWeights2d
+
+    :param target_density:
+        Either a density or a function that returns a density.
+    :type target_density:
+        float or function(in_channels, out_channels, kernel_size)
+    """
+    layer = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride,
+                      padding=padding, dilation=dilation, groups=groups,
+                      bias=bias)
+
+    if callable(target_density):
+        target_density = target_density(in_channels, out_channels, kernel_size)
+
+    if target_density < 1.0:
+        layer = PrunableSparseWeights2d(layer, sparsity=0.0)
+        layer._target_density = target_density
+
+    return layer
+
+
 __all__ = [
     "relu_maybe_kwinners2d",
     "sparse_linear",
     "sparse_conv2d",
+    "prunable_linear",
+    "prunable_conv2d",
 ]
