@@ -35,9 +35,9 @@ class MultiCycleLR:
     def setup_experiment(self, config):
         """
         :param config:
-            - multi_lr_scheduler_args: A list of (epoch, dict) pairs.
-                                       The dicts don't need to include epoch
-                                       counts, this is inferred from the config.
+            - multi_cycle_lr_args: A list of (epoch, dict) pairs.
+                                   The dicts don't need to include epoch
+                                   counts, this is inferred from the config.
         """
         config = copy.deepcopy(config)
 
@@ -47,31 +47,36 @@ class MultiCycleLR:
         ignored_args = config.pop("lr_scheduler_args", None)
         if ignored_args is not None and len(ignored_args) > 0:
             self.logger.warning("Ignoring lr_scheduler_args, using "
-                                "multi_lr_scheduler_args")
+                                "multi_cycle_lr_args")
+
+        config["lr_scheduler_step_every_batch"] = True
 
         super().setup_experiment(config)
 
-        args_by_epoch = dict(copy.deepcopy(config["multi_lr_scheduler_args"]))
-
         # Insert epoch counts and div_factors
-        cycle_start_epochs = sorted(args_by_epoch.keys())
-        assert len(cycle_start_epochs) > 0 and cycle_start_epochs[0] == 0
-        for i, start_epoch in enumerate(cycle_start_epochs):
-            if i + 1 < len(cycle_start_epochs):
-                end_epoch = cycle_start_epochs[i + 1]
+        improved_args = {}
+        multi_cycle_lr_args = sorted(config["multi_cycle_lr_args"],
+                                     key=lambda x: x[0])
+        for i, (start_epoch, cycle_config) in enumerate(multi_cycle_lr_args):
+            if i + 1 < len(multi_cycle_lr_args):
+                end_epoch = multi_cycle_lr_args[i + 1][0]
             else:
                 end_epoch = config["epochs"]
 
-            args_by_epoch[start_epoch]["epochs"] = end_epoch - start_epoch
+            cycle_config = copy.deepcopy(cycle_config)
+            cycle_config["epochs"] = end_epoch - start_epoch
 
             # Default behavior: no sudden change in learning rate between
             # cycles.
-            if "div_factor" not in args_by_epoch[start_epoch] and i > 0:
-                prev_args = args_by_epoch[cycle_start_epochs[i - 1]]
-                if "final_div_factor" in prev_args:
-                    args_by_epoch[start_epoch]["div_factor"] = \
-                        prev_args["final_div_factor"]
-        self.multi_cycle_args_by_epoch = args_by_epoch
+            if "div_factor" not in cycle_config and i > 0:
+                prev_cycle_config = multi_cycle_lr_args[i - 1][1]
+                if "final_div_factor" in prev_cycle_config:
+                    cycle_config["div_factor"] = \
+                        prev_cycle_config["final_div_factor"]
+
+            improved_args[start_epoch] = cycle_config
+
+        self.multi_cycle_args_by_epoch = improved_args
 
         if self.rank == 0:
             self.logger.info("MultiCycleLR regime: "

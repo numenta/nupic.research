@@ -45,10 +45,12 @@ class PruneLowMagnitude:
                                  percentage if remaining weights to be pruned at
                                  each step. With "linear", a fixed percentage of
                                  the total weights will be pruned at each step.
+            - validate_on_prune: Whether to run validation after pruning.
         """
         super().setup_experiment(config)
         self.prune_schedule = dict(config["prune_schedule"])
         self.prune_curve_shape = config.get("prune_curve_shape", "exponential")
+        self.validate_on_prune = config.get("validate_on_prune", True)
 
     def pre_epoch(self):
         super().pre_epoch()
@@ -72,6 +74,14 @@ class PruneLowMagnitude:
                     off_mask.view(-1)[on_indices] = 0
                     module.off_mask = off_mask
                     module.rezero_weights()
+
+            self.current_timestep += 1
+
+            if self.validate_on_prune:
+                result = self.validate()
+                self.extra_val_results.append(
+                    (self.current_timestep, result)
+                )
 
     @classmethod
     def get_execution_order(cls):
