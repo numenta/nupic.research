@@ -50,7 +50,7 @@ class PruneLowMagnitude:
         super().setup_experiment(config)
         self.prune_schedule = dict(config["prune_schedule"])
         self.prune_curve_shape = config.get("prune_curve_shape", "exponential")
-        self.validate_on_prune = config.get("validate_on_prune", True)
+        self.validate_on_prune = config.get("validate_on_prune", False)
 
     def pre_epoch(self):
         super().pre_epoch()

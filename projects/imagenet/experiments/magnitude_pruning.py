@@ -72,6 +72,7 @@ MAGPRUNE_BASE.update(dict(
     batch_size=128,
     val_batch_size=128,
     extra_validations_per_epoch=1,
+    validate_on_prune=True,
 
     seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
 
