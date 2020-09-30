@@ -25,6 +25,7 @@ from .default import CONFIGS as DEFAULT
 from .magnitude_pruning import CONFIGS as MAGNITUDE_PRUNING
 from .mixed_precision import CONFIGS as MIXED_PRECISION
 from .retrained_output_layer import CONFIGS as RETRAINED_OUTPUT_LAYER
+from .snr_pruning import CONFIGS as SNR_PRUNING
 from .super_convergence import CONFIGS as SUPER_CONVERGENCE
 from .sparse_r1 import CONFIGS as SPARSE_R1
 
@@ -41,6 +42,7 @@ CONFIGS.update(CUSTOM_SUPER)
 CONFIGS.update(DEFAULT)
 CONFIGS.update(MAGNITUDE_PRUNING)
 CONFIGS.update(MIXED_PRECISION)
+CONFIGS.update(SNR_PRUNING)
 CONFIGS.update(SUPER_CONVERGENCE)
 CONFIGS.update(RETRAINED_OUTPUT_LAYER)
 CONFIGS.update(SPARSE_R1)
