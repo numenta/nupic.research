@@ -21,6 +21,7 @@
 import gzip
 import pickle
 import random
+import re
 import sys
 import time
 
@@ -427,6 +428,26 @@ def set_module_attr(module, name, value):
         setattr(parent_module, child_name, value)
 
 
+def get_parent_module(module, name):
+    """
+    Retrieves the parent module by name. For example "features.stem.conv" has
+    parent module "features.stem", while the name "conv" would imply the
+    parent module is simply "module".
+    """
+
+    # Ex 1: "features.stem.conv" -> [None, "features.stem", "conv"]
+    # Ex 2: "weight" -> [None, "weight"]
+    split_name = [None] + name.rsplit(".", 1)
+    parent_name = split_name[-2]
+
+    if parent_name is not None:
+        parent_module = get_module_attr(module, parent_name)
+    else:
+        parent_module = module
+
+    return parent_module
+
+
 def _get_sub_module(module, name):
     """
     Gets a submodule either by name or index - pytorch either uses names for module
@@ -438,3 +459,17 @@ def _get_sub_module(module, name):
         return module[int(name)]
     else:
         return getattr(module, name)
+
+
+def _is_match(pattern, string):
+
+    try:
+        r = re.compile(pattern)
+    except re.error as msg:
+        raise Exception(f"Invalid regex '{pattern}': {msg}")
+
+    match = r.match(string)
+    if match is not None:
+        return True
+    else:
+        return False
