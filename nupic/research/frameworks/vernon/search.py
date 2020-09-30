@@ -244,4 +244,3 @@ class TrialsCollection:
                             v2.expand_in_place(config, index, k1, k2)
 
         return expanded_trials
-
