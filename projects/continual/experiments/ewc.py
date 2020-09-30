@@ -28,15 +28,15 @@ from copy import deepcopy
 import torch
 
 from nupic.research.frameworks.pytorch.datasets import torchvisiondataset
-from nupic.research.frameworks.pytorch.models import StandardMLP
+from nupic.research.frameworks.pytorch.models import EWCNetwork, StandardMLP
 from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 from nupic.research.frameworks.vernon.run_experiment.trainables import (
-    ContinualLearningTrainable
+    ContinualLearningTrainable,
 )
 
 
 class EWCContinualLearningExperiment(mixins.ElasticWeightConsolidation,
-                                            ContinualLearningExperiment):
+                                     ContinualLearningExperiment):
     pass
 
 
@@ -44,15 +44,16 @@ class ReduceLRContinualLearningExperiment(mixins.ReduceLRAfterTask,
                                           ContinualLearningExperiment):
     pass
 
-# Alternative to run on a single GPU
-def run_experiment(config):
-    exp = config.get("experiment_class")()
-    exp.setup_experiment(config)
-    print(f"Training started....")
-    while not exp.should_stop():
-        result = exp.run_epoch()
-        print(f"Accuracy: {result['mean_accuracy']:.4f}")
-    print(f"....Training finished")
+
+# Regular continual learning, no EWC, 5 tasks
+# avg acc .499 -> acc per task [.398, .361, .546, .839, .364]
+
+# Same experiment, with EWC
+# avg acc .529 -> acc per task [.514, .437, .584, .836, .278]
+
+# Same experiment, reducing learning rate after first task, no EWC
+# sanity check
+# avg acc .2339 -> acc per task [.976, .006, .005, .002, 0.000]
 
 
 cl_mnist = dict(
@@ -78,45 +79,42 @@ cl_mnist = dict(
     batch_size=1024,
     # optimizer
     optimizer_class=torch.optim.SGD,
-    # .1828 -> [0, 0, 0, 0, .92]
-    optimizer_args=dict(lr=1e-2),
-    # .4995 -> [.39, .36, .54, .83, .36]
-    # optimizer_args=dict(lr=5e-3),
+    optimizer_args=dict(lr=5e-3),
 )
 
 cl_mnist_ewc = deepcopy(cl_mnist)
 cl_mnist_ewc.update(
     experiment_class=EWCContinualLearningExperiment,
-    optimizer_args=dict(lr=5e-3),
-    # .5032 -> [.40, .37, .55, .84, .34]
-    # ewc_lambda=40,
-    # .5041 -> [.40, .38, .56, .84, .33]
-    # ewc_lambda=80,
-    # .5155 -> [.44, .41, .58, .84, .29]
-    # ewc_lambda=400,
-    # .529 -> [.51, .43, .58, .83, .27]
-    ewc_lambda=800,
+    ewc_lambda=400,
 )
 
-# there is evidence it is working, it is doing what it is supposed to be
-# might just be a matter of getting the right hyperparameters
-
-# there is a limit to how high lambda can be
-# the actual question here is not whether this is the best results possible -
-# its just within our framework, can we replicate the results from a known repo?
-
-# .5978 -> [.94, .35, .57, .75, .34]
 cl_mnist_reduce = deepcopy(cl_mnist)
 cl_mnist_reduce.update(
     experiment_class=ReduceLRContinualLearningExperiment,
-    new_lr=5e-3,
+    new_lr=2e-3,
+)
+
+# Mimics the original implementation in the repo
+# useful to compare experiments.
+ewc_repr = deepcopy(cl_mnist)
+ewc_repr.update(
+    experiment_class=EWCContinualLearningExperiment,
+    epochs=3,
+    num_classes=10,
+    num_tasks=10,
+    ewc_lambda=40,
+    optimizer_class=torch.optim.SGD,
+    optimizer_args=dict(lr=1e-1, weight_decay=0),
+    batch_size=128,
+    ewc_fisher_sample_size=1024,
+    model_class=EWCNetwork,
+    model_args=dict(input_size=28 * 28, output_size=10),
 )
 
 # Export configurations in this file
 CONFIGS = dict(
     cl_mnist=cl_mnist,
     cl_mnist_ewc=cl_mnist_ewc,
-    cl_mnist_reduce=cl_mnist_reduce
+    cl_mnist_reduce=cl_mnist_reduce,
+    ewc_repr=ewc_repr
 )
-
-

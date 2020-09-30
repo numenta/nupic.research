@@ -38,3 +38,4 @@ from .pretrained_models import (
     xception
 )
 from .common_models import StandardMLP, OmniglotCNN
+from .cl_models import EWCNetwork
