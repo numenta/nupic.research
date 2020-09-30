@@ -19,7 +19,7 @@
 #
 
 """
-Run a simple GSC experiment using OneCycleLR. The parameters used here 
+Run a simple GSC experiment using OneCycleLR. The parameters used here
 are derived from earlier ImageNet experiments and are unlikely to be optimal.
 """
 
