@@ -64,8 +64,13 @@ class ElasticWeightConsolidation:
         return ret
 
     def estimate_fisher(self):
-        """Estimate diagonal of the fisher of fisher information matrix.
-        Saves mean and diagonals as attributes to the parameter"""
+        """
+        Estimate diagonal of the fisher of fisher information matrix.
+        Saves mean and diagonals as attributes to the parameter
+
+        TODO: adapt it to take advantage of multiple GPUs/nodes in
+        distributed setting.
+        """
         loglikelihoods = []
         for idx, (x, y) in enumerate(self.train_loader):
             loglikelihoods.append(
