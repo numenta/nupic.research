@@ -297,6 +297,7 @@ class SupervisedTrainable(BaseTrainable):
 
     def _run_iteration(self):
         """Run one epoch of training on each process."""
+
         status = []
         for w in self.procs:
             status.append(w.run_epoch.remote())

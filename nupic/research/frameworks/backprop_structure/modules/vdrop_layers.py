@@ -510,6 +510,46 @@ def vdrop_regularization(logalpha):
              - 0.5 * F.softplus(-logalpha) - k1)
 
 
+K1 = 0.63576
+K2 = 1.8732
+K3 = 1.48695
+
+
+class GaussianLogUniformKLDivergence(torch.autograd.Function):
+    """
+    Like vdrop_regularization, but designed to have no autograd memory overhead.
+    It receives mu and logvar, matching the way these parameters are already
+    stored. This function could be made faster by caching intermediate values,
+    but it is often run on every weight in the network, so these cached tensors
+    would often be very large.
+    """
+    @staticmethod
+    def forward(ctx, mu, logvar, epsilon=1e-8):
+        ctx.save_for_backward(mu, logvar)
+        ctx.epsilon = epsilon
+
+        logalpha = logvar - (mu.square() + epsilon).log()
+        return (-K1 * torch.sigmoid(K2 + K3 * logalpha)
+                + 0.5 * F.softplus(-logalpha) + K1)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        mu, logvar = ctx.saved_tensors
+        epsilon = ctx.epsilon
+
+        mu2_plus_epsilon = mu.square() + epsilon
+        logalpha = logvar - mu2_plus_epsilon.log()
+
+        sig = torch.sigmoid(K2 + K3 * logalpha)
+        grad_logalpha = grad_output * (-K1 * K3 * sig * (1 - sig)
+                                       - 0.5 * torch.sigmoid(-logalpha))
+
+        grad_mu = grad_logalpha * (-2 * mu / mu2_plus_epsilon)
+        grad_logvar = grad_logalpha
+
+        return grad_mu, grad_logvar, None
+
+
 __all__ = [
     "VDropCentralData",
     "MaskedVDropCentralData",
