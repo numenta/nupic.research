@@ -35,9 +35,9 @@ import ray  # noqa: F401, I001
 import torch.multiprocessing as multiprocessing
 
 from experiments import CONFIGS
-from nupic.research.frameworks import vernon
 from nupic.research.frameworks.vernon import ImagenetExperiment
 from nupic.research.frameworks.vernon.parser_utils import MAIN_PARSER, process_args
+from nupic.research.frameworks.vernon.run import run, terminate_processes
 
 multiprocessing.set_start_method("spawn", force=True)
 
@@ -139,14 +139,14 @@ def run_trial(config):
     queue = multiprocessing.SimpleQueue()
     ctx = multiprocessing.spawn(log_background_task, args=(config, queue), join=False)
     try:
-        result = vernon.run(
+        result = run(
             config=config,
             logger=partial(log_results, queue),
             on_checkpoint=partial(save_checkpoint, config),
         )
     except Exception as ex:
         # Terminate background process on error
-        vernon.terminate_processes(ctx)
+        terminate_processes(ctx)
         raise ex
     finally:
         # No more results

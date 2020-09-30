@@ -19,10 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .trainables import (
-    BaseTrainable,
-    SupervisedTrainable,
-    ContinualLearningTrainable,
-    SigOptSupervisedTrainable,
-    DebugTrainable,
-)
+from .oml import CONFIGS as OML
+
+"""
+Import and collect all Imagenet experiment configurations into one CONFIG
+"""
+__all__ = ["CONFIGS"]
+
+# Collect all configurations
+CONFIGS = dict()
+CONFIGS.update(OML)
