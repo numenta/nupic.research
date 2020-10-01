@@ -22,7 +22,8 @@
 import torch
 
 from nupic.torch.modules import SparseWeights
-from utils import generate_random_binary_vectors
+
+from .utils import generate_random_binary_vectors
 
 
 class RoutingFunction(torch.nn.Module):
@@ -76,7 +77,6 @@ class RoutingFunction(torch.nn.Module):
         :param x: the batch input to the routing function
         :type x: torch Tensor
         """
-        # TODO: remove this assertion, since this slows down forward computation
         assert len(output_mask_inds) == x.size(0), (
             "Length of output_mask_inds must match size of x on batch dimension 0"
         )
@@ -92,6 +92,10 @@ class RoutingFunction(torch.nn.Module):
     @property
     def num_output_masks(self):
         return self.output_masks.size(0)
+
+    @property
+    def weights(self):
+        return list(self.sparse_weights.parameters())[0].data
 
 
 if __name__ == "__main__":
