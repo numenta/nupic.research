@@ -24,11 +24,11 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import gradcheck
 
-from nupic.research.frameworks.continuous_learning.dend_kwinners import (
+from nupic.research.frameworks.continual_learning.dend_kwinners import (
     DendriteKWinners2d,
     DendriteKWinners2dLocal,
 )
-from nupic.research.frameworks.continuous_learning.dendrite_layers import DendriteOutput
+from nupic.research.frameworks.continual_learning.dendrite_layers import DendriteOutput
 
 
 class DendKWinnerTest(unittest.TestCase):

@@ -23,15 +23,12 @@ import math
 
 import torch
 
-from nupic.torch.modules.prunable_sparse_weights import PrunableSparseWeightBase
 
-
-class PruneLowMagnitude:
+class PruneLowSNR:
     """
-    Prunes weights by magnitude at the beginning of select epochs.
-
-    Each module of type PrunableSparseWeightBase will be pruned. Each of these
-    modules must have attribute "_target_density".
+    Prunes weights by signal-to-noise ratioin. Requires variational dropout
+    modules. Annotate each module with its their target density by setting
+    attribute module._target_density.
     """
     def setup_experiment(self, config):
         """
@@ -56,9 +53,23 @@ class PruneLowMagnitude:
         super().pre_epoch()
         if self.current_epoch in self.prune_schedule:
             prune_progress = self.prune_schedule[self.current_epoch]
+            vdrop_data = self.model.module.vdrop_data
 
-            for module in self.model.modules():
-                if isinstance(module, PrunableSparseWeightBase):
+            for (module,
+                 z_mask,
+                 z_mu,
+                 z_logvar,
+                 z_logalpha) in zip(vdrop_data.modules,
+                                    vdrop_data.z_mask.split(
+                                        vdrop_data.z_chunk_sizes),
+                                    vdrop_data.z_mu.split(
+                                        vdrop_data.z_chunk_sizes),
+                                    vdrop_data.z_logvar.split(
+                                        vdrop_data.z_chunk_sizes),
+                                    vdrop_data.compute_z_logalpha().split(
+                                        vdrop_data.z_chunk_sizes)):
+
+                if hasattr(module, "_target_density"):
                     if self.prune_curve_shape == "exponential":
                         density = module._target_density ** prune_progress
                     elif self.prune_curve_shape == "linear":
@@ -66,14 +77,22 @@ class PruneLowMagnitude:
                             (1 - module._target_density) * prune_progress
                         )
 
-                    mag = module.module.weight.detach().abs().view(-1)
-                    on_indices = mag.topk(math.floor(mag.numel() * density))[1]
-                    off_mask = torch.ones(module.zero_mask.shape,
-                                          device=module.zero_mask.device,
-                                          dtype=torch.bool)
-                    off_mask.view(-1)[on_indices] = 0
-                    module.off_mask = off_mask
-                    module.rezero_weights()
+                    num_weights = math.floor(z_logalpha.numel() * density)
+                    on_indices = z_logalpha.topk(num_weights, largest=False)[1]
+
+                    z_mask.zero_()
+                    z_mask[on_indices] = 1
+                    z_mu.data *= z_mask
+                    z_logvar[~z_mask.bool()] = vdrop_data.pruned_logvar_sentinel
+
+                    if self.rank == 0:
+                        name = [name
+                                for name, m in self.model.named_modules()
+                                if m is module][0]
+                        self.logger.info(f"Pruned {name} to {density} ")
+
+            for parameter, mask in vdrop_data.masked_parameters():
+                zero_momentum(self.optimizer, parameter, mask)
 
             self.current_timestep += 1
 
@@ -86,6 +105,26 @@ class PruneLowMagnitude:
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].append("PruneLowMagnitude: Initialize")
-        eo["pre_epoch"].append("PruneLowMagnitude: Maybe prune")
+        eo["setup_experiment"].append("PruneLowSNR: Initialize")
+        eo["pre_epoch"].append("PruneLowSNR: Maybe prune")
         return eo
+
+
+def zero_momentum(optimizer, parameter, mask):
+    """
+    Modifies the momentum of the given parameter by masking it.
+    """
+    if isinstance(optimizer, torch.optim.Adam):
+        state = optimizer.state[parameter]
+        if "exp_avg" in state:
+            state["exp_avg"].data *= mask
+        if "exp_avg_sq" in state:
+            state["exp_avg_sq"].data *= mask
+    elif isinstance(optimizer, torch.optim.SGD):
+        state = optimizer.state[parameter]
+        if "momentum_buffer" in state:
+            state["momentum_buffer"] *= mask
+    else:
+        raise ValueError(
+            f"Tell me how to zero the momentum of optimizer {type(optimizer)}"
+        )
