@@ -39,6 +39,7 @@ class TaskDistributedSampler(DistributedSampler):
     ):
         super().__init__(dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle)
         self.task_indices = task_indices
+        self.num_classes = len(task_indices)
         self.set_active_tasks(0)
 
     def set_active_tasks(self, tasks):
@@ -86,6 +87,7 @@ class TaskRandomSampler(Sampler):
 
     def __init__(self, task_indices):
         self.task_indices = task_indices
+        self.num_classes = len(task_indices)
         self.set_active_tasks(0)
 
     def set_active_tasks(self, tasks):
