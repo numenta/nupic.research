@@ -54,13 +54,13 @@ class RoutingFunction(torch.nn.Module):
         :param d_out: the number of dimensions in the sparse linear output
         :type d_out: int
         :param k: the number of unique random binary vectors that can "route" the
-        sparse linear output
+                  sparse linear output
         :type k: int
         :param sparsity: the sparsity in the SparseWeights layer (see
-        nupic.torch.modules.SparseWeights for more details)
+                         nupic.torch.modules.SparseWeights for more details)
         :type sparsity: float
         """
-        super(RoutingFunction, self).__init__()
+        super().__init__()
         self.sparse_weights = SparseWeights(
             torch.nn.Linear(in_features=d_in, out_features=d_out, bias=False),
             sparsity=sparsity
@@ -72,7 +72,8 @@ class RoutingFunction(torch.nn.Module):
         Forward pass of the routing function
 
         :param output_mask_inds: a list of indices where the item at index j specifies
-        the input to the routing function corresponding to batch item j in x
+                                 the input to the routing function corresponding to
+                                 batch item j in x
         :type output_mask_inds: list of int
         :param x: the batch input to the routing function
         :type x: torch Tensor
@@ -95,7 +96,7 @@ class RoutingFunction(torch.nn.Module):
 
     @property
     def weights(self):
-        return list(self.sparse_weights.parameters())[0].data
+        return self.sparse_weights.module.weight.data
 
 
 if __name__ == "__main__":

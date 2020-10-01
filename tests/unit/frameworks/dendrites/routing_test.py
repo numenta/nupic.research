@@ -32,26 +32,10 @@ from nupic.research.frameworks.dendrites.routing import RoutingFunction
 
 
 class RoutingFunctionTest(unittest.TestCase):
-
-    def test_output_masks(self):
-        dim_in = 100
-        dim_out = 100
-        num_output_masks = 10
-        sparsity = 0.7
-
-        r = RoutingFunction(
-            d_in=dim_in,
-            d_out=dim_out,
-            k=num_output_masks,
-            sparsity=sparsity
-        )
-
-        for j in range(num_output_masks):
-
-            output_mask_j = r.get_output_mask(j)
-            for i in range(dim_out):
-                if output_mask_j[i] == 0.0:
-                    self.assertEqual(output_mask_j[i], 0.0)
+    """
+    Tests to check the correctness of the routing function R(j, x), as implemented by
+    the RoutingFunction class
+    """
 
     def test_function_output_satisfies_masks(self):
         dim_in = 100
@@ -71,8 +55,8 @@ class RoutingFunctionTest(unittest.TestCase):
         for j in range(num_output_masks):
 
             output = r([j], x)
-            if output.ndim > 1:
-                output = output.view(-1)
+            self.assertEqual(output.ndim, 2)
+            output = output.view(-1)
 
             output_mask_j = r.get_output_mask(j)
             for i in range(dim_out):
@@ -94,8 +78,6 @@ class RoutingFunctionTest(unittest.TestCase):
 
         x = torch.randn((1, dim_in))
         output = torch.matmul(r.weights, x.view(-1))
-        if output.ndim > 1:
-            output = output.view(-1)
 
         for j in range(num_output_masks):
 
@@ -103,8 +85,8 @@ class RoutingFunctionTest(unittest.TestCase):
             expected_output = output_mask_j * output
 
             actual_output = r([j], x)
-            if actual_output.ndim > 1:
-                actual_output = actual_output.view(-1)
+            self.assertEqual(actual_output.ndim, 2)
+            actual_output = actual_output.view(-1)
 
             for i in range(dim_out):
                 self.assertEqual(actual_output[i], expected_output[i])
