@@ -21,6 +21,7 @@
 
 from .base import CONFIGS as BASE
 from .test_sigopt import CONFIGS as TEST_SIGOPT
+from .gsc_onecyclelr import CONFIGS as SPARSE_CNN_ONECYCLELR
 
 """
 Import and collect all Imagenet experiment configurations into one CONFIG
@@ -31,3 +32,4 @@ __all__ = ["CONFIGS"]
 CONFIGS = dict()
 CONFIGS.update(BASE)
 CONFIGS.update(TEST_SIGOPT)
+CONFIGS.update(SPARSE_CNN_ONECYCLELR)
