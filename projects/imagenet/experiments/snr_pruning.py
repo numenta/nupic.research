@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-
 import copy
 
 import numpy as np
@@ -28,6 +27,9 @@ import torch.nn.init
 import torch.optim
 from ray import tune
 
+from nupic.research.frameworks.backprop_structure.model_conversion import (
+    maskedvdrop_to_sparseweights,
+)
 from nupic.research.frameworks.backprop_structure.modules import (
     MaskedVDropCentralData,
     prunable_vdrop_conv2d,
@@ -35,6 +37,8 @@ from nupic.research.frameworks.backprop_structure.modules import (
 )
 from nupic.research.frameworks.backprop_structure.networks import vdrop_resnet50
 from nupic.research.frameworks.pytorch.models import resnet50_swsl
+from nupic.research.frameworks.pytorch.models.resnets import resnet50
+from nupic.research.frameworks.pytorch.modules import sparse_conv2d, sparse_linear
 from nupic.research.frameworks.vernon import ImagenetExperiment, mixins
 
 from .base import DEFAULT
@@ -193,6 +197,36 @@ SNR_PRUNE_15_15_30.update(dict(
 ))
 
 
+class ExportedExperiment(mixins.ExportModel,
+                         mixins.RezeroWeights,
+                         mixins.KnowledgeDistillation,
+                         ImagenetExperiment):
+    pass
+
+
+EXPORT_TO_STATIC = copy.deepcopy(DEFAULT)
+EXPORT_TO_STATIC.update(
+    batch_size=128,
+    experiment_class=ExportedExperiment,
+    model_class=resnet50,
+    model_args=dict(
+        num_classes=NUM_CLASSES,
+        conv_layer=sparse_conv2d,
+        conv_args=dict(
+            density=conv_target_density,
+        ),
+        linear_layer=sparse_linear,
+        linear_args=dict(
+            density=0.25,
+        ),
+    ),
+)
+
+
 CONFIGS = dict(
     snr_prune_15_15_30=SNR_PRUNE_15_15_30,
+
+    snr_prune_15_15_30_exported={**EXPORT_TO_STATIC,
+                                 "prev_config": SNR_PRUNE_15_15_30,
+                                 "export_model_fn": maskedvdrop_to_sparseweights},
 )
