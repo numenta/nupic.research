@@ -22,6 +22,7 @@
 import unittest
 
 import torch
+from torch.nn.functional import sigmoid
 
 from nupic.research.frameworks.dendrites import (
     DendriteSegments,
@@ -123,6 +124,43 @@ class DendriticWeightsTests(unittest.TestCase):
         out = dendritic_weights(x, context)
         self.assertEqual(out.shape, (8, 10))
 
+    def test_apply_biasing_dendrites(self):
+        """
+        Validate the apply_dendrites function of a biasing dendritic layer.
+        The max of the dendrite_activations should be taken per batch per unit.
+        """
+        # Dendritic weights as a bias.
+        linear = torch.nn.Linear(10, 10)
+        dendritic_weights = DendriticWeights(
+            module=linear,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=True,
+        )
+
+        # pseudo output: batch_size=2, out_features=3
+        y = torch.tensor([[0.1, -0.1, 0.5], [0.2, 0.3, -0.2]])
+
+        # pseudo dendrite_activations: batch_size=2, num_units=3, num_segments=3
+        dendrite_activations = torch.tensor(
+            [
+                [[0.43, 1.64, 1.49], [-0.79, 0.53, 1.08], [0.02, 0.04, 0.57]],
+                [[1.79, -0.48, -0.38], [-0.15, 0.76, -1.13], [1.04, -0.58, -0.31]],
+            ]
+        )
+
+        # Expected max activation per batch per unit.
+        max_activation = torch.tensor([[1.64, 1.08, 0.57], [1.79, 0.76, 1.04]])
+
+        # Expected output: dendrites applied as bias
+        expected_output = y + max_activation
+        actual_output = dendritic_weights.apply_dendrites(y, dendrite_activations)
+
+        all_matches = (expected_output == actual_output).all()
+        self.assertTrue(all_matches)
+
     def test_sparsity(self):
         """
         Ensure both the linear weights and segment weights are rezeroed properly.
@@ -176,6 +214,43 @@ class DendriticWeightsTests(unittest.TestCase):
 
         out = dendritic_weights(x, context)
         self.assertEqual(out.shape, (8, 10))
+
+    def test_apply_gating_dendrites(self):
+        """
+        Validate the apply_dendrites function of a gating dendritic layer.
+        The max of the dendrite_activations should be taken per batch per unit.
+        """
+        # Dendritic weights as a bias.
+        linear = torch.nn.Linear(10, 10)
+        dendritic_weights = GatingDendriticWeights(
+            module=linear,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=True,
+        )
+
+        # pseudo output: batch_size=2, out_features=3
+        y = torch.tensor([[0.73, 0.72, 0.62], [0.26, 0.24, 0.65]])
+
+        # pseudo dendrite_activations: batch_size=2, num_units=3, num_segments=2
+        dendrite_activations = torch.tensor(
+            [
+                [[-1.15, -0.49], [0.87, -0.58], [-0.36, -0.93]],
+                [[-0.08, -1.00], [-0.71, 0.08], [0.15, 0.40]],
+            ]
+        )
+
+        # Expected max activation per batch per unit.
+        max_activation = torch.tensor([[-0.49, 0.87, -0.36], [-0.08, 0.08, 0.40]])
+
+        # Expected output: dendrites applied as gate
+        expected_output = y * sigmoid(max_activation)
+        actual_output = dendritic_weights.apply_dendrites(y, dendrite_activations)
+
+        all_matches = (expected_output == actual_output).all()
+        self.assertTrue(all_matches)
 
 
 if __name__ == "__main__":
