@@ -24,6 +24,8 @@ A simple implementation of dendrite weights. This combines the output from a (sp
 linear layer with the output from a set of dendritic segments.
 """
 
+from torch.nn.functional import sigmoid
+
 from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights
 
@@ -82,4 +84,5 @@ class DendriticWeights(SparseWeights):
 class GatingDendriticWeights(DendriticWeights):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a gating mechanism."""
-        return y * dendrite_activations.max(dim=2).values  # max along each segment
+        # Multiple by the sigmoid of the max along each segment.
+        return y * sigmoid(dendrite_activations.max(dim=2).values)
