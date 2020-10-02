@@ -20,8 +20,6 @@
 #
 # ------------------------------------------------------------------------------
 
-attrs
-
 # Invoke py.test as distutils command
 pytest-runner==5.1
 pytest==5.2.1
@@ -80,3 +78,5 @@ pep8-naming==0.8.2
 
 # Check string quotes
 flake8-quotes==2.1.0
+
+# Required by pytest and flake8-bugbear
