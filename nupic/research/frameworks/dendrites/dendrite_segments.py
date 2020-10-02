@@ -87,7 +87,10 @@ class DendriteSegments(torch.nn.Module):
         """Initialize the linear transformation for each unit."""
         for unit in range(self.num_units):
             weight = self.weights[unit, ...]
-            bias = self.biases[unit, ...]
+            if self.biases is not None:
+                bias = self.biases[unit, ...]
+            else:
+                bias = None
             init_linear_(weight, bias)
 
     def rezero_weights(self):
