@@ -31,7 +31,6 @@ from nupic.research.frameworks.dendrites import (
 
 
 class DendriteSegmentsTests(unittest.TestCase):
-
     def test_forward(self):
         """Validate shape of forward output."""
 
@@ -63,9 +62,12 @@ class DendriteSegmentsTests(unittest.TestCase):
                 w = weights[unit, segment, :]
                 num_off = (weights[unit, segment, :] == 0).sum().item()
                 actual_sparsity = num_off / w.numel()
-                self.assertEqual(sparsity, actual_sparsity,
-                                 f"Sparsity {actual_sparsity} != {sparsity}"
-                                 f"for unit {unit} and segment {segment}")
+                self.assertEqual(
+                    sparsity,
+                    actual_sparsity,
+                    f"Sparsity {actual_sparsity} != {sparsity}"
+                    f"for unit {unit} and segment {segment}",
+                )
 
     def test_equivalent_forward(self):
         """
@@ -89,21 +91,26 @@ class DendriteSegmentsTests(unittest.TestCase):
             expected_out = torch.nn.functional.linear(context, unit_weight, unit_bias)
             actual_out = out[:, unit, :]
             same_out = torch.allclose(actual_out, expected_out, atol=1e-7)
-            self.assertTrue(same_out,
-                            f"Didn't observe the expected output for unit {unit}: "
-                            f"actual_out - expected_out = {actual_out - expected_out}")
+            self.assertTrue(
+                same_out,
+                f"Didn't observe the expected output for unit {unit}: "
+                f"actual_out - expected_out = {actual_out - expected_out}",
+            )
 
 
 class DendriticWeightsTests(unittest.TestCase):
-
     def test_forward(self):
         """Validate shape of forward output."""
 
         # Dendritic weights as a bias.
         linear = torch.nn.Linear(10, 10)
         dendritic_weights = DendriticWeights(
-            module=linear, num_segments=20, dim_context=15,
-            module_sparsity=0.7, dendrite_sparsity=0.9, dendrite_bias=True
+            module=linear,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=True,
         )
         dendritic_weights.rezero_weights()
 
@@ -124,9 +131,12 @@ class DendriticWeightsTests(unittest.TestCase):
         dendrite_sparsity = 13 / 15
         linear = torch.nn.Linear(10, 10)
         dendritic_weights = DendriticWeights(
-            module=linear, num_segments=20, dim_context=15,
-            module_sparsity=linear_sparsity, dendrite_sparsity=dendrite_sparsity,
-            dendrite_bias=True
+            module=linear,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=linear_sparsity,
+            dendrite_sparsity=dendrite_sparsity,
+            dendrite_bias=True,
         )
 
         linear_weights = linear.weight.data
@@ -149,8 +159,12 @@ class DendriticWeightsTests(unittest.TestCase):
         # Gating dendritic weights.
         linear = torch.nn.Linear(10, 10)
         dendritic_weights = GatingDendriticWeights(
-            module=linear, num_segments=20, dim_context=15,
-            module_sparsity=0.7, dendrite_sparsity=0.9, dendrite_bias=True
+            module=linear,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=True,
         )
         dendritic_weights.rezero_weights()
 
