@@ -25,8 +25,8 @@ import torch
 from torch.nn.functional import sigmoid
 
 from nupic.research.frameworks.dendrites import (
-    DendriteSegments,
     BiasingDendriticLayer,
+    DendriteSegments,
     GatingDendriticLayer,
 )
 
