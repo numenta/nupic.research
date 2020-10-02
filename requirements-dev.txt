@@ -78,6 +78,3 @@ pep8-naming==0.8.2
 
 # Check string quotes
 flake8-quotes==2.1.0
-
-# Temporary hack to fix CI. Force installation of different version of attrs.
-attrs==19.3.0
