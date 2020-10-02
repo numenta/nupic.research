@@ -30,7 +30,7 @@ from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights
 
 
-class DendriticWeights(SparseWeights):
+class BiasingDendriticLayer(SparseWeights):
     """
     This combines a DendriteSegments module with a SparseLinear module.
     The output from the dendrite segments (shape of num_units x num_segments)
@@ -81,7 +81,7 @@ class DendriticWeights(SparseWeights):
         return self.apply_dendrites(y, dendrite_activations)
 
 
-class GatingDendriticWeights(DendriticWeights):
+class GatingDendriticLayer(BiasingDendriticLayer):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a gating mechanism."""
         # Multiple by the sigmoid of the max along each segment.

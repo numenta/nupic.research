@@ -26,8 +26,8 @@ from torch.nn.functional import sigmoid
 
 from nupic.research.frameworks.dendrites import (
     DendriteSegments,
-    DendriticWeights,
-    GatingDendriticWeights,
+    BiasingDendriticLayer,
+    GatingDendriticLayer,
 )
 
 
@@ -99,13 +99,13 @@ class DendriteSegmentsTests(unittest.TestCase):
             )
 
 
-class DendriticWeightsTests(unittest.TestCase):
+class BiasingDendriticLayerTests(unittest.TestCase):
     def test_forward_output_shape(self):
         """Validate shape of forward output."""
 
         # Dendritic weights as a bias.
         linear = torch.nn.Linear(10, 10)
-        dendritic_weights = DendriticWeights(
+        dendritic_layer = BiasingDendriticLayer(
             module=linear,
             num_segments=20,
             dim_context=15,
@@ -113,15 +113,15 @@ class DendriticWeightsTests(unittest.TestCase):
             dendrite_sparsity=0.9,
             dendrite_bias=True,
         )
-        dendritic_weights.rezero_weights()
+        dendritic_layer.rezero_weights()
 
         batch_size = 8
-        input_dim = dendritic_weights.module.weight.shape[1]
-        context_dim = dendritic_weights.segments.weights.shape[2]
+        input_dim = dendritic_layer.module.weight.shape[1]
+        context_dim = dendritic_layer.segments.weights.shape[2]
         x = torch.rand(batch_size, input_dim)
         context = torch.rand(batch_size, context_dim)
 
-        out = dendritic_weights(x, context)
+        out = dendritic_layer(x, context)
         self.assertEqual(out.shape, (8, 10))
 
     def test_forward_output_values(self):
@@ -131,7 +131,7 @@ class DendriticWeightsTests(unittest.TestCase):
 
         # Dendritic weights as a bias.
         linear = torch.nn.Linear(4, 4, bias=False)
-        dendritic_weights = DendriticWeights(
+        dendritic_layer = BiasingDendriticLayer(
             module=linear,
             num_segments=3,
             dim_context=4,
@@ -139,7 +139,7 @@ class DendriticWeightsTests(unittest.TestCase):
             dendrite_sparsity=0.7,
             dendrite_bias=False,
         )
-        dendritic_weights.rezero_weights()
+        dendritic_layer.rezero_weights()
 
         linear.weight.data[:] = torch.tensor(
             [
@@ -151,7 +151,7 @@ class DendriticWeightsTests(unittest.TestCase):
             requires_grad=True,
         )
 
-        dendritic_weights.segments.weights.data[:] = torch.tensor(
+        dendritic_layer.segments.weights.data[:] = torch.tensor(
             [
                 [
                     [-0.26, 0.00, 0.00, 0.00],
@@ -203,7 +203,7 @@ class DendriticWeightsTests(unittest.TestCase):
         )
 
         # Validate dendrite activations.
-        actual_dendrite_activations = dendritic_weights.segments(context)
+        actual_dendrite_activations = dendritic_layer.segments(context)
         self.assertTrue(
             expected_dendrite_activations.allclose(actual_dendrite_activations)
         )
@@ -219,7 +219,7 @@ class DendriticWeightsTests(unittest.TestCase):
 
         # Validate output of dendritic layer.
         expected_out = linear(x) + biasing_dendrites
-        actual_out = dendritic_weights(x, context)
+        actual_out = dendritic_layer(x, context)
         self.assertTrue(expected_out.allclose(actual_out))
 
     def test_apply_biasing_dendrites(self):
@@ -229,7 +229,7 @@ class DendriticWeightsTests(unittest.TestCase):
         """
         # Dendritic weights as a bias.
         linear = torch.nn.Linear(10, 10)
-        dendritic_weights = DendriticWeights(
+        dendritic_layer = BiasingDendriticLayer(
             module=linear,
             num_segments=20,
             dim_context=15,
@@ -254,7 +254,7 @@ class DendriticWeightsTests(unittest.TestCase):
 
         # Expected output: dendrites applied as bias
         expected_output = y + max_activation
-        actual_output = dendritic_weights.apply_dendrites(y, dendrite_activations)
+        actual_output = dendritic_layer.apply_dendrites(y, dendrite_activations)
 
         all_matches = (expected_output == actual_output).all()
         self.assertTrue(all_matches)
@@ -266,7 +266,7 @@ class DendriticWeightsTests(unittest.TestCase):
         linear_sparsity = 70 / 100
         dendrite_sparsity = 13 / 15
         linear = torch.nn.Linear(10, 10)
-        dendritic_weights = DendriticWeights(
+        dendritic_layer = BiasingDendriticLayer(
             module=linear,
             num_segments=20,
             dim_context=15,
@@ -276,10 +276,10 @@ class DendriticWeightsTests(unittest.TestCase):
         )
 
         linear_weights = linear.weight.data
-        dendrite_weights = dendritic_weights.segments.weights
+        dendrite_weights = dendritic_layer.segments.weights
         linear_weights[:] = 1
         dendrite_weights[:] = 1
-        dendritic_weights.rezero_weights()
+        dendritic_layer.rezero_weights()
 
         num_off = (dendrite_weights == 0).sum().item()
         actual_dendrite_sparsity = num_off / dendrite_weights.numel()
@@ -294,7 +294,7 @@ class DendriticWeightsTests(unittest.TestCase):
 
         # Gating dendritic weights.
         linear = torch.nn.Linear(10, 10)
-        dendritic_weights = GatingDendriticWeights(
+        dendritic_layer = GatingDendriticLayer(
             module=linear,
             num_segments=20,
             dim_context=15,
@@ -302,15 +302,15 @@ class DendriticWeightsTests(unittest.TestCase):
             dendrite_sparsity=0.9,
             dendrite_bias=True,
         )
-        dendritic_weights.rezero_weights()
+        dendritic_layer.rezero_weights()
 
         batch_size = 8
-        input_dim = dendritic_weights.module.weight.shape[1]
-        context_dim = dendritic_weights.segments.weights.shape[2]
+        input_dim = dendritic_layer.module.weight.shape[1]
+        context_dim = dendritic_layer.segments.weights.shape[2]
         x = torch.rand(batch_size, input_dim)
         context = torch.rand(batch_size, context_dim)
 
-        out = dendritic_weights(x, context)
+        out = dendritic_layer(x, context)
         self.assertEqual(out.shape, (8, 10))
 
     def test_apply_gating_dendrites(self):
@@ -320,7 +320,7 @@ class DendriticWeightsTests(unittest.TestCase):
         """
         # Dendritic weights as a bias.
         linear = torch.nn.Linear(10, 10)
-        dendritic_weights = GatingDendriticWeights(
+        dendritic_layer = GatingDendriticLayer(
             module=linear,
             num_segments=20,
             dim_context=15,
@@ -345,7 +345,7 @@ class DendriticWeightsTests(unittest.TestCase):
 
         # Expected output: dendrites applied as gate
         expected_output = y * sigmoid(max_activation)
-        actual_output = dendritic_weights.apply_dendrites(y, dendrite_activations)
+        actual_output = dendritic_layer.apply_dendrites(y, dendrite_activations)
 
         all_matches = (expected_output == actual_output).all()
         self.assertTrue(all_matches)
