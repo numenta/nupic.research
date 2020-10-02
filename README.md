@@ -55,3 +55,4 @@ Some of our old research code and experiments are archived in the following repo
 * https://github.com/numenta/htmresearch (requires python 2.7)
 * https://github.com/numenta-archive/htmresearch (requires python 2.7)
 
+REJECT THIS PR
