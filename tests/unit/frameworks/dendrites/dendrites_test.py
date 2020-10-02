@@ -100,7 +100,7 @@ class DendriteSegmentsTests(unittest.TestCase):
 
 
 class DendriticWeightsTests(unittest.TestCase):
-    def test_forward(self):
+    def test_forward_output_shape(self):
         """Validate shape of forward output."""
 
         # Dendritic weights as a bias.
@@ -123,6 +123,104 @@ class DendriticWeightsTests(unittest.TestCase):
 
         out = dendritic_weights(x, context)
         self.assertEqual(out.shape, (8, 10))
+
+    def test_forward_output_values(self):
+        """
+        Test all parts of the forward pass of a biasing dendritic layer from end to end.
+        """
+
+        # Dendritic weights as a bias.
+        linear = torch.nn.Linear(4, 4, bias=False)
+        dendritic_weights = DendriticWeights(
+            module=linear,
+            num_segments=3,
+            dim_context=4,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.7,
+            dendrite_bias=False,
+        )
+        dendritic_weights.rezero_weights()
+
+        linear.weight.data[:] = torch.tensor(
+            [
+                [-0.04, 0.00, 0.00, 0.00],
+                [0.00, 0.00, 0.00, -0.26],
+                [0.00, 0.00, 0.00, -0.13],
+                [0.00, 0.00, 0.00, 0.41],
+            ],
+            requires_grad=True,
+        )
+
+        dendritic_weights.segments.weights.data[:] = torch.tensor(
+            [
+                [
+                    [-0.26, 0.00, 0.00, 0.00],
+                    [0.09, 0.00, 0.00, 0.00],
+                    [-0.34, 0.00, 0.00, 0.00],
+                ],
+                [
+                    [0.00, 0.00, 0.00, 0.36],
+                    [0.00, 0.00, 0.00, -0.32],
+                    [0.00, 0.00, 0.00, 0.41],
+                ],
+                [
+                    [0.00, 0.00, 0.00, 0.18],
+                    [0.00, 0.00, 0.38, 0.00],
+                    [0.00, 0.00, 0.23, 0.00],
+                ],
+                [
+                    [0.00, 0.00, 0.00, 0.23],
+                    [-0.30, 0.00, 0.00, 0.00],
+                    [0.00, 0.00, -0.24, 0.00],
+                ],
+            ],
+            requires_grad=True,
+        )
+
+        # Pseudo input: batch_size=2, input_dim=4
+        x = torch.tensor([[0.79, 0.36, 0.47, 0.30], [0.55, 0.64, 0.50, 0.50]])
+
+        # Pseudo input: batch_size=2, context_dim=4
+        context = torch.tensor([[0.84, 0.63, 0.67, 0.42], [0.30, 0.07, 0.52, 0.15]])
+
+        # Expected dendrite activations: dendritic_layer.segments(context)
+        # This will be the shape batch_size x num_units x num_segments
+        expected_dendrite_activations = torch.tensor(
+            [
+                [
+                    [-0.2184, 0.0756, -0.2856],
+                    [0.1512, -0.1344, 0.1722],
+                    [0.0756, 0.2546, 0.1541],
+                    [0.0966, -0.2520, -0.1608],
+                ],
+                [
+                    [-0.0780, 0.0270, -0.1020],
+                    [0.0540, -0.0480, 0.0615],
+                    [0.0270, 0.1976, 0.1196],
+                    [0.0345, -0.0900, -0.1248],
+                ],
+            ]
+        )
+
+        # Validate dendrite activations.
+        actual_dendrite_activations = dendritic_weights.segments(context)
+        self.assertTrue(
+            expected_dendrite_activations.allclose(actual_dendrite_activations)
+        )
+
+        # Validate the biasing term: max per batch per unit
+        biasing_dendrites = torch.tensor(
+            [[0.0756, 0.1722, 0.2546, 0.0966], [0.0270, 0.0615, 0.1976, 0.0345]]
+        )
+        all_matches = (
+            expected_dendrite_activations.max(dim=2).values == biasing_dendrites
+        ).all()
+        self.assertTrue(all_matches)
+
+        # Validate output of dendritic layer.
+        expected_out = linear(x) + biasing_dendrites
+        actual_out = dendritic_weights(x, context)
+        self.assertTrue(expected_out.allclose(actual_out))
 
     def test_apply_biasing_dendrites(self):
         """
