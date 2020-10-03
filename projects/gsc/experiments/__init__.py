@@ -23,6 +23,7 @@ from .base import CONFIGS as BASE
 from .test_sigopt import CONFIGS as TEST_SIGOPT
 from .test_sigopt_niels import CONFIGS as NIELS_SIGOPT_TEST
 from .gsc_onecyclelr import CONFIGS as SPARSE_CNN_ONECYCLELR
+from .gsc_onecyclelr_sigopt import CONFIGS as SIGOPT_SPARSE_CNN_ONECYCLELR
 
 """
 Import and collect all Imagenet experiment configurations into one CONFIG
@@ -35,3 +36,4 @@ CONFIGS.update(BASE)
 CONFIGS.update(TEST_SIGOPT)
 CONFIGS.update(SPARSE_CNN_ONECYCLELR)
 CONFIGS.update(NIELS_SIGOPT_TEST)
+CONFIGS.update(SIGOPT_SPARSE_CNN_ONECYCLELR)

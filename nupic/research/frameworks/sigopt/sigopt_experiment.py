@@ -45,7 +45,7 @@ class SigOptExperiment:
         self.conn = None
         self.training_run = None
 
-        self.api_key = os.environ.get("SIGOPT_KEY", None)
+        self.api_key = 'PYOADJYDDUTADANGHZKREMZAICJQLCXSEAMLRUXLXVTDFPFQ'
         if self.api_key is None:
             self.api_key = os.environ.get("SIGOPT_DEV_KEY", None)
         assert self.api_key is not None, "No SigOpt API key!"
