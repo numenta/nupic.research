@@ -28,30 +28,23 @@ import torch
 
 from nupic.research.frameworks.sigopt import SigOptSGDOneCycleLRExperiment
 
-from .base import DEFAULT_SPARSE_CNN
+from .base import DEFAULT_BASE
 
-SIGOPT_SPARSE_CNN_ONECYCLELR = deepcopy(DEFAULT_SPARSE_CNN)
+SIGOPT_SPARSE_CNN_ONECYCLELR = deepcopy(DEFAULT_BASE)
 SIGOPT_SPARSE_CNN_ONECYCLELR.update(
     # Learning rate scheduler class. Must inherit from "_LRScheduler"
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
 
     lr_scheduler_args=dict(
-        # commented arguments are suggested by sigopt
+        # commented arguments are to be suggested by sigopt
         # max_lr=6.91,
         div_factor=10.0, 
-        final_div_factor=4000,  
+        #final_div_factor=4000,  
         pct_start=0.1,
         epochs=30,
         anneal_strategy="linear",
         max_momentum=0.01,
         cycle_momentum=False,
-    ),
-
-    optimizer_args=dict(
-        lr=0.1,
-        weight_decay=0.0001,
-        momentum=0.0,
-        nesterov=False,
     ),
 
     sigopt_experiment_class=SigOptSGDOneCycleLRExperiment,
@@ -60,10 +53,11 @@ SIGOPT_SPARSE_CNN_ONECYCLELR.update(
     epochs_to_validate=range(0, 30),
 
     sigopt_config=dict(
-        name="gsc_onecyclelr_v1",
+        name="gsc_onecyclelr_v2",
         # See https://app.sigopt.com/docs/overview/parameter_bounds
         parameters=[
-            dict(name="max_lr", type="double", bounds=dict(min=1, max=10)),
+            dict(name="max_lr", type="double", bounds=dict(min=0.5, max=5)),
+            dict(name="final_div_factor", type="double", bounds=dict(min=5, max=5000)),
         ],
         metrics=[dict(name="mean_accuracy", objective="maximize")],
         parallel_bandwidth=1,

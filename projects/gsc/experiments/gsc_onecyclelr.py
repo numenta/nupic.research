@@ -27,9 +27,9 @@ from copy import deepcopy
 
 import torch
 
-from .base import DEFAULT_SPARSE_CNN
+from .base import DEFAULT_BASE
 
-SPARSE_CNN_ONECYCLELR = deepcopy(DEFAULT_SPARSE_CNN)
+SPARSE_CNN_ONECYCLELR = deepcopy(DEFAULT_BASE)
 SPARSE_CNN_ONECYCLELR.update(
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
 
