@@ -24,6 +24,7 @@ A simple implementation of dendrite weights. This combines the output from a (sp
 linear layer with the output from a set of dendritic segments.
 """
 
+import torch
 from torch.nn.functional import sigmoid
 
 from nupic.research.frameworks.dendrites import DendriteSegments
@@ -86,3 +87,22 @@ class GatingDendriticLayer(BiasingDendriticLayer):
         """Apply dendrites as a gating mechanism."""
         # Multiple by the sigmoid of the max along each segment.
         return y * sigmoid(dendrite_activations.max(dim=2).values)
+
+
+class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
+    """
+    This layer is similar to `GatingDendriticLayer`, but selects dendrite activations
+    based on absolute max activation values instead of just max activation values. For
+    example, if choosing between activations -7.4, and 6.5 for a particular unit, -7.4
+    will be chosen, and its sign will be kept.
+    """
+
+    def apply_dendrites(self, y, dendrite_activations):
+        output_max = dendrite_activations.max(dim=2).values
+        output_min = dendrite_activations.min(dim=2).values
+        sign_mask = torch.where(
+            (output_max ** 2) > (output_min ** 2),
+            torch.ones(output_max.shape),
+            -1.0 * torch.ones(output_min.shape)
+        )
+        return y * sigmoid(dendrite_activations.max(dim=2).values * sign_mask)
