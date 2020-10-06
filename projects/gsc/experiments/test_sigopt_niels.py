@@ -28,9 +28,9 @@ import torch
 
 from nupic.research.frameworks.sigopt import SigOptSGDStepLRExperiment
 
-from .base import DEFAULT_SPARSE_CNN
+from .base import DEFAULT_BASE
 
-NIELS_SIGOPT_TEST = deepcopy(DEFAULT_SPARSE_CNN)
+NIELS_SIGOPT_TEST = deepcopy(DEFAULT_BASE)
 NIELS_SIGOPT_TEST.update(
     # Learning rate scheduler class. Must inherit from "_LRScheduler"
     lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
@@ -47,7 +47,7 @@ NIELS_SIGOPT_TEST.update(
     epochs_to_validate=range(0, 30),
 
     sigopt_config=dict(
-        name="test_sigopt_cluster_v3",
+        name="test_sigopt_cluster_v5",
         # See https://app.sigopt.com/docs/overview/parameter_bounds
         parameters=[
             dict(name="gamma", type="double", bounds=dict(min=0.01, max=0.99)),
