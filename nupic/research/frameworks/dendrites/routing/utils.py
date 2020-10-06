@@ -19,17 +19,25 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .base import CONFIGS as BASE
-from .test_sigopt import CONFIGS as TEST_SIGOPT
-from .gsc_onecyclelr import CONFIGS as SPARSE_CNN_ONECYCLELR
+import torch
 
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(BASE)
-CONFIGS.update(TEST_SIGOPT)
-CONFIGS.update(SPARSE_CNN_ONECYCLELR)
+def generate_random_binary_vectors(k, n_dim, sparsity_level=0.5):
+    """
+    Returns a Torch tensor of shape (k, n_dim) where each each entry is 1
+    with probability (1 - sparsity_level), 0 otherwise
+
+    :param k: the number of unique binary vectors
+    :type k: int
+    :param n_dim: the size of each binary vector
+    :type n_dim: int
+    :param sparsity_level: the expected level of sparsity of each binary vector
+    :type n_dim: float
+    """
+    binary_vectors = torch.rand((k, n_dim))
+    binary_vectors = torch.where(
+        binary_vectors > sparsity_level,
+        torch.zeros((k, n_dim)),
+        torch.ones((k, n_dim))
+    )
+    return binary_vectors

@@ -897,6 +897,7 @@ class SupervisedExperiment:
             setup_experiment=[exp + ".setup_experiment"],
             create_model=[exp + ".create_model"],
             transform_model=[exp + ".transform_model"],
+            load_dataset=[exp + ".load_dataset"],
             create_loaders=[exp + ".create_loaders"],
             create_train_dataloader=[exp + ".create_train_dataloader"],
             create_train_sampler=[exp + ".create_train_sampler"],
@@ -1391,27 +1392,26 @@ class ImagenetExperiment(SupervisedExperiment):
     Experiment class used to train Sparse and dense versions of Resnet50 v1.5
     models on Imagenet dataset
     """
-
-    def create_loaders(self, config):
-        dataset_args = {}
+    @classmethod
+    def load_dataset(cls, config, train=True):
+        config = copy.copy(config)
         config.setdefault("dataset_class", datasets.imagenet)
-        config.setdefault("dataset_args", dataset_args)
+        if "dataset_args" not in config:
+            config["dataset_args"] = dict(
+                data_path=config["data"],
+                train_dir=config.get("train_dir", "train"),
+                val_dir=config.get("val_dir", "val"),
+                num_classes=config.get("num_classes", 1000),
+                use_auto_augment=config.get("use_auto_augment", False),
+                sample_transform=config.get("sample_transform", None),
+                target_transform=config.get("target_transform", None),
+                replicas_per_sample=config.get("replicas_per_sample", 1),
+            )
 
-        dataset_args.update(
-            data_path=config["data"],
-            train_dir=config.get("train_dir", "train"),
-            val_dir=config.get("val_dir", "val"),
-            num_classes=config.get("num_classes", 1000),
-            use_auto_augment=config.get("use_auto_augment", False),
-            sample_transform=config.get("sample_transform", None),
-            target_transform=config.get("target_transform", None),
-            replicas_per_sample=config.get("replicas_per_sample", 1),
-        )
-
-        super().create_loaders(config)
+        return super().load_dataset(config, train)
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["create_loaders"].insert(0, "ImagenetExperiment.create_loaders")
+        eo["load_dataset"].insert(0, "ImagenetExperiment: Set default dataset")
         return eo

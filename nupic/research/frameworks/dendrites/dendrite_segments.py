@@ -60,20 +60,20 @@ class DendriteSegments(torch.nn.Module):
         self.sparsity = sparsity
 
         # TODO: Use named dimensions.
-        segment_weights = torch.Tensor(num_units, num_segments, dim_context)
-        self.segment_weights = torch.nn.Parameter(segment_weights)
+        weights = torch.Tensor(num_units, num_segments, dim_context)
+        self.weights = torch.nn.Parameter(weights)
 
         # Create a bias per unit per segment.
         if bias:
-            segment_biases = torch.Tensor(num_units, num_segments)
-            self.segment_biases = torch.nn.Parameter(segment_biases)
+            biases = torch.Tensor(num_units, num_segments)
+            self.biases = torch.nn.Parameter(biases)
         else:
-            self.register_parameter("segment_biases", None)
+            self.register_parameter("biases", None)
         self.reset_parameters()
 
         # Create a random mask per unit per segment (dims=[0, 1])
         zero_mask = random_mask(
-            self.segment_weights.shape,
+            self.weights.shape,
             sparsity=sparsity,
             dims=[0, 1]
         )
@@ -86,12 +86,15 @@ class DendriteSegments(torch.nn.Module):
     def reset_parameters(self):
         """Initialize the linear transformation for each unit."""
         for unit in range(self.num_units):
-            weight = self.segment_weights[unit, ...]
-            bias = self.segment_biases[unit, ...]
+            weight = self.weights[unit, ...]
+            if self.biases is not None:
+                bias = self.biases[unit, ...]
+            else:
+                bias = None
             init_linear_(weight, bias)
 
     def rezero_weights(self):
-        self.segment_weights.data[self.zero_mask.bool()] = 0
+        self.weights.data[self.zero_mask.bool()] = 0
 
     def forward(self, context):
         """
@@ -104,10 +107,10 @@ class DendriteSegments(torch.nn.Module):
         #    * k => the context dimension; multiplication will be along this dimension
         #    * ij => the units and segment dimensions, respectively
         # W^C * M^C * C -> num_units x num_segments
-        output = torch.einsum("ijk,bk->bij", self.segment_weights, context)
+        output = torch.einsum("ijk,bk->bij", self.weights, context)
 
-        if self.segment_biases is not None:
-            output += self.segment_biases
+        if self.biases is not None:
+            output += self.biases
         return output
 
 
@@ -180,17 +183,3 @@ def random_mask(size, sparsity, dims=None, **kwargs):
     mask_flat[on_indices] = False
 
     return mask
-
-
-if __name__ == "__main__":
-
-    dendrite_segment = DendriteSegments(
-        num_units=10, num_segments=20, dim_context=15, sparsity=0.7, bias=True
-    )
-    dendrite_segment.rezero_weights()
-
-    batch_size = 8
-    context = torch.rand(batch_size, dendrite_segment.dim_context)
-    out = dendrite_segment(context)
-
-    print(f"out.shape={out.shape}")

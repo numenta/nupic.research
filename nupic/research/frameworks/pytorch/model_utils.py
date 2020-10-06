@@ -236,7 +236,8 @@ def evaluate_model(
     async_gpu = loader.pin_memory
 
     if progress is not None:
-        loader = tqdm(loader, **progress)
+        loader = tqdm(loader, total=min(len(loader), batches_in_epoch),
+                      **progress)
 
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(loader):
