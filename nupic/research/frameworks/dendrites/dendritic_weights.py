@@ -89,7 +89,7 @@ class GatingDendriticLayer(BiasingDendriticLayer):
         return y * sigmoid(dendrite_activations.max(dim=2).values)
 
 
-class AbsoluateMaxGatingDendriticLayer(BiasingDendriticLayer):
+class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
     """
     This layer is similar to `GatingDendriticLayer`, but selects dendrite activations
     based on absolute max activation values instead of just max activation values. For

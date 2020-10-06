@@ -21,7 +21,7 @@
 
 import unittest
 
-from nupic.research.frameworks.dendrites import AbsoluateMaxGatingDendriticLayer
+from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 from nupic.research.frameworks.dendrites.routing import get_gating_context_weights
 from nupic.research.frameworks.dendrites.routing.hardcoded import (
     run_hardcoded_routing_test,
@@ -60,7 +60,7 @@ class HardcodedErrorTest(unittest.TestCase):
             d_out=d_out,
             k=num_contexts,
             d_context=d_context,
-            dendrite_module=AbsoluateMaxGatingDendriticLayer,
+            dendrite_module=AbsoluteMaxGatingDendriticLayer,
             context_weights_fn=get_gating_context_weights,
             batch_size=batch_size
         )

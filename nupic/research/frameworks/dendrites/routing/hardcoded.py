@@ -24,7 +24,7 @@ import copy
 import torch
 from numpy.random import randint
 
-from nupic.research.frameworks.dendrites import AbsoluateMaxGatingDendriticLayer
+from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 from nupic.research.frameworks.dendrites.routing import (
     RoutingFunction,
     generate_context_vectors,
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         d_out=d_out,
         k=num_contexts,
         d_context=d_context,
-        dendrite_module=AbsoluateMaxGatingDendriticLayer,
+        dendrite_module=AbsoluteMaxGatingDendriticLayer,
         context_weights_fn=get_gating_context_weights,
         batch_size=batch_size
     )
@@ -143,4 +143,4 @@ if __name__ == "__main__":
 
     # Results over 100 examples with 10 random contexts
     # > Mean absolute error between R(j, x) and output from dendritic network:
-    # >      1.5237264228140646e-10
+    # >      0.0006185245583765209
