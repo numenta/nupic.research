@@ -20,4 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .dendrite_segments import DendriteSegments
-from .dendritic_weights import BiasingDendriticLayer, GatingDendriticLayer
+from .dendritic_weights import (
+	AbsoluateMaxGatingDendriticLayer, BiasingDendriticLayer,
+	GatingDendriticLayer
+)

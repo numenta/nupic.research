@@ -85,7 +85,7 @@ def get_gating_context_weights(output_masks, context_vectors, num_dendrites):
     dim_context = context_vectors.size(1)
 
     # Context weights
-    context_weights = -99.0 * torch.ones((num_units, num_dendrites, dim_context))
+    context_weights = torch.zeros((num_units, num_dendrites, dim_context))
 
     for m in range(num_units):
         for j in range(num_dendrites):

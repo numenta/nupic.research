@@ -24,7 +24,7 @@ import copy
 import torch
 from numpy.random import randint
 
-from nupic.research.frameworks.dendrites import GatingDendriticLayer
+from nupic.research.frameworks.dendrites import AbsoluateMaxGatingDendriticLayer
 from nupic.research.frameworks.dendrites.routing import (
     RoutingFunction,
     generate_context_vectors,
@@ -33,13 +33,13 @@ from nupic.research.frameworks.dendrites.routing import (
 
 
 def run_hardcoded_routing_test(
-        d_in,
-        d_out,
-        k,
-        d_context,
-        dendrite_module,
-        context_weights_fn=None,
-        batch_size=100
+    d_in,
+    d_out,
+    k,
+    d_context,
+    dendrite_module,
+    context_weights_fn=None,
+    batch_size=100
 ):
     """
     Runs the hardcoded routing test for a specific type of dendritic network
@@ -109,9 +109,7 @@ def run_hardcoded_routing_test(
 
     # Report mean absolute error
     mean_abs_error = torch.abs(target - actual).mean().item()
-    print(" Results over {} examples with {} random contexts".format(batch_size, k))
-    print(" > Mean absolute error between R(j, x) and output from dendritic network:")
-    print(" > \t{}".format(mean_abs_error))
+    return {"mean_abs_error": mean_abs_error}
 
 
 if __name__ == "__main__":
@@ -123,15 +121,23 @@ if __name__ == "__main__":
     d_out = 100
     num_contexts = 10
     d_context = 100
+    batch_size = 100
 
-    run_hardcoded_routing_test(
+    result = run_hardcoded_routing_test(
         d_in=d_in,
         d_out=d_out,
         k=num_contexts,
         d_context=d_context,
-        dendrite_module=GatingDendriticLayer,
-        context_weights_fn=get_gating_context_weights
+        dendrite_module=AbsoluateMaxGatingDendriticLayer,
+        context_weights_fn=get_gating_context_weights,
+        batch_size=batch_size
     )
+
+    print(" Results over {} examples with {} random contexts".format(
+        batch_size, num_contexts
+    ))
+    print(" > Mean absolute error between R(j, x) and output from dendritic network:")
+    print(" > \t{}".format(result["mean_abs_error"]))
 
     # Sample output below
 
