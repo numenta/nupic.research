@@ -60,7 +60,8 @@ def run_hardcoded_routing_test(
                                dendrite_module, and has parameters `output_masks`,
                                `context_vectors`, and `num_dendrites`
     :param batch_size: the number of test inputs
-    :param verbose: prints the 
+    :param verbose: if True, prints target and output values on the first 15 dimensions
+                    of batch item 1
     """
 
     # Initialize routing function that this task will try to hardcode
