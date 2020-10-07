@@ -22,9 +22,9 @@
 import unittest
 
 import torch
-from torch.nn.functional import sigmoid
 
 from nupic.research.frameworks.dendrites import (
+    AbsoluteMaxGatingDendriticLayer,
     BiasingDendriticLayer,
     DendriteSegments,
     GatingDendriticLayer,
@@ -344,10 +344,116 @@ class BiasingDendriticLayerTests(unittest.TestCase):
         max_activation = torch.tensor([[-0.49, 0.87, -0.36], [-0.08, 0.08, 0.40]])
 
         # Expected output: dendrites applied as gate
-        expected_output = y * sigmoid(max_activation)
+        expected_output = y * torch.sigmoid(max_activation)
         actual_output = dendritic_layer.apply_dendrites(y, dendrite_activations)
 
         all_matches = (expected_output == actual_output).all()
+        self.assertTrue(all_matches)
+
+
+class AbsoluteMaxGatingDendriticLayerTests(unittest.TestCase):
+    def test_forward_output_shape(self):
+        """Validate shape of forward output."""
+
+        # Dendritic weights as a bias.
+        linear = torch.nn.Linear(10, 10)
+        dendritic_layer = AbsoluteMaxGatingDendriticLayer(
+            module=linear,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9
+        )
+        dendritic_layer.rezero_weights()
+
+        batch_size = 8
+        input_dim = dendritic_layer.module.weight.shape[1]
+        context_dim = dendritic_layer.segments.weights.shape[2]
+        x = torch.rand(batch_size, input_dim)
+        context = torch.rand(batch_size, context_dim)
+
+        out = dendritic_layer(x, context)
+        self.assertEqual(out.shape, (8, 10))
+
+    def test_apply_gating_dendrites(self):
+        """
+        Validate the outputs of the absolute max gating layer against hand-computed
+        outputs.
+        """
+        linear = torch.nn.Linear(10, 10)
+        dendritic_layer = AbsoluteMaxGatingDendriticLayer(
+            module=linear,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=False,
+        )
+
+        # pseudo output: batch_size=2, out_features=3
+        y = torch.tensor([[0.1, -0.1, 0.5], [0.2, 0.3, -0.2]])
+
+        # pseudo dendrite_activations: batch_size=2, num_units=3, num_segments=3
+        dendrite_activations = torch.tensor(
+            [
+                [[0.43, -1.64, 1.49], [-0.79, 0.53, 1.08], [0.02, 0.04, -0.57]],
+                [[1.79, -0.48, -0.38], [-0.15, 0.76, -1.13], [1.04, -0.58, -0.31]],
+            ]
+        )
+
+        # Expected absolute max activation per batch per unit
+        absolute_max_activations = torch.tensor([
+            [-1.64, 1.08, -0.57],
+            [1.79, -1.13, 1.04]
+        ])
+
+        # Expected output: dendrites applied as bias
+        expected_output = y * torch.sigmoid(absolute_max_activations)
+        actual_output = dendritic_layer.apply_dendrites(y, dendrite_activations)
+
+        all_matches = (expected_output == actual_output).all()
+        self.assertTrue(all_matches)
+
+    def test_gradients(self):
+        """
+        Validate gradient values to ensure they are flowing through the absolute max
+        operation. Note that this test doesn't actually consider the values of
+        gradients, apart from whether they are zero or non-zero.
+        """
+        linear = torch.nn.Linear(10, 10)
+        dendritic_layer = AbsoluteMaxGatingDendriticLayer(
+            module=linear,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=False,
+        )
+
+        # pseudo output: batch_size=2, out_features=3
+        y = torch.tensor([[0.1, -0.1, 0.5], [0.2, 0.3, -0.2]])
+
+        # pseudo dendrite_activations: batch_size=2, num_units=3, num_segments=3
+        dendrite_activations = torch.tensor(
+            [
+                [[0.43, -1.64, 1.49], [-0.79, 0.53, 1.08], [0.02, 0.04, -0.57]],
+                [[1.79, -0.48, -0.38], [-0.15, 0.76, -1.13], [1.04, -0.58, -0.31]],
+            ], requires_grad=True
+        )
+
+        output = dendritic_layer.apply_dendrites(y, dendrite_activations)
+        output.sum().backward()
+
+        # Expected gradient mask
+        expected_grad_mask = torch.tensor(
+            [
+                [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0]],
+                [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]],
+            ]
+        )
+        actual_grad_mask = 1.0 * (dendrite_activations.grad != 0.0)
+
+        all_matches = (expected_grad_mask == actual_grad_mask).all()
         self.assertTrue(all_matches)
 
 
