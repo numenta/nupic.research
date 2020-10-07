@@ -119,10 +119,10 @@ def run_hardcoded_routing_test(
         print("")
         print(" {}{}".format("target".ljust(24), "actual".ljust(24)))
         for target_i, actual_i in zip(target[0, :15], actual[0, :15]):
-            
+
             target_i = str(target_i.item()).ljust(24)
             actual_i = str(actual_i.item()).ljust(24)
-            
+
             print(" {}{}".format(target_i, actual_i))
         print(" ...")
         print("")

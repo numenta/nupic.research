@@ -24,10 +24,10 @@ import unittest
 import torch
 
 from nupic.research.frameworks.dendrites import (
+    AbsoluteMaxGatingDendriticLayer,
     BiasingDendriticLayer,
     DendriteSegments,
     GatingDendriticLayer,
-    AbsoluteMaxGatingDendriticLayer
 )
 
 
