@@ -39,7 +39,8 @@ def run_hardcoded_routing_test(
     d_context,
     dendrite_module,
     context_weights_fn=None,
-    batch_size=100
+    batch_size=100,
+    verbose=False
 ):
     """
     Runs the hardcoded routing test for a specific type of dendritic network
@@ -59,6 +60,8 @@ def run_hardcoded_routing_test(
                                dendrite_module, and has parameters `output_masks`,
                                `context_vectors`, and `num_dendrites`
     :param batch_size: the number of test inputs
+    :param verbose: if True, prints target and output values on the first 15 dimensions
+                    of batch item 1
     """
 
     # Initialize routing function that this task will try to hardcode
@@ -101,11 +104,28 @@ def run_hardcoded_routing_test(
     x_test = 4.0 * torch.rand((batch_size, d_in)) - 2.0  # sampled i.i.d. from U[-2, 2)
     context_inds_test = randint(low=0, high=k, size=batch_size).tolist()
     context_test = torch.stack(
-        [context_vectors[j, :] for j in context_inds_test], dim=0
+        [context_vectors[j, :] for j in context_inds_test],
+        dim=0
     )
 
     target = r(context_inds_test, x_test)
     actual = dendritic_network(x_test, context_test)
+
+    if verbose:
+
+        # Print targets and outputs on the first 15 dimensions
+        print("")
+        print(" Element-wise outputs along the first 15 dimensions:")
+        print("")
+        print(" {}{}".format("target".ljust(24), "actual".ljust(24)))
+        for target_i, actual_i in zip(target[0, :15], actual[0, :15]):
+
+            target_i = str(target_i.item()).ljust(24)
+            actual_i = str(actual_i.item()).ljust(24)
+
+            print(" {}{}".format(target_i, actual_i))
+        print(" ...")
+        print("")
 
     # Report mean absolute error
     mean_abs_error = torch.abs(target - actual).mean().item()
@@ -130,7 +150,8 @@ if __name__ == "__main__":
         d_context=d_context,
         dendrite_module=AbsoluteMaxGatingDendriticLayer,
         context_weights_fn=get_gating_context_weights,
-        batch_size=batch_size
+        batch_size=batch_size,
+        verbose=True
     )
 
     print(" Results over {} examples with {} random contexts".format(

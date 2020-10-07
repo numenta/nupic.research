@@ -25,7 +25,6 @@ linear layer with the output from a set of dendritic segments.
 """
 
 import torch
-from torch.nn.functional import sigmoid
 
 from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights
@@ -86,7 +85,7 @@ class GatingDendriticLayer(BiasingDendriticLayer):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a gating mechanism."""
         # Multiple by the sigmoid of the max along each segment.
-        return y * sigmoid(dendrite_activations.max(dim=2).values)
+        return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
 
 
 class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
@@ -105,4 +104,6 @@ class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
             torch.ones(output_max.shape),
             -1.0 * torch.ones(output_min.shape)
         )
-        return y * sigmoid(dendrite_activations.max(dim=2).values * sign_mask)
+        return y * torch.sigmoid(
+            torch.abs(dendrite_activations).max(dim=2).values * sign_mask
+        )
