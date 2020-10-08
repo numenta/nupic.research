@@ -1244,7 +1244,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Take step for outer loop. This will backprop through to the original
         # slow and fast params.
         output = cloned_adaptation_net(slow_data)
-        output = self.model(slow_data)
         loss = self._loss_function(output, slow_target)
         loss.backward()
 
