@@ -92,7 +92,9 @@ class OnlineMetaLearning(object):
             for lr in lr_sweep_range:
 
                 # reset fast weights
-                for param in self.get_fast_params():
+                named_params = dict(self.get_named_fast_params())
+                params = list(named_params.values())
+                for param in params:
                     if len(param.shape) > 1:
                         kaiming_normal_(param)
                     else:
@@ -101,7 +103,7 @@ class OnlineMetaLearning(object):
                 train_model(
                     model=self.model.module,
                     loader=self.test_train_loader,
-                    optimizer=Adam(self.get_fast_params(), lr=lr),
+                    optimizer=Adam(params, lr=lr),
                     device=self.device
                 )
                 results = evaluate_model(
@@ -136,7 +138,9 @@ class OnlineMetaLearning(object):
             self.test_test_loader.sampler.set_active_tasks(new_tasks)
 
             # reset fast weights
-            for param in self.get_fast_params():
+            named_params = dict(self.get_named_fast_params())
+            params = list(named_params.values())
+            for param in params:
                 if len(param.shape) > 1:
                     kaiming_normal_(param)
                 else:
@@ -148,7 +152,7 @@ class OnlineMetaLearning(object):
             train_model(
                 model=self.model.module,
                 loader=self.test_train_loader,
-                optimizer=Adam(self.get_fast_params(), lr=lr),
+                optimizer=Adam(params, lr=lr),
                 device=self.device
             )
 
