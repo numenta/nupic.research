@@ -1112,6 +1112,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             data, also used to train the slow parameters (the replay batch is used to
             sample examples to update the slow parameters during meta-training testing
             to prevent the learner from forgetting other tasks)
+            - num_fast_steps: number of sequential steps to take in the inner loop per
+                              every outer loop
         """
         if "num_classes" not in config["model_args"]:
             # manually set `num_classes` in `model_args`
@@ -1133,6 +1135,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.val_batch_size = config.get("val_batch_size", 15)
         self.slow_batch_size = config.get("slow_batch_size", 64)
         self.replay_batch_size = config.get("replay_batch_size", 64)
+        self.num_fast_steps = config.get("num_fast_steps", 1)
 
     def create_loaders(self, config):
         """Create train and val dataloaders."""
@@ -1278,14 +1281,17 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.val_fast_loader.sampler.set_active_tasks(task)
 
         # Train, one batch
-        data, target = next(iter(self.train_fast_loader))
-        data = data.to(self.device)
-        target = target.to(self.device)
-        train_loss = self._loss_function(
-            cloned_adaptation_net(data), target
-        )
-        # Update in place
-        self.adapt(cloned_adaptation_net, train_loss)
+        for i, (data, target) in enumerate(self.train_fast_loader):
+            if i >= self.num_fast_steps:
+                break
+
+            data = data.to(self.device)
+            target = target.to(self.device)
+            train_loss = self._loss_function(
+                cloned_adaptation_net(data), target
+            )
+            # Update in place
+            self.adapt(cloned_adaptation_net, train_loss)
 
         # Evaluate the adapted model
         with torch.no_grad():
