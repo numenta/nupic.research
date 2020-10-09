@@ -21,6 +21,7 @@
 import gzip
 import pickle
 import random
+import re
 import sys
 import time
 
@@ -130,21 +131,27 @@ def train_model(
 
         del data, target, output
 
+        t2 = time.time()
+        if use_amp:
+            with amp.scale_loss(error_loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            error_loss.backward()
+
+        t3 = time.time()
+
+        # Compute and backpropagate the complexity loss. This happens after
+        # error loss has backpropagated, freeing its computation graph, so the
+        # two loss functions don't compete for memory.
         complexity_loss = (complexity_loss_fn(model)
                            if complexity_loss_fn is not None
                            else None)
-
-        loss = (error_loss + complexity_loss
-                if complexity_loss is not None
-                else error_loss)
-
-        t2 = time.time()
-        if use_amp:
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            loss.backward()
-        del loss
+        if complexity_loss is not None:
+            if use_amp:
+                with amp.scale_loss(complexity_loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                complexity_loss.backward()
 
         if freeze_params is not None:
             with torch.no_grad():
@@ -153,14 +160,15 @@ def train_model(
                     param_indices = param[1]
                     param_module.grad[param_indices, :] = 0.0
 
-        t3 = time.time()
-        optimizer.step()
         t4 = time.time()
+        optimizer.step()
+        t5 = time.time()
 
         if post_batch_callback is not None:
             time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
+                           "complexity loss forward/backward: {:.3f}s,"
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                              t4 - t3)
+                                                              t4 - t3, t5 - t4)
             post_batch_callback(model=model,
                                 error_loss=error_loss.detach(),
                                 complexity_loss=(complexity_loss.detach()
@@ -228,7 +236,8 @@ def evaluate_model(
     async_gpu = loader.pin_memory
 
     if progress is not None:
-        loader = tqdm(loader, **progress)
+        loader = tqdm(loader, total=min(len(loader), batches_in_epoch),
+                      **progress)
 
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(loader):
@@ -427,6 +436,26 @@ def set_module_attr(module, name, value):
         setattr(parent_module, child_name, value)
 
 
+def get_parent_module(module, name):
+    """
+    Retrieves the parent module by name. For example "features.stem.conv" has
+    parent module "features.stem", while the name "conv" would imply the
+    parent module is simply "module".
+    """
+
+    # Ex 1: "features.stem.conv" -> [None, "features.stem", "conv"]
+    # Ex 2: "weight" -> [None, "weight"]
+    split_name = [None] + name.rsplit(".", 1)
+    parent_name = split_name[-2]
+
+    if parent_name is not None:
+        parent_module = get_module_attr(module, parent_name)
+    else:
+        parent_module = module
+
+    return parent_module
+
+
 def _get_sub_module(module, name):
     """
     Gets a submodule either by name or index - pytorch either uses names for module
@@ -438,3 +467,17 @@ def _get_sub_module(module, name):
         return module[int(name)]
     else:
         return getattr(module, name)
+
+
+def _is_match(pattern, string):
+
+    try:
+        r = re.compile(pattern)
+    except re.error as msg:
+        raise Exception(f"Invalid regex '{pattern}': {msg}")
+
+    match = r.match(string)
+    if match is not None:
+        return True
+    else:
+        return False

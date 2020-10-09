@@ -27,21 +27,30 @@ import torch.nn.init
 import torch.optim
 from ray import tune
 
+from nupic.research.frameworks.backprop_structure.model_conversion import (
+    maskedvdrop_to_sparseweights,
+)
+from nupic.research.frameworks.backprop_structure.modules import (
+    MaskedVDropCentralData,
+    prunable_vdrop_conv2d,
+    prunable_vdrop_linear,
+)
+from nupic.research.frameworks.backprop_structure.networks import vdrop_resnet50
 from nupic.research.frameworks.pytorch.models import resnet50_swsl
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
-from nupic.research.frameworks.pytorch.modules import prunable_conv2d, prunable_linear
+from nupic.research.frameworks.pytorch.modules import sparse_conv2d, sparse_linear
 from nupic.research.frameworks.vernon import ImagenetExperiment, mixins
 
 from .base import DEFAULT
 
 
-class MagPruneExperiment(mixins.LogEveryLoss,
-                         mixins.LogEveryLearningRate,
-                         mixins.KnowledgeDistillation,
-                         mixins.RezeroWeights,
-                         mixins.MultiCycleLR,
-                         mixins.PruneLowMagnitude,
-                         ImagenetExperiment):
+class SNPruneExperiment(mixins.LogEveryLoss,
+                        mixins.LogEveryLearningRate,
+                        mixins.KnowledgeDistillation,
+                        mixins.MultiCycleLR,
+                        mixins.PruneLowSNR,
+                        mixins.RegularizeLoss,
+                        ImagenetExperiment):
     pass
 
 
@@ -51,6 +60,24 @@ def conv_target_density(in_channels, out_channels, kernel_size):
         return 1.0
     else:
         return 0.25
+
+
+def make_reg_schedule(epochs, pct_ramp_start, pct_ramp_end, peak_value,
+                      pct_drop, final_value):
+    def reg_schedule(epoch, batch_idx, steps_per_epoch):
+        pct = (epoch + batch_idx / steps_per_epoch) / epochs
+
+        if pct < pct_ramp_start:
+            return 0.0
+        elif pct < pct_ramp_end:
+            progress = (pct - pct_ramp_start) / (pct_ramp_end - pct_ramp_start)
+            return progress * peak_value
+        elif pct < pct_drop:
+            return peak_value
+        else:
+            return final_value
+
+    return reg_schedule
 
 
 NUM_CLASSES = 1000
@@ -64,26 +91,29 @@ SUBSEQUENT_LR_SCHED_ARGS = dict(
     final_div_factor=1000.0
 )
 
-MAGPRUNE_BASE = copy.deepcopy(DEFAULT)
-MAGPRUNE_BASE.update(dict(
-    experiment_class=MagPruneExperiment,
+
+SNR_PRUNE_BASE = copy.deepcopy(DEFAULT)
+SNR_PRUNE_BASE.update(dict(
+    experiment_class=SNPruneExperiment,
     log_timestep_freq=10,
     num_classes=NUM_CLASSES,
-    batch_size=128,
+    batch_size=64,
     val_batch_size=128,
     extra_validations_per_epoch=1,
     validate_on_prune=True,
 
     seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
 
-    model_class=resnet50,
+    model_class=vdrop_resnet50,
     model_args=dict(
         num_classes=NUM_CLASSES,
-        conv_layer=prunable_conv2d,
+        z_logvar_init=-15,
+        vdrop_data_class=MaskedVDropCentralData,
+        conv_layer=prunable_vdrop_conv2d,
         conv_args=dict(
             target_density=conv_target_density,
         ),
-        linear_layer=prunable_linear,
+        linear_layer=prunable_vdrop_linear,
         linear_args=dict(
             target_density=0.25,
         ),
@@ -93,13 +123,14 @@ MAGPRUNE_BASE.update(dict(
     optimizer_args=dict(
         lr=6.0 / 6.0,
         momentum=0.75,
-        weight_decay=0.0001,
     ),
 
     lr_scheduler_class=None,
     lr_scheduler_args=None,
 
     teacher_model_class=[resnet50_swsl],
+
+    downscale_reg_with_training_set=True,
 
     init_batch_norm=True,
     use_auto_augment=True,
@@ -110,51 +141,7 @@ MAGPRUNE_BASE.update(dict(
     keep_checkpoints_num=None,
 ))
 
-# 0.72368
-INITIAL_EPOCHS = 20
-NUM_PRUNINGS = 5
-EPOCHS_BETWEEN_PRUNINGS = 5
-FINAL_EPOCHS = 10
-NUM_EPOCHS = (INITIAL_EPOCHS
-              + ((NUM_PRUNINGS - 1) * EPOCHS_BETWEEN_PRUNINGS)
-              + FINAL_EPOCHS)
-MAGPRUNE20_20_10 = copy.deepcopy(MAGPRUNE_BASE)
-MAGPRUNE20_20_10.update(dict(
-    name="MAGPRUNE20_20_10",
-    epochs_to_validate=range(NUM_EPOCHS),
-    epochs=NUM_EPOCHS,
-
-    wandb_args=dict(
-        project="magnitude-pruning",
-        name="20 epochs initial, 20 epochs doing 5 prunings, 10 final",
-    ),
-
-    multi_cycle_lr_args=(
-        (0, dict(max_lr=6.0,
-                 pct_start=0.2,
-                 anneal_strategy="linear",
-                 base_momentum=0.6,
-                 max_momentum=0.75,
-                 cycle_momentum=True,
-                 div_factor=6.0,
-                 final_div_factor=1000.0)),
-        (20, SUBSEQUENT_LR_SCHED_ARGS),
-        (25, SUBSEQUENT_LR_SCHED_ARGS),
-        (30, SUBSEQUENT_LR_SCHED_ARGS),
-        (35, SUBSEQUENT_LR_SCHED_ARGS),
-        (40, SUBSEQUENT_LR_SCHED_ARGS),
-    ),
-
-    prune_schedule=[
-        (20, 1 / 5),
-        (25, 2 / 5),
-        (30, 3 / 5),
-        (35, 4 / 5),
-        (40, 5 / 5),
-    ],
-))
-
-# 0.72892
+# 0.7465 on 32 GPUs
 INITIAL_EPOCHS = 15
 NUM_PRUNINGS = 6
 EPOCHS_BETWEEN_PRUNINGS = 3
@@ -162,14 +149,14 @@ FINAL_EPOCHS = 30
 NUM_EPOCHS = (INITIAL_EPOCHS
               + ((NUM_PRUNINGS - 1) * EPOCHS_BETWEEN_PRUNINGS)
               + FINAL_EPOCHS)
-MAGPRUNE15_15_30 = copy.deepcopy(MAGPRUNE_BASE)
-MAGPRUNE15_15_30.update(dict(
-    name="MAGPRUNE15_15_30",
+SNR_PRUNE_15_15_30 = copy.deepcopy(SNR_PRUNE_BASE)
+SNR_PRUNE_15_15_30.update(dict(
+    name="SNR_PRUNE_15_15_30",
     epochs_to_validate=range(NUM_EPOCHS),
     epochs=NUM_EPOCHS,
 
     wandb_args=dict(
-        project="magnitude-pruning",
+        project="snr-pruning",
         name="15 epochs initial, 15 epochs doing 6 prunings, 30 final",
     ),
 
@@ -190,6 +177,15 @@ MAGPRUNE15_15_30.update(dict(
         (30, SUBSEQUENT_LR_SCHED_ARGS),
     ),
 
+    reg_scalar_fn=make_reg_schedule(
+        epochs=NUM_EPOCHS,
+        pct_ramp_start=2 / 60,
+        pct_ramp_end=14 / 60,
+        peak_value=0.05,
+        pct_drop=30 / 60,
+        final_value=0.0005,
+    ),
+
     prune_schedule=[
         (15, 1 / 6),
         (18, 2 / 6),
@@ -201,7 +197,36 @@ MAGPRUNE15_15_30.update(dict(
 ))
 
 
+class ExportedExperiment(mixins.ExportModel,
+                         mixins.RezeroWeights,
+                         mixins.KnowledgeDistillation,
+                         ImagenetExperiment):
+    pass
+
+
+EXPORT_TO_STATIC = copy.deepcopy(DEFAULT)
+EXPORT_TO_STATIC.update(
+    batch_size=128,
+    experiment_class=ExportedExperiment,
+    model_class=resnet50,
+    model_args=dict(
+        num_classes=NUM_CLASSES,
+        conv_layer=sparse_conv2d,
+        conv_args=dict(
+            density=conv_target_density,
+        ),
+        linear_layer=sparse_linear,
+        linear_args=dict(
+            density=0.25,
+        ),
+    ),
+)
+
+
 CONFIGS = dict(
-    mag_prune_20_20_10=MAGPRUNE20_20_10,
-    mag_prune_15_15_30=MAGPRUNE15_15_30,
+    snr_prune_15_15_30=SNR_PRUNE_15_15_30,
+
+    snr_prune_15_15_30_exported={**EXPORT_TO_STATIC,
+                                 "prev_config": SNR_PRUNE_15_15_30,
+                                 "export_model_fn": maskedvdrop_to_sparseweights},
 )

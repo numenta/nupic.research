@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .constrain_parameters import ConstrainParameters
+from .export_model import ExportModel
 from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
 from .load_preprocessed_data import LoadPreprocessedData
 from .log_backprop_structure import LogBackpropStructure
@@ -32,6 +33,7 @@ from .multi_cycle_lr import MultiCycleLR
 from .profile import Profile
 from .profile_autograd import ProfileAutograd
 from .prune_low_magnitude import PruneLowMagnitude
+from .prune_low_snr import PruneLowSNR
 from .regularize_loss import RegularizeLoss
 from .rezero_weights import RezeroWeights
 from .save_final_checkpoint import SaveFinalCheckpoint
@@ -42,3 +44,4 @@ from .quantization_aware import QuantizationAware
 from .reduce_lr_after_task import ReduceLRAfterTask
 from .vary_batch_size import VaryBatchSize
 from .ewc import ElasticWeightConsolidation
+from .oml import OnlineMetaLearning

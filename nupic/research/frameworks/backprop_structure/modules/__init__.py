@@ -21,3 +21,6 @@
 from .binary_layers import BinaryGatedConv2d, BinaryGatedLinear
 from .reparameterization_layers import HardConcreteGatedConv2d, HardConcreteGatedLinear
 from .vdrop_layers import *
+
+# Import last so that common_layers has no issues using above imports
+from .common_layers import *

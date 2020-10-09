@@ -38,20 +38,17 @@ class RegularizeLoss(object):
         :param config:
             Dictionary containing the following parameters that set the schedule
             for the regularization strength:
-            - initial_reg_scalar, final_reg_scalar
-            - pct_begin_reg_ramp, pct_end_reg_ramp
-            - num_reg_cycles: How many times to repeat the reg schedule
+            - reg_scalar: (float or callable) Returns the reg_scalar, given the
+                 epoch number, batch index, and total batches per epoch
             - downscale_reg_with_training_set: If True, multiply the
                  regularization term by (1 / size_of_training_set)
         """
         super().setup_experiment(config)
 
-        self.num_reg_cycles = config.get("num_reg_cycles", 1)
-        self.initial_reg_scalar = config.get("initial_reg_scalar", 1.0)
-        self.final_reg_scalar = config.get("final_reg_scalar", 1.0)
-        self.pct_begin_reg_ramp = config.get("pct_begin_reg_ramp", 0.0)
-        self.pct_end_reg_ramp = config.get("pct_end_reg_ramp", 0.0)
-        self.reg_coefficient = (
+        self.reg_scalar = config.get("reg_scalar", 0)
+        self._update_reg_scalar(0)
+
+        self.reg_scalar_downscale = (
             1 / len(self.train_loader.dataset)
             if config.get("downscale_reg_with_training_set", False)
             else 1
@@ -62,37 +59,22 @@ class RegularizeLoss(object):
         self.prev_model_complexity = None
 
         # Cache these floats
-        self.reg_ramp_window_length = (self.pct_end_reg_ramp
-                                       - self.pct_begin_reg_ramp)
-        self.reg_ramp_amount = self.final_reg_scalar - self.initial_reg_scalar
-
-        self.reg_scalar = self._compute_reg_scalar(0.0)
-
         self._regularized_modules = [module
                                      for module in self.model.modules()
                                      if hasattr(module, "regularization")]
         assert len(self._regularized_modules) > 0
 
-    def _compute_reg_scalar(self, pct):
-        if pct < self.pct_begin_reg_ramp:
-            return self.initial_reg_scalar
-        elif pct < self.pct_end_reg_ramp:
-            ramp_pct = ((pct - self.pct_begin_reg_ramp)
-                        / self.reg_ramp_window_length)
-            return (self.initial_reg_scalar
-                    + ramp_pct * self.reg_ramp_amount)
-        else:
-            return self.final_reg_scalar
+    def _update_reg_scalar(self, batch_idx):
+        reg_scalar = self.reg_scalar
+        if callable(reg_scalar):
+            reg_scalar = reg_scalar(self.current_epoch, batch_idx,
+                                    self.total_batches)
+
+        self.reg_scalar_value = reg_scalar
 
     def pre_batch(self, model, batch_idx):
         super().pre_batch(model, batch_idx)
-
-        epochs_per_cycle = self.epochs / self.num_reg_cycles
-        epoch = self.current_epoch % epochs_per_cycle
-
-        pct = ((epoch * self.total_batches + batch_idx)
-               / (epochs_per_cycle * self.total_batches))
-        self.reg_scalar = self._compute_reg_scalar(pct)
+        self._update_reg_scalar(batch_idx)
 
     def complexity_loss(self, model):
         c_loss = super().complexity_loss(model)
@@ -103,7 +85,7 @@ class RegularizeLoss(object):
             # Save this now, decide whether to log it in post_batch when we know
             # the batch index.
             self.prev_model_complexity = reg.detach().clone()
-        reg *= self.reg_scalar * self.reg_coefficient
+        reg *= self.reg_scalar_value * self.reg_scalar_downscale
         c_loss = (c_loss + reg
                   if c_loss is not None
                   else reg)
@@ -116,7 +98,7 @@ class RegularizeLoss(object):
 
         if self.should_log_batch(batch_idx):
             self.model_complexity_history.append(self.prev_model_complexity)
-            self.reg_scalar_history.append(self.reg_scalar)
+            self.reg_scalar_history.append(self.reg_scalar_value)
         self.prev_model_complexity = None
 
     def run_epoch(self):

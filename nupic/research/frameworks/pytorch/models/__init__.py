@@ -37,5 +37,5 @@ from .pretrained_models import (
     se_resnext50_32x4d,
     xception
 )
-from .common_models import StandardMLP, OmniglotCNN
+from .common_models import StandardMLP, OMLNetwork, OmniglotCNN, MetaContinualLearningMLP
 from .cl_models import EWCNetwork

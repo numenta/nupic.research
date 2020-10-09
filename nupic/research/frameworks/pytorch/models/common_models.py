@@ -80,3 +80,87 @@ class OmniglotCNN(nn.Module):
             nn.MaxPool2d(2, 2),
             nn.ReLU(),
         ]
+
+
+class OMLNetwork(nn.Module):
+
+    def __init__(self, num_classes, **kwargs):
+
+        super().__init__()
+
+        self.representation = nn.Sequential(
+            *self.conv_block(1, 256, 3, 2, 0),
+            *self.conv_block(256, 256, 3, 1, 0),
+            *self.conv_block(256, 256, 3, 2, 0),
+            *self.conv_block(256, 256, 3, 1, 0),
+            *self.conv_block(256, 256, 3, 2, 0),
+            *self.conv_block(256, 256, 3, 2, 0),
+            nn.Flatten(),
+        )
+        self.adaptation = nn.Sequential(
+            nn.Linear(2304, num_classes),
+        )
+
+        # apply Kaiming initialization
+        for param in self.parameters():
+            if param.ndim > 1:
+                nn.init.kaiming_normal_(param)
+            else:
+                nn.init.zeros_(param)
+
+    @classmethod
+    def conv_block(cls, in_channels, out_channels, kernel_size, stride, padding):
+        return [
+            nn.Conv2d(
+                in_channels=in_channels, out_channels=out_channels,
+                kernel_size=kernel_size, stride=stride, padding=padding
+            ),
+            nn.ReLU(),
+        ]
+
+    @property
+    def fast_params(self):
+        return self.adaptation.parameters()
+
+    @property
+    def slow_params(self):
+        return self.representation.parameters()
+
+    def forward(self, x):
+        x = self.representation(x)
+        x = self.adaptation(x)
+        return x
+
+
+class MetaContinualLearningMLP(nn.Module):
+
+    def __init__(self, input_size, num_classes,
+                 hidden_sizes=(100, 100)):
+
+        super().__init__()
+
+        layers = [
+            nn.Flatten(),
+            nn.Linear(int(np.prod(input_size)), hidden_sizes[0]),
+            nn.ReLU()
+        ]
+        for idx in range(1, len(hidden_sizes)):
+            layers.extend([
+                nn.Linear(hidden_sizes[idx - 1], hidden_sizes[idx]),
+                nn.ReLU()
+            ])
+        self.representation = nn.Sequential(*layers)
+        self.adaptation = nn.Linear(hidden_sizes[-1], num_classes)
+
+    @property
+    def slow_params(self):
+        return self.representation.parameters()
+
+    @property
+    def fast_params(self):
+        return self.adaptation.parameters()
+
+    def forward(self, x):
+        x = self.representation(x)
+        x = self.adaptation(x)
+        return x

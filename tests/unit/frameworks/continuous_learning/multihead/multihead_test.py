@@ -29,7 +29,7 @@ import unittest
 
 import torch
 
-from nupic.research.frameworks.continuous_learning.multihead.multihead import (
+from nupic.research.frameworks.continual_learning.multihead.multihead import (
     active_class_outputs,
     get_active_classes,
     get_target_transform,
