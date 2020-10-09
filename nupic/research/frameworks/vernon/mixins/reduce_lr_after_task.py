@@ -41,11 +41,14 @@ class ReduceLRAfterTask:
     def run_task(self):
         """Run outer loop over tasks"""
         # configure the sampler to load only samples from current task
+        ret = super().run_task()
+
         if self.current_task >= self.task_when_reduce_lr:
+            self.logger.info(f"Setting learning rate to {self.new_lr:.2f}")
             for param_group in self.optimizer.param_groups:
                 param_group["lr"] = self.new_lr
 
-        return super().run_task()
+        return ret
 
     @classmethod
     def get_execution_order(cls):
