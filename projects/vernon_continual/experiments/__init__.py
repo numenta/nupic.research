@@ -22,7 +22,7 @@
 from .ewc import CONFIGS as EWC
 
 """
-Import and collect all Imagenet experiment configurations into one CONFIG
+Import and collect all Continual Learning experiment configurations into one CONFIG
 """
 __all__ = ["CONFIGS"]
 

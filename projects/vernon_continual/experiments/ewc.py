@@ -24,11 +24,14 @@ Base GSC Experiment configuration.
 
 import os
 from copy import deepcopy
+from functools import reduce
 
 import torch
+import torch.nn as nn
+from torch.nn import init
 
 from nupic.research.frameworks.pytorch.datasets import torchvisiondataset
-from nupic.research.frameworks.pytorch.models import EWCNetwork, StandardMLP
+from nupic.research.frameworks.pytorch.models import StandardMLP
 from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 from nupic.research.frameworks.vernon.run_experiment.trainables import (
     ContinualLearningTrainable,
@@ -43,6 +46,65 @@ class EWCContinualLearningExperiment(mixins.ElasticWeightConsolidation,
 class ReduceLRContinualLearningExperiment(mixins.ReduceLRAfterTask,
                                           ContinualLearningExperiment):
     pass
+
+
+class EWCNetwork(nn.Module):
+
+    def __init__(self, input_size, output_size,
+                 hidden_size=400,
+                 hidden_layer_num=2,
+                 hidden_dropout_prob=.5,
+                 input_dropout_prob=.2,
+                 ):
+        """
+        Adapted nearly verbatim from
+        https://github.com/kuc2477/pytorch-ewc/blob/master/model.py
+
+        Used to test consistency in the algorithm implementation.
+        """
+
+        # Configurations.
+        super().__init__()
+        self.input_size = input_size
+        self.input_dropout_prob = input_dropout_prob
+        self.hidden_size = hidden_size
+        self.hidden_layer_num = hidden_layer_num
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.output_size = output_size
+
+        # Layers.
+        self.layers = nn.ModuleList([
+            # input
+            nn.Flatten(),
+            nn.Linear(self.input_size, self.hidden_size), nn.ReLU(),
+            nn.Dropout(self.input_dropout_prob),
+            # hidden
+            *((nn.Linear(self.hidden_size, self.hidden_size), nn.ReLU(),
+               nn.Dropout(self.hidden_dropout_prob)) * self.hidden_layer_num),
+            # output
+            nn.Linear(self.hidden_size, self.output_size)
+        ])
+
+        self.xavier_initialize()
+
+    def forward(self, x):
+        return reduce(lambda x, l: l(x), self.layers, x)
+
+    def xavier_initialize(self):
+        modules = [
+            m for n, m in self.named_modules() if
+            "conv" in n or "linear" in n
+        ]
+
+        parameters = [
+            p for
+            m in modules for
+            p in m.parameters() if
+            p.dim() >= 2
+        ]
+
+        for p in parameters:
+            init.xavier_normal(p)
 
 
 # Regular continual learning, no EWC, 5 tasks

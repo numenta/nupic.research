@@ -27,7 +27,7 @@ from torch import autograd
 class ElasticWeightConsolidation:
     """
     Online version of Elastic Weight Consolidation.
-    Diagonals of the Fisher information matrix is calculated at the end
+    Diagonals of the Fisher information matrix are calculated at the end
     of each task, and used for loss calculation as the subsequent task.
 
     Based on the implementation in:
@@ -99,10 +99,8 @@ class ElasticWeightConsolidation:
         """
         Defines the complexity loss to be applied.
         """
-        cp = super().complexity_loss(model)
         if self.current_task > 0:
-            ewc_loss = self.ewc_loss()
-        return cp + ewc_loss
+            return self.ewc_loss()
 
     def ewc_loss(self):
         """Note: lambda constant is not divided by 2 in this version"""
