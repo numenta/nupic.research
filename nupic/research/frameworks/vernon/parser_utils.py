@@ -23,14 +23,8 @@ import argparse
 import socket
 
 import torch
-from wandb import util
 
-from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers_2 import (
-    DEFAULT_LOGGERS,
-)
-from nupic.research.frameworks.sigopt import SigOptExperiment
 from nupic.research.frameworks.vernon import mixins
-from nupic.research.frameworks.wandb import ray_wandb
 
 __all__ = [
     "DEFAULT_PARSERS",
@@ -151,6 +145,11 @@ def process_args(args, config):
 
     if "wandb" in args and args.wandb:
 
+        from wandb import util
+        from nupic.research.frameworks.wandb import ray_wandb
+        from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers_2 \
+            import DEFAULT_LOGGERS
+
         # Add ray-wandb logger to loggers.
         config.setdefault("loggers", [])
         config["loggers"].extend(list(DEFAULT_LOGGERS) + [ray_wandb.WandbLogger])
@@ -175,6 +174,9 @@ def process_args(args, config):
         insert_experiment_mixin(config, ray_wandb.WorkerLogger, prepend_name=False)
 
     if "create_sigopt" in args:
+
+        from nupic.research.frameworks.sigopt import SigOptExperiment
+
         s = SigOptExperiment()
         s.create_experiment(config["sigopt_config"])
         print("Created experiment: https://app.sigopt.com/experiment/",
