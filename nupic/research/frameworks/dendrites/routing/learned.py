@@ -30,7 +30,7 @@ from nupic.research.frameworks.dendrites.routing import (
     RoutingFunction,
     evaluate_dendrite_model,
     generate_context_vectors,
-    train_dendrite_model
+    train_dendrite_model,
 )
 
 
@@ -41,7 +41,14 @@ class RoutingDataset(Dataset):
     sampled from U[-2, 2) each paired a binary sparse context vector
     """
 
-    def __init__(self, routing_function, input_size, context_vectors, device, dataset_size=1e4):
+    def __init__(
+        self,
+        routing_function,
+        input_size,
+        context_vectors,
+        device,
+        dataset_size=1e4
+    ):
         super().__init__()
         self.function = routing_function
         self.num_output_masks = routing_function.num_output_masks
@@ -86,8 +93,8 @@ class RoutingDataset(Dataset):
 
 def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_module):
     """
-    Returns the routing function, dendritic network, context vectors, and device to use in the "learning
-    to route" experiment
+    Returns the routing function, dendritic network, context vectors, and device to use
+    in the "learning to route" experiment
 
     :param dim_in: the number of dimensions in the input to the routing function and
                    test module
@@ -104,7 +111,13 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
 
     # Initialize routing function that this task will try to hardcode, and set
     # `requires_grad=False` since the routing function is static
-    r = RoutingFunction(d_in=dim_in, d_out=dim_out, k=num_contexts, device=device, sparsity=0.7)
+    r = RoutingFunction(
+        d_in=dim_in,
+        d_out=dim_out,
+        k=num_contexts,
+        device=device,
+        sparsity=0.7
+    )
     r.sparse_weights.module.weight.requires_grad = False
 
     # Initialize context vectors, where each context vector corresponds to an output
