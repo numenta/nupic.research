@@ -36,8 +36,8 @@ torch.manual_seed(18)
 np.random.seed(18)
 
 # Training parameters
-TRAIN_NEW_NET = False
-DATASET = 'fashion_mnist'
+TRAIN_NEW_NET = True
+DATASET = 'mnist'
 
 LEARNING_RATE = 0.01
 MOMENTUM = 0.5
@@ -143,6 +143,7 @@ class sdr_cnn_base(nn.Module):
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
         x = self.k_winner(x)
+        print(np.shape(x))
         x = x.view(-1, 5*5*64)
         x = F.relu(self.dense1(x))
         x = F.relu(self.dense2(x))
