@@ -47,7 +47,7 @@ class RoutingFunction(torch.nn.Module):
     R(1, x) = [0.3, −0.4, 0.0, 0.0].
     """
 
-    def __init__(self, d_in, d_out, k, sparsity=0.7):
+    def __init__(self, d_in, d_out, k, device=None, sparsity=0.7):
         """
         :param d_in: the number of dimensions in the input
         :type d_in: int
@@ -55,6 +55,8 @@ class RoutingFunction(torch.nn.Module):
         :type d_out: int
         :param k: the number of unique random binary vectors that can "route" the
                   sparse linear output
+        :param device: device to use ('cpu' or 'cuda')
+        :type device: :class:`torch.device`
         :type k: int
         :param sparsity: the sparsity in the SparseWeights layer (see
                          nupic.torch.modules.SparseWeights for more details)
@@ -66,6 +68,7 @@ class RoutingFunction(torch.nn.Module):
             sparsity=sparsity
         )
         self.output_masks = generate_random_binary_vectors(k, d_out)
+        self.device = device if device is not None else torch.device("cpu")
 
     def forward(self, output_mask_inds, x):
         """
@@ -83,6 +86,7 @@ class RoutingFunction(torch.nn.Module):
         )
 
         mask = torch.stack([self.get_output_mask(j) for j in output_mask_inds], dim=0)
+        mask = mask.to(self.device)
         output = self.sparse_weights(x)
         output = output * mask
         return output
