@@ -1390,10 +1390,12 @@ class ImagenetExperiment(SupervisedExperiment):
 
             - train_model_func: Optional user defined function to train the model,
                                 expected to behave similarly to `train_model`
-                                in terms of input parameters and return values
+                                in terms of input parameters and return values.
+                                Deprecated.
             - evaluate_model_func: Optional user defined function to validate the model
                                    expected to behave similarly to `evaluate_model`
-                                   in terms of input parameters and return values
+                                   in terms of input parameters and return values/
+                                   Deprecated.
         """
         config = copy.copy(config)
         config.setdefault("epochs", 1)  # Necessary for next line.
@@ -1402,8 +1404,23 @@ class ImagenetExperiment(SupervisedExperiment):
 
         super().setup_experiment(config)
 
-        self.train_model = config.get("train_model_func", train_model)
-        self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
+        if "train_model_func" in config:
+            self.logger.warning(
+                "'train_model_func' is deprecated and will be removed soon."
+                "Instead, override the train_epoch method."
+            )
+            self.train_model = config["train_model_func"]
+        else:
+            self.train_model = train_model
+
+        if "evaluate_model_func" in config:
+            self.logger.warning(
+                "'evaluate_model_func' is deprecated and will be removed soon."
+                "Instead, override the validate method."
+            )
+            self.train_model = config["evaluate_model_func"]
+        else:
+            self.evaluate_model = evaluate_model
 
     def train_epoch(self):
         self.train_model(
