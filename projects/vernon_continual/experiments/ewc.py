@@ -33,9 +33,7 @@ from torch.nn import init
 from nupic.research.frameworks.pytorch.datasets import torchvisiondataset
 from nupic.research.frameworks.pytorch.models import StandardMLP
 from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
-from nupic.research.frameworks.vernon.run_experiment.trainables import (
-    ContinualLearningTrainable,
-)
+from nupic.research.frameworks.vernon.trainables import ContinualLearningTrainable
 
 
 class EWCContinualLearningExperiment(mixins.ElasticWeightConsolidation,
