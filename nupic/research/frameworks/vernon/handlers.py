@@ -188,7 +188,8 @@ class SupervisedExperiment:
                                   before it
             - epochs_to_validate: list of epochs to run validate(). A -1 asks
                                   to run validate before any training occurs.
-                                  Default: last three epochs.
+                                  Default: every epoch.
+            - validate_immediately: Whether to validate before the first epoch.
             - extra_validations_per_epoch: number of additional validations to
                                            perform mid-epoch. Additional
                                            validations are distributed evenly
@@ -303,8 +304,9 @@ class SupervisedExperiment:
         self.total_batches = len(self.train_loader,)
 
         self.epochs_to_validate = config.get("epochs_to_validate",
-                                             range(self.epochs - 3,
-                                                   self.epochs + 1))
+                                             range(self.epochs))
+        self.validate_immediately = config.get("validate_immediately",
+                                               (-1 in self.epochs_to_validate))
 
         extra_validations = config.get("extra_validations_per_epoch", 0)
         batches_to_validate = np.linspace(
@@ -480,7 +482,7 @@ class SupervisedExperiment:
 
     def pre_experiment(self):
         """Run validation before training."""
-        if -1 in self.epochs_to_validate:
+        if self.validate_immediately:
             self.logger.debug("Validating before any training:")
             return self.validate()
 
@@ -1393,6 +1395,11 @@ class ImagenetExperiment(SupervisedExperiment):
                                    expected to behave similarly to `evaluate_model`
                                    in terms of input parameters and return values
         """
+        config = copy.copy(config)
+        config.setdefault("epochs", 1)  # Necessary for next line.
+        config.setdefault("epochs_to_validate", range(config["epochs"] - 3,
+                                                      config["epochs"]))
+
         super().setup_experiment(config)
 
         self.train_model = config.get("train_model_func", train_model)
@@ -1450,6 +1457,7 @@ class ImagenetExperiment(SupervisedExperiment):
         exp = "ImagenetExperiment"
 
         # Extended methods
+        eo["setup_experiment"].insert(0, exp + ": Compatibility shims")
         eo["setup_experiment"].append(exp + ": Additional setup")
         eo["load_dataset"].insert(0, exp + ": Set default dataset")
 
