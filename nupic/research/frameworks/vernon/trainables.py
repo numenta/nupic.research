@@ -18,7 +18,6 @@
 #  http://numenta.org/licenses/
 #
 
-import abc
 import copy
 import logging
 import os
@@ -52,11 +51,10 @@ class RayActorHelperMethods:
         return get_free_port()
 
 
-class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
+class DistributedTrainable(Trainable):
     """
-    Trainable class used to train arbitrary experiments with ray. Whatever
-    the case, it's expected to proceed over well-defined iterations. Thus,
-    `_run_iteration` must be overridden.
+    Trainable class used to train arbitrary distributed experiments with ray.
+    The experiment_class should inherit from BaseExperiment and Distributed.
     """
 
     @classmethod
@@ -145,7 +143,7 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
                 if self._iteration == 0:
                     status = []
                     for w in self.procs:
-                        status.append(w.pre_experiment.remote())
+                        status.append(w.run_pre_experiment.remote())
 
                     agg_pre_exp = self.experiment_class.aggregate_pre_experiment_results
                     if ray_utils.check_for_failure(status):
@@ -163,7 +161,11 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
                 # Aggregate results from iteration.
                 ret = self.experiment_class.aggregate_results(results)
 
-                self._process_result(ret, pre_experiment_result)
+                if pre_experiment_result is not None:
+                    self.experiment_class.insert_pre_experiment_result(
+                        ret, pre_experiment_result)
+
+                self._process_result(ret)
                 printable_result = self.experiment_class.get_printable_result(ret)
                 self.logger.info(f"End Iteration Result: {printable_result}")
 
@@ -298,40 +300,28 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
     def _process_config(self, config):
         pass
 
-    @abc.abstractmethod
     def _run_iteration(self):
         """Run one iteration of the experiment"""
-        raise NotImplementedError
-
-    def _process_result(self, result, pre_experiment_result=None):
-        pass
-
-
-class SupervisedTrainable(BaseTrainable):
-    """
-    Trainable class used to train supervised machine learning experiments
-    with ray.
-    """
-
-    def _run_iteration(self):
-        """Run one epoch of training on each process."""
-
         status = []
         for w in self.procs:
-            status.append(w.run_epoch.remote())
+            status.append(w.run_iteration.remote())
 
         # Wait for remote functions and check for errors
         if ray_utils.check_for_failure(status):
             return ray.get(status)
 
-    def _process_result(self, result, pre_experiment_result=None):
-
-        # Aggregate initial validation results (before any training).
-        if pre_experiment_result is not None:
-            result["extra_val_results"].insert(0, (0, pre_experiment_result))
+    def _process_result(self, result):
+        pass
 
 
-class ContinualLearningTrainable(SupervisedTrainable):
+class SupervisedTrainable(DistributedTrainable):
+    """
+    Trainable class used to train supervised machine learning experiments
+    with ray.
+    """
+
+
+class ContinualLearningTrainable(DistributedTrainable):
     """
     Trainable class used to train supervised machine learning experiments
     with ray.
@@ -340,18 +330,8 @@ class ContinualLearningTrainable(SupervisedTrainable):
     # This is used in the run_with_raytune function to clarify the stopping condition.
     stop_condition = "num_tasks"
 
-    def _run_iteration(self):
-        """Run one epoch of training on each process."""
-        status = []
-        for w in self.procs:
-            status.append(w.run_task.remote())
 
-        # Wait for remote functions and check for errors
-        if ray_utils.check_for_failure(status):
-            return ray.get(status)
-
-
-class SigOptSupervisedTrainable(SupervisedTrainable):
+class SigOptSupervisedTrainable(DistributedTrainable):
     """
     This class updates the config using SigOpt before the models and workers are
     instantiated, and updates the result using SigOpt once training completes.
@@ -403,12 +383,12 @@ class SigOptSupervisedTrainable(SupervisedTrainable):
             assert "mean_accuracy" in self.metric_names, \
                 "For now, we only update the observation if `mean_accuracy` is present."
 
-    def _process_result(self, result, pre_experiment_result=None):
+    def _process_result(self, result):
         """
         Update sigopt with the new result once we're at the end of training.
         """
 
-        super()._process_result(result, pre_experiment_result=pre_experiment_result)
+        super()._process_result(result)
 
         if self.sigopt is not None:
             result["early_stop"] = result.get("early_stop", 0.0)
