@@ -19,8 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .dendrite_segments import DendriteSegments
-from .dendritic_layers import (
-	AbsoluteMaxGatingDendriticLayer, BiasingDendriticLayer,
-	GatingDendriticLayer
-)
+from .ewc import CONFIGS as EWC
+
+"""
+Import and collect all Continual Learning experiment configurations into one CONFIG
+"""
+__all__ = ["CONFIGS"]
+
+# Collect all configurations
+CONFIGS = dict()
+CONFIGS.update(EWC)
