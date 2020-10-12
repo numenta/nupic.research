@@ -26,9 +26,7 @@ import torch
 from nupic.research.frameworks.pytorch.datasets import omniglot
 from nupic.research.frameworks.pytorch.models import OMLNetwork
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
-from nupic.research.frameworks.vernon.run_experiment.trainables import (
-    SupervisedTrainable,
-)
+from nupic.research.frameworks.vernon.trainables import SupervisedTrainable
 
 
 class OMLExperiment(mixins.OnlineMetaLearning,
