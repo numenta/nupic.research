@@ -56,17 +56,13 @@ from nupic.research.frameworks.pytorch.model_utils import (
     set_random_seed,
     train_model,
 )
+from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.vernon.evaluation_metrics import ContinualLearningMetrics
 from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
 from nupic.research.frameworks.vernon.network_utils import (
     create_model,
     get_compatible_state_dict,
 )
-
-try:
-    from apex import amp
-except ImportError:
-    amp = None
 
 __all__ = [
     "SupervisedExperiment",
@@ -98,7 +94,6 @@ class SupervisedExperiment:
         self.batch_size = 1
         self.epochs = 1
         self.distributed = False
-        self.mixed_precision = False
         self.rank = 0
         self.total_batches = 0
         self.progress = False
@@ -164,9 +159,6 @@ class SupervisedExperiment:
             - log_level: Python Logging level
             - log_format: Python Logging format
             - seed: the seed to be used for pytorch, python, and numpy
-            - mixed_precision: Whether or not to enable apex mixed precision
-            - mixed_precision_args: apex mixed precision arguments.
-                                    See "amp.initialize"
             - sample_transform: Transform acting on the training samples. To be used
                                 additively after default transform or auto-augment.
             - target_transform: Transform acting on the training targets.
@@ -260,22 +252,6 @@ class SupervisedExperiment:
                                           dict(params=group_no_decay,
                                                weight_decay=0.)],
                                          **optimizer_args)
-
-        # Validate mixed precision requirements
-        self.mixed_precision = config.get("mixed_precision", False)
-        if self.mixed_precision and amp is None:
-            self.mixed_precision = False
-            self.logger.error(
-                "Mixed precision requires NVIDA APEX."
-                "Please install apex from https://www.github.com/nvidia/apex"
-                "Disabling mixed precision training.")
-
-        # Configure mixed precision training
-        if self.mixed_precision:
-            amp_args = config.get("mixed_precision_args", {})
-            self.model, self.optimizer = amp.initialize(
-                self.model, self.optimizer, **amp_args)
-            self.logger.info("Using mixed precision")
 
         # Apply DistributedDataParallel after all other model mutations
         if self.distributed:
@@ -760,11 +736,6 @@ class SupervisedExperiment:
                 serialize_state_dict(buffer, state_dict)
                 state["lr_scheduler"] = buffer.getvalue()
 
-        if self.mixed_precision:
-            with io.BytesIO() as buffer:
-                serialize_state_dict(buffer, amp.state_dict())
-                state["amp"] = buffer.getvalue()
-
         return state
 
     def set_state(self, state):
@@ -788,11 +759,6 @@ class SupervisedExperiment:
             with io.BytesIO(state["lr_scheduler"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
             self.lr_scheduler.load_state_dict(state_dict)
-
-        if "amp" in state and amp is not None:
-            with io.BytesIO(state["amp"]) as buffer:
-                state_dict = deserialize_state_dict(buffer, self.device)
-            amp.load_state_dict(state_dict)
 
         if "current_epoch" in state:
             self.current_epoch = state["current_epoch"]
@@ -900,6 +866,8 @@ class SupervisedExperiment:
             post_batch=[exp + ".post_batch"],
             error_loss=[exp + ".error_loss"],
             complexity_loss=[exp + ".complexity_loss"],
+            get_state=[exp + ".get_state"],
+            set_state=[exp + ".set_state"],
             should_decay_parameter=[exp + ".should_decay_parameter"],
             transform_data_to_device=[exp + ".transform_data_to_device"],
             aggregate_results=[exp + ".aggregate_results"],
@@ -1373,7 +1341,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return eo
 
 
-class ImagenetExperiment(SupervisedExperiment):
+class ImagenetExperiment(mixins.MixedPrecision,
+                         SupervisedExperiment):
     """
     Experiment class used to train Sparse and dense versions of Resnet50 v1.5
     models on Imagenet dataset
