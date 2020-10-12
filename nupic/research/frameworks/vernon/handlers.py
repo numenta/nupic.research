@@ -177,12 +177,6 @@ class SupervisedExperiment:
             - replicas_per_sample: Number of replicas to create per sample in the batch.
                                    (each replica is transformed independently)
                                    Used in maxup.
-            - train_model_func: Optional user defined function to train the model,
-                                expected to behave similarly to `train_model`
-                                in terms of input parameters and return values
-            - evaluate_model_func: Optional user defined function to validate the model
-                                   expected to behave similarly to `evaluate_model`
-                                   in terms of input parameters and return values
             - checkpoint_file: if not None, will start from this model. The model
                                must have the same model_args and model_class as the
                                current experiment.
@@ -353,10 +347,6 @@ class SupervisedExperiment:
         if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
             self.step_lr_every_batch = True
 
-        # Set train and validate methods.
-        self.train_model = config.get("train_model_func", train_model)
-        self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
-
     @classmethod
     def create_model(cls, config, device):
         """
@@ -498,7 +488,7 @@ class SupervisedExperiment:
         if loader is None:
             loader = self.val_loader
 
-        return self.evaluate_model(
+        return evaluate_model(
             model=self.model,
             loader=loader,
             device=self.device,
@@ -509,7 +499,7 @@ class SupervisedExperiment:
         )
 
     def train_epoch(self):
-        self.train_model(
+        train_model(
             model=self.model,
             loader=self.train_loader,
             optimizer=self.optimizer,
@@ -1392,6 +1382,50 @@ class ImagenetExperiment(SupervisedExperiment):
     Experiment class used to train Sparse and dense versions of Resnet50 v1.5
     models on Imagenet dataset
     """
+    def setup_experiment(self, config):
+        """
+        :param config: Dictionary containing the configuration parameters
+
+            - train_model_func: Optional user defined function to train the model,
+                                expected to behave similarly to `train_model`
+                                in terms of input parameters and return values
+            - evaluate_model_func: Optional user defined function to validate the model
+                                   expected to behave similarly to `evaluate_model`
+                                   in terms of input parameters and return values
+        """
+        super().setup_experiment(config)
+
+        self.train_model = config.get("train_model_func", train_model)
+        self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
+
+    def train_epoch(self):
+        self.train_model(
+            model=self.model,
+            loader=self.train_loader,
+            optimizer=self.optimizer,
+            device=self.device,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
+            batches_in_epoch=self.batches_in_epoch,
+            pre_batch_callback=self.pre_batch,
+            post_batch_callback=self.post_batch_wrapper,
+            transform_to_device_fn=self.transform_data_to_device,
+        )
+
+    def validate(self, loader=None):
+        if loader is None:
+            loader = self.val_loader
+
+        return self.evaluate_model(
+            model=self.model,
+            loader=loader,
+            device=self.device,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
+            batches_in_epoch=self.batches_in_epoch_val,
+            transform_to_device_fn=self.transform_data_to_device,
+        )
+
     @classmethod
     def load_dataset(cls, config, train=True):
         config = copy.copy(config)
@@ -1413,5 +1447,16 @@ class ImagenetExperiment(SupervisedExperiment):
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["load_dataset"].insert(0, "ImagenetExperiment: Set default dataset")
+        exp = "ImagenetExperiment"
+
+        # Extended methods
+        eo["setup_experiment"].append(exp + ": Additional setup")
+        eo["load_dataset"].insert(0, exp + ": Set default dataset")
+
+        eo.update(
+            # Overwritten methods
+            train_model=[exp + ": Call train_model_func"],
+            validate=[exp + ": Call evaluate_model_func"],
+        )
+
         return eo
