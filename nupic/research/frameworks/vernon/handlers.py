@@ -57,11 +57,7 @@ from nupic.research.frameworks.pytorch.model_utils import (
     train_model,
 )
 from nupic.research.frameworks.vernon.evaluation_metrics import ContinualLearningMetrics
-from nupic.research.frameworks.vernon.experiment_utils import (
-    create_lr_scheduler,
-    get_free_port,
-    get_node_ip_address,
-)
+from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
 from nupic.research.frameworks.vernon.network_utils import (
     create_model,
     get_compatible_state_dict,
@@ -879,14 +875,6 @@ class SupervisedExperiment:
         :return: list of weight decays used by the optimizer
         """
         return [p["weight_decay"] for p in self.optimizer.param_groups]
-
-    def get_node_ip(self):
-        """Returns the IP address of the current node."""
-        return get_node_ip_address()
-
-    def get_free_port(self):
-        """Returns free TCP port in the current node"""
-        return get_free_port()
 
     @classmethod
     def get_execution_order(cls):
