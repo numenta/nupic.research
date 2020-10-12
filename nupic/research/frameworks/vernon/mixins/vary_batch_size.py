@@ -47,7 +47,7 @@ class VaryBatchSize(object):
         self.train_loaders = [self.train_loader]
         for i in range(1, len(batch_sizes)):
             self.train_loaders.append(self.create_train_dataloader(
-                config, train_set, batch_size_variant=i
+                config=config, dataset=train_set, batch_size_variant=i
             ))
 
         self.current_batch_size_variant = 0
@@ -86,7 +86,7 @@ class VaryBatchSize(object):
         config = deepcopy(config)
         config.update(batch_size=batch_size)
 
-        return super().create_train_dataloader(config, dataset)
+        return super().create_train_dataloader(config=config, dataset=dataset)
 
     @classmethod
     def get_execution_order(cls):
