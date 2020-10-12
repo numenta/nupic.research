@@ -61,6 +61,7 @@ class OnlineMetaLearning(object):
         )
 
     def post_epoch(self):
+        super().post_epoch()
         if self.should_stop() and self.run_meta_test:
             # meta-training phase complete, perform meta-testing phase
             for num_classes_learned in [10, 50, 100, 200, 600]:

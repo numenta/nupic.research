@@ -88,6 +88,8 @@ class QuantizationAware(object):
 
     def transform_model(self):
         """Prepare for quantization, send to device and set up to start training"""
+        super().transform_model()
+
         # prepare model for qat
         prepare_for_qat(self.model, self.quantize_weights_per_channel, self.fuse_relu)
         self.model.to(self.device)
@@ -99,6 +101,7 @@ class QuantizationAware(object):
         self.batch_norm_frozen = False
 
     def pre_batch(self, model, batch_idx):
+        super().pre_batch(model=model, batch_idx=batch_idx)
 
         # freeze observer parameters for the last 500 batches of last epoch
         if (not self.observer_disabled
