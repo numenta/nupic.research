@@ -147,8 +147,9 @@ def process_args(args, config):
 
         from wandb import util
         from nupic.research.frameworks.wandb import ray_wandb
-        from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers_2 \
-            import DEFAULT_LOGGERS
+        from nupic.research.frameworks.vernon.ray_custom_loggers import (
+            DEFAULT_LOGGERS
+        )
 
         # Add ray-wandb logger to loggers.
         config.setdefault("loggers", [])
