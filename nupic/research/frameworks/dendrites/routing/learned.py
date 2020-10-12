@@ -19,77 +19,18 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from random import randint
-
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 from nupic.research.frameworks.dendrites.routing import (
+    RoutingDataset,
     RoutingFunction,
     evaluate_dendrite_model,
     generate_context_vectors,
     train_dendrite_model,
 )
-
-
-# TODO place this dataset in a separate module
-class RoutingDataset(Dataset):
-    """
-    A dataset class for generating input-target pairs for the routing test specifically
-    for a linear network with a single layer, where the inputs are random vectors
-    sampled from U[-2, 2) each paired a binary sparse context vector
-    """
-
-    def __init__(
-        self,
-        routing_function,
-        input_size,
-        context_vectors,
-        device,
-        dataset_size=1e4
-    ):
-        super().__init__()
-        self.function = routing_function
-        self.num_output_masks = routing_function.num_output_masks
-        self.input_size = input_size
-        self.context_vectors = context_vectors
-        self.device = device
-        self.size = int(dataset_size)
-
-    def __getitem__(self, idx):
-
-        # To retrieve an input-context-target pair, first generate noise from a
-        # standard Gaussian distribution as input, and take the routing function's
-        # output on said input using any of its output masks
-
-        if idx > self.size:
-            raise IndexError("Index {} is out of range".format(idx))
-        torch.manual_seed(idx)
-
-        # x = 4.0 * torch.rand((self.input_size,)) - 2.0  # sampled i.i.d. from U[-2, 2)
-        x = torch.rand((self.input_size,))
-        x = x.to(self.device)
-
-        context_id = randint(0, self.num_output_masks - 1)
-        context = self.context_vectors[context_id, :]
-        context = context.to(self.device)
-
-        target = self.function([context_id], x.view(1, -1))
-        target = target.view(-1)
-
-        if torch.isnan(target).any().item():
-            # print(self.function.sparse_weights.module.weight.data)
-            print(self.function.sparse_weights(x))
-            print(target)
-            print(self.function.output_masks[context_id, :])
-            print("")
-
-        return x, context, target
-
-    def __len__(self):
-        return self.size
 
 
 def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_module):
