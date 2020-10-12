@@ -582,16 +582,14 @@ class SupervisedExperiment:
                               num_images)
             self.logger.debug("Timing: %s", time_string)
 
-    def post_batch_wrapper(self, model, error_loss, complexity_loss, batch_idx,
-                           *args, **kwargs):
+    def post_batch_wrapper(self, batch_idx, **kwargs):
         """
         Perform the post_batch updates, then maybe validate.
 
         This method exists because post_batch is designed to be overridden, and
         validation needs to wait until after all post_batch overrides have run.
         """
-        self.post_batch(model, error_loss, complexity_loss, batch_idx,
-                        *args, **kwargs)
+        self.post_batch(batch_idx=batch_idx, **kwargs)
         self.current_timestep += 1
         validate = (batch_idx in self.additional_batches_to_validate
                     and self.current_epoch in self.epochs_to_validate)
