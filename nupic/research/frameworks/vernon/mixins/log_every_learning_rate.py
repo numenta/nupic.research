@@ -31,10 +31,8 @@ class LogEveryLearningRate:
         self.lr_history = []
         self.momentum_history = []
 
-    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
-                   *args, **kwargs):
-        super().post_batch(model, error_loss, complexity_loss, batch_idx,
-                           *args, **kwargs)
+    def post_batch(self, batch_idx, **kwargs):
+        super().post_batch(batch_idx=batch_idx, **kwargs)
 
         if self.should_log_batch(batch_idx):
             # Get the lr and momentum from the first param group.

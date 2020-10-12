@@ -100,8 +100,8 @@ class QuantizationAware(object):
         self.observer_disabled = False
         self.batch_norm_frozen = False
 
-    def pre_batch(self, model, batch_idx):
-        super().pre_batch(model=model, batch_idx=batch_idx)
+    def pre_batch(self, **kwargs):
+        super().pre_batch(**kwargs)
 
         # freeze observer parameters for the last 500 batches of last epoch
         if (not self.observer_disabled
