@@ -10,7 +10,7 @@
 from copy import deepcopy
 
 from nupic.research.frameworks.pytorch.lr_scheduler import LinearLRScheduler
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import expansions, mixins
 
 
 class LRRangeTest(object):
@@ -31,7 +31,8 @@ class LRRangeTest(object):
     """
 
     # List the required mixins that should be accompanied with this class.
-    required_mixins = [mixins.LogEveryLoss, mixins.LogEveryLearningRate]
+    required_mixins = [mixins.LogEveryLoss, mixins.LogEveryLearningRate,
+                       expansions.FixedLRSchedule]
 
     def setup_experiment(self, config):
         """
