@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import copy
 import unittest
 
 import torch.nn.functional as F
@@ -58,7 +59,9 @@ class LearnToRouteTest(unittest.TestCase):
 
         optimizer = init_optimizer(network=dendritic_network)
 
-        non_dendritic_weights_before = dendritic_network.module.weight.data
+        non_dendritic_weights_before = copy.deepcopy(
+            dendritic_network.module.weight.data
+        )
 
         # Perform a single training epoch
         train_dendrite_model(
@@ -69,10 +72,52 @@ class LearnToRouteTest(unittest.TestCase):
             criterion=F.mse_loss
         )
 
-        non_dendritic_weights_after = dendritic_network.module.weight.data
+        non_dendritic_weights_after = copy.deepcopy(
+            dendritic_network.module.weight.data
+        )
 
         expected = (non_dendritic_weights_before == non_dendritic_weights_after).all()
         self.assertTrue(expected)
+
+    def test_dendritic_weights(self):
+        """ Dendritic weights should be modified """
+
+        r, dendritic_network, context_vectors, device = init_test_scenario(
+            dim_in=100,
+            dim_out=100,
+            num_contexts=10,
+            dim_context=100,
+            dendrite_module=AbsoluteMaxGatingDendriticLayer
+        )
+
+        routing_test_dataloader = init_dataloader(
+            routing_function=r,
+            context_vectors=context_vectors,
+            device=device,
+            batch_size=64
+        )
+
+        optimizer = init_optimizer(network=dendritic_network)
+
+        dendritic_weights_before = copy.deepcopy(
+            dendritic_network.segments.weights.data
+        )
+
+        # Perform a single training epoch
+        train_dendrite_model(
+            model=dendritic_network,
+            loader=routing_test_dataloader,
+            optimizer=optimizer,
+            device=device,
+            criterion=F.mse_loss
+        )
+
+        dendritic_weights_after = copy.deepcopy(
+            dendritic_network.segments.weights.data
+        )
+
+        expected = (dendritic_weights_before == dendritic_weights_after).all()
+        self.assertFalse(expected)
 
 
 if __name__ == "__main__":

@@ -122,9 +122,6 @@ def train_dendrite_model(model, loader, optimizer, device, criterion):
 
     for data, context, target in loader:
 
-        # for i in range(target.shape[0]):
-        #     print(target[i, :])
-
         data = data.to(device)
         context = context.to(device)
         target = target.to(device)

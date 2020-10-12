@@ -34,6 +34,7 @@ from nupic.research.frameworks.dendrites.routing import (
 )
 
 
+# TODO place this dataset in a separate module
 class RoutingDataset(Dataset):
     """
     A dataset class for generating input-target pairs for the routing test specifically
@@ -154,7 +155,6 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
 
 
 def init_dataloader(routing_function, context_vectors, device, batch_size):
-
     """
     Returns a torch DataLoader for the routing task given a random routing function
 
