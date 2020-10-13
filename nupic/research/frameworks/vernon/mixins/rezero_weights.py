@@ -53,8 +53,8 @@ class RezeroWeights:
                 module.rezero_weights()
         return model
 
-    def post_batch(self, *args, **kwargs):
-        super().post_batch(*args, **kwargs)
+    def post_batch(self, **kwargs):
+        super().post_batch(**kwargs)
         for module in self._rezero_modules:
             module.rezero_weights()
 

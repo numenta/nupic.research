@@ -57,11 +57,7 @@ from nupic.research.frameworks.pytorch.model_utils import (
     train_model,
 )
 from nupic.research.frameworks.vernon.evaluation_metrics import ContinualLearningMetrics
-from nupic.research.frameworks.vernon.experiment_utils import (
-    create_lr_scheduler,
-    get_free_port,
-    get_node_ip_address,
-)
+from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
 from nupic.research.frameworks.vernon.network_utils import (
     create_model,
     get_compatible_state_dict,
@@ -586,16 +582,14 @@ class SupervisedExperiment:
                               num_images)
             self.logger.debug("Timing: %s", time_string)
 
-    def post_batch_wrapper(self, model, error_loss, complexity_loss, batch_idx,
-                           *args, **kwargs):
+    def post_batch_wrapper(self, batch_idx, **kwargs):
         """
         Perform the post_batch updates, then maybe validate.
 
         This method exists because post_batch is designed to be overridden, and
         validation needs to wait until after all post_batch overrides have run.
         """
-        self.post_batch(model, error_loss, complexity_loss, batch_idx,
-                        *args, **kwargs)
+        self.post_batch(batch_idx=batch_idx, **kwargs)
         self.current_timestep += 1
         validate = (batch_idx in self.additional_batches_to_validate
                     and self.current_epoch in self.epochs_to_validate)
@@ -881,14 +875,6 @@ class SupervisedExperiment:
         :return: list of weight decays used by the optimizer
         """
         return [p["weight_decay"] for p in self.optimizer.param_groups]
-
-    def get_node_ip(self):
-        """Returns the IP address of the current node."""
-        return get_node_ip_address()
-
-    def get_free_port(self):
-        """Returns free TCP port in the current node"""
-        return get_free_port()
 
     @classmethod
     def get_execution_order(cls):

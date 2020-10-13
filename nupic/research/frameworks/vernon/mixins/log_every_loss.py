@@ -36,10 +36,10 @@ class LogEveryLoss:
         self.error_loss_history = []
         self.complexity_loss_history = []
 
-    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
-                   *args, **kwargs):
-        super().post_batch(model, error_loss, complexity_loss, batch_idx,
-                           *args, **kwargs)
+    def post_batch(self, error_loss, complexity_loss, batch_idx, **kwargs):
+        super().post_batch(error_loss=error_loss,
+                           complexity_loss=complexity_loss, batch_idx=batch_idx,
+                           **kwargs)
         if self.should_log_batch(batch_idx):
             self.error_loss_history.append(error_loss.clone())
             if complexity_loss is not None:
