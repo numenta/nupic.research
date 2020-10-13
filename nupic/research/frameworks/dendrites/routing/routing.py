@@ -42,8 +42,24 @@ class RoutingDataset(Dataset):
         input_size,
         context_vectors,
         device,
-        dataset_size=1e4
+        dataset_size=1e4,
+        x_min=-2.0,
+        x_max=2.0,
     ):
+        """
+        :param routing_function: the random routing function
+        :param input_size: the number of dimensions in the input to the routing
+                           function and test module
+        :param context_vectors: 2D torch Tensor in which each row gives a context
+                                vector
+        :param device: device to use ('cpu' or 'cuda')
+        :param dataset_size: the number of (input, context, target) pairs that be
+                             iterated over
+        :param x_min: the minimum bound of the uniform distribution from which input
+                      vectors are i.i.d. sampled along each input dimension
+        :param x_max: the maximum bound of the uniform distribution from which input
+                      vectors are i.i.d. sampled along each input dimension
+        """
         super().__init__()
         self.function = routing_function
         self.num_output_masks = routing_function.num_output_masks
@@ -52,18 +68,23 @@ class RoutingDataset(Dataset):
         self.device = device
         self.size = int(dataset_size)
 
+        # The following attributes are selected such that self.alpha * u + self.beta
+        # gives a sample drawn from U[x_min, x_max) given a sample u ~ U[0, 1)
+        self.alpha = (x_max - x_min)
+        self.beta = x_min
+
     def __getitem__(self, idx):
 
-        # To retrieve an input-context-target pair, first generate noise from a
-        # standard Gaussian distribution as input, and take the routing function's
-        # output on said input using any of its output masks
+        # To retrieve an input-context-target pair, first generate noise from a uniform
+        # distribution as input (where the bounds of the distribution were specified in
+        # the `__init__` method), and take the routing function's output on said input
+        # using any of its output masks
 
         if idx > self.size:
             raise IndexError("Index {} is out of range".format(idx))
         torch.manual_seed(idx)
 
-        # x = 4.0 * torch.rand((self.input_size,)) - 2.0  # sampled i.i.d. from U[-2, 2)
-        x = torch.rand((self.input_size,))
+        x = self.alpha * torch.rand((self.input_size,)) - self.beta
         x = x.to(self.device)
 
         context_id = randint(0, self.num_output_masks - 1)
