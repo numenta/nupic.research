@@ -20,7 +20,8 @@
 
 """
 Run a simple GSC experiment using OneCycleLR. The parameters used here
-are derived from earlier ImageNet experiments and are unlikely to be optimal.
+have been optimized by OneCycleLr, and achieved an accuracy of 0.964
+averaged over 5 model examples.
 """
 
 from copy import deepcopy
@@ -34,15 +35,24 @@ SPARSE_CNN_ONECYCLELR.update(
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
 
     lr_scheduler_args=dict(
-        max_lr=6.0,
-        div_factor=6,  # initial_lr = 1.0
-        final_div_factor=4000,  # min_lr = 0.00025
-        pct_start=0.1,
+        max_lr=0.11, #Optimized in Sig-Opt
+        div_factor=50,  
+        final_div_factor=4000, 
+        pct_start=0.15,
         epochs=30,
         anneal_strategy="linear",
         max_momentum=0.01,
         cycle_momentum=False,
     ),
+
+    epochs=30,
+    epochs_to_validate=range(0, 30),
+
+    # Training batch size
+    batch_size=128,
+    # Validation batch size
+    val_batch_size=128,
+
     optimizer_args=dict(
         lr=0.1,
         weight_decay=0.0001,

@@ -36,11 +36,11 @@ SIGOPT_SPARSE_CNN_ONECYCLELR.update(
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
 
     lr_scheduler_args=dict(
-        # commented arguments are to be suggested by sigopt
-        # max_lr=6.91,
-        div_factor=10.0, 
-        #final_div_factor=4000,  
-        pct_start=0.1,
+        # Commented arguments are to be suggested by sigopt
+        # max_lr=1.2,
+        # div_factor=6.0, 
+        final_div_factor=4000,
+        # pct_start=0.1,
         epochs=30,
         anneal_strategy="linear",
         max_momentum=0.01,
@@ -49,15 +49,29 @@ SIGOPT_SPARSE_CNN_ONECYCLELR.update(
 
     sigopt_experiment_class=SigOptSGDOneCycleLRExperiment,
 
+    # Training batch size
+    batch_size=128,
+    # Validation batch size
+    val_batch_size=128,
+
+    optimizer_args=dict(
+        lr=0.1,
+        #weight_decay=0.0001,
+        momentum=0.0,
+        nesterov=False,
+    ),
+
     epochs=30,
     epochs_to_validate=range(0, 30),
 
     sigopt_config=dict(
-        name="gsc_onecyclelr_v2",
+        name="sparse_gsc_onecyclelr_v2",
         # See https://app.sigopt.com/docs/overview/parameter_bounds
         parameters=[
-            dict(name="max_lr", type="double", bounds=dict(min=0.5, max=5)),
-            dict(name="final_div_factor", type="double", bounds=dict(min=5, max=5000)),
+            dict(name="max_lr", type="double", bounds=dict(min=0.01, max=1.5)),
+            dict(name="div_factor", type="double", bounds=dict(min=30.0, max=100)),
+            dict(name="pct_start", type="double", bounds=dict(min=0.03, max=0.15)),
+            dict(name="weight_decay", type="double", bounds=dict(min=0.00001, max=0.001)),
         ],
         metrics=[dict(name="mean_accuracy", objective="maximize")],
         parallel_bandwidth=1,
