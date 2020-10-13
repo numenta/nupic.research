@@ -36,9 +36,9 @@ SPARSE_CNN_ONECYCLELR.update(
 
     lr_scheduler_args=dict(
         max_lr=0.11, #Optimized in Sig-Opt
-        div_factor=50,  
+        div_factor=50, #Optimized in Sig-Opt
         final_div_factor=4000, 
-        pct_start=0.15,
+        pct_start=0.15, #Optimized in Sig-Opt
         epochs=30,
         anneal_strategy="linear",
         max_momentum=0.01,
@@ -55,7 +55,7 @@ SPARSE_CNN_ONECYCLELR.update(
 
     optimizer_args=dict(
         lr=0.1,
-        weight_decay=0.0001,
+        weight_decay=0.0001, #Optimized in Sig-Opt
         momentum=0.0,
         nesterov=False,
     ),
