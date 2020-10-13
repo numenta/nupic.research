@@ -51,7 +51,8 @@ def run(config):
     ray.init(address=address, local_mode=config.get("local_mode", False))
 
     # Register serializer and deserializer - needed when logging arrays and tensors.
-    register_torch_serializers()
+    if not  config.get("local_mode", False):
+        register_torch_serializers()
 
     # Get ray.tune kwargs for the given config.
     kwargs = get_tune_kwargs(config)
