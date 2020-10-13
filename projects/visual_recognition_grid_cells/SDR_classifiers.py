@@ -32,7 +32,7 @@ shuffle_SDRs_bool = True
 class MLP(torch.nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
-        self.fc1 = torch.nn.Linear(5*5*64, 256)
+        self.fc1 = torch.nn.Linear(5*5*128, 256)
         self.fc2 = torch.nn.Linear(256, 128)
         self.fc3 = torch.nn.Linear(128, 10)
         print("\nUsing an MLP classifier")
@@ -46,39 +46,37 @@ class MLP(torch.nn.Module):
 class linear(torch.nn.Module):
     def __init__(self):
         super(linear, self).__init__()
-        self.fc = torch.nn.Linear(1*1*64, 10)
+        self.fc = torch.nn.Linear(5*5*128, 10)
         print("\nUsing a linear classifier")
 
     def forward(self, x):
-        # *** randomize the SDR orders 
-        x = x.view(-1, 5*5, 64)
-        x = torch.transpose(x)
-        print(np.shape(x))
+        # x = x.view(-1, 5*5, 64)
+        # x = torch.transpose(x)
+        # print(np.shape(x))
 
-        x = x[:, 2, 2, :]
-        print(np.shape(x))
+        # x = x[:, 2, 2, :]
+        # print(np.shape(x))
         x = self.fc(x)
         return x
 
 def train_net():
 
-    net = linear()
+    net = MLP()
 
     training_data = torch.from_numpy(np.load(data_set + '_SDRs_training.npy'))
     training_labels = torch.from_numpy(np.load(data_set + '_labels_training.npy'))
 
-    if shuffle_SDRs_bool == True:
-        for input_iter in len(training_labels:
-            training_data[input_iter, :, :]
-
+    # if shuffle_SDRs_bool == True:
+    #     for input_iter in len(training_labels:
+    #         training_data[input_iter, :, :]
 
     testing_data = torch.from_numpy(np.load(data_set + '_SDRs_testing.npy'))
     testing_labels = torch.from_numpy(np.load(data_set + '_labels_testing.npy'))
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.1, momentum=0.9)
 
-    for epoch in range(3000):  # loop over the dataset multiple times
+    for epoch in range(800):  # loop over the dataset multiple times
 
         optimizer.zero_grad()
 

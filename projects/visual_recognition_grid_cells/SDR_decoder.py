@@ -34,10 +34,21 @@ from PIL import Image
 
 import inspect
 
-data_set = 'fashion_mnist'
+data_set = 'mnist'
 train_net_bool = False
 num_epochs = 10
 batch_size = 64
+
+if data_set == 'mnist':
+    training_sources = datasets.MNIST('data', train=True, download=True).train_data.float()
+    testing_sources = datasets.MNIST('data', train=False, download=True).test_data.float()
+elif data_set == 'fashion_mnist':
+    training_sources = datasets.FashionMNIST('data', train=True, download=True).train_data.float()
+    testing_sources = datasets.FashionMNIST('data', train=False, download=True).test_data.float()
+
+print(np.shape(testing_sources))
+np.save("first_100_images", testing_sources[0:100])
+exit()
 
 
 class cnn_decoder(torch.nn.Module):
@@ -91,6 +102,7 @@ def initialize():
     elif data_set == 'fashion_mnist':
         training_sources = datasets.FashionMNIST('data', train=True, download=True).train_data.float()
         testing_sources = datasets.FashionMNIST('data', train=False, download=True).test_data.float()
+
 
     #Labels are loaded from the npy data and saved along with the source image as a sanity check 
     # that they correctly correspond

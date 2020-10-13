@@ -36,14 +36,14 @@ torch.manual_seed(18)
 np.random.seed(18)
 
 # Training parameters
-TRAIN_NEW_NET = True
+TRAIN_NEW_NET = False
 DATASET = 'mnist'
 
 LEARNING_RATE = 0.01
 MOMENTUM = 0.5
 EPOCHS = 10
 FIRST_EPOCH_BATCH_SIZE = 4
-TRAIN_BATCH_SIZE = 64
+TRAIN_BATCH_SIZE = 128
 TEST_BATCH_SIZE = 1000
 
 # Use GPU if available
@@ -127,12 +127,12 @@ print("Creating model")
 class sdr_cnn_base(nn.Module):
     def __init__(self, percent_on=0.1, boost_strength=1.5):
         super(sdr_cnn_base, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, padding=2)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5, padding=2)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, padding=0)
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, padding=0)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.k_winner = KWinners2d(channels=64, percent_on=percent_on, boost_strength=boost_strength, local=True)
-        self.dense1 = nn.Linear(in_features=5*5*64, out_features=256)
+        self.k_winner = KWinners2d(channels=128, percent_on=percent_on, boost_strength=boost_strength, local=True)
+        self.dense1 = nn.Linear(in_features=5*5*128, out_features=256)
         self.dense2 = nn.Linear(in_features=256, out_features=128)
         self.output = nn.Linear(in_features=128, out_features=10)
         self.softmax = nn.LogSoftmax(dim=1)
@@ -143,8 +143,8 @@ class sdr_cnn_base(nn.Module):
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
         x = self.k_winner(x)
-        print(np.shape(x))
-        x = x.view(-1, 5*5*64)
+        #print(np.shape(x))
+        x = x.view(-1, 5*5*128)
         x = F.relu(self.dense1(x))
         x = F.relu(self.dense2(x))
         x = self.softmax(self.output(x))
@@ -157,7 +157,7 @@ class sdr_cnn_base(nn.Module):
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
         x = self.k_winner(x)
-        x = x.view(-1, 5*5*64)
+        x = x.view(-1, 5*5*128)
         x = (x>0).float()
 
         return x
