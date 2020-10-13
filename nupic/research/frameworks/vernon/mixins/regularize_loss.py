@@ -72,8 +72,8 @@ class RegularizeLoss(object):
 
         self.reg_scalar_value = reg_scalar
 
-    def pre_batch(self, model, batch_idx):
-        super().pre_batch(model, batch_idx)
+    def pre_batch(self, batch_idx, **kwargs):
+        super().pre_batch(batch_idx=batch_idx, **kwargs)
         self._update_reg_scalar(batch_idx)
 
     def complexity_loss(self, model):
@@ -91,10 +91,8 @@ class RegularizeLoss(object):
                   else reg)
         return c_loss
 
-    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
-                   *args, **kwargs):
-        super().post_batch(model, error_loss, complexity_loss, batch_idx,
-                           *args, **kwargs)
+    def post_batch(self, batch_idx, **kwargs):
+        super().post_batch(batch_idx=batch_idx, **kwargs)
 
         if self.should_log_batch(batch_idx):
             self.model_complexity_history.append(self.prev_model_complexity)

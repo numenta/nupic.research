@@ -19,27 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .ewc import CONFIGS as EWC
 
-class ConstrainParameters(object):
-    """
-    Calls modules' "constrain_parameters" method after every batch.
-    """
-    def setup_experiment(self, config):
-        super().setup_experiment(config)
-        self._constrain_parameters_modules = [
-            module
-            for module in self.model.modules()
-            if hasattr(module, "constrain_parameters")
-        ]
+"""
+Import and collect all Continual Learning experiment configurations into one CONFIG
+"""
+__all__ = ["CONFIGS"]
 
-    def post_batch(self, **kwargs):
-        super().post_batch(**kwargs)
-        for module in self._constrain_parameters_modules:
-            module.constrain_parameters()
-
-    @classmethod
-    def get_execution_order(cls):
-        eo = super().get_execution_order()
-        eo["setup_experiment"].append("ConstrainParameters initialization")
-        eo["post_batch"].append("ConstrainParameters")
-        return eo
+# Collect all configurations
+CONFIGS = dict()
+CONFIGS.update(EWC)
