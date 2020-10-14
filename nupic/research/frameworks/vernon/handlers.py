@@ -52,6 +52,7 @@ from nupic.research.frameworks.pytorch.model_utils import (
     aggregate_eval_results,
     deserialize_state_dict,
     evaluate_model,
+    get_parent_module,
     serialize_state_dict,
     set_random_seed,
     train_model,
@@ -1295,10 +1296,11 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.logger.debug(f"Valid accuracy meta train training: {valid_accuracy}")
 
     @classmethod
-    def update_params(cls, params, loss, lr, distributed=False):
+    def update_params(cls, named_params, model, loss, lr, distributed=False):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
+        params = list(named_params.values())
         gradients = torch.autograd.grad(
             loss, params,
             retain_graph=True, create_graph=True
@@ -1311,15 +1313,20 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 grad.data /= size
 
         if gradients is not None:
-            params = list(params)
-            for p, g in zip(params, gradients):
+            for g, (name, p) in zip(gradients, named_params.items()):
                 if g is not None:
-                    p.add_(g, alpha=-lr)
+                    updated = p.add(g, alpha=-lr)
+
+                    # Update in place inn a way that preserves grads.
+                    parent_module = get_parent_module(model, name)
+                    base_name = name.split(".")[-1]
+                    parent_module._parameters[base_name] = updated
 
     def adapt(self, cloned_adaptation_net, train_loss):
-        fast_params = list(self.get_fast_params(cloned_adaptation_net))
+        named_fast_params = dict(self.get_named_fast_params(cloned_adaptation_net))
         self.update_params(
-            fast_params, train_loss, self.adaptation_lr, distributed=self.distributed
+            named_fast_params, cloned_adaptation_net, train_loss,
+            self.adaptation_lr, distributed=self.distributed
         )
 
     def clone_model(self, keep_as_reference=None):
