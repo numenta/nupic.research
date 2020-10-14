@@ -45,7 +45,7 @@ os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 class RayActorHelperMethods:
     def get_node_ip(self):
         """Returns the IP address of the current node."""
-        return socket.gethostbyname(socket.getfqdn())
+        return socket.gethostbyname(socket.gethostname())
 
     def get_free_port(self):
         """Returns free TCP port in the current node"""
@@ -230,11 +230,11 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
 
         self._process_config(config)
 
+        experiment = ray.remote(
+            num_cpus=num_cpus, num_gpus=num_gpus)(self.experiment_class)
         for i in range(1 + self.max_retries):
             self.procs = []
             for _ in range(world_size):
-                experiment = ray.remote(
-                    num_cpus=num_cpus, num_gpus=num_gpus)(self.experiment_class)
                 self.procs.append(experiment.remote())
 
             # Use first process as head of the group
