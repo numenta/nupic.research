@@ -19,11 +19,92 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from random import randint
+
 import torch
+from torch.utils.data import Dataset
 
 from nupic.torch.modules import SparseWeights
 
 from .utils import generate_random_binary_vectors
+
+
+class RoutingDataset(Dataset):
+    """
+    A dataset class for generating input-target pairs for the routing test specifically
+    for a linear network with a single layer, where the inputs are random vectors
+    sampled from U[-2, 2) each paired a binary sparse context vector
+    """
+
+    def __init__(
+        self,
+        routing_function,
+        input_size,
+        context_vectors,
+        device,
+        concat=False,
+        dataset_size=1e4,
+        x_min=-2.0,
+        x_max=2.0,
+    ):
+        """
+        :param routing_function: the random routing function
+        :param input_size: the number of dimensions in the input to the routing
+                           function and test module
+        :param context_vectors: 2D torch Tensor in which each row gives a context
+                                vector
+        :param device: device to use ('cpu' or 'cuda')
+        :param concat: if True, input and context vectors are concatenated together
+        :param dataset_size: the number of (input, context, target) pairs that be
+                             iterated over
+        :param x_min: the minimum bound of the uniform distribution from which input
+                      vectors are i.i.d. sampled along each input dimension
+        :param x_max: the maximum bound of the uniform distribution from which input
+                      vectors are i.i.d. sampled along each input dimension
+        """
+        super().__init__()
+        self.function = routing_function
+        self.num_output_masks = routing_function.num_output_masks
+        self.input_size = input_size
+        self.context_vectors = context_vectors
+        self.device = device
+        self.concat = concat
+        self.size = int(dataset_size)
+
+        # The following attributes are selected such that self.alpha * u + self.beta
+        # gives a sample drawn from U[x_min, x_max) given a sample u ~ U[0, 1)
+        self.alpha = (x_max - x_min)
+        self.beta = x_min
+
+    def __getitem__(self, idx):
+
+        # To retrieve an input-context-target pair, first generate noise from a uniform
+        # distribution as input (where the bounds of the distribution were specified in
+        # the `__init__` method), and take the routing function's output on said input
+        # using any of its output masks
+
+        if idx > self.size:
+            raise IndexError("Index {} is out of range".format(idx))
+        torch.manual_seed(idx)
+
+        x = self.alpha * torch.rand((self.input_size,)) - self.beta
+        x = x.to(self.device)
+
+        context_id = randint(0, self.num_output_masks - 1)
+        context = self.context_vectors[context_id, :]
+        context = context.to(self.device)
+
+        target = self.function([context_id], x.view(1, -1))
+        target = target.view(-1)
+
+        if self.concat:
+            x = torch.cat((x, context))
+            return x, target
+
+        return x, context, target
+
+    def __len__(self):
+        return self.size
 
 
 class RoutingFunction(torch.nn.Module):
@@ -47,7 +128,7 @@ class RoutingFunction(torch.nn.Module):
     R(1, x) = [0.3, −0.4, 0.0, 0.0].
     """
 
-    def __init__(self, d_in, d_out, k, sparsity=0.7):
+    def __init__(self, d_in, d_out, k, device=None, sparsity=0.7):
         """
         :param d_in: the number of dimensions in the input
         :type d_in: int
@@ -55,6 +136,8 @@ class RoutingFunction(torch.nn.Module):
         :type d_out: int
         :param k: the number of unique random binary vectors that can "route" the
                   sparse linear output
+        :param device: device to use ('cpu' or 'cuda')
+        :type device: :class:`torch.device`
         :type k: int
         :param sparsity: the sparsity in the SparseWeights layer (see
                          nupic.torch.modules.SparseWeights for more details)
@@ -66,6 +149,7 @@ class RoutingFunction(torch.nn.Module):
             sparsity=sparsity
         )
         self.output_masks = generate_random_binary_vectors(k, d_out)
+        self.device = device if device is not None else torch.device("cpu")
 
     def forward(self, output_mask_inds, x):
         """
@@ -83,6 +167,7 @@ class RoutingFunction(torch.nn.Module):
         )
 
         mask = torch.stack([self.get_output_mask(j) for j in output_mask_inds], dim=0)
+        mask = mask.to(self.device)
         output = self.sparse_weights(x)
         output = output * mask
         return output

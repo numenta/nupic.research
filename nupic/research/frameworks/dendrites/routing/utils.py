@@ -103,3 +103,132 @@ def get_gating_context_weights(output_masks, context_vectors, num_dendrites):
                         context_weights[m, j, c] = -1.0
 
     return context_weights
+
+
+def train_dendrite_model(model, loader, optimizer, device, criterion):
+    """
+    Trains a dendritic network model by iterating through all batches in the given
+    dataloader
+
+    :param model: a torch.nn.Module subclass that implements a dendrite module in
+                  addition to a linear feed-forward module, and takes both feedforward
+                  and context inputs to its `forward` method
+    :param loader: a torch dataloader that iterates over all train and test batches
+    :param optimizer: optimizer object used to train the model
+    :param device: device to use ('cpu' or 'cuda')
+    :param criterion: loss function to minimize
+    """
+    model.train()
+
+    for data, context, target in loader:
+
+        data = data.to(device)
+        context = context.to(device)
+        target = target.to(device)
+
+        optimizer.zero_grad()
+        output = model(data, context)
+        loss = criterion(output, target)
+
+        loss.backward()
+        optimizer.step()
+
+
+def train_non_dendrite_model(model, loader, optimizer, device, criterion):
+    """
+    Trains a regular network model by iterating through all batches in the given
+    dataloader
+
+    :param model: a torch.nn.Module subclass that implements a dendrite module in
+                  addition to a linear feed-forward module, and takes both feedforward
+                  and context inputs to its `forward` method
+    :param loader: a torch dataloader that iterates over all train and test batches
+    :param optimizer: optimizer object used to train the model
+    :param device: device to use ('cpu' or 'cuda')
+    :param criterion: loss function to minimize
+    """
+    model.train()
+
+    for data_and_context, target in loader:
+
+        data_and_context = data_and_context.to(device)
+        target = target.to(device)
+
+        optimizer.zero_grad()
+        output = model(data_and_context)
+        loss = criterion(output, target)
+
+        loss.backward()
+        optimizer.step()
+
+
+def evaluate_dendrite_model(model, loader, device, criterion):
+    """
+    Evaluates a dendritic network on a specified criterion by iterating through all
+    batches in the given dataloader
+
+    :param model: a torch.nn.Module subclass that implements a dendrite module in
+                  addition to a linear feed-forward module, and takes both feedforward
+                  and context inputs to its `forward` method
+    :param loader: a torch dataloader that iterates over all train and test batches
+    :param device: device to use ('cpu' or 'cuda')
+    :param criterion: loss function to minimize
+    """
+    model.to(device)
+    model.eval()
+    loss = torch.tensor(0.0, device=device)
+
+    with torch.no_grad():
+        for data, context, target in loader:
+
+            data = data.to(device)
+            context = context.to(device)
+            target = target.to(device)
+
+            output = model(data, context)
+            loss += criterion(output, target, reduction="sum")
+
+    loss = loss.item()
+    return {"loss": loss}
+
+
+def evaluate_non_dendrite_model(model, loader, device, criterion):
+    """
+    Evaluates a regular network on a specified criterion by iterating through all
+    batches in the given dataloader
+
+    :param model: a torch.nn.Module subclass that implements a dendrite module in
+                  addition to a linear feed-forward module, and takes both feedforward
+                  and context inputs to its `forward` method
+    :param loader: a torch dataloader that iterates over all train and test batches
+    :param device: device to use ('cpu' or 'cuda')
+    :param criterion: loss function to minimize
+    """
+    model.to(device)
+    model.eval()
+    loss = torch.tensor(0.0, device=device)
+
+    with torch.no_grad():
+        for data_and_context, target in loader:
+
+            data_and_context = data_and_context.to(device)
+            target = target.to(device)
+
+            output = model(data_and_context)
+            loss += criterion(output, target, reduction="sum")
+
+            # Report mean absolute error for masked and unmasked indices separately
+            mask = 1.0 * (target != 0.0)
+            l1_masked = torch.abs(output - target)
+            l1_masked = torch.mean(mask * l1_masked)
+
+            mask = 1.0 - mask
+            l1_unmasked = torch.abs(output - target)
+            l1_unmasked = torch.mean(mask * l1_unmasked)
+
+    loss = loss.item()
+    return {
+        "loss": loss,
+        "mean_abs_err_1s": l1_masked,
+        "mean_abs_err_0s": l1_unmasked
+    }
