@@ -71,8 +71,10 @@ SIGOPT_SPARSE_CNN_ONECYCLELR.update(
             dict(name="max_lr", type="double", bounds=dict(min=0.01, max=1.5)),
             dict(name="div_factor", type="double", bounds=dict(min=30.0, max=100)),
             dict(name="pct_start", type="double", bounds=dict(min=0.03, max=0.15)),
-            dict(name="weight_decay", type="double",
-                    bounds=dict(min=0.00001, max=0.001)),
+            dict(
+                name="weight_decay", type="double",
+                bounds=dict(min=0.00001, max=0.001)
+                ),
         ],
         metrics=[dict(name="mean_accuracy", objective="maximize")],
         parallel_bandwidth=1,
