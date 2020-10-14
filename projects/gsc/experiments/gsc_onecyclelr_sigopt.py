@@ -38,7 +38,7 @@ SIGOPT_SPARSE_CNN_ONECYCLELR.update(
     lr_scheduler_args=dict(
         # Commented arguments are to be suggested by sigopt
         # max_lr=1.2,
-        # div_factor=6.0, 
+        # div_factor=6.0,
         final_div_factor=4000,
         # pct_start=0.1,
         epochs=30,
@@ -56,7 +56,7 @@ SIGOPT_SPARSE_CNN_ONECYCLELR.update(
 
     optimizer_args=dict(
         lr=0.1,
-        #weight_decay=0.0001,
+        # weight_decay=0.0001,
         momentum=0.0,
         nesterov=False,
     ),
@@ -71,7 +71,8 @@ SIGOPT_SPARSE_CNN_ONECYCLELR.update(
             dict(name="max_lr", type="double", bounds=dict(min=0.01, max=1.5)),
             dict(name="div_factor", type="double", bounds=dict(min=30.0, max=100)),
             dict(name="pct_start", type="double", bounds=dict(min=0.03, max=0.15)),
-            dict(name="weight_decay", type="double", bounds=dict(min=0.00001, max=0.001)),
+            dict(name="weight_decay", type="double", 
+                bounds=dict(min=0.00001, max=0.001)),
         ],
         metrics=[dict(name="mean_accuracy", objective="maximize")],
         parallel_bandwidth=1,
