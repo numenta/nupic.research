@@ -1219,14 +1219,21 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         for task in tasks_train:
             self.run_task(task, cloned_adaptation_net)
 
-        # Concatenate slow and replay sets
-        self.train_slow_loader.sampler.set_active_tasks(tasks_train)
+        # Sample from the replay set.
         self.train_replay_loader.sampler.set_active_tasks(list(range(self.num_classes)))
-        slow_data, slow_target = next(iter(self.train_slow_loader))
         replay_data, replay_target = next(iter(self.train_replay_loader))
 
-        slow_data = torch.cat([slow_data, replay_data]).to(self.device)
-        slow_target = torch.cat([slow_target, replay_target]).to(self.device)
+        # Sample from the slow set.
+        slow_data, slow_target = [], []
+        for task in tasks_train:
+            self.train_slow_loader.sampler.set_active_tasks(task)
+            x, y = next(iter(self.train_slow_loader))
+            slow_data.append(x)
+            slow_target.append(y)
+
+        # Concatenate the slow and replay set.
+        slow_data = torch.cat(slow_data + [replay_data]).to(self.device)
+        slow_target = torch.cat(slow_target + [replay_target]).to(self.device)
 
         # Take step for outer loop. This will backprop through to the original
         # slow and fast params.
