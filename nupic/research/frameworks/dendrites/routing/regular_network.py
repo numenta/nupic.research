@@ -26,9 +26,9 @@ from torch.utils.data import DataLoader
 from nupic.research.frameworks.dendrites.routing import (
     RoutingDataset,
     RoutingFunction,
-    evaluate_non_dendrite_model,
+    evaluate_dendrite_model,
     generate_context_vectors,
-    train_non_dendrite_model,
+    train_dendrite_model,
 )
 
 
@@ -115,32 +115,34 @@ def test_regular_network(
     model = model.to(model.device)
     r = r.to(r.device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 
     print("epoch,mean_loss")
     for epoch in range(1, num_training_epochs + 1):
 
-        train_non_dendrite_model(
+        train_dendrite_model(
             model=model,
             loader=routing_test_dataloader,
             optimizer=optimizer,
             device=model.device,
-            criterion=F.mse_loss
+            criterion=F.mse_loss,
+            concat=True
         )
 
         # Validate model - note that we use the same dataset/dataloader for validation
-        results = evaluate_non_dendrite_model(
+        results = evaluate_dendrite_model(
             model=model,
             loader=routing_test_dataloader,
             device=model.device,
-            criterion=F.mse_loss
+            criterion=F.mse_loss,
+            concat=True
         )
 
-        print("{},{},{},{}".format(
+        print("{},{},{}".format(
             epoch,
             results["loss"],
-            results["mean_abs_err_1s"],
-            results["mean_abs_err_0s"]
+            results["mean_abs_err"]
         ))
 
 

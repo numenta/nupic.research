@@ -87,7 +87,7 @@ class RoutingDataset(Dataset):
             raise IndexError("Index {} is out of range".format(idx))
         torch.manual_seed(idx)
 
-        x = self.alpha * torch.rand((self.input_size,)) - self.beta
+        x = self.alpha * torch.rand((self.input_size,)) + self.beta
         x = x.to(self.device)
 
         context_id = randint(0, self.num_output_masks - 1)
