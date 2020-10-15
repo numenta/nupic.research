@@ -1148,10 +1148,10 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     @classmethod
     def create_replay_sampler(cls, config, dataset):
-        return cls.create_task_sampler(config, dataset, mode="replay")
+        return cls.create_task_sampler(config, dataset, mode="all")
 
     @classmethod
-    def create_task_sampler(cls, config, dataset, mode="replay"):
+    def create_task_sampler(cls, config, dataset, mode="all"):
         """In meta continuous learning paradigm, one task equals one class"""
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
@@ -1165,7 +1165,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             fast_sample_size = config.get("fast_sample_size", 5)
             for c in class_indices:
                 class_indices[c] = class_indices[c][fast_sample_size:]
-        elif mode == "replay":
+        elif mode == "all":
             pass
 
         distributed = config.get("distributed", False)
