@@ -1237,6 +1237,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.optimizer.step()
 
         # Report statistics for the outer loop
+        # TODO: Move validation of training to here.
         pred = output.max(1, keepdim=True)[1]
         correct = pred.eq(slow_target.view_as(pred)).sum().item()
         total = output.shape[0]
@@ -1278,8 +1279,10 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             )
             # Update in place
             self.adapt(cloned_adaptation_net, train_loss)
+        print(f"Performed {i + 1} update steps in the inner loop.")
 
-        # Evaluate the adapted model
+        # Temporarily prevent validation.
+        return
         with torch.no_grad():
             data, target = next(iter(self.val_fast_loader))
             data = data.to(self.device)
