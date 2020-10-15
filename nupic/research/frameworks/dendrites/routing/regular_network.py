@@ -116,7 +116,6 @@ def test_regular_network(
     r = r.to(r.device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 
     print("epoch,mean_loss")
     for epoch in range(1, num_training_epochs + 1):
