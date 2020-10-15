@@ -103,3 +103,104 @@ def get_gating_context_weights(output_masks, context_vectors, num_dendrites):
                         context_weights[m, j, c] = -1.0
 
     return context_weights
+
+
+def train_dendrite_model(model, loader, optimizer, device, criterion, concat=False):
+    """
+    Trains a regular network model by iterating through all batches in the given
+    dataloader
+
+    :param model: a torch.nn.Module subclass that implements a dendrite module in
+                  addition to a linear feed-forward module, and takes both feedforward
+                  and context inputs to its `forward` method
+    :param loader: a torch dataloader that iterates over all train and test batches
+    :param optimizer: optimizer object used to train the model
+    :param device: device to use ('cpu' or 'cuda')
+    :param criterion: loss function to minimize
+    :param concat: if True, assumes input and context vectors are concatenated together
+                   and model takes just a single input to its `forward`, otherwise
+                   assumes input and context vectors are separate and model's `forward`
+                   function takes a regular input and contextual input separately
+    """
+    model.train()
+
+    for item in loader:
+
+        optimizer.zero_grad()
+        if concat:
+            data, target = item
+
+            data = data.to(device)
+            target = target.to(device)
+
+            output = model(data)
+
+        else:
+            data, context, target = item
+
+            data = data.to(device)
+            context = context.to(device)
+            target = target.to(device)
+
+            output = model(data, context)
+
+        loss = criterion(output, target)
+
+        loss.backward()
+        optimizer.step()
+
+
+def evaluate_dendrite_model(model, loader, device, criterion, concat=False):
+    """
+    Evaluates a model on a specified criterion by iterating through all batches in the
+    given dataloader, and returns a dict of metrics that give evaluation performance
+
+    :param model: a torch.nn.Module subclass that implements a dendrite module in
+                  addition to a linear feed-forward module, and takes both feedforward
+                  and context inputs to its `forward` method
+    :param loader: a torch dataloader that iterates over all train and test batches
+    :param device: device to use ('cpu' or 'cuda')
+    :param criterion: loss function to minimize
+    :param concat: if True, assumes input and context vectors are concatenated together
+                   and model takes just a single input to its `forward`, otherwise
+                   assumes input and context vectors are separate and model's `forward`
+                   function takes a regular input and contextual input separately
+    """
+    model.to(device)
+    model.eval()
+
+    loss = torch.tensor(0.0, device=device)
+    mean_abs_err = torch.tensor(0.0, device=device)
+
+    with torch.no_grad():
+        for item in loader:
+
+            if concat:
+                data, target = item
+
+                data = data.to(device)
+                target = target.to(device)
+
+                output = model(data)
+
+            else:
+                data, context, target = item
+
+                data = data.to(device)
+                context = context.to(device)
+                target = target.to(device)
+
+                output = model(data, context)
+
+            loss += criterion(output, target, reduction="sum")
+
+            # Report mean absolute error
+            abs_err = torch.abs(output - target)
+            mean_abs_err += torch.mean(abs_err)
+
+    loss = loss.item()
+    mean_abs_err = mean_abs_err.item() / len(loader)
+    return {
+        "loss": loss,
+        "mean_abs_err": mean_abs_err
+    }
