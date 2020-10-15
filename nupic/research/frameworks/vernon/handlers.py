@@ -1181,7 +1181,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     @classmethod
     def create_slow_train_dataloader(cls, config, dataset):
-        sampler = cls.create_validation_sampler(config, dataset)
+        sampler = cls.create_train_sampler(config, dataset)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("slow_batch_size", 64),
