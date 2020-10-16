@@ -24,10 +24,11 @@ This module provides an example of how to visualize dendritic weight activations
 """
 
 import torch
+import wandb
 
 from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
-    visualize_dendritic_activations,
+    plot_dendritic_activations,
 )
 from nupic.research.frameworks.dendrites.routing import generate_context_vectors
 
@@ -57,16 +58,17 @@ def run_wandb_demo():
 
     dendritic_weight_tensor = dendritic_network.segments.weights.data
 
-    # Visualize the absolute activations from just the first output unit's dendritic
-    # weights using Weights & Biases
-    visualize_dendritic_activations(
+    # Call `plot_dendritic_activations` to create a heatmap of just the first output
+    # unit's dendritic activations
+    visual = plot_dendritic_activations(
         dendritic_weights=dendritic_weight_tensor[0, :, :],
         context_vectors=context_vectors,
-        project_title="Dendrites demo",
-        run_name="Output unit 0",
-        plot_name="Epoch 0",
         use_absolute_activations=True
     )
+
+    # Plot heatmap of dendrite activations using wandb
+    wandb.init(name="Output unit 0", project="Dendrites demo")
+    wandb.log({"Epoch 0": visual})
 
 
 if __name__ == "__main__":

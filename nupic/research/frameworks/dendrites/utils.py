@@ -23,27 +23,21 @@ import torch
 import wandb
 
 
-def visualize_dendritic_activations(
+def plot_dendritic_activations(
     dendritic_weights,
     context_vectors,
-    project_title,
-    run_name,
-    plot_name,
     use_absolute_activations=False
 ):
     """
-    Creates a matrix visualization of dendrite activations (given dendritic weights for
-    a single neuron and context vectors) using the Weights & Biases library. Note that
-    the user must be logged in to Weights & Biases on both browser and terminal to view
-    the resulting plots, and this can be done via the following command:
+    Returns a heatmap of dendrite activations (given dendritic weights for a single
+    neuron and context vectors) using wandb. Note that the user must be logged in to
+    wandb on both browser and terminal to view the resulting plots, and this can be
+    done via the following command:
 
     $ wandb login your-login-key
 
     :param dendritic_weights: 2D torch tensor with shape (num_dendrites, dim_context)
     :param context_vectors: 2D torch tensor with shape (num_contexts, dim_context)
-    :param project_title: title of wandb project that logs resulting visualization
-    :param run_name: name for this run
-    :param plot_name: display string for plot
     :param use_absolute_activations: plots absolute activation values if True
     """
     assert dendritic_weights.size(1) == context_vectors.size(1)
@@ -59,7 +53,4 @@ def visualize_dendritic_activations(
     x_labels = ["context {}".format(j) for j in range(num_contexts)]
     y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
 
-    wandb.init(name=run_name, project=project_title)
-    wandb.log({plot_name: wandb.plots.HeatMap(
-        x_labels, y_labels, activations, show_text=False
-    )})
+    return wandb.plots.HeatMap(x_labels, y_labels, activations, show_text=False)
