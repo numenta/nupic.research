@@ -26,6 +26,7 @@ import wandb
 def plot_dendritic_activations(
     dendritic_weights,
     context_vectors,
+    mask_values,
     use_absolute_activations=False
 ):
     """
@@ -38,6 +39,8 @@ def plot_dendritic_activations(
 
     :param dendritic_weights: 2D torch tensor with shape (num_dendrites, dim_context)
     :param context_vectors: 2D torch tensor with shape (num_contexts, dim_context)
+    :param mask_values: list of the routing function's mask values for the output unit
+                        corresponding to `dendritic_weights`, across all contexts
     :param use_absolute_activations: plots absolute activation values if True
     """
     assert dendritic_weights.size(1) == context_vectors.size(1)
@@ -49,8 +52,11 @@ def plot_dendritic_activations(
 
     num_contexts = context_vectors.size(0)
     num_dendrites = dendritic_weights.size(0)
+    assert len(mask_values) == num_contexts
 
-    x_labels = ["context {}".format(j) for j in range(num_contexts)]
+    x_labels = [
+        "context {} [{}]".format(j, mask_values[j]) for j in range(num_contexts)
+    ]
     y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
 
     return wandb.plots.HeatMap(x_labels, y_labels, activations, show_text=False)

@@ -58,11 +58,15 @@ def run_wandb_demo():
 
     dendritic_weight_tensor = dendritic_network.segments.weights.data
 
+    # The routing function's mask value for a particular output unit, across all masks
+    mask_values = [0, 1, 1, 0, 0, 1, 0, 1, 1, 0]
+
     # Call `plot_dendritic_activations` to create a heatmap of just the first output
     # unit's dendritic activations
     visual = plot_dendritic_activations(
         dendritic_weights=dendritic_weight_tensor[0, :, :],
         context_vectors=context_vectors,
+        mask_values=mask_values,
         use_absolute_activations=True
     )
 
