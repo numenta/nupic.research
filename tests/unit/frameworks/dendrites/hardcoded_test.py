@@ -49,17 +49,17 @@ class HardcodedErrorTest(unittest.TestCase):
         # function (and dendritic network), the number of dendritic weights, the size
         # of the context vector, and batch size over which the mean absolute error is
         # computed
-        d_in = 100
-        d_out = 100
+        dim_in = 100
+        dim_out = 100
         num_contexts = 10
-        d_context = 100
+        dim_context = 100
         batch_size = 100
 
         result = run_hardcoded_routing_test(
-            d_in=d_in,
-            d_out=d_out,
+            dim_in=dim_in,
+            dim_out=dim_out,
             k=num_contexts,
-            d_context=d_context,
+            dim_context=dim_context,
             dendrite_module=AbsoluteMaxGatingDendriticLayer,
             context_weights_fn=get_gating_context_weights,
             batch_size=batch_size
