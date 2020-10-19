@@ -1101,6 +1101,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             to prevent the learner from forgetting other tasks)
             - num_fast_steps: number of sequential steps to take in the inner loop per
                               every outer loop
+            - prep_fast_params_func: a function over the model the preps the fast params
+                                     for the inner loop; useful for reseting specific
+                                     weights for instance.
         """
         if "num_classes" not in config["model_args"]:
             # manually set `num_classes` in `model_args`
@@ -1123,6 +1126,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.slow_batch_size = config.get("slow_batch_size", 64)
         self.replay_batch_size = config.get("replay_batch_size", 64)
         self.num_fast_steps = config.get("num_fast_steps", 1)
+
+        self.prep_fast_params = config.get("prep_fast_params_func", None)
 
     def create_loaders(self, config):
         """Create train and val dataloaders."""
@@ -1212,9 +1217,17 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Clone model - clone fast params and the slow params. The latter will be frozen
         cloned_adaptation_net = self.clone_model()
 
+        # Sample tasks for inner loop.
         tasks_train = np.random.choice(
             self.num_classes, self.tasks_per_epoch, replace=False
         )
+
+        # Prep model for inner loop if needed.
+        if self.prep_fast_params is not None:
+            model = self.get_undistributed_model()
+            self.prep_fast_params(model)
+
+        # Inner loop: Train over sampled tasks.
         for task in tasks_train:
             self.run_task(task, cloned_adaptation_net)
 
@@ -1366,6 +1379,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             return model.module.named_fast_params
         else:
             return model.named_fast_params
+
+    def get_undistributed_model(self):
+        if hasattr(self.model, "module"):
+            return self.model.module
+        else:
+            return self.model
 
     @classmethod
     def aggregate_results(cls, results):
