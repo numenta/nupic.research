@@ -25,7 +25,7 @@ import torch
 from torchvision import datasets, transforms
 
 from nupic.research.frameworks.pytorch.models.common_models import StandardMLP
-from nupic.research.frameworks.vernon.handlers import SupervisedExperiment
+from nupic.research.frameworks.vernon.experiments import SupervisedExperiment
 
 mnist_mlp = dict(
     dataset_class=datasets.MNIST,  # Using a new data-set such as datasets.CIFAR10 is
