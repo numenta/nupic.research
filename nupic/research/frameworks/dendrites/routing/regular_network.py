@@ -81,8 +81,8 @@ def test_regular_network(
     # Initialize routing function that this task will try to learn, and set
     # `requires_grad=False` since the routing function is static
     r = RoutingFunction(
-        d_in=dim_in,
-        d_out=dim_out,
+        dim_in=dim_in,
+        dim_out=dim_out,
         k=num_contexts,
         device=model.device,
         sparsity=0.7

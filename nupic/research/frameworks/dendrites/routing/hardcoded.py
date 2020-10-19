@@ -33,10 +33,10 @@ from nupic.research.frameworks.dendrites.routing import (
 
 
 def run_hardcoded_routing_test(
-    d_in,
-    d_out,
+    dim_in,
+    dim_out,
     k,
-    d_context,
+    dim_context,
     dendrite_module,
     context_weights_fn=None,
     batch_size=100,
@@ -45,14 +45,14 @@ def run_hardcoded_routing_test(
     """
     Runs the hardcoded routing test for a specific type of dendritic network
 
-    :param d_in: the number of dimensions in the input to the routing function and test
-                 module
-    :param d_out: the number of dimensions in the sparse linear output of the routing
-                  function and test network
+    :param dim_in: the number of dimensions in the input to the routing function and
+                   test module
+    :param dim_out: the number of dimensions in the sparse linear output of the routing
+                    function and test network
     :param k: the number of unique random binary vectors in the routing function that
               can "route" the sparse linear output, and also the number of unique
               context vectors
-    :param d_context: the number of dimensions in the context vectors
+    :param dim_context: the number of dimensions in the context vectors
     :param dendrite_module: a torch.nn.Module subclass that implements a dendrite
                             module in addition to a linear feed-forward module
     :param context_weights_fn: a function that returns a 3D torch Tensor that gives the
@@ -65,13 +65,13 @@ def run_hardcoded_routing_test(
     """
 
     # Initialize routing function that this task will try to hardcode
-    r = RoutingFunction(d_in=d_in, d_out=d_out, k=k, sparsity=0.7)
+    r = RoutingFunction(dim_in=dim_in, dim_out=dim_out, k=k, sparsity=0.7)
 
     # Initialize context vectors, where each context vector corresponds to an output
     # mask in the routing function
     context_vectors = generate_context_vectors(
         num_contexts=k,
-        n_dim=d_context,
+        n_dim=dim_context,
         percent_on=0.2
     )
 
@@ -81,7 +81,7 @@ def run_hardcoded_routing_test(
     dendritic_network = dendrite_module(
         module=r.sparse_weights.module,
         num_segments=k,
-        dim_context=d_context,
+        dim_context=dim_context,
         module_sparsity=0.7,
         dendrite_sparsity=0.0
     )
@@ -101,7 +101,7 @@ def run_hardcoded_routing_test(
 
     # Sample a random batch of inputs and random batch of context vectors, and perform
     # hardcoded routing test
-    x_test = 4.0 * torch.rand((batch_size, d_in)) - 2.0  # sampled i.i.d. from U[-2, 2)
+    x_test = 4.0 * torch.rand((batch_size, dim_in)) - 2.0  # sampled from U(-2, 2)
     context_inds_test = randint(low=0, high=k, size=batch_size).tolist()
     context_test = torch.stack(
         [context_vectors[j, :] for j in context_inds_test],
@@ -137,17 +137,17 @@ if __name__ == "__main__":
     # Run the hardcoded routing test with a dendritic network that uses "dendrites as
     # gating"; this achieves near-zero mean absolute error, which strongly suggests
     # that dendritic networks can successfully route
-    d_in = 100
-    d_out = 100
+    dim_in = 100
+    dim_out = 100
     num_contexts = 10
-    d_context = 100
+    dim_context = 100
     batch_size = 100
 
     result = run_hardcoded_routing_test(
-        d_in=d_in,
-        d_out=d_out,
+        dim_in=dim_in,
+        dim_out=dim_out,
         k=num_contexts,
-        d_context=d_context,
+        dim_context=dim_context,
         dendrite_module=AbsoluteMaxGatingDendriticLayer,
         context_weights_fn=get_gating_context_weights,
         batch_size=batch_size,
