@@ -56,7 +56,6 @@ def run(config):
 
     # Get ray.tune kwargs for the given config.
     kwargs = get_tune_kwargs(config)
-    pprint(kwargs)
 
     # Queue trials until the cluster scales up
     kwargs.update(queue_trials=True)
