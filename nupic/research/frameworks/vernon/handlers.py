@@ -1207,7 +1207,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.pre_epoch()
 
-        timestep_begin = self.current_timestep
         self.optimizer.zero_grad()
 
         # Clone model - clone fast params and the slow params. The latter will be frozen
@@ -1257,8 +1256,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.logger.debug(results)
 
         results.update(
-            timestep_begin=timestep_begin,
-            timestep_end=self.current_timestep,
+            timestep_begin=self.current_epoch,
+            timestep_end=self.current_epoch + 1,
             learning_rate=self.get_lr()[0],
             extra_val_results=self.extra_val_results,
         )
@@ -1286,7 +1285,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             )
             # Update in place
             self.adapt(cloned_adaptation_net, train_loss)
-        print(f"Performed {i + 1} update steps in the inner loop.")
+        print(f"Performed {i} update steps of task {task} in the inner loop.")
 
         # Temporarily prevent validation.
         return
