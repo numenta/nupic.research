@@ -21,6 +21,9 @@
 
 """
 This module provides an example of how to visualize dendritic weight activations
+
+NOTE: Wandb will create and store files in ./wandb/ which will not be removed after
+      this script has finished executing, and the new files must be manually deleted
 """
 
 import torch
