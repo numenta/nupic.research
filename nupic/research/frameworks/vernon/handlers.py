@@ -1134,9 +1134,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # All loaders share tasks and dataset, but different indices and batch sizes
         self.train_fast_loader = self.create_train_dataloader(config, main_set)
-        self.val_fast_loader = self.create_validation_dataloader(config, main_set)
         self.train_slow_loader = self.create_slow_train_dataloader(config, main_set)
         self.train_replay_loader = self.create_replay_dataloader(config, main_set)
+        self.val_fast_loader = self.create_validation_dataloader(config, main_set)
 
         # For pre/post epoch and batch processing slow loader is equiv to train loader
         self.train_loader = self.train_slow_loader
@@ -1156,16 +1156,16 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                                        mode="train", sample_size=sample_size)
 
     @classmethod
+    def create_replay_sampler(cls, config, dataset):
+        """Sampler used to augment meta-train testing; "replays" previous classes."""
+        return cls.create_task_sampler(config, dataset, mode="all")
+
+    @classmethod
     def create_validation_sampler(cls, config, dataset):
         """Sampler used to validate meta-training phase."""
         sample_size = config.get("meta_train_sample_size", 5)
         return cls.create_task_sampler(config, dataset,
                                        mode="test", sample_size=sample_size)
-
-    @classmethod
-    def create_replay_sampler(cls, config, dataset):
-        """Sampler used to augment meta-train testing; "replays" previous classes."""
-        return cls.create_task_sampler(config, dataset, mode="all")
 
     @classmethod
     def create_task_sampler(cls, config, dataset, mode="all", sample_size=None):
