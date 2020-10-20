@@ -134,6 +134,9 @@ class OnlineMetaLearning(object):
     def run_meta_testing_phase(self, num_classes_learned):
         """Adapted from original OML repo"""
 
+        lr = self.find_best_lr(num_classes_learned)
+        print(f"Found best lr={lr} for num_classes_learned={num_classes_learned}")
+
         meta_test_accuracies = []
         for _current_run in range(0, 15):
 
@@ -149,8 +152,6 @@ class OnlineMetaLearning(object):
             params = list(named_params.values())
             if self.reset_fast_params:
                 self.reset_params(params)
-
-            lr = self.find_best_lr(num_classes_learned)
 
             # meta-testing training
             optim = Adam(params, lr=lr),
