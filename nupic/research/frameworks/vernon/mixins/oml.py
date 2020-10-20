@@ -107,14 +107,16 @@ class OnlineMetaLearning(object):
                     model=self.model.module,
                     loader=self.test_train_loader,
                     optimizer=optim,
-                    device=self.device
+                    device=self.device,
+                    criterion=self._loss_function,
                 )
 
                 self.test_test_loader.sampler.set_active_tasks(new_tasks)
                 results = evaluate_model(
                     model=self.model.module,
                     loader=self.test_test_loader,
-                    device=self.device
+                    device=self.device,
+                    criterion=self._loss_function,
                 )
                 correct = results["total_correct"]
 
@@ -156,14 +158,16 @@ class OnlineMetaLearning(object):
                 model=self.model.module,
                 loader=self.test_train_loader,
                 optimizer=optim,
-                device=self.device
+                device=self.device,
+                criterion=self._loss_function,
             )
 
             # meta-testing testing
             results = evaluate_model(
                 model=self.model.module,
                 loader=self.test_test_loader,
-                device=self.device
+                device=self.device,
+                criterion=self._loss_function,
             )
             correct = results["total_correct"]
 
