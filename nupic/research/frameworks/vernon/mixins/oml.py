@@ -117,9 +117,9 @@ class OnlineMetaLearning(object):
                 )
                 correct = results["total_correct"]
 
-                correct = 1.0 * correct / len(self.test_test_loader.sampler.indices)
-                if (correct > max_acc):
-                    max_acc = correct
+                acc = correct / len(self.test_test_loader.sampler.indices)
+                if (acc > max_acc):
+                    max_acc = acc
                     max_lr = lr
 
             lr_all.append(max_lr)
@@ -165,8 +165,8 @@ class OnlineMetaLearning(object):
             )
             correct = results["total_correct"]
 
-            correct = 1.0 * correct / len(self.test_test_loader.sampler.indices)
-            meta_test_accuracies.append(correct)
+            acc = correct / len(self.test_test_loader.sampler.indices)
+            meta_test_accuracies.append(acc)
 
         return meta_test_accuracies
 
