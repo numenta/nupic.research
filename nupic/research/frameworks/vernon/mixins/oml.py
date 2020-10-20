@@ -91,7 +91,6 @@ class OnlineMetaLearning(object):
             new_tasks = np.random.choice(
                 self.num_classes_eval, num_classes_learned, replace=False
             )
-            self.test_train_loader.sampler.set_active_tasks(new_tasks)
 
             max_acc = -1000
             for lr in lr_sweep_range:
@@ -103,13 +102,15 @@ class OnlineMetaLearning(object):
                     self.reset_params(params)
 
                 optim = Adam(params, lr=lr),
-                train_model(
-                    model=self.model.module,
-                    loader=self.test_train_loader,
-                    optimizer=optim,
-                    device=self.device,
-                    criterion=self._loss_function,
-                )
+                for task in new_tasks:
+                    self.test_train_loader.sampler.set_active_tasks(task)
+                    train_model(
+                        model=self.model.module,
+                        loader=self.test_train_loader,
+                        optimizer=optim,
+                        device=self.device,
+                        criterion=self._loss_function,
+                    )
 
                 self.test_test_loader.sampler.set_active_tasks(new_tasks)
                 results = evaluate_model(
@@ -141,7 +142,6 @@ class OnlineMetaLearning(object):
             new_tasks = np.random.choice(
                 self.num_classes_eval, num_classes_learned, replace=False
             )
-            self.test_train_loader.sampler.set_active_tasks(new_tasks)
             self.test_test_loader.sampler.set_active_tasks(new_tasks)
 
             # Reset fast weights.
@@ -154,13 +154,15 @@ class OnlineMetaLearning(object):
 
             # meta-testing training
             optim = Adam(params, lr=lr),
-            train_model(
-                model=self.model.module,
-                loader=self.test_train_loader,
-                optimizer=optim,
-                device=self.device,
-                criterion=self._loss_function,
-            )
+            for task in new_tasks:
+                self.test_train_loader.sampler.set_active_tasks(task)
+                train_model(
+                    model=self.model.module,
+                    loader=self.test_train_loader,
+                    optimizer=optim,
+                    device=self.device,
+                    criterion=self._loss_function,
+                )
 
             # meta-testing testing
             results = evaluate_model(
