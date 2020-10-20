@@ -44,11 +44,15 @@ class OnlineMetaLearning(object):
             - lr_sweep_range: list of learning rates to attempt meta-test training.
                               The best one, according to the meta-test test set,
                               will be chosen and used for the meta-testing phase.
-
+            - num_lr_search_runs: number of runs to attempt an lr-sweep. The one that
+                                  achieves the highest test-test accuracy the most
+                                  times, i.e. the mode, will be chosen for the
+                                  meta-testing phase.
         """
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_fast_params = config.get("reset_fast_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
+        self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         super().setup_experiment(config)
 
     def create_loaders(self, config):
@@ -90,7 +94,7 @@ class OnlineMetaLearning(object):
         lr_all = []
 
         # Grid search over lr
-        for _lr_search_runs in range(0, 5):
+        for _lr_search_runs in range(0, self.num_lr_search_runs):
 
             # Choose num_classes_learned random classes from the non-background set
             # to train on.
