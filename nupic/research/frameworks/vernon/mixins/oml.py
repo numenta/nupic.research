@@ -108,6 +108,8 @@ class OnlineMetaLearning(object):
                     optimizer=Adam(params, lr=lr),
                     device=self.device
                 )
+
+                self.test_test_loader.sampler.set_active_tasks(new_tasks)
                 results = evaluate_model(
                     model=self.model.module,
                     loader=self.test_test_loader,
