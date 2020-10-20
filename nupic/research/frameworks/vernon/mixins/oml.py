@@ -39,8 +39,12 @@ class OnlineMetaLearning(object):
         :param config: Dictionary containing the configuration parameters
 
             - run_meta_test: whether or not to run the meta-testing phase
+            - reset_fast_params: whether to reset (i.e. re-init) the fast
+                                 params prior to meta-test training
+
         """
         self.run_meta_test = config.get("run_meta_test", False)
+        self.reset_fast_params = config.get("reset_fast_params", True)
         super().setup_experiment(config)
 
     def create_loaders(self, config):
@@ -92,14 +96,11 @@ class OnlineMetaLearning(object):
             max_acc = -1000
             for lr in lr_sweep_range:
 
-                # reset fast weights
+                # Reset fast weights.
                 named_params = dict(self.get_named_fast_params())
                 params = list(named_params.values())
-                for param in params:
-                    if len(param.shape) > 1:
-                        kaiming_normal_(param)
-                    else:
-                        zeros_(param)
+                if self.reset_fast_params:
+                    self.reset_params(params)
 
                 train_model(
                     model=self.model.module,
@@ -138,14 +139,11 @@ class OnlineMetaLearning(object):
             self.test_train_loader.sampler.set_active_tasks(new_tasks)
             self.test_test_loader.sampler.set_active_tasks(new_tasks)
 
-            # reset fast weights
+            # Reset fast weights.
             named_params = dict(self.get_named_fast_params())
             params = list(named_params.values())
-            for param in params:
-                if len(param.shape) > 1:
-                    kaiming_normal_(param)
-                else:
-                    zeros_(param)
+            if self.reset_fast_params:
+                self.reset_params(params)
 
             lr = self.find_best_lr(num_classes_learned)
 
@@ -168,6 +166,13 @@ class OnlineMetaLearning(object):
             meta_test_accuracies.append(correct / len(self.test_test_loader))
 
         return meta_test_accuracies
+
+    def reset_params(self, params):
+        for param in params:
+            if len(param.shape) > 1:
+                kaiming_normal_(param)
+            else:
+                zeros_(param)
 
     @classmethod
     def get_execution_order(cls):
