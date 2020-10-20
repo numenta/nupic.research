@@ -44,4 +44,4 @@ from .quantization_aware import QuantizationAware
 from .reduce_lr_after_task import ReduceLRAfterTask
 from .vary_batch_size import VaryBatchSize
 from .ewc import ElasticWeightConsolidation
-from .oml import OnlineMetaLearning
+from .oml import OnlineMetaLearning, ResetOMLTaskParams

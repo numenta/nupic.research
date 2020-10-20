@@ -21,10 +21,12 @@
 
 import numpy as np
 from scipy import stats
+from torch import nn
 from torch.nn.init import kaiming_normal_, zeros_
 from torch.optim import Adam
 
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
+from nupic.research.frameworks.pytorch.models import OMLNetwork
 
 
 class OnlineMetaLearning(object):
@@ -219,4 +221,32 @@ class OnlineMetaLearning(object):
         eo["post_epoch"].append("Run meta testing phase")
         eo["create_loaders"].append("Create loaders for the meta testing phase")
 
+        return eo
+
+
+class ResetOMLTaskParams(object):
+    """
+    Reset the task parameters, within the output layer weights,
+    prior to training over those tasks. The mixin must be used with
+    the `OMLNetwork`.
+    """
+
+    def setup_experiment(self, config):
+        super().setup_experiment(config)
+        model = self.get_undistributed_model()
+        assert isinstance(model, OMLNetwork)
+
+    def pre_task(self, tasks):
+        super().pre_task(tasks)
+        model = self.get_undistributed_model()
+        for t in tasks:
+            task_weights = model.adaptation[0].weight[t, :].unsqueeze(0)
+            nn.init.kaiming_normal_(task_weights)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        name = "ResetOMLTaskParams"
+        eo["setup_experiment"].append(name + ": Ensure use of OMLNetwork.")
+        eo["pre_task"].append(name + ": Reset the output params for upcoming tasks.")
         return eo
