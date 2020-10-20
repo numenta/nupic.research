@@ -1101,9 +1101,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             to prevent the learner from forgetting other tasks)
             - num_fast_steps: number of sequential steps to take in the inner loop per
                               every outer loop
-            - prep_fast_params_func: a function over the model the preps the fast params
-                                     for the inner loop; useful for reseting specific
-                                     weights for instance.
         """
         if "num_classes" not in config["model_args"]:
             # manually set `num_classes` in `model_args`
@@ -1126,8 +1123,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.slow_batch_size = config.get("slow_batch_size", 64)
         self.replay_batch_size = config.get("replay_batch_size", 64)
         self.num_fast_steps = config.get("num_fast_steps", 1)
-
-        self.prep_fast_params = config.get("prep_fast_params_func", None)
 
     def create_loaders(self, config):
         """Create train and val dataloaders."""
@@ -1222,10 +1217,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.num_classes, self.tasks_per_epoch, replace=False
         )
 
-        # Prep model for inner loop if needed.
-        if self.prep_fast_params is not None:
-            model = self.get_undistributed_model()
-            self.prep_fast_params(model)
+        # Run pre_task; For instance, may reset parameters as needed.
+        self.pre_task(tasks_train)
 
         # Inner loop: Train over sampled tasks.
         for task in tasks_train:
@@ -1281,6 +1274,14 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.post_epoch()
 
         return results
+
+    def pre_task(self, tasks):
+        """
+        Run any necessary pre-task logic for the upcoming tasks.
+
+        :param tasks: list of task about to be ran.
+        """
+        pass
 
     def run_task(self, task, cloned_adaptation_net):
         self.train_fast_loader.sampler.set_active_tasks(task)
@@ -1403,6 +1404,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo["create_task_sampler"] = [exp + ".create_task_sampler"]
         eo["create_slow_train_dataloader"] = [exp + ".create_slow_train_dataloader"]
         eo["run_epoch"] = [exp + ".run_epoch"]
+        eo["pre_task"] = [exp + ".pre_task"]
         eo["run_task"] = [exp + ".run_task"]
         eo["update_params"] = [exp + ".update_params"]
         eo["adapt"] = [exp + ".adapt"]
