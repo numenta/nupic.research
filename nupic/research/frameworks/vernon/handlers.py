@@ -1302,7 +1302,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def run_task(self, task, cloned_adaptation_net):
         self.train_fast_loader.sampler.set_active_tasks(task)
-        self.val_fast_loader.sampler.set_active_tasks(task)
 
         # Train, one batch
         for i, (data, target) in enumerate(self.train_fast_loader):
@@ -1318,9 +1317,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.adapt(cloned_adaptation_net, train_loss)
         print(f"Performed {i} update steps of task {task} in the inner loop.")
 
-        # Temporarily prevent validation.
-        return
+        # See if there are images to validate on. If 'meta_train_sample_size'
+        # is equivalent to the number of images per class, then there won't be.
+        if len(self.val_fast_loader) == 0:
+            return
+
+        # Run and log validation for given task.
         with torch.no_grad():
+            self.val_fast_loader.sampler.set_active_tasks(task)
+
             data, target = next(iter(self.val_fast_loader))
             data = data.to(self.device)
             target = target.to(self.device)
