@@ -103,7 +103,7 @@ class OnlineMetaLearning(object):
                 if self.reset_fast_params:
                     self.reset_params(params)
 
-                optim = Adam(params, lr=lr),
+                optim = Adam(params, lr=lr)
                 for task in new_tasks:
                     self.test_train_loader.sampler.set_active_tasks(task)
                     train_model(
@@ -156,7 +156,7 @@ class OnlineMetaLearning(object):
                 self.reset_params(params)
 
             # meta-testing training
-            optim = Adam(params, lr=lr),
+            optim = Adam(params, lr=lr)
             for task in new_tasks:
                 self.test_train_loader.sampler.set_active_tasks(task)
                 train_model(
