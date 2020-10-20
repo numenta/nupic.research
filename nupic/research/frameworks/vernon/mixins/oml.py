@@ -73,10 +73,12 @@ class OnlineMetaLearning(object):
                     break
 
                 # TODO log results in addition to simply priting them to stdout
-                accs = self.run_meta_testing_phase(num_classes_learned)
+                results = self.run_meta_testing_phase(num_classes_learned)
+                test_train_accs, test_test_accs = results
                 print("Accuracy for meta-testing phase over"
                       f" {num_classes_learned} num classes.")
-                print(accs)
+                print("Meta-test training accuracies:", test_train_accs)
+                print("Meta-test tests accuracies:", test_test_accs)
 
     def find_best_lr(self, num_classes_learned):
         """Adapted from original OML repo"""
@@ -137,7 +139,8 @@ class OnlineMetaLearning(object):
         lr = self.find_best_lr(num_classes_learned)
         print(f"Found best lr={lr} for num_classes_learned={num_classes_learned}")
 
-        meta_test_accuracies = []
+        meta_test_test_accuracies = []
+        meta_test_train_accuracies = []
         for _current_run in range(0, 15):
 
             # Choose num_classes_learned random classes from the non-background set to
@@ -164,10 +167,10 @@ class OnlineMetaLearning(object):
                     criterion=self._loss_function,
                 )
 
-            # meta-testing testing
+            # Meta-testing testing (using the test-test set).
             self.test_test_loader.sampler.set_active_tasks(new_tasks)
             results = evaluate_model(
-                model=self.model.module,
+                model=self.model,
                 loader=self.test_test_loader,
                 device=self.device,
                 criterion=self._loss_function,
@@ -175,9 +178,22 @@ class OnlineMetaLearning(object):
             correct = results["total_correct"]
 
             acc = correct / len(self.test_test_loader.sampler.indices)
-            meta_test_accuracies.append(acc)
+            meta_test_test_accuracies.append(acc)
 
-        return meta_test_accuracies
+            # Meta-testing testing (using the test-train set).
+            self.test_train_loader.sampler.set_active_tasks(new_tasks)
+            results = evaluate_model(
+                model=self.model.module,
+                loader=self.test_train_loader,
+                device=self.device,
+                criterion=self._loss_function,
+            )
+            correct = results["total_correct"]
+
+            acc = correct / len(self.test_train_loader.sampler.indices)
+            meta_test_train_accuracies.append(acc)
+
+        return meta_test_train_accuracies, meta_test_test_accuracies
 
     def reset_params(self, params):
         for param in params:
