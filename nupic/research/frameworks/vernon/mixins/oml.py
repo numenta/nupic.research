@@ -145,7 +145,6 @@ class OnlineMetaLearning(object):
             new_tasks = np.random.choice(
                 self.num_classes_eval, num_classes_learned, replace=False
             )
-            self.test_test_loader.sampler.set_active_tasks(new_tasks)
 
             # Reset fast weights.
             named_params = dict(self.get_named_fast_params())
@@ -166,6 +165,7 @@ class OnlineMetaLearning(object):
                 )
 
             # meta-testing testing
+            self.test_test_loader.sampler.set_active_tasks(new_tasks)
             results = evaluate_model(
                 model=self.model.module,
                 loader=self.test_test_loader,
