@@ -102,10 +102,11 @@ class OnlineMetaLearning(object):
                 if self.reset_fast_params:
                     self.reset_params(params)
 
+                optim = Adam(params, lr=lr),
                 train_model(
                     model=self.model.module,
                     loader=self.test_train_loader,
-                    optimizer=Adam(params, lr=lr),
+                    optimizer=optim,
                     device=self.device
                 )
 
@@ -150,10 +151,11 @@ class OnlineMetaLearning(object):
             lr = self.find_best_lr(num_classes_learned)
 
             # meta-testing training
+            optim = Adam(params, lr=lr),
             train_model(
                 model=self.model.module,
                 loader=self.test_train_loader,
-                optimizer=Adam(params, lr=lr),
+                optimizer=optim,
                 device=self.device
             )
 
