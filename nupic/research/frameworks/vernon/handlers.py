@@ -1141,36 +1141,39 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     @classmethod
     def create_train_sampler(cls, config, dataset):
         """Sampler for meta-train training."""
-        return cls.create_task_sampler(config, dataset, mode="train")
+        sample_size = config.get("fast_sample_size", 5)
+        return cls.create_task_sampler(config, dataset, mode="train", sample_size=sample_size)
 
     @classmethod
     def create_train_slow_sampler(cls, config, dataset):
         """Sampler for meta-train testing. Uses same images as for train-training."""
-        return cls.create_task_sampler(config, dataset, mode="train")
+        sample_size = config.get("fast_sample_size", 5)
+        return cls.create_task_sampler(config, dataset, mode="train", sample_size=sample_size)
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
-        return cls.create_task_sampler(config, dataset, mode="test")
+        sample_size = config.get("fast_sample_size", 5)
+        return cls.create_task_sampler(config, dataset, mode="test", sample_size=sample_size)
 
     @classmethod
     def create_replay_sampler(cls, config, dataset):
         return cls.create_task_sampler(config, dataset, mode="all")
 
     @classmethod
-    def create_task_sampler(cls, config, dataset, mode="all"):
+    def create_task_sampler(cls, config, dataset, mode="all", sample_size=None):
         """In meta continuous learning paradigm, one task equals one class"""
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
 
         if mode == "train":
-            fast_sample_size = config.get("fast_sample_size", 5)
+            assert isinstance(sample_size, int)
             for c in class_indices:
-                class_indices[c] = class_indices[c][:fast_sample_size]
+                class_indices[c] = class_indices[c][:sample_size]
         elif mode == "test":
-            fast_sample_size = config.get("fast_sample_size", 5)
+            assert isinstance(sample_size, int)
             for c in class_indices:
-                class_indices[c] = class_indices[c][fast_sample_size:]
+                class_indices[c] = class_indices[c][sample_size:]
         elif mode == "all":
             pass
 
