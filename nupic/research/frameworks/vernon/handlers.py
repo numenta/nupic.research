@@ -1145,18 +1145,21 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     def create_train_sampler(cls, config, dataset):
         """Sampler for meta-train training."""
         sample_size = config.get("meta_train_sample_size", 5)
-        return cls.create_task_sampler(config, dataset, mode="train", sample_size=sample_size)
+        return cls.create_task_sampler(config, dataset,
+                                       mode="train", sample_size=sample_size)
 
     @classmethod
     def create_train_slow_sampler(cls, config, dataset):
         """Sampler for meta-train testing. Uses same images as for train-training."""
         sample_size = config.get("meta_train_sample_size", 5)
-        return cls.create_task_sampler(config, dataset, mode="train", sample_size=sample_size)
+        return cls.create_task_sampler(config, dataset,
+                                       mode="train", sample_size=sample_size)
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
         sample_size = config.get("meta_train_sample_size", 5)
-        return cls.create_task_sampler(config, dataset, mode="test", sample_size=sample_size)
+        return cls.create_task_sampler(config, dataset,
+                                       mode="test", sample_size=sample_size)
 
     @classmethod
     def create_replay_sampler(cls, config, dataset):
