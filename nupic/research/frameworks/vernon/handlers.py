@@ -1069,6 +1069,10 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         of holdout tasks
         - meta-testing testing: Evaluate the inner loop learner on the same tasks
 
+    Note, in this experiment class, there's also a validation phase that involves no
+    training, but simply evaluates the model's performance on a given task over any
+    remaining images that were not used during meta-training.
+
     The parameters for a model used in a meta-continual learning setup are broken down
     into 2 groups:
 
@@ -1103,7 +1107,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                               every outer loop
             - meta_train_sample_size: number of images per class to sample from for
                                       meta-training; same size will be used in both
-                                      the inner and outer loops.
+                                      the inner and outer loops. The rest of the
+                                      images will be used for a validation step.
         """
         if "num_classes" not in config["model_args"]:
             # manually set `num_classes` in `model_args`
@@ -1315,7 +1320,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             )
             # Update in place
             self.adapt(cloned_adaptation_net, train_loss)
-        print(f"Performed {i} update steps of task {task} in the inner loop.")
 
         # See if there are images to validate on. If 'meta_train_sample_size'
         # is equivalent to the number of images per class, then there won't be.
