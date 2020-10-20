@@ -20,10 +20,12 @@
 # ----------------------------------------------------------------------
 
 import numpy as np
+import torch
 from scipy import stats
 from torch import nn
 from torch.nn.init import kaiming_normal_, zeros_
 from torch.optim import Adam
+from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from nupic.research.frameworks.pytorch.models import OMLNetwork
@@ -51,6 +53,9 @@ class OnlineMetaLearning(object):
                                   times, i.e. the mode, will be chosen for the
                                   meta-testing phase.
             - num_meta_testing_runs: number of meta-testing phases to run
+            - meta_test_sample_size: number of images per class to sample from for
+                                     meta-testing training. The rest of the
+                                     images will be used for meta-test testing.
         """
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_fast_params = config.get("reset_fast_params", True)
@@ -68,12 +73,50 @@ class OnlineMetaLearning(object):
 
         eval_set = self.load_dataset(config, train=False)
 
-        self.test_train_loader = self.create_train_dataloader(config, eval_set)
-        self.test_test_loader = self.create_validation_dataloader(config, eval_set)
+        self.test_train_loader = self.create_test_train_dataloader(config, eval_set)
+        self.test_test_loader = self.create_test_test_dataloader(config, eval_set)
 
         self.num_classes_eval = min(
             config.get("num_classes_eval", 50),
             self.test_train_loader.sampler.num_classes
+        )
+
+    @classmethod
+    def create_test_train_sampler(cls, config, dataset):
+        """Sampler for meta-test training."""
+        sample_size = config.get("meta_test_sample_size", 15)
+        return cls.create_task_sampler(config, dataset,
+                                       mode="train", sample_size=sample_size)
+
+    @classmethod
+    def create_test_test_sampler(cls, config, dataset):
+        """Sampler for meta-test testing."""
+        sample_size = config.get("meta_test_sample_size", 15)
+        return cls.create_task_sampler(config, dataset,
+                                       mode="test", sample_size=sample_size)
+
+    @classmethod
+    def create_test_train_dataloader(cls, config, dataset):
+        sampler = cls.create_test_train_sampler(config, dataset)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("test_train_batch_size", 1),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    @classmethod
+    def create_test_test_dataloader(cls, config, dataset):
+        sampler = cls.create_test_test_sampler(config, dataset)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("test_test_batch_size", 1),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
         )
 
     def post_epoch(self):
