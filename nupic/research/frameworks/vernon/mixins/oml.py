@@ -48,11 +48,13 @@ class OnlineMetaLearning(object):
                                   achieves the highest test-test accuracy the most
                                   times, i.e. the mode, will be chosen for the
                                   meta-testing phase.
+            - num_meta_testing_runs: number of meta-testing phases to run
         """
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_fast_params = config.get("reset_fast_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
+        self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
         super().setup_experiment(config)
 
     def create_loaders(self, config):
@@ -149,7 +151,7 @@ class OnlineMetaLearning(object):
 
         meta_test_test_accuracies = []
         meta_test_train_accuracies = []
-        for _current_run in range(0, 15):
+        for _current_run in range(0, self.num_meta_testing_runs):
 
             # Choose num_classes_learned random classes from the non-background set to
             # test on
