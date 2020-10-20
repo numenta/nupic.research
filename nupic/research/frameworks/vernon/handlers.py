@@ -1157,12 +1157,14 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
+        """Sampler used to validate meta-training phase."""
         sample_size = config.get("meta_train_sample_size", 5)
         return cls.create_task_sampler(config, dataset,
                                        mode="test", sample_size=sample_size)
 
     @classmethod
     def create_replay_sampler(cls, config, dataset):
+        """Sampler used to augment meta-train testing; "replays" previous classes."""
         return cls.create_task_sampler(config, dataset, mode="all")
 
     @classmethod
