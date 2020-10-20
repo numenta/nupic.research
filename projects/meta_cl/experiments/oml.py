@@ -46,7 +46,7 @@ def run_experiment(config):
 
 
 # Simple Omniglot Experiment
-metacl_test = dict(
+metacl_base = dict(
     # training infrastructure
     ray_trainable=SupervisedTrainable,
     distributed=False,
@@ -72,7 +72,7 @@ metacl_test = dict(
     local_dir=os.path.expanduser("~/nta/results/experiments/meta_cl"),
 )
 
-metacl_oml = copy.deepcopy(metacl_test)
+metacl_oml = copy.deepcopy(metacl_base)
 metacl_oml.update(
     experiment_class=OMLExperiment,
     run_meta_test=True,
@@ -80,6 +80,6 @@ metacl_oml.update(
 
 # Export configurations in this file
 CONFIGS = dict(
-    metacl_test=metacl_test,
+    metacl_base=metacl_base,
     metacl_oml=metacl_oml,
 )
