@@ -385,17 +385,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return model
 
     def get_named_slow_params(self):
-        if hasattr(self.model, "module"):
-            return self.model.module.named_slow_params
-        else:
-            return self.model.named_slow_params
+        model = self.get_model()
+        return model.named_slow_params
 
     def get_named_fast_params(self, clone=None):
-        model = clone if clone is not None else self.model
-        if hasattr(model, "module"):
-            return model.module.named_fast_params
-        else:
-            return model.named_fast_params
+        model = self.get_model(clone=clone)
+        return model.named_fast_params
 
     def get_model(self, clone=None):
         model = clone if clone is not None else self.model
