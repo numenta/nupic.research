@@ -20,6 +20,8 @@
 import argparse
 import copy
 
+import ray  # noqa: F401
+
 from experiments import CONFIGS
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
 from nupic.research.frameworks.vernon.run_with_raytune import run

@@ -19,5 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .routing import RoutingDataset, RoutingFunction
-from .utils import *
+from .cl_experiment import *
+from .imagenet_experiment import *
+from .meta_cl_experiment import *
+from .supervised_experiment import *
+
+# Import "common_experiments" last so that common_experiments.py can import from
+# this "experiments" module.
+from .common_experiments import *

@@ -44,8 +44,8 @@ class RoutingFunctionTest(unittest.TestCase):
         sparsity = 0.7
 
         r = RoutingFunction(
-            d_in=dim_in,
-            d_out=dim_out,
+            dim_in=dim_in,
+            dim_out=dim_out,
             k=num_output_masks,
             sparsity=sparsity
         )
@@ -70,8 +70,8 @@ class RoutingFunctionTest(unittest.TestCase):
         sparsity = 0.7
 
         r = RoutingFunction(
-            d_in=dim_in,
-            d_out=dim_out,
+            dim_in=dim_in,
+            dim_out=dim_out,
             k=num_output_masks,
             sparsity=sparsity
         )
