@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import os
 from operator import itemgetter
 from pathlib import Path
 from shutil import copytree
