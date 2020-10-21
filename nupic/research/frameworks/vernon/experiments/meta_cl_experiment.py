@@ -397,11 +397,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         else:
             return model.named_fast_params
 
-    def get_model(self):
-        if hasattr(self.model, "module"):
-            return self.model.module
+    def get_model(self, clone=None):
+        model = clone if clone is not None else self.model
+        if hasattr(model, "module"):
+            return model.module
         else:
-            return self.model
+            return model
 
     @classmethod
     def aggregate_results(cls, results):
