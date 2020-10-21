@@ -127,7 +127,7 @@ class OnlineMetaLearning(object):
                 if num_classes_learned > self.num_classes_eval:
                     break
 
-                # TODO log results in addition to simply priting them to stdout
+                # TODO log results in addition to simply printing them to stdout
                 results = self.run_meta_testing_phase(num_classes_learned)
                 test_train_accs, test_test_accs = results
                 print("Accuracy for meta-testing phase over"
@@ -136,15 +136,21 @@ class OnlineMetaLearning(object):
                 print("Meta-test tests accuracies:", test_test_accs)
 
     def find_best_lr(self, num_classes_learned):
-        """Adapted from original OML repo"""
+        """
+        This is a simple hyper-parameter search for a good lr:
+            1) Sample num_classes_learned classes
+            2) Train over the sampled classes; once for each lr
+            3) Evaluate the model on a held-out set
+            4) Repeat as many times as desired and pick the lr that performs the best
+               the most number times
+        """
 
         lr_all = []
 
         # Grid search over lr
         for _lr_search_runs in range(0, self.num_lr_search_runs):
 
-            # Choose num_classes_learned random classes from the non-background set
-            # to train on.
+            # Choose num_classes_learned random classes to train and then test on.
             new_tasks = np.random.choice(
                 self.num_classes_eval, num_classes_learned, replace=False
             )
@@ -158,6 +164,7 @@ class OnlineMetaLearning(object):
                 if self.reset_fast_params:
                     self.reset_params(params)
 
+                # Meta-test training.
                 optim = Adam(params, lr=lr)
                 for task in new_tasks:
                     self.test_train_loader.sampler.set_active_tasks(task)
@@ -169,6 +176,7 @@ class OnlineMetaLearning(object):
                         criterion=self._loss_function,
                     )
 
+                # Meta-test testing.
                 self.test_test_loader.sampler.set_active_tasks(new_tasks)
                 results = evaluate_model(
                     model=self.model.module,
@@ -189,7 +197,14 @@ class OnlineMetaLearning(object):
         return best_lr
 
     def run_meta_testing_phase(self, num_classes_learned):
-        """Adapted from original OML repo"""
+        """
+        Run the meta-testing phase: train over num_classes_learned and then test over a
+        held-out set comprised of those same classes (aka the meta-test test set). This
+        shows the model's ability to conduct continual learning in a way that allows
+        generalization. As well, at the end of this phase, this function also evaluates
+        the models performance on the meta-test training set to evaluate it's ability to
+        memorize without forgetting.
+        """
 
         lr = self.find_best_lr(num_classes_learned)
         print(f"Found best lr={lr} for num_classes_learned={num_classes_learned}")
@@ -198,8 +213,7 @@ class OnlineMetaLearning(object):
         meta_test_train_accuracies = []
         for _current_run in range(0, self.num_meta_testing_runs):
 
-            # Choose num_classes_learned random classes from the non-background set to
-            # test on
+            # Choose num_classes_learned random classes to train and then test on.
             new_tasks = np.random.choice(
                 self.num_classes_eval, num_classes_learned, replace=False
             )
@@ -210,7 +224,7 @@ class OnlineMetaLearning(object):
             if self.reset_fast_params:
                 self.reset_params(params)
 
-            # meta-testing training
+            # Meta-testing training.
             optim = Adam(params, lr=lr)
             for task in new_tasks:
                 self.test_train_loader.sampler.set_active_tasks(task)
@@ -251,6 +265,7 @@ class OnlineMetaLearning(object):
         return meta_test_train_accuracies, meta_test_test_accuracies
 
     def reset_params(self, params):
+        """Helper function to reinitialize params."""
         for param in params:
             if len(param.shape) > 1:
                 kaiming_normal_(param)

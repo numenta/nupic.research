@@ -1069,10 +1069,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         of holdout tasks
         - meta-testing testing: Evaluate the inner loop learner on the same tasks
 
-    Note, in this experiment class, there's also a validation phase that involves no
-    training, but simply evaluates the model's performance on a given task over any
-    remaining images that were not used during meta-training.
-
     The parameters for a model used in a meta-continual learning setup are broken down
     into 2 groups:
 
@@ -1137,7 +1133,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         main_set = self.load_dataset(config, train=True)
 
-        # All loaders share tasks and dataset, but different indices and batch sizes
+        # All loaders share tasks and dataset, but different indices and batch sizes.
         self.train_fast_loader = self.create_train_dataloader(config, main_set)
         self.train_slow_loader = self.create_slow_train_dataloader(config, main_set)
         self.train_replay_loader = self.create_replay_dataloader(config, main_set)
@@ -1271,7 +1267,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.optimizer.step()
 
         # Report statistics for the outer loop
-        # TODO: Move validation of training to here.
         pred = output.max(1, keepdim=True)[1]
         correct = pred.eq(slow_target.view_as(pred)).sum().item()
         total = output.shape[0]
@@ -1322,7 +1317,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.adapt(cloned_adaptation_net, train_loss)
 
         # See if there are images to validate on. If 'meta_train_sample_size'
-        # is equivalent to the number of images per class, then there won't be.
+        # is equivalent to the number of images per class, then there won't be any.
         if len(self.val_fast_loader) == 0:
             return
 
