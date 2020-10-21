@@ -30,6 +30,7 @@ from nupic.research.frameworks.vernon.trainables import SupervisedTrainable
 
 
 class OMLExperiment(mixins.OnlineMetaLearning,
+                    mixins.ResetOMLTaskParams,
                     MetaContinualLearningExperiment):
     pass
 
