@@ -397,7 +397,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         else:
             return model.named_fast_params
 
-    def get_undistributed_model(self):
+    def get_model(self):
         if hasattr(self.model, "module"):
             return self.model.module
         else:

@@ -291,12 +291,12 @@ class ResetOMLTaskParams(object):
 
     def setup_experiment(self, config):
         super().setup_experiment(config)
-        model = self.get_undistributed_model()
+        model = self.get_model()
         assert isinstance(model, OMLNetwork)
 
     def pre_task(self, tasks):
         super().pre_task(tasks)
-        model = self.get_undistributed_model()
+        model = self.get_model()
         for t in tasks:
             task_weights = model.adaptation[0].weight[t, :].unsqueeze(0)
             nn.init.kaiming_normal_(task_weights)
