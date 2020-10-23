@@ -20,3 +20,4 @@
 
 from .fake_data import *
 from .temp_fake_data import *
+from .omniglot_from_zip import *
