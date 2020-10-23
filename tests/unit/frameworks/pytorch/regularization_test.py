@@ -106,7 +106,7 @@ class L1RegulatizationStepTest(unittest.TestCase):
 
         l1_regularization_step(params=[weight, bias], lr=0.1, weight_decay=0.1)
 
-        # Here, we assert that the at least 1 weight has changed
+        # Here, we assert that at least 1 weight has changed and the bias remains fixed
         self.assertFalse(torch.allclose(weight, weight_original))
         self.assertTrue(torch.allclose(bias, bias_original))
 

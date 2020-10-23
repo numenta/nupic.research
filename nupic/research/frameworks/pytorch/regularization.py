@@ -25,7 +25,9 @@ import torch
 @torch.no_grad()
 def l1_regularization_step(params, lr, weight_decay=1e-3):
     """
-    Performs L1 regularization gradient step in place
+    Performs L1 regularization gradient step in place, and this implementation is based
+    on how `torch.optimizer.SGD` performs L2 regularization updates:
+    https://pytorch.org/docs/stable/_modules/torch/optim/sgd.html#SGD.step
 
 
     Example usage:
