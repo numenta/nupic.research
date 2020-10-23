@@ -123,6 +123,13 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.replay_batch_size = config.get("replay_batch_size", 64)
         self.num_fast_steps = config.get("num_fast_steps", 1)
 
+        if self.num_fast_steps > len(self.train_fast_loader):
+            self.logger.warning(
+                "The num_fast_steps given is greater than the len of images available "
+                " for the inner loop. This should ideally be no more than:\n"
+                " train_train_sample_size * tasks_per_epoch / batch_size"
+            )
+
     def create_loaders(self, config):
         """Create train and val dataloaders."""
 
