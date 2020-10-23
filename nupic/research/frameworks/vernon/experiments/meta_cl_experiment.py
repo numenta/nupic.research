@@ -305,7 +305,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     def run_task(self, task, cloned_adaptation_net):
         self.train_fast_loader.sampler.set_active_tasks(task)
 
-        # Train, one batch
+        # Meta-train training. Use no more than `num_fast_steps` sequential updates.
         for i, (data, target) in enumerate(self.train_fast_loader):
             if i >= self.num_fast_steps:
                 break
