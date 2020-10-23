@@ -339,6 +339,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
+        named_params = dict(named_params)
         params = list(named_params.values())
         gradients = torch.autograd.grad(
             loss, params,
