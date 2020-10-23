@@ -96,7 +96,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             to prevent the learner from forgetting other tasks)
             - num_fast_steps: number of sequential steps to take in the inner loop per
                               every outer loop
-            - meta_train_sample_size: number of images per class to sample from for
+            - train_train_sample_size: number of images per class to sample from for
                                       meta-training; same size will be used in both
                                       the inner and outer loops. The rest of the
                                       images will be used for a validation step.
@@ -147,14 +147,14 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     @classmethod
     def create_train_sampler(cls, config, dataset):
         """Sampler for meta-train training."""
-        sample_size = config.get("meta_train_sample_size", 5)
+        sample_size = config.get("train_train_sample_size", 5)
         return cls.create_task_sampler(config, dataset,
                                        mode="train", sample_size=sample_size)
 
     @classmethod
     def create_train_slow_sampler(cls, config, dataset):
         """Sampler for meta-train testing. Uses same images as for train-training."""
-        sample_size = config.get("meta_train_sample_size", 5)
+        sample_size = config.get("train_train_sample_size", 5)
         return cls.create_task_sampler(config, dataset,
                                        mode="train", sample_size=sample_size)
 
@@ -166,7 +166,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     @classmethod
     def create_validation_sampler(cls, config, dataset):
         """Sampler used to validate meta-training phase."""
-        sample_size = config.get("meta_train_sample_size", 5)
+        sample_size = config.get("train_train_sample_size", 5)
         return cls.create_task_sampler(config, dataset,
                                        mode="test", sample_size=sample_size)
 
@@ -318,7 +318,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             # Update in place
             self.adapt(cloned_adaptation_net, train_loss)
 
-        # See if there are images to validate on. If 'meta_train_sample_size'
+        # See if there are images to validate on. If 'train_train_sample_size'
         # is equivalent to the number of images per class, then there won't be any.
         if len(self.val_fast_loader) == 0:
             return

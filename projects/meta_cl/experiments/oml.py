@@ -102,7 +102,7 @@ metacl_oml_replicate.update(
     # num_slow_steps=1,  # not actually defined, but technically this is always one.
 
     # Number of images sampled for training (should be b/w 1 and 20)
-    meta_train_sample_size=20,  # This applies to both the slow and fast iterations.
+    train_train_sample_size=20,  # This applies to both the slow and fast iterations.
 
     # Sampled for the remember set; taken from the whole dataset.
     # Total images used for one step in the outer loop equals:
@@ -153,7 +153,7 @@ metacl_oml_replicate_metatest.update(
     reset_fast_params=True,
 
     # Results reported over 15 sampled.
-    meta_test_sample_size=15,
+    test_train_sample_size=15,
 
     # The best lr was chosen among the following; done separately for each number of
     # classes trained on.

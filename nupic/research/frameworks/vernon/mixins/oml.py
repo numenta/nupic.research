@@ -53,7 +53,7 @@ class OnlineMetaLearning(object):
                                   times, i.e. the mode, will be chosen for the
                                   meta-testing phase.
             - num_meta_testing_runs: number of meta-testing phases to run
-            - meta_test_sample_size: number of images per class to sample from for
+            - test_train_sample_size: number of images per class to sample from for
                                      meta-testing training. The rest of the
                                      images will be used for meta-test testing.
         """
@@ -84,14 +84,14 @@ class OnlineMetaLearning(object):
     @classmethod
     def create_test_train_sampler(cls, config, dataset):
         """Sampler for meta-test training."""
-        sample_size = config.get("meta_test_sample_size", 15)
+        sample_size = config.get("test_train_sample_size", 15)
         return cls.create_task_sampler(config, dataset,
                                        mode="train", sample_size=sample_size)
 
     @classmethod
     def create_test_test_sampler(cls, config, dataset):
         """Sampler for meta-test testing."""
-        sample_size = config.get("meta_test_sample_size", 15)
+        sample_size = config.get("test_train_sample_size", 15)
         return cls.create_task_sampler(config, dataset,
                                        mode="test", sample_size=sample_size)
 
