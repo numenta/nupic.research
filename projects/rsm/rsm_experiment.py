@@ -396,7 +396,7 @@ class RSMExperiment(object):
                 visual_debug=self.visual_debug,
             )
             if self.n_layers > 1:
-                predictor_d_in = sum([l.total_cells for l in self.model.children()])
+                predictor_d_in = sum([ly.total_cells for ly in self.model.children()])
             else:
                 predictor_d_in = self.m_groups * self.n_cells_per_group
 
@@ -613,11 +613,11 @@ class RSMExperiment(object):
 
             if self.n_layers > 1 and self.loss_layers in ["above_first", "all_layers"]:
                 memory = self._repackage_hidden(targets[1])
-                for l in range(self.n_layers - 1):
+                for ly in range(self.n_layers - 1):
                     higher_targets = memory[
-                        l
+                        ly
                     ]  # Target memory states up to 2nd to last layer
-                    outputs = predicted_outputs[l + 1]  # Predictions from layer above
+                    outputs = predicted_outputs[ly + 1]  # Predictions from layer above
                     ls_loss = self.loss(outputs, higher_targets)
                     if loss is None:
                         loss = ls_loss
@@ -625,17 +625,17 @@ class RSMExperiment(object):
                         loss += ls_loss
 
             if self.l2_reg and self.lateral_conn:
-                for l in self.model.children():
+                for ly in self.model.children():
                     # Add L2 reg term for recurrent weights
-                    loss += self.l2_reg * l.linear_b.weight.norm(2) ** 2
-                    if hasattr(l.linear_b, "bias"):
-                        loss += self.l2_reg * l.linear_b.bias.norm(2) ** 2
+                    loss += self.l2_reg * ly.linear_b.weight.norm(2) ** 2
+                    if hasattr(ly.linear_b, "bias"):
+                        loss += self.l2_reg * ly.linear_b.bias.norm(2) ** 2
             if self.dec_l2_reg:
-                for l in self.model.children():
+                for ly in self.model.children():
                     # Add L2 reg term for decode weights
-                    loss += self.dec_l2_reg * l.linear_d.weight.norm(2) ** 2
-                    if hasattr(l.linear_d, "bias") and l.linear_d.bias is not None:
-                        loss += self.dec_l2_reg * l.linear_d.bias.norm(2) ** 2
+                    loss += self.dec_l2_reg * ly.linear_d.weight.norm(2) ** 2
+                    if hasattr(ly.linear_d, "bias") and ly.linear_d.bias is not None:
+                        loss += self.dec_l2_reg * ly.linear_d.bias.norm(2) ** 2
 
         return loss
 
