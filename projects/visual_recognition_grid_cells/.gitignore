@@ -1,0 +1,7 @@
+*.npy
+testing_ground.py
+data/
+output_images/
+predicted_images/
+saved_networks/
+__pycache__/
