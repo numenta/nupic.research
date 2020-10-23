@@ -122,3 +122,8 @@ checkcode.sh
 /projects/ray_tune_example/mnist/data
 /projects/whydense/cifar/results
 /projects/whydense/cifar/results1
+
+
+# local test data
+/tests/unit/frameworks/pytorch/data/omniglot-py/images_background
+/tests/unit/frameworks/pytorch/data/omniglot-py/images_evaluation
