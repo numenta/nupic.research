@@ -357,7 +357,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 if g is not None:
                     updated = p.add(g, alpha=-lr)
 
-                    # Update in place inn a way that preserves grads.
+                    # Update in-place in a way that preserves grads.
                     parent_module = get_parent_module(model, name)
                     base_name = name.split(".")[-1]
                     parent_module._parameters[base_name] = updated
