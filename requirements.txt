@@ -50,3 +50,4 @@ tqdm
 h5py
 pretrainedmodels==0.7.4
 wandb>=0.9.4
+colorama==0.4.3

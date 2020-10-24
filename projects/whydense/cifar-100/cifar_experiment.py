@@ -391,18 +391,18 @@ class TinyCIFAR(object):
         in_channels = 3
         output_size = 32 * 32
         output_units = output_size * in_channels
-        for l, block_size in enumerate(self.block_sizes):
+        for ly, block_size in enumerate(self.block_sizes):
             for b in range(block_size):
                 self._add_cnn_layer(
-                    index_str=str(l) + "_" + str(b),
+                    index_str=str(ly) + "_" + str(b),
                     in_channels=in_channels,
-                    out_channels=self.cnn_out_channels[l],
-                    kernel_size=self.cnn_kernel_sizes[l],
-                    percent_on=self.cnn_percent_on[l],
-                    weight_sparsity=self.cnn_weight_sparsity[l],
+                    out_channels=self.cnn_out_channels[ly],
+                    kernel_size=self.cnn_kernel_sizes[ly],
+                    percent_on=self.cnn_percent_on[ly],
+                    weight_sparsity=self.cnn_weight_sparsity[ly],
                     add_pooling=b == block_size - 1,
                 )
-                in_channels = self.cnn_out_channels[l]
+                in_channels = self.cnn_out_channels[ly]
             output_size = int(output_size / 4)
             output_units = output_size * in_channels
 
@@ -411,31 +411,31 @@ class TinyCIFAR(object):
 
         # Linear layer
         input_size = output_units
-        for l, linear_n in enumerate(self.linear_n):
+        for ly, linear_n in enumerate(self.linear_n):
             linear = nn.Linear(input_size, linear_n)
-            if self.linear_weight_sparsity[l] < 1.0:
+            if self.linear_weight_sparsity[ly] < 1.0:
                 self.model.add_module(
-                    "linear_" + str(l),
-                    SparseWeights(linear, self.linear_weight_sparsity[l]),
+                    "linear_" + str(ly),
+                    SparseWeights(linear, self.linear_weight_sparsity[ly]),
                 )
             else:
-                self.model.add_module("linear_" + str(l), linear)
+                self.model.add_module("linear_" + str(ly), linear)
 
-            if self.linear_percent_on[l] < 1.0:
+            if self.linear_percent_on[ly] < 1.0:
                 self.model.add_module(
-                    "kwinners_linear_" + str(l),
+                    "kwinners_linear_" + str(ly),
                     KWinners(
                         n=linear_n,
-                        percent_on=self.linear_percent_on[l],
+                        percent_on=self.linear_percent_on[ly],
                         k_inference_factor=self.k_inference_factor,
                         boost_strength=self.boost_strength,
                         boost_strength_factor=self.boost_strength_factor,
                     ),
                 )
             else:
-                self.model.add_module("Linear_ReLU_" + str(l), nn.ReLU())
+                self.model.add_module("Linear_ReLU_" + str(ly), nn.ReLU())
 
-            input_size = self.linear_n[l]
+            input_size = self.linear_n[ly]
 
         # Output layer
         self.model.add_module("output", nn.Linear(input_size, self.output_size))

@@ -189,7 +189,7 @@ class MLPHeb(HebbianNetwork):
         )
 
         # Create the classifier.
-        self.dynamic_sparse_modules = [l[0] for l in layers[1:]]
+        self.dynamic_sparse_modules = [layer[0] for layer in layers[1:]]
         self.classifier = nn.Sequential(*layers)
 
         # Initialize attr to decide whether to update coactivations during learning.
