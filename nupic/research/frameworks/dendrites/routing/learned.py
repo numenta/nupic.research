@@ -78,7 +78,7 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
         num_segments=num_contexts,
         dim_context=dim_context,
         module_sparsity=0.7,
-        dendrite_sparsity=0.5
+        dendrite_sparsity=0.0
     )
 
     # In this version of learning to route, there is no sparsity constraint on the
@@ -91,6 +91,7 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
     # Place objects that inherit from torch.nn.Module on device
     r = r.to(device)
     dendritic_network = dendritic_network.to(device)
+    context_vectors = context_vectors.to(device)
 
     return r, dendritic_network, context_vectors, device
 
@@ -119,7 +120,7 @@ def init_dataloader(routing_function, context_vectors, device, batch_size):
     return routing_test_dataloader
 
 
-def init_optimizer(network, lr=0.1):
+def init_optimizer(network, lr=0.5):
     return torch.optim.SGD(network.parameters(), lr=lr)
 
 
@@ -168,7 +169,7 @@ def learn_to_route(
 
     optimizer = init_optimizer(network=dendritic_network)
 
-    print("epoch,mean_loss")
+    print("epoch,mean_loss,mean_abs_err")
     for epoch in range(1, num_training_epochs + 1):
 
         train_dendrite_model(
@@ -176,7 +177,9 @@ def learn_to_route(
             loader=routing_test_dataloader,
             optimizer=optimizer,
             device=device,
-            criterion=F.mse_loss
+            criterion=F.l1_loss,
+            concat=False,
+            l1_weight_decay=1e-8
         )
 
         # Validate model - note that we use the same dataset/dataloader for validation
@@ -184,11 +187,12 @@ def learn_to_route(
             model=dendritic_network,
             loader=routing_test_dataloader,
             device=device,
-            criterion=F.mse_loss
+            criterion=F.l1_loss,
+            concat=False
         )
 
-        print("{},{}".format(
-            epoch, results["loss"]
+        print("{},{},{}".format(
+            epoch, results["loss"], results["mean_abs_err"]
         ))
 
 

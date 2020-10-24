@@ -101,8 +101,8 @@ class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
         output_min = dendrite_activations.min(dim=2).values
         sign_mask = torch.where(
             (output_max ** 2) > (output_min ** 2),
-            torch.ones(output_max.shape),
-            -1.0 * torch.ones(output_min.shape)
+            torch.ones(output_max.shape).to(y.device),
+            -1.0 * torch.ones(output_min.shape).to(y.device)
         )
         return y * torch.sigmoid(
             torch.abs(dendrite_activations).max(dim=2).values * sign_mask
