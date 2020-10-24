@@ -76,22 +76,22 @@ class VGGSparseNet(nn.Sequential):
         in_channels, h, w = input_shape
         output_size = h * w
         output_units = output_size * in_channels
-        for l, block_size in enumerate(block_sizes):
+        for ly, block_size in enumerate(block_sizes):
             for b in range(block_size):
                 self._add_cnn_layer(
-                    index_str=str(l) + "_" + str(b),
+                    index_str=str(ly) + "_" + str(b),
                     in_channels=in_channels,
-                    out_channels=cnn_out_channels[l],
-                    kernel_size=cnn_kernel_sizes[l],
-                    percent_on=cnn_percent_on[l],
-                    weight_sparsity=cnn_weight_sparsity[l],
+                    out_channels=cnn_out_channels[ly],
+                    kernel_size=cnn_kernel_sizes[ly],
+                    percent_on=cnn_percent_on[ly],
+                    weight_sparsity=cnn_weight_sparsity[ly],
                     k_inference_factor=k_inference_factor,
                     boost_strength=boost_strength,
                     boost_strength_factor=boost_strength_factor,
                     add_pooling=b == block_size - 1,
                     use_max_pooling=use_max_pooling,
                 )
-                in_channels = cnn_out_channels[l]
+                in_channels = cnn_out_channels[ly]
             output_size = int(output_size / 4)
             output_units = output_size * in_channels
 
@@ -100,29 +100,29 @@ class VGGSparseNet(nn.Sequential):
 
         # Linear layer
         input_size = output_units
-        for l, linear_n in enumerate(linear_units):
+        for ly, linear_n in enumerate(linear_units):
             linear = nn.Linear(input_size, linear_n)
-            if linear_weight_sparsity[l] < 1.0:
+            if linear_weight_sparsity[ly] < 1.0:
                 self.add_module(
-                    "linear_" + str(l),
-                    SparseWeights(linear, linear_weight_sparsity[l]),
+                    "linear_" + str(ly),
+                    SparseWeights(linear, linear_weight_sparsity[ly]),
                 )
             else:
-                self.add_module("linear_" + str(l), linear)
+                self.add_module("linear_" + str(ly), linear)
 
-            if linear_percent_on[l] < 1.0:
+            if linear_percent_on[ly] < 1.0:
                 self.add_module(
-                    "kwinners_linear_" + str(l),
+                    "kwinners_linear_" + str(ly),
                     KWinners(
                         n=linear_n,
-                        percent_on=linear_percent_on[l],
+                        percent_on=linear_percent_on[ly],
                         k_inference_factor=k_inference_factor,
                         boost_strength=boost_strength,
                         boost_strength_factor=boost_strength_factor,
                     ),
                 )
             else:
-                self.add_module("Linear_ReLU_" + str(l), nn.ReLU())
+                self.add_module("Linear_ReLU_" + str(ly), nn.ReLU())
 
             input_size = linear_n
 
