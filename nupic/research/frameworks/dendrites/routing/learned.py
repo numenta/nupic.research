@@ -54,8 +54,8 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
     # Initialize routing function that this task will try to hardcode, and set
     # `requires_grad=False` since the routing function is static
     r = RoutingFunction(
-        d_in=dim_in,
-        d_out=dim_out,
+        dim_in=dim_in,
+        dim_out=dim_out,
         k=num_contexts,
         device=device,
         sparsity=0.7
