@@ -23,6 +23,7 @@ import copy
 import logging
 import os
 import pickle
+import socket
 import time
 from pprint import pformat, pprint
 
@@ -36,8 +37,19 @@ from ray.tune.result import DONE, RESULT_DUPLICATE
 from ray.tune.utils import warn_if_slow
 
 from nupic.research.frameworks.sigopt import SigOptExperiment
+from nupic.research.frameworks.vernon.experiment_utils import get_free_port
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
+
+
+class RayActorHelperMethods:
+    def get_node_ip(self):
+        """Returns the IP address of the current node."""
+        return socket.gethostbyname(socket.gethostname())
+
+    def get_free_port(self):
+        """Returns free TCP port in the current node"""
+        return get_free_port()
 
 
 class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
@@ -64,7 +76,13 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
         return resource
 
     def _setup(self, config):
-        self.experiment_class = config["experiment_class"]
+        experiment_class = config["experiment_class"]
+
+        class ExtendedExpClass(RayActorHelperMethods, experiment_class):
+            pass
+
+        ExtendedExpClass.__name__ = experiment_class.__name__
+        self.experiment_class = ExtendedExpClass
 
         config["logdir"] = self.logdir
 
@@ -212,11 +230,11 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
 
         self._process_config(config)
 
+        experiment = ray.remote(
+            num_cpus=num_cpus, num_gpus=num_gpus)(self.experiment_class)
         for i in range(1 + self.max_retries):
             self.procs = []
             for _ in range(world_size):
-                experiment = ray.remote(
-                    num_cpus=num_cpus, num_gpus=num_gpus)(self.experiment_class)
                 self.procs.append(experiment.remote())
 
             # Use first process as head of the group

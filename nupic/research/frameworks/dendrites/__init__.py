@@ -20,7 +20,8 @@
 # ----------------------------------------------------------------------
 
 from .dendrite_segments import DendriteSegments
-from .dendritic_weights import (
-	AbsoluteMaxGatingDendriticLayer, BiasingDendriticLayer,
-	GatingDendriticLayer
+from .dendritic_layers import (
+    AbsoluteMaxGatingDendriticLayer, BiasingDendriticLayer,
+    GatingDendriticLayer
 )
+from .utils import plot_dendritic_activations

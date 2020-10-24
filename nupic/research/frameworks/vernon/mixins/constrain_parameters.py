@@ -32,8 +32,8 @@ class ConstrainParameters(object):
             if hasattr(module, "constrain_parameters")
         ]
 
-    def post_batch(self, *args, **kwargs):
-        super().post_batch(*args, **kwargs)
+    def post_batch(self, **kwargs):
+        super().post_batch(**kwargs)
         for module in self._constrain_parameters_modules:
             module.constrain_parameters()
 

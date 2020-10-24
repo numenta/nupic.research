@@ -154,8 +154,8 @@ def random_mask(size, sparsity, dims=None, **kwargs):
 
         # Loop all combinations that index through dims.
         # The 1D case is equivalent to range.
-        dim_legths = [mask.shape[dim] for dim in dims]
-        dim_indices = product(*[range(l) for l in dim_legths])
+        dim_lengths = [mask.shape[dim] for dim in dims]
+        dim_indices = product(*[range(dl) for dl in dim_lengths])
 
         for idxs in dim_indices:
 
