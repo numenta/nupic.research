@@ -105,9 +105,9 @@ def get_gating_context_weights(output_masks, context_vectors, num_dendrites):
     return context_weights
 
 
-def train_dendrite_model(model, loader, optimizer, device, criterion):
+def train_dendrite_model(model, loader, optimizer, device, criterion, concat=False):
     """
-    Trains a dendritic network model by iterating through all batches in the given
+    Trains a regular network model by iterating through all batches in the given
     dataloader
 
     :param model: a torch.nn.Module subclass that implements a dendrite module in
@@ -117,27 +117,43 @@ def train_dendrite_model(model, loader, optimizer, device, criterion):
     :param optimizer: optimizer object used to train the model
     :param device: device to use ('cpu' or 'cuda')
     :param criterion: loss function to minimize
+    :param concat: if True, assumes input and context vectors are concatenated together
+                   and model takes just a single input to its `forward`, otherwise
+                   assumes input and context vectors are separate and model's `forward`
+                   function takes a regular input and contextual input separately
     """
     model.train()
 
-    for data, context, target in loader:
-
-        data = data.to(device)
-        context = context.to(device)
-        target = target.to(device)
+    for item in loader:
 
         optimizer.zero_grad()
-        output = model(data, context)
+        if concat:
+            data, target = item
+
+            data = data.to(device)
+            target = target.to(device)
+
+            output = model(data)
+
+        else:
+            data, context, target = item
+
+            data = data.to(device)
+            context = context.to(device)
+            target = target.to(device)
+
+            output = model(data, context)
+
         loss = criterion(output, target)
 
         loss.backward()
         optimizer.step()
 
 
-def evaluate_dendrite_model(model, loader, device, criterion):
+def evaluate_dendrite_model(model, loader, device, criterion, concat=False):
     """
-    Evaluates a dendritic network on a specified criterion by iterating through all
-    batches in the given dataloader
+    Evaluates a model on a specified criterion by iterating through all batches in the
+    given dataloader, and returns a dict of metrics that give evaluation performance
 
     :param model: a torch.nn.Module subclass that implements a dendrite module in
                   addition to a linear feed-forward module, and takes both feedforward
@@ -145,20 +161,46 @@ def evaluate_dendrite_model(model, loader, device, criterion):
     :param loader: a torch dataloader that iterates over all train and test batches
     :param device: device to use ('cpu' or 'cuda')
     :param criterion: loss function to minimize
+    :param concat: if True, assumes input and context vectors are concatenated together
+                   and model takes just a single input to its `forward`, otherwise
+                   assumes input and context vectors are separate and model's `forward`
+                   function takes a regular input and contextual input separately
     """
     model.to(device)
     model.eval()
+
     loss = torch.tensor(0.0, device=device)
+    mean_abs_err = torch.tensor(0.0, device=device)
 
     with torch.no_grad():
-        for data, context, target in loader:
+        for item in loader:
 
-            data = data.to(device)
-            context = context.to(device)
-            target = target.to(device)
+            if concat:
+                data, target = item
 
-            output = model(data, context)
+                data = data.to(device)
+                target = target.to(device)
+
+                output = model(data)
+
+            else:
+                data, context, target = item
+
+                data = data.to(device)
+                context = context.to(device)
+                target = target.to(device)
+
+                output = model(data, context)
+
             loss += criterion(output, target, reduction="sum")
 
+            # Report mean absolute error
+            abs_err = torch.abs(output - target)
+            mean_abs_err += torch.mean(abs_err)
+
     loss = loss.item()
-    return {"loss": loss}
+    mean_abs_err = mean_abs_err.item() / len(loader)
+    return {
+        "loss": loss,
+        "mean_abs_err": mean_abs_err
+    }

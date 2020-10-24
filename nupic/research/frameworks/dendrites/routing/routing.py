@@ -42,6 +42,7 @@ class RoutingDataset(Dataset):
         input_size,
         context_vectors,
         device,
+        concat=False,
         dataset_size=1e4,
         x_min=-2.0,
         x_max=2.0,
@@ -53,6 +54,7 @@ class RoutingDataset(Dataset):
         :param context_vectors: 2D torch Tensor in which each row gives a context
                                 vector
         :param device: device to use ('cpu' or 'cuda')
+        :param concat: if True, input and context vectors are concatenated together
         :param dataset_size: the number of (input, context, target) pairs that be
                              iterated over
         :param x_min: the minimum bound of the uniform distribution from which input
@@ -66,6 +68,7 @@ class RoutingDataset(Dataset):
         self.input_size = input_size
         self.context_vectors = context_vectors
         self.device = device
+        self.concat = concat
         self.size = int(dataset_size)
 
         # The following attributes are selected such that self.alpha * u + self.beta
@@ -84,7 +87,7 @@ class RoutingDataset(Dataset):
             raise IndexError("Index {} is out of range".format(idx))
         torch.manual_seed(idx)
 
-        x = self.alpha * torch.rand((self.input_size,)) - self.beta
+        x = self.alpha * torch.rand((self.input_size,)) + self.beta
         x = x.to(self.device)
 
         context_id = randint(0, self.num_output_masks - 1)
@@ -94,11 +97,9 @@ class RoutingDataset(Dataset):
         target = self.function([context_id], x.view(1, -1))
         target = target.view(-1)
 
-        if torch.isnan(target).any().item():
-            print(self.function.sparse_weights(x))
-            print(target)
-            print(self.function.output_masks[context_id, :])
-            print("")
+        if self.concat:
+            x = torch.cat((x, context))
+            return x, target
 
         return x, context, target
 
@@ -127,12 +128,12 @@ class RoutingFunction(torch.nn.Module):
     R(1, x) = [0.3, −0.4, 0.0, 0.0].
     """
 
-    def __init__(self, d_in, d_out, k, device=None, sparsity=0.7):
+    def __init__(self, dim_in, dim_out, k, device=None, sparsity=0.7):
         """
-        :param d_in: the number of dimensions in the input
-        :type d_in: int
-        :param d_out: the number of dimensions in the sparse linear output
-        :type d_out: int
+        :param dim_in: the number of dimensions in the input
+        :type dim_in: int
+        :param dim_out: the number of dimensions in the sparse linear output
+        :type dim_out: int
         :param k: the number of unique random binary vectors that can "route" the
                   sparse linear output
         :param device: device to use ('cpu' or 'cuda')
@@ -144,10 +145,10 @@ class RoutingFunction(torch.nn.Module):
         """
         super().__init__()
         self.sparse_weights = SparseWeights(
-            torch.nn.Linear(in_features=d_in, out_features=d_out, bias=False),
+            torch.nn.Linear(in_features=dim_in, out_features=dim_out, bias=False),
             sparsity=sparsity
         )
-        self.output_masks = generate_random_binary_vectors(k, d_out)
+        self.output_masks = generate_random_binary_vectors(k, dim_out)
         self.device = device if device is not None else torch.device("cpu")
 
     def forward(self, output_mask_inds, x):
@@ -201,7 +202,7 @@ if __name__ == "__main__":
 
     # Initialize RoutingFunction object with output_dim output dimensions and k output
     # masks
-    R = RoutingFunction(d_in=input_dim, d_out=output_dim, k=k)
+    R = RoutingFunction(dim_in=input_dim, dim_out=output_dim, k=k)
 
     # Print output masks
     for j in range(R.num_output_masks):
