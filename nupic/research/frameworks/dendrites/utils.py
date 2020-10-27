@@ -19,8 +19,9 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
-import wandb
 
 
 def plot_dendritic_activations(
@@ -31,9 +32,9 @@ def plot_dendritic_activations(
 ):
     """
     Returns a heatmap of dendrite activations (given dendritic weights for a single
-    neuron and context vectors) using wandb. Note that the user must be logged in to
-    wandb on both browser and terminal to view the resulting plots, and this can be
-    done via the following command:
+    neuron and context vectors) plotted using matplotlib. Note that the user must be
+    logged in to wandb on both browser and terminal to view the resulting plots, and
+    this can be done via the following command:
 
     $ wandb login your-login-key
 
@@ -44,6 +45,8 @@ def plot_dendritic_activations(
     :param use_absolute_activations: plots absolute activation values if True
     """
     assert dendritic_weights.size(1) == context_vectors.size(1)
+
+    plt.cla()
 
     activations = torch.matmul(dendritic_weights, context_vectors.T)
     if use_absolute_activations:
@@ -59,4 +62,23 @@ def plot_dendritic_activations(
     ]
     y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
 
-    return wandb.plots.HeatMap(x_labels, y_labels, activations, show_text=False)
+    # Use matplotlib to plot the activation heatmap
+    fig, ax = plt.subplots()
+    ax.imshow(activations, cmap="coolwarm_r")
+
+    ax.set_xticks(np.arange(num_contexts))
+    ax.set_yticks(np.arange(num_dendrites))
+
+    ax.set_xticklabels(x_labels)
+    ax.set_yticklabels(y_labels)
+
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    plt.tight_layout()
+
+    # Annotate just the top absolute activation for each context
+    top_activation_dendrite_per_context = np.argmax(np.abs(activations), axis=0)
+    for j, i in enumerate(top_activation_dendrite_per_context):
+        val = np.round(activations[i, j], 2)
+        ax.text(j, i, val, ha="center", va="center", color="w")
+
+    return plt
