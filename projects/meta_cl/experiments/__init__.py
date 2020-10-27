@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .oml import CONFIGS as OML
+from .dendrites import CONFIGS as DENDRITES
 
 """
 Import and collect all Imagenet experiment configurations into one CONFIG
@@ -29,3 +30,4 @@ __all__ = ["CONFIGS"]
 # Collect all configurations
 CONFIGS = dict()
 CONFIGS.update(OML)
+CONFIGS.update(DENDRITES)
