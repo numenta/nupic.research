@@ -37,21 +37,24 @@ from SDR_decoder import mlp_decoder
 torch.manual_seed(18)
 np.random.seed(18)
 
-NUM_OBJECTS = 10
+NUM_OBJECTS = 100
 DATA_SET = 'mnist'
 
-def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, prediction_validity, ground_truth):
+def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, numSensationsToInference, ground_truth):
 
     print("\n New prediction")
     plt.imsave('predicted_images/' + label + '_ground_truth.png', ground_truth)
 
     # for width_iter in range(5):
     #     for height_iter in range(5):
-    for touch_iter in range(25):
+    for touch_iter in range(len(prediction_sequence)):
 
-        # touch_iter = width_iter*5 + height_iter
-        # print("Touch iter")
-        # print(touch_iter)
+        # if touch_iter == 4:
+        #     exit()
+
+
+        print("Touch iter")
+        print(touch_iter)
 
         # if touch_iter >= len(touch_sequence):
         #     # *** note touch sequence does not actually track how many touches were performed
@@ -74,18 +77,18 @@ def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, pr
         # print(touch_indices)
         # print(touch_indices[0])
 
-        # print("Prediction SDR indices")
-        # print(np.shape(prediction_sequence))
+        print("Prediction sequence")
+        print(np.shape(prediction_sequence))
         # print("\n\n")
         # #print(prediction_sequence)
         # print("\n\n")
         current_sequence = prediction_sequence[touch_iter]
         # print(prediction_sequence[touch_iter])
 
-        # print("Current sequence")
-        # print(len(current_sequence))
-        # print(current_sequence)
-        # exit()
+        print("Current sequence")
+        print(len(current_sequence))
+
+        print(current_sequence)
 
 
         for sequence_iter in range(len(current_sequence)):
@@ -95,11 +98,11 @@ def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, pr
                 print(touch_sequence[sequence_iter])
                 print("SDR indices")
                 print(current_sequence[sequence_iter])
-                print("SDR before modification")
-                print(input_SDR[:, touch_sequence[sequence_iter]])
-                input_SDR[current_sequence[sequence_iter], touch_sequence[sequence_iter-1]] = 1
-                print("SDR after modification")
-                print(input_SDR[:, touch_sequence[sequence_iter]])
+                # print("SDR before modification")
+                # print(input_SDR[:, touch_sequence[sequence_iter]])
+                input_SDR[current_sequence[sequence_iter], touch_sequence[sequence_iter]] = 1
+                # print("SDR after modification")
+                # print(input_SDR[:, touch_sequence[sequence_iter]])
             else:
                 print("\nOn iter " + str(sequence_iter) + " of the sequence, there is no sensation or prediction to use")
 
@@ -120,15 +123,27 @@ def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, pr
         current_touch = touch_sequence[touch_iter]
         print("Current touch")
         print(current_touch)
-        print("Wdith and height iter")
+        print("Width and height iter")
         width_iter = current_touch//5
         height_iter = current_touch%5
         highlight_width_lower, highlight_width_upper = (1 + width_iter*5),  (1 + (width_iter+1)*5)
         highlight_height_lower, highlight_height_upper = (1 + height_iter*5),  (1 + (height_iter+1)*5)
 
+
         highlight_array = np.zeros((28,28))
         highlight_array[highlight_width_lower:highlight_width_upper, 
             highlight_height_lower:highlight_height_upper] = 0.5
+
+
+        if numSensationsToInference != None:
+            if touch_iter >= numSensationsToInference:
+                #Add highlight to borders to indicate inference successful, and all 
+                # future representations are based on model predictions
+                highlight_array[0,:] = 1.0
+                highlight_array[27,:] = 1.0
+                highlight_array[:,0] = 1.0
+                highlight_array[:,27] = 1.0
+
 
         # print("Highlight_array")
         # print(np.shape(highlight_array))
@@ -144,7 +159,7 @@ def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, pr
 
         # controlSDR = input_SDR[touch_sequence[touch_iter]][np.nonzero(np.random())]
         # control_reconstructed = net(controlSDR)
-        if prediction_validity == True:
+        if numSensationsToInference != None:
             prediction = "correctly_classified"
         else:
             prediction = "misclassified"
@@ -155,16 +170,12 @@ def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, pr
         plt.imsave('predicted_images/' + label + '_' + prediction + 
             '_touch_' + str(touch_iter) + '.png', reconstructed[0,:,:])
 
-        if touch_iter == 24:
-            #Save the final prediction without the prediction window 
-            plt.imsave('predicted_images/' + label + '_' + prediction + 
-                '_touch_' + str(touch_iter) + '.png', reconstructed[0,:,:])
+    #Save the final prediction without the prediction window 
+    plt.imsave('predicted_images/' + label + '_' + prediction + 
+        '_touch_' + str(touch_iter) + '.png', reconstructed[0,:,:])
 
 
         # plt.imsave('predicted_images/' + label + '_RandomControl_touch_' + str(touch_iter) + '.png')        
-
-
-
 
 
 if __name__ == '__main__':
@@ -184,7 +195,7 @@ if __name__ == '__main__':
 
         current_object = object_prediction_sequences[object_iter]
 
-        print(current_object)
+        # print(current_object)
 
         # for key in current_object.items():
         #     print(key)
@@ -192,5 +203,5 @@ if __name__ == '__main__':
 
         predict_column_plus_reps(net, prediction_sequence=current_object['prediction_sequence'], 
             touch_sequence=current_object['touch_sequence'], label=current_object['name'], 
-            prediction_validity=current_object['correctly_classified'],
+            numSensationsToInference=current_object['numSensationsToInference'],
             ground_truth=current_object['ground_truth_image'])
