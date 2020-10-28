@@ -55,7 +55,7 @@ metacl_base = dict(
     experiment_class=MetaContinualLearningExperiment,
     dataset_class=omniglot,
     model_class=OMLNetwork,
-    model_args=dict(input_size=(105, 105)),
+    model_args=dict(num_classes=963),
     # metacl variables
     num_classes=963,
     num_classes_eval=660,

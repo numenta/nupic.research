@@ -49,7 +49,7 @@ class StandardMLP(nn.Module):
 
 class OmniglotCNN(nn.Module):
 
-    def __init__(self, num_classes, **kwargs):
+    def __init__(self, num_classes):
 
         super().__init__()
 
@@ -84,7 +84,7 @@ class OmniglotCNN(nn.Module):
 
 class OMLNetwork(nn.Module):
 
-    def __init__(self, num_classes, **kwargs):
+    def __init__(self, num_classes):
 
         super().__init__()
 
