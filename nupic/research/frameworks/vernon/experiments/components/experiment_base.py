@@ -93,14 +93,15 @@ class ExperimentBase(
 
     @classmethod
     def get_execution_order(cls):
-        exp = "ExperimentCore"
+        exp = "ExperimentBase"
         return dict(
             setup_experiment=[exp + ": Initialize logger"],
-            run_iteration=[],
+            run_iteration=[exp + ": Not implemented, must override"],
             run_pre_experiment=[exp + ": No pre_experiment implemented"],
             get_printable_result=[exp + ": Return unfiltered result"],
             insert_pre_experiment_result=[],
             stop_experiment=[],
+            should_stop=[exp + ": Not implemented, must override"],
             get_state=[],
             set_state=[],
         )

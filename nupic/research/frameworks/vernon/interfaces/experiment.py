@@ -141,10 +141,10 @@ class Experiment(abc.ABC):
     @abc.abstractmethod
     def get_execution_order(cls) -> dict:
         """
-        Gets a dict that can be printed to show the order of events that occur
-        for each method. Subclasses and mixins should extend this method,
-        modifying each list of events according to when/whether they call
-        super().
+        Gets a dict that can be printed to show the order of events that occur for
+        each method. Subclasses and mixins should extend this method, modifying
+        each list of events according to when/whether they call super(). The
+        dict should contain methods that are intended as extensibility points.
         """
 
     @staticmethod
