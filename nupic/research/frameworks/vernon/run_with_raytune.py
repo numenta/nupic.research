@@ -166,17 +166,7 @@ def get_tune_kwargs(config):
     # Make sure to only select `tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
 
-    # Collect tune stop criteria.
-    stop = kwargs.get("stop", {}) or dict()
-
-    # Update the stop criteria `training_iteration` with the named `stop_condition`
-    # This may be `epochs` or `num_tasks`, for instance.
-    stop_condition = getattr(ray_trainable, "stop_condition", "epochs")
-    stop_iteration = config.get(stop_condition, None)
-    if stop_iteration is not None:
-        stop.update(training_iteration=stop_iteration)
-
     # Update the stop condition.
-    kwargs["stop"] = stop
+    kwargs["stop"] = kwargs.get("stop", {}) or dict()
 
     return kwargs
