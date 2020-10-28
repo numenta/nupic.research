@@ -22,23 +22,21 @@
 import math
 from collections import defaultdict
 
+from nupic.research.frameworks.vernon import interfaces
+
 __all__ = [
     "StepBasedLogging",
 ]
 
 
-class StepBasedLogging:
-    """
-    Adds logic and extensibility points to keep a step-based log (rather than an
-    epoch-based log).
+class StepBasedLogging(
+    interfaces.Experiment,  # Requires
+    interfaces.StepBasedLogging,  # Implements
+):
+    @staticmethod
+    def step_based_logging_interface_implemented():
+        return True
 
-    Conceptually, the "current_timestep" is a version number for the model's
-    parameters. By default, this is the elapsed number of batches that the model
-    has been trained on. Experiments may also increment this on other events
-    like model prunings. When validation is performed after a training batch,
-    the validation results are assigned to the next timestep after that training
-    batch, since it was performed on the subsequent version of the parameters.
-    """
     def setup_experiment(self, config):
         """
         :param config: Dictionary containing the configuration parameters
@@ -49,12 +47,20 @@ class StepBasedLogging:
                                  Set to 0 to log only at the end of each epoch.
         """
         super().setup_experiment(config)
-        self.current_timestep = 0
+        self._current_timestep = 0
         self.log_timestep_freq = config.get("log_timestep_freq", 1)
 
-    def run_epoch(self):
+    @property
+    def current_timestep(self):
+        return self._current_timestep
+
+    @current_timestep.setter
+    def current_timestep(self, value):
+        self._current_timestep = value
+
+    def run_iteration(self):
         timestep_begin = self.current_timestep
-        ret = super().run_epoch()
+        ret = super().run_iteration()
         ret.update(
             timestep_begin=timestep_begin,
             timestep_end=self.current_timestep,
@@ -63,15 +69,10 @@ class StepBasedLogging:
 
     def post_batch(self, **kwargs):
         super().post_batch(**kwargs)
+        # FIXME: move to post_optimizer_step
         self.current_timestep += 1
 
     def should_log_batch(self, train_batch_idx):
-        """
-        Returns true if the current timestep should be logged, either because it's a
-        logged timestep or the final training batch of an epoch.
-
-        This is a utility method, not intended for extensibility.
-        """
         return (train_batch_idx == self.total_batches - 1) or (
             self.log_timestep_freq > 0
             and (self.current_timestep % self.log_timestep_freq) == 0)
@@ -88,12 +89,6 @@ class StepBasedLogging:
 
     @classmethod
     def get_recorded_timesteps(cls, result, config):
-        """
-        Given an epoch result dict and config, returns a list of timestep numbers
-        that are supposed to be logged for that epoch.
-
-        This is a utility method, not intended for extensibility.
-        """
         log_timestep_freq = config.get("log_timestep_freq", 1)
         timestep_end = result["timestep_end"]
         if log_timestep_freq == 0:
@@ -114,16 +109,6 @@ class StepBasedLogging:
 
     @classmethod
     def expand_result_to_time_series(cls, result, config):
-        """
-        Given a result dict containing data for multiple batches, returns a mapping
-        from timesteps to results. The mapping is stored as a dict so that
-        subclasses and mixins can easily add data to it.
-
-        Result keys are converted from Ray Tune requirements to better names,
-        and the keys are filtered to those that make useful charts.
-
-        :return: defaultdict mapping timesteps to result dicts
-        """
         result_by_timestep = defaultdict(dict)
 
         # Assign the epoch result to the appropriate timestep.
@@ -144,10 +129,15 @@ class StepBasedLogging:
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        exp = "StepBasedLogging"
+        exp = "StepBasedLoggingCore"
+
+        eo["run_iteration"].append(exp + ": Add timestep info")
+        eo["post_batch"].append(exp + ": Increment timestep")
+        eo["get_state"].append(exp + ": Get current timestep")
+        eo["set_state"].append(exp + ": Set current timestep")
+
         eo.update(
-            # New methods
+            # StepBasedLogging
             expand_result_to_time_series=[exp + ": common result dict keys"],
-            post_batch_wrapper=[exp + ".post_batch_wrapper"],
         )
         return eo

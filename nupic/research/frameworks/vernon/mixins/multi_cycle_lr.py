@@ -78,14 +78,24 @@ class MultiCycleLR:
 
         self.multi_cycle_args_by_epoch = improved_args
 
-        if self.rank == 0:
-            self.logger.info("MultiCycleLR regime: "
-                             f"{self.multi_cycle_args_by_epoch}")
+        self.logger.info("MultiCycleLR regime: "
+                         f"{self.multi_cycle_args_by_epoch}")
+
+        # Set it immediately, rather than waiting for the pre_epoch, in case a
+        # restore is occurring.
+        args = self.multi_cycle_args_by_epoch[0]
+        self.lr_scheduler = create_lr_scheduler(
+            optimizer=self.optimizer,
+            lr_scheduler_class=OneCycleLR,
+            lr_scheduler_args=args,
+            steps_per_epoch=self.total_batches)
 
     def pre_epoch(self):
         super().pre_epoch()
 
-        if self.current_epoch in self.multi_cycle_args_by_epoch:
+        if self.current_epoch != 0 and \
+           self.current_epoch in self.multi_cycle_args_by_epoch:
+
             args = self.multi_cycle_args_by_epoch[self.current_epoch]
             self.lr_scheduler = create_lr_scheduler(
                 optimizer=self.optimizer,

@@ -36,7 +36,7 @@ class RezeroWeights:
                                 for module in self.model.modules()
                                 if isinstance(module, SparseWeightsBase)]
 
-        if self.rank == 0:
+        if not self.logger.disabled:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(
                 self.model)
             self.logger.debug("Params nnz/total %s / %s = %s ",
@@ -61,7 +61,7 @@ class RezeroWeights:
     def post_epoch(self):
         super().post_epoch()
 
-        if self.logger.isEnabledFor(logging.DEBUG) and self.rank == 0:
+        if self.logger.isEnabledFor(logging.DEBUG) and not self.logger.disabled:
             params_sparse, nonzero_params_sparse = count_nonzero_params(
                 self.model)
             self.logger.debug(

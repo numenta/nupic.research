@@ -19,6 +19,9 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .cl_experiment import *
-from .meta_cl_experiment import *
-from .supervised_experiment import *
+from nupic.research.frameworks.vernon.mixins import *
+
+# Overwrite select mixins with distributed versions
+from .extra_validations_per_epoch import *
+from .log_every_loss import *
+from .profile import *

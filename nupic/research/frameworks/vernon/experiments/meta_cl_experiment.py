@@ -23,15 +23,10 @@ from collections import defaultdict
 
 import numpy as np
 import torch
-import torch.distributed as dist
-from torch.nn import DataParallel
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.continual_learning.maml_utils import clone_model
-from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
-    TaskDistributedSampler,
-    TaskRandomSampler,
-)
+from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
 from nupic.research.frameworks.pytorch.model_utils import get_parent_module
 from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment,
@@ -148,31 +143,37 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     def create_train_sampler(cls, config, dataset):
         """Sampler for meta-train training."""
         sample_size = config.get("train_train_sample_size", 5)
-        return cls.create_task_sampler(config, dataset,
-                                       mode="train", sample_size=sample_size)
+        class_indices = cls.compute_class_indices(config, dataset,
+                                                  mode="train",
+                                                  sample_size=sample_size)
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
     def create_train_slow_sampler(cls, config, dataset):
         """Sampler for meta-train testing. Uses same images as for train-training."""
         sample_size = config.get("train_train_sample_size", 5)
-        return cls.create_task_sampler(config, dataset,
-                                       mode="train", sample_size=sample_size)
+        class_indices = cls.compute_class_indices(config, dataset,
+                                                  mode="train",
+                                                  sample_size=sample_size)
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
     def create_replay_sampler(cls, config, dataset):
         """Sampler used to augment meta-train testing; "replays" previous classes."""
-        return cls.create_task_sampler(config, dataset, mode="all")
+        class_indices = cls.compute_class_indices(config, dataset, mode="replay")
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
         """Sampler used to validate meta-training phase."""
         sample_size = config.get("train_train_sample_size", 5)
-        return cls.create_task_sampler(config, dataset,
-                                       mode="test", sample_size=sample_size)
+        class_indices = cls.compute_class_indices(config, dataset,
+                                                  mode="test",
+                                                  sample_size=sample_size)
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def create_task_sampler(cls, config, dataset, mode="all", sample_size=None):
-        """In meta continuous learning paradigm, one task equals one class"""
+    def compute_class_indices(cls, config, dataset, mode="all", sample_size=None):
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
@@ -188,16 +189,14 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         elif mode == "all":
             pass
 
-        distributed = config.get("distributed", False)
-        if distributed:
-            sampler = TaskDistributedSampler(
-                dataset,
-                class_indices
-            )
-        else:
-            sampler = TaskRandomSampler(class_indices)
+        return class_indices
 
-        return sampler
+    @classmethod
+    def create_sampler(cls, config, dataset, class_indices):
+        """
+        Provides a hook for a distributed experiment.
+        """
+        return TaskRandomSampler(class_indices)
 
     @classmethod
     def create_slow_train_dataloader(cls, config, dataset):
@@ -277,20 +276,13 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             "total_tested": total,
             "mean_loss": loss.item(),
             "mean_accuracy": correct / total if total > 0 else 0,
+            "learning_rate": self.get_lr()[0],
         }
         self.logger.debug(results)
 
-        results.update(
-            timestep_begin=self.current_epoch,
-            timestep_end=self.current_epoch + 1,
-            learning_rate=self.get_lr()[0],
-            extra_val_results=self.extra_val_results,
-        )
+        self.post_epoch()
 
         self.current_epoch += 1
-        self.extra_val_results = []
-
-        self.post_epoch()
 
         return results
 
@@ -342,7 +334,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.logger.debug(f"Valid accuracy meta train training: {valid_accuracy}")
 
     @classmethod
-    def update_params(cls, named_params, model, loss, lr, distributed=False):
+    def update_params(cls, named_params, model, loss, lr):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
@@ -352,12 +344,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             loss, params,
             retain_graph=True, create_graph=True
         )
-
-        if distributed:
-            size = float(dist.get_world_size())
-            for grad in gradients:
-                dist.all_reduce(grad.data, op=dist.reduce_op.SUM)
-                grad.data /= size
 
         if gradients is not None:
             for g, (name, p) in zip(gradients, named_params.items()):
@@ -373,7 +359,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         named_fast_params = dict(self.get_named_fast_params(cloned_adaptation_net))
         self.update_params(
             named_fast_params, cloned_adaptation_net, train_loss,
-            self.adaptation_lr, distributed=self.distributed
+            self.adaptation_lr
         )
 
     def clone_model(self, keep_as_reference=None):
@@ -381,16 +367,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         Clones self.model by cloning some of the params and keeping those listed
         specified `keep_as_reference` via reference.
         """
-        model = clone_model(self.model.module, keep_as_reference=None)
-
-        if not self.distributed:
-            model = DataParallel(model)
-        else:
-            # Instead of using DistributedDataParallel, the grads will be reduced
-            # manually since we won't call loss.backward()
-            model
-
-        return model
+        return clone_model(self.model, keep_as_reference=None)
 
     def get_named_slow_params(self):
         model = self.get_model()
@@ -402,15 +379,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def get_model(self, clone=None):
         model = clone if clone is not None else self.model
-        if hasattr(model, "module"):
-            return model.module
-        else:
-            return model
-
-    @classmethod
-    def aggregate_results(cls, results):
-        """Run validation in single GPU"""
-        return results[0]
+        return model
 
     @classmethod
     def get_execution_order(cls):
@@ -432,4 +401,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo["get_named_slow_params"] = [exp + ".get_named_slow_params"]
         eo["get_named_fast_params"] = [exp + ".get_named_fast_params"]
         eo["aggregate_results"] = [exp + ".aggregate_results"]
+        eo["aggregate_pre_experiment_results"] = [
+            exp + ".aggregate_pre_experiment_results"]
         return eo

@@ -85,7 +85,7 @@ class PruneLowSNR:
                     z_mu.data *= z_mask
                     z_logvar[~z_mask.bool()] = vdrop_data.pruned_logvar_sentinel
 
-                    if self.rank == 0:
+                    if not self.logger.disabled:
                         name = [name
                                 for name, m in self.model.named_modules()
                                 if m is module][0]

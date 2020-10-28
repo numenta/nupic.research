@@ -19,17 +19,20 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import copy
-
 import torch.distributed as dist
 from torch import multiprocessing
 
+from nupic.research.frameworks.vernon import interfaces
+
 __all__ = [
-    "Distributed",
+    "DistributedBase",
 ]
 
 
-class Distributed:
+class DistributedBase(
+    interfaces.DistributedAggregation,  # Implements
+    interfaces.Experiment,  # Requires
+):
     """
     Extends the BaseExperiment to work in distributed scenarios.
 
@@ -40,6 +43,10 @@ class Distributed:
     - Use DistributedSamplers when using dataloaders
     - Update samplers with `sampler.set_epoch()`
     """
+    @staticmethod
+    def distributed_aggregation_interface_implemented():
+        return True
+
     def setup_experiment(self, config):
         """
         :param config: Dictionary containing the configuration parameters
@@ -53,30 +60,34 @@ class Distributed:
         distributed = config.get("distributed", False)
         rank = config.get("rank", 0)
 
-        if distributed and rank != 0:
-            # Only enable logs from first process
-            config = copy.copy(config)
-            config["disable_logger"] = True
-
-        super().setup_experiment(config)
-
-        self.distributed = distributed
-        self.rank = rank
-
         # CUDA runtime does not support the fork start method.
         # See https://pytorch.org/docs/stable/notes/multiprocessing.html
         multiprocessing.set_start_method("spawn", force=True)
 
-        if self.distributed:
+        if distributed:
             dist_url = config.get("dist_url", "tcp://127.0.0.1:54321")
             backend = config.get("backend", "nccl")
             world_size = config.get("world_size", 1)
             dist.init_process_group(
                 backend=backend,
                 init_method=dist_url,
-                rank=self.rank,
+                rank=rank,
                 world_size=world_size,
             )
+
+        super().setup_experiment(config)
+
+        self.distributed = distributed
+        self.rank = rank
+
+    @classmethod
+    def create_logger(cls, config):
+        logger = super().create_logger(config)
+        distributed = config.get("distributed", False)
+        rank = config.get("rank", 0)
+        if distributed and rank != 0:
+            logger.disabled = True
+        return logger
 
     def stop_experiment(self):
         super().stop_experiment()
@@ -85,51 +96,26 @@ class Distributed:
 
     @classmethod
     def aggregate_results(cls, results):
-        """
-        Aggregate multiple processes' "run_iteration" results into a single
-        result. The default implementation does no aggregation and simply
-        returns the first result.
-
-        :param results:
-            A list of return values from run_iteration from different processes.
-        :type results: list
-
-        :return:
-            A single result dict with results aggregated.
-        :rtype: dict
-        """
+        # Default behavior: No aggregation
         return results[0]
 
     @classmethod
     def aggregate_pre_experiment_results(cls, results):
-        """
-        Aggregate multiple processes' "run_pre_experiment" results into a single
-        result. The default implementation does no aggregation and simply
-        returns the first result.
-
-        :param results:
-            A list of return values from run_iteration from different processes.
-        :type results: list
-
-        :return:
-            A single result dict with results aggregated.
-        :rtype: dict
-        """
+        # Default behavior: No aggregation
         return results[0]
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
 
-        name = "Distributed"
+        name = "DistributedBase"
 
         # Extended methods
-        eo["setup_experiment"].insert(0, name + ": Check if logging enabled")
-        eo["setup_experiment"].append(name + ": Initialize")
+        eo["setup_experiment"].insert(0, name + ": Initialize")
         eo["stop_experiment"].append(name + ": Destroy processes")
 
         eo.update(
-            # New methods
+            # DistributedAggregation
             aggregate_results=[name + ": Skipping aggregation"],
             aggregate_pre_experiment_results=[name + ": Skipping aggregation"],
         )

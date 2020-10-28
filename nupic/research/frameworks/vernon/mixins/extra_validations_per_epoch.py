@@ -21,16 +21,16 @@
 
 import numpy as np
 
-from nupic.research.frameworks.pytorch.model_utils import aggregate_eval_results
+from nupic.research.frameworks.vernon.mixins.step_based_logging import StepBasedLogging
 
 __all__ = [
-    "ExtraValidations"
+    "ExtraValidationsPerEpoch",
 ]
 
 
-class ExtraValidations:
+class ExtraValidationsPerEpoch(StepBasedLogging):
     """
-    Perform validations mid-epoch. Requires StepBasedLogging core mixin.
+    Perform validations mid-epoch.
     """
     def setup_experiment(self, config):
         """
@@ -42,10 +42,6 @@ class ExtraValidations:
                                            across training batches.
         """
         super().setup_experiment(config)
-
-        assert hasattr(self, "current_timestep"), (
-            "Must use StepBasedLogging or similar extension"
-        )
 
         # A list of [(timestep, result), ...] for the current epoch.
         self.extra_val_results = []
@@ -82,8 +78,10 @@ class ExtraValidations:
 
     @classmethod
     def expand_result_to_time_series(cls, result, config):
+        # Get the end-of-epoch validation results.
         result_by_timestep = super().expand_result_to_time_series(result, config)
 
+        # Add additional validations to the time series.
         k_mapping = {
             "mean_loss": "validation_loss",
             "mean_accuracy": "validation_accuracy",
@@ -100,22 +98,6 @@ class ExtraValidations:
         return result_by_timestep
 
     @classmethod
-    def aggregate_results(cls, results):
-        ret = super().aggregate_results(results)
-
-        extra_val_aggregated = []
-        for i in range(len(ret["extra_val_results"])):
-            timestep = ret["extra_val_results"][i][0]
-            val_results = [process_result["extra_val_results"][i][1]
-                           for process_result in results]
-            extra_val_aggregated.append(
-                (timestep, aggregate_eval_results(val_results))
-            )
-        ret["extra_val_results"] = extra_val_aggregated
-
-        return ret
-
-    @classmethod
     def insert_pre_experiment_result(cls, result, pre_experiment_result):
         if pre_experiment_result is not None:
             result["extra_val_results"].insert(0, (0, pre_experiment_result))
@@ -124,7 +106,7 @@ class ExtraValidations:
     def get_execution_order(cls):
         eo = super().get_execution_order()
 
-        name = "ExtraValidations"
+        name = "ExtraValidationsPerEpoch"
 
         # Extended methods
         eo["run_epoch"].append(
@@ -132,9 +114,7 @@ class ExtraValidations:
         eo["post_batch"].append(name + ": Maybe run validation")
         eo["expand_result_to_time_series"].append(
             name + ": Insert extra validations")
-        if "aggregate_results" in eo:
-            # Optional Distributed logic
-            eo["aggregate_results"].append(
-                name + ": Aggregate extra validations")
+        eo["insert_pre_experiment_result"].append(
+            name + ": Insert pre experiment validation")
 
         return eo

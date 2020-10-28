@@ -19,34 +19,28 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import copy
 import io
 import sys
 import time
 from pprint import pformat
 
 import torch
-import torch.distributed as dist
 from torch.backends import cudnn
-from torch.nn import DataParallel
 from torch.nn.modules.batchnorm import _BatchNorm
-from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import OneCycleLR
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DataLoader
 
-from nupic.research.frameworks.pytorch.distributed_sampler import (
-    UnpaddedDistributedSampler,
-)
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.model_utils import (
-    aggregate_eval_results,
     deserialize_state_dict,
     evaluate_model,
     serialize_state_dict,
     train_model,
 )
-from nupic.research.frameworks.vernon import core_mixins, experiments
 from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
+from nupic.research.frameworks.vernon.experiments.components.experiment_base import (
+    ExperimentBase,
+)
 from nupic.research.frameworks.vernon.network_utils import (
     create_model,
     get_compatible_state_dict,
@@ -67,12 +61,10 @@ __all__ = [
 cudnn.benchmark = True
 
 
-class SupervisedExperiment(core_mixins.Distributed,
-                           experiments.BaseExperiment):
+class SupervisedExperiment(ExperimentBase):
     """
     General experiment class used to train neural networks in supervised learning tasks.
     """
-
     def __init__(self):
         self.model = None
         self.optimizer = None
@@ -95,6 +87,7 @@ class SupervisedExperiment(core_mixins.Distributed,
         Configure the experiment for training
         :param config: Dictionary containing the configuration parameters
             - data: Dataset path
+            - progress: Show progress during training
             - train_dir: Dataset training data relative path
             - batch_size: Training batch size
             - val_dir: Dataset validation data relative path
@@ -150,8 +143,15 @@ class SupervisedExperiment(core_mixins.Distributed,
             - epochs_to_validate: list of epochs to run validate(). A -1 asks
                                   to run validate before any training occurs.
                                   Default: last three epochs.
+            - launch_time: time the config was created (via time.time). Used to report
+                           wall clock time until the first batch is done.
+                           Default: time.time() in this setup_experiment().
         """
+
+        self.launch_time = config.get("launch_time", time.time())
         super().setup_experiment(config)
+        self.logger.info("Execution order: %s",
+                         pformat(self.get_execution_order()))
 
         # Configure model
         self.device = config.get("device", self.device)
@@ -192,12 +192,6 @@ class SupervisedExperiment(core_mixins.Distributed,
                 self.model, self.optimizer, **amp_args)
             self.logger.info("Using mixed precision")
 
-        # Apply DistributedDataParallel after all other model mutations
-        if self.distributed:
-            self.model = DistributedDataParallel(self.model)
-        else:
-            self.model = DataParallel(self.model)
-
         self._loss_function = config.get(
             "loss_function", torch.nn.functional.cross_entropy
         )
@@ -237,6 +231,10 @@ class SupervisedExperiment(core_mixins.Distributed,
         # Set train and validate methods.
         self.train_model = config.get("train_model_func", train_model)
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
+
+        self.progress = config.get("progress", False)
+        if self.logger.disabled:
+            self.progress = False
 
     @classmethod
     def create_model(cls, config, device):
@@ -302,11 +300,7 @@ class SupervisedExperiment(core_mixins.Distributed,
 
     @classmethod
     def create_train_sampler(cls, config, dataset):
-        if config.get("distributed", False):
-            sampler = DistributedSampler(dataset)
-        else:
-            sampler = None
-        return sampler
+        return None
 
     @classmethod
     def create_train_dataloader(cls, config, dataset=None):
@@ -330,11 +324,7 @@ class SupervisedExperiment(core_mixins.Distributed,
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
-        if config.get("distributed", False):
-            sampler = UnpaddedDistributedSampler(dataset, shuffle=False)
-        else:
-            sampler = None
-        return sampler
+        return None
 
     @classmethod
     def create_validation_dataloader(cls, config, dataset=None):
@@ -422,17 +412,15 @@ class SupervisedExperiment(core_mixins.Distributed,
             learning_rate=self.get_lr()[0],
         )
 
-        if self.rank == 0:
-            self.logger.debug("validate time: %s", time.time() - t1)
-            self.logger.debug("---------- End of run epoch ------------")
-            self.logger.debug("")
+        self.logger.debug("validate time: %s", time.time() - t1)
+        self.logger.debug("---------- End of run epoch ------------")
+        self.logger.debug("")
 
         self.current_epoch += 1
         return ret
 
     def pre_epoch(self):
-        if self.distributed:
-            self.train_loader.sampler.set_epoch(self.current_epoch)
+        pass
 
     def pre_batch(self, model, batch_idx):
         pass
@@ -450,7 +438,7 @@ class SupervisedExperiment(core_mixins.Distributed,
         if self.progress and (batch_idx % 40) == 0:
             total_batches = self.total_batches
             current_batch = batch_idx
-            if self.distributed:
+            if hasattr(self.train_loader.sampler, "num_replicas"):
                 # Compute actual batch size from distributed sampler
                 total_batches *= self.train_loader.sampler.num_replicas
                 current_batch *= self.train_loader.sampler.num_replicas
@@ -499,23 +487,6 @@ class SupervisedExperiment(core_mixins.Distributed,
         return data, target
 
     @classmethod
-    def aggregate_results(cls, results):
-        return cls._aggregate_validation_results(results)
-
-    @classmethod
-    def _aggregate_validation_results(cls, results):
-        result = copy.copy(results[0])
-        result.update(aggregate_eval_results(results))
-        return result
-
-    @classmethod
-    def aggregate_pre_experiment_results(cls, results):
-        if results[0] is not None:
-            return cls._aggregate_validation_results(results)
-
-        return None
-
-    @classmethod
     def get_printable_result(cls, result):
         """
         Return a stripped down version of result that has its large data structures
@@ -534,13 +505,16 @@ class SupervisedExperiment(core_mixins.Distributed,
         """
         state = {
             "current_epoch": self.current_epoch,
-            "current_timestep": self.current_timestep,
         }
 
         # Save state into a byte array to avoid ray's GPU serialization issues
         # See https://github.com/ray-project/ray/issues/5519
         with io.BytesIO() as buffer:
-            serialize_state_dict(buffer, self.model.module.state_dict())
+            model = self.model
+            if hasattr(model, "module"):
+                # DistributedDataParallel
+                model = model.module
+            serialize_state_dict(buffer, model.state_dict())
             state["model"] = buffer.getvalue()
 
         with io.BytesIO() as buffer:
@@ -573,8 +547,12 @@ class SupervisedExperiment(core_mixins.Distributed,
         if "model" in state:
             with io.BytesIO(state["model"]) as buffer:
                 state_dict = deserialize_state_dict(buffer, self.device)
-            state_dict = get_compatible_state_dict(state_dict, self.model.module)
-            self.model.module.load_state_dict(state_dict)
+            model = self.model
+            if hasattr(model, "module"):
+                # DistributedDataParallel
+                model = model.module
+            state_dict = get_compatible_state_dict(state_dict, model)
+            model.load_state_dict(state_dict)
 
         if "optimizer" in state:
             with io.BytesIO(state["optimizer"]) as buffer:
@@ -603,15 +581,6 @@ class SupervisedExperiment(core_mixins.Distributed,
                 self.current_epoch = last_epoch // steps_per_epoch
             else:
                 self.current_epoch = last_epoch
-
-        if "current_timestep" in state:
-            self.current_timestep = state["current_timestep"]
-        else:
-            self.current_timestep = self.total_batches * self.current_epoch
-
-    def stop_experiment(self):
-        if self.distributed:
-            dist.destroy_process_group()
 
     def run_iteration(self):
         return self.run_epoch()
@@ -647,15 +616,11 @@ class SupervisedExperiment(core_mixins.Distributed,
     def get_execution_order(cls):
         eo = super().get_execution_order()
         exp = "SupervisedExperiment"
-
         # Extended methods
         eo["setup_experiment"].append(exp + ".setup_experiment")
 
         eo.update(
             # Overwritten methods
-            aggregate_results=[exp + ": Aggregate validation results"],
-            aggregate_pre_experiment_results=[
-                exp + ": Aggregate validation results"],
             get_printable_result=[exp + ": Basic keys"],
             run_iteration=[exp + ".run_iteration"],
             run_pre_experiment=[exp + ".run_pre_experiment"],
@@ -671,12 +636,11 @@ class SupervisedExperiment(core_mixins.Distributed,
             create_validation_sampler=[exp + ".create_validation_sampler"],
             train_epoch=[exp + ".train_epoch"],
             run_epoch=[exp + ".run_epoch"],
-            pre_epoch=[exp + ": Update distributed sampler"],
+            pre_epoch=[],
             post_epoch=[],
             pre_batch=[],
             post_batch=[exp + ": Logging"],
             transform_data_to_device=[exp + ".transform_data_to_device"],
-            stop_experiment=[exp + ".stop_experiment"],
             error_loss=[exp + ".error_loss"],
             complexity_loss=[],
             should_decay_parameter=[exp + ".should_decay_parameter"],

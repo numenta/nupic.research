@@ -19,9 +19,4 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-"""
-Core mixins are mixins that expand the API of the experiment.
-"""
-
-from .distributed import *
-from .step_based_logging import *
+from .distributed_base import *

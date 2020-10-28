@@ -39,7 +39,10 @@ from nupic.research.frameworks.backprop_structure.networks import vdrop_resnet50
 from nupic.research.frameworks.pytorch.models import resnet50_swsl
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.modules import sparse_conv2d, sparse_linear
-from nupic.research.frameworks.vernon import ImagenetExperiment, mixins
+from nupic.research.frameworks.vernon.distributed import mixins
+from nupic.research.frameworks.vernon.distributed.common_experiments import (
+    ImagenetExperiment,
+)
 
 from .base import DEFAULT
 
@@ -50,6 +53,7 @@ class SNPruneExperiment(mixins.LogEveryLoss,
                         mixins.MultiCycleLR,
                         mixins.PruneLowSNR,
                         mixins.RegularizeLoss,
+                        mixins.ConstrainParameters,
                         ImagenetExperiment):
     pass
 
@@ -157,7 +161,7 @@ SNR_PRUNE_15_15_30.update(dict(
 
     wandb_args=dict(
         project="snr-pruning",
-        name="15 epochs initial, 15 epochs doing 6 prunings, 30 final",
+        name="SNR 15-15(6)-30, peak_reg=0.01",
     ),
 
     multi_cycle_lr_args=(
@@ -177,11 +181,11 @@ SNR_PRUNE_15_15_30.update(dict(
         (30, SUBSEQUENT_LR_SCHED_ARGS),
     ),
 
-    reg_scalar_fn=make_reg_schedule(
+    reg_scalar=make_reg_schedule(
         epochs=NUM_EPOCHS,
         pct_ramp_start=2 / 60,
         pct_ramp_end=14 / 60,
-        peak_value=0.05,
+        peak_value=0.01,
         pct_drop=30 / 60,
         final_value=0.0005,
     ),

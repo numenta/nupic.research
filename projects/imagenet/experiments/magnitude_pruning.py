@@ -30,7 +30,10 @@ from ray import tune
 from nupic.research.frameworks.pytorch.models import resnet50_swsl
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.modules import prunable_conv2d, prunable_linear
-from nupic.research.frameworks.vernon import ImagenetExperiment, mixins
+from nupic.research.frameworks.vernon.distributed import mixins
+from nupic.research.frameworks.vernon.distributed.common_experiments import (
+    ImagenetExperiment,
+)
 
 from .base import DEFAULT
 
@@ -108,6 +111,7 @@ MAGPRUNE_BASE.update(dict(
     sync_to_driver=False,
     checkpoint_freq=10,
     keep_checkpoints_num=None,
+    batch_norm_weight_decay=False,
 ))
 
 # 0.72368
@@ -168,9 +172,15 @@ MAGPRUNE15_15_30.update(dict(
     epochs_to_validate=range(NUM_EPOCHS),
     epochs=NUM_EPOCHS,
 
+    optimizer_args=dict(
+        lr=6.0 / 6.0,
+        momentum=0.75,
+        weight_decay=1e-5,
+    ),
+
     wandb_args=dict(
         project="magnitude-pruning",
-        name="15 epochs initial, 15 epochs doing 6 prunings, 30 final",
+        name="15-15(6)-30, weight_decay 1e-5",
     ),
 
     multi_cycle_lr_args=(

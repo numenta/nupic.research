@@ -21,8 +21,14 @@
 
 import torch
 
+from nupic.research.frameworks.vernon.mixins.step_based_logging import StepBasedLogging
 
-class LogEveryLoss:
+__all__ = [
+    "LogEveryLoss",
+]
+
+
+class LogEveryLoss(StepBasedLogging):
     """
     Include the training loss for every batch in the result dict. Requires
     StepBasedLogging core mixin.
@@ -65,23 +71,6 @@ class LogEveryLoss:
         return result
 
     @classmethod
-    def aggregate_results(cls, results):
-        aggregated = super().aggregate_results(results)
-
-        k = "error_loss_history"
-        if k in aggregated:
-            loss_by_process_and_batch = torch.Tensor(len(results),
-                                                     len(results[0][k]))
-            for rank, result in enumerate(results):
-                loss_by_process_and_batch[rank, :] = torch.tensor(result[k])
-            aggregated[k] = loss_by_process_and_batch.mean(dim=0).tolist()
-
-        # "complexity_loss_history" doesn't need to be aggregated, since it's
-        # the same on every process.
-
-        return aggregated
-
-    @classmethod
     def expand_result_to_time_series(cls, result, config):
         result_by_timestep = super().expand_result_to_time_series(result,
                                                                   config)
@@ -107,7 +96,6 @@ class LogEveryLoss:
         eo["setup_experiment"].append("LogEveryLoss: initialize")
         eo["post_batch"].append("LogEveryLoss: record losses")
         eo["run_epoch"].append("LogEveryLoss: to result dict")
-        eo["aggregate_results"].append("LogEveryLoss: Aggregate")
         eo["expand_result_to_time_series"].append(
             "LogEveryLoss: error_loss, complexity_loss"
         )
