@@ -140,7 +140,7 @@ class OMLNetwork(nn.Module):
         named_parameters = self.representation.named_parameters()
         prepended = {}
         for n, p in named_parameters:
-            n = "adaptation." + n
+            n = "representation." + n
             prepended[n] = p
         return prepended
 
