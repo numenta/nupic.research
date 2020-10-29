@@ -81,4 +81,5 @@ def plot_dendritic_activations(
         val = np.round(activations[i, j], 2)
         ax.text(j, i, val, ha="center", va="center", color="w")
 
-    return plt
+    figure = plt.gcf()
+    return figure
