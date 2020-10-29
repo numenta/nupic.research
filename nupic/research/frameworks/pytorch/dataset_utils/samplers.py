@@ -56,7 +56,7 @@ class TaskDistributedSampler(DistributedSampler):
         g = torch.Generator()
         g.manual_seed(self.epoch)
 
-        indices = self.indices
+        indices = list(self.indices)
         if self.shuffle:
             indices = [indices[i] for i in torch.randperm(len(indices), generator=g)]
 
