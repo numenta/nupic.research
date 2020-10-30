@@ -44,9 +44,9 @@ os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 class RemoteTrainableBase(Trainable):
     """
     Base class for running remote experiments. This trainable can run on a
-    non-GPU instance, and scheduling work to other processes. This enables
-    coordinating experiments cheap reliable machines, while running the actual
-    experiment on spot instances.
+    non-GPU instance, scheduling work to other processes. This enables
+    coordinating experiments on cheap reliable machines, while running the
+    actual experiment on spot instances.
     """
     def _setup(self, config):
         self.experiment_class = self._extend_experiment_class(
@@ -258,8 +258,8 @@ class RemoteProcessTrainable(RemoteTrainableBase):
                         ret, pre_experiment_result)
 
                 self._process_result(ret)
-                printable_result = self.experiment_class.get_printable_result(ret)
-                self.logger.info(f"End Iteration Result: {printable_result}")
+                readable_result = self.experiment_class.get_readable_result(ret)
+                self.logger.info(f"End Iteration Result: {readable_result}")
 
                 # Check if we should stop the experiment
                 ret[DONE] = self._should_stop()
@@ -276,6 +276,10 @@ class RemoteProcessTrainable(RemoteTrainableBase):
 
 
 class RayActorHelperMethods:
+    """
+    Mixin that adds functionality needed by the DistributedTrainable to the
+    experiment class.
+    """
     def get_node_ip(self):
         """Returns the IP address of the current node."""
         return socket.gethostbyname(socket.gethostname())
@@ -427,8 +431,8 @@ class DistributedTrainable(RemoteTrainableBase):
                         ret, pre_experiment_result)
 
                 self._process_result(ret)
-                printable_result = self.experiment_class.get_printable_result(ret)
-                self.logger.info(f"End Iteration Result: {printable_result}")
+                readable_result = self.experiment_class.get_readable_result(ret)
+                self.logger.info(f"End Iteration Result: {readable_result}")
 
                 # Check if we should stop the experiment
                 ret[DONE] = self._should_stop()
@@ -541,8 +545,8 @@ class DebugTrainable(Trainable):
 
     def _train(self):
         ret = self.experiment.run_task()
-        printable_result = self.experiment_class.get_printable_result(ret)
-        print(f"End Iteration Result: {printable_result}")
+        readable_result = self.experiment_class.get_readable_result(ret)
+        print(f"End Iteration Result: {readable_result}")
 
         return ret
 

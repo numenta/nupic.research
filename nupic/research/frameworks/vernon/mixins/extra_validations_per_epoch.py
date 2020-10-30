@@ -82,25 +82,19 @@ class ExtraValidationsPerEpoch(StepBasedLogging):
         result_by_timestep = super().expand_result_to_time_series(result, config)
 
         # Add additional validations to the time series.
-        k_mapping = {
-            "mean_loss": "validation_loss",
-            "mean_accuracy": "validation_accuracy",
-            "learning_rate": "learning_rate",
-            "complexity_loss": "complexity_loss",
-        }
         for timestep, val_result in result["extra_val_results"]:
-            result_by_timestep[timestep].update({
-                k2: val_result[k1]
-                for k1, k2 in k_mapping.items()
-                if k1 in val_result
-            })
+            result_by_timestep[timestep].update(
+                cls.get_readable_result(val_result)
+            )
 
         return result_by_timestep
 
     @classmethod
     def insert_pre_experiment_result(cls, result, pre_experiment_result):
         if pre_experiment_result is not None:
-            result["extra_val_results"].insert(0, (0, pre_experiment_result))
+            result["extra_val_results"].insert(
+                0, (0, cls.get_readable_result(pre_experiment_result))
+            )
 
     @classmethod
     def get_execution_order(cls):

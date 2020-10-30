@@ -102,6 +102,8 @@ class SupervisedExperiment(DistributedBase,
 
         eo.update(
             # Overwritten methods
+            create_train_sampler=[exp + ": Create distributed sampler"],
+            create_validation_sampler=[exp + ": Create distributed sampler"],
             aggregate_results=[exp + ": Aggregate validation results"],
             aggregate_pre_experiment_results=[
                 exp + ": Aggregate validation results"],

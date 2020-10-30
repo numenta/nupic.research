@@ -487,16 +487,20 @@ class SupervisedExperiment(ExperimentBase):
         return data, target
 
     @classmethod
-    def get_printable_result(cls, result):
-        """
-        Return a stripped down version of result that has its large data structures
-        removed so that the result can be printed to the console.
-        """
-        keys = ["total_correct", "total_tested", "mean_loss", "mean_accuracy",
-                "learning_rate"]
-        return {key: result[key]
-                for key in keys
-                if key in result}
+    def get_readable_result(cls, result):
+        keep_keys = ["total_correct", "total_tested", "complexity_loss",
+                     "learning_rate"]
+        change_keys = {"mean_loss": "validation_loss",
+                       "mean_accuracy": "validation_accuracy"}
+
+        return {
+            **{k: result[k]
+               for k in keep_keys
+               if k in result},
+            **{k2: result[k1]
+               for k1, k2 in change_keys.items()
+               if k1 in result}
+        }
 
     def get_state(self):
         """
@@ -618,11 +622,14 @@ class SupervisedExperiment(ExperimentBase):
         exp = "SupervisedExperiment"
         # Extended methods
         eo["setup_experiment"].append(exp + ".setup_experiment")
+        eo["get_state"].append(exp + ": Model, optimizer, LR scheduler, epoch")
+        eo["set_state"].append(exp + ": Model, optimizer, LR scheduler, epoch")
 
         eo.update(
             # Overwritten methods
-            get_printable_result=[exp + ": Basic keys"],
+            get_readable_result=[exp + ": Basic keys"],
             run_iteration=[exp + ".run_iteration"],
+            should_stop=[exp + ".should_stop"],
             run_pre_experiment=[exp + ".run_pre_experiment"],
 
             # New methods

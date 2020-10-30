@@ -88,7 +88,7 @@ class ExperimentBase(
         pass
 
     @classmethod
-    def get_printable_result(cls, result):
+    def get_readable_result(cls, result):
         return result
 
     @classmethod
@@ -98,7 +98,7 @@ class ExperimentBase(
             setup_experiment=[exp + ": Initialize logger"],
             run_iteration=[exp + ": Not implemented, must override"],
             run_pre_experiment=[exp + ": No pre_experiment implemented"],
-            get_printable_result=[exp + ": Return unfiltered result"],
+            get_readable_result=[exp + ": Return unfiltered result"],
             insert_pre_experiment_result=[],
             stop_experiment=[],
             should_stop=[exp + ": Not implemented, must override"],

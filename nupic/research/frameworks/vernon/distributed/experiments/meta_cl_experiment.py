@@ -136,8 +136,21 @@ class MetaContinualLearningExperiment(DistributedBase,
         eo = super().get_execution_order()
         exp = "DistributedMetaContinualLearningExperiment"
 
+        # Overwritten methods
+        eo["update_params"] = [exp + ".update_params"]
+        eo["adapt"] = [exp + ".adapt"]
+        eo["get_model"] = [exp + ".get_model"]
+        eo["clone_model"] = [exp + ".clone_model"]
+
         # Extended methods
         eo["setup_experiment"].append(exp + ": DistributedDataParallel")
         eo["pre_epoch"].append(exp + ": Update distributed sampler")
+        eo["create_sampler"].insert(0,
+                                    ("if distributed { "
+                                     "create distributed sampler"
+                                     " } else { "))
+        eo["create_sampler"].append("}")
+        # FIXME: Validation is not currently distributed. Implement samplers in
+        # a way that distributes validation, and implement aggregate_results.
 
         return eo

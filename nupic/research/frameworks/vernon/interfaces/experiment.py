@@ -50,7 +50,7 @@ class Experiment(abc.ABC):
             if first_run:
                 ExperimentClass.insert_pre_experiment_result(result, pre_result)
                 first_run = False
-            print(ExperimentClass.get_printable_result(result))
+            print(ExperimentClass.get_readable_result(result))
             save_iteration_somehow(result)  # Example-specific logging
     """
     @abc.abstractmethod
@@ -131,10 +131,11 @@ class Experiment(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def get_printable_result(cls, result: dict):
+    def get_readable_result(cls, result: dict) -> dict:
         """
-        Return a stripped down version of result that has its large data structures
-        removed so that the result can be printed to the console.
+        Return a version of the result that is meant for human eyes. Rename any
+        dictionary keys to improve clarity, and remove large data structures so
+        that the result can be printed to the console.
         """
 
     @classmethod

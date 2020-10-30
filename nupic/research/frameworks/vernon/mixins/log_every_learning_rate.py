@@ -24,16 +24,12 @@ from nupic.research.frameworks.vernon.mixins.step_based_logging import StepBased
 
 class LogEveryLearningRate(StepBasedLogging):
     """
-    Include the learning rate for every batch in the result dict. Requires
-    StepBasedLogging core mixin.
+    Include the learning rate for every batch in the result dict.
 
     Adjust config["log_timestep_freq"] to reduce the logging frequency.
     """
     def setup_experiment(self, config):
         super().setup_experiment(config)
-        assert hasattr(self, "current_timestep"), (
-            "Must use StepBasedLogging or similar extension"
-        )
         self.lr_history = []
         self.momentum_history = []
 

@@ -387,6 +387,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         exp = "MetaContinualLearningExperiment"
         eo["create_loaders"] = [exp + ".create_loaders"]
         eo["create_fast_slow_loaders"] = [exp + ".create_fast_slow_loaders"]
+        eo["create_sampler"] = [exp + ".create_sampler"]
         eo["create_train_sampler"] = [exp + ".create_train_sampler"]
         eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
         eo["create_replay_sampler"] = [exp + ".create_replay_sampler"]
@@ -400,7 +401,5 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo["clone_model"] = [exp + ".clone_model"]
         eo["get_named_slow_params"] = [exp + ".get_named_slow_params"]
         eo["get_named_fast_params"] = [exp + ".get_named_fast_params"]
-        eo["aggregate_results"] = [exp + ".aggregate_results"]
-        eo["aggregate_pre_experiment_results"] = [
-            exp + ".aggregate_pre_experiment_results"]
+        eo["get_model"] = [exp + ".get_model"]
         return eo

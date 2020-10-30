@@ -47,7 +47,7 @@ In contrast, continual learning follows the below structure, with the experiment
 
 Mixins for advanced experiments
 ==============
-Because Vernon experiments are extensible via subclassing, they automatically support mixins via Python's multiple inheritance. A subclass can override a method directly, or it can do it via mixins.
+Because Vernon experiments are extensible via subclassing, they automatically support mixins via Python's multiple inheritance. A subclass can override a method directly, or it can do it via mixins. An introduction to Python mixins can be found [here](https://realpython.com/inheritance-composition-python/#mixing-features-with-mixin-classes).
 
 As an example, one could define
 ```python
@@ -78,7 +78,7 @@ one can see that **update_boost_strength** will be applied in the parent class's
 
 Mixins have full access to the experiment class, and they can do whatever they want. Often, they will extend methods, first calling `super().method` then running additional code. Other times, they will replace methods (never calling `super().method`). Mixins can depend on the internals of specific experiments and even the internals of other mixins. Because this is research code, we don't place any firm restrictions on how mixins should work. To make the dependencies explicit and to promote reusability, as mixins become mature they should use the following practices:
 
-- Interact with the `self` via explicit **interfaces**. Rather than having mixins interact directly with specific experiments, the experiment should implement an [interface](./interfaces/), and the mixin should interact with that interface. This enables using the mixin with any experiment exposing this interface. It also prevents errors; if any mixins have an unresolved interface dependency, the experiment class will have unimplemented abstract methods and will fail to instantiate. Finally, this enables static analysis and IDE support.
+- Interact with the `self` via explicit **interfaces**. Rather than having mixins interact directly with specific experiments, the experiment should implement an [interface](./interfaces/), and the mixin should interact with that interface. This enables using the mixin with any experiment exposing this interface. It also prevents errors; if any mixins have an unresolved interface dependency, the experiment class will have unimplemented abstract methods and will fail to instantiate. Finally, this enables static analysis and IDE support. An introduction to interfaces in Python can be found [here](https://realpython.com/python-interface/#python-interface-overview).
 - Implement the `get_execution_order` classmethod. This documents the mixin's modifications to various stages of the experiment. The execution order list is displayed when an experiment is run.
 
 Vernon provides a variety of mixins that enable the specification of more advanced experiments, including:

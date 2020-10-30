@@ -112,17 +112,9 @@ class StepBasedLogging(
         result_by_timestep = defaultdict(dict)
 
         # Assign the epoch result to the appropriate timestep.
-        k_mapping = {
-            "mean_loss": "validation_loss",
-            "mean_accuracy": "validation_accuracy",
-            "learning_rate": "learning_rate",
-            "complexity_loss": "complexity_loss",
-        }
-        result_by_timestep[result["timestep_end"]].update({
-            k2: result[k1]
-            for k1, k2 in k_mapping.items()
-            if k1 in result
-        })
+        result_by_timestep[result["timestep_end"]].update(
+            cls.get_readable_result(result)
+        )
 
         return result_by_timestep
 

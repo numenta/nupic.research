@@ -69,17 +69,17 @@ class ContinualLearningExperiment(DistributedBase,
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        exp = "DistributedSupervisedExperiment"
+        exp = "DistributedContinualLearningExperiment"
 
         # Extended methods
         eo["setup_experiment"].append(exp + ": DistributedDataParallel")
         eo["pre_epoch"].append(exp + ": Update distributed sampler")
-
-        eo.update(
-            # Overwritten methods
-            aggregate_results=[exp + ": Aggregate validation results"],
-            aggregate_pre_experiment_results=[
-                exp + ": Aggregate validation results"],
-        )
+        eo["create_train_sampler"].insert(0,
+                                          ("If distributed { "
+                                           "create distribited sampler "
+                                           "} else {"))
+        eo["create_train_sampler"].append("}")
+        # FIXME: Validation is not currently distributed. Implement
+        # create_validation_sampler and aggregate_results.
 
         return eo

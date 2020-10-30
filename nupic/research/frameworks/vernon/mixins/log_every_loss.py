@@ -30,8 +30,7 @@ __all__ = [
 
 class LogEveryLoss(StepBasedLogging):
     """
-    Include the training loss for every batch in the result dict. Requires
-    StepBasedLogging core mixin.
+    Include the training loss for every batch in the result dict.
 
     These numbers are stored on the GPU until the end of the epoch. If every
     kilobyte of GPU memory is being used by the experiment, this could result in
@@ -40,9 +39,6 @@ class LogEveryLoss(StepBasedLogging):
     """
     def setup_experiment(self, config):
         super().setup_experiment(config)
-        assert hasattr(self, "current_timestep"), (
-            "Must use StepBasedLogging or similar extension"
-        )
         self.error_loss_history = []
         self.complexity_loss_history = []
 
