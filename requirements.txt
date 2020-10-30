@@ -35,7 +35,8 @@ matplotlib
 numpy
 pandas
 python-dateutil==2.8.0
-fastai
+# fastai 2.1 requires pytorch 1.7, nupic.torch requires pytorch 1.6
+fastai<2.1
 pillow
 python-dotenv
 ray[tune]==0.8.3
@@ -52,6 +53,3 @@ wandb>=0.9.4
 # FIXME: this is needed because the pip install isn't properly choosing a version
 # of colorama compatible with awscli
 colorama==0.4.3
-# FIXME: this is needed because the pip install isn't properly choosing a version
-# of torch compatible with nupic.torch
-torch==1.6
