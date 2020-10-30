@@ -92,7 +92,7 @@ class GradsOfGradsTest(unittest.TestCase):
         # Using the identity from
         #    `https://en.wikipedia.org/wiki/Matrix_calculus#Scalar-by-matrix_identities`
         #
-        # We have
+        # we have
         #    dL/dW = W · (x·a + (x·a)^T)
         #
         # where "·" is a matrix product.
@@ -128,7 +128,7 @@ class GradsOfGradsTest(unittest.TestCase):
         # The term on the right hand side is analogous to dL/dW as above so that
         #    dL_2/dW_2 = W_2 · (x·a + (x·a)^T)
         #
-        # For the second term, recall that W_2 = W - lr dL/dW = W - lr (x·a + (x·a)^T)
+        # For the second term, recall that W_2 = W - lr dL/dW = W - lr W·(x·a + (x·a)^T)
         # This gives,
         #    dW_2/dW  = I - lr(x·a + (x·a)^T)
         #
