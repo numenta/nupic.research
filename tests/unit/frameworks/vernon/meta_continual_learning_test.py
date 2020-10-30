@@ -52,7 +52,7 @@ class GradsOfGradsTest(unittest.TestCase):
     """
     Perform tests for taking gradients of gradients. Specifically, this uses a
     quadratic layer as a test example since it yields non-trivial results (unlike a
-    linear layer) and enables hand derived expected values.
+    linear layer) and enables manually calculated expected values.
     """
 
     def setUp(self):
@@ -73,7 +73,7 @@ class GradsOfGradsTest(unittest.TestCase):
         # Use the predefined weight from the quadratic layer.
         weight = Quadratic().weight
 
-        # First forward pass: Loss = a W^T W x
+        # First forward pass: L = a W^T W x
         a = self.left_input
         x = self.right_input
         loss = torch.matmul(weight, x)
@@ -84,8 +84,19 @@ class GradsOfGradsTest(unittest.TestCase):
         loss.backward(retain_graph=True, create_graph=True)
         weight.grad
 
+        # --------------
+        # 1st Derivative
+        # --------------
+
         # Compare the manually computed expected 2nd derivative with pytorch's autograd.
-        #   W' = W * (x·a + (x·a)^T)
+        # Using the identity from
+        #    `https://en.wikipedia.org/wiki/Matrix_calculus#Scalar-by-matrix_identities`
+        #
+        # We have
+        #    dL/dW = W · (x·a + (x·a)^T)
+        #
+        # where "·" is a matrix product.
+        #
         with torch.no_grad():
             m = torch.matmul(x, a)
             m = m + m.transpose(1, 0)
@@ -100,15 +111,30 @@ class GradsOfGradsTest(unittest.TestCase):
         # Zero the gradient of the non-updated weight.
         weight.grad = None
 
-        # Second forward pass.
+        # Second forward pass: L_2 = a W_2^T W_2 x
         loss2 = torch.matmul(weight2, x)
         loss2 = torch.matmul(weight2.transpose(1, 0), loss2)
         loss2 = torch.matmul(a, loss2)
         loss2.backward()
 
-        # Compare the manually computed expected 2nd derivative with pytorch's autograd.
-        #   W'  = W2' · (I - lr(x·a + (x·a)^T))
-        #   W2' = W2  · (x·a + (x·a)^T)
+        # --------------
+        # 2nd Derivative
+        # --------------
+
+        # Compare the manually derived 2nd derivative with pytorch's autograd.
+        # Using the chain rule
+        #    dL_2/dW = (dL_2/dW_2) · (dW_2/dW)
+        #
+        # The term on the right hand side is analogous to dL/dW as above so that
+        #    dL_2/dW_2 = W_2 · (x·a + (x·a)^T)
+        #
+        # For the second term, recall that W_2 = W - lr dL/dW = W - lr (x·a + (x·a)^T)
+        # This gives,
+        #    dW_2/dW  = I - lr(x·a + (x·a)^T)
+        #
+        # Putting these results together
+        #    dL_2/dW = W_2 · (x·a + (x·a)^T) · (I - lr(x·a + (x·a)^T)
+        #
         m = torch.matmul(x, a)
         m = m + m.transpose(1, 0)
         w2_grad_expected = torch.matmul(weight2, m)
