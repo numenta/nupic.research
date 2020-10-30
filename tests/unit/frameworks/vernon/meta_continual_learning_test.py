@@ -32,7 +32,7 @@ from nupic.research.frameworks.vernon import MetaContinualLearningExperiment
 update_params = MetaContinualLearningExperiment.update_params
 
 
-class Quadractic(torch.nn.Module):
+class Quadratic(torch.nn.Module):
     """Quadratic layer: Computes W^T W x"""
     def __init__(self):
         super().__init__()
@@ -71,7 +71,7 @@ class GradsOfGradsTest(unittest.TestCase):
         """
 
         # Use the predefined weight from the quadratic layer.
-        weight = Quadractic().weight
+        weight = Quadratic().weight
 
         # First forward pass: Loss = a W^T W x
         a = self.left_input
@@ -127,7 +127,7 @@ class GradsOfGradsTest(unittest.TestCase):
         a gradient of a gradient.
         """
 
-        quad = Quadractic()
+        quad = Quadratic()
         quad_clone = clone_model(quad)
         x = self.right_input
 
