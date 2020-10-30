@@ -96,7 +96,14 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
     return r, dendritic_network, context_vectors, device
 
 
-def init_dataloader(routing_function, context_vectors, device, batch_size):
+def init_dataloader(
+    routing_function,
+    context_vectors,
+    device,
+    batch_size,
+    x_min,
+    x_max
+):
     """
     Returns a torch DataLoader for the routing task given a random routing function
 
@@ -104,12 +111,18 @@ def init_dataloader(routing_function, context_vectors, device, batch_size):
     :param context_vectors: 2D torch Tensor in which each row gives a context vector
     :param device: device to use ('cpu' or 'cuda')
     :param batch_size: the batch size during training and evaluation
+    :param x_min: the minimum bound of the uniform distribution from which input
+                  vectors are i.i.d. sampled along each input dimension
+    :param x_max: the maximum bound of the uniform distribution from which input
+                  vectors are i.i.d. sampled along each input dimension
     """
     routing_test_dataset = RoutingDataset(
         routing_function=routing_function,
         input_size=routing_function.sparse_weights.module.in_features,
         context_vectors=context_vectors,
-        device=device
+        device=device,
+        x_min=x_min,
+        x_max=x_max,
     )
 
     routing_test_dataloader = DataLoader(
@@ -131,7 +144,7 @@ def learn_to_route(
     dim_context,
     dendrite_module,
     batch_size=64,
-    num_training_epochs=1000
+    num_training_epochs=5000
 ):
     """
     Trains a dendritic network to match an arbitrary routing function, while only
@@ -160,11 +173,22 @@ def learn_to_route(
         dendrite_module=dendrite_module
     )
 
-    routing_test_dataloader = init_dataloader(
+    train_dataloader = init_dataloader(
         routing_function=r,
         context_vectors=context_vectors,
         device=device,
-        batch_size=batch_size
+        batch_size=batch_size,
+        x_min=-2.0,
+        x_max=2.0,
+    )
+
+    test_dataloader = init_dataloader(
+        routing_function=r,
+        context_vectors=context_vectors,
+        device=device,
+        batch_size=batch_size,
+        x_min=2.0,
+        x_max=6.0,
     )
 
     optimizer = init_optimizer(network=dendritic_network)
@@ -174,7 +198,7 @@ def learn_to_route(
 
         train_dendrite_model(
             model=dendritic_network,
-            loader=routing_test_dataloader,
+            loader=train_dataloader,
             optimizer=optimizer,
             device=device,
             criterion=F.l1_loss,
@@ -182,10 +206,11 @@ def learn_to_route(
             l1_weight_decay=1e-8
         )
 
-        # Validate model - note that we use the same dataset/dataloader for validation
+        # Validate model - note that we use a different dataset/dataloader as the input
+        # distribution has changed
         results = evaluate_dendrite_model(
             model=dendritic_network,
-            loader=routing_test_dataloader,
+            loader=test_dataloader,
             device=device,
             criterion=F.l1_loss,
             concat=False
