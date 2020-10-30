@@ -52,3 +52,6 @@ wandb>=0.9.4
 # FIXME: this is needed because the pip install isn't properly choosing a version
 # of colorama compatible with awscli
 colorama==0.4.3
+# FIXME: this is needed because the pip install isn't properly choosing a version
+# of torch compatible with nupic.torch
+torch==1.6
