@@ -25,6 +25,7 @@ import unittest
 import torch
 
 from nupic.research.frameworks.continual_learning.maml_utils import clone_model
+from nupic.research.frameworks.pytorch.models import OMLNetwork
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment
 
 # Retrieve function that updates params in place.
@@ -169,6 +170,29 @@ class GradsOfGradsTest(unittest.TestCase):
 
         # Validate gradient on original weight parameter.
         self.assertTrue(torch.allclose(quad.weight.grad, self.expected_grad, atol=1e-4))
+
+
+class CloneModelTest(unittest.TestCase):
+
+    def test_clone_model_params_are_deepcopied(self):
+        """
+        Validate that the parameters cloned from the OMLNetwork have been deepcopied -
+        the clone and original model should share no data between there params.
+        """
+
+        oml = OMLNetwork(num_classes=10)
+        oml_data_ptrs = [p.data_ptr() for p in oml.parameters()]
+
+        # The clone and original model should share no data between there params.
+        oml_clone = clone_model(oml)
+        clone_data_ptrs = [p.data_ptr() for p in oml_clone.parameters()]
+
+        overlap_ptrs = set(clone_data_ptrs) & set(oml_data_ptrs)
+        self.assertEqual(len(overlap_ptrs), 0)
+
+        # Params from the property named_fast_params should solely belong to the clone.
+        fast_data_ptrs = [p.data_ptr() for n, p in oml_clone.named_fast_params.items()]
+        self.assertTrue(set(fast_data_ptrs) <= set(clone_data_ptrs))
 
 
 if __name__ == "__main__":
