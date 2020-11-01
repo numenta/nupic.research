@@ -19,46 +19,39 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import cProfile
-import os
-import pstats
+import torch
+
+from nupic.research.frameworks.vernon import interfaces
+from nupic.research.frameworks.vernon.mixins.log_every_loss import (
+    LogEveryLoss as LogEveryLossBase,
+)
+
+__all__ = [
+    "LogEveryLoss",
+]
 
 
-class Profile:
-    """
-    Save cProfile traces for initialization and each run_epoch.
-    """
-    def setup_experiment(self, config):
-        pr = cProfile.Profile()
-        pr.enable()
-        super().setup_experiment(config)
+class LogEveryLoss(interfaces.DistributedAggregation,  # Requires
+                   LogEveryLossBase):
+    @classmethod
+    def aggregate_results(cls, results):
+        aggregated = super().aggregate_results(results)
 
-        pr.disable()
+        k = "error_loss_history"
+        if k in aggregated:
+            loss_by_process_and_batch = torch.Tensor(len(results),
+                                                     len(results[0][k]))
+            for rank, result in enumerate(results):
+                loss_by_process_and_batch[rank, :] = torch.tensor(result[k])
+            aggregated[k] = loss_by_process_and_batch.mean(dim=0).tolist()
 
-        filepath = os.path.join(self.logdir,
-                                "profile-initialization.profile")
-        pstats.Stats(pr).dump_stats(filepath)
-        self.logger.info(f"Saved {filepath}")
+        # "complexity_loss_history" doesn't need to be aggregated, since it's
+        # the same on every process.
 
-    def run_epoch(self):
-        pr = cProfile.Profile()
-        pr.enable()
-
-        result = super().run_epoch()
-
-        pr.disable()
-        filepath = os.path.join(self.logdir,
-                                f"profile-epoch{self.current_epoch}.profile")
-        pstats.Stats(pr).dump_stats(filepath)
-        self.logger.info(f"Saved {filepath}")
-
-        return result
+        return aggregated
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].insert(0, "Profile begin")
-        eo["setup_experiment"].append("Profile end")
-        eo["run_epoch"].insert(0, "Profile begin")
-        eo["run_epoch"].append("Profile end")
+        eo["aggregate_results"].append("LogEveryLoss: Aggregate")
         return eo
