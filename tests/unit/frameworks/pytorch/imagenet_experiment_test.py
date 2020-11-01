@@ -25,9 +25,7 @@ import torch
 
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.test_utils import TempFakeSavedData
-from nupic.research.frameworks.vernon.distributed.common_experiments import (
-    ImagenetExperiment,
-)
+from nupic.research.frameworks.vernon.distributed import ImagenetExperiment
 
 
 class ImagenetExperimentTest(unittest.TestCase):

@@ -39,10 +39,7 @@ from nupic.research.frameworks.backprop_structure.networks import vdrop_resnet50
 from nupic.research.frameworks.pytorch.models import resnet50_swsl
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.modules import sparse_conv2d, sparse_linear
-from nupic.research.frameworks.vernon.distributed import mixins
-from nupic.research.frameworks.vernon.distributed.common_experiments import (
-    ImagenetExperiment,
-)
+from nupic.research.frameworks.vernon.distributed import ImagenetExperiment, mixins
 
 from .base import DEFAULT
 

@@ -30,10 +30,7 @@ from ray import tune
 from nupic.research.frameworks.pytorch.models import resnet50_swsl
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.modules import prunable_conv2d, prunable_linear
-from nupic.research.frameworks.vernon.distributed import mixins
-from nupic.research.frameworks.vernon.distributed.common_experiments import (
-    ImagenetExperiment,
-)
+from nupic.research.frameworks.vernon.distributed import ImagenetExperiment, mixins
 
 from .base import DEFAULT
 
