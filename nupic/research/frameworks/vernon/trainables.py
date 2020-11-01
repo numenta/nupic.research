@@ -315,11 +315,11 @@ class DistributedTrainable(RemoteTrainableBase):
         return Resources(cpu=0, gpu=0, extra_cpu=num_cpus, extra_gpu=num_gpus)
 
     def _extend_experiment_class(self, experiment_class):
-        class ExtendedExpClass(RayActorHelperMethods, experiment_class):
+        class ExtendedExperimentClass(RayActorHelperMethods, experiment_class):
             pass
 
-        ExtendedExpClass.__name__ = experiment_class.__name__
-        return ExtendedExpClass
+        ExtendedExperimentClass.__name__ = experiment_class.__name__
+        return ExtendedExperimentClass
 
     def _create_workers(self, config):
         """
