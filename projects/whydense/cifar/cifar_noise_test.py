@@ -195,7 +195,7 @@ def test_model_sparsity(config, options, project_dir):
     loaders = create_test_loaders(
         noise_values, batch_size=1, data_dir=tiny_cifar.data_dir
     )
-    noise_datasets = [l.dataset for l in loaders]
+    noise_datasets = [loader.dataset for loader in loaders]
 
     # Test noise sensitivity for different layers
     model = tiny_cifar.model
@@ -253,7 +253,7 @@ def layer_noise_sensitivities(config, options, project_dir):
     loaders = create_test_loaders(
         noise_values, batch_size=1, data_dir=tiny_cifar.data_dir
     )
-    noise_datasets = [l.dataset for l in loaders]
+    noise_datasets = [loader.dataset for loader in loaders]
 
     # Test noise sensitivity for different layers
     model = tiny_cifar.model

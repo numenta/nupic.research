@@ -543,20 +543,20 @@ def plot_tensors(model, tuples, detailed=False, return_fig=False):
     n_tensors = len(tuples)
     fig, axs = plt.subplots(model.n_layers, n_tensors, dpi=144)
     for i, (label, val) in enumerate(tuples):
-        for l in range(model.n_layers):
-            layer_idx = model.n_layers - l - 1
+        for layer in range(model.n_layers):
+            layer_idx = model.n_layers - layer - 1
             ax = axs[layer_idx][i] if n_tensors > 1 else axs[layer_idx]
             # Get layer's values (from either list or tensor)
             # Outputs can't be stored in tensors since dimension heterogeneous
             if isinstance(val, list):
-                if val[l] is None:
+                if val[layer] is None:
                     ax.set_visible(False)
                     t = None
                 else:
-                    t = val[l].detach()[0]
+                    t = val[layer].detach()[0]
             else:
-                t = val.detach()[l, 0]
-            mod = list(model.children())[l]
+                t = val.detach()[layer, 0]
+            mod = list(model.children())[layer]
             if t is not None:
                 size = t.numel()
                 is_cell_level = t.numel() == mod.total_cells and mod.n > 1
@@ -571,7 +571,7 @@ def plot_tensors(model, tuples, detailed=False, return_fig=False):
                 tmin = t.min()
                 tmax = t.max()
                 tsum = t.sum()
-                title = "L%d %s" % (l + 1, label)
+                title = "L%d %s" % (layer + 1, label)
                 if detailed:
                     title += " (%s, rng: %.3f-%.3f, sum: %.3f)" % (
                         size,
