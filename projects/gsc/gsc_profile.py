@@ -32,6 +32,7 @@ from torch.utils.data import DataLoader
 
 from experiments import CONFIGS  # noqa
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
+from nupic.research.frameworks.pytorch.model_utils import evaluate_model
 from nupic.research.frameworks.pytorch.restore_utils import load_state_from_checkpoint
 
 PATH_TO_CONFIGS = expanduser("~/nta/nupic.research/projects/gsc")
@@ -41,38 +42,45 @@ sys.path.insert(0, PATH_TO_CONFIGS)
 DATA_ROOT = expanduser("~/nta/data/gsc_preprocessed")
 
 
-def evaluate_model(model, dataloader):
+def run_model(model, dataloader, device):
     """
     Simply run a forward pass through all of the data; don't compute the
     loss or accuracy. All inference is done on GPU.
     """
     samples_processed = 0
-    for image, _ in dataloader:
-        samples_processed += len(image)
-        image = image.to("cuda")
-        model(image)
+    with torch.no_grad():
+        for image, _ in dataloader:
+            samples_processed += len(image)
+            image = image.to(device)
+            model(image)
     return samples_processed
 
 
-def profile(model, num_workers, num_runs, batch_size):
-    # Load the train dataset and accompanying dataloader.
-    train_dataset = preprocessed_gsc(root=DATA_ROOT, train=True, download=False)
+def profile(model, num_workers, num_runs, batch_size, train=True):
+    # Load the training or test dataset and accompanying dataloader.
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    the_dataset = preprocessed_gsc(root=DATA_ROOT, train=train, download=False)
     dataloader = DataLoader(
-        dataset=train_dataset,
+        dataset=the_dataset,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=True,
         num_workers=num_workers,
         sampler=None,
         pin_memory=torch.cuda.is_available(),
         drop_last=False,  # TODO: Will this affect timing?
     )
 
+    # Verify accuracy of model
+    accuracies = evaluate_model(model, dataloader, device)
+    print("Accuracies:")
+    print(accuracies)
+
     print(f"Profiling inference with batch size: {batch_size}")
     run_times = []
     samples_processed = []
     for _ in range(num_runs + 1):
         t0 = time()
-        s = evaluate_model(model, dataloader)
+        s = run_model(model, dataloader, device)
         run_times.append(time() - t0)
         samples_processed.append(s)
 
@@ -104,7 +112,7 @@ if __name__ == "__main__":
                         help="Path to checkpoint.")
     parser.add_argument("-n", "--num_runs", type=int, default=10,
                         help="Number of runs to average over.")
-    parser.add_argument("-w", "--num_workers", type=int, default=0,
+    parser.add_argument("-w", "--num_workers", type=int, default=4,
                         help="Number of workers for the dataloader.")
     parser.add_argument("-f", "--table_format", default="grid",
                         help="Table format: grid or latex.")
@@ -123,11 +131,12 @@ if __name__ == "__main__":
     # Create and load model.
     config = CONFIGS[args.name]
     exp = config["experiment_class"]()
-    model = exp.create_model(config, device="cuda")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = exp.create_model(config, device=device)
     load_state_from_checkpoint(
         model,
         checkpoint_path=args.checkpoint_file,
-        device="cuda"
+        device=device
     )
     print("Loaded model:\n", model)
     print()
@@ -143,9 +152,9 @@ if __name__ == "__main__":
         ]
     ]
 
-    for batch_size in [4, 16, 64, 256, 1024, 8192]:
+    for batch_size in [4, 16, 64, 256, 512, 1024, 8192]:
         throughput, run_time = profile(model, args.num_workers, args.num_runs,
-                                       batch_size)
+                                       batch_size, train=False)
         results.append([args.gpu, batch_size, args.num_workers, args.num_runs,
                         throughput, run_time])
     print(tabulate(results, headers="firstrow", tablefmt=args.table_format,
