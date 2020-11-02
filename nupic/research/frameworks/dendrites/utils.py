@@ -62,9 +62,13 @@ def plot_dendritic_activations(
     ]
     y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
 
+    # Find the range of activation values to anchor the colorbar
+    vmax = np.abs(activations).max()
+    vmin = -1.0 * vmax
+
     # Use matplotlib to plot the activation heatmap
     fig, ax = plt.subplots()
-    ax.imshow(activations, cmap="coolwarm_r")
+    ax.imshow(activations, cmap="coolwarm_r", vmin=vmin, vmax=vmax)
 
     ax.set_xticks(np.arange(num_contexts))
     ax.set_yticks(np.arange(num_dendrites))
