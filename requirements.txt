@@ -45,6 +45,8 @@ scikit-image
 seaborn>=0.9.0
 sigopt
 tabulate
+# temporary workaround to ensure torch 1.6 is installed
+torch==1.6
 torchvision==0.7.0
 tqdm
 h5py
