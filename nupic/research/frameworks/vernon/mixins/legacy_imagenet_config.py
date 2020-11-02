@@ -19,22 +19,23 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+
 import copy
 
 from nupic.research.frameworks.pytorch import datasets
-from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
-    SupervisedExperiment,
-)
+from nupic.research.frameworks.vernon import interfaces
 
 __all__ = [
-    "ImagenetExperiment",
+    "LegacyImagenetConfig",
 ]
 
 
-class ImagenetExperiment(SupervisedExperiment):
+class LegacyImagenetConfig(
+    interfaces.Experiment,  # Requires
+):
     """
-    Experiment class used to train Sparse and dense versions of Resnet50 v1.5
-    models on Imagenet dataset
+    Converts the SupervisedExperiment into the ImagenetExperiment that many
+    experiments are configured to use.
     """
     @classmethod
     def load_dataset(cls, config, train=True):

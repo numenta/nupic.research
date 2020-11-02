@@ -23,6 +23,10 @@ import cProfile
 import os
 import pstats
 
+__all__ = [
+    "Profile",
+]
+
 
 class Profile:
     """
@@ -35,22 +39,26 @@ class Profile:
 
         pr.disable()
 
-        filepath = os.path.join(self.logdir,
-                                "profile-initialization.profile")
-        pstats.Stats(pr).dump_stats(filepath)
-        self.logger.info(f"Saved {filepath}")
+        self.use_cProfile = (self.rank == 0)
+        if self.use_cProfile:
+            filepath = os.path.join(self.logdir,
+                                    "profile-initialization.profile")
+            pstats.Stats(pr).dump_stats(filepath)
+            self.logger.info(f"Saved {filepath}")
 
     def run_epoch(self):
-        pr = cProfile.Profile()
-        pr.enable()
+        if self.use_cProfile:
+            pr = cProfile.Profile()
+            pr.enable()
 
         result = super().run_epoch()
 
-        pr.disable()
-        filepath = os.path.join(self.logdir,
-                                f"profile-epoch{self.current_epoch}.profile")
-        pstats.Stats(pr).dump_stats(filepath)
-        self.logger.info(f"Saved {filepath}")
+        if self.use_cProfile:
+            pr.disable()
+            filepath = os.path.join(self.logdir,
+                                    f"profile-epoch{self.current_epoch}.profile")
+            pstats.Stats(pr).dump_stats(filepath)
+            self.logger.info(f"Saved {filepath}")
 
         return result
 

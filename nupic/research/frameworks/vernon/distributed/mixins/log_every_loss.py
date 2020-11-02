@@ -19,36 +19,39 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import copy
+import torch
+
+from nupic.research.frameworks.vernon import interfaces
+from nupic.research.frameworks.vernon.mixins.log_every_loss import (
+    LogEveryLoss as LogEveryLossBase,
+)
+
+__all__ = [
+    "LogEveryLoss",
+]
 
 
-class ExportModel:
-    """
-    Allows importing checkpoints from one type of model into another by first
-    importing it into the original model then exporting to the new model.
-    """
+class LogEveryLoss(interfaces.DistributedAggregation,  # Requires
+                   LogEveryLossBase):
     @classmethod
-    def create_model(cls, config, device):
-        prev_config = copy.copy(config["prev_config"])
-        if "checkpoint_file" in config:
-            prev_config["checkpoint_file"] = config["checkpoint_file"]
-        else:
-            print("Warning: No checkpoint_file has been specified")
+    def aggregate_results(cls, results):
+        aggregated = super().aggregate_results(results)
 
-        prev_model = super().create_model(prev_config, device)
+        k = "error_loss_history"
+        if k in aggregated:
+            loss_by_process_and_batch = torch.Tensor(len(results),
+                                                     len(results[0][k]))
+            for rank, result in enumerate(results):
+                loss_by_process_and_batch[rank, :] = torch.tensor(result[k])
+            aggregated[k] = loss_by_process_and_batch.mean(dim=0).tolist()
 
-        model_class = config["model_class"]
-        model_args = config["model_args"]
-        model = model_class(**model_args).to(device)
+        # "complexity_loss_history" doesn't need to be aggregated, since it's
+        # the same on every process.
 
-        export = config["export_model_fn"]
-        export(prev_model, model)
-
-        return model
+        return aggregated
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["create_model"].insert(0, "ExportModel: Set to create previous model")
-        eo["create_model"].append("ExportModel: Export previous modell")
+        eo["aggregate_results"].append("LogEveryLoss: Aggregate")
         return eo

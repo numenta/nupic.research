@@ -19,6 +19,22 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .cl_experiment import *
-from .meta_cl_experiment import *
-from .supervised_experiment import *
+from nupic.research.frameworks.vernon import experiments, mixins
+
+
+class RezeroedKWinnersGSCExperiment(mixins.RezeroWeights,
+                                    mixins.UpdateBoostStrength,
+                                    mixins.LoadPreprocessedData,
+                                    experiments.SupervisedExperiment):
+    pass
+
+
+class VariedRezeroedKWinnersGSCExperiment(mixins.VaryBatchSize,
+                                          RezeroedKWinnersGSCExperiment):
+    pass
+
+
+__all__ = [
+    "RezeroedKWinnersGSCExperiment",
+    "VariedRezeroedKWinnersGSCExperiment",
+]
