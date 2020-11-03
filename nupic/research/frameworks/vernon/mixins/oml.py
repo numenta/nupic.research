@@ -27,7 +27,11 @@ from torch.nn.init import kaiming_normal_, zeros_
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
+from nupic.research.frameworks.pytorch.model_utils import (
+    evaluate_model,
+    filter_params,
+    train_model,
+)
 from nupic.research.frameworks.pytorch.models import OMLNetwork
 
 
@@ -56,20 +60,38 @@ class OnlineMetaLearning(object):
             - test_train_sample_size: number of images per class to sample from for
                                      meta-testing training. The rest of the
                                      images will be used for meta-test testing.
+            - test_train_params: list of regex patterns identifying which params to
+                                 update during meta-test training
+            - output_layer_params: list of names for the output layer; if this is given
+                                   and `reset_output_params=True` these will be reset
+                                   prior to meta-test training
         """
+        super().setup_experiment(config)
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_fast_params = config.get("reset_fast_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
-        super().setup_experiment(config)
+
+        # Resolve the names of the meta-test training params.
+        assert "test_train_params" in config
+        test_train_named_params = filter_params(
+            self.model,
+            include_patterns=config["test_train_params"]
+        )
+        self.test_train_param_names = list(test_train_named_params.keys())
+
+        # Resolve the names of the output layer params.
+        if self.reset_fast_params:
+            assert "output_layer_params" in config
+        output_named_params = filter_params(
+            self.model,
+            include_names=config.get("output_layer_params", [])
+        )
+        self.output_param_names = list(output_named_params.keys())
 
     def create_loaders(self, config):
         super().create_loaders(config)
-
-        # Only initialize test loader if needed
-        if not self.run_meta_test:
-            return
 
         eval_set = self.load_dataset(config, train=False)
 
@@ -162,14 +184,14 @@ class OnlineMetaLearning(object):
             max_acc = -1000
             for lr in self.lr_sweep_range:
 
-                # Reset fast weights.
-                named_params = dict(self.get_named_fast_params())
-                params = list(named_params.values())
+                # Reset output layer weights.
                 if self.reset_fast_params:
-                    self.reset_params(params)
+                    output_params = self.get_named_output_params()
+                    self.reset_params(output_params.values())
 
                 # Meta-test training.
-                optim = Adam(params, lr=lr)
+                test_train_param = self.get_named_test_train_params()
+                optim = Adam(test_train_param.values(), lr=lr)
                 for task in new_tasks:
                     self.test_train_loader.sampler.set_active_tasks(task)
                     train_model(
@@ -222,14 +244,14 @@ class OnlineMetaLearning(object):
                 self.num_classes_eval, num_classes_learned, replace=False
             )
 
-            # Reset fast weights.
-            named_params = dict(self.get_named_fast_params())
-            params = list(named_params.values())
+            # Reset output layer weights.
             if self.reset_fast_params:
-                self.reset_params(params)
+                output_params = self.get_named_output_params()
+                self.reset_params(output_params.values())
 
             # Meta-testing training.
-            optim = Adam(params, lr=lr)
+            test_train_param = self.get_named_test_train_params()
+            optim = Adam(test_train_param.values(), lr=lr)
             for task in new_tasks:
                 self.test_train_loader.sampler.set_active_tasks(task)
                 train_model(
@@ -268,6 +290,26 @@ class OnlineMetaLearning(object):
 
         return meta_test_train_accuracies, meta_test_test_accuracies
 
+    def get_named_test_train_params(self):
+        """Filter out the params from test_train_param_names."""
+        model = self.get_model()
+        named_test_train_params = {}
+        for n, p in model.named_parameters():
+            if n in self.test_train_param_names:
+                named_test_train_params[n] = p
+
+        return named_test_train_params
+
+    def get_named_output_params(self):
+        """Filter out the params from output_param_names."""
+        model = self.get_model()
+        named_output_params = {}
+        for n, p in model.named_parameters():
+            if n in self.output_param_names:
+                named_output_params[n] = p
+
+        return named_output_params
+
     def reset_params(self, params):
         """Helper function to reinitialize params."""
         for param in params:
@@ -279,7 +321,7 @@ class OnlineMetaLearning(object):
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].insert(0, "OML additional attributes")
+        eo["setup_experiment"].append("OML meta-testing setup")
         eo["post_epoch"].append("Run meta testing phase")
         eo["create_loaders"].append("Create loaders for the meta testing phase")
 

@@ -64,6 +64,9 @@ metacl_base = dict(
     epochs=1000,
     tasks_per_epoch=10,
     adaptation_lr=0.03,
+    fast_params=["adaptation.*"],
+    test_train_params=["adaptation.*"],
+    output_layer_params=["adaptation.0.weight", "adaptation.0.bias"],
     # generic
     optimizer_class=torch.optim.Adam,
     optimizer_args=dict(lr=1e-4),
