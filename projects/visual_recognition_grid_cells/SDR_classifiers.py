@@ -26,7 +26,9 @@ import logging.config
 import torch
 import torch.nn.functional as F
 
-data_set = 'mnist'
+from sklearn.neighbors import KNeighborsClassifier
+
+data_set = 'fashion_mnist'
 shuffle_SDRs_bool = True
 
 class MLP(torch.nn.Module):
@@ -70,7 +72,7 @@ def train_net():
     #     for input_iter in len(training_labels:
     #         training_data[input_iter, :, :]
 
-    limited_samples = 1000
+    limited_samples = 50
     print("\nOnly providing " + str(limited_samples) + " for training!")
     training_data = training_data[0:limited_samples]
     training_labels = training_labels[0:limited_samples]
@@ -81,26 +83,34 @@ def train_net():
     testing_data = torch.from_numpy(np.load(data_set + '_SDRs_testing.npy'))
     testing_labels = torch.from_numpy(np.load(data_set + '_labels_testing.npy'))
 
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=1.0, momentum=0.9)
 
-    for epoch in range(1):  # loop over the dataset multiple times
 
-        optimizer.zero_grad()
+    knn = KNeighborsClassifier(n_neighbors=1)
 
-        outputs = net(training_data)
-        loss = criterion(outputs, training_labels)
-        loss.backward()
-        optimizer.step()
+    knn.fit(training_data, training_labels)
 
-        training_acc = 100*(torch.sum(torch.argmax(outputs, dim=1)==training_labels)).item()/len(training_labels)
-        print("\nEpoch:" + str(epoch))
-        print("Training accuracy is " + str(training_acc))
+    print("Accuracy of knn " + str(knn.score(testing_data, testing_labels)))
 
-        testing_acc = 100*(torch.sum(torch.argmax(net(testing_data), dim=1)==testing_labels)).item()/len(testing_labels)
-        print("Testing accuracy is " + str(testing_acc))
+    # criterion = torch.nn.CrossEntropyLoss()
+    # optimizer = torch.optim.SGD(net.parameters(), lr=1.0, momentum=0.9)
 
-    print('Finished Training')
+    # for epoch in range(1):  # loop over the dataset multiple times
+
+    #     optimizer.zero_grad()
+
+    #     outputs = net(training_data)
+    #     loss = criterion(outputs, training_labels)
+    #     loss.backward()
+    #     optimizer.step()
+
+    #     training_acc = 100*(torch.sum(torch.argmax(outputs, dim=1)==training_labels)).item()/len(training_labels)
+    #     print("\nEpoch:" + str(epoch))
+    #     print("Training accuracy is " + str(training_acc))
+
+    #     testing_acc = 100*(torch.sum(torch.argmax(net(testing_data), dim=1)==testing_labels)).item()/len(testing_labels)
+    #     print("Testing accuracy is " + str(testing_acc))
+
+    # print('Finished Training')
 
 if __name__ == '__main__':
     train_net()
