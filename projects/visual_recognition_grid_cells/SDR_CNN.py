@@ -44,7 +44,7 @@ BOOST_STRENGTH = 20.0
 
 CROSS_VAL = True # If true, use cross-validation subset of training data
 CROSS_VAL_SPLIT = 0.1
-DATASET = 'mnist'
+DATASET = 'fashion_mnist'
 
 LEARNING_RATE = 0.01
 MOMENTUM = 0.5
@@ -123,9 +123,9 @@ def test(model, loader, test_size, criterion, epoch, test_data_bool):
         plt.ylabel('Count')
         plt.xlim(0,0.6)
         plt.ylim(0,70)
-        plt.show()
-        # plt.savefig('duty_cycle_boost_' + str(BOOST_STRENGTH) + '_' + str(epoch) + '.png')
-        # plt.clf()
+        # plt.show()
+        plt.savefig('duty_cycle_boost_' + str(BOOST_STRENGTH) + '_' + str(epoch) + '.png')
+        plt.clf()
 
         all_SDRs = np.concatenate(all_SDRs, axis=0)
         all_labels = np.concatenate(all_labels, axis=0)
@@ -193,7 +193,7 @@ class sdr_cnn_base(nn.Module):
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
         x = self.k_winner(x)
-        print(np.shape(x))
+        # print(np.shape(x))
         x = x.view(-1, 5*5*128)
         x = (x>0).float()
 
@@ -206,31 +206,40 @@ sdr_cnn.to(device)
 print("Loading data-sets")
 
 if DATASET == 'mnist':
+    print("Using MNIST data-set")
     normalize = transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])
     train_dataset = datasets.MNIST('data', train=True, download=True, transform=normalize)
-    traing_len = len(train_dataset)
+    test_dataset = datasets.MNIST('data', train=True, download=True, transform=normalize)
 
-    if CROSS_VAL == True:
-        print("Using hold-out cross-validation data-set for evaluating model")
-        indices = range(traing_len)
-        val_split = int(np.floor(CROSS_VAL_SPLIT*traing_len))
-        train_idx, test_idx = indices[val_split:], indices[:val_split]
-        # print(train_idx[0:10])
-        # print(test_idx[0:10])
-        # print(train_dataset.train_labels[train_idx][0:10])
-        # print(train_dataset.train_labels[test_idx][0:10])
-        # exit()
-        test_dataset = datasets.MNIST('data', train=True, download=True, transform=normalize)
-
-    elif CROSS_VAL == False:
-        assert 1 == 0, "Not implemented"
-        test_dataset = datasets.MNIST('data', train=False, transform=normalize)
-
-    train_sampler = SequentialSubSampler(train_idx)
-    test_sampler = SequentialSubSampler(test_idx)
+elif DATASET == 'fashion_mnist':
+    print("Using Fashion-MNIST data-set")
+    normalize = transforms.ToTensor()
+    train_dataset = datasets.FashionMNIST('data', train=True, download=True, transform=normalize)
+    test_dataset = datasets.FashionMNIST('data', train=True, download=True, transform=normalize)
 
 
-# elif DATASET == 'fashion_mnist':
+traing_len = len(train_dataset)
+
+if CROSS_VAL == True:
+    print("Using hold-out cross-validation data-set for evaluating model")
+    indices = range(traing_len)
+    val_split = int(np.floor(CROSS_VAL_SPLIT*traing_len))
+    train_idx, test_idx = indices[val_split:], indices[:val_split]
+    # print(train_idx[0:10])
+    # print(test_idx[0:10])
+    # print(train_dataset.train_labels[train_idx][0:10])
+    # print(train_dataset.train_labels[test_idx][0:10])
+    # exit()
+
+elif CROSS_VAL == False:
+    assert 1 == 0, "Not implemented"
+
+train_sampler = SequentialSubSampler(train_idx)
+test_sampler = SequentialSubSampler(test_idx)
+
+
+
+
 # *** need to fix normalizaiton ***
 #     normalize = transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])
 #     train_dataset = datasets.FashionMNIST('data', train=True, download=True, transform=normalize)

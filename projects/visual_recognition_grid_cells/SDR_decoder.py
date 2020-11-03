@@ -37,24 +37,12 @@ import inspect
 torch.manual_seed(18)
 np.random.seed(18)
 
-data_set = 'mnist'
-train_net_bool = True
+data_set = 'fashion_mnist'
+train_net_bool = False
 CROSS_VAL = True # If true, use cross-validation subset of training data
 CROSS_VAL_SPLIT = 0.1
 num_epochs = 10
 batch_size = 64
-
-# if data_set == 'mnist':
-#     training_sources = datasets.MNIST('data', train=True, download=True).train_data.float()
-#     testing_sources = datasets.MNIST('data', train=False, download=True).test_data.float()
-# elif data_set == 'fashion_mnist':
-#     training_sources = datasets.FashionMNIST('data', train=True, download=True).train_data.float()
-#     testing_sources = datasets.FashionMNIST('data', train=False, download=True).test_data.float()
-
-# print(np.shape(testing_sources))
-# np.save("mnist_images_training", training_sources)
-# np.save("mnist_images_testing", testing_sources)
-# exit()
 
 
 class cnn_decoder(torch.nn.Module):
@@ -66,13 +54,13 @@ class cnn_decoder(torch.nn.Module):
         self.deconv2 = nn.ConvTranspose2d(32, 1, 5, stride=1)
 
     def forward(self, x):
-        print(np.shape(x))
+        # print(np.shape(x))
         x = x.view(-1, 5, 5, 128)
         x = self.unpool1(x)
         x = self.deconv1(x)
         x = self.unpool2(x)
         x = self.deconv1(x)
-        print(np.shape(x))
+        # print(np.shape(x))
 
         return x
 
@@ -102,34 +90,43 @@ def initialize():
 
     #Note the 'sources' are the original image that needs to be reconstructed
 
-    # if data_set == 'mnist':
-    #     training_sources = datasets.MNIST('data', train=True, download=True).train_data.float()
-    #     testing_sources = datasets.MNIST('data', train=False, download=True).test_data.float()
+    print("\nNot normalizing data\n")
+    normalize = None
 
     if data_set == 'mnist':
-        # print("\nUsing normalization\n")
-        # normalize = transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])
-        print("\nNot normalizing data\n")
-        normalize = None
 
+        print("Using MNIST data-set")
         training_sources = datasets.MNIST('data', train=True, download=True, transform=normalize).train_data.float()/255
 
-        traing_len = len(training_sources)
+    elif data_set == 'fashion_mnist':
 
-        if CROSS_VAL == True:
-            print("Using hold-out cross-validation data-set for evaluating model")
-            indices = range(traing_len) 
-            val_split = int(np.floor(CROSS_VAL_SPLIT*traing_len))
-            train_idx, test_idx = indices[val_split:], indices[:val_split]
-            training_sources = training_sources[train_idx]
+        print("Using Fashion-MNIST data-set")
+        training_sources = datasets.FashionMNIST('data', train=True, download=True, transform=normalize).train_data.float()/255
+
+    traing_len = len(training_sources)
+
+    if CROSS_VAL == True:
+        print("Using hold-out cross-validation data-set for evaluating model")
+        indices = range(traing_len) 
+        val_split = int(np.floor(CROSS_VAL_SPLIT*traing_len))
+        train_idx, test_idx = indices[val_split:], indices[:val_split]
+        training_sources = training_sources[train_idx]
+
+        if data_set == 'mnist':
 
             training_labels_comparison = datasets.MNIST('data', train=True, download=True, transform=normalize).train_labels[train_idx]
             testing_sources = datasets.MNIST('data', train=True, download=True, transform=normalize).train_data.float()[test_idx]/255
             testing_labels_comparison = datasets.MNIST('data', train=True, download=True, transform=normalize).train_labels[test_idx]
 
-        elif CROSS_VAL == False:
-            assert 1 == 0, "Not implemented"
-            testing_sources = datasets.MNIST('data', train=False, transform=normalize).train_data.float()
+        elif data_set == 'fashion_mnist':
+
+            training_labels_comparison = datasets.FashionMNIST('data', train=True, download=True, transform=normalize).train_labels[train_idx]
+            testing_sources = datasets.FashionMNIST('data', train=True, download=True, transform=normalize).train_data.float()[test_idx]/255
+            testing_labels_comparison = datasets.FashionMNIST('data', train=True, download=True, transform=normalize).train_labels[test_idx]
+
+
+    elif CROSS_VAL == False:
+        assert 1 == 0, "Not implemented"
 
     print("Inputs")
     print(np.shape(training_input))
@@ -145,8 +142,8 @@ def initialize():
     testing_labels = torch.from_numpy(np.load(data_set + '_labels_testing.npy'))
 
 
-    np.save("mnist_images_training", training_sources)
-    np.save("mnist_images_testing", testing_sources)
+    np.save(data_set + "_images_training", training_sources)
+    np.save(data_set + "_images_testing", testing_sources)
 
     print("Labels")
     print(np.shape(training_labels))
