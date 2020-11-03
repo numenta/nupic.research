@@ -32,7 +32,6 @@ from nupic.research.frameworks.pytorch.model_utils import (
     filter_params,
     train_model,
 )
-from nupic.research.frameworks.pytorch.models import OMLNetwork
 
 
 class OnlineMetaLearning(object):
@@ -49,6 +48,9 @@ class OnlineMetaLearning(object):
             - run_meta_test: whether or not to run the meta-testing phase
             - reset_output_params: whether to reset (i.e. re-init) the output layer
                                    params prior to meta-test training
+            - reset_task_params: whether to reset (i.e. re-init) the output layer
+                                 params corresponding to a given task, prior to
+                                 meta-train training on that task
             - lr_sweep_range: list of learning rates to attempt meta-test training.
                               The best one, according to the meta-test test set,
                               will be chosen and used for the meta-testing phase.
@@ -69,6 +71,7 @@ class OnlineMetaLearning(object):
         super().setup_experiment(config)
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_output_params = config.get("reset_output_params", True)
+        self.reset_task_params = config.get("reset_task_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
@@ -144,6 +147,19 @@ class OnlineMetaLearning(object):
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
         )
+
+    def pre_task(self, tasks):
+        """Re-initialize task params prior to meta-train training."""
+        super().pre_task(tasks)
+        if not self.reset_task_params:
+            return
+
+        output_params = self.get_named_output_params().values()
+        for p in output_params:
+            if p.dim() == 2:
+                for t in tasks:
+                    task_weights = p[t, :].unsqueeze(0)
+                    nn.init.kaiming_normal_(task_weights)
 
     def post_epoch(self):
         super().post_epoch()
@@ -324,33 +340,6 @@ class OnlineMetaLearning(object):
         eo["setup_experiment"].append("OML meta-testing setup")
         eo["post_epoch"].append("Run meta testing phase")
         eo["create_loaders"].append("Create loaders for the meta testing phase")
+        eo["pre_task"].append("Reset the output params for upcoming tasks.")
 
-        return eo
-
-
-class ResetOMLTaskParams(object):
-    """
-    Reset the task parameters, within the output layer weights,
-    prior to training over those tasks. The mixin must be used with
-    the `OMLNetwork`.
-    """
-
-    def setup_experiment(self, config):
-        super().setup_experiment(config)
-        model = self.get_model()
-        assert isinstance(model, OMLNetwork)
-
-    def pre_task(self, tasks):
-        super().pre_task(tasks)
-        model = self.get_model()
-        for t in tasks:
-            task_weights = model.adaptation[0].weight[t, :].unsqueeze(0)
-            nn.init.kaiming_normal_(task_weights)
-
-    @classmethod
-    def get_execution_order(cls):
-        eo = super().get_execution_order()
-        name = "ResetOMLTaskParams"
-        eo["setup_experiment"].append(name + ": Ensure use of OMLNetwork.")
-        eo["pre_task"].append(name + ": Reset the output params for upcoming tasks.")
         return eo
