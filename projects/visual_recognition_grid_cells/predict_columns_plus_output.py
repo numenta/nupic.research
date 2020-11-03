@@ -37,7 +37,6 @@ from SDR_decoder import mlp_decoder
 torch.manual_seed(18)
 np.random.seed(18)
 
-NUM_OBJECTS = 100
 DATA_SET = 'mnist'
 
 def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, numSensationsToInference, ground_truth):
@@ -191,7 +190,7 @@ if __name__ == '__main__':
     net = mlp_decoder().double()
     net.load_state_dict(torch.load('saved_networks/' + DATA_SET + '_decoder.pt'))
 
-    for object_iter in range(NUM_OBJECTS):
+    for object_iter in range(len(object_prediction_sequences)):
 
         current_object = object_prediction_sequences[object_iter]
 
