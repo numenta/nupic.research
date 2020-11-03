@@ -126,6 +126,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         assert "fast_params" in config
         fast_named_params = filter_params(self.model, config["fast_params"])
         self.fast_param_names = list(fast_named_params.keys())
+        self.logger.info(f"Setup: fast_param_names={self.fast_param_names}")
 
         if self.num_fast_steps > len(self.train_fast_loader):
             self.logger.warning(

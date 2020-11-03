@@ -83,6 +83,7 @@ class OnlineMetaLearning(object):
             include_patterns=config["test_train_params"]
         )
         self.test_train_param_names = list(test_train_named_params.keys())
+        self.logger.info(f"Setup: test_train_param_names={self.test_train_param_names}")
 
         # Resolve the names of the output layer params.
         if self.reset_output_params:
@@ -92,6 +93,7 @@ class OnlineMetaLearning(object):
             include_names=config.get("output_layer_params", [])
         )
         self.output_param_names = list(output_named_params.keys())
+        self.logger.info(f"Setup: output_param_names={self.output_param_names}")
 
     def create_loaders(self, config):
         super().create_loaders(config)
