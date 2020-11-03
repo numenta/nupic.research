@@ -150,8 +150,8 @@ metacl_oml_replicate_metatest.update(
     # Setup the meta-testing phase and allow it to run.
     run_meta_test=True,
 
-    # This resets the fast params (in this case the output layer of the OMLNetwork)
-    reset_fast_params=True,
+    # This resets the output layer params prior to meta-test training.
+    reset_output_params=True,
 
     # Results reported over 15 sampled.
     test_train_sample_size=15,

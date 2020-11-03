@@ -47,8 +47,8 @@ class OnlineMetaLearning(object):
         :param config: Dictionary containing the configuration parameters
 
             - run_meta_test: whether or not to run the meta-testing phase
-            - reset_fast_params: whether to reset (i.e. re-init) the fast
-                                 params prior to meta-test training
+            - reset_output_params: whether to reset (i.e. re-init) the output layer
+                                   params prior to meta-test training
             - lr_sweep_range: list of learning rates to attempt meta-test training.
                               The best one, according to the meta-test test set,
                               will be chosen and used for the meta-testing phase.
@@ -68,7 +68,7 @@ class OnlineMetaLearning(object):
         """
         super().setup_experiment(config)
         self.run_meta_test = config.get("run_meta_test", False)
-        self.reset_fast_params = config.get("reset_fast_params", True)
+        self.reset_output_params = config.get("reset_output_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
@@ -82,7 +82,7 @@ class OnlineMetaLearning(object):
         self.test_train_param_names = list(test_train_named_params.keys())
 
         # Resolve the names of the output layer params.
-        if self.reset_fast_params:
+        if self.reset_output_params:
             assert "output_layer_params" in config
         output_named_params = filter_params(
             self.model,
@@ -185,7 +185,7 @@ class OnlineMetaLearning(object):
             for lr in self.lr_sweep_range:
 
                 # Reset output layer weights.
-                if self.reset_fast_params:
+                if self.reset_output_params:
                     output_params = self.get_named_output_params()
                     self.reset_params(output_params.values())
 
@@ -245,7 +245,7 @@ class OnlineMetaLearning(object):
             )
 
             # Reset output layer weights.
-            if self.reset_fast_params:
+            if self.reset_output_params:
                 output_params = self.get_named_output_params()
                 self.reset_params(output_params.values())
 
