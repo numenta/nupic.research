@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from copy import deepcopy
+from collections.abc import Sequence
 
 
 class VaryBatchSize(object):
@@ -33,66 +33,39 @@ class VaryBatchSize(object):
     """
 
     def setup_experiment(self, config):
-
-        super().setup_experiment(config)
-
         # Get and validate batch sizes.
         batch_sizes = config.get("batch_sizes", None)
-        assert isinstance(batch_sizes, list), "Must specify list of batch sizes"
+        assert isinstance(batch_sizes, Sequence), "Must specify list of batch sizes"
+        super().setup_experiment(
+            {**config, "batch_size": batch_sizes[0]}
+        )
+
+        self.config = config
         self.batch_sizes = batch_sizes
 
-        # super() will set up a loader for the first batch size. Now the remaining..
-        train_set = self.train_loader.dataset
+        # super() set up a loader for the first batch size.
+        self.logger.info("Setting batch_size=%s (variant 0)",
+                         self.train_loader.batch_size)
 
-        self.train_loaders = [self.train_loader]
-        for i in range(1, len(batch_sizes)):
-            self.train_loaders.append(self.create_train_dataloader(
-                config=config, dataset=train_set, batch_size_variant=i
-            ))
-
-        self.current_batch_size_variant = 0
-        self.batch_size = self.train_loader.batch_size
-        self.logger.info("Setting batch_size={} (variant {})".format(
-            self.batch_size, self.current_batch_size_variant
-        ))
-
-    def post_epoch(self):
+    def pre_epoch(self):
         """
-        Set the next train dataloader to set the next batch-size.
+        Set the train dataloader to the appropriate batch size.
         """
-        super().post_epoch()
-        i = self.current_batch_size_variant
-        self.current_batch_size_variant = min(i + 1, len(self.train_loaders) - 1)
-        self.train_loader = self.train_loaders[self.current_batch_size_variant]
-        self.batch_size = self.train_loader.batch_size
-        self.logger.info("Setting batch_size={} (variant {})".format(
-            self.batch_size, self.current_batch_size_variant
-        ))
+        super().pre_epoch()
+        if 0 < self.current_epoch < len(self.batch_sizes):
+            batch_size = self.batch_sizes[self.current_epoch]
+            self.train_loader = self.create_train_dataloader(
+                {**self.config, "batch_size": batch_size}
+            )
 
-    @classmethod
-    def create_train_dataloader(cls, config, dataset=None, batch_size_variant=0):
-        """
-        Create a train dataloader based off `batch_size_variant` if multiple
-        batch_sizes are specified.
-        """
-        batch_sizes = config.get("batch_sizes", None)
-
-        # Ensure batch_sizes is a list.
-        assert isinstance(batch_sizes, list), "Must specify list of batch sizes"
-        assert batch_size_variant < len(batch_sizes)
-
-        # Set the batch size to the desired variant.
-        batch_size = batch_sizes[batch_size_variant]
-        config = deepcopy(config)
-        config.update(batch_size=batch_size)
-
-        return super().create_train_dataloader(config=config, dataset=dataset)
+            self.logger.info("Setting batch_size=%s (variant %s)", batch_size,
+                             self.current_epoch)
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         name = "VaryBatchSize: "
-        eo["setup_experiment"].append(name + "load one train dataloader per batch-size")
-        eo["create_train_dataloader"].append(name + "create with varied batch size")
-        eo["post_epoch"].append(name + "set the next dataloader and batch-size")
+        eo["setup_experiment"].insert(0, name + "set initial batch size")
+        eo["setup_experiment"].append(name + "initialization")
+        eo["pre_epoch"].append(name + "set the dataloader and batch-size")
         return eo

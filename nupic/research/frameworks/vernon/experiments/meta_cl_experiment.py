@@ -112,10 +112,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.adaptation_lr = config.get("adaptation_lr", 0.03)
 
-        self.batch_size = config.get("batch_size", 5)
-        self.val_batch_size = config.get("val_batch_size", 15)
-        self.slow_batch_size = config.get("slow_batch_size", 64)
-        self.replay_batch_size = config.get("replay_batch_size", 64)
         self.num_fast_steps = config.get("num_fast_steps", 1)
 
         if self.num_fast_steps > len(self.train_fast_loader):
