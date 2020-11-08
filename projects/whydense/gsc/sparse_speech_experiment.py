@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 import logging
 import os
+import pprint
 import time
 
 import torch
@@ -62,8 +63,12 @@ class SparseSpeechExperiment(object):
     def __init__(self, config):
         """Called once at the beginning of each experiment."""
         self.start_time = time.time()
+        console = logging.StreamHandler()
+        console.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
         self.logger = get_logger(config["name"], config.get("verbose", 2))
-        self.logger.debug("Config: %s", config)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.info("Logged Config: %s", config)
+        pprint.pprint(config)
 
         # Setup random seed
         seed = config["seed"]
@@ -81,7 +86,7 @@ class SparseSpeechExperiment(object):
         self.background_noise_dir = config["background_noise_dir"]
         self.noise_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
 
-        self.load_datasets()
+        self.load_datasets(num_workers=config.get("num_workers", 4))
 
         if self.model_type == "le_sparse":
             model = LeSparseNet(
@@ -133,6 +138,8 @@ class SparseSpeechExperiment(object):
             model = torch.nn.DataParallel(model)
 
         self.model = model
+        print(self.model)
+        print("Model non-zero params: ", count_nonzero_params(self.model))
         self.logger.debug("Model: %s", self.model)
         self.logger.debug("Model non-zero params: %s", count_nonzero_params(self.model))
         self.learning_rate = config["learning_rate"]
@@ -209,7 +216,7 @@ class SparseSpeechExperiment(object):
             "Learning rate: %s",
             self.learning_rate
             if self.lr_scheduler is None
-            else self.lr_scheduler.get_lr(),
+            else self.lr_scheduler.get_last_lr(),
         )
 
         self.pre_epoch()
@@ -243,6 +250,8 @@ class SparseSpeechExperiment(object):
             "entropy": float(entropy),
             "total_samples": len(test_loader.sampler),
             "non_zero_parameters": count_nonzero_params(self.model)[1],
+            "learning_rate": self.learning_rate if self.lr_scheduler is None
+                               else self.lr_scheduler.get_last_lr(),
         })
 
         return ret
@@ -276,7 +285,7 @@ class SparseSpeechExperiment(object):
             ret[noise] = self.test(self.test_loader)
         return ret
 
-    def load_datasets(self):
+    def load_datasets(self, num_workers=4):
         """
         GSC specifies specific files to be used as training, test, and validation.
 
@@ -301,13 +310,16 @@ class SparseSpeechExperiment(object):
         )
 
         self.train_loader = DataLoader(
-            train_dataset, batch_size=self.batch_size, shuffle=True
+            train_dataset, batch_size=self.batch_size, shuffle=True,
+            num_workers = num_workers
         )
 
         self.validation_loader = DataLoader(
-            validation_dataset, batch_size=self.batch_size, shuffle=False
+            validation_dataset, batch_size=self.batch_size, shuffle=False,
+            num_workers=num_workers
         )
 
         self.test_loader = DataLoader(
-            test_dataset, batch_size=self.batch_size, shuffle=False
+            test_dataset, batch_size=self.batch_size, shuffle=False,
+            num_workers=num_workers
         )
