@@ -88,10 +88,11 @@ def omniglot(root, train=True, download=True, transform=None, target_transform=N
         creates from the "evaluation" set.
         Background contains 964 classes, and evaluation 659 classes, all unique
     """
-    if train:
-        transform = base_transform_with_resize(*DATASETS_STATS["Omniglot_bg"])
-    else:
-        transform = base_transform_with_resize(*DATASETS_STATS["Omniglot_eval"])
+    if transform is None:
+        if train:
+            transform = base_transform_with_resize(*DATASETS_STATS["Omniglot_bg"])
+        else:
+            transform = base_transform_with_resize(*DATASETS_STATS["Omniglot_eval"])
 
     dataset_class = datasets.Omniglot
     root = os.path.expanduser(root)
