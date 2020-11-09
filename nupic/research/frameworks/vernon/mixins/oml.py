@@ -59,13 +59,13 @@ class OnlineMetaLearning(object):
                                      meta-testing training. The rest of the
                                      images will be used for meta-test testing.
         """
+        super().setup_experiment(config)
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_fast_params = config.get("reset_fast_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
         self.num_meta_test_classes = config.get("num_meta_test_classes", [10, 50, 100, 200, 600])
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
-        super().setup_experiment(config)
 
     def create_loaders(self, config):
         super().create_loaders(config)
