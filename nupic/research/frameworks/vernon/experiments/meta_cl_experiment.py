@@ -228,9 +228,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.optimizer.zero_grad()
 
-        # Clone model - clone fast params and the slow params. The latter will be frozen
-        cloned_adaptation_net = self.clone_model()
-
         # Sample tasks for inner loop.
         tasks_train = np.random.choice(
             self.num_classes, self.tasks_per_epoch, replace=False
@@ -238,6 +235,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # Run pre_task; For instance, may reset parameters as needed.
         self.pre_task(tasks_train)
+
+        # Clone model - clone fast params and the slow params. The latter will be frozen
+        cloned_adaptation_net = self.clone_model()
 
         # Inner loop: Train over sampled tasks.
         for task in tasks_train:
