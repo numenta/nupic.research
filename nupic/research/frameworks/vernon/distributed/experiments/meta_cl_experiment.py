@@ -57,7 +57,10 @@ class MetaContinualLearningExperiment(DistributedBase,
     def pre_epoch(self):
         super().pre_epoch()
         if self.distributed:
-            self.train_loader.sampler.set_epoch(self.current_epoch)
+            self.train_fast_loader.sampler.set_epoch(self.current_epoch)
+            self.train_slow_loader.sampler.set_epoch(self.current_epoch)
+            self.train_replay_loader.sampler.set_epoch(self.current_epoch)
+            self.val_fast_loader.sampler.set_epoch(self.current_epoch)
 
     @classmethod
     def update_params(cls, named_params, model, loss, lr, distributed=False):
