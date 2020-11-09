@@ -142,6 +142,12 @@ class OnlineMetaLearning(object):
                 print("Meta-test training accuracies:", test_train_accs)
                 print("Meta-test tests accuracies:", test_test_accs)
 
+    def pre_meta_test_run(self, run_num):
+        """Call set_epoch for the distributed samplers."""
+        if self.distributed:
+            self.test_train_loader.sampler.set_epoch(run_num)
+            self.test_test_loader.sampler.set_epoch(run_num)
+
     def find_best_lr(self, num_classes_learned):
         """
         This is a simple hyper-parameter search for a good lr:
@@ -155,7 +161,9 @@ class OnlineMetaLearning(object):
         lr_all = []
 
         # Grid search over lr
-        for _lr_search_runs in range(0, self.num_lr_search_runs):
+        for lr_search_runs in range(0, self.num_lr_search_runs):
+
+            self.pre_meta_test_run(lr_search_runs)
 
             # Choose num_classes_learned random classes to train and then test on.
             new_tasks = np.random.choice(
@@ -176,7 +184,7 @@ class OnlineMetaLearning(object):
                 for task in new_tasks:
                     self.test_train_loader.sampler.set_active_tasks(task)
                     train_model(
-                        model=self.model.module,
+                        model=self.get_model(),
                         loader=self.test_train_loader,
                         optimizer=optim,
                         device=self.device,
@@ -186,7 +194,7 @@ class OnlineMetaLearning(object):
                 # Meta-test testing.
                 self.test_test_loader.sampler.set_active_tasks(new_tasks)
                 results = evaluate_model(
-                    model=self.model.module,
+                    model=self.get_model(),
                     loader=self.test_test_loader,
                     device=self.device,
                     criterion=self._loss_function,
@@ -218,7 +226,9 @@ class OnlineMetaLearning(object):
 
         meta_test_test_accuracies = []
         meta_test_train_accuracies = []
-        for _current_run in range(0, self.num_meta_testing_runs):
+        for meta_test_run in range(0, self.num_meta_testing_runs):
+
+            self.pre_meta_test_run(meta_test_run)
 
             # Choose num_classes_learned random classes to train and then test on.
             new_tasks = np.random.choice(
@@ -236,7 +246,7 @@ class OnlineMetaLearning(object):
             for task in new_tasks:
                 self.test_train_loader.sampler.set_active_tasks(task)
                 train_model(
-                    model=self.model.module,
+                    model=self.get_model(),
                     loader=self.test_train_loader,
                     optimizer=optim,
                     device=self.device,
@@ -259,7 +269,7 @@ class OnlineMetaLearning(object):
             # Meta-testing testing (using the test-train set).
             self.test_train_loader.sampler.set_active_tasks(new_tasks)
             results = evaluate_model(
-                model=self.model.module,
+                model=self.get_model(),
                 loader=self.test_train_loader,
                 device=self.device,
                 criterion=self._loss_function,
