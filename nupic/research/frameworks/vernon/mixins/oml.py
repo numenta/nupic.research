@@ -48,6 +48,8 @@ class OnlineMetaLearning(object):
             - lr_sweep_range: list of learning rates to attempt meta-test training.
                               The best one, according to the meta-test test set,
                               will be chosen and used for the meta-testing phase.
+            - num_meta_test_classes: list of number of classes to train and test over
+                                     for meta-testing
             - num_lr_search_runs: number of runs to attempt an lr-sweep. The one that
                                   achieves the highest test-test accuracy the most
                                   times, i.e. the mode, will be chosen for the
@@ -60,6 +62,7 @@ class OnlineMetaLearning(object):
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_fast_params = config.get("reset_fast_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
+        self.num_meta_test_classes = config.get("num_meta_test_classes", [10, 50, 100, 200, 600])
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
         super().setup_experiment(config)
@@ -127,7 +130,7 @@ class OnlineMetaLearning(object):
         super().post_epoch()
         if self.should_stop() and self.run_meta_test:
             # meta-training phase complete, perform meta-testing phase
-            for num_classes_learned in [10, 50, 100, 200, 600]:
+            for num_classes_learned in self.num_meta_test_classes:
                 if num_classes_learned > self.num_classes_eval:
                     break
 
