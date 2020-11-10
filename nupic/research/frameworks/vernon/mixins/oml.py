@@ -22,6 +22,7 @@
 import numpy as np
 import torch
 from scipy import stats
+from tabulate import tabulate
 from torch import nn
 from torch.nn.init import kaiming_normal_, zeros_
 from torch.optim import Adam
@@ -63,9 +64,10 @@ class OnlineMetaLearning(object):
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_fast_params = config.get("reset_fast_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
-        self.num_meta_test_classes = config.get("num_meta_test_classes", [10, 50, 100, 200, 600])
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
+        self.num_meta_test_classes = config.get("num_meta_test_classes",
+                                                [10, 50, 100, 200, 600])
 
     def create_loaders(self, config):
         super().create_loaders(config)
@@ -124,19 +126,38 @@ class OnlineMetaLearning(object):
 
     def post_epoch(self):
         super().post_epoch()
-        if self.should_stop() and self.run_meta_test:
-            # meta-training phase complete, perform meta-testing phase
-            for num_classes_learned in self.num_meta_test_classes:
-                if num_classes_learned > self.num_classes_eval:
+        if self.current_epoch >= self.epochs - 1 and self.run_meta_test:
+
+            # Accumulate results.
+            table = []
+            headers = ["Num Classes", "Meta-test test", "Meta-test train", "LR"]
+
+            # Meta-training phase complete, perform meta-testing phase
+            for num_classes in self.num_meta_test_classes:
+                if num_classes > self.num_classes_eval:
                     break
 
-                # TODO log results in addition to simply printing them to stdout
-                results = self.run_meta_testing_phase(num_classes_learned)
-                test_train_accs, test_test_accs = results
-                print("Accuracy for meta-testing phase over"
-                      f" {num_classes_learned} num classes.")
-                print("Meta-test training accuracies:", test_train_accs)
-                print("Meta-test tests accuracies:", test_test_accs)
+                # TODO: log results in addition to simply printing them to stdout
+                results = self.run_meta_testing_phase(num_classes)
+                test_train_accs, test_test_accs, lr = results
+
+                print(f"Accuracy for meta-testing phase over {num_classes} num classes.")
+
+                mu_test = np.mean(test_test_accs)
+                sd_test = np.std(test_test_accs)
+                mu_train = np.mean(test_train_accs)
+                sd_train = np.std(test_train_accs)
+                test_acc_str = f"{mu_test:0.2f} ± {sd_test:0.2f}"
+                train_acc_str = f"{mu_train:0.2f} ± {sd_train:0.2f}"
+
+                print(f"  test accs: {test_acc_str}")
+                print(f"  train accs: {train_acc_str}")
+                print()
+
+                table.append((num_classes, test_acc_str, train_acc_str, lr))
+
+            print("Meta-testing results:")
+            print(tabulate(table, headers=headers, tablefmt="pipe"))
 
     def find_best_lr(self, num_classes_learned):
         """
@@ -210,7 +231,6 @@ class OnlineMetaLearning(object):
         """
 
         lr = self.find_best_lr(num_classes_learned)
-        print(f"Found best lr={lr} for num_classes_learned={num_classes_learned}")
 
         meta_test_test_accuracies = []
         meta_test_train_accuracies = []
@@ -265,7 +285,7 @@ class OnlineMetaLearning(object):
             acc = correct / len(self.test_train_loader.sampler.indices)
             meta_test_train_accuracies.append(acc)
 
-        return meta_test_train_accuracies, meta_test_test_accuracies
+        return meta_test_train_accuracies, meta_test_test_accuracies, lr
 
     def reset_params(self, params):
         """Helper function to reinitialize params."""
