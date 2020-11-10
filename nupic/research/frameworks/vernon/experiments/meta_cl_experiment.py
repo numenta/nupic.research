@@ -160,7 +160,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     @classmethod
     def create_replay_sampler(cls, config, dataset):
         """Sampler used to augment meta-train testing; "replays" previous classes."""
-        class_indices = cls.compute_class_indices(config, dataset, mode="replay")
+        class_indices = cls.compute_class_indices(config, dataset, mode="all")
         return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
@@ -188,6 +188,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 class_indices[c] = class_indices[c][sample_size:]
         elif mode == "all":
             pass
+        else:
+            raise ValueError(f"Received unexpected mode: {mode}")
 
         return class_indices
 
