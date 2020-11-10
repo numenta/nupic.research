@@ -469,6 +469,72 @@ def _get_sub_module(module, name):
         return getattr(module, name)
 
 
+def filter_params(
+    model,
+    include_modules=None,
+    include_names=None,
+    include_patterns=None,
+):
+    """
+    This iterates through all a models parameters and returns a list of tuples (name,
+    param) for those matches any one of the following conditions
+        1. The param belongs to a module within 'include_modules'
+        2. The param has a name contained in 'include_names'
+        3. The param matches a regex pattern contained in 'include_patterns'
+
+    The regex macthing uses re.match which identifies whether zero or more characters at
+    the beginning of the param name match the regular expression pattern given.
+
+    Example:
+    ```
+    model = resnet50()
+    filter_params(
+        model,
+        include_modules=torch.nn.Linear,
+        include_names=["features.stem.weight"],
+        include_patterns=["features.*bn\\d"]
+    )
+    ```
+    """
+
+    include_modules = include_modules or []
+    include_names = include_names or []
+    include_patterns = include_patterns or []
+    assert isinstance(include_names, list)
+    assert isinstance(include_patterns, list)
+    assert isinstance(include_modules, list)
+
+    # Identify parameter pointers for all matching modules.
+    include_data_ptrs = []
+    if len(include_modules) > 0:
+        include_modules = tuple(include_modules)
+        for module in model.modules():
+            if isinstance(module, include_modules):
+                for param in module.parameters():
+                    include_data_ptrs.append(param.data_ptr())
+
+    filtered_named_params = dict()
+    for name, param in model.named_parameters():
+
+        # Case 1: The module matches
+        if param.data_ptr() in include_data_ptrs:
+            filtered_named_params[name] = param
+            continue
+
+        # Case 2: The name is in the white-list.
+        if name in include_names:
+            filtered_named_params[name] = param
+            continue
+
+        # Case 3: The name matches one of the allowed patterns.
+        for pattern in include_patterns:
+            if _is_match(pattern, name):
+                filtered_named_params[name] = param
+                continue
+
+    return filtered_named_params
+
+
 def _is_match(pattern, string):
 
     try:

@@ -29,7 +29,6 @@ from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mi
 
 
 class OMLExperiment(mixins.OnlineMetaLearning,
-                    mixins.ResetOMLTaskParams,
                     MetaContinualLearningExperiment):
     pass
 
@@ -64,6 +63,8 @@ metacl_base = dict(
     epochs=1000,
     tasks_per_epoch=10,
     adaptation_lr=0.03,
+    fast_params=["adaptation.*"],
+    test_train_params=["adaptation.*"],
     # generic
     optimizer_class=torch.optim.Adam,
     optimizer_args=dict(lr=1e-4),
@@ -116,6 +117,12 @@ metacl_oml_replicate.update(
     # for a consistent comparison.
     epochs=20000,
 
+    # Identify the params of the output layer.
+    output_layer_params=["adaptation.0.weight", "adaptation.0.bias"],
+
+    # Reset task params in the output layer prior to meta-train training on that task.
+    reset_task_params=True,
+
     # Whether to run the meta-testing phase at the end of the experiment.
     run_meta_test=False,  # we won't run this for now
 
@@ -147,8 +154,8 @@ metacl_oml_replicate_metatest.update(
     # Setup the meta-testing phase and allow it to run.
     run_meta_test=True,
 
-    # This resets the fast params (in this case the output layer of the OMLNetwork)
-    reset_fast_params=True,
+    # This resets the output layer params prior to meta-test training.
+    reset_output_params=True,
 
     # Results reported over 15 sampled.
     test_train_sample_size=15,
