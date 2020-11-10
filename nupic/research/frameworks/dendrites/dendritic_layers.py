@@ -27,7 +27,7 @@ linear layer with the output from a set of dendritic segments.
 import torch
 
 from nupic.research.frameworks.dendrites import DendriteSegments
-from nupic.torch.modules.sparse_weights import SparseWeights
+from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
 
 class BiasingDendriticLayer(SparseWeights):
@@ -49,6 +49,7 @@ class BiasingDendriticLayer(SparseWeights):
                             the same context will be applied to each segment
         :param module_sparsity: sparsity applied over linear module;
         :param dendrite_sparsity: sparsity applied transformation per unit per segment
+        :param dendrite_bias: whether or not dendrite activations have an additive bias
         """
         self.segments = None
         super().__init__(module, sparsity=module_sparsity)
@@ -107,3 +108,72 @@ class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
         return y * torch.sigmoid(
             torch.abs(dendrite_activations).max(dim=2).values * sign_mask
         )
+
+
+class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
+    """
+    A dendrite layer using the absolute max gating formulation, for convolutional
+    layers. The multiplicative dendrite outputs are applied element-wise to each output
+    channel. That is, for a given output channel, all activation values (determined by
+    the convolution operation) are multiplied by a single value computed via dendrites.
+    """
+
+    def __init__(
+        self, module, num_segments, dim_context,
+        module_sparsity, dendrite_sparsity, dendrite_bias=None
+    ):
+        """
+        :param module: conv2d module which performs the forward pass
+        :param num_segments: number of dendrite segments per out-unit
+        :param dim_context: length of the context vector;
+                            the same context will be applied to each segment
+        :param module_sparsity: sparsity applied over linear module;
+        :param dendrite_sparsity: sparsity applied transformation per unit per segment
+        :param dendrite_bias: whether or not dendrite activations have an additive bias
+        """
+        self.segments = None
+        super().__init__(module, sparsity=module_sparsity)
+
+        self.segments = DendriteSegments(
+            num_units=module.out_channels,
+            num_segments=num_segments,
+            dim_context=dim_context,
+            sparsity=dendrite_sparsity,
+            bias=dendrite_bias,
+        )
+
+        self.rezero_weights()
+
+    def rezero_weights(self):
+        super().rezero_weights()
+        if self.segments is not None:  # only none at beggining of init
+            self.segments.rezero_weights()
+
+    def apply_dendrites(self, y, dendrite_activations):
+        output_max = dendrite_activations.max(dim=2).values
+        output_min = dendrite_activations.min(dim=2).values
+        sign_mask = torch.where(
+            (output_max ** 2) > (output_min ** 2),
+            torch.ones(output_max.shape).to(y.device),
+            -1.0 * torch.ones(output_min.shape).to(y.device)
+        )
+        dendrite_activations = torch.abs(dendrite_activations).max(dim=2).values
+        dendrite_activations = dendrite_activations * sign_mask
+        dendrite_activations = torch.sigmoid(dendrite_activations)
+
+        # The following operation uses `torch.einsum` to multiply each channel by a
+        # single scalar value
+
+        #    * b => the batch dimension
+        #    * i => the channel dimension
+        #    * ij => the width and height dimensions
+
+        return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
+
+    def forward(self, x, context):
+        """
+        Compute of linear layer and apply output of dendrite segments.
+        """
+        y = super().forward(x)
+        dendrite_activations = self.segments(context)  # num_units x num_segments
+        return self.apply_dendrites(y, dendrite_activations)

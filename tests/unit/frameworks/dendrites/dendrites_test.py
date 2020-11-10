@@ -25,6 +25,7 @@ import torch
 
 from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
+    AbsoluteMaxGatingDendriticLayer2d,
     BiasingDendriticLayer,
     DendriteSegments,
     GatingDendriticLayer,
@@ -354,8 +355,6 @@ class BiasingDendriticLayerTests(unittest.TestCase):
 class AbsoluteMaxGatingDendriticLayerTests(unittest.TestCase):
     def test_forward_output_shape(self):
         """Validate shape of forward output."""
-
-        # Dendritic weights as a bias.
         linear = torch.nn.Linear(10, 10)
         dendritic_layer = AbsoluteMaxGatingDendriticLayer(
             module=linear,
@@ -454,6 +453,65 @@ class AbsoluteMaxGatingDendriticLayerTests(unittest.TestCase):
         actual_grad_mask = 1.0 * (dendrite_activations.grad != 0.0)
 
         all_matches = (expected_grad_mask == actual_grad_mask).all()
+        self.assertTrue(all_matches)
+
+
+class AbsoluteMaxGatingDendriticLayer2dTests(unittest.TestCase):
+    def test_apply_gating_dendrites(self):
+        conv_layer = torch.nn.Conv2d(
+            in_channels=1, out_channels=3, kernel_size=3, stride=1, bias=True
+        )
+        dendritic_layer = AbsoluteMaxGatingDendriticLayer2d(
+            module=conv_layer,
+            num_segments=20,
+            dim_context=15,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=False,
+        )
+
+        # pseudo output: batch_size=2, num_channels=3, height=2, width=2
+        y = torch.tensor([
+            [
+                [[0.3, 0.4], [-0.2, 0.1]],
+                [[-0.3, 0.5], [-0.1, 0.1]],
+                [[0.0, 0.1], [0.3, 0.2]]
+            ],
+            [
+                [[0.1, -0.2], [-0.2, 0.1]],
+                [[0.0, 0.1], [-0.4, -0.1]],
+                [[-0.3, 0.0], [0.2, 0.4]]
+            ],
+        ])
+
+        # pseudo dendrite_activations: batch_size=2, num_channels=3, num_segments=3
+        dendrite_activations = torch.tensor(
+            [
+                [[0.4, 0.9, -0.1], [-0.8, 0.7, 0.0], [0.6, -0.6, -0.7]],
+                [[0.2, 0.8, 0.8], [-0.1, -0.4, 0.5], [0.0, 0.0, 0.0]],
+            ]
+        )
+
+        # Expected absolute max dendrite activations:
+        # [[0.9  -0.8  -0.7]
+        #  [0.8   0.5   0.0]]
+
+        # Expected output based on `dendrite_activations`
+        expected_output = torch.tensor([
+            [
+                [[0.2133,  0.2844], [-0.1422,  0.0711]],
+                [[-0.093,  0.155], [-0.031,  0.031]],
+                [[0.0, 0.0332], [0.0995, 0.0664]]
+            ],
+            [
+                [[0.069, -0.138], [-0.138,  0.069]],
+                [[0.0, 0.0622], [-0.249, -0.0622]],
+                [[-0.15, 0.0], [0.1, 0.2]]
+            ],
+        ])
+
+        actual_output = dendritic_layer.apply_dendrites(y, dendrite_activations)
+        all_matches = torch.allclose(expected_output, actual_output, atol=1e-4)
         self.assertTrue(all_matches)
 
 
