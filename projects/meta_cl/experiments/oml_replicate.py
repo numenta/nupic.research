@@ -35,7 +35,6 @@ from .oml import metacl_oml_replicate
 
 
 class OMLSlowFastReplaySplitExperiment(mixins.OnlineMetaLearning,
-                                       mixins.ResetOMLTaskParams,
                                        MetaCLDataSplitExperiment):
     pass
 
@@ -83,7 +82,7 @@ meta_test_test_kwargs = dict(
     run_meta_test=True,
 
     # This resets the fast params (in this case the output layer of the OMLNetwork)
-    reset_fast_params=True,
+    reset_output_params=True,
 
     # Results reported over 15 sampled.
     meta_test_sample_size=15,

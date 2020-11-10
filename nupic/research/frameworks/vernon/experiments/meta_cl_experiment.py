@@ -124,7 +124,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.num_fast_steps = config.get("num_fast_steps", 1)
 
         assert "fast_params" in config
-        fast_named_params = filter_params(self.model, config["fast_params"])
+        fast_named_params = filter_params(self.model,
+                                          include_patterns=config["fast_params"])
         self.fast_param_names = list(fast_named_params.keys())
         self.logger.info(f"Setup: fast_param_names={self.fast_param_names}")
 
