@@ -47,6 +47,12 @@ meta_test_test_kwargs = dict(
 
 
 # Run OML for 2000 steps to ensure meta=testing accuracy hasn't regressed.
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.84 ± 0.06      | 0.94 ± 0.05       | 0.003 |
+# |            50 | 0.75 ± 0.03      | 0.95 ± 0.01       | 0.001 |
+# |--------------------------------------------------------------|
 oml_regression_test = deepcopy(metacl_oml_replicate)
 oml_regression_test.update(
 
