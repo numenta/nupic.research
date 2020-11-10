@@ -70,10 +70,6 @@ class OnlineMetaLearning(object):
     def create_loaders(self, config):
         super().create_loaders(config)
 
-        # Only initialize test loader if needed
-        if not self.run_meta_test:
-            return
-
         eval_set = self.load_dataset(config, train=False)
 
         self.test_train_loader = self.create_test_train_dataloader(config, eval_set)
