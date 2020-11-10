@@ -91,7 +91,7 @@ class OnlineMetaLearning(object):
         self.logger.info(f"Setup: test_train_param_names={self.test_train_param_names}")
 
         # Resolve the names of the output layer params.
-        if self.reset_output_params:
+        if self.reset_output_params or self.reset_task_params:
             assert "output_layer_params" in config
         output_named_params = filter_params(
             self.model,
