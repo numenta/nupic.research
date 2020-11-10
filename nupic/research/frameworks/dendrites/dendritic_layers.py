@@ -166,7 +166,7 @@ class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
 
         #    * b => the batch dimension
         #    * i => the channel dimension
-        #    * ij => the width and height dimensions
+        #    * jk => the width and height dimensions
 
         return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
 
