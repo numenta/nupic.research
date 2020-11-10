@@ -185,7 +185,7 @@ class OnlineMetaLearning(object):
                 results = self.run_meta_testing_phase(num_classes)
                 test_train_accs, test_test_accs, lr = results
 
-                print(f"Accuracy for meta-testing phase over {num_classes} num classes.")
+                print(f"Accuracy for meta-testing phase over {num_classes} num classes")
 
                 mu_test = np.mean(test_test_accs)
                 sd_test = np.std(test_test_accs)
