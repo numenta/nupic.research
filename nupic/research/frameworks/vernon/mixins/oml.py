@@ -334,23 +334,11 @@ class OnlineMetaLearning(object):
 
     def get_named_test_train_params(self):
         """Filter out the params from test_train_param_names."""
-        model = self.get_model()
-        named_test_train_params = {}
-        for n, p in model.named_parameters():
-            if n in self.test_train_param_names:
-                named_test_train_params[n] = p
-
-        return named_test_train_params
+        return self._get_params_by_names(self.test_train_param_names)
 
     def get_named_output_params(self):
         """Filter out the params from output_param_names."""
-        model = self.get_model()
-        named_output_params = {}
-        for n, p in model.named_parameters():
-            if n in self.output_param_names:
-                named_output_params[n] = p
-
-        return named_output_params
+        return self._get_params_by_names(self.output_param_names)
 
     def reset_params(self, params):
         """Helper function to reinitialize params."""

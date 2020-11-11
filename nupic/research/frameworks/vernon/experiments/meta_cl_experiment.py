@@ -384,13 +384,17 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
     def get_named_fast_params(self, clone=None):
         """Filter out the params from fast_param_names."""
-        model = self.get_model(clone=clone)
-        named_fast_params = {}
-        for n, p in model.named_parameters():
-            if n in self.fast_param_names:
-                named_fast_params[n] = p
+        return self._get_params_by_names(self.fast_param_names, clone=clone)
 
-        return named_fast_params
+    def _get_params_by_names(self, names, clone=None):
+        """Filter out the params from names."""
+        model = self.get_model(clone=clone)
+        named_params = {}
+        for n, p in model.named_parameters():
+            if n in names:
+                named_params[n] = p
+
+        return named_params
 
     def get_model(self, clone=None):
         model = clone if clone is not None else self.model
