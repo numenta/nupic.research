@@ -41,7 +41,8 @@ class OMLExperiment(mixins.OnlineMetaLearning,
 
 # class DendriticNetwork(nn.Module):
 
-#     def __init__(self, input_shape, num_classes,
+#     def __init__(self, num_classes,
+#                  input_shape=105 * 105 * 3,
 #                  hidden_size=1000,
 #                  num_segments=10,
 #                  dim_context=100,
@@ -119,9 +120,7 @@ class DendriticNetwork(nn.Module):
             *self.conv_block(1, 256, 3, 2, 0),
             *self.conv_block(256, 256, 3, 1, 0),
             *self.conv_block(256, 256, 3, 2, 0),
-            *self.conv_block(256, 256, 3, 1, 0),
-            *self.conv_block(256, 256, 3, 2, 0),
-            *self.conv_block(256, 256, 3, 2, 0),
+            nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
         )
 
@@ -129,9 +128,7 @@ class DendriticNetwork(nn.Module):
             *self.conv_block(1, 256, 3, 2, 0),
             *self.conv_block(256, 256, 3, 1, 0),
             *self.conv_block(256, 256, 3, 2, 0),
-            *self.conv_block(256, 256, 3, 1, 0),
-            *self.conv_block(256, 256, 3, 2, 0),
-            *self.conv_block(256, 256, 3, 2, 0),
+            nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
             nn.Linear(2304, dim_context)
         )
@@ -359,7 +356,7 @@ CONFIGS = dict(
 if __name__ == "__main__":
     # = 1000 * 10 * 100 * .50
     # = 500,000
-    # network = OMLNetwork(input_shape=100, num_classes=10,
+    # network = OMLNetwork(input_size=100, num_classes=10,
     #                      hidden_size=1000,
     #                      num_segments=10,
     #                      dim_context=100,
