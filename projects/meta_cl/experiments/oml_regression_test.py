@@ -42,7 +42,7 @@ meta_test_test_kwargs = dict(
     lr_sweep_range=[0.03, 0.01, 0.003, 0.001, 0.0003, 0.0001, 0.00003, 0.00001],
 
     # Run through meta-test testing 5 images at a time. No training occurs here.
-    test_test_batch_size=5,
+    test_test_batch_size=60,
 )
 
 
@@ -53,6 +53,7 @@ meta_test_test_kwargs = dict(
 # |            10 | 0.84 ± 0.06      | 0.94 ± 0.05       | 0.003 |
 # |            50 | 0.75 ± 0.03      | 0.95 ± 0.01       | 0.001 |
 # |--------------------------------------------------------------|
+#
 oml_regression_test = deepcopy(metacl_oml_replicate)
 oml_regression_test.update(
 
@@ -69,10 +70,35 @@ oml_regression_test.update(
     **deepcopy(meta_test_test_kwargs),
 )
 
+# This is meant as a quick run to ensure all functionality is fully working.
+# |---------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |     LR |
+# |--------------:|:-----------------|:------------------|-------:|
+# |            10 | 0.61 ± 0.06      | 0.82 ± 0.03       | 0.001  |
+# |            50 | 0.26 ± 0.02      | 0.48 ± 0.02       | 0.0003 |
+# |---------------------------------------------------------------|
+#
+oml_regression_test_50_epochs = deepcopy(oml_regression_test)
+oml_regression_test_50_epochs.update(
+    # The number of outer (i.e. slow) steps.
+    epochs=50,
+
+    # Average over 10 meta-test runs.
+    num_meta_testing_runs=10,
+
+    # Log results to wandb.
+    wandb_args=dict(
+        name="oml_regression_test_50_epochs",
+        project="metacl",
+    ),
+)
+
+
 # ------------
 # All configs.
 # ------------
 
 CONFIGS = dict(
     oml_regression_test=oml_regression_test,
+    oml_regression_test_50_epochs=oml_regression_test_50_epochs,
 )
