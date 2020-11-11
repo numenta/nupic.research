@@ -177,6 +177,8 @@ class OnlineMetaLearning(object):
 
             # Meta-training phase complete, perform meta-testing phase
             for num_classes in self.num_meta_test_classes:
+
+                # Only sample as many classes as there are in the meta-test set.
                 if num_classes > self.num_classes_eval:
                     break
 
