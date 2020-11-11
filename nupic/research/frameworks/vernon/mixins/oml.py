@@ -158,19 +158,18 @@ class OnlineMetaLearning(object):
     def pre_task(self, tasks):
         """Re-initialize task params prior to meta-train training."""
         super().pre_task(tasks)
-        if not self.reset_task_params:
-            return
 
-        output_params = self.get_named_output_params().values()
-        for p in output_params:
-            if p.dim() == 2:
-                for t in tasks:
-                    task_weights = p[t, :].unsqueeze(0)
-                    nn.init.kaiming_normal_(task_weights)
+        if self.reset_task_params:
+            output_params = self.get_named_output_params().values()
+            for p in output_params:
+                if p.dim() == 2:
+                    for t in tasks:
+                        task_weights = p[t, :].unsqueeze(0)
+                        nn.init.kaiming_normal_(task_weights)
 
     def post_epoch(self):
         super().post_epoch()
-        if self.current_epoch >= self.epochs - 1 and self.run_meta_test:
+        if self.current_epoch == self.epochs - 1 and self.run_meta_test:
 
             # Accumulate results.
             table = []
