@@ -107,6 +107,8 @@ class OnlineMetaLearning(object):
 
         self.test_train_loader = self.create_test_train_dataloader(config, eval_set)
         self.test_test_loader = self.create_test_test_dataloader(config, eval_set)
+        self.test_train_eval_loader = self.create_test_train_eval_dataloader(config,
+                                                                             eval_set)
 
         self.num_classes_eval = min(
             config.get("num_classes_eval", 50),
@@ -137,6 +139,23 @@ class OnlineMetaLearning(object):
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("test_train_batch_size", 1),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    @classmethod
+    def create_test_train_eval_dataloader(cls, config, dataset):
+        """
+        Exactly the same as the test-train loader, but with a potentially
+        larger batch size for evaluation.
+        """
+        sampler = cls.create_test_train_sampler(config, dataset)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("test_train_eval_batch_size",
+                                  config.get("test_test_batch_size", 1)),
             shuffle=False,
             num_workers=config.get("workers", 0),
             sampler=sampler,
@@ -318,16 +337,16 @@ class OnlineMetaLearning(object):
             meta_test_test_accuracies.append(acc)
 
             # Meta-testing testing (using the test-train set).
-            self.test_train_loader.sampler.set_active_tasks(new_tasks)
+            self.test_train_eval_loader.sampler.set_active_tasks(new_tasks)
             results = evaluate_model(
                 model=self.get_model(),
-                loader=self.test_train_loader,
+                loader=self.test_train_eval_loader,
                 device=self.device,
                 criterion=self._loss_function,
             )
             correct = results["total_correct"]
 
-            acc = correct / len(self.test_train_loader.sampler.indices)
+            acc = correct / len(self.test_train_eval_loader.sampler.indices)
             meta_test_train_accuracies.append(acc)
 
         return meta_test_train_accuracies, meta_test_test_accuracies, lr
