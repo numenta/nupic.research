@@ -217,7 +217,7 @@ class OnlineMetaLearning(object):
         lr_all = []
 
         # Grid search over lr
-        for _lr_search_run in range(0, self.num_lr_search_runs):
+        for _ in range(0, self.num_lr_search_runs):
 
             # Choose num_classes_learned random classes to train and then test on.
             new_tasks = np.random.choice(
@@ -279,7 +279,7 @@ class OnlineMetaLearning(object):
 
         meta_test_test_accuracies = []
         meta_test_train_accuracies = []
-        for _meta_test_run in range(0, self.num_meta_testing_runs):
+        for _ in range(0, self.num_meta_testing_runs):
 
             # Choose num_classes_learned random classes to train and then test on.
             new_tasks = np.random.choice(
