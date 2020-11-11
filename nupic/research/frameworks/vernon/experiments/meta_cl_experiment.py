@@ -92,6 +92,10 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             data, also used to train the slow parameters (the replay batch is used to
             sample examples to update the slow parameters during meta-training testing
             to prevent the learner from forgetting other tasks)
+            - replay_classes: list of classes to sample from for the replay set;
+                              defaults to range(0, num_classes)
+            - slowfast_classes: list of classes to sample from for fast and slow sets;
+                                defaults to range(0, num_classes)
             - num_fast_steps: number of sequential steps to take in the inner loop per
                               every outer loop
             - train_train_sample_size: number of images per class to sample from for
@@ -101,22 +105,25 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             - fast_params: list of regex patterns identifying which params to
                            update during meta-train training
         """
-        if "num_classes" not in config["model_args"]:
-            # manually set `num_classes` in `model_args`
-            num_classes = config["num_classes"]
-            config["model_args"]["num_classes"] = num_classes
-
         super().setup_experiment(config)
+
+        if "num_classes" in config:
+            if "replay_classes" in config and "slowfast_classes" in config:
+                self.logger.warn("Over-specified classes for meta-training.")
 
         self.epochs_to_validate = []
         self.tasks_per_epoch = config.get("tasks_per_epoch", 1)
-        self.num_classes = min(
-            config.get("num_classes", 50),
-            self.train_fast_loader.sampler.num_classes
-        )
+        self.num_classes = config.get("num_classes", 50)
+
+        replay_classes = config.get("replay_classes", range(0, self.num_classes))
+        slowfast_classes = config.get("slowfast_classes", range(0, self.num_classes))
+        self.replay_classes = list(replay_classes)
+        self.slowfast_classes = list(slowfast_classes)
+
+        max_class = max(*self.replay_classes, *self.slowfast_classes)
+        assert max_class < self.train_fast_loader.sampler.num_classes
 
         self.adaptation_lr = config.get("adaptation_lr", 0.03)
-
         self.batch_size = config.get("batch_size", 5)
         self.val_batch_size = config.get("val_batch_size", 15)
         self.slow_batch_size = config.get("slow_batch_size", 64)
@@ -243,7 +250,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # Sample tasks for inner loop.
         tasks_train = np.random.choice(
-            self.num_classes, self.tasks_per_epoch, replace=False
+            self.slowfast_classes,
+            size=self.tasks_per_epoch,
+            replace=False
         )
 
         # Run pre_task; For instance, may reset parameters as needed.
@@ -257,7 +266,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.run_task(task, cloned_adaptation_net)
 
         # Sample from the replay set.
-        self.train_replay_loader.sampler.set_active_tasks(list(range(self.num_classes)))
+        self.train_replay_loader.sampler.set_active_tasks(self.replay_classes)
         replay_data, replay_target = next(iter(self.train_replay_loader))
 
         # Sample from the slow set.

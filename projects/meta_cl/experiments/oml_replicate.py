@@ -23,20 +23,12 @@ from copy import deepcopy
 
 from torchvision import transforms
 
-from mixins import MetaCLDataSplitExperiment
-from nupic.research.frameworks.vernon import mixins
-
 from .oml import metacl_oml_replicate
 
 # """
 # These experiments serves to further narrow the gap between our implementation
 # of the OML algorithm and that of the original repos.
 # """
-
-
-class OMLSlowFastReplaySplitExperiment(mixins.OnlineMetaLearning,
-                                       MetaCLDataSplitExperiment):
-    pass
 
 
 transform_without_normalization = transforms.Compose([
@@ -110,13 +102,16 @@ meta_test_test_kwargs = dict(
 #
 oml_fastslow_replay_split = deepcopy(metacl_oml_replicate)
 oml_fastslow_replay_split.update(
-    experiment_class=OMLSlowFastReplaySplitExperiment,
 
     # Log results to wandb.
     wandb_args=dict(
         name="oml_fastslow_replay_split",
         project="metacl",
     ),
+
+    # Split classes among fastslow and replay sets.
+    replay_classes=list(range(0, 481)),
+    slowfast_classes=list(range(481, 963)),
 
     # Meta-testing specific arguments.
     **deepcopy(meta_test_test_kwargs),
@@ -162,13 +157,16 @@ oml_without_normalization.update(
 #
 oml_datasplit_without_norm = deepcopy(oml_without_normalization)
 oml_datasplit_without_norm.update(
-    experiment_class=OMLSlowFastReplaySplitExperiment,
 
     # Log results to wandb.
     wandb_args=dict(
         name="oml_datasplit_without_norm",
         project="metacl",
     ),
+
+    # Split classes among fastslow and replay sets.
+    replay_classes=list(range(0, 481)),
+    slowfast_classes=list(range(481, 963)),
 
     # Meta-testing specific arguments.
     **deepcopy(meta_test_test_kwargs),
