@@ -19,7 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import os
+
 import numpy as np
+import pandas as pd
 import torch
 from scipy import stats
 from tabulate import tabulate
@@ -191,7 +194,8 @@ class OnlineMetaLearning(object):
         if self.current_epoch == self.epochs - 1 and self.run_meta_test:
 
             # Accumulate results.
-            table = []
+            table = []  # for printout
+            dataframe = []  # for saving
             headers = ["Num Classes", "Meta-test test", "Meta-test train", "LR"]
 
             # Meta-training phase complete, perform meta-testing phase
@@ -218,10 +222,21 @@ class OnlineMetaLearning(object):
                 print(f"  train accs: {train_acc_str}")
                 print()
 
+                num_runs = len(test_train_accs)
                 table.append((num_classes, test_acc_str, train_acc_str, lr))
+                dataframe.extend(zip([num_classes] * num_runs,
+                                     test_test_accs,
+                                     test_train_accs,
+                                     [lr] * num_runs))
 
             print("Meta-testing results:")
             print(tabulate(table, headers=headers, tablefmt="pipe"))
+
+            # Save results to csv
+            if self.logdir is not None:
+                results_path = os.path.join(self.logdir, "meta_test_accuracies.csv")
+                results_df = pd.DataFrame(dataframe, columns=headers)
+                results_df.to_csv(results_path)
 
     def find_best_lr(self, num_classes_learned):
         """
