@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .constrain_parameters import ConstrainParameters
+from .delay_load_checkpoint import *
 from .export_model import ExportModel
 from .extra_validations_per_epoch import *
 from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
