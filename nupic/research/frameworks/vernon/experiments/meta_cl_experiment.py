@@ -94,8 +94,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             to prevent the learner from forgetting other tasks)
             - replay_classes: list of classes to sample from for the replay set;
                               defaults to range(0, num_classes)
-            - slowfast_classes: list of classes to sample from for fast and slow sets;
-                                defaults to range(0, num_classes)
+            - fast_and_slow_classes: list of classes to sample from for fast and slow
+                                     sets; defaults to range(0, num_classes)
             - num_fast_steps: number of sequential steps to take in the inner loop per
                               every outer loop
             - train_train_sample_size: number of images per class to sample from for
@@ -108,7 +108,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         super().setup_experiment(config)
 
         if "num_classes" in config:
-            if "replay_classes" in config and "slowfast_classes" in config:
+            if "replay_classes" in config and "fast_and_slow_classes" in config:
                 self.logger.warn("Over-specified classes for meta-training.")
 
         self.epochs_to_validate = []
@@ -116,11 +116,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.num_classes = config.get("num_classes", 50)
 
         replay_classes = config.get("replay_classes", range(0, self.num_classes))
-        slowfast_classes = config.get("slowfast_classes", range(0, self.num_classes))
+        fast_and_slow_classes = config.get("fast_and_slow_classes",
+                                           range(0, self.num_classes))
         self.replay_classes = list(replay_classes)
-        self.slowfast_classes = list(slowfast_classes)
+        self.fast_and_slow_classes = list(fast_and_slow_classes)
 
-        max_class = max(*self.replay_classes, *self.slowfast_classes)
+        max_class = max(*self.replay_classes, *self.fast_and_slow_classes)
         assert max_class < self.train_fast_loader.sampler.num_classes
 
         self.adaptation_lr = config.get("adaptation_lr", 0.03)
@@ -250,7 +251,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         # Sample tasks for inner loop.
         tasks_train = np.random.choice(
-            self.slowfast_classes,
+            self.fast_and_slow_classes,
             size=self.tasks_per_epoch,
             replace=False
         )

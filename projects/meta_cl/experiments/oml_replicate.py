@@ -173,7 +173,7 @@ oml_fastslow_replay_split.update(
 
     # Split classes among fastslow and replay sets.
     replay_classes=list(range(0, 481)),
-    slowfast_classes=list(range(481, 963)),
+    fast_and_slow_classes=list(range(481, 963)),
 
     # Meta-testing specific arguments.
     **deepcopy(meta_test_test_kwargs),
@@ -228,7 +228,7 @@ oml_datasplit_without_norm.update(
 
     # Split classes among fastslow and replay sets.
     replay_classes=list(range(0, 481)),
-    slowfast_classes=list(range(481, 963)),
+    fast_and_slow_classes=list(range(481, 963)),
 
     # Meta-testing specific arguments.
     **deepcopy(meta_test_test_kwargs),
