@@ -53,5 +53,6 @@ h5py
 pretrainedmodels==0.7.4
 wandb>=0.9.4
 # FIXME: this is needed because the pip install isn't properly choosing a version
-# of colorama compatible with awscli
+# of colorama or urllib3 compatible with awscli
 colorama==0.4.3
+urllib3==1.26.0
