@@ -159,7 +159,7 @@ class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
         :param y: output of the convolution operation (a torch tensor with shape
                   (b, c, h, w) where the axes represent the batch, channel, height, and
                   width dimensions respectively)
-        :param dendrite_activations: the dendrite activation values (a torch tensor 
+        :param dendrite_activations: the dendrite activation values (a torch tensor
                                      with shape (b, c) where the axes represent the
                                      batch and channel dimensions, respectively)
         """
