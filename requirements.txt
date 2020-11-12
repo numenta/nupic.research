@@ -55,4 +55,4 @@ wandb>=0.9.4
 # FIXME: this is needed because the pip install isn't properly choosing a version
 # of colorama or urllib3 compatible with awscli
 colorama==0.4.3
-urllib3==1.26.0
+urllib3==1.25.11
