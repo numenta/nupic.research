@@ -21,6 +21,8 @@
 
 from .oml import CONFIGS as OML
 from .dendrites import CONFIGS as DENDRITES
+from .oml_replicate import CONFIGS as OML_REPLICATE
+from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
 
 """
 Import and collect all Imagenet experiment configurations into one CONFIG
@@ -31,3 +33,5 @@ __all__ = ["CONFIGS"]
 CONFIGS = dict()
 CONFIGS.update(OML)
 CONFIGS.update(DENDRITES)
+CONFIGS.update(OML_REPLICATE)
+CONFIGS.update(OML_REGRESSION_TEST)
