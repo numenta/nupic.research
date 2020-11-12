@@ -150,6 +150,19 @@ class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
             self.segments.rezero_weights()
 
     def apply_dendrites(self, y, dendrite_activations):
+        """
+        Returns the output of the absolute max gating convolutional dendritic layer by
+        multiplying all values each output channel by the selected dendrite activation.
+        Each channel has its own set of dendritic weights, and the selected activation
+        is based on the the absolute max value.
+
+        :param y: output of the convolution operation (a torch tensor with shape
+                  (b, c, h, w) where the axes represent the batch, channel, height, and
+                  width dimensions respectively)
+        :param dendrite_activations: the dendrite activation values (a torch tensor 
+                                     with shape (b, c) where the axes represent the
+                                     batch and channel dimensions, respectively)
+        """
         output_max = dendrite_activations.max(dim=2).values
         output_min = dendrite_activations.min(dim=2).values
         sign_mask = torch.where(
@@ -163,7 +176,6 @@ class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
 
         # The following operation uses `torch.einsum` to multiply each channel by a
         # single scalar value
-
         #    * b => the batch dimension
         #    * i => the channel dimension
         #    * jk => the width and height dimensions
