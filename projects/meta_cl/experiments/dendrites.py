@@ -23,78 +23,18 @@ import os
 
 import torch
 from torch import nn
+
+from nupic.research.frameworks.dendrites.dendritic_layers import GatingDendriticLayer
 from nupic.research.frameworks.pytorch.datasets import omniglot
 from nupic.research.frameworks.pytorch.models import OMLNetwork
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
 from nupic.research.frameworks.vernon.trainables import SupervisedTrainable
-from nupic.research.frameworks.dendrites.dendritic_layers import (
-    BiasingDendriticLayer,
-    GatingDendriticLayer,
-    AbsoluteMaxGatingDendriticLayer
-)
-from nupic.torch.modules.sparse_weights import SparseWeights
 
 
 class OMLExperiment(mixins.OnlineMetaLearning,
                     MetaContinualLearningExperiment):
     pass
 
-# class DendriticNetwork(nn.Module):
-
-#     def __init__(self, num_classes,
-#                  input_shape=105 * 105 * 3,
-#                  hidden_size=1000,
-#                  num_segments=10,
-#                  dim_context=100,
-#                  module_sparsity=0.75,
-#                  dendrite_sparsity=0.50,
-#                  **kwargs):
-
-#         super().__init__()
-
-#         self.prediction = GatingDendriticLayer(
-#             nn.Linear(input_shape, num_classes),
-#             num_segments,
-#             dim_context,
-#             module_sparsity,  # % of weights that are zero
-#             dendrite_sparsity,  # % of dendrites that are zero
-#             dendrite_bias=None
-#         )
-
-#         self.modulation = SparseWeights(
-#             nn.Linear(input_shape, dim_context),
-#             sparsity=module_sparsity
-#         )
-
-#     @property
-#     def named_fast_params(self):
-#         """
-#         Returns named params of adaption network, being sure to prepend
-#         the names with "adaptation."
-#         """
-#         prepended = {}
-#         for n, p in self.prediction.named_parameters():
-#             n = "prediction." + n
-#             prepended[n] = p
-#         return prepended
-
-#     @property
-#     def named_slow_params(self):
-#         """
-#         Returns named params of adaption network, being sure to prepend
-#         the names with "representation."
-#         """
-#         prepended = {}
-#         for n, p in self.modulation.named_parameters():
-#             n = "modulation." + n
-#             prepended[n] = p
-#         return prepended
-
-#     def forward(self, x):
-#         x = torch.flatten(x, start_dim=1)  # preserve the batch dimension
-#         mod = self.modulation(x)
-#         pred = self.prediction(x, context=mod)
-#         return pred
 
 class DendriticNetwork(nn.Module):
 
@@ -108,7 +48,7 @@ class DendriticNetwork(nn.Module):
         super().__init__()
 
         self.gating_layer = GatingDendriticLayer(  # <- linear + "den. segs"
-            nn.Linear(2304, num_classes),
+            nn.Linear(256, num_classes),
             num_segments,
             dim_context,
             module_sparsity,  # % of weights that are zero
@@ -130,7 +70,7 @@ class DendriticNetwork(nn.Module):
             *self.conv_block(256, 256, 3, 2, 0),
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(2304, dim_context)
+            nn.Linear(256, dim_context)
         )
 
         # apply Kaiming initialization
@@ -319,12 +259,15 @@ metacl_oml_replicate_metatest.update(
     lr_sweep_range=[0.03, 0.01, 0.003, 0.001, 0.0003, 0.0001, 0.00003, 0.00001],
 )
 
+# 256 * .25 * 4 * 20 * .5 = 2560 weights
+# no units * units sparsity * num segments * dim context * dendrite sparsity
+
 metacl_dendrites = copy.deepcopy(metacl_oml_replicate)
 metacl_dendrites.update(
     model_class=DendriticNetwork,
     model_args=dict(num_classes=963,
-                    num_segments=10,
-                    dim_context=100,
+                    num_segments=4,
+                    dim_context=20,
                     module_sparsity=0.75,
                     dendrite_sparsity=0.50),
     wandb_args=dict(
@@ -332,6 +275,7 @@ metacl_dendrites.update(
         project="dendrites",
         notes="Dendritic Networks applied to OML Problem. Test 1"
     ),
+    optimizer_args=dict(lr=1e-3),
 
     # Setup the meta-testing phase and allow it to run.
     run_meta_test=True,
@@ -352,42 +296,3 @@ metacl_dendrites.update(
 CONFIGS = dict(
     metacl_dendrites=metacl_dendrites
 )
-
-if __name__ == "__main__":
-    # = 1000 * 10 * 100 * .50
-    # = 500,000
-    # network = OMLNetwork(input_size=100, num_classes=10,
-    #                      hidden_size=1000,
-    #                      num_segments=10,
-    #                      dim_context=100,
-    #                      module_sparsity=0.75,
-    #                      dendrite_sparsity=0.50)
-
-
-    class Network(nn.Module):
-
-        def __init__(self):
-            super().__init__()
-            self.prediction = nn.Sequential(
-                *self.conv_block(1, 256, 3, 2, 0),
-                *self.conv_block(256, 256, 3, 1, 0),
-                *self.conv_block(256, 256, 3, 2, 0),
-                nn.Flatten(),
-            )
-
-        def forward(self, x):
-            return self.prediction(x)
-
-        @classmethod
-        def conv_block(cls, in_channels, out_channels, kernel_size, stride, padding):
-            return [
-                nn.Conv2d(
-                    in_channels=in_channels, out_channels=out_channels,
-                    kernel_size=kernel_size, stride=stride, padding=padding
-                ),
-                nn.ReLU(),
-            ]
-
-
-    output = Network()(torch.rand(2, 1, 84, 84))
-    print(output.shape)
