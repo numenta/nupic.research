@@ -503,6 +503,7 @@ def filter_params(
     assert isinstance(include_names, list)
     assert isinstance(include_patterns, list)
     assert isinstance(include_modules, list)
+    # TODO: Check these as sequences.
 
     # Identify parameter pointers for all matching modules.
     include_data_ptrs = []
