@@ -136,9 +136,6 @@ metacl_oml_replicate.update(
     # Reset task params in the output layer prior to meta-train training on that task.
     reset_task_params=True,
 
-    # Whether to run the meta-testing phase at the end of the experiment.
-    run_meta_test=False,  # we won't run this for now
-
     # Log results to wandb.
     wandb_args=dict(
         name="metacl_oml_replicate",

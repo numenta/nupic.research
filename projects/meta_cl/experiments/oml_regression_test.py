@@ -21,7 +21,7 @@
 
 from copy import deepcopy
 
-from .oml import metacl_oml_replicate
+from .oml_replicate import metacl_oml_replicate
 
 meta_test_test_kwargs = dict(
 
@@ -74,8 +74,7 @@ oml_regression_test.update(
 # |---------------------------------------------------------------|
 # |   Num Classes | Meta-test test   | Meta-test train   |     LR |
 # |--------------:|:-----------------|:------------------|-------:|
-# |            10 | 0.61 ± 0.06      | 0.82 ± 0.03       | 0.001  |
-# |            50 | 0.26 ± 0.02      | 0.48 ± 0.02       | 0.0003 |
+# |            10 | 0.51 ± 0.03      | 0.81 ± 0.01       |  0.001 |
 # |---------------------------------------------------------------|
 #
 oml_regression_test_50_epochs = deepcopy(oml_regression_test)
@@ -84,7 +83,10 @@ oml_regression_test_50_epochs.update(
     epochs=50,
 
     # Average over 10 meta-test runs.
-    num_meta_testing_runs=10,
+    num_meta_testing_runs=3,
+    num_meta_test_classes=[10],
+    num_lr_search_runs=1,
+    lr_sweep_range=[0.001],
 
     # Log results to wandb.
     wandb_args=dict(
