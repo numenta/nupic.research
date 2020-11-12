@@ -20,6 +20,9 @@
 # ----------------------------------------------------------------------
 
 from .oml import CONFIGS as OML
+from .oml_replicate import CONFIGS as OML_REPLICATE
+from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
+
 
 """
 Import and collect all Imagenet experiment configurations into one CONFIG
@@ -29,3 +32,5 @@ __all__ = ["CONFIGS"]
 # Collect all configurations
 CONFIGS = dict()
 CONFIGS.update(OML)
+CONFIGS.update(OML_REPLICATE)
+CONFIGS.update(OML_REGRESSION_TEST)

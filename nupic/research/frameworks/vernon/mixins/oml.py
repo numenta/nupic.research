@@ -19,16 +19,23 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import os
+
 import numpy as np
+import pandas as pd
 import torch
 from scipy import stats
+from tabulate import tabulate
 from torch import nn
 from torch.nn.init import kaiming_normal_, zeros_
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
-from nupic.research.frameworks.pytorch.models import OMLNetwork
+from nupic.research.frameworks.pytorch.model_utils import (
+    evaluate_model,
+    filter_params,
+    train_model,
+)
 
 
 class OnlineMetaLearning(object):
@@ -43,11 +50,16 @@ class OnlineMetaLearning(object):
         :param config: Dictionary containing the configuration parameters
 
             - run_meta_test: whether or not to run the meta-testing phase
-            - reset_fast_params: whether to reset (i.e. re-init) the fast
-                                 params prior to meta-test training
+            - reset_output_params: whether to reset (i.e. re-init) the output layer
+                                   params prior to meta-test training
+            - reset_task_params: whether to reset (i.e. re-init) the output layer
+                                 params corresponding to a given task, prior to
+                                 meta-train training on that task
             - lr_sweep_range: list of learning rates to attempt meta-test training.
                               The best one, according to the meta-test test set,
                               will be chosen and used for the meta-testing phase.
+            - num_meta_test_classes: list of number of classes to train and test over
+                                     for meta-testing
             - num_lr_search_runs: number of runs to attempt an lr-sweep. The one that
                                   achieves the highest test-test accuracy the most
                                   times, i.e. the mode, will be chosen for the
@@ -56,25 +68,50 @@ class OnlineMetaLearning(object):
             - test_train_sample_size: number of images per class to sample from for
                                      meta-testing training. The rest of the
                                      images will be used for meta-test testing.
+            - test_train_params: list of regex patterns identifying which params to
+                                 update during meta-test training
+            - output_layer_params: list of names for the output layer; if this is given
+                                   and `reset_output_params=True` these will be reset
+                                   prior to meta-test training
         """
+        super().setup_experiment(config)
         self.run_meta_test = config.get("run_meta_test", False)
-        self.reset_fast_params = config.get("reset_fast_params", True)
+        self.reset_output_params = config.get("reset_output_params", True)
+        self.reset_task_params = config.get("reset_task_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
-        super().setup_experiment(config)
+        self.num_meta_test_classes = config.get("num_meta_test_classes",
+                                                [10, 50, 100, 200, 600])
+
+        # Resolve the names of the meta-test training params.
+        assert "test_train_params" in config
+        test_train_named_params = filter_params(
+            self.model,
+            include_patterns=config["test_train_params"]
+        )
+        self.test_train_param_names = list(test_train_named_params.keys())
+        self.logger.info(f"Setup: test_train_param_names={self.test_train_param_names}")
+
+        # Resolve the names of the output layer params.
+        if self.reset_output_params or self.reset_task_params:
+            assert "output_layer_params" in config
+        output_named_params = filter_params(
+            self.model,
+            include_names=config.get("output_layer_params", [])
+        )
+        self.output_param_names = list(output_named_params.keys())
+        self.logger.info(f"Setup: output_param_names={self.output_param_names}")
 
     def create_loaders(self, config):
         super().create_loaders(config)
-
-        # Only initialize test loader if needed
-        if not self.run_meta_test:
-            return
 
         eval_set = self.load_dataset(config, train=False)
 
         self.test_train_loader = self.create_test_train_dataloader(config, eval_set)
         self.test_test_loader = self.create_test_test_dataloader(config, eval_set)
+        self.test_train_eval_loader = self.create_test_train_eval_dataloader(config,
+                                                                             eval_set)
 
         self.num_classes_eval = min(
             config.get("num_classes_eval", 50),
@@ -112,6 +149,23 @@ class OnlineMetaLearning(object):
         )
 
     @classmethod
+    def create_test_train_eval_dataloader(cls, config, dataset):
+        """
+        Exactly the same as the test-train loader, but with a potentially
+        larger batch size for evaluation.
+        """
+        sampler = cls.create_test_train_sampler(config, dataset)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("test_train_eval_batch_size",
+                                  config.get("test_test_batch_size", 1)),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    @classmethod
     def create_test_test_dataloader(cls, config, dataset):
         sampler = cls.create_test_test_sampler(config, dataset)
         return DataLoader(
@@ -123,21 +177,66 @@ class OnlineMetaLearning(object):
             pin_memory=torch.cuda.is_available(),
         )
 
+    def pre_task(self, tasks):
+        """Re-initialize task params prior to meta-train training."""
+        super().pre_task(tasks)
+
+        if self.reset_task_params:
+            output_params = self.get_named_output_params().values()
+            for p in output_params:
+                if p.dim() == 2:
+                    for t in tasks:
+                        task_weights = p[t, :].unsqueeze(0)
+                        nn.init.kaiming_normal_(task_weights)
+
     def post_epoch(self):
         super().post_epoch()
-        if self.should_stop() and self.run_meta_test:
-            # meta-training phase complete, perform meta-testing phase
-            for num_classes_learned in [10, 50, 100, 200, 600]:
-                if num_classes_learned > self.num_classes_eval:
+        if self.current_epoch == self.epochs - 1 and self.run_meta_test:
+
+            # Accumulate results.
+            table = []  # for printout
+            dataframe = []  # for saving
+            headers = ["Num Classes", "Meta-test test", "Meta-test train", "LR"]
+
+            # Meta-training phase complete, perform meta-testing phase
+            for num_classes in self.num_meta_test_classes:
+
+                # Only sample as many classes as there are in the meta-test set.
+                if num_classes > self.num_classes_eval:
                     break
 
-                # TODO log results in addition to simply printing them to stdout
-                results = self.run_meta_testing_phase(num_classes_learned)
-                test_train_accs, test_test_accs = results
-                print("Accuracy for meta-testing phase over"
-                      f" {num_classes_learned} num classes.")
-                print("Meta-test training accuracies:", test_train_accs)
-                print("Meta-test tests accuracies:", test_test_accs)
+                # TODO: log results in addition to simply printing them to stdout
+                results = self.run_meta_testing_phase(num_classes)
+                test_train_accs, test_test_accs, lr = results
+
+                print(f"Accuracy for meta-testing phase over {num_classes} num classes")
+
+                mu_test = np.mean(test_test_accs)
+                sd_test = np.std(test_test_accs)
+                mu_train = np.mean(test_train_accs)
+                sd_train = np.std(test_train_accs)
+                test_acc_str = f"{mu_test:0.2f} ± {sd_test:0.2f}"
+                train_acc_str = f"{mu_train:0.2f} ± {sd_train:0.2f}"
+
+                print(f"  test accs: {test_acc_str}")
+                print(f"  train accs: {train_acc_str}")
+                print()
+
+                num_runs = len(test_train_accs)
+                table.append((num_classes, test_acc_str, train_acc_str, lr))
+                dataframe.extend(zip([num_classes] * num_runs,
+                                     test_test_accs,
+                                     test_train_accs,
+                                     [lr] * num_runs))
+
+            print("Meta-testing results:")
+            print(tabulate(table, headers=headers, tablefmt="pipe"))
+
+            # Save results to csv
+            if self.logdir is not None:
+                results_path = os.path.join(self.logdir, "meta_test_accuracies.csv")
+                results_df = pd.DataFrame(dataframe, columns=headers)
+                results_df.to_csv(results_path)
 
     def find_best_lr(self, num_classes_learned):
         """
@@ -152,7 +251,7 @@ class OnlineMetaLearning(object):
         lr_all = []
 
         # Grid search over lr
-        for _lr_search_runs in range(0, self.num_lr_search_runs):
+        for _ in range(0, self.num_lr_search_runs):
 
             # Choose num_classes_learned random classes to train and then test on.
             new_tasks = np.random.choice(
@@ -162,18 +261,18 @@ class OnlineMetaLearning(object):
             max_acc = -1000
             for lr in self.lr_sweep_range:
 
-                # Reset fast weights.
-                named_params = dict(self.get_named_fast_params())
-                params = list(named_params.values())
-                if self.reset_fast_params:
-                    self.reset_params(params)
+                # Reset output layer weights.
+                if self.reset_output_params:
+                    output_params = self.get_named_output_params()
+                    self.reset_params(output_params.values())
 
                 # Meta-test training.
-                optim = Adam(params, lr=lr)
+                test_train_param = self.get_named_test_train_params()
+                optim = Adam(test_train_param.values(), lr=lr)
                 for task in new_tasks:
                     self.test_train_loader.sampler.set_active_tasks(task)
                     train_model(
-                        model=self.model.module,
+                        model=self.get_model(),
                         loader=self.test_train_loader,
                         optimizer=optim,
                         device=self.device,
@@ -183,7 +282,7 @@ class OnlineMetaLearning(object):
                 # Meta-test testing.
                 self.test_test_loader.sampler.set_active_tasks(new_tasks)
                 results = evaluate_model(
-                    model=self.model.module,
+                    model=self.get_model(),
                     loader=self.test_test_loader,
                     device=self.device,
                     criterion=self._loss_function,
@@ -211,29 +310,28 @@ class OnlineMetaLearning(object):
         """
 
         lr = self.find_best_lr(num_classes_learned)
-        print(f"Found best lr={lr} for num_classes_learned={num_classes_learned}")
 
         meta_test_test_accuracies = []
         meta_test_train_accuracies = []
-        for _current_run in range(0, self.num_meta_testing_runs):
+        for _ in range(0, self.num_meta_testing_runs):
 
             # Choose num_classes_learned random classes to train and then test on.
             new_tasks = np.random.choice(
                 self.num_classes_eval, num_classes_learned, replace=False
             )
 
-            # Reset fast weights.
-            named_params = dict(self.get_named_fast_params())
-            params = list(named_params.values())
-            if self.reset_fast_params:
-                self.reset_params(params)
+            # Reset output layer weights.
+            if self.reset_output_params:
+                output_params = self.get_named_output_params()
+                self.reset_params(output_params.values())
 
             # Meta-testing training.
-            optim = Adam(params, lr=lr)
+            test_train_param = self.get_named_test_train_params()
+            optim = Adam(test_train_param.values(), lr=lr)
             for task in new_tasks:
                 self.test_train_loader.sampler.set_active_tasks(task)
                 train_model(
-                    model=self.model.module,
+                    model=self.get_model(),
                     loader=self.test_train_loader,
                     optimizer=optim,
                     device=self.device,
@@ -254,19 +352,27 @@ class OnlineMetaLearning(object):
             meta_test_test_accuracies.append(acc)
 
             # Meta-testing testing (using the test-train set).
-            self.test_train_loader.sampler.set_active_tasks(new_tasks)
+            self.test_train_eval_loader.sampler.set_active_tasks(new_tasks)
             results = evaluate_model(
-                model=self.model.module,
-                loader=self.test_train_loader,
+                model=self.get_model(),
+                loader=self.test_train_eval_loader,
                 device=self.device,
                 criterion=self._loss_function,
             )
             correct = results["total_correct"]
 
-            acc = correct / len(self.test_train_loader.sampler.indices)
+            acc = correct / len(self.test_train_eval_loader.sampler.indices)
             meta_test_train_accuracies.append(acc)
 
-        return meta_test_train_accuracies, meta_test_test_accuracies
+        return meta_test_train_accuracies, meta_test_test_accuracies, lr
+
+    def get_named_test_train_params(self):
+        """Filter out the params from test_train_param_names."""
+        return self._get_params_by_names(self.test_train_param_names)
+
+    def get_named_output_params(self):
+        """Filter out the params from output_param_names."""
+        return self._get_params_by_names(self.output_param_names)
 
     def reset_params(self, params):
         """Helper function to reinitialize params."""
@@ -279,36 +385,9 @@ class OnlineMetaLearning(object):
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].insert(0, "OML additional attributes")
+        eo["setup_experiment"].append("OML meta-testing setup")
         eo["post_epoch"].append("Run meta testing phase")
         eo["create_loaders"].append("Create loaders for the meta testing phase")
+        eo["pre_task"].append("Reset the output params for upcoming tasks.")
 
-        return eo
-
-
-class ResetOMLTaskParams(object):
-    """
-    Reset the task parameters, within the output layer weights,
-    prior to training over those tasks. The mixin must be used with
-    the `OMLNetwork`.
-    """
-
-    def setup_experiment(self, config):
-        super().setup_experiment(config)
-        model = self.get_model()
-        assert isinstance(model, OMLNetwork)
-
-    def pre_task(self, tasks):
-        super().pre_task(tasks)
-        model = self.get_model()
-        for t in tasks:
-            task_weights = model.adaptation[0].weight[t, :].unsqueeze(0)
-            nn.init.kaiming_normal_(task_weights)
-
-    @classmethod
-    def get_execution_order(cls):
-        eo = super().get_execution_order()
-        name = "ResetOMLTaskParams"
-        eo["setup_experiment"].append(name + ": Ensure use of OMLNetwork.")
-        eo["pre_task"].append(name + ": Reset the output params for upcoming tasks.")
         return eo
