@@ -374,6 +374,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                     updated = p.add(g, alpha=-lr)
 
                     # Update in-place in a way that preserves grads.
+                    # TODO: Add a check at initilization that enforces the ability
+                    # to access the model's params by name.
                     parent_module = get_parent_module(model, name)
                     base_name = name.split(".")[-1]
                     parent_module._parameters[base_name] = updated
