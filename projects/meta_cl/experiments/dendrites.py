@@ -37,6 +37,17 @@ class OMLExperiment(mixins.OnlineMetaLearning,
 
 
 class DendriticNetwork(nn.Module):
+    """
+    Prototype of a dendritic network, based on ANML.
+
+    It is composed of two parallel networks, one for prediction, and
+    one for modulation. Each network has 3 conv layers with 256 channels
+    each, followed by an adaptive average pool that reduces it to a 256x1x1.
+
+    The output of the prediction and of the modulation are fed into a
+    sparse linear gating layer as input and context respectively. The
+    output of the gating layer are the logits used to calculate the loss function.
+    """
 
     def __init__(self, num_classes,
                  num_segments=10,
