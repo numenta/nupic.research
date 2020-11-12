@@ -50,11 +50,13 @@ class LearnToRouteTest(unittest.TestCase):
             dendrite_module=AbsoluteMaxGatingDendriticLayer
         )
 
-        routing_test_dataloader = init_dataloader(
+        dataloader = init_dataloader(
             routing_function=r,
             context_vectors=context_vectors,
             device=device,
-            batch_size=64
+            batch_size=64,
+            x_min=-2.0,
+            x_max=2.0
         )
 
         optimizer = init_optimizer(network=dendritic_network)
@@ -66,10 +68,10 @@ class LearnToRouteTest(unittest.TestCase):
         # Perform a single training epoch
         train_dendrite_model(
             model=dendritic_network,
-            loader=routing_test_dataloader,
+            loader=dataloader,
             optimizer=optimizer,
             device=device,
-            criterion=F.mse_loss
+            criterion=F.l1_loss
         )
 
         non_dendritic_weights_after = copy.deepcopy(
@@ -90,11 +92,13 @@ class LearnToRouteTest(unittest.TestCase):
             dendrite_module=AbsoluteMaxGatingDendriticLayer
         )
 
-        routing_test_dataloader = init_dataloader(
+        dataloader = init_dataloader(
             routing_function=r,
             context_vectors=context_vectors,
             device=device,
-            batch_size=64
+            batch_size=64,
+            x_min=-2.0,
+            x_max=2.0
         )
 
         optimizer = init_optimizer(network=dendritic_network)
@@ -106,10 +110,10 @@ class LearnToRouteTest(unittest.TestCase):
         # Perform a single training epoch
         train_dendrite_model(
             model=dendritic_network,
-            loader=routing_test_dataloader,
+            loader=dataloader,
             optimizer=optimizer,
             device=device,
-            criterion=F.mse_loss
+            criterion=F.l1_loss
         )
 
         dendritic_weights_after = copy.deepcopy(

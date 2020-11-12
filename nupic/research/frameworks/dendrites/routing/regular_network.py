@@ -97,17 +97,34 @@ def test_regular_network(
         percent_on=0.2
     )
 
-    # Initialize dataset and dataloader
-    routing_test_dataset = RoutingDataset(
+    # Initialize datasets and dataloaders
+    train_dataset = RoutingDataset(
         routing_function=r,
         input_size=r.sparse_weights.module.in_features,
         context_vectors=context_vectors,
         device=model.device,
-        concat=True
+        concat=True,
+        x_min=-2.0,
+        x_max=2.0
     )
 
-    routing_test_dataloader = DataLoader(
-        dataset=routing_test_dataset,
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=batch_size
+    )
+
+    test_dataset = RoutingDataset(
+        routing_function=r,
+        input_size=r.sparse_weights.module.in_features,
+        context_vectors=context_vectors,
+        device=model.device,
+        concat=True,
+        x_min=2.0,
+        x_max=6.0
+    )
+
+    test_dataloader = DataLoader(
+        dataset=test_dataset,
         batch_size=batch_size
     )
 
@@ -117,31 +134,30 @@ def test_regular_network(
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
-    print("epoch,mean_loss")
+    print("epoch,mean_loss,mean_abs_err")
     for epoch in range(1, num_training_epochs + 1):
 
         train_dendrite_model(
             model=model,
-            loader=routing_test_dataloader,
+            loader=train_dataloader,
             optimizer=optimizer,
             device=model.device,
-            criterion=F.mse_loss,
+            criterion=F.l1_loss,
             concat=True
         )
 
-        # Validate model - note that we use the same dataset/dataloader for validation
+        # Validate model - note that we use a different dataset/dataloader as the input
+        # distribution has changed
         results = evaluate_dendrite_model(
             model=model,
-            loader=routing_test_dataloader,
+            loader=test_dataloader,
             device=model.device,
-            criterion=F.mse_loss,
+            criterion=F.l1_loss,
             concat=True
         )
 
         print("{},{},{}".format(
-            epoch,
-            results["loss"],
-            results["mean_abs_err"]
+            epoch, results["loss"], results["mean_abs_err"]
         ))
 
 

@@ -22,6 +22,7 @@
 import os
 import sys
 import warnings
+from contextlib import nullcontext
 
 import torch
 from filelock import FileLock
@@ -64,7 +65,7 @@ def torchvisiondataset(root, dataset_name, train=True, download=True,
                 )
                 raise
 
-    with FileLock(f"{root}.lock"):
+    with FileLock(f"{root}.lock") if download else nullcontext():
         dataset = dataset_class(
             root=root,
             train=train,
@@ -94,7 +95,7 @@ def omniglot(root, train=True, download=True, transform=None, target_transform=N
 
     dataset_class = datasets.Omniglot
     root = os.path.expanduser(root)
-    with FileLock(f"{root}.lock"):
+    with FileLock(f"{root}.lock") if download else nullcontext():
         dataset = dataset_class(
             root=root,
             background=train,

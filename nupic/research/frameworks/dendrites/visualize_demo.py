@@ -75,7 +75,7 @@ def run_wandb_demo():
 
     # Plot heatmap of dendrite activations using wandb
     wandb.init(name="Output unit 0", project="Dendrites demo")
-    wandb.log({"Epoch 0": visual})
+    wandb.log({"Initial activations": visual})
 
 
 if __name__ == "__main__":

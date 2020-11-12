@@ -19,6 +19,4 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .cl_experiment import *
-from .meta_cl_experiment import *
-from .supervised_experiment import *
+from .distributed_base import *

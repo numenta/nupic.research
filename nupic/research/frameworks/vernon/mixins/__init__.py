@@ -20,8 +20,11 @@
 # ----------------------------------------------------------------------
 
 from .constrain_parameters import ConstrainParameters
+from .delay_load_checkpoint import *
 from .export_model import ExportModel
+from .extra_validations_per_epoch import *
 from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
+from .legacy_imagenet_config import LegacyImagenetConfig
 from .load_preprocessed_data import LoadPreprocessedData
 from .log_backprop_structure import LogBackpropStructure
 from .log_covariance import LogCovariance
@@ -37,6 +40,7 @@ from .prune_low_snr import PruneLowSNR
 from .regularize_loss import RegularizeLoss
 from .rezero_weights import RezeroWeights
 from .save_final_checkpoint import SaveFinalCheckpoint
+from .step_based_logging import *
 from .update_boost_strength import UpdateBoostStrength
 from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .composite_loss import CompositeLoss

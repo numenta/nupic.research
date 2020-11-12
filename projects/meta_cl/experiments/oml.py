@@ -26,7 +26,6 @@ import torch
 from nupic.research.frameworks.pytorch.datasets import omniglot
 from nupic.research.frameworks.pytorch.models import OMLNetwork
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
-from nupic.research.frameworks.vernon.trainables import SupervisedTrainable
 
 
 class OMLExperiment(mixins.OnlineMetaLearning,
@@ -49,13 +48,12 @@ def run_experiment(config):
 # Simple Omniglot Experiment
 metacl_base = dict(
     # training infrastructure
-    ray_trainable=SupervisedTrainable,
     distributed=False,
     # problem specific
     experiment_class=MetaContinualLearningExperiment,
     dataset_class=omniglot,
     model_class=OMLNetwork,
-    model_args=dict(input_size=(105, 105)),
+    model_args=dict(num_classes=963),
     # metacl variables
     num_classes=963,
     num_classes_eval=660,

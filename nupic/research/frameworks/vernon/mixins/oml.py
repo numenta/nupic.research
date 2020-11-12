@@ -85,15 +85,19 @@ class OnlineMetaLearning(object):
     def create_test_train_sampler(cls, config, dataset):
         """Sampler for meta-test training."""
         sample_size = config.get("test_train_sample_size", 15)
-        return cls.create_task_sampler(config, dataset,
-                                       mode="train", sample_size=sample_size)
+        class_indices = cls.compute_class_indices(config, dataset,
+                                                  mode="train",
+                                                  sample_size=sample_size)
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
     def create_test_test_sampler(cls, config, dataset):
         """Sampler for meta-test testing."""
         sample_size = config.get("test_train_sample_size", 15)
-        return cls.create_task_sampler(config, dataset,
-                                       mode="test", sample_size=sample_size)
+        class_indices = cls.compute_class_indices(config, dataset,
+                                                  mode="test",
+                                                  sample_size=sample_size)
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
     def create_test_train_dataloader(cls, config, dataset):

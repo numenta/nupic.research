@@ -19,6 +19,28 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .cl_experiment import *
-from .meta_cl_experiment import *
-from .supervised_experiment import *
+from nupic.research.frameworks.pytorch.restore_utils import load_state_from_checkpoint
+
+__all__ = [
+    "DelayLoadCheckpoint",
+]
+
+
+class DelayLoadCheckpoint:
+    """
+    Load the checkpoint after super().create_model has finished.
+    """
+    @classmethod
+    def create_model(cls, config, device):
+        model = super().create_model({**config, "checkpoint_file": None},
+                                     device)
+        load_state_from_checkpoint(model, config.get("checkpoint_file", None),
+                                   device)
+        return model
+
+    @classmethod
+    def get_execution_order(cls):
+        name = "DelayLoadCheckpoint"
+        eo = super().get_execution_order()
+        eo["create_model"].insert(0, name + ": Set checkpoint_file=None")
+        eo["create_model"].append(0, name + ": Load checkpoint_file")
