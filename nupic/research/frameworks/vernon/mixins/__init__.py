@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .constrain_parameters import ConstrainParameters
+from .delay_load_checkpoint import *
 from .export_model import ExportModel
 from .extra_validations_per_epoch import *
 from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
@@ -47,4 +48,4 @@ from .quantization_aware import QuantizationAware
 from .reduce_lr_after_task import ReduceLRAfterTask
 from .vary_batch_size import VaryBatchSize
 from .ewc import ElasticWeightConsolidation
-from .oml import OnlineMetaLearning, ResetOMLTaskParams
+from .oml import OnlineMetaLearning

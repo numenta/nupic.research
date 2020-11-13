@@ -65,8 +65,8 @@ def generate_random_binary_vectors(k, n_dim, sparsity_level=0.5):
     binary_vectors = torch.rand((k, n_dim))
     binary_vectors = torch.where(
         binary_vectors > sparsity_level,
-        torch.zeros((k, n_dim)),
-        torch.ones((k, n_dim))
+        torch.ones((k, n_dim)),
+        torch.zeros((k, n_dim))
     )
     return binary_vectors
 
