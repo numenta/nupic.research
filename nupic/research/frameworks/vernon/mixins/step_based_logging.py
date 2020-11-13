@@ -73,7 +73,7 @@ class StepBasedLogging(
         self.current_timestep += 1
 
     def should_log_batch(self, train_batch_idx):
-        return (train_batch_idx == self.total_batches - 1) or (
+        return (train_batch_idx == len(self.train_loader) - 1) or (
             self.log_timestep_freq > 0
             and (self.current_timestep % self.log_timestep_freq) == 0)
 

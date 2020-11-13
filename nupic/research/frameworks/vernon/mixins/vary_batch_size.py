@@ -43,22 +43,25 @@ class VaryBatchSize(object):
         self.config = config
         self.batch_sizes = batch_sizes
 
-        # super() set up a loader for the first batch size.
-        self.logger.info("Setting batch_size=%s (variant 0)",
-                         self.train_loader.batch_size)
-
-    def pre_epoch(self):
+    def prepare_loaders_for_epoch(self, epoch):
         """
         Set the train dataloader to the appropriate batch size.
         """
-        super().pre_epoch()
-        if 0 < self.current_epoch < len(self.batch_sizes):
-            batch_size = self.batch_sizes[self.current_epoch]
+        super().prepare_loaders_for_epoch(epoch)
+        batch_size = self.batch_sizes[min(epoch,
+                                          len(self.batch_sizes) - 1)]
+        if self.train_loader.batch_size != batch_size:
             self.train_loader = self.create_train_dataloader(
                 {**self.config, "batch_size": batch_size}
             )
 
-            self.logger.info("Setting batch_size=%s (variant %s)", batch_size,
+    def pre_epoch(self):
+        super().pre_epoch()
+        if self.current_epoch < len(self.batch_sizes):
+            # Log this here, not in prepare_loaders_for_epoch, because
+            # prepare_loaders_for_epoch is also called in compute_steps_in_epoch.
+            self.logger.info("Setting batch_size=%s (variant %s)",
+                             self.train_loader.batch_size,
                              self.current_epoch)
 
     @classmethod
@@ -67,5 +70,8 @@ class VaryBatchSize(object):
         name = "VaryBatchSize: "
         eo["setup_experiment"].insert(0, name + "set initial batch size")
         eo["setup_experiment"].append(name + "initialization")
-        eo["pre_epoch"].append(name + "set the dataloader and batch-size")
+        eo["prepare_loaders_for_epoch"].append(
+            name + "set the dataloader and batch-size")
+        eo["pre_epoch"].append(
+            name + "log modified batch size")
         return eo

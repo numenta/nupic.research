@@ -90,7 +90,6 @@ class ContinualLearningExperiment(
         """Run outer loop over tasks"""
         # configure the sampler to load only samples from current task
         self.logger.info("Training...")
-        self.train_loader.sampler.set_active_tasks(self.current_task)
 
         # Run epochs, inner loop
         # TODO: return the results from run_epoch
@@ -111,6 +110,11 @@ class ContinualLearningExperiment(
 
         self.current_task += 1
         return ret
+
+    def prepare_loaders_for_epoch(self, epoch):
+        super().prepare_loaders_for_epoch(epoch)
+        task = epoch // self.epochs
+        self.train_loader.sampler.set_active_tasks(task)
 
     @classmethod
     def create_train_sampler(cls, config, dataset):
@@ -148,6 +152,7 @@ class ContinualLearningExperiment(
 
         # Extended methods
         eo["setup_experiment"].append(exp + ".setup_experiment")
+        eo["prepare_loaders_for_epoch"].append(exp + ": Set current task")
 
         eo.update(
             # Overwritten methods

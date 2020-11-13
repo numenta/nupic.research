@@ -106,7 +106,8 @@ class QuantizationAware(object):
         # freeze observer parameters for the last 500 batches of last epoch
         if (not self.observer_disabled
            and self.current_epoch == self.epochs
-           and self.batch_idx > (self.when_disable_observers * self.total_batches)):
+           and self.batch_idx > (self.when_disable_observers
+                                 * len(self.train_loader))):
             self.logger.info(f"Freezing observer at epoch {self.current_epoch} "
                              "and batch {self.batch_idx}")
             self.model.apply(disable_observer)
@@ -115,7 +116,8 @@ class QuantizationAware(object):
         # freeze BN parameters for the last 200 batches of last epoch
         if (not self.batch_norm_frozen
            and self.current_epoch == self.epochs
-           and self.batch_idx > (self.when_freeze_batch_norm * self.total_batches)):
+           and self.batch_idx > (self.when_freeze_batch_norm
+                                 * len(self.train_loader))):
             self.logger.info(f"Freezing BN parameters at epoch {self.current_epoch}"
                              "and batch {self.batch_idx}")
             self.model.apply(nni.qat.freeze_bn_stats)

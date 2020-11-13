@@ -48,7 +48,7 @@ class ExtraValidationsPerEpoch(StepBasedLogging):
 
         extra_validations = config.get("extra_validations_per_epoch", 0)
         batches_to_validate = np.linspace(
-            min(self.total_batches, self.batches_in_epoch),
+            min(len(self.train_loader), self.batches_in_epoch),
             0,
             1 + extra_validations,
             endpoint=False

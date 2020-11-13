@@ -68,7 +68,7 @@ class RegularizeLoss(object):
         reg_scalar = self.reg_scalar
         if callable(reg_scalar):
             reg_scalar = reg_scalar(self.current_epoch, batch_idx,
-                                    self.total_batches)
+                                    len(self.train_loader))
 
         self.reg_scalar_value = reg_scalar
 

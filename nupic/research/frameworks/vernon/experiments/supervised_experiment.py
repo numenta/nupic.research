@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import copy
 import io
 import sys
 import time
@@ -37,7 +38,6 @@ from nupic.research.frameworks.pytorch.model_utils import (
     serialize_state_dict,
     train_model,
 )
-from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
 from nupic.research.frameworks.vernon.experiments.components.experiment_base import (
     ExperimentBase,
 )
@@ -77,9 +77,10 @@ class SupervisedExperiment(ExperimentBase):
         self.batches_in_epoch_val = sys.maxsize
         self.epochs = 1
         self.mixed_precision = False
-        self.total_batches = 0
         self.epochs_to_validate = []
         self.current_epoch = 0
+        self.current_step = 0
+        self.train_loader_in_use = False
 
     def setup_experiment(self, config):
         """
@@ -203,22 +204,22 @@ class SupervisedExperiment(ExperimentBase):
 
         # Configure data loaders
         self.create_loaders(config)
-        self.total_batches = len(self.train_loader,)
 
         self.epochs_to_validate = config.get("epochs_to_validate",
                                              range(self.epochs - 3,
                                                    self.epochs + 1))
 
         # Configure learning rate scheduler
-        self.lr_scheduler = self.create_lr_scheduler(
-            config, self.optimizer, self.total_batches)
-        if self.lr_scheduler is not None:
-            lr_scheduler_class = self.lr_scheduler.__class__.__name__
+        lr_scheduler_class = config.get("lr_scheduler_class", None)
+        if lr_scheduler_class is not None:
             lr_scheduler_args = config.get("lr_scheduler_args", {})
-            self.logger.info("LR Scheduler class: " + lr_scheduler_class)
+            lr_scheduler_args = self.expand_lr_scheduler_args(lr_scheduler_class,
+                                                              lr_scheduler_args)
+            self.lr_scheduler = lr_scheduler_class(self.optimizer,
+                                                   **lr_scheduler_args)
+            self.logger.info("LR Scheduler class: %s", lr_scheduler_class)
             self.logger.info("LR Scheduler args:")
             self.logger.info(pformat(lr_scheduler_args))
-            self.logger.info("steps_per_epoch=%s", self.total_batches)
 
         self.step_lr_every_batch = config.get("lr_scheduler_step_every_batch", False)
         if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
@@ -259,30 +260,60 @@ class SupervisedExperiment(ExperimentBase):
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
         )
 
-    @classmethod
-    def create_lr_scheduler(cls, config, optimizer, total_batches):
+    def expand_lr_scheduler_args(self, lr_scheduler_class, lr_scheduler_args):
         """
-        Create lr scheduler from an ImagenetExperiment config
-        :param config:
-            - lr_scheduler_class: (optional) Class of lr-scheduler
-            - lr_scheduler_args: (optional) dict of args to pass to lr-class
-        :param optimizer: torch optimizer
-        :param total_batches: number of batches/steps in an epoch
+        Return a new lr_scheduler_args with extra args inserted.
+        :param lr_scheduler_class: Class of lr-scheduler
+        :param lr_scheduler_args: User-specified args
+        :return: New lr_scheduler_args
         """
-        lr_scheduler_class = config.get("lr_scheduler_class", None)
-        if lr_scheduler_class is not None:
-            lr_scheduler_args = config.get("lr_scheduler_args", {})
-            return create_lr_scheduler(
-                optimizer=optimizer,
-                lr_scheduler_class=lr_scheduler_class,
-                lr_scheduler_args=lr_scheduler_args,
-                steps_per_epoch=total_batches)
+        if issubclass(lr_scheduler_class, OneCycleLR):
+            # Update OneCycleLR parameters
+            lr_scheduler_args = {
+                **lr_scheduler_args,
+                "total_steps": sum(self.compute_steps_in_epoch(epoch)
+                                   for epoch in range(self.epochs)),
+            }
+        elif issubclass(lr_scheduler_class, ComposedLRScheduler):
+            # Update ComposedLRScheduler parameters
+            steps_per_epoch = len(self.train_loader)
+            assert all(self.compute_steps_in_epoch(epoch) == steps_per_epoch
+                       for epoch in range(self.epochs)), (
+                "ComposedLRScheduler requires every epoch to be the same length")
+
+            lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
+            schedulers = lr_scheduler_args.get("schedulers", None)
+            if schedulers is not None:
+                # Convert dict from ray/json {str:dict} style to {int:dict}
+                schedulers = {int(k): v for k, v in schedulers.items()}
+
+                # Update OneCycleLR "steps_per_epoch" parameter
+                for _, item in schedulers.items():
+                    lr_class = item.get("lr_scheduler_class", None)
+                    if lr_class is not None and issubclass(lr_class, OneCycleLR):
+                        lr_args = item.get("lr_scheduler_args", {})
+                        lr_args.update(steps_per_epoch=len(self.train_loader))
+                lr_scheduler_args["schedulers"] = schedulers
+            lr_scheduler_args["steps_per_epoch"] = steps_per_epoch
+
+        return lr_scheduler_args
 
     def create_loaders(self, config):
         """Create and assign train and val dataloaders"""
 
         self.train_loader = self.create_train_dataloader(config)
         self.val_loader = self.create_validation_dataloader(config)
+
+    def compute_steps_in_epoch(self, epoch):
+        """
+        Get the number of optimizer steps in a given epoch.
+        :param epoch: Epoch number
+        :return: Number of optimizer steps
+        """
+        assert not self.train_loader_in_use, (
+            "Computing steps in epoch will modify the data loader")
+        self.prepare_loaders_for_epoch(epoch)
+        return len(self.train_loader)
 
     @classmethod
     def load_dataset(cls, config, train=True):
@@ -415,8 +446,17 @@ class SupervisedExperiment(ExperimentBase):
         self.current_epoch += 1
         return ret
 
-    def pre_epoch(self):
+    def prepare_loaders_for_epoch(self, epoch):
+        """
+        Update the dataloaders for the specified epoch. This method should allow
+        arbitrary jumps between epochs, with no assumption of being called in
+        order, and may be called multiple times for a given epoch.
+        """
         pass
+
+    def pre_epoch(self):
+        self.prepare_loaders_for_epoch(self.current_epoch)
+        self.train_loader_in_use = True
 
     def pre_batch(self, model, batch_idx):
         pass
@@ -432,7 +472,7 @@ class SupervisedExperiment(ExperimentBase):
                              time.time() - self.launch_time)
 
         if self.progress and (batch_idx % 40) == 0:
-            total_batches = self.total_batches
+            total_batches = len(self.train_loader)
             current_batch = batch_idx
             if hasattr(self.train_loader.sampler, "num_replicas"):
                 # Compute actual batch size from distributed sampler
@@ -449,8 +489,10 @@ class SupervisedExperiment(ExperimentBase):
         # TODO: a soon-to-come PR will add the following line:
         # self.post_optimizer_step()
         self.post_batch(**kwargs)
+        self.current_step += 1
 
     def post_epoch(self):
+        self.train_loader_in_use = False
         self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s",
                           self.current_epoch, self.get_lr(), self.get_weight_decay())
 
@@ -582,6 +624,9 @@ class SupervisedExperiment(ExperimentBase):
             else:
                 self.current_epoch = last_epoch
 
+        self.current_step = sum(self.compute_steps_in_epoch(epoch)
+                                for epoch in range(self.current_epoch))
+
     def run_iteration(self):
         return self.run_epoch()
 
@@ -637,9 +682,10 @@ class SupervisedExperiment(ExperimentBase):
             create_train_sampler=[exp + ".create_train_sampler"],
             create_validation_dataloader=[exp + ".create_validation_dataloader"],
             create_validation_sampler=[exp + ".create_validation_sampler"],
+            prepare_loaders_for_epoch=[],
             train_epoch=[exp + ".train_epoch"],
             run_epoch=[exp + ".run_epoch"],
-            pre_epoch=[],
+            pre_epoch=[exp + ": Call prepare_loaders_for_epoch()"],
             post_epoch=[],
             pre_batch=[],
             post_batch=[exp + ": Logging"],

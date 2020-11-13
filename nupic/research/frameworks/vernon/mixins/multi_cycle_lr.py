@@ -23,14 +23,12 @@ import copy
 
 from torch.optim.lr_scheduler import OneCycleLR
 
-from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
-
 
 class MultiCycleLR:
     """
     Composes a sequence of OneCycleLR regimes, allowing different configurations
-    for each cycle. This infers args like total_batches, epochs, and also the
-    div_factor for subsequent cycles.
+    for each cycle. This infers args like total_steps and the div_factor for
+    subsequent cycles.
     """
     def setup_experiment(self, config):
         """
@@ -53,7 +51,7 @@ class MultiCycleLR:
 
         super().setup_experiment(config)
 
-        # Insert epoch counts and div_factors
+        # Insert step counts and div_factors
         improved_args = {}
         multi_cycle_lr_args = sorted(config["multi_cycle_lr_args"],
                                      key=lambda x: x[0])
@@ -64,7 +62,10 @@ class MultiCycleLR:
                 end_epoch = config["epochs"]
 
             cycle_config = copy.deepcopy(cycle_config)
-            cycle_config["epochs"] = end_epoch - start_epoch
+            cycle_config["total_steps"] = sum(
+                self.compute_steps_in_epoch(epoch)
+                for epoch in range(start_epoch, end_epoch)
+            )
 
             # Default behavior: no sudden change in learning rate between
             # cycles.
@@ -84,11 +85,7 @@ class MultiCycleLR:
         # Set it immediately, rather than waiting for the pre_epoch, in case a
         # restore is occurring.
         args = self.multi_cycle_args_by_epoch[0]
-        self.lr_scheduler = create_lr_scheduler(
-            optimizer=self.optimizer,
-            lr_scheduler_class=OneCycleLR,
-            lr_scheduler_args=args,
-            steps_per_epoch=self.total_batches)
+        self.lr_scheduler = OneCycleLR(self.optimizer, **args)
 
     def pre_epoch(self):
         super().pre_epoch()
@@ -97,11 +94,7 @@ class MultiCycleLR:
            self.current_epoch in self.multi_cycle_args_by_epoch:
 
             args = self.multi_cycle_args_by_epoch[self.current_epoch]
-            self.lr_scheduler = create_lr_scheduler(
-                optimizer=self.optimizer,
-                lr_scheduler_class=OneCycleLR,
-                lr_scheduler_args=args,
-                steps_per_epoch=self.total_batches)
+            self.lr_scheduler = OneCycleLR(self.optimizer, **args)
 
     @classmethod
     def get_execution_order(cls):
