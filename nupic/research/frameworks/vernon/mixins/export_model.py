@@ -32,6 +32,8 @@ class ExportModel:
         prev_config = copy.copy(config["prev_config"])
         if "checkpoint_file" in config:
             prev_config["checkpoint_file"] = config["checkpoint_file"]
+        else:
+            print("Warning: No checkpoint_file has been specified")
 
         prev_model = super().create_model(prev_config, device)
 

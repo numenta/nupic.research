@@ -67,9 +67,6 @@ flake8-isort==2.7.0
 # Check for mutable default arguments
 flake8-mutable==1.2.0
 
-# Checks type annotations conforming to PEP 484
-flake8-mypy==17.8.0
-
 # Check for Print statements in python files
 flake8-print==3.1.0
 

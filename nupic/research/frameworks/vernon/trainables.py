@@ -18,7 +18,6 @@
 #  http://numenta.org/licenses/
 #
 
-import abc
 import copy
 import logging
 import os
@@ -42,47 +41,17 @@ from nupic.research.frameworks.vernon.experiment_utils import get_free_port
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
-class RayActorHelperMethods:
-    def get_node_ip(self):
-        """Returns the IP address of the current node."""
-        return socket.gethostbyname(socket.gethostname())
-
-    def get_free_port(self):
-        """Returns free TCP port in the current node"""
-        return get_free_port()
-
-
-class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
+class RemoteTrainableBase(Trainable):
     """
-    Trainable class used to train arbitrary experiments with ray. Whatever
-    the case, it's expected to proceed over well-defined iterations. Thus,
-    `_run_iteration` must be overridden.
+    Base class for running remote experiments. This trainable can run on a
+    non-GPU instance, scheduling work to other processes. This enables
+    coordinating experiments on cheap reliable machines, while running the
+    actual experiment on spot instances.
     """
-
-    @classmethod
-    def default_resource_request(cls, config):
-        """
-        Configure the cluster resources used by this experiment
-        """
-        num_gpus = config.get("num_gpus", 0)
-        num_cpus = config.get("num_cpus", 1)
-
-        if num_gpus > 0:
-            # Assign extra CPUs for dataloaders
-            workers = config.get("workers", 0)
-            num_cpus = workers * num_gpus
-
-        resource = Resources(cpu=0, gpu=0, extra_cpu=num_cpus, extra_gpu=num_gpus)
-        return resource
-
     def _setup(self, config):
-        experiment_class = config["experiment_class"]
-
-        class ExtendedExpClass(RayActorHelperMethods, experiment_class):
-            pass
-
-        ExtendedExpClass.__name__ = experiment_class.__name__
-        self.experiment_class = ExtendedExpClass
+        self.experiment_class = self._extend_experiment_class(
+            config["experiment_class"]
+        )
 
         config["logdir"] = self.logdir
 
@@ -105,6 +74,8 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
         # Try to recover a trial at least this many times
         self.max_retries = max(config.get("max_retries", 3), 0)
 
+        self._process_config(config)
+
         # Create ray remote workers
         self._create_workers(config)
 
@@ -122,63 +93,11 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
 
         self._first_run = True
 
+    def _extend_experiment_class(self, experiment_class):
+        return experiment_class
+
     def _train(self):
-        self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
-        try:
-            # Check if restore checkpoint file fulfills the stop criteria on first run
-            pre_experiment_result = None
-            if self._first_run:
-                self._first_run = False
-                if self._restored and self._should_stop():
-                    self.logger.warning(
-                        f"Restored checkpoint file '{self.restore_checkpoint_file}' "
-                        f"fulfills stop criteria without additional training.")
-                    return {
-                        # Do not train or log results, just stop
-                        RESULT_DUPLICATE: True,
-                        DONE: True
-                    }
-
-                # Run any pre-experiment functionality such as pre-training validation.
-                # The results are aggregated here so they may be immediately logged
-                # as opposed to waiting till the end of the iteration.
-                if self._iteration == 0:
-                    status = []
-                    for w in self.procs:
-                        status.append(w.pre_experiment.remote())
-
-                    agg_pre_exp = self.experiment_class.aggregate_pre_experiment_results
-                    if ray_utils.check_for_failure(status):
-                        results = ray.get(status)
-                        pre_experiment_result = agg_pre_exp(results)
-                        self.logger.info(
-                            f"Pre-Experiment Result: {pre_experiment_result}"
-                        )
-
-            results = self._run_iteration()
-
-            # Aggregate the results from all processes
-            if results is not None:
-
-                # Aggregate results from iteration.
-                ret = self.experiment_class.aggregate_results(results)
-
-                self._process_result(ret, pre_experiment_result)
-                printable_result = self.experiment_class.get_printable_result(ret)
-                self.logger.info(f"End Iteration Result: {printable_result}")
-
-                # Check if we should stop the experiment
-                ret[DONE] = self._should_stop()
-
-                return ret
-
-            err_msg = (f"{self._trial_info.trial_name}({self.iteration}): "
-                       f"One of the remote workers failed during training")
-            self.logger.error(err_msg)
-            raise RuntimeError(err_msg)
-        except Exception:
-            self._kill_workers()
-            raise
+        pass
 
     def _should_stop(self):
         """
@@ -209,6 +128,200 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
         self.logger.debug(f"_restore: {self._trial_info.trial_name}({self.iteration})")
 
     def _create_workers(self, config):
+        pass
+
+    def _kill_workers(self):
+        for w in self.procs:
+            self.logger.warning(
+                f"Killing worker {w}, "
+                f"trial={self._trial_info.trial_name}({self.iteration})")
+            ray.kill(w)
+        self.procs = []
+
+    def _stop(self):
+        self.logger.debug(f"_stop: {self._trial_info.trial_name}({self.iteration})")
+        try:
+            status = [w.stop_experiment.remote() for w in self.procs]
+            # Wait until all remote workers stop
+            ray.get(status)
+            for w in self.procs:
+                w.__ray_terminate__.remote()
+            self.procs = []
+        except RayActorError as ex:
+            self.logger.warning("Failed to shutdown gracefully", exc_info=ex)
+            self._kill_workers()
+
+    def _process_config(self, config):
+        pass
+
+    def _run_iteration(self):
+        """Run one iteration of the experiment"""
+        status = []
+        for w in self.procs:
+            status.append(w.run_iteration.remote())
+
+        # Wait for remote functions and check for errors
+        if ray_utils.check_for_failure(status):
+            return ray.get(status)
+
+    def _process_result(self, result):
+        pass
+
+
+class RemoteProcessTrainable(RemoteTrainableBase):
+    """
+    Use a single remote process. With this trainable, there are two processes
+    total: the trainable process and the experiment process.
+
+    The experiment_class must implement the Experiment interface.
+    """
+    @classmethod
+    def default_resource_request(cls, config):
+        """
+        Configure the cluster resources used by this experiment
+        """
+        num_gpus = config.get("num_gpus", 0)
+        num_cpus = max(config.get("num_cpus", 1),
+                       config.get("workers", 0))
+        return Resources(cpu=0, gpu=0, extra_cpu=num_cpus, extra_gpu=num_gpus)
+
+    def _create_workers(self, config):
+        """
+        Create one ray remote process
+        """
+        num_gpus = config.get("num_gpus", 0)
+        num_cpus = max(config.get("num_cpus", 1),
+                       config.get("workers", 0))
+
+        experiment = ray.remote(
+            num_cpus=num_cpus, num_gpus=num_gpus)(self.experiment_class)
+        for i in range(1 + self.max_retries):
+            self.procs = [experiment.remote()]
+            status = self.procs[0].setup_experiment.remote(config)
+            self.logger.debug("_create_workers: trial=%s(%s)",
+                              self._trial_info.trial_name, self.iteration)
+
+            # Wait for remote function and check for errors
+            if ray_utils.check_for_failure([status]):
+                return
+
+            # Remote function failed, kill workers and try again
+            self.logger.warning(f"Failed to create workers, "
+                                f"retrying {i + 1}/{self.max_retries}")
+            # Restart all workers on failure
+            self._kill_workers()
+
+            # Back off a few seconds
+            time.sleep(2 ** i)
+        else:
+            # Reached max failures
+            err_msg = f"Failed to create workers after {self.max_retries} retries"
+            self.logger.error(err_msg)
+            raise RuntimeError(err_msg)
+
+    def _train(self):
+        self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
+        try:
+            # Check if restore checkpoint file fulfills the stop criteria on first run
+            pre_experiment_result = None
+            if self._first_run:
+                self._first_run = False
+                if self._restored and self._should_stop():
+                    self.logger.warning(
+                        f"Restored checkpoint file '{self.restore_checkpoint_file}' "
+                        f"fulfills stop criteria without additional training.")
+                    return {
+                        # Do not train or log results, just stop
+                        RESULT_DUPLICATE: True,
+                        DONE: True
+                    }
+
+                # Run any pre-experiment functionality such as pre-training validation.
+                # The results are aggregated here so they may be immediately logged
+                # as opposed to waiting till the end of the iteration.
+                if self._iteration == 0:
+                    status = self.procs[0].run_pre_experiment.remote()
+                    if ray_utils.check_for_failure([status]):
+                        pre_experiment_result = ray.get(status)
+                        self.logger.info(
+                            f"Pre-Experiment Result: {pre_experiment_result}"
+                        )
+
+            results = self._run_iteration()
+
+            # Aggregate the results from all processes
+            if results is not None:
+                ret = results[0]
+
+                if pre_experiment_result is not None:
+                    self.experiment_class.insert_pre_experiment_result(
+                        ret, pre_experiment_result)
+
+                self._process_result(ret)
+                readable_result = self.experiment_class.get_readable_result(ret)
+                self.logger.info(f"End Iteration Result: {readable_result}")
+
+                # Check if we should stop the experiment
+                ret[DONE] = self._should_stop()
+
+                return ret
+
+            err_msg = (f"{self._trial_info.trial_name}({self.iteration}): "
+                       f"One of the remote workers failed during training")
+            self.logger.error(err_msg)
+            raise RuntimeError(err_msg)
+        except Exception:
+            self._kill_workers()
+            raise
+
+
+class RayActorHelperMethods:
+    """
+    Mixin that adds functionality needed by the DistributedTrainable to the
+    experiment class.
+    """
+    def get_node_ip(self):
+        """Returns the IP address of the current node."""
+        return socket.gethostbyname(socket.gethostname())
+
+    def get_free_port(self):
+        """Returns free TCP port in the current node"""
+        return get_free_port()
+
+
+class DistributedTrainable(RemoteTrainableBase):
+    """
+    Use a multiple synchronized remote processes. With this trainable, there are
+    num_gpus + 1 processes total: the trainable process and the experiment
+    processes.
+
+    The experiment_class must implement the Experiment and
+    DistributedAggregation interfaces.
+    """
+
+    @classmethod
+    def default_resource_request(cls, config):
+        """
+        Configure the cluster resources used by this experiment
+        """
+        num_gpus = config.get("num_gpus", 0)
+        num_cpus = config.get("num_cpus", 1)
+
+        if num_gpus > 0:
+            # Assign extra CPUs for dataloaders
+            workers = config.get("workers", 0)
+            num_cpus = workers * num_gpus
+
+        return Resources(cpu=0, gpu=0, extra_cpu=num_cpus, extra_gpu=num_gpus)
+
+    def _extend_experiment_class(self, experiment_class):
+        class ExtendedExperimentClass(RayActorHelperMethods, experiment_class):
+            pass
+
+        ExtendedExperimentClass.__name__ = experiment_class.__name__
+        return ExtendedExperimentClass
+
+    def _create_workers(self, config):
         """
         Create one ray remote process for each GPU/process
         """
@@ -227,8 +340,6 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
             world_size = num_cpus
             # Assign one CPU per remote process
             num_cpus = 1
-
-        self._process_config(config)
 
         experiment = ray.remote(
             num_cpus=num_cpus, num_gpus=num_gpus)(self.experiment_class)
@@ -274,84 +385,70 @@ class BaseTrainable(Trainable, metaclass=abc.ABCMeta):
             self.logger.error(err_msg)
             raise RuntimeError(err_msg)
 
-    def _kill_workers(self):
-        for w in self.procs:
-            self.logger.warning(
-                f"Killing worker {w}, "
-                f"trial={self._trial_info.trial_name}({self.iteration})")
-            ray.kill(w)
-        self.procs = []
-
-    def _stop(self):
-        self.logger.debug(f"_stop: {self._trial_info.trial_name}({self.iteration})")
+    def _train(self):
+        self.logger.debug(f"_train: {self._trial_info.trial_name}({self.iteration})")
         try:
-            status = [w.stop_experiment.remote() for w in self.procs]
-            # Wait until all remote workers stop
-            ray.get(status)
-            for w in self.procs:
-                w.__ray_terminate__.remote()
-            self.procs = []
-        except RayActorError as ex:
-            self.logger.warning("Failed to shutdown gracefully", exc_info=ex)
+            # Check if restore checkpoint file fulfills the stop criteria on first run
+            pre_experiment_result = None
+            if self._first_run:
+                self._first_run = False
+                if self._restored and self._should_stop():
+                    self.logger.warning(
+                        f"Restored checkpoint file '{self.restore_checkpoint_file}' "
+                        f"fulfills stop criteria without additional training.")
+                    return {
+                        # Do not train or log results, just stop
+                        RESULT_DUPLICATE: True,
+                        DONE: True
+                    }
+
+                # Run any pre-experiment functionality such as pre-training validation.
+                # The results are aggregated here so they may be immediately logged
+                # as opposed to waiting till the end of the iteration.
+                if self._iteration == 0:
+                    status = []
+                    for w in self.procs:
+                        status.append(w.run_pre_experiment.remote())
+
+                    agg_pre_exp = self.experiment_class.aggregate_pre_experiment_results
+                    if ray_utils.check_for_failure(status):
+                        results = ray.get(status)
+                        pre_experiment_result = agg_pre_exp(results)
+                        self.logger.info(
+                            f"Pre-Experiment Result: {pre_experiment_result}"
+                        )
+
+            results = self._run_iteration()
+
+            # Aggregate the results from all processes
+            if results is not None:
+
+                # Aggregate results from iteration.
+                ret = self.experiment_class.aggregate_results(results)
+
+                if pre_experiment_result is not None:
+                    self.experiment_class.insert_pre_experiment_result(
+                        ret, pre_experiment_result)
+
+                self._process_result(ret)
+                readable_result = self.experiment_class.get_readable_result(ret)
+                self.logger.info(f"End Iteration Result: {readable_result}")
+
+                # Check if we should stop the experiment
+                ret[DONE] = self._should_stop()
+
+                return ret
+
+            err_msg = (f"{self._trial_info.trial_name}({self.iteration}): "
+                       f"One of the remote workers failed during training")
+            self.logger.error(err_msg)
+            raise RuntimeError(err_msg)
+        except Exception:
             self._kill_workers()
-
-    def _process_config(self, config):
-        pass
-
-    @abc.abstractmethod
-    def _run_iteration(self):
-        """Run one iteration of the experiment"""
-        raise NotImplementedError
-
-    def _process_result(self, result, pre_experiment_result=None):
-        pass
+            raise
 
 
-class SupervisedTrainable(BaseTrainable):
-    """
-    Trainable class used to train supervised machine learning experiments
-    with ray.
-    """
-
-    def _run_iteration(self):
-        """Run one epoch of training on each process."""
-
-        status = []
-        for w in self.procs:
-            status.append(w.run_epoch.remote())
-
-        # Wait for remote functions and check for errors
-        if ray_utils.check_for_failure(status):
-            return ray.get(status)
-
-    def _process_result(self, result, pre_experiment_result=None):
-
-        # Aggregate initial validation results (before any training).
-        if pre_experiment_result is not None:
-            result["extra_val_results"].insert(0, (0, pre_experiment_result))
-
-
-class ContinualLearningTrainable(SupervisedTrainable):
-    """
-    Trainable class used to train supervised machine learning experiments
-    with ray.
-    """
-
-    # This is used in the run_with_raytune function to clarify the stopping condition.
-    stop_condition = "num_tasks"
-
-    def _run_iteration(self):
-        """Run one epoch of training on each process."""
-        status = []
-        for w in self.procs:
-            status.append(w.run_task.remote())
-
-        # Wait for remote functions and check for errors
-        if ray_utils.check_for_failure(status):
-            return ray.get(status)
-
-
-class SigOptSupervisedTrainable(SupervisedTrainable):
+class SigOptTrainableMixin:
     """
     This class updates the config using SigOpt before the models and workers are
     instantiated, and updates the result using SigOpt once training completes.
@@ -403,12 +500,12 @@ class SigOptSupervisedTrainable(SupervisedTrainable):
             assert "mean_accuracy" in self.metric_names, \
                 "For now, we only update the observation if `mean_accuracy` is present."
 
-    def _process_result(self, result, pre_experiment_result=None):
+    def _process_result(self, result):
         """
         Update sigopt with the new result once we're at the end of training.
         """
 
-        super()._process_result(result, pre_experiment_result=pre_experiment_result)
+        super()._process_result(result)
 
         if self.sigopt is not None:
             result["early_stop"] = result.get("early_stop", 0.0)
@@ -427,6 +524,14 @@ class SigOptSupervisedTrainable(SupervisedTrainable):
                     pprint(result)
 
 
+class SigOptRemoteProcessTrainable(SigOptTrainableMixin, RemoteProcessTrainable):
+    pass
+
+
+class SigOptDistributedTrainable(SigOptTrainableMixin, DistributedTrainable):
+    pass
+
+
 class DebugTrainable(Trainable):
     """Simple trainable compatible with experiment class and config. For debugging."""
 
@@ -440,8 +545,8 @@ class DebugTrainable(Trainable):
 
     def _train(self):
         ret = self.experiment.run_task()
-        printable_result = self.experiment_class.get_printable_result(ret)
-        print(f"End Iteration Result: {printable_result}")
+        readable_result = self.experiment_class.get_readable_result(ret)
+        print(f"End Iteration Result: {readable_result}")
 
         return ret
 

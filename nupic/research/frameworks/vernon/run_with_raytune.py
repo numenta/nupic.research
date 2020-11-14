@@ -27,12 +27,9 @@ import ray.resource_spec
 import torch
 from ray.tune import Trainable, tune
 
+from nupic.research.frameworks.vernon import interfaces, trainables
 from nupic.research.frameworks.vernon.experiment_utils import get_free_port
 from nupic.research.frameworks.vernon.search import TrialsCollection
-from nupic.research.frameworks.vernon.trainables import (
-    SigOptSupervisedTrainable,
-    SupervisedTrainable,
-)
 from nupic.research.support.ray_utils import (
     get_last_checkpoint,
     register_torch_serializers,
@@ -70,7 +67,7 @@ def run_single_instance(config):
 
     # Get number of GPUs
     config.setdefault("num_gpus", torch.cuda.device_count())
-    config["workers"] = 4
+    config.setdefault("workers", 4)
     config["log_level"] = "INFO"
     config["reuse_actors"] = False
     config["dist_port"] = get_free_port()
@@ -105,7 +102,7 @@ def run_single_instance(config):
         print(f"***** Experiment {trials.name} finished: {len(trials.completed)}"
               " trials completed")
     else:
-        run_trial_single_instance(config, kwargs),
+        run_trial_single_instance(config, kwargs)
         ray.shutdown()
 
 
@@ -123,12 +120,14 @@ def get_tune_kwargs(config):
     Build and return the kwargs needed to run `tune.run` for a given config.
 
     :param config:
-        - ray_trainable: the ray.tune.Trainable; defaults to SupervisedTrainable
+        - ray_trainable: the ray.tune.Trainable; defaults to
+                         RemoteProcessTrainable or DistributedTrainable,
+                         depending on whether the experiment class is distributed
             - stop_condition: If the trainable has this attribute, it will be used
                               to decide which config parameter dictates the stop
                               training_iteration.
         - sigopt_config: (optional) used for running experiments with SigOpt and
-                         the SigOptSupervisedTrainable
+                         the SigOpt trainables
         - restore: whether to restore from the latest checkpoint; defaults to False
         - local_dir: needed with 'restore'; identifies the parent directory of
                      experiment results.
@@ -140,10 +139,16 @@ def get_tune_kwargs(config):
     kwargs_names = tune.run.__code__.co_varnames[:tune.run.__code__.co_argcount]
 
     # Zip the kwargs along with the Ray trainable.
+    distributed = issubclass(config.get("experiment_class"),
+                             interfaces.DistributedAggregation)
     if "sigopt_config" in config:
-        default_trainable = SigOptSupervisedTrainable
+        default_trainable = (trainables.SigOptDistributedTrainable
+                             if distributed
+                             else trainables.SigOptRemoteProcessTrainable)
     else:
-        default_trainable = SupervisedTrainable
+        default_trainable = (trainables.DistributedTrainable
+                             if distributed
+                             else trainables.RemoteProcessTrainable)
 
     ray_trainable = config.get("ray_trainable", default_trainable)
     assert issubclass(ray_trainable, Trainable)
@@ -161,17 +166,7 @@ def get_tune_kwargs(config):
     # Make sure to only select `tune.run` function arguments
     kwargs = dict(filter(lambda x: x[0] in kwargs_names, kwargs.items()))
 
-    # Collect tune stop criteria.
-    stop = kwargs.get("stop", {}) or dict()
-
-    # Update the stop criteria `training_iteration` with the named `stop_condition`
-    # This may be `epochs` or `num_tasks`, for instance.
-    stop_condition = getattr(ray_trainable, "stop_condition", "epochs")
-    stop_iteration = config.get(stop_condition, None)
-    if stop_iteration is not None:
-        stop.update(training_iteration=stop_iteration)
-
     # Update the stop condition.
-    kwargs["stop"] = stop
+    kwargs["stop"] = kwargs.get("stop", {}) or dict()
 
     return kwargs

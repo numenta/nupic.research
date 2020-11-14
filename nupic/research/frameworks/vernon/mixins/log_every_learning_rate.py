@@ -19,8 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from nupic.research.frameworks.vernon.mixins.step_based_logging import StepBasedLogging
 
-class LogEveryLearningRate:
+
+class LogEveryLearningRate(StepBasedLogging):
     """
     Include the learning rate for every batch in the result dict.
 
