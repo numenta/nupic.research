@@ -26,7 +26,7 @@ import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 from nupic.research.frameworks.dendrites.routing import train_dendrite_model
-from nupic.research.frameworks.dendrites.routing.learn_dendrites import (
+from nupic.research.frameworks.dendrites.routing.learn import (
     init_dataloader,
     init_optimizer,
     init_test_scenario,
@@ -43,6 +43,7 @@ class LearnToRouteTest(unittest.TestCase):
         """ Non-dendritic weights should not be modified """
 
         r, dendritic_network, context_vectors, device = init_test_scenario(
+            mode="dendrites",
             dim_in=100,
             dim_out=100,
             num_contexts=10,
@@ -85,6 +86,7 @@ class LearnToRouteTest(unittest.TestCase):
         """ Dendritic weights should be modified """
 
         r, dendritic_network, context_vectors, device = init_test_scenario(
+            mode="dendrites",
             dim_in=100,
             dim_out=100,
             num_contexts=10,
@@ -101,7 +103,7 @@ class LearnToRouteTest(unittest.TestCase):
             x_max=2.0
         )
 
-        optimizer = init_optimizer(network=dendritic_network)
+        optimizer = init_optimizer(mode="dendrites", network=dendritic_network)
 
         dendritic_weights_before = copy.deepcopy(
             dendritic_network.segments.weights.data
