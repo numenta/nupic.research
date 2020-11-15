@@ -19,6 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+"""
+Perform the routing task by learning both the feed-forward and dendritic weights
+"""
+
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -35,7 +39,7 @@ from nupic.research.frameworks.dendrites.routing import (
 
 def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_module):
     """
-    Returns the routing function, dendritic network, context vectors, and device to use
+    Returns the routing function, dendrite layer, context vectors, and device to use
     in the "learning to route" experiment
 
     :param dim_in: the number of dimensions in the input to the routing function and
@@ -51,8 +55,8 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Initialize routing function that this task will try to hardcode, and set
-    # `requires_grad=False` since the routing function is static
+    # Initialize routing function and set `requires_grad=False` since the routing
+    # function is static
     r = RoutingFunction(
         dim_in=dim_in,
         dim_out=dim_out,
@@ -70,11 +74,12 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
         percent_on=0.2
     )
 
-    # Initialize dendrite module using the same feed-forward sparse weights as the
-    # routing function; also note that the value passed to `dendrite_sparsity` is
-    # irrelevant since the context weights are subsequently overwritten
+    # Initialize the dendrite layer's feed-forward module as torch.nn.Linear (which
+    # will be learned) without a bias; also note that the value passed to
+    # `dendrite_sparsity` is irrelevant since the context weights are subsequently
+    # overwritten
     dendritic_network = dendrite_module(
-        module=r.sparse_weights.module,
+        module=torch.nn.Linear(dim_in, dim_out, bias=False),
         num_segments=num_contexts,
         dim_context=dim_context,
         module_sparsity=0.7,
@@ -133,8 +138,8 @@ def init_dataloader(
     return routing_test_dataloader
 
 
-def init_optimizer(network, lr=0.5):
-    return torch.optim.SGD(network.parameters(), lr=lr)
+def init_optimizer(network, lr=1e-5):
+    return torch.optim.Adam(network.parameters(), lr=lr)
 
 
 def learn_to_route(
@@ -147,8 +152,8 @@ def learn_to_route(
     num_training_epochs=5000
 ):
     """
-    Trains a dendritic network to match an arbitrary routing function, while only
-    learning the dendritic weights with no sparsity constraint
+    Trains a dendrite layer to match an arbitrary routing function by learning both
+    feed-forward and dendritic weights
 
     :param dim_in: the number of dimensions in the input to the routing function and
                    test module
@@ -203,11 +208,10 @@ def learn_to_route(
             device=device,
             criterion=F.l1_loss,
             concat=False,
-            l1_weight_decay=1e-8
+            l1_weight_decay=1e-6
         )
 
-        # Validate model - note that we use a different dataset/dataloader as the input
-        # distribution has changed
+        # Validate model
         results = evaluate_dendrite_model(
             model=dendritic_network,
             loader=test_dataloader,
@@ -216,15 +220,12 @@ def learn_to_route(
             concat=False
         )
 
-        print("{},{},{}".format(
-            epoch, results["loss"], results["mean_abs_err"]
+        print("{},{}".format(
+            epoch, results["mean_abs_err"]
         ))
 
 
 if __name__ == "__main__":
-
-    # Learn dendritic weights that learn to route, while keeping feedforward weights
-    # fixed
 
     learn_to_route(
         dim_in=100,
