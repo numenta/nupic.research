@@ -36,13 +36,13 @@ from nupic.research.frameworks.dendrites.routing.learn import (
 class LearnToRouteTest(unittest.TestCase):
     """
     This test suite only applies to the "learning to route" scenario in which only
-    dendritic weights are learned while feed-forward weights are fixed
+    dendrite weights are learned while feed-forward weights are fixed
     """
 
-    def test_non_dendritic_weights(self):
-        """ Non-dendritic weights should not be modified """
+    def test_non_dendrite_weights(self):
+        """ Non-dendrite weights should not be modified """
 
-        r, dendritic_network, context_vectors, device = init_test_scenario(
+        r, dendrite_layer, context_vectors, device = init_test_scenario(
             mode="dendrites",
             dim_in=100,
             dim_out=100,
@@ -60,32 +60,32 @@ class LearnToRouteTest(unittest.TestCase):
             x_max=2.0
         )
 
-        optimizer = init_optimizer(network=dendritic_network)
+        optimizer = init_optimizer(mode="dendrites", layer=dendrite_layer)
 
-        non_dendritic_weights_before = copy.deepcopy(
-            dendritic_network.module.weight.data
+        non_dendrite_weights_before = copy.deepcopy(
+            dendrite_layer.module.weight.data
         )
 
         # Perform a single training epoch
         train_dendrite_model(
-            model=dendritic_network,
+            model=dendrite_layer,
             loader=dataloader,
             optimizer=optimizer,
             device=device,
             criterion=F.l1_loss
         )
 
-        non_dendritic_weights_after = copy.deepcopy(
-            dendritic_network.module.weight.data
+        non_dendrite_weights_after = copy.deepcopy(
+            dendrite_layer.module.weight.data
         )
 
-        expected = (non_dendritic_weights_before == non_dendritic_weights_after).all()
+        expected = (non_dendrite_weights_before == non_dendrite_weights_after).all()
         self.assertTrue(expected)
 
-    def test_dendritic_weights(self):
-        """ Dendritic weights should be modified """
+    def test_dendrite_weights(self):
+        """ Dendrite weights should be modified """
 
-        r, dendritic_network, context_vectors, device = init_test_scenario(
+        r, dendrite_layer, context_vectors, device = init_test_scenario(
             mode="dendrites",
             dim_in=100,
             dim_out=100,
@@ -103,26 +103,26 @@ class LearnToRouteTest(unittest.TestCase):
             x_max=2.0
         )
 
-        optimizer = init_optimizer(mode="dendrites", network=dendritic_network)
+        optimizer = init_optimizer(mode="dendrites", layer=dendrite_layer)
 
-        dendritic_weights_before = copy.deepcopy(
-            dendritic_network.segments.weights.data
+        dendrite_weights_before = copy.deepcopy(
+            dendrite_layer.segments.weights.data
         )
 
         # Perform a single training epoch
         train_dendrite_model(
-            model=dendritic_network,
+            model=dendrite_layer,
             loader=dataloader,
             optimizer=optimizer,
             device=device,
             criterion=F.l1_loss
         )
 
-        dendritic_weights_after = copy.deepcopy(
-            dendritic_network.segments.weights.data
+        dendrite_weights_after = copy.deepcopy(
+            dendrite_layer.segments.weights.data
         )
 
-        expected = (dendritic_weights_before == dendritic_weights_after).all()
+        expected = (dendrite_weights_before == dendrite_weights_after).all()
         self.assertFalse(expected)
 
 
