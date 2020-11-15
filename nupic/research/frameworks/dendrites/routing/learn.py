@@ -97,6 +97,8 @@ def init_test_scenario(
         dendrite_layer_forward_module = r.sparse_weights.module
     elif mode == "all":
         dendrite_layer_forward_module = torch.nn.Linear(dim_in, dim_out, bias=False)
+    else:
+        raise Exception("Invalid value for `mode`: {}".format(mode))
 
     dendrite_layer = dendrite_module(
         module=dendrite_layer_forward_module,
