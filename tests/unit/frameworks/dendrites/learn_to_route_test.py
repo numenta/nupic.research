@@ -85,7 +85,7 @@ class LearnToRouteTest(unittest.TestCase):
             )
 
             expected = (forward_weights_before == forward_weights_after).all()
-            
+
             # If training both feed-forward and dendrite weights, we expect the
             # dendrite weights to change
             if mode == "all":
