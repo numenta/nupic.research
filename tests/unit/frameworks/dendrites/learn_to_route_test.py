@@ -26,7 +26,7 @@ import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 from nupic.research.frameworks.dendrites.routing import train_dendrite_model
-from nupic.research.frameworks.dendrites.routing.learned import (
+from nupic.research.frameworks.dendrites.routing.learned_v1 import (
     init_dataloader,
     init_optimizer,
     init_test_scenario,
