@@ -39,17 +39,23 @@ class RegularizeLoss(object):
             Dictionary containing the following parameters that set the schedule
             for the regularization strength:
             - reg_scalar: (float or callable) Returns the reg_scalar, given the
-                 epoch number, batch index, and total batches per epoch
+                 epoch number and percent of batches elapsed in this epoch
             - downscale_reg_with_training_set: If True, multiply the
                  regularization term by (1 / size_of_training_set)
         """
         super().setup_experiment(config)
 
         self.reg_scalar = config.get("reg_scalar", 0)
-        self._update_reg_scalar(0)
+
+        # Extra logic to set the value immediately so that loss can be computed
+        # for pre-experiment validations.
+        if callable(self.reg_scalar):
+            self.reg_scalar_value = self.reg_scalar(self.current_epoch, 0.0)
+        else:
+            self.reg_scalar_value = self.reg_scalar
 
         self.reg_scalar_downscale = (
-            1 / len(self.train_loader.dataset)
+            1 / len(self.train_dataset)
             if config.get("downscale_reg_with_training_set", False)
             else 1
         )
@@ -67,8 +73,8 @@ class RegularizeLoss(object):
     def _update_reg_scalar(self, batch_idx):
         reg_scalar = self.reg_scalar
         if callable(reg_scalar):
-            reg_scalar = reg_scalar(self.current_epoch, batch_idx,
-                                    len(self.train_loader))
+            reg_scalar = reg_scalar(self.current_epoch,
+                                    batch_idx / len(self.train_loader))
 
         self.reg_scalar_value = reg_scalar
 

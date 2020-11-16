@@ -45,6 +45,12 @@ class ContinualLearningExperiment(
     def setup_experiment(self, config):
 
         super().setup_experiment(config)
+
+        self.train_task_indices = self.compute_task_indices(config,
+                                                            self.train_dataset)
+        self.val_task_indices = self.compute_task_indices(config,
+                                                          self.val_dataset)
+
         # Override epochs to validate to not validate within the inner loop over epochs
         self.epochs_to_validate = []
 
@@ -111,20 +117,85 @@ class ContinualLearningExperiment(
         self.current_task += 1
         return ret
 
-    def prepare_loaders_for_epoch(self, epoch):
-        super().prepare_loaders_for_epoch(epoch)
-        task = epoch // self.epochs
-        self.train_loader.sampler.set_active_tasks(task)
+    def validate(self, tasks):
+        loader = self.fast_create_validation_loader(tasks)
+        return super().validate(loader=loader)
 
     @classmethod
-    def create_train_sampler(cls, config, dataset):
-        task_indices = cls.compute_task_indices(config, dataset)
-        return TaskRandomSampler(task_indices)
+    def create_train_sampler(cls, config, dataset, task_indices, epoch):
+        current_task = epoch // config["epochs"]
+        sampler = TaskRandomSampler(task_indices)
+        sampler.set_active_tasks(current_task)
+        return sampler
 
     @classmethod
-    def create_validation_sampler(cls, config, dataset):
+    def create_train_dataloader(cls, config, epoch=0):
+        """
+        This classmethod makes it possible to create an experiment's train
+        dataloaders without instantiating the experiment.
+
+        :param config: experiment config
+        :param epoch: epoch number. subclasses may vary the loader by epoch.
+        :return: dataloader
+        """
+        dataset = cls.load_dataset(config, train=True)
         task_indices = cls.compute_task_indices(config, dataset)
-        return TaskRandomSampler(task_indices)
+        sampler = cls.create_train_sampler(config, dataset, task_indices, epoch)
+
+        return cls._create_train_dataloader(config, dataset, sampler, epoch)
+
+    def fast_create_train_loader(self, epoch):
+        """
+        Like create_train_dataloader, but is an instance method that uses cached
+        dataset and task_indices objects. This enables using dataloaders in a
+        functional way, quickly creating them and discarding them, while reusing
+        the underlying dataset and task_indices objects (which are not mutated).
+
+        :param epoch: epoch number
+        :return: dataloader
+        """
+        sampler = self.create_train_sampler(self.config, self.train_dataset,
+                                            self.train_task_indices, epoch)
+        return self._create_train_dataloader(self.config, self.train_dataset,
+                                             sampler, epoch)
+
+    @classmethod
+    def create_validation_sampler(cls, config, dataset, task_indices, tasks):
+        sampler = TaskRandomSampler(task_indices)
+        sampler.set_active_tasks(tasks)
+        return sampler
+
+    @classmethod
+    def create_validation_dataloader(cls, config, tasks=0):
+        """
+        This classmethod makes it possible to create an experiment's validation
+        dataloaders without instantiating the experiment.
+
+        :param config: experiment config
+        :param tasks: task numbers or number
+        :return: dataloader
+        """
+        dataset = cls.load_dataset(config, train=False)
+        task_indices = cls.compute_task_indices(config, dataset)
+        sampler = cls.create_validation_sampler(config, dataset, task_indices,
+                                                tasks)
+        return cls._create_validation_dataloader(config, dataset, sampler)
+
+    def fast_create_validation_loader(self, tasks):
+        """
+        Like create_validation_dataloader, but is an instance method that uses
+        cached dataset and task_indices objects. This enables using dataloaders
+        in a functional way, quickly creating them and discarding them, while
+        reusing the underlying dataset and task_indices objects (which are not
+        mutated).
+
+        :param tasks: task numbers or number
+        :return: dataloader
+        """
+        sampler = self.create_validation_sampler(self.config, self.val_dataset,
+                                                 self.val_task_indices, tasks)
+        return self._create_validation_dataloader(self.config, self.val_dataset,
+                                                  sampler)
 
     @classmethod
     def compute_task_indices(cls, config, dataset):
@@ -152,7 +223,7 @@ class ContinualLearningExperiment(
 
         # Extended methods
         eo["setup_experiment"].append(exp + ".setup_experiment")
-        eo["prepare_loaders_for_epoch"].append(exp + ": Set current task")
+        eo["validate"].insert(0, exp + ": Create loader for specified tasks")
 
         eo.update(
             # Overwritten methods
@@ -160,10 +231,6 @@ class ContinualLearningExperiment(
             run_iteration=[exp + ": Call run_task"],
             create_train_sampler=[exp + ".create_train_sampler"],
             create_validation_sampler=[exp + ".create_validation_sampler"],
-            aggregate_results=[exp + ".aggregate_results"],
-            aggregate_pre_experiment_results=[
-                exp + ".aggregate_pre_experiment_results"
-            ],
 
             # New methods
             run_task=[exp + ".run_task"],

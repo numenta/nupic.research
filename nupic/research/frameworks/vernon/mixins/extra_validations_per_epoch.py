@@ -46,19 +46,6 @@ class ExtraValidationsPerEpoch(StepBasedLogging):
         # A list of [(timestep, result), ...] for the current epoch.
         self.extra_val_results = []
 
-        extra_validations = config.get("extra_validations_per_epoch", 0)
-        batches_to_validate = np.linspace(
-            min(len(self.train_loader), self.batches_in_epoch),
-            0,
-            1 + extra_validations,
-            endpoint=False
-        )[::-1].round().astype("int").tolist()
-        self.additional_batches_to_validate = batches_to_validate[:-1]
-        if extra_validations > 0:
-            self.logger.info(
-                f"Extra validations per epoch: {extra_validations}, "
-                f"batch indices: {self.additional_batches_to_validate}")
-
     def run_epoch(self):
         ret = super().run_epoch()
         ret["extra_val_results"] = self.extra_val_results
@@ -67,7 +54,17 @@ class ExtraValidationsPerEpoch(StepBasedLogging):
 
     def post_batch(self, batch_idx, **kwargs):
         super().post_batch(batch_idx=batch_idx, **kwargs)
-        validate = (batch_idx in self.additional_batches_to_validate
+
+        extra_validations = self.config.get("extra_validations_per_epoch", 0)
+        batches_to_validate = np.linspace(
+            min(len(self.train_loader), self.batches_in_epoch),
+            0,
+            1 + extra_validations,
+            endpoint=False
+        )[::-1].round().astype("int").tolist()
+        additional_batches_to_validate = batches_to_validate[:-1]
+
+        validate = (batch_idx in additional_batches_to_validate
                     and self.current_epoch in self.epochs_to_validate)
         if validate:
             result = self.validate()

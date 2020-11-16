@@ -22,10 +22,14 @@ import os
 import tarfile
 import urllib
 
+import numpy as np
+import torch.utils.data
 from filelock import FileLock
 from tqdm import tqdm
 
-from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
+from nupic.research.frameworks.pytorch.dataset_utils import (
+    FunctionalPreprocessedDataset,
+)
 
 DATA_URL = "http://public.numenta.com/datasets/google_speech_commands/gsc_preprocessed_v0.01.tar.gz"  # noqa: E501
 
@@ -41,9 +45,8 @@ def preprocessed_gsc(root, train=True, download=True):
     Create train or validation dataset from preprocessed GSC data, downloading if
     necessary.
 
-    Warning: Be sure to call dataset.load_next() following each epoch of training.
-    Otherwise, no new augmentations will be loaded, and the same exact samples
-    will be reused.
+    Warning: During training, be sure to call dataset.get_variant(), and call it
+    with different indices to train with different augmentations.
 
     :param root: directory to store or load downloaded data
     :param train: whether to load train of validation data
@@ -55,17 +58,16 @@ def preprocessed_gsc(root, train=True, download=True):
         download_gsc_data(root)
 
     if train:
-        basename = "gsc_train"
-        qualifiers = range(30)
+        dataset = FunctionalPreprocessedDataset(
+            cachefilepath=root,
+            basename="gsc_train",
+            qualifiers=range(30),
+        )
     else:
-        basename = "gsc_valid"
-        qualifiers = [""]
-
-    dataset = PreprocessedDataset(
-        cachefilepath=root,
-        basename=basename,
-        qualifiers=qualifiers,
-    )
+        x, y = np.load(os.path.join(root, "gsc_valid.npz")).values()
+        dataset = torch.utils.data.TensorDataset(
+            torch.tensor(x), torch.tensor(y)
+        )
 
     return dataset
 

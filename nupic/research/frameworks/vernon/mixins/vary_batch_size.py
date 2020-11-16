@@ -40,26 +40,21 @@ class VaryBatchSize(object):
             {**config, "batch_size": batch_sizes[0]}
         )
 
-        self.config = config
         self.batch_sizes = batch_sizes
 
-    def prepare_loaders_for_epoch(self, epoch):
-        """
-        Set the train dataloader to the appropriate batch size.
-        """
-        super().prepare_loaders_for_epoch(epoch)
-        batch_size = self.batch_sizes[min(epoch,
-                                          len(self.batch_sizes) - 1)]
-        if self.train_loader.batch_size != batch_size:
-            self.train_loader = self.create_train_dataloader(
-                {**self.config, "batch_size": batch_size}
-            )
+    @classmethod
+    def _create_train_dataloader(cls, config, dataset, sampler, epoch):
+        # Set the train dataloader to the appropriate batch size.
+        batch_sizes = config["batch_sizes"]
+        batch_size = batch_sizes[min(epoch, len(batch_sizes) - 1)]
+        return super()._create_train_dataloader(
+            {**config, "batch_size": batch_size},
+            dataset, sampler, epoch
+        )
 
     def pre_epoch(self):
         super().pre_epoch()
         if self.current_epoch < len(self.batch_sizes):
-            # Log this here, not in prepare_loaders_for_epoch, because
-            # prepare_loaders_for_epoch is also called in compute_steps_in_epoch.
             self.logger.info("Setting batch_size=%s (variant %s)",
                              self.train_loader.batch_size,
                              self.current_epoch)
@@ -70,8 +65,8 @@ class VaryBatchSize(object):
         name = "VaryBatchSize: "
         eo["setup_experiment"].insert(0, name + "set initial batch size")
         eo["setup_experiment"].append(name + "initialization")
-        eo["prepare_loaders_for_epoch"].append(
-            name + "set the dataloader and batch-size")
+        eo["_create_train_dataloader"].append(
+            name + "set the batch-size")
         eo["pre_epoch"].append(
             name + "log modified batch size")
         return eo

@@ -53,15 +53,11 @@ class SupervisedExperiment(DistributedBase,
         else:
             self.model = DataParallel(self.model)
 
-    def prepare_loaders_for_epoch(self, epoch):
-        super().prepare_loaders_for_epoch(epoch)
-        if self.distributed:
-            self.train_loader.sampler.set_epoch(epoch)
-
     @classmethod
-    def create_train_sampler(cls, config, dataset):
+    def create_train_sampler(cls, config, dataset, epoch):
         if config.get("distributed", False):
             sampler = DistributedSampler(dataset)
+            sampler.set_epoch(epoch)
         else:
             sampler = None
         return sampler
@@ -98,8 +94,6 @@ class SupervisedExperiment(DistributedBase,
 
         # Extended methods
         eo["setup_experiment"].append(exp + ": DistributedDataParallel")
-        eo["prepare_loaders_for_epoch"].append(
-            exp + ": Update distributed sampler")
 
         eo.update(
             # Overwritten methods

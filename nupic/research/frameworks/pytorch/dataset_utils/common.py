@@ -48,6 +48,7 @@ __all__ = [
     "UnionDataset",
     "split_dataset",
     "PreprocessedDataset",
+    "FunctionalPreprocessedDataset",
     "CachedDatasetFolder",
     "ProgressiveRandomResizedCrop",
     "HDF5Dataset",
@@ -251,6 +252,65 @@ class PreprocessedDataset(Dataset):
         file_name = os.path.join(self.path, self.basename + "{}.npz".format(qualifier))
         self.tensors = list(np.load(file_name).values())
         return file_name
+
+
+class FunctionalPreprocessedDataset(Dataset):
+    def __init__(self, cachefilepath, basename, qualifiers):
+        """
+        Like the PreprocessedDataset, but designed to be immutable, using a more
+        functional programming approach. Rather than calling load_next() and
+        modifying the dataset object, call get_variant() to get a new dataset
+        object.
+
+        This class only directly provides limited Dataset functionality (it
+        provides the dataset length). It is not directly compatible with
+        dataloaders. Call get_variant() to get a dataset that is ready for
+        dataloaders.
+
+        :param cachefilepath: String for the directory containing pre-processed
+        data.
+
+        :param basename: Base file name from which to construct actual file
+        names. Actual file name will be "basename{}.npz".format(i) where i
+        cycles through the list of qualifiers.
+
+        :param qualifiers: List of qualifiers for each preprocessed files in
+        this dataset.
+        """
+        self.path = cachefilepath
+        self.basename = basename
+        self.qualifiers = qualifiers
+
+        # Compute the length once so that __len__ is fast.
+        self.length = len(self.get_variant(0))
+
+    def __getitem__(self, index):
+        raise TypeError(
+            "The PreprocessedDataset doesn't support enumeration. "
+            "Must first use get_variant."
+        )
+
+    def __len__(self):
+        return self.length
+
+    def num_variants(self):
+        """
+        :return: number of variant datasets
+        """
+        return len(self.qualifiers)
+
+    def get_variant(self, variant):
+        """
+        :param variant: index of the dataset variant
+        :return: variant dataset
+        """
+        qualifier = self.qualifiers[variant]
+        file_name = os.path.join(self.path,
+                                 self.basename + "{}.npz".format(qualifier))
+        x, y = np.load(file_name).values()
+        return torch.utils.data.TensorDataset(
+            torch.tensor(x), torch.tensor(y)
+        )
 
 
 class CachedDatasetFolder(DatasetFolder):

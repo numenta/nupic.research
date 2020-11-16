@@ -50,21 +50,16 @@ class ContinualLearningExperiment(DistributedBase,
         else:
             self.model = DataParallel(self.model)
 
-    def prepare_loaders_for_epoch(self, epoch):
-        super().prepare_loaders_for_epoch(epoch)
-        if self.distributed:
-            self.train_loader.sampler.set_epoch(epoch)
-
     @classmethod
-    def create_train_sampler(cls, config, dataset):
+    def create_train_sampler(cls, config, epoch, dataset, task_indices):
         if config.get("distributed", False):
-            task_indices = cls.compute_task_indices(config, dataset)
-            return TaskDistributedSampler(
-                dataset,
-                task_indices
-            )
+            sampler = TaskDistributedSampler(dataset, task_indices)
+            sampler.set_epoch(epoch)
+            sampler.set_active_tasks(epoch // config["epochs"])
+            return sampler
         else:
-            return super().create_train_sampler(config, dataset)
+            return super().create_train_sampler(config, epoch, dataset,
+                                                task_indices)
 
     @classmethod
     def get_execution_order(cls):
@@ -73,11 +68,9 @@ class ContinualLearningExperiment(DistributedBase,
 
         # Extended methods
         eo["setup_experiment"].append(exp + ": DistributedDataParallel")
-        eo["prepare_loaders_for_epoch"].append(
-            exp + ": Update distributed sampler")
         eo["create_train_sampler"].insert(0,
                                           ("If distributed { "
-                                           "create distribited sampler "
+                                           "create distributed sampler "
                                            "} else {"))
         eo["create_train_sampler"].append("}")
         # FIXME: Validation is not currently distributed. Implement

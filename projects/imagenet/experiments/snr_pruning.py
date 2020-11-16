@@ -65,8 +65,8 @@ def conv_target_density(in_channels, out_channels, kernel_size):
 
 def make_reg_schedule(epochs, pct_ramp_start, pct_ramp_end, peak_value,
                       pct_drop, final_value):
-    def reg_schedule(epoch, batch_idx, steps_per_epoch):
-        pct = (epoch + batch_idx / steps_per_epoch) / epochs
+    def reg_schedule(epoch, epoch_pct):
+        pct = (epoch + epoch_pct) / epochs
 
         if pct < pct_ramp_start:
             return 0.0

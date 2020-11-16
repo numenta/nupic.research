@@ -19,30 +19,32 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.pytorch.dataset_utils import PreprocessedDataset
+from nupic.research.frameworks.pytorch.dataset_utils import (
+    FunctionalPreprocessedDataset,
+)
 
 
 class LoadPreprocessedData(object):
     """
-    This mixin helps manage preprocessed by ensuring the next set is loaded
-    following every epoch in preparation for the next.
+    This mixin loads the appropriate preprocessed dataset for each epoch.
     """
 
     def setup_experiment(self, config):
         super().setup_experiment(config)
-        assert isinstance(self.train_loader.dataset, PreprocessedDataset), (
+        assert isinstance(self.train_dataset, FunctionalPreprocessedDataset), (
             "The train dataset is not preprocessed; there's nothing to load."
         )
 
-    def post_epoch(self):
-        super().post_epoch()
-        self.train_loader.dataset.load_next()
-        self.logger.info("Loaded next set of preprocessed data.")
+    @classmethod
+    def _create_train_dataloader(cls, config, dataset, sampler, epoch):
+        dataset = dataset.get_variant(epoch % dataset.num_variants())
+        return super()._create_train_dataloader(config, dataset, sampler, epoch)
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         name = "LoadPreprocessedData"
         eo["setup_experiment"].append(name + ": ensure the train set is preprocessed")
-        eo["post_epoch"].append(name + ": load the next set of preprocessed data")
+        eo["_create_train_dataloader"].append(
+            name + ": load the specified epoch's data")
         return eo

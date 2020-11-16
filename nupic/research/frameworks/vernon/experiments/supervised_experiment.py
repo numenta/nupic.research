@@ -71,7 +71,6 @@ class SupervisedExperiment(ExperimentBase):
         self._loss_function = None
         self.lr_scheduler = None
         self.train_loader = None
-        self.val_loader = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batches_in_epoch = sys.maxsize
         self.batches_in_epoch_val = sys.maxsize
@@ -80,7 +79,6 @@ class SupervisedExperiment(ExperimentBase):
         self.epochs_to_validate = []
         self.current_epoch = 0
         self.current_step = 0
-        self.train_loader_in_use = False
 
     def setup_experiment(self, config):
         """
@@ -153,6 +151,8 @@ class SupervisedExperiment(ExperimentBase):
         self.logger.info("Execution order: %s",
                          pformat(self.get_execution_order()))
 
+        self.config = config
+
         # Configure model
         self.device = config.get("device", self.device)
         self.model = self.create_model(config, self.device)
@@ -201,6 +201,7 @@ class SupervisedExperiment(ExperimentBase):
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
         self.batches_in_epoch_val = config.get("batches_in_epoch_val", sys.maxsize)
         self.current_epoch = 0
+        self.current_step = 0
 
         # Configure data loaders
         self.create_loaders(config)
@@ -276,9 +277,9 @@ class SupervisedExperiment(ExperimentBase):
             }
         elif issubclass(lr_scheduler_class, ComposedLRScheduler):
             # Update ComposedLRScheduler parameters
-            steps_per_epoch = len(self.train_loader)
+            steps_per_epoch = self.compute_steps_in_epoch(0)
             assert all(self.compute_steps_in_epoch(epoch) == steps_per_epoch
-                       for epoch in range(self.epochs)), (
+                       for epoch in range(1, self.epochs)), (
                 "ComposedLRScheduler requires every epoch to be the same length")
 
             lr_scheduler_args = copy.deepcopy(lr_scheduler_args)
@@ -292,7 +293,7 @@ class SupervisedExperiment(ExperimentBase):
                     lr_class = item.get("lr_scheduler_class", None)
                     if lr_class is not None and issubclass(lr_class, OneCycleLR):
                         lr_args = item.get("lr_scheduler_args", {})
-                        lr_args.update(steps_per_epoch=len(self.train_loader))
+                        lr_args.update(steps_per_epoch=steps_per_epoch)
                 lr_scheduler_args["schedulers"] = schedulers
             lr_scheduler_args["steps_per_epoch"] = steps_per_epoch
 
@@ -300,9 +301,10 @@ class SupervisedExperiment(ExperimentBase):
 
     def create_loaders(self, config):
         """Create and assign train and val dataloaders"""
+        # FIXME: Remove this method, inline into setup_experiment.
 
-        self.train_loader = self.create_train_dataloader(config)
-        self.val_loader = self.create_validation_dataloader(config)
+        self.train_dataset = self.load_dataset(config, train=True)
+        self.val_dataset = self.load_dataset(config, train=False)
 
     def compute_steps_in_epoch(self, epoch):
         """
@@ -310,10 +312,7 @@ class SupervisedExperiment(ExperimentBase):
         :param epoch: Epoch number
         :return: Number of optimizer steps
         """
-        assert not self.train_loader_in_use, (
-            "Computing steps in epoch will modify the data loader")
-        self.prepare_loaders_for_epoch(epoch)
-        return len(self.train_loader)
+        return len(self.fast_create_train_loader(epoch))
 
     @classmethod
     def load_dataset(cls, config, train=True):
@@ -326,19 +325,21 @@ class SupervisedExperiment(ExperimentBase):
         return dataset_class(**dataset_args)
 
     @classmethod
-    def create_train_sampler(cls, config, dataset):
+    def create_train_sampler(cls, config, dataset, epoch):
         return None
 
     @classmethod
-    def create_train_dataloader(cls, config, dataset=None):
+    def _create_train_dataloader(cls, config, dataset, sampler, epoch):
         """
-        This method is a classmethod so that it can be used directly by analysis
-        tools, while also being easily overrideable.
-        """
-        if dataset is None:
-            dataset = cls.load_dataset(config, train=True)
+        Common function underlying all create_train_dataloader paths, making it a
+        good extensibility point.
 
-        sampler = cls.create_train_sampler(config, dataset)
+        :param config: experiment config
+        :param dataset: pytorch dataset
+        :param sampler: pytorch sampler or None
+        :param epoch: epoch number. subclasses may vary the loader by epoch.
+        :return: dataloader
+        """
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("batch_size", 1),
@@ -350,19 +351,48 @@ class SupervisedExperiment(ExperimentBase):
         )
 
     @classmethod
+    def create_train_dataloader(cls, config, epoch=0):
+        """
+        This classmethod makes it possible to create an experiment's train
+        dataloaders without instantiating the experiment.
+
+        :param config: experiment config
+        :param epoch: epoch number. subclasses may vary the loader by epoch.
+        :return: dataloader
+        """
+        dataset = cls.load_dataset(config, train=True)
+        sampler = cls.create_train_sampler(config, dataset, epoch)
+        return cls._create_train_dataloader(config, dataset, sampler, epoch)
+
+    def fast_create_train_loader(self, epoch):
+        """
+        Like create_train_dataloader, but is an instance method that uses a cached
+        dataset object. This enables using dataloaders in a functional way,
+        quickly creating them and discarding them, while reusing the underlying
+        dataset object (which is not mutated).
+
+        :param epoch: epoch number. subclasses may vary the loader by epoch.
+        :return: dataloader
+        """
+        sampler = self.create_train_sampler(self.config, self.train_dataset,
+                                            epoch)
+        return self._create_train_dataloader(self.config, self.train_dataset,
+                                             sampler, epoch)
+
+    @classmethod
     def create_validation_sampler(cls, config, dataset):
         return None
 
     @classmethod
-    def create_validation_dataloader(cls, config, dataset=None):
+    def _create_validation_dataloader(cls, config, dataset, sampler):
         """
-        This method is a classmethod so that it can be used directly by analysis
-        tools, while also being easily overrideable.
-        """
-        if dataset is None:
-            dataset = cls.load_dataset(config, train=False)
+        Common function underlying all create_validation_dataloader paths.
 
-        sampler = cls.create_validation_sampler(config, dataset)
+        :param config: experiment config
+        :param dataset: pytorch dataset
+        :param sampler: pytorch sampler or None
+        :return: dataloader
+        """
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("val_batch_size",
@@ -372,6 +402,32 @@ class SupervisedExperiment(ExperimentBase):
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
         )
+
+    @classmethod
+    def create_validation_dataloader(cls, config):
+        """
+        This classmethod makes it possible to create an experiment's validation
+        dataloaders without instantiating the experiment.
+
+        :param config: experiment config
+        :return: dataloader
+        """
+        dataset = cls.load_dataset(config, train=False)
+        sampler = cls.create_validation_sampler(config, dataset)
+        return cls._create_validation_dataloader(config, dataset, sampler)
+
+    def fast_create_validation_loader(self):
+        """
+        Like create_validation_dataloader, but is an instance method that uses a
+        cached dataset object. This enables using dataloaders in a functional
+        way, quickly creating them and discarding them, while reusing the
+        underlying dataset object (which is not mutated).
+
+        :return: dataloader
+        """
+        sampler = self.create_validation_sampler(self.config, self.val_dataset)
+        return self._create_validation_dataloader(self.config, self.val_dataset,
+                                                  sampler)
 
     def transform_model(self):
         """Placeholder for any model transformation required prior to training"""
@@ -393,7 +449,7 @@ class SupervisedExperiment(ExperimentBase):
 
     def validate(self, loader=None):
         if loader is None:
-            loader = self.val_loader
+            loader = self.fast_create_validation_loader()
 
         return self.evaluate_model(
             model=self.model,
@@ -446,17 +502,8 @@ class SupervisedExperiment(ExperimentBase):
         self.current_epoch += 1
         return ret
 
-    def prepare_loaders_for_epoch(self, epoch):
-        """
-        Update the dataloaders for the specified epoch. This method should allow
-        arbitrary jumps between epochs, with no assumption of being called in
-        order, and may be called multiple times for a given epoch.
-        """
-        pass
-
     def pre_epoch(self):
-        self.prepare_loaders_for_epoch(self.current_epoch)
-        self.train_loader_in_use = True
+        self.train_loader = self.fast_create_train_loader(self.current_epoch)
 
     def pre_batch(self, model, batch_idx):
         pass
@@ -492,7 +539,7 @@ class SupervisedExperiment(ExperimentBase):
         self.current_step += 1
 
     def post_epoch(self):
-        self.train_loader_in_use = False
+        self.train_loader = None
         self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s",
                           self.current_epoch, self.get_lr(), self.get_weight_decay())
 
@@ -678,15 +725,14 @@ class SupervisedExperiment(ExperimentBase):
             transform_model=[exp + ".transform_model"],
             validate=[exp + ".validate"],
             create_loaders=[exp + ".create_loaders"],
-            create_train_dataloader=[exp + ".create_train_dataloader"],
-            create_train_sampler=[exp + ".create_train_sampler"],
+            _create_train_dataloader=[exp + ": Common creation path"],
+            create_train_sampler=[exp + ": Don't use a sampler"],
             create_validation_dataloader=[exp + ".create_validation_dataloader"],
-            create_validation_sampler=[exp + ".create_validation_sampler"],
-            prepare_loaders_for_epoch=[],
+            create_validation_sampler=[exp + ": Don't use a sampler"],
             train_epoch=[exp + ".train_epoch"],
             run_epoch=[exp + ".run_epoch"],
-            pre_epoch=[exp + ": Call prepare_loaders_for_epoch()"],
-            post_epoch=[],
+            pre_epoch=[exp + ": Set self.train_loader"],
+            post_epoch=[exp + ": Unset self.train_loader"],
             pre_batch=[],
             post_batch=[exp + ": Logging"],
             transform_data_to_device=[exp + ".transform_data_to_device"],

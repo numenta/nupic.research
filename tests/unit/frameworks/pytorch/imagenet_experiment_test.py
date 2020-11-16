@@ -113,7 +113,7 @@ class ImagenetExperimentTest(unittest.TestCase):
             exp.setup_experiment(self.config)
 
             i = 0
-            for image, _ in exp.train_loader:
+            for image, _ in exp.create_train_dataloader(self.config):
                 batch_size = image.shape[0]
                 self.assertEqual(batch_size, 4)
                 i += 1
