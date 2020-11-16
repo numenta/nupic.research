@@ -189,3 +189,25 @@ class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
         y = super().forward(x)
         dendrite_activations = self.segments(context)  # num_units x num_segments
         return self.apply_dendrites(y, dendrite_activations)
+
+
+class GatingDendriticLayer2d(AbsoluteMaxGatingDendriticLayer2d):
+    """
+    A convolutional version of `GatingDendriticLayer`.
+    """
+
+    def apply_dendrites(self, y, dendrite_activations):
+        """
+        Similar to `apply_dendrites` for `AbsoluteMaxGatingDendriticLayer2d`, except
+        uses the max operator (instead of absolute max) to select dendrite activations.
+        """
+        dendrite_activations = dendrite_activations.max(dim=2).values
+        dendrite_activations = torch.sigmoid(dendrite_activations)
+
+        # The following operation uses `torch.einsum` to multiply each channel by a
+        # single scalar value
+        #    * b => the batch dimension
+        #    * i => the channel dimension
+        #    * jk => the width and height dimensions
+
+        return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
