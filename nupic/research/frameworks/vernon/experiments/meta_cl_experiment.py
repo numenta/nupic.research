@@ -19,28 +19,34 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import io
 from collections import defaultdict
+from pprint import pformat
 
 import numpy as np
 import torch
+from torch.nn.modules.batchnorm import _BatchNorm
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.continual_learning.maml_utils import clone_model
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
 from nupic.research.frameworks.pytorch.model_utils import (
+    deserialize_state_dict,
     filter_params,
     get_parent_module,
+    serialize_state_dict,
 )
-from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
-    SupervisedExperiment,
+from nupic.research.frameworks.vernon.experiments.components.experiment_base import (
+    ExperimentBase,
 )
+from nupic.research.frameworks.vernon.network_utils import create_model
 
 __all__ = [
     "MetaContinualLearningExperiment",
 ]
 
 
-class MetaContinualLearningExperiment(SupervisedExperiment):
+class MetaContinualLearningExperiment(ExperimentBase):
     """
     Experiment class for meta-continual learning (based on OML and ANML meta-continual
     learning setups). There are 2 main phases in a meta-continual learning setup:
@@ -106,12 +112,49 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                            update during meta-train training
         """
         super().setup_experiment(config)
+        self.logger.info("Execution order: %s",
+                         pformat(self.get_execution_order()))
+
+        # Configure model
+        self.device = config.get("device",
+                                 torch.device("cuda"
+                                              if torch.cuda.is_available()
+                                              else "cpu"))
+        self.model = self.create_model(config, self.device)
+
+        self.logger.debug(self.model)
+
+        # Configure optimizer
+        group_decay, group_no_decay = [], []
+        for module in self.model.modules():
+            for name, param in module.named_parameters(recurse=False):
+                if self.should_decay_parameter(module, name, param, config):
+                    group_decay.append(param)
+                else:
+                    group_no_decay.append(param)
+
+        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+        optimizer_args = config.get("optimizer_args", {})
+        self.optimizer = optimizer_class([dict(params=group_decay),
+                                          dict(params=group_no_decay,
+                                               weight_decay=0.)],
+                                         **optimizer_args)
+
+        self._loss_function = config.get(
+            "loss_function", torch.nn.functional.cross_entropy
+        )
+
+        self.num_classes = config.get("num_classes", 1000)
+        self.epochs = config.get("epochs", 1)
+        self.current_epoch = 0
+
+        # Configure data loaders
+        self.create_loaders(config)
 
         if "num_classes" in config:
             if "replay_classes" in config and "fast_and_slow_classes" in config:
                 self.logger.warn("Over-specified classes for meta-training.")
 
-        self.epochs_to_validate = []
         self.tasks_per_epoch = config.get("tasks_per_epoch", 1)
         self.num_classes = config.get("num_classes", 50)
 
@@ -139,6 +182,51 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 " for the inner loop. This should ideally be no more than:\n"
                 " train_train_sample_size * tasks_per_epoch / batch_size"
             )
+
+    @classmethod
+    def create_model(cls, config, device):
+        """
+        Create imagenet model from an ImagenetExperiment config
+        :param config:
+            - model_class: Model class. Must inherit from "torch.nn.Module"
+            - model_args: model model class arguments passed to the constructor
+            - init_batch_norm: Whether or not to Initialize running batch norm
+                               mean to 0.
+            - checkpoint_file: if not None, will start from this model. The
+                               model must have the same model_args and
+                               model_class as the current experiment.
+            - load_checkpoint_args: args to be passed to `load_state_from_checkpoint`
+        :param device:
+            Pytorch device
+        :return:
+                Model instance
+        """
+        return create_model(
+            model_class=config["model_class"],
+            model_args=config.get("model_args", {}),
+            init_batch_norm=config.get("init_batch_norm", False),
+            device=device,
+            checkpoint_file=config.get("checkpoint_file", None),
+            load_checkpoint_args=config.get("load_checkpoint_args", {}),
+        )
+
+    def should_decay_parameter(self, module, parameter_name, parameter, config):
+        if isinstance(module, _BatchNorm):
+            return config.get("batch_norm_weight_decay", True)
+        elif parameter_name == "bias":
+            return config.get("bias_weight_decay", True)
+        else:
+            return True
+
+    @classmethod
+    def load_dataset(cls, config, train=True):
+        dataset_class = config.get("dataset_class", None)
+        if dataset_class is None:
+            raise ValueError("Must specify 'dataset_class' in config.")
+
+        dataset_args = config.get("dataset_args", {})
+        dataset_args.update(train=train)
+        return dataset_class(**dataset_args)
 
     def create_loaders(self, config):
         """Create train and val dataloaders."""
@@ -216,6 +304,30 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return TaskRandomSampler(class_indices)
 
     @classmethod
+    def create_train_dataloader(cls, config, dataset):
+        sampler = cls.create_train_sampler(config, dataset)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("batch_size", 64),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    @classmethod
+    def create_validation_dataloader(cls, config, dataset):
+        sampler = cls.create_validation_sampler(config, dataset)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("val_batch_size", 64),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    @classmethod
     def create_slow_train_dataloader(cls, config, dataset):
         sampler = cls.create_train_slow_sampler(config, dataset)
         return DataLoader(
@@ -238,6 +350,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             sampler=sampler,
             pin_memory=torch.cuda.is_available(),
         )
+
+    def pre_epoch(self):
+        pass
+
+    def post_epoch(self):
+        pass
 
     def run_epoch(self):
 
@@ -304,6 +422,12 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.current_epoch += 1
 
         return results
+
+    def run_iteration(self):
+        return self.run_epoch()
+
+    def should_stop(self):
+        return self.current_epoch >= self.epochs
 
     def pre_task(self, tasks):
         """
@@ -408,6 +532,53 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         model = clone if clone is not None else self.model
         return model
 
+    def get_state(self):
+        """
+        Get experiment serialized state as a dictionary of  byte arrays
+        :return: dictionary with "model", "optimizer" and "lr_scheduler" states
+        """
+        state = {
+            "current_epoch": self.current_epoch,
+        }
+
+        # Save state into a byte array to avoid ray's GPU serialization issues
+        # See https://github.com/ray-project/ray/issues/5519
+        with io.BytesIO() as buffer:
+            model = self.model
+            if hasattr(model, "module"):
+                # DistributedDataParallel
+                model = model.module
+            serialize_state_dict(buffer, model.state_dict())
+            state["model"] = buffer.getvalue()
+
+        with io.BytesIO() as buffer:
+            serialize_state_dict(buffer, self.optimizer.state_dict())
+            state["optimizer"] = buffer.getvalue()
+
+        return state
+
+    def set_state(self, state):
+        """
+        Restore the experiment from the state returned by `get_state`
+        :param state: dictionary with "model", "optimizer", "lr_scheduler", and "amp"
+                      states
+        """
+        if "model" in state:
+            with io.BytesIO(state["model"]) as buffer:
+                state_dict = deserialize_state_dict(buffer, self.device)
+            model = self.model
+            if hasattr(model, "module"):
+                # DistributedDataParallel
+                model = model.module
+            model.load_state_dict(state_dict)
+
+        if "optimizer" in state:
+            with io.BytesIO(state["optimizer"]) as buffer:
+                state_dict = deserialize_state_dict(buffer, self.device)
+            self.optimizer.load_state_dict(state_dict)
+
+        self.current_epoch = state["current_epoch"]
+
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
@@ -428,4 +599,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo["clone_model"] = [exp + ".clone_model"]
         eo["get_named_fast_params"] = [exp + ".get_named_fast_params"]
         eo["get_model"] = [exp + ".get_model"]
+
+        eo.update(
+            pre_epoch=[],
+            post_epoch=[],
+        )
         return eo
