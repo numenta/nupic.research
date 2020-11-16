@@ -27,7 +27,10 @@ from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.continual_learning.maml_utils import clone_model
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
-from nupic.research.frameworks.pytorch.model_utils import get_parent_module
+from nupic.research.frameworks.pytorch.model_utils import (
+    filter_params,
+    get_parent_module,
+)
 from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment,
 )
@@ -89,34 +92,46 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             data, also used to train the slow parameters (the replay batch is used to
             sample examples to update the slow parameters during meta-training testing
             to prevent the learner from forgetting other tasks)
+            - replay_classes: list of classes to sample from for the replay set;
+                              defaults to range(0, num_classes)
+            - fast_and_slow_classes: list of classes to sample from for fast and slow
+                                     sets; defaults to range(0, num_classes)
             - num_fast_steps: number of sequential steps to take in the inner loop per
                               every outer loop
             - train_train_sample_size: number of images per class to sample from for
                                       meta-training; same size will be used in both
                                       the inner and outer loops. The rest of the
                                       images will be used for a validation step.
+            - fast_params: list of regex patterns identifying which params to
+                           update during meta-train training
         """
-        if "num_classes" not in config["model_args"]:
-            # manually set `num_classes` in `model_args`
-            num_classes = config["num_classes"]
-            config["model_args"]["num_classes"] = num_classes
-
         super().setup_experiment(config)
+
+        if "num_classes" in config:
+            if "replay_classes" in config and "fast_and_slow_classes" in config:
+                self.logger.warn("Over-specified classes for meta-training.")
 
         self.epochs_to_validate = []
         self.tasks_per_epoch = config.get("tasks_per_epoch", 1)
-        self.num_classes = min(
-            config.get("num_classes", 50),
-            self.train_fast_loader.sampler.num_classes
-        )
+        self.num_classes = config.get("num_classes", 50)
+
+        replay_classes = config.get("replay_classes", range(0, self.num_classes))
+        fast_and_slow_classes = config.get("fast_and_slow_classes",
+                                           range(0, self.num_classes))
+        self.replay_classes = list(replay_classes)
+        self.fast_and_slow_classes = list(fast_and_slow_classes)
+
+        max_class = max(*self.replay_classes, *self.fast_and_slow_classes)
+        assert max_class < self.train_fast_loader.sampler.num_classes
 
         self.adaptation_lr = config.get("adaptation_lr", 0.03)
-
-        self.batch_size = config.get("batch_size", 5)
-        self.val_batch_size = config.get("val_batch_size", 15)
-        self.slow_batch_size = config.get("slow_batch_size", 64)
-        self.replay_batch_size = config.get("replay_batch_size", 64)
         self.num_fast_steps = config.get("num_fast_steps", 1)
+
+        assert "fast_params" in config
+        fast_named_params = filter_params(self.model,
+                                          include_patterns=config["fast_params"])
+        self.fast_param_names = list(fast_named_params.keys())
+        self.logger.info(f"Setup: fast_param_names={self.fast_param_names}")
 
         if self.num_fast_steps > len(self.train_fast_loader):
             self.logger.warning(
@@ -160,7 +175,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     @classmethod
     def create_replay_sampler(cls, config, dataset):
         """Sampler used to augment meta-train testing; "replays" previous classes."""
-        class_indices = cls.compute_class_indices(config, dataset, mode="replay")
+        class_indices = cls.compute_class_indices(config, dataset, mode="all")
         return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
@@ -188,6 +203,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                 class_indices[c] = class_indices[c][sample_size:]
         elif mode == "all":
             pass
+        else:
+            raise ValueError(f"Received unexpected mode: {mode}")
 
         return class_indices
 
@@ -228,23 +245,25 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.optimizer.zero_grad()
 
-        # Clone model - clone fast params and the slow params. The latter will be frozen
-        cloned_adaptation_net = self.clone_model()
-
         # Sample tasks for inner loop.
         tasks_train = np.random.choice(
-            self.num_classes, self.tasks_per_epoch, replace=False
+            self.fast_and_slow_classes,
+            size=self.tasks_per_epoch,
+            replace=False
         )
 
         # Run pre_task; For instance, may reset parameters as needed.
         self.pre_task(tasks_train)
+
+        # Clone model - clone fast params and the slow params. The latter will be frozen
+        cloned_adaptation_net = self.clone_model()
 
         # Inner loop: Train over sampled tasks.
         for task in tasks_train:
             self.run_task(task, cloned_adaptation_net)
 
         # Sample from the replay set.
-        self.train_replay_loader.sampler.set_active_tasks(list(range(self.num_classes)))
+        self.train_replay_loader.sampler.set_active_tasks(self.replay_classes)
         replay_data, replay_target = next(iter(self.train_replay_loader))
 
         # Sample from the slow set.
@@ -351,12 +370,14 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                     updated = p.add(g, alpha=-lr)
 
                     # Update in-place in a way that preserves grads.
+                    # TODO: Add a check at initilization that enforces the ability
+                    # to access the model's params by name.
                     parent_module = get_parent_module(model, name)
                     base_name = name.split(".")[-1]
                     parent_module._parameters[base_name] = updated
 
     def adapt(self, cloned_adaptation_net, train_loss):
-        named_fast_params = dict(self.get_named_fast_params(cloned_adaptation_net))
+        named_fast_params = self.get_named_fast_params(cloned_adaptation_net)
         self.update_params(
             named_fast_params, cloned_adaptation_net, train_loss,
             self.adaptation_lr
@@ -369,13 +390,19 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         """
         return clone_model(self.model, keep_as_reference=None)
 
-    def get_named_slow_params(self):
-        model = self.get_model()
-        return model.named_slow_params
-
     def get_named_fast_params(self, clone=None):
+        """Filter out the params from fast_param_names."""
+        return self._get_params_by_names(self.fast_param_names, clone=clone)
+
+    def _get_params_by_names(self, names, clone=None):
+        """Filter out the params from names."""
         model = self.get_model(clone=clone)
-        return model.named_fast_params
+        named_params = {}
+        for n, p in model.named_parameters():
+            if n in names:
+                named_params[n] = p
+
+        return named_params
 
     def get_model(self, clone=None):
         model = clone if clone is not None else self.model
@@ -399,7 +426,6 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo["update_params"] = [exp + ".update_params"]
         eo["adapt"] = [exp + ".adapt"]
         eo["clone_model"] = [exp + ".clone_model"]
-        eo["get_named_slow_params"] = [exp + ".get_named_slow_params"]
         eo["get_named_fast_params"] = [exp + ".get_named_fast_params"]
         eo["get_model"] = [exp + ".get_model"]
         return eo

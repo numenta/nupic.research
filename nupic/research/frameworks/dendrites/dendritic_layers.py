@@ -32,6 +32,9 @@ from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
 class BiasingDendriticLayer(SparseWeights):
     """
+    TODO: Mention it is a wrapper around any module and not a standalone module
+    maybe add an example of how to initialize it
+
     This combines a DendriteSegments module with a SparseLinear module.
     The output from the dendrite segments (shape of num_units x num_segments)
     is applied to the output of of the linear weights (shape of num_units).
@@ -43,6 +46,7 @@ class BiasingDendriticLayer(SparseWeights):
         module_sparsity, dendrite_sparsity, dendrite_bias=None
     ):
         """
+        TODO: specify the type - what is module_sparsity type?
         :param module: linear module from in-units to out-units
         :param num_segments: number of dendrite segments per out-unit
         :param dim_context: length of the context vector;

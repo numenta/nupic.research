@@ -19,19 +19,28 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .oml import CONFIGS as OML
-from .dendrites import CONFIGS as DENDRITES
-from .oml_replicate import CONFIGS as OML_REPLICATE
-from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
+from nupic.research.frameworks.pytorch.restore_utils import load_state_from_checkpoint
 
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
+__all__ = [
+    "DelayLoadCheckpoint",
+]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(OML)
-CONFIGS.update(DENDRITES)
-CONFIGS.update(OML_REPLICATE)
-CONFIGS.update(OML_REGRESSION_TEST)
+
+class DelayLoadCheckpoint:
+    """
+    Load the checkpoint after super().create_model has finished.
+    """
+    @classmethod
+    def create_model(cls, config, device):
+        model = super().create_model({**config, "checkpoint_file": None},
+                                     device)
+        load_state_from_checkpoint(model, config.get("checkpoint_file", None),
+                                   device)
+        return model
+
+    @classmethod
+    def get_execution_order(cls):
+        name = "DelayLoadCheckpoint"
+        eo = super().get_execution_order()
+        eo["create_model"].insert(0, name + ": Set checkpoint_file=None")
+        eo["create_model"].append(0, name + ": Load checkpoint_file")

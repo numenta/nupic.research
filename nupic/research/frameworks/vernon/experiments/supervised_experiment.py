@@ -75,7 +75,6 @@ class SupervisedExperiment(ExperimentBase):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batches_in_epoch = sys.maxsize
         self.batches_in_epoch_val = sys.maxsize
-        self.batch_size = 1
         self.epochs = 1
         self.mixed_precision = False
         self.total_batches = 0
@@ -201,9 +200,6 @@ class SupervisedExperiment(ExperimentBase):
         self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
         self.batches_in_epoch_val = config.get("batches_in_epoch_val", sys.maxsize)
         self.current_epoch = 0
-
-        # Get initial batch size
-        self.batch_size = config.get("batch_size", 1)
 
         # Configure data loaders
         self.create_loaders(config)
