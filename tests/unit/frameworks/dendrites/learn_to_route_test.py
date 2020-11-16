@@ -26,7 +26,7 @@ import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 from nupic.research.frameworks.dendrites.routing import train_dendrite_model
-from nupic.research.frameworks.dendrites.routing.learned import (
+from nupic.research.frameworks.dendrites.routing.learn import (
     init_dataloader,
     init_optimizer,
     init_test_scenario,
@@ -35,93 +35,111 @@ from nupic.research.frameworks.dendrites.routing.learned import (
 
 class LearnToRouteTest(unittest.TestCase):
     """
-    This test suite only applies to the "learning to route" scenario in which only
-    dendritic weights are learned while feed-forward weights are fixed
+    This test suite tests whether dendrite layer weights are changing when learning the
+    routing task
     """
 
-    def test_non_dendritic_weights(self):
-        """ Non-dendritic weights should not be modified """
+    def test_forward_weights(self):
+        """
+        Feed-forward weights should not be modified when `mode == "dendrites"`, and
+        should be modified when `mode == "all"`
+        """
 
-        r, dendritic_network, context_vectors, device = init_test_scenario(
-            dim_in=100,
-            dim_out=100,
-            num_contexts=10,
-            dim_context=100,
-            dendrite_module=AbsoluteMaxGatingDendriticLayer
-        )
+        for mode in ("dendrites", "all"):
 
-        dataloader = init_dataloader(
-            routing_function=r,
-            context_vectors=context_vectors,
-            device=device,
-            batch_size=64,
-            x_min=-2.0,
-            x_max=2.0
-        )
+            r, dendrite_layer, context_vectors, device = init_test_scenario(
+                mode=mode,
+                dim_in=100,
+                dim_out=100,
+                num_contexts=10,
+                dim_context=100,
+                dendrite_module=AbsoluteMaxGatingDendriticLayer
+            )
 
-        optimizer = init_optimizer(network=dendritic_network)
+            dataloader = init_dataloader(
+                routing_function=r,
+                context_vectors=context_vectors,
+                device=device,
+                batch_size=64,
+                x_min=-2.0,
+                x_max=2.0
+            )
 
-        non_dendritic_weights_before = copy.deepcopy(
-            dendritic_network.module.weight.data
-        )
+            optimizer = init_optimizer(mode=mode, layer=dendrite_layer)
 
-        # Perform a single training epoch
-        train_dendrite_model(
-            model=dendritic_network,
-            loader=dataloader,
-            optimizer=optimizer,
-            device=device,
-            criterion=F.l1_loss
-        )
+            forward_weights_before = copy.deepcopy(
+                dendrite_layer.module.weight.data
+            )
 
-        non_dendritic_weights_after = copy.deepcopy(
-            dendritic_network.module.weight.data
-        )
+            # Perform a single training epoch
+            train_dendrite_model(
+                model=dendrite_layer,
+                loader=dataloader,
+                optimizer=optimizer,
+                device=device,
+                criterion=F.l1_loss
+            )
 
-        expected = (non_dendritic_weights_before == non_dendritic_weights_after).all()
-        self.assertTrue(expected)
+            forward_weights_after = copy.deepcopy(
+                dendrite_layer.module.weight.data
+            )
 
-    def test_dendritic_weights(self):
-        """ Dendritic weights should be modified """
+            expected = (forward_weights_before == forward_weights_after).all()
 
-        r, dendritic_network, context_vectors, device = init_test_scenario(
-            dim_in=100,
-            dim_out=100,
-            num_contexts=10,
-            dim_context=100,
-            dendrite_module=AbsoluteMaxGatingDendriticLayer
-        )
+            # If training both feed-forward and dendrite weights, we expect the
+            # dendrite weights to change
+            if mode == "all":
+                expected = not expected
 
-        dataloader = init_dataloader(
-            routing_function=r,
-            context_vectors=context_vectors,
-            device=device,
-            batch_size=64,
-            x_min=-2.0,
-            x_max=2.0
-        )
+            self.assertTrue(expected)
 
-        optimizer = init_optimizer(network=dendritic_network)
+    def test_dendrite_weights(self):
+        """
+        Dendrite weights should be modified both when `mode == "dendrites"` and when
+        `mode == "all"`
+        """
 
-        dendritic_weights_before = copy.deepcopy(
-            dendritic_network.segments.weights.data
-        )
+        for mode in ("dendrites", "all"):
 
-        # Perform a single training epoch
-        train_dendrite_model(
-            model=dendritic_network,
-            loader=dataloader,
-            optimizer=optimizer,
-            device=device,
-            criterion=F.l1_loss
-        )
+            r, dendrite_layer, context_vectors, device = init_test_scenario(
+                mode=mode,
+                dim_in=100,
+                dim_out=100,
+                num_contexts=10,
+                dim_context=100,
+                dendrite_module=AbsoluteMaxGatingDendriticLayer
+            )
 
-        dendritic_weights_after = copy.deepcopy(
-            dendritic_network.segments.weights.data
-        )
+            dataloader = init_dataloader(
+                routing_function=r,
+                context_vectors=context_vectors,
+                device=device,
+                batch_size=64,
+                x_min=-2.0,
+                x_max=2.0
+            )
 
-        expected = (dendritic_weights_before == dendritic_weights_after).all()
-        self.assertFalse(expected)
+            optimizer = init_optimizer(mode=mode, layer=dendrite_layer)
+
+            dendrite_weights_before = copy.deepcopy(
+                dendrite_layer.segments.weights.data
+            )
+
+            # Perform a single training epoch
+            train_dendrite_model(
+                model=dendrite_layer,
+                loader=dataloader,
+                optimizer=optimizer,
+                device=device,
+                criterion=F.l1_loss
+            )
+
+            dendrite_weights_after = copy.deepcopy(
+                dendrite_layer.segments.weights.data
+            )
+
+            expected = (dendrite_weights_before != dendrite_weights_after).any()
+            self.assertTrue(expected)
 
 
 if __name__ == "__main__":

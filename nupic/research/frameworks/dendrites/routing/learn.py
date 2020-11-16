@@ -19,6 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+"""
+Perform the routing task with a dendrite layer by either (a) learning just the
+dendrite weights, or (b) learning both the feed-forward and dendrite weights together
+"""
+
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -33,15 +38,26 @@ from nupic.research.frameworks.dendrites.routing import (
 )
 
 
-def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_module):
+def init_test_scenario(
+    mode,
+    dim_in,
+    dim_out,
+    num_contexts,
+    dim_context,
+    dendrite_module
+):
     """
-    Returns the routing function, dendritic network, context vectors, and device to use
-    in the "learning to route" experiment
+    Returns the routing function, dendrite layer, context vectors, and device to use
+    in the "learn to route" experiment
 
+    :param mode: must be one of ("dendrites", "all")
+                 "dendrites" -> learn only dendrite weights while setting feed-forward
+                 weights to those of the routing function
+                 "all" -> learn both feed-forward and dendrite weights
     :param dim_in: the number of dimensions in the input to the routing function and
                    test module
     :param dim_out: the number of dimensions in the sparse linear output of the routing
-                    function and test network
+                    function and test layer
     :param num_contexts: the number of unique random binary vectors in the routing
                          function that can "route" the sparse linear output, and also
                          the number of unique context vectors
@@ -70,11 +86,22 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
         percent_on=0.2
     )
 
-    # Initialize dendrite module using the same feed-forward sparse weights as the
-    # routing function; also note that the value passed to `dendrite_sparsity` is
-    # irrelevant since the context weights are subsequently overwritten
-    dendritic_network = dendrite_module(
-        module=r.sparse_weights.module,
+    # If only training the dendrite weights, initialize the dendrite module using the
+    # same feed-forward sparse weights as the routing function, otherwise if learning
+    # feed-forward weights, use `torch.nn.Linear`
+
+    # Also, note that the value passed to `dendrite_sparsity` is irrelevant since the
+    # context weights are subsequently
+    # overwritten
+    if mode == "dendrites":
+        dendrite_layer_forward_module = r.sparse_weights.module
+    elif mode == "all":
+        dendrite_layer_forward_module = torch.nn.Linear(dim_in, dim_out, bias=False)
+    else:
+        raise Exception("Invalid value for `mode`: {}".format(mode))
+
+    dendrite_layer = dendrite_module(
+        module=dendrite_layer_forward_module,
         num_segments=num_contexts,
         dim_context=dim_context,
         module_sparsity=0.7,
@@ -82,18 +109,18 @@ def init_test_scenario(dim_in, dim_out, num_contexts, dim_context, dendrite_modu
     )
 
     # In this version of learning to route, there is no sparsity constraint on the
-    # dendritic weights
-    dendritic_network.register_buffer(
+    # dendrite weights
+    dendrite_layer.register_buffer(
         "zero_mask",
-        torch.ones(dendritic_network.zero_mask.shape).half()
+        torch.ones(dendrite_layer.zero_mask.shape).half()
     )
 
     # Place objects that inherit from torch.nn.Module on device
     r = r.to(device)
-    dendritic_network = dendritic_network.to(device)
+    dendrite_layer = dendrite_layer.to(device)
     context_vectors = context_vectors.to(device)
 
-    return r, dendritic_network, context_vectors, device
+    return r, dendrite_layer, context_vectors, device
 
 
 def init_dataloader(
@@ -133,11 +160,15 @@ def init_dataloader(
     return routing_test_dataloader
 
 
-def init_optimizer(network, lr=0.5):
-    return torch.optim.SGD(network.parameters(), lr=lr)
+def init_optimizer(layer, mode):
+    if mode == "dendrites":
+        return torch.optim.SGD(layer.parameters(), lr=0.5)
+    elif mode == "all":
+        return torch.optim.Adam(layer.parameters(), lr=1e-5)
 
 
 def learn_to_route(
+    mode,
     dim_in,
     dim_out,
     num_contexts,
@@ -147,13 +178,16 @@ def learn_to_route(
     num_training_epochs=5000
 ):
     """
-    Trains a dendritic network to match an arbitrary routing function, while only
-    learning the dendritic weights with no sparsity constraint
+    Trains a dendrite layer to match an arbitrary routing function
 
+    :param mode: must be one of ("dendrites", "all")
+                 "dendrites" -> learn only dendrite weights while setting feed-forward
+                 weights to those of the routing function
+                 "all" -> learn both feed-forward and dendrite weights
     :param dim_in: the number of dimensions in the input to the routing function and
                    test module
     :param dim_out: the number of dimensions in the sparse linear output of the routing
-                    function and test network
+                    function and test layer
     :param num_contexts: the number of unique random binary vectors in the routing
                          function that can "route" the sparse linear output, and also
                          the number of unique context vectors
@@ -161,11 +195,12 @@ def learn_to_route(
     :param dendrite_module: a torch.nn.Module subclass that implements a dendrite
                             module in addition to a linear feed-forward module
     :param batch_size: the batch size during training and evaluation
-    :param num_training_epochs: the number of epochs for which to train the dendritic
-                                network
+    :param num_training_epochs: the number of epochs for which to train the dendrite
+                                layer
     """
 
-    r, dendritic_network, context_vectors, device = init_test_scenario(
+    r, dendrite_layer, context_vectors, device = init_test_scenario(
+        mode=mode,
         dim_in=dim_in,
         dim_out=dim_out,
         num_contexts=num_contexts,
@@ -191,42 +226,48 @@ def learn_to_route(
         x_max=6.0,
     )
 
-    optimizer = init_optimizer(network=dendritic_network)
+    optimizer = init_optimizer(mode=mode, layer=dendrite_layer)
 
     print("epoch,mean_loss,mean_abs_err")
     for epoch in range(1, num_training_epochs + 1):
 
+        # Select L1 weight decay penalty based on scenario
+        if mode == "dendrites":
+            l1_weight_decay = 0.0
+        elif mode == "all":
+            l1_weight_decay = 1e-6
+
         train_dendrite_model(
-            model=dendritic_network,
+            model=dendrite_layer,
             loader=train_dataloader,
             optimizer=optimizer,
             device=device,
             criterion=F.l1_loss,
             concat=False,
-            l1_weight_decay=1e-8
+            l1_weight_decay=l1_weight_decay
         )
 
-        # Validate model - note that we use a different dataset/dataloader as the input
-        # distribution has changed
+        # Validate model
         results = evaluate_dendrite_model(
-            model=dendritic_network,
+            model=dendrite_layer,
             loader=test_dataloader,
             device=device,
             criterion=F.l1_loss,
             concat=False
         )
 
-        print("{},{},{}".format(
-            epoch, results["loss"], results["mean_abs_err"]
+        print("{},{}".format(
+            epoch, results["mean_abs_err"]
         ))
 
 
 if __name__ == "__main__":
 
-    # Learn dendritic weights that learn to route, while keeping feedforward weights
+    # Learn dendrite weights that learn to route, while keeping feedforward weights
     # fixed
 
     learn_to_route(
+        mode="all",
         dim_in=100,
         dim_out=100,
         num_contexts=10,
