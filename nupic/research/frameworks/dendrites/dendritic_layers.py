@@ -102,16 +102,12 @@ class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
     """
 
     def apply_dendrites(self, y, dendrite_activations):
-        output_max = dendrite_activations.max(dim=2).values
-        output_min = dendrite_activations.min(dim=2).values
-        sign_mask = torch.where(
-            (output_max ** 2) > (output_min ** 2),
-            torch.ones(output_max.shape).to(y.device),
-            -1.0 * torch.ones(output_min.shape).to(y.device)
-        )
-        return y * torch.sigmoid(
-            torch.abs(dendrite_activations).max(dim=2).values * sign_mask
-        )
+        inds = dendrite_activations.abs().max(dim=2).indices
+        inds = inds.unsqueeze(dim=2)
+        dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
+        dendrite_activations = dendrite_activations.squeeze()
+        dendrite_activations = torch.sigmoid(dendrite_activations)
+        return y * dendrite_activations
 
 
 class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
@@ -167,15 +163,10 @@ class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
                                      with shape (b, c) where the axes represent the
                                      batch and channel dimensions, respectively)
         """
-        output_max = dendrite_activations.max(dim=2).values
-        output_min = dendrite_activations.min(dim=2).values
-        sign_mask = torch.where(
-            (output_max ** 2) > (output_min ** 2),
-            torch.ones(output_max.shape).to(y.device),
-            -1.0 * torch.ones(output_min.shape).to(y.device)
-        )
-        dendrite_activations = torch.abs(dendrite_activations).max(dim=2).values
-        dendrite_activations = dendrite_activations * sign_mask
+        inds = dendrite_activations.abs().max(dim=2).indices
+        inds = inds.unsqueeze(dim=2)
+        dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
+        dendrite_activations = dendrite_activations.squeeze()
         dendrite_activations = torch.sigmoid(dendrite_activations)
 
         # The following operation uses `torch.einsum` to multiply each channel by a
