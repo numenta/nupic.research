@@ -25,6 +25,13 @@ from nupic.research.frameworks.pytorch.model_utils import filter_params
 
 
 class ANMLNetwork(nn.Module):
+    """
+    This network is reproduced from the `ANML`_ repository.
+
+    .. _ANML: https://github.com/uvm-neurobotics-lab/ANML
+
+    With `num_classes=963`, it uses 5,963,139 weights in total.
+    """
 
     def __init__(self, num_classes):
         super().__init__()

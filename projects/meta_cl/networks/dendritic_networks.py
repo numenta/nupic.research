@@ -35,6 +35,9 @@ class DendriticNetwork(nn.Module):
     The output of the prediction and of the modulation are fed into a
     sparse linear gating layer as input and context respectively. The
     output of the gating layer are the logits used to calculate the loss function.
+
+    With default parameters and `num_classes-963`, it uses 2,933,599 weights-on
+    out of a total of 3,601,631 weights.
     """
 
     def __init__(self, num_classes,
