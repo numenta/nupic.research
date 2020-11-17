@@ -110,12 +110,12 @@ class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
         return y * dendrite_activations
 
 
-class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
+class GatingDendriticLayer2d(SparseWeights2d):
     """
-    A dendrite layer using the absolute max gating formulation, for convolutional
-    layers. The multiplicative dendrite outputs are applied element-wise to each output
-    channel. That is, for a given output channel, all activation values (determined by
-    the convolution operation) are multiplied by a single value computed via dendrites.
+    A convolutional version of `GatingDendriticLayer`. The multiplicative dendrite
+    outputs are applied element-wise to each output channel. That is, for a given
+    output channel, all activation values (determined by the convolution operation) are
+    multiplied by a single value computed via dendrites.
     """
 
     def __init__(
@@ -151,10 +151,44 @@ class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
 
     def apply_dendrites(self, y, dendrite_activations):
         """
+        Returns the output of the gating convolutional dendritic layer by multiplying
+        all values in each output channel by the selected dendrite activations.
+        Dendrite activations are selected based on the maximum activations across all
+        segments for each channel. Each channel has its own set of dendritic weights,
+        and the selected activation is based on the the absolute max value.
+
+        :param y: output of the convolution operation (a torch tensor with shape
+                  (b, c, h, w) where the axes represent the batch, channel, height, and
+                  width dimensions respectively)
+        :param dendrite_activations: the dendrite activation values (a torch tensor
+                                     with shape (b, c) where the axes represent the
+                                     batch and channel dimensions, respectively)
+        """
+        dendrite_activations = dendrite_activations.max(dim=2).values
+        dendrite_activations = torch.sigmoid(dendrite_activations)
+
+        # The following operation uses `torch.einsum` to multiply each channel by a
+        # single scalar value
+        #    * b => the batch dimension
+        #    * i => the channel dimension
+        #    * jk => the width and height dimensions
+
+        return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
+
+
+class AbsoluteMaxGatingDendriticLayer2d(GatingDendriticLayer2d):
+    """
+    A convolutional version of `AbsoluteMaxGatingDendriticLayer`.
+    """
+
+    def apply_dendrites(self, y, dendrite_activations):
+        """
         Returns the output of the absolute max gating convolutional dendritic layer by
         multiplying all values in each output channel by the selected dendrite
-        activation. Each channel has its own set of dendritic weights, and the selected
-        activation is based on the the absolute max value.
+        activations. Dendrite activations are selected based on the absolute maximum
+        activations (keeping the sign) across all segments for each channel. Each
+        channel has its own set of dendritic weights, and the selected activation is
+        based on the the absolute max value.
 
         :param y: output of the convolution operation (a torch tensor with shape
                   (b, c, h, w) where the axes represent the batch, channel, height, and
@@ -167,36 +201,6 @@ class AbsoluteMaxGatingDendriticLayer2d(SparseWeights2d):
         inds = inds.unsqueeze(dim=2)
         dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
         dendrite_activations = dendrite_activations.squeeze()
-        dendrite_activations = torch.sigmoid(dendrite_activations)
-
-        # The following operation uses `torch.einsum` to multiply each channel by a
-        # single scalar value
-        #    * b => the batch dimension
-        #    * i => the channel dimension
-        #    * jk => the width and height dimensions
-
-        return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
-
-    def forward(self, x, context):
-        """
-        Compute of linear layer and apply output of dendrite segments.
-        """
-        y = super().forward(x)
-        dendrite_activations = self.segments(context)  # num_units x num_segments
-        return self.apply_dendrites(y, dendrite_activations)
-
-
-class GatingDendriticLayer2d(AbsoluteMaxGatingDendriticLayer2d):
-    """
-    A convolutional version of `GatingDendriticLayer`.
-    """
-
-    def apply_dendrites(self, y, dendrite_activations):
-        """
-        Similar to `apply_dendrites` for `AbsoluteMaxGatingDendriticLayer2d`, except
-        uses the max operator (instead of absolute max) to select dendrite activations.
-        """
-        dendrite_activations = dendrite_activations.max(dim=2).values
         dendrite_activations = torch.sigmoid(dendrite_activations)
 
         # The following operation uses `torch.einsum` to multiply each channel by a
