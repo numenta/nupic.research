@@ -56,6 +56,9 @@ class ANMLNetwork(nn.Module):
         self.classifier = nn.Linear(2304, num_classes)
         self.reset_params()
 
+        # The ANML repo always keep its model in training mode. See self.eval()
+        self.train()
+
     def reset_params(self):
         # Apply Kaiming initialization to Linear and COnv2d params
         named_params = filter_params(self, include_modules=[nn.Linear, nn.Conv2d])
@@ -82,6 +85,10 @@ class ANMLNetwork(nn.Module):
         out = pred * mod
         out = self.classifier(out)
         return out
+
+    def eval(self):  # noqa
+        """The ANML repo keeps its model always in training mode."""
+        self.train()
 
 
 class ANMLsOMLNetwork(nn.Module):
