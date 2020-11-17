@@ -554,7 +554,7 @@ class GatingDendriticLayer2dTests(unittest.TestCase):
 
         # Expected max dendrite activations:
         # [[0.9   0.7   0.6]
-        #  [0.8  -0.5   0.0]]
+        #  [0.8   0.5   0.0]]
 
         # Expected output based on `dendrite_activations`
         expected_output = torch.tensor([
