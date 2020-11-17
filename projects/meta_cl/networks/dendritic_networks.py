@@ -99,33 +99,6 @@ class DendriticNetwork(nn.Module):
             nn.ReLU(),
         ]
 
-    @property
-    def named_fast_params(self):
-        """
-        Returns named params of adaption network, being sure to prepend
-        the names with "adaptation."
-        """
-        prepended = {}
-        for n, p in self.prediction.named_parameters():
-            n = "prediction." + n
-            prepended[n] = p
-        for n, p in self.gating_layer.named_parameters():
-            n = "gating_layer." + n
-            prepended[n] = p
-        return prepended
-
-    @property
-    def named_slow_params(self):
-        """
-        Returns named params of adaption network, being sure to prepend
-        the names with "representation."
-        """
-        prepended = {}
-        for n, p in self.modulation.named_parameters():
-            n = "modulation." + n
-            prepended[n] = p
-        return prepended
-
     def forward(self, x):
         mod = self.modulation(x)
         pred = self.prediction(x)
