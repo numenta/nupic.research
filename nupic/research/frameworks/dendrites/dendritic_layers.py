@@ -209,7 +209,7 @@ class AbsoluteMaxGatingDendriticLayer2d(GatingDendriticLayer2d):
         inds = dendrite_activations.abs().max(dim=2).indices
         inds = inds.unsqueeze(dim=2)
         dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
-        dendrite_activations = dendrite_activations.squeeze()
+        dendrite_activations = dendrite_activations.squeeze(dim=2)
         dendrite_activations = torch.sigmoid(dendrite_activations)
 
         # The following operation uses `torch.einsum` to multiply each channel by a
