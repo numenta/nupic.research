@@ -476,7 +476,7 @@ class GatingDendriticLayer2dTests(unittest.TestCase):
             dendrite_bias=False,
         )
 
-        # set weights and biases of convolutional layer
+        # Set weights and biases of convolutional layer
         conv_layer.weight.data[:] = torch.tensor(
             [
                 [
@@ -651,6 +651,77 @@ class GatingDendriticLayer2dTests(unittest.TestCase):
         all_matches = torch.allclose(expected_output, actual_output, atol=1e-4)
         self.assertTrue(all_matches)
 
+    def test_gradients(self):
+        """
+        Ensure dendrite gradients are flowing through the layer
+        `GatingDendriticLayer2d`. Note that this test doesn't actually consider the
+        values of gradients, apart from whether they are zero or non-zero.
+        """
+        conv_layer = torch.nn.Conv2d(
+            in_channels=2, out_channels=3, kernel_size=2, stride=1, bias=True
+        )
+        dendrite_layer = GatingDendriticLayer2d(
+            module=conv_layer,
+            num_segments=3,
+            dim_context=4,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=False,
+        )
+
+        # Dendrite weights: num_channels=3, num_segments=3, dim_context=4
+        dendrite_layer.segments.weights.data[:] = torch.tensor([
+            [
+                [-0.4933, 0.0000, 0.0000, 0.0000],
+                [0.0000, 0.0000, 0.3805, 0.0000],
+                [0.0000, 0.0000, 0.0000, -0.1641]
+            ],
+            [
+                [0.0000, 0.0000, 0.0000, 0.3555],
+                [0.0000, 0.0000, 0.0000, 0.1892],
+                [0.0000, 0.0000, -0.4274, 0.0000]
+            ],
+            [
+                [0.0000, 0.0000, 0.0000, 0.0957],
+                [0.0000, 0.0000, -0.0689, 0.0000],
+                [0.0000, 0.0000, 0.0000, -0.3192]
+            ]
+        ])
+
+        # Input to dendrite layer: batch_size=1, num_channels=2, width=3, height=3
+        x = torch.randn((1, 2, 3, 3))
+
+        # Context input to dendrite layer: batch_size=1, dim_context=4
+        context_vectors = torch.tensor([[1.0, 0.0, 1.0, 0.0]])
+
+        # Expected dendrite activations:
+        #
+        # batch item 1 (each row corresponds to an output channel)
+        # [[-0.4933  0.3805    zero]
+        #  [   zero    zero -0.4274]
+        #  [   zero -0.0689    zero]]
+
+        # Expected dendrite gradient mask
+        #
+        # batch item 1
+        # [[0  1  0]
+        #  [1  0  0]
+        #  [1  0  0]]
+
+        output = dendrite_layer(x, context_vectors)
+        output.sum().backward()
+
+        # Expected gradient mask
+        expected_grad_mask = torch.tensor([
+            [[0.0, 0.0, 0.0, 0.0], [1.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[1.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[1.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+        ])
+        actual_grad_mask = 1.0 * (dendrite_layer.segments.weights.grad != 0.0)
+
+        all_matches = (expected_grad_mask == actual_grad_mask).all()
+        self.assertTrue(all_matches)
+
 
 class AbsoluteMaxGatingDendriticLayer2dTests(unittest.TestCase):
     def test_forward(self):
@@ -671,7 +742,7 @@ class AbsoluteMaxGatingDendriticLayer2dTests(unittest.TestCase):
             dendrite_bias=False,
         )
 
-        # set weights and biases of convolutional layer
+        # Set weights and biases of convolutional layer
         conv_layer.weight.data[:] = torch.tensor(
             [
                 [
@@ -844,6 +915,77 @@ class AbsoluteMaxGatingDendriticLayer2dTests(unittest.TestCase):
 
         actual_output = dendrite_layer.apply_dendrites(y, dendrite_activations)
         all_matches = torch.allclose(expected_output, actual_output, atol=1e-4)
+        self.assertTrue(all_matches)
+
+    def test_gradients(self):
+        """
+        Ensure dendrite gradients are flowing through the layer
+        `AbsoluteMaxGatingDendriticLayer2d`. Note that this test doesn't actually
+        consider the values of gradients, apart from whether they are zero or non-zero.
+        """
+        conv_layer = torch.nn.Conv2d(
+            in_channels=2, out_channels=3, kernel_size=2, stride=1, bias=True
+        )
+        dendrite_layer = AbsoluteMaxGatingDendriticLayer2d(
+            module=conv_layer,
+            num_segments=3,
+            dim_context=4,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=False,
+        )
+
+        # Dendrite weights: num_channels=3, num_segments=3, dim_context=4
+        dendrite_layer.segments.weights.data[:] = torch.tensor([
+            [
+                [-0.4933, 0.0000, 0.0000, 0.0000],
+                [0.0000, 0.0000, 0.3805, 0.0000],
+                [0.0000, 0.0000, 0.0000, -0.1641]
+            ],
+            [
+                [0.0000, 0.0000, 0.0000, 0.3555],
+                [0.0000, 0.0000, 0.0000, 0.1892],
+                [0.0000, 0.0000, -0.4274, 0.0000]
+            ],
+            [
+                [0.0000, 0.0000, 0.0000, 0.0957],
+                [0.0000, 0.0000, -0.0689, 0.0000],
+                [0.0000, 0.0000, 0.0000, -0.3192]
+            ]
+        ])
+
+        # Input to dendrite layer: batch_size=1, num_channels=2, width=3, height=3
+        x = torch.randn((1, 2, 3, 3))
+
+        # Context input to dendrite layer: batch_size=1, dim_context=4
+        context_vectors = torch.tensor([[1.0, 0.0, 1.0, 0.0]])
+
+        # Expected dendrite activations:
+        #
+        # batch item 1 (each row corresponds to an output channel)
+        # [[-0.4933  0.3805    zero]
+        #  [   zero    zero -0.4274]
+        #  [   zero -0.0689    zero]]
+
+        # Expected dendrite gradient mask
+        #
+        # batch item 1
+        # [[1  0  0]
+        #  [0  0  1]
+        #  [0  1  0]]
+
+        output = dendrite_layer(x, context_vectors)
+        output.sum().backward()
+
+        # Expected gradient mask
+        expected_grad_mask = torch.tensor([
+            [[1.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [1.0, 0.0, 1.0, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [1.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+        ])
+        actual_grad_mask = 1.0 * (dendrite_layer.segments.weights.grad != 0.0)
+
+        all_matches = (expected_grad_mask == actual_grad_mask).all()
         self.assertTrue(all_matches)
 
 
