@@ -26,7 +26,9 @@ from nupic.research.frameworks.pytorch.model_utils import filter_params
 
 class ANMLNetwork(nn.Module):
     """
-    This network is reproduced from the `ANML`_ repository.
+    This network is reproduced from the `ANML`_ repository. This expects
+    an input size of 28 x 28 (which differs from OML's and ours wherein
+    we reshape Omniglot images to 84 x 84).
 
     .. _ANML: https://github.com/uvm-neurobotics-lab/ANML
 

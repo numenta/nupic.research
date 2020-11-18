@@ -102,16 +102,18 @@ meta_test_test_kwargs = dict(
 
 
 # This attempts to replicate the results from the original ANML paper.
+# |----------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |      LR |
+# |--------------:|:-----------------|:------------------|--------:|
+# |            10 | 0.71 ± 0.08      | 0.79 ± 0.05       | 0.001   |
+# |            50 | 0.76 ± 0.03      | 0.88 ± 0.02       | 0.0006  |
+# |           100 | 0.64 ± 0.03      | 0.79 ± 0.02       | 0.00035 |
+# |           200 | 0.49 ± 0.02      | 0.65 ± 0.02       | 0.0003  |
+# |           600 | 0.26 ± 0.01      | 0.39 ± 0.01       | 0.00015 |
+# |----------------------------------------------------------------|
 #
 metacl_anml_replicate = deepcopy(metacl_oml)
 metacl_anml_replicate.update(
-
-    # TODO: Validate ANML network(s)
-    # TODO: Update local_dir
-    # TODO: What if we called `model.eval()` during meta-test testing?
-    #       The ANML repo seems to keep their BN layer in training all the time,
-    #       I'm not sure what the effects of this would be.
-    #
 
     local_dir=os.path.expanduser("~/nta/results/experiments/meta_cl"),
 

@@ -52,7 +52,17 @@ meta_test_test_kwargs = dict(
 )
 
 
-# A metacl model with a dendritic layer
+# A dendritic network trained with meta-continual learning
+# |----------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR   |
+# |--------------:|:-----------------|:------------------|--------:|
+# |            10 | 0.20 ± 0.08      | 0.21 ± 0.07       | 0.001   |
+# |            50 | 0.04 ± 0.01      | 0.04 ± 0.01       | 0.001   |
+# |           100 | 0.03 ± 0.01      | 0.03 ± 0.01       | 0.001   |
+# |           200 | 0.01 ± 0.01      | 0.01 ± 0.01       | 0.001   |
+# |           600 | 0.00 ± 0.00      | 0.01 ± 0.00       | 0.001   |
+# |----------------------------------------------------------------|
+#
 metacl_dendrites = deepcopy(metacl_oml_replicate)
 metacl_dendrites.update(
     model_class=DendriticNetwork,
@@ -63,7 +73,7 @@ metacl_dendrites.update(
                     dendrite_sparsity=0.50),
     wandb_args=dict(
         name="metacl_dendrites",
-        project="dendrites",
+        project="metacl",
         notes="Dendritic Networks applied to OML Problem. Test 1"
     ),
     optimizer_args=dict(lr=1e-3),
@@ -72,13 +82,13 @@ metacl_dendrites.update(
     fast_params=["prediction.*", "gating_layer.*"],
 
     # Update only the linear module of the gating_layer during meta-test training.
-    test_train_params=["gating_layer.module*"],  # meta-test training
+    test_train_params=["gating_layer.module*"],
 
     # Identify the params of the output layer.
     output_layer_params=["gating_layer.module.weight", "gating_layer.module.bias"],
 
     # Update with meta_test testing arguments.
-    **deepcopy(meta_test_test_kwargs)
+    **deepcopy(meta_test_test_kwargs),
 )
 
 
