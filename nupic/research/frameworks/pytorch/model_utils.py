@@ -19,11 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import gzip
+import io
 import pickle
 import random
 import re
 import sys
 import time
+import warnings
 
 import numpy as np
 import torch
@@ -352,17 +354,18 @@ def count_nonzero_params(model):
     return total_params, total_nonzero_params
 
 
-def serialize_state_dict(fileobj, state_dict, compresslevel=3):
+def serialize_state_dict(fileobj, state_dict, **kwargs):
     """
     Serialize the state dict to file object
     :param fileobj: file-like object such as :class:`io.BytesIO`
     :param state_dict: state dict to serialize. Usually the dict returned by
                        module.state_dict() but it can be any state dict.
-    :param compresslevel: compression level for gzip (lower equals faster but
-                          less compression).
    """
-    with gzip.GzipFile(fileobj=fileobj, mode="wb", compresslevel=compresslevel) as fout:
-        torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+    if "compresslevel" in kwargs:
+        warnings.warn("Checkpoints from pytorch >=1.6 are compressed by default."
+                      "The gzip compression is deprecated",
+                      DeprecationWarning)
+    torch.save(state_dict, fileobj, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def deserialize_state_dict(fileobj, device=None):
@@ -373,13 +376,24 @@ def deserialize_state_dict(fileobj, device=None):
     :param device: Device to map tensors to
     :return: the state dict stored in the file object
     """
-    try:
-        with gzip.GzipFile(fileobj=fileobj, mode="rb") as fin:
-            state_dict = torch.load(fin, map_location=device)
-    except OSError:
-        # FIXME: Backward compatibility with old uncompressed checkpoints
-        state_dict = torch.load(fileobj, map_location=device)
-    return state_dict
+    # Checks if the fileobj is compressed by checking for gzip's magic header
+    magic_number = fileobj.read(2)
+    fileobj.seek(-2, io.SEEK_CUR)
+    is_gzip = magic_number == b"\037\213"
+    if is_gzip:
+        warnings.warn("Checkpoints from pytorch >=1.6 are compressed by default."
+                      "Applying gzip compression on top of pytorch compression "
+                      "will slow down the deserialization significantly. Please "
+                      "convert this checkpoint to improve deserialization "
+                      "performance.",
+                      DeprecationWarning)
+        try:
+            with gzip.GzipFile(fileobj=fileobj, mode="rb") as fin:
+                return torch.load(fin, map_location=device)
+        except OSError:
+            pass
+
+    return torch.load(fileobj, map_location=device)
 
 
 def get_module_attr(module, name):

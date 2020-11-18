@@ -52,9 +52,10 @@ class ElasticWeightConsolidation:
         """
         super().setup_experiment(config)
         self.ewc_lambda = config.get("ewc_lambda", 40)
-        fischer_sampler_size = config.get("ewc_fisher_sample_size",
-                                          int(len(self.train_loader) * 0.1))
-        self.ewc_fisher_num_batches = fischer_sampler_size // self.batch_size
+        fisher_sampler_size = config.get("ewc_fisher_sample_size",
+                                         int(len(self.train_loader) * 0.1))
+        self.ewc_fisher_num_batches = (fisher_sampler_size
+                                       // self.train_loader.batch_size)
 
     def run_task(self):
         """Run outer loop over tasks"""
@@ -74,7 +75,9 @@ class ElasticWeightConsolidation:
         loglikelihoods = []
         for idx, (x, y) in enumerate(self.train_loader):
             loglikelihoods.append(
-                F.log_softmax(self.model(x))[range(self.batch_size), y.data]
+                F.log_softmax(self.model(x))[
+                    range(self.train_loader.batch_size), y.data
+                ]
             )
             # Can't use the full dataset, too expensive
             if idx >= self.ewc_fisher_num_batches:

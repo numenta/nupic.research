@@ -35,7 +35,7 @@ import ray  # noqa: F401, I001
 import torch.multiprocessing as multiprocessing
 
 from experiments import CONFIGS
-from nupic.research.frameworks.vernon import ImagenetExperiment
+from nupic.research.frameworks.vernon.distributed import ImagenetExperiment
 from nupic.research.frameworks.vernon.parser_utils import MAIN_PARSER, process_args
 from nupic.research.frameworks.vernon.run import run, terminate_processes
 
