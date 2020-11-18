@@ -175,6 +175,15 @@ class GatingDendriticLayer2d(SparseWeights2d):
 
         return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
 
+    def forward(self, x, context):
+        """
+        Computes the forward pass through the `torch.nn.Conv2d` module and applies the
+        output of the dendrite segments.
+        """
+        y = super().forward(x)
+        dendrite_activations = self.segments(context)  # num_units x num_segments
+        return self.apply_dendrites(y, dendrite_activations)
+
 
 class AbsoluteMaxGatingDendriticLayer2d(GatingDendriticLayer2d):
     """
