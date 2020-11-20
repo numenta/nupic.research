@@ -83,6 +83,13 @@ class OmniglotCNN(nn.Module):
 
 
 class OMLNetwork(nn.Module):
+    """
+    This reproduces the network from the `OML`_ repository.
+
+    .. OML: https://github.com/khurramjaved96/mrcl
+
+    With `num_classes=963`, it uses 5,172,675 weights in total.
+    """
 
     def __init__(self, num_classes):
 

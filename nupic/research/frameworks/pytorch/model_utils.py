@@ -26,6 +26,7 @@ import re
 import sys
 import time
 import warnings
+from collections.abc import Collection
 
 import numpy as np
 import torch
@@ -514,9 +515,9 @@ def filter_params(
     include_modules = include_modules or []
     include_names = include_names or []
     include_patterns = include_patterns or []
-    assert isinstance(include_names, list)
-    assert isinstance(include_patterns, list)
-    assert isinstance(include_modules, list)
+    assert isinstance(include_names, Collection)
+    assert isinstance(include_patterns, Collection)
+    assert isinstance(include_modules, Collection)
 
     # Identify parameter pointers for all matching modules.
     include_data_ptrs = []
