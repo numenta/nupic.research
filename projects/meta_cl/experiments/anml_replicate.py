@@ -57,15 +57,29 @@ class ANMLTransform:
 
 
 # ANML-repo results:
-# |-----------------------------------------------------------|
-# | Num Classes | Meta test-test   | Meta test-train  |  LR   |
-# |:----------- |:----------------:|:-----------------|------:|
-# |          10 |                  |                  |       |
-# |          50 |                  |                  |       |
-# |         100 |                  |                  |       |
-# |         200 |                  |                  |       |
-# |         600 |                  |                  |       |
-# |-----------------------------------------------------------|
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.84 ± 0.05      | 0.92 ± 0.02       | 0.001 |
+# |            50 | 0.84 ± 0.02      | 0.97 ± 0.01       | 0.001 |
+# |           100 | 0.81 ± 0.01      | 0.98 ± 0.01       | 0.001 |
+# |           200 | 0.77 ± 0.01      | 0.97 ± 0.00       | 0.001 |
+# |           600 | 0.64 ± 0.00      | 0.92 ± 0.00       | 0.001 |
+# |--------------------------------------------------------------|
+#
+# Training command:
+# ```
+# python mrcl_classification.py --rln 7 --meta_lr 0.001 --update_lr 0.1
+#                               --name mrcl_omniglot --steps 20000 --seed 9
+#                               --model_name ANML_Model --treatment Neuromodulation
+# ```
+#
+# Evaluation command:
+# ```
+# python evaluate_classification.py --rln 13 --model ANML_Model.net
+#                                   --name ANML_meta_tesing --runs 10
+#                                   --schedule 10 50 --neuromodulation
+# ```
 #
 
 
