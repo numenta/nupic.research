@@ -104,7 +104,13 @@ metacl_dendrites.update(
 )
 
 
-# An update version of the dendrites model.
+# An updated version of the dendrites model.
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.00 ± 0.00      | 0.00 ± 0.00       | 0.001 |
+# |--------------------------------------------------------------|
+#
 metacl_dendrites2 = deepcopy(metacl_anml_replicate)
 metacl_dendrites2.update(
     experiment_class=DendritesExperiment,
