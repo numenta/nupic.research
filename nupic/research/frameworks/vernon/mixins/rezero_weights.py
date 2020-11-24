@@ -22,7 +22,7 @@
 import logging
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
-from nupic.torch.modules.sparse_weights import SparseWeightsBase
+from nupic.torch.modules.sparse_weights import HasRezeroWeights
 
 
 class RezeroWeights:
@@ -34,7 +34,7 @@ class RezeroWeights:
 
         self._rezero_modules = [module
                                 for module in self.model.modules()
-                                if isinstance(module, SparseWeightsBase)]
+                                if isinstance(module, HasRezeroWeights)]
 
         if not self.logger.disabled:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(
@@ -49,7 +49,7 @@ class RezeroWeights:
         # Some initialization strategies can destroy sparsity, so we call rezero
         # here.
         for module in model.modules():
-            if isinstance(module, SparseWeightsBase):
+            if isinstance(module, HasRezeroWeights):
                 module.rezero_weights()
         return model
 
