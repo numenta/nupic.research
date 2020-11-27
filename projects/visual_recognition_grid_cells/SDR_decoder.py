@@ -74,7 +74,7 @@ def initialize():
 
     total_len = len(total_sources)
 
-    print("Using hold-out cross-validation data-set for evaluating model")
+    print("Using hold-out cross-validation data-set for evaluating decoder")
     indices = range(total_len) 
     val_split = int(np.floor(0.1*total_len))
     train_idx, test_decoder_idx = indices[val_split:], indices[:val_split]

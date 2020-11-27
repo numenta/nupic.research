@@ -49,7 +49,7 @@ TRAIN_NEW_NET = False # To generate all the SDRs needed for down-stream use in o
 PERCENT_ON = 0.15
 BOOST_STRENGTH = 20.0
 
-DATASET = 'mnist' # Options are 'mnist' or fashion_mnist'; note in some cases
+DATASET = 'mnist' # Options are 'mnist' or 'fashion_mnist'; note in some cases
 # fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of SDRs
 # by downstream classifiers)
 
