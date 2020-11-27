@@ -1,3 +1,4 @@
+*.txt
 *.npy
 *.png
 testing_ground.py
