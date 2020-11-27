@@ -18,8 +18,12 @@
 #  http://numenta.org/licenses/
 #
 '''
-This trains a simple CNN that can be used to output SDR features 
-derived from images such as MNIST or Fashion-MNIST
+This trains a simple supervised CNN that can be used to output SDR features 
+derived from images such as MNIST or Fashion-MNIST; these can subsequently
+be used by other classifiers including GridCellNet, or a decoder to reconstruct
+the images
+Several functions are based on the k-WTA sparse_cnn.ipynb example in
+nupic.torch/examples
 '''
 import numpy as np
 import torch
@@ -30,30 +34,32 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 from nupic.torch.modules import (
-    KWinners2d, Flatten, rezero_weights, update_boost_strength
+    KWinners2d, rezero_weights, update_boost_strength
 )
 import torch
 
 torch.manual_seed(18)
 np.random.seed(18)
 
-# Training parameters
-TRAIN_NEW_NET = False
+# Parameters
+TRAIN_NEW_NET = False # To generate all the SDRs needed for down-stream use in other
+# programs, train a network and run this again with TRAIN_NEW_NET=False
+
+# k-WTA parameters
 PERCENT_ON = 0.15
 BOOST_STRENGTH = 20.0
 
-CROSS_VAL = True # If true, use cross-validation subset of training data
-CROSS_VAL_SPLIT = 0.1
-DATASET = 'fashion_mnist'
+DATASET = 'mnist' # Options are 'mnist' or fashion_mnist'; note in some cases
+# fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of SDRs
+# by downstream classifiers)
 
 LEARNING_RATE = 0.01
 MOMENTUM = 0.5
-EPOCHS = 10
-FIRST_EPOCH_BATCH_SIZE = 4
+EPOCHS = 1
+FIRST_EPOCH_BATCH_SIZE = 4 # Used for optimizing k-WTA
 TRAIN_BATCH_SIZE = 128
 TEST_BATCH_SIZE = 1000
 
-# Use GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device: " + str(device))
 
@@ -83,7 +89,7 @@ def train(model, loader, optimizer, criterion, post_batch_callback=None):
         if post_batch_callback is not None:
             post_batch_callback(model)
         
-def test(model, loader, test_size, criterion, epoch, test_data_bool):
+def test(model, loader, test_size, criterion, epoch, SDR_ouput_subset=None):
     """
     Evaluate pre-trained model using given dataset loader.
     Called on every epoch.
@@ -91,8 +97,11 @@ def test(model, loader, test_size, criterion, epoch, test_data_bool):
     :type model: torch.nn.Module
     :param loader: dataloader configured for the epoch.
     :type loader: :class:`torch.utils.data.DataLoader`
+    :param test_size: size of split used for evaluation. May != len(loader.dataset)
     :param criterion: loss function to use
     :type criterion: function
+    :param epoch: the current epoch; can specify as int or e.g. 'pre_epoch'
+    :param SDR_ouput_subset: string specifying the data-subset used for generating SDRs
     :return: Dict with "accuracy", "loss" and "total_correct"
     """
     model.eval()
@@ -115,36 +124,36 @@ def test(model, loader, test_size, criterion, epoch, test_data_bool):
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             total_correct += pred.eq(target.view_as(pred)).sum().item()
     
+        # Track data on duty-cycle in order to optimize sparse representation for SDR output
         duty_cycle = (model.k_winner.duty_cycle[0,:,0,0]).numpy()
-        print("\nMean duty cycle : " + str(np.mean(duty_cycle)))
-        print("Stdev duty cycle: " + str(np.std(duty_cycle)))
-        plt.hist(duty_cycle, bins=20, facecolor='crimson')
-        plt.xlabel('Duty Cycle')
-        plt.ylabel('Count')
-        plt.xlim(0,0.6)
-        plt.ylim(0,70)
-        # plt.show()
-        plt.savefig('duty_cycle_boost_' + str(BOOST_STRENGTH) + '_' + str(epoch) + '.png')
-        plt.clf()
 
-        all_SDRs = np.concatenate(all_SDRs, axis=0)
-        all_labels = np.concatenate(all_labels, axis=0)
+    print("\nMean duty cycle : " + str(np.mean(duty_cycle)))
+    print("Stdev duty cycle: " + str(np.std(duty_cycle)))
+    plt.hist(duty_cycle, bins=20, facecolor='crimson')
+    plt.xlabel('Duty Cycle')
+    plt.ylabel('Count')
+    plt.xlim(0,0.6)
+    plt.ylim(0,70)
+    plt.savefig('duty_cycle_boost_' + str(BOOST_STRENGTH) + '_' + str(epoch) + '.png')
+    plt.clf()
 
-    if test_data_bool == True:
-        print("Saving outputs from testing data")
-        np.save(DATASET + '_SDRs_testing', all_SDRs)
-        np.save(DATASET + '_labels_testing', all_labels)
-    else:
-        print("Saving outputs from training data")
-        np.save(DATASET + '_SDRs_training', all_SDRs)
-        np.save(DATASET + '_labels_training', all_labels)
+    all_SDRs = np.concatenate(all_SDRs, axis=0)
+    all_labels = np.concatenate(all_labels, axis=0)
+
+    if SDR_ouput_subset != None:
+        print("Saving generated SDR and label outputs from data sub-section: " + SDR_ouput_subset)
+        np.save(DATASET + '_SDRs_' + SDR_ouput_subset, all_SDRs)
+        np.save(DATASET + '_labels_' + SDR_ouput_subset, all_labels)
 
     return {"accuracy": total_correct / test_size, 
             "loss": loss / test_size, 
             "total_correct": total_correct}
 
 class SequentialSubSampler(torch.utils.data.Sampler):
-    r"""Samples elements sequentially from a given list of indices.
+    r"""Custom sampler to take elements sequentially from a given list of indices.
+    Performing sampling sequentially is helpful for keeping track of the generated SDRs
+    and their correspondence to examples in the MNIST data-set.
+    Using indices to sub-sample enables creating a splits of the training data.
 
     Arguments:
         indices (sequence): a sequence of indices
@@ -159,9 +168,16 @@ class SequentialSubSampler(torch.utils.data.Sampler):
     def __len__(self):
         return len(self.indices)
 
+def post_batch(model):
+    model.apply(rezero_weights)
 
-print("Creating model")
 class sdr_cnn_base(nn.Module):
+    """
+    Classifier that uses k-WTA to create a sparse representation after the second pooling
+    operation. 
+    This sparse operation can subsequently be binarized and output so as to generate SDR-like
+    representaitons given an input image.
+    """
     def __init__(self, percent_on, boost_strength):
         super(sdr_cnn_base, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5, padding=2)
@@ -174,13 +190,18 @@ class sdr_cnn_base(nn.Module):
         self.output = nn.Linear(in_features=128, out_features=10)
         self.softmax = nn.LogSoftmax(dim=1)
 
-    def forward(self, inputs):
+    def until_kWTA(self, inputs):
         x = F.relu(self.conv1(inputs))
         x = self.pool1(x)
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
         x = self.k_winner(x)
         x = x.view(-1, 5*5*128)
+
+        return x
+
+    def forward(self, inputs):
+        x = self.until_kWTA(inputs)
         x = F.relu(self.dense1(x))
         x = F.relu(self.dense2(x))
         x = self.softmax(self.output(x))
@@ -188,105 +209,101 @@ class sdr_cnn_base(nn.Module):
         return x
 
     def output_sdr(self, inputs):
-        x = F.relu(self.conv1(inputs))
-        x = self.pool1(x)
-        x = F.relu(self.conv2(x))
-        x = self.pool2(x)
-        x = self.k_winner(x)
-        # print(np.shape(x))
-        x = x.view(-1, 5*5*128)
+        """Returns a binarized SDR-like output from the CNN's 
+        mid-level representations"""
+        x = self.until_kWTA(inputs)
         x = (x>0).float()
 
         return x
 
-sdr_cnn = sdr_cnn_base(percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
+def data_setup():
+    """
+    Note there are three data-sets used in all of the experiments; the training 
+    and testing data used for the CNN (and the decoder later), which can be thought
+    of as a cross-validation split of the MNIST training data-set, and the true test data of MNIST.
+    The true MNIST test data-set (which is saved as "SDR_classifiers_testing" data later)
+    is used to evaluate the classifiers that receive SDRrs as input - which are trained 
+    on the 'test' data-set for the CNN/decoder ("test_CNN" data - which is therefore saved as
+    "SDR_classifiers_training" data later)
+    Hyper-parameter tuning of the CNN/decoder should be performed using the results from the
+    "test_CNN" data.
+    """
+    print("Loading data-sets")
 
-sdr_cnn.to(device)
+    if DATASET == 'mnist':
+        print("Using MNIST data-set")
+        normalize = transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])
+        train_dataset = datasets.MNIST('data', train=True, download=True, transform=normalize)
+        test_SDR_classifier_dataset = datasets.MNIST('data', train=False, download=True, transform=normalize)
 
-print("Loading data-sets")
+    elif DATASET == 'fashion_mnist':
+        print("Using Fashion-MNIST data-set")
+        normalize = transforms.ToTensor() # TODO add normalization of pixel intensities
+        train_dataset = datasets.FashionMNIST('data', train=True, download=True, transform=normalize)
+        test_SDR_classifier_dataset = datasets.FashionMNIST('data', train=False, download=True, transform=normalize)
 
-if DATASET == 'mnist':
-    print("Using MNIST data-set")
-    normalize = transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])
-    train_dataset = datasets.MNIST('data', train=True, download=True, transform=normalize)
-    test_dataset = datasets.MNIST('data', train=True, download=True, transform=normalize)
+    total_traing_len = len(train_dataset)
+    indices = range(total_traing_len)
+    val_split = int(np.floor(0.1*total_traing_len))
+    train_idx, test_CNN_idx = indices[val_split:], indices[:val_split]
 
-elif DATASET == 'fashion_mnist':
-    print("Using Fashion-MNIST data-set")
-    normalize = transforms.ToTensor()
-    train_dataset = datasets.FashionMNIST('data', train=True, download=True, transform=normalize)
-    test_dataset = datasets.FashionMNIST('data', train=True, download=True, transform=normalize)
+    train_sampler = SequentialSubSampler(train_idx)
+    test_CNN_sampler = SequentialSubSampler(test_CNN_idx)
+    test_SDR_classifier_sample = SequentialSubSampler(range(len(test_SDR_classifier_dataset)))
 
+    # Configure data loaders
+    first_loader = torch.utils.data.DataLoader(train_dataset, batch_size=FIRST_EPOCH_BATCH_SIZE, sampler=train_sampler)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=TRAIN_BATCH_SIZE, sampler=train_sampler)
+    test_CNN_loader = torch.utils.data.DataLoader(train_dataset, batch_size=TEST_BATCH_SIZE, sampler=test_CNN_sampler)
+    test_SDR_classifier_loader = torch.utils.data.DataLoader(test_SDR_classifier_dataset, batch_size=TEST_BATCH_SIZE, sampler=test_SDR_classifier_sample)
 
-traing_len = len(train_dataset)
-
-if CROSS_VAL == True:
-    print("Using hold-out cross-validation data-set for evaluating model")
-    indices = range(traing_len)
-    val_split = int(np.floor(CROSS_VAL_SPLIT*traing_len))
-    train_idx, test_idx = indices[val_split:], indices[:val_split]
-    # print(train_idx[0:10])
-    # print(test_idx[0:10])
-    # print(train_dataset.train_labels[train_idx][0:10])
-    # print(train_dataset.train_labels[test_idx][0:10])
-    # exit()
-
-elif CROSS_VAL == False:
-    assert 1 == 0, "Not implemented"
-
-train_sampler = SequentialSubSampler(train_idx)
-test_sampler = SequentialSubSampler(test_idx)
-
-
-
-
-# *** need to fix normalizaiton ***
-#     normalize = transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])
-#     train_dataset = datasets.FashionMNIST('data', train=True, download=True, transform=normalize)
-#     test_dataset = datasets.FashionMNIST('data', train=False, transform=normalize)
-
-# Configure data loaders
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=TRAIN_BATCH_SIZE, sampler=train_sampler)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=TEST_BATCH_SIZE, sampler=test_sampler)
-first_loader = torch.utils.data.DataLoader(train_dataset, batch_size=FIRST_EPOCH_BATCH_SIZE, sampler=train_sampler)
+    return first_loader, train_loader, test_CNN_loader, test_SDR_classifier_loader, len(train_idx), len(test_CNN_idx), len(test_SDR_classifier_dataset)
 
 
-def post_batch(model):
-    model.apply(rezero_weights)
+if __name__ == '__main__':
 
-if os.path.exists('saved_networks/') == False:
-    try:
-        os.mkdir('saved_networks/')
-    except OSError:
-        pass
+    first_loader, train_loader, test_CNN_loader, test_SDR_classifier_loader, training_len, testing_CNN_len, testing_SDR_classifier_len = data_setup()
 
-if TRAIN_NEW_NET == True:
+    sdr_cnn = sdr_cnn_base(percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
 
-    print("Performing first epoch for update-boost-strength")
-    sgd = optim.SGD(sdr_cnn.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
-    train(model=sdr_cnn, loader=first_loader, optimizer=sgd, criterion=F.nll_loss, post_batch_callback=post_batch)
+    sdr_cnn.to(device)
 
-    sdr_cnn.apply(update_boost_strength)
+    if os.path.exists('saved_networks/') == False:
+        try:
+            os.mkdir('saved_networks/')
+        except OSError:
+            pass
 
-    test(model=sdr_cnn, loader=test_loader, test_size=len(test_idx), epoch='pre_epoch', criterion=F.nll_loss, test_data_bool=False)
+    if TRAIN_NEW_NET == True:
 
-    print("Performing full training")
-    for epoch in range(1, EPOCHS):
-        train(model=sdr_cnn, loader=train_loader, optimizer=sgd, criterion=F.nll_loss, post_batch_callback=post_batch)
+        print("Performing first epoch for update-boost-strength")
+        sgd = optim.SGD(sdr_cnn.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+        train(model=sdr_cnn, loader=first_loader, optimizer=sgd, criterion=F.nll_loss, post_batch_callback=post_batch)
+
         sdr_cnn.apply(update_boost_strength)
-        results = test(model=sdr_cnn, loader=test_loader, test_size=len(test_idx), epoch=epoch, criterion=F.nll_loss, test_data_bool=False)
+
+        test(model=sdr_cnn, loader=test_CNN_loader, test_size=testing_CNN_len, epoch='pre_epoch', criterion=F.nll_loss)
+
+        print("Performing full training")
+        for epoch in range(1, EPOCHS):
+            train(model=sdr_cnn, loader=train_loader, optimizer=sgd, criterion=F.nll_loss, post_batch_callback=post_batch)
+            sdr_cnn.apply(update_boost_strength)
+            results = test(model=sdr_cnn, loader=test_CNN_loader, test_size=testing_CNN_len, epoch=epoch, criterion=F.nll_loss)
+            print(results)
+
+        print("Saving network state...")
+        torch.save(sdr_cnn.state_dict(), 'saved_networks/sdr_cnn.pt')
+
+    else:
+        sdr_cnn.load_state_dict(torch.load('saved_networks/sdr_cnn.pt'))
+
+        print("Evaluating a pre-trained model:")
+        print("\nResults from training data-set. The output SDRs are saved as base_net_training, and are used later to train the decoder")
+        results = test(model=sdr_cnn, loader=train_loader, test_size=training_len, epoch='final_train', criterion=F.nll_loss, SDR_ouput_subset='base_net_training') #Save SDRs from the training-data
         print(results)
-
-    print("Saving network state...")
-    torch.save(sdr_cnn.state_dict(), 'saved_networks/sdr_cnn.pt')
-
-else:
-    sdr_cnn.load_state_dict(torch.load('saved_networks/sdr_cnn.pt'))
-
-    print("Evaluating a pre-trained model:")
-    print("\nResults from training data-set")
-    results = test(model=sdr_cnn, loader=train_loader, test_size=len(train_idx), epoch='final_train', criterion=F.nll_loss, test_data_bool=False) #Save SDRs from the training-data
-    print(results)
-    print("\nResults from testing data-set")
-    results = test(model=sdr_cnn, loader=test_loader, test_size=len(test_idx), epoch='test', criterion=F.nll_loss, test_data_bool=True)
-    print(results)
+        print("\nResults from data-set for evaluating CNN/decoder. The output SDRs are saved as SDR_classifiers_training")
+        results = test(model=sdr_cnn, loader=test_CNN_loader, test_size=testing_CNN_len, epoch='test_CNN', criterion=F.nll_loss, SDR_ouput_subset='SDR_classifiers_training')
+        print(results)
+        print("\nResults from data-set for evaluating later SDR-based classifiers. The output SDRs are saved as SDR_classifiers_testing")
+        results = test(model=sdr_cnn, loader=test_SDR_classifier_loader, test_size=testing_SDR_classifier_len, epoch='test_SDRs', criterion=F.nll_loss, SDR_ouput_subset='SDR_classifiers_testing')
+        print(results)
