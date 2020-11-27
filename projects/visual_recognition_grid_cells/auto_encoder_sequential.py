@@ -45,13 +45,20 @@ train_net_bool = True
 randomize_order_bool = False
 generate_SDR_patches_bool = False
 sample_patches_bool = False
+noise_level = 0.3
 CROSS_VAL = True # If true, use cross-validation subset of training data
 CROSS_VAL_SPLIT = 0.1
-num_epochs = 10
-batch_size = 64
-percent_on = 0.15
-boost_strength = 20.0
+# LEARNING_RATE = 0.001
+# MOMENTUM = 0.5
 
+num_epochs = 3
+batch_size = 128
+percent_on = 0.15
+boost_strength = 10.0
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("\nUsing device: " + str(device))
 
 class mlp_auto_encoder(torch.nn.Module):
     def __init__(self):
@@ -112,56 +119,77 @@ class mlp_auto_encoder(torch.nn.Module):
 
         return x
 
-class hinton_auto_encoder(mlp_auto_encoder):
+# class hinton_auto_encoder(mlp_auto_encoder):
+#     def __init__(self):
+#         super(hinton_auto_encoder, self).__init__()
+#         self.dense1_encode = nn.Linear(in_features=28*28, out_features=256)
+#         self.dense2_encode = nn.Linear(in_features=256, out_features=256)
+#         self.dense3_encode = nn.Linear(in_features=256, out_features=128)
+#         self.dense1_decode = nn.Linear(in_features=128, out_features=256)
+#         self.dense2_decode = nn.Linear(in_features=256, out_features=256)
+#         self.dense3_decode = nn.Linear(in_features=256, out_features=28*28)
+
+
+#     def encode(self, x):
+#         #print(np.shape(x))
+#         x = x.reshape(-1, 28*28)
+#         x = F.relu(self.dense1_encode(x))
+#         x = F.relu(self.dense2_encode(x))
+#         x = torch.sigmoid(self.dense3_encode(x))
+
+#         if self.training == True:
+#             x = x + torch.randn(size=x.shape)*16
+
+#         return x
+
+#     def decode(self, x):
+
+#         x = F.relu(self.dense1_decode(x))
+#         x = F.relu(self.dense2_decode(x))
+#         x = torch.sigmoid(self.dense3_decode(x))
+#         x = x.view(-1, 28, 28)
+
+#         return x
+
+
+class half_cnn_auto_encoder_twenty_eight(torch.nn.Module):
     def __init__(self):
-        super(hinton_auto_encoder, self).__init__()
-        self.dense1_encode = nn.Linear(in_features=7*7, out_features=256)
-        self.dense2_encode = nn.Linear(in_features=256, out_features=256)
-        self.dense3_encode = nn.Linear(in_features=256, out_features=128)
-        self.dense1_decode = nn.Linear(in_features=128, out_features=256)
-        self.dense2_decode = nn.Linear(in_features=256, out_features=256)
-        self.dense3_decode = nn.Linear(in_features=256, out_features=7*7)
-
-
-    def encode(self, x):
-        #print(np.shape(x))
-        x = x.reshape(-1, 7*7)
-        x = F.relu(self.dense1_encode(x))
-        x = F.relu(self.dense2_encode(x))
-        x = torch.sigmoid(self.dense3_encode(x))
-
-        if self.training == True:
-            x = x + torch.randn(size=x.shape)*32
-
-        return x
-
-    def decode(self, x):
-
-        x = F.relu(self.dense1_decode(x))
-        x = F.relu(self.dense2_decode(x))
-        x = torch.sigmoid(self.dense3_decode(x))
-        x = x.view(-1, 7, 7)
-
-        return x
-
-
-
-class half_cnn_auto_encoder(mlp_auto_encoder):
-    def __init__(self):
-        super(half_cnn_auto_encoder, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=4, padding=1)
+        super(half_cnn_auto_encoder_twenty_eight, self).__init__()
+        self.dropout_noise = nn.Dropout(p = 0.1)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5, padding=2)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=2, padding=0)
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, padding=0)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.k_winner = KWinners2d(channels=128, percent_on=percent_on, boost_strength=boost_strength, local=True)
 
-        print("Using a CNN-encoding component")
+
+        self.dense_decode1 = nn.Linear(in_features=128*5*5, out_features=256)
+        self.dense_decode2 = nn.Linear(in_features=256, out_features=28*28)
+
+        print("\nUsing a CNN-encoding component")
+
+        print("\n\n***Applying dropout to inputs!")
 
     def encode(self, x):
 
         # print("\n New encode pass")
+        # print(np.shape(x))
+        x = x.reshape(-1, 1, 28, 28) # Add channel dimension
 
-        x = x.reshape(-1, 1, 7, 7) # Add channel dimension
+        # print(x[0])
+        
+        # if self.training == True:
+        #     # add noise to some examples
+        #     # if np.random.uniform() > 0.5:
+        #         # print("Adding noise")
+        #     x = torch.clamp(x + torch.FloatTensor(np.random.normal(0, scale=noise_level, size=x.shape)), 0, 1)
+        #     # else:
+        #     #     print("Not adding noise")
+        # # print(x[0])
+
+        x = self.dropout_noise(x)
+
+        # print(np.shape(x))
         # print(np.shape(x))
         # print("Conv1:")
         x = F.relu(self.conv1(x))
@@ -174,14 +202,76 @@ class half_cnn_auto_encoder(mlp_auto_encoder):
         x = self.pool2(x)
         # print(np.shape(x))
 
-        x = x.reshape(-1, 128, 1, 1)
-
         x = self.k_winner(x)
-
-
-        x = x.reshape(-1, 128)
+        # print(np.shape(x))
 
         return x
+
+    def decode(self, x):
+
+        x = x.view(-1, 5*5*128)
+        x = F.relu(self.dense_decode1(x))
+        x = torch.sigmoid(self.dense_decode2(x))
+        x = x.view(-1, 28, 28)
+
+        return x
+
+    def forward(self, x):
+
+        x = self.encode(x)
+        x = self.decode(x)
+
+        return x
+
+    def extract_SDRs(self, x):
+
+        x = self.encode(x)
+        # indices = x>0
+        # x[indices] = 1
+        x = x.view(-1, 5*5*128)
+        x = (x>0).float()
+        print("Extracted SDR")
+        print(x[0])
+
+        return x
+
+
+# class half_cnn_auto_encoder(mlp_auto_encoder):
+#     def __init__(self):
+#         super(half_cnn_auto_encoder, self).__init__()
+#         self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=4, padding=1)
+#         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+#         self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=2, padding=0)
+#         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+#         self.k_winner = KWinners2d(channels=128, percent_on=percent_on, boost_strength=boost_strength, local=True)
+
+#         print("Using a CNN-encoding component")
+
+#     def encode(self, x):
+
+#         # print("\n New encode pass")
+
+#         x = x.reshape(-1, 1, 7, 7) # Add channel dimension
+#         # print(np.shape(x))
+#         # print("Conv1:")
+#         x = F.relu(self.conv1(x))
+#         # print(np.shape(x))
+#         x = self.pool1(x)
+#         # print(np.shape(x))
+#         # print("Conv2:")
+#         x = F.relu(self.conv2(x))
+#         # print(np.shape(x))
+#         x = self.pool2(x)
+#         # print(np.shape(x))
+
+#         x = x.reshape(-1, 128, 1, 1)
+
+#         x = self.k_winner(x)
+
+
+#         x = x.reshape(-1, 128)
+
+#         return x
 
 
 
@@ -208,7 +298,7 @@ def sample_patches(input_images):
 
 def initialize(sample_patches_bool):
 
-    net = hinton_auto_encoder()
+    net = half_cnn_auto_encoder_twenty_eight()
 
     #Note the 'sources' are the original image that needs to be reconstructed
 
@@ -217,19 +307,19 @@ def initialize(sample_patches_bool):
 
     if data_set == 'mnist':
 
-        print("Using MNIST data-set")
+        print("\nUsing MNIST data-set")
         training_sources = datasets.MNIST('data', train=True, download=True, transform=normalize).train_data.float()/255
         training_labels = datasets.MNIST('data', train=True, download=True, transform=normalize).train_labels
 
     elif data_set == 'fashion_mnist':
 
-        print("Using Fashion-MNIST data-set")
+        print("\nUsing Fashion-MNIST data-set")
         training_sources = datasets.FashionMNIST('data', train=True, download=True, transform=normalize).train_data.float()/255
 
     traing_len = len(training_sources)
 
     if CROSS_VAL == True:
-        print("Using hold-out cross-validation data-set for evaluating model")
+        print("\nUsing hold-out cross-validation data-set for evaluating model")
         indices = range(traing_len) 
         val_split = int(np.floor(CROSS_VAL_SPLIT*traing_len))
         train_idx, test_idx = indices[val_split:], indices[:val_split]
@@ -255,7 +345,9 @@ def initialize(sample_patches_bool):
 def train_net(net, training_sources):
 
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-3) #SGD(net.parameters(), lr=0.1, momentum=0.9)
+    #optimizer = torch.optim.SGD(net.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+
+    optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 
     net.train()
 
@@ -309,7 +401,7 @@ def evaluate_auto_encoder(net, source):
     net.eval()
 
     print("Outputing a sample of the trained auto-encodrs predictions")
-    num_example_patches = 50
+    num_example_patches = 10
 
     reconstructed = net(source[0:num_example_patches])
 
@@ -317,6 +409,39 @@ def evaluate_auto_encoder(net, source):
 
         plt.imsave('output_images/' + str(image_iter) + '_original_patch.png', source.detach().numpy()[image_iter])
         plt.imsave('output_images/' + str(image_iter) + '_reconstructed_patch.png', reconstructed.detach().numpy()[image_iter])
+
+def generate_full_size_SDRs(net, input_images, all_labels, test_data_bool=False, randomize_order_bool=False):
+
+    net.load_state_dict(torch.load('saved_networks/' + data_set + '_patch_autoencoder.pt'))
+
+    net.eval()
+
+    num_image_examples = 1000 # len(input_images)
+    print("Generating SDRs for " + str(num_image_examples) + " images")
+
+    all_image_SDRs = net.extract_SDRs(input_images[0:num_image_examples]).detach().numpy()
+    all_labels_output = all_labels.detach().numpy()[0:num_image_examples]
+
+    print("\nShape of outputs")
+    print(np.shape(all_image_SDRs))
+    print(np.shape(all_labels_output))
+
+    # all_image_SDRs = np.concatenate(all_image_SDRs, axis=0)
+    # all_labels_output = np.concatenate(all_labels_output, axis=0)
+
+
+    if test_data_bool == True:
+        print("Saving outputs from testing data")
+        np.save(data_set + '_SDRs_testing', all_image_SDRs)
+        np.save(data_set + '_labels_testing', all_labels_output)
+        np.save(data_set + "_images_testing", input_images.detach().numpy())
+
+    else:
+        print("Saving outputs from training data")
+        np.save(data_set + '_SDRs_training', all_image_SDRs)
+        np.save(data_set + '_labels_training', all_labels_output)
+        np.save(data_set + "_images_training", input_images.detach().numpy())
+
 
 
 def generate_patch_wise_SDRs(net, input_images, all_labels, test_data_bool=False, randomize_order_bool=False):
@@ -449,3 +574,10 @@ if __name__ == '__main__':
         print("Generating patch-based SDRs for testing data")
         generate_patch_wise_SDRs(net, input_images=testing_sources, all_labels=testing_labels, test_data_bool=True, randomize_order_bool=randomize_order_bool)
 
+    else:
+
+        print("Generating full-size SDRs for training data")
+        generate_full_size_SDRs(net, input_images=training_sources, all_labels=training_labels, test_data_bool=False, randomize_order_bool=randomize_order_bool)
+
+        print("Generating full-size SDRs for testing data")
+        generate_full_size_SDRs(net, input_images=testing_sources, all_labels=testing_labels, test_data_bool=True, randomize_order_bool=randomize_order_bool)
