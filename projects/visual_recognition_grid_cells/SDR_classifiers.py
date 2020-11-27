@@ -22,7 +22,6 @@ This trains basic classifiers on SDRs derived from images
 '''
 
 import numpy as np
-import logging.config
 import torch
 import torch.nn.functional as F
 import json
@@ -32,45 +31,31 @@ from sklearn.neighbors import KNeighborsClassifier
 torch.manual_seed(18)
 np.random.seed(18)
 
-data_set = 'mnist'
-list_num_samples_per_class = [5]
-WEIGHT_DECAY = 0.001
-num_epochs = 1
-knn_bool = True
-knn_progressive_senations_bool = True
-n_neighbors = 1
+DATASET = 'mnist' # Options are 'mnist' or 'fashion_mnist'; note 'fashion_mnist' not
+    # fully supported in the current implementation
+NUM_SAMPLES_PER_CLASS_LIST = [5] # How many samples per class to use in training the
+    # classifier; can be provided as a single-value list (e.g. [5]), or multi-valued list,
+    # in which case a classifier will be trained for each number of sample classes
+CLASSIFIER_TYPE = 'knn' # Options are 'rnn' and 'knn'
+ARBITRARY_SDR_ORDER_BOOL = False # Option to shuffle the order of the SDRs for each example; 
+    # this is used to determine the robustness of a classifier to a stream of inputs of arbitrary order
 
-class MLP(torch.nn.Module):
-    def __init__(self):
-        super(MLP, self).__init__()
-        self.fc1 = torch.nn.Linear(5*5*128, 256)
-        self.fc2 = torch.nn.Linear(256, 128)
-        self.fc3 = torch.nn.Linear(128, 10)
-        print("\nUsing an MLP classifier")
+# Hyperparameters for RNN
+EPOCHS = 1 
+WEIGHT_DECAY = 0.001 # Recommend 0.001
+LR_LIST = list(range(1, 2)) # Learning to try for the RNN; can specify just a single-value list 
+    # if desired; for learning with only 1 epoch of training, recommend large learning rates (e.g. list(range(1,11)))
 
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-class linear(torch.nn.Module):
-    def __init__(self):
-        super(linear, self).__init__()
-        self.fc = torch.nn.Linear(5*5*128, 10)
-        print("\nUsing a linear classifier")
-
-    def forward(self, x):
-        # x = x.view(-1, 5*5, 64)
-        # x = torch.transpose(x)
-        # print(np.shape(x))
-
-        # x = x[:, 2, 2, :]
-        # print(np.shape(x))
-        x = self.fc(x)
-        return x
+# Hyperparameters for k-NN
+KNN_PROGRESSIVE_SENSATIONS_BOOL = True # Whether to evaluate the k-NN classifier where 
+    # progressively more input points are given (from just 1 up to the maximum of 25); this 
+    # provides an indication of how many sensations are needed before classification is robust
+N_NEIGHBOURS_LIST = list(range(1, 2)) # Number of neighbours to try for the k-NN
 
 class RNN_model(torch.nn.Module):
+    """
+    Basic RNN to test the learning of sequential inputs.
+    """
     def __init__(self):
         super(RNN_model, self).__init__()
 
@@ -80,45 +65,25 @@ class RNN_model(torch.nn.Module):
             batch_first=True)
         self.fc = torch.nn.Linear(self.hidden_size, 10)
 
-        print("Using an RNN classifier")
-
     def forward(self, x):
 
-        # print("X shapes")
-        # print(np.shape(x))
-
         hidden = torch.zeros(self.num_layers, np.shape(x)[0], self.hidden_size)
-
         x = x.reshape(-1, 5*5, 128)
-
-        # print(np.shape(x)) 
-
         out, hidden = self.rnn(x, hidden)
-
-        # print("Out shapes")
-        # print(np.shape(out))
-
         out = out[:, -1, :] #Take the final representation
-
-        # print(np.shape(out))
-
-        # out = out.contiguous().view(-1, self.hidden_size)
-
-        # print(np.shape(out))
-        
         out = self.fc(out)
-
-        # print(np.shape(out))
 
         return out
 
-
 def sub_sample_classes(input_data, labels, num_samples_per_class, sanity_check=None):
-
+    """
+    As we're evaluating few-shot learning, take a sub-sample while ensuring an equal number of
+    each class
+    """
     input_data_samples = []
     label_samples = []
 
-    print("\n Loading " + str(num_samples_per_class) + " examples per class")
+    print("Loading " + str(num_samples_per_class) + " examples per class")
 
     if sanity_check == 'one_class_training':
         print("\nAs a sanity check, loading data for only a single class")
@@ -132,107 +97,78 @@ def sub_sample_classes(input_data, labels, num_samples_per_class, sanity_check=N
         input_data_samples.extend(input_data[indices][0:num_samples_per_class])
         label_samples.extend(labels[indices][0:num_samples_per_class])
 
-    print("Size of sub-samples")
-    print(np.shape(input_data_samples))
-    print(np.shape(label_samples))
-
     return input_data_samples, label_samples
 
 def shuffle_SDR_order(input_data_samples, random_indices):
-
+    """
+    Shuffles the order of the input SDRs (total of 25)
+    """
     SDR_shuffled_input_data_samples = []
 
     for image_iter in range(len(input_data_samples)):
 
-        if arbitrary_SDR_order_bool == True:
+        if ARBITRARY_SDR_ORDER_BOOL == True:
 
-            np.random.shuffle(random_indices)
-            print("Shuffling the order of SDRs for each image")
-        
-        else: 
-            print("Shuffling the order of SDRs using the same fixed sequence across images")
+            np.random.shuffle(random_indices) # Re-shuffle the SDRs for each image
+            # Otherwise the same fixed sequence is used to re-order them
 
-        # print(random_indices)
-
-        # print("Original SDR:")
-        # print(np.shape(input_data_samples[0]))
         temp_SDR_array = np.reshape(input_data_samples[image_iter], (128, 5*5))
-        # print(np.shape(temp_SDR_array))
-        # print(temp_SDR_array)
         random_SDR_array = temp_SDR_array[:, random_indices]
         SDR_shuffled_input_data_samples.append(np.reshape(random_SDR_array, (128*5*5)))
-
-        # print("Shuffled SDR")
-        # print(np.shape(SDR_shuffled_input_data_samples[0]))
-        # print(SDR_shuffled_input_data_samples[0])
-        
-
-    print(np.shape(SDR_shuffled_input_data_samples))
 
     return SDR_shuffled_input_data_samples
 
 def truncate_SDR_samples(input_data_samples, truncation_point):
-
-    print("Truncating the number of sensations/SDR locations provided")
+    """
+    Truncate the input SDRs, so as to evaluate e.g. how well a k-NN performs when given only
+    3 out of the total 25 input features
+    """
 
     truncated_input_data_samples = []
 
-# len(input_data_samples)
-
     for image_iter in range(len(input_data_samples)):
 
-        # print(np.shape(input_data_samples[0]))
         temp_SDR_array = np.reshape(input_data_samples[image_iter], (128, 5*5))
-        # print(np.shape(temp_SDR_array))
-        # print(temp_SDR_array)
         truncated_SDR_array = temp_SDR_array[:, 0:truncation_point+1]
-        # print(np.shape(truncated_SDR_array))
         truncated_input_data_samples.append(np.reshape(truncated_SDR_array, (128*(truncation_point+1))))
-
-        # print("Truncated SDR")
-        # print(np.shape(truncated_input_data_samples[0]))
-        # print(SDR_shuffled_input_data_samples[0])
-        
-
-    print(np.shape(truncated_input_data_samples))
 
     return truncated_input_data_samples
 
-def load_data(data_section, random_indices, num_samples_per_class=5, sanity_check=None, data_set=data_set):
+def load_data(data_section, random_indices, num_samples_per_class=5, sanity_check=None, DATASET=DATASET):
 
-    input_data = np.load(data_set + '_SDRs_' + data_section + '.npy')
-    labels = np.load(data_set + '_labels_' + data_section + '.npy')
+    input_data = np.load(DATASET + '_SDRs_' + data_section + '.npy')
+    labels = np.load(DATASET + '_labels_' + data_section + '.npy')
+
+    print("\nLoading data from " + data_section)
 
     input_data_samples, label_samples = sub_sample_classes(input_data, labels, num_samples_per_class, sanity_check=None)
-
-    input_data_samples = shuffle_SDR_order(input_data_samples, random_indices)
+    input_data_samples = shuffle_SDR_order(input_data_samples, random_indices) # Note this still maintains the order of the examples,
+    # just not their features 
 
     return input_data_samples, label_samples
 
-def kNN(n_neighbors, training_data, training_labels, testing_data, testing_labels):
+def kNN(N_NEIGHBORS, training_data, training_labels, testing_data, testing_labels):
 
-    knn = KNeighborsClassifier(n_neighbors=n_neighbors)
-
-    # knn.fit(np.reshape(training_data, (np.shape(training_data)[0], np.shape(training_data)[1]*np.shape(training_data)[2]*np.shape(training_data)[3])), training_labels)
+    knn = KNeighborsClassifier(n_neighbors=N_NEIGHBORS)
     knn.fit(training_data, training_labels)
-
     acc = knn.score(testing_data, testing_labels)
 
     print("Accuracy of k-NN classifier " + str(acc))
-    # print("Accuracy of k-NN classifier " + str(knn.score(np.reshape(testing_data, (np.shape(testing_data)[0], np.shape(testing_data)[1]*np.shape(testing_data)[2]*np.shape(testing_data)[3])), testing_labels)))
 
     return acc
 
-def knn_progressive_senations(n_neighbors, training_data, training_labels, testing_data, testing_labels):
+def knn_progressive_senations(N_NEIGHBORS, training_data, training_labels, testing_data, testing_labels):
 
     acc_list = []
+
+    print("\nTruncating the number of sensations/SDR locations provided")
 
     for truncation_iter in range(25):
 
         truncated_training_data = truncate_SDR_samples(training_data, truncation_point=truncation_iter)
         truncated_testing_data = truncate_SDR_samples(testing_data, truncation_point=truncation_iter)
 
-        acc_list.append(kNN(n_neighbors, truncated_training_data, training_labels, truncated_testing_data, testing_labels))
+        acc_list.append(kNN(N_NEIGHBORS, truncated_training_data, training_labels, truncated_testing_data, testing_labels))
 
     print("All accuracies across truncation levels")
     print(acc_list)
@@ -241,11 +177,9 @@ def knn_progressive_senations(n_neighbors, training_data, training_labels, testi
     plt.ylim(0,1)
     plt.show()
 
+    return None
 
 def train_net(net, training_data, training_labels, testing_data, testing_labels, lr):
-
-    # input_data = torch.from_numpy(np.load(data_set + '_SDRs_' + data_section + '.npy'))
-    # labels = torch.from_numpy(np.load(data_set + '_labels_' + data_section + '.npy'))
 
     training_data, training_labels, testing_data, testing_labels = (torch.FloatTensor(training_data), torch.LongTensor(training_labels),
         torch.FloatTensor(testing_data), torch.LongTensor(testing_labels))
@@ -253,16 +187,13 @@ def train_net(net, training_data, training_labels, testing_data, testing_labels,
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=WEIGHT_DECAY)
 
-    for epoch in range(num_epochs):  # loop over the dataset multiple times
+    for epoch in range(EPOCHS):
 
         optimizer.zero_grad()
 
-        # print(np.shape(training_data))
-        # print(np.shape(training_labels))
         shuffle_indices = torch.randperm(len(training_labels))
         training_data = training_data[shuffle_indices,:]
         training_labels = training_labels[shuffle_indices]
-        # print(training_labels[0:5])
 
         outputs = net(training_data)
         loss = criterion(outputs, training_labels)
@@ -279,53 +210,42 @@ def train_net(net, training_data, training_labels, testing_data, testing_labels,
     print('Finished Training')
     return testing_acc
 
+def run_classifier(num_samples_per_class):
 
-def main_sim(num_samples_per_class):
-
-
-    # Note the same fixed, random sampling of the input is used across training and testing, unless arbitrary_SDR_order_bool==True
+    # Note the same fixed, random sampling of the input is used across all examples in both training and testing, unless ARBITRARY_SDR_ORDER_BOOL==True
     random_indices = np.arange(25)
     np.random.shuffle(random_indices)
 
-    training_data, training_labels = load_data(data_section='training', random_indices=random_indices, num_samples_per_class=num_samples_per_class, sanity_check=None)
+    training_data, training_labels = load_data(data_section='SDR_classifiers_training', random_indices=random_indices, num_samples_per_class=num_samples_per_class, sanity_check=None)
 
-    print(np.shape(training_data))
-    print(np.shape(training_labels))
-
-
-    testing_data, testing_labels = load_data(data_section='testing', random_indices=random_indices, num_samples_per_class=100, sanity_check=None)
-
-    print(np.shape(testing_data))
-    print(np.shape(testing_labels))
-
-    neighbour_parameters_lists = list(range(1, 11))
-
-    rnn_lr_list = list(range(1, 11)) # for 1k epochs [0.005, 0.01, 0.05, 0.1, 0.5]
+    # Note unless specified otherwise, the full test-dataset is not used for evaluation, as this would take too long for GridCellNet
+    testing_data, testing_labels = load_data(data_section='SDR_classifiers_testing', random_indices=random_indices, num_samples_per_class=100, sanity_check=None)
 
     acc_dic = {}
 
-    if knn_bool == True:
+    if CLASSIFIER_TYPE == 'knn':
 
-        if knn_progressive_senations_bool == True:
+        if KNN_PROGRESSIVE_SENSATIONS_BOOL == True:
 
-            n_neighbors=1
-            knn_progressive_senations(n_neighbors, training_data, training_labels, testing_data, testing_labels)
+            N_NEIGHBORS=N_NEIGHBOURS_LIST[0]
+            print("Performing k-NN classification with a progressive number of sensations and # neighbours = " + str(N_NEIGHBORS))
+            knn_progressive_senations(N_NEIGHBORS, training_data, training_labels, testing_data, testing_labels)
 
         else:
 
-            for n_neighbors in neighbour_parameters_lists:
+            for N_NEIGHBORS in N_NEIGHBOURS_LIST:
 
-                acc_dic[str(n_neighbors)] = kNN(n_neighbors, training_data, training_labels, testing_data, testing_labels)
+                acc_dic[str(N_NEIGHBORS)] = kNN(N_NEIGHBORS, training_data, training_labels, testing_data, testing_labels)
 
                 with open('knn_parameter_resuts_' + str(num_samples_per_class) + '_samples_per_class.txt', 'w') as outfile:
                     json.dump(acc_dic, outfile)
 
 
-    else:
+    elif CLASSIFIER_TYPE == 'rnn':
 
         net = RNN_model()
 
-        for lr in rnn_lr_list:
+        for lr in LR_LIST:
 
             acc_dic[str(lr)] = train_net(net, training_data, training_labels, testing_data, testing_labels, lr)
     
@@ -335,6 +255,8 @@ def main_sim(num_samples_per_class):
 
 if __name__ == '__main__':
 
-    for num_samples_per_class in list_num_samples_per_class:
+    print("\nUsing a " + CLASSIFIER_TYPE + " classifier")
 
-        main_sim(num_samples_per_class)
+    for num_samples_per_class in NUM_SAMPLES_PER_CLASS_LIST:
+
+        run_classifier(num_samples_per_class)
