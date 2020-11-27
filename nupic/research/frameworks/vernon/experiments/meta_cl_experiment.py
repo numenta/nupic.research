@@ -23,14 +23,13 @@ from collections import defaultdict
 
 import numpy as np
 import torch
-import torch.distributed as dist
-from torch.nn import DataParallel
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.continual_learning.maml_utils import clone_model
-from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
-    TaskDistributedSampler,
-    TaskRandomSampler,
+from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
+from nupic.research.frameworks.pytorch.model_utils import (
+    filter_params,
+    get_parent_module,
 )
 from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment,
@@ -93,86 +92,132 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             data, also used to train the slow parameters (the replay batch is used to
             sample examples to update the slow parameters during meta-training testing
             to prevent the learner from forgetting other tasks)
+            - replay_classes: list of classes to sample from for the replay set;
+                              defaults to range(0, num_classes)
+            - fast_and_slow_classes: list of classes to sample from for fast and slow
+                                     sets; defaults to range(0, num_classes)
+            - num_fast_steps: number of sequential steps to take in the inner loop per
+                              every outer loop
+            - train_train_sample_size: number of images per class to sample from for
+                                      meta-training; same size will be used in both
+                                      the inner and outer loops. The rest of the
+                                      images will be used for a validation step.
+            - fast_params: list of regex patterns identifying which params to
+                           update during meta-train training
         """
-        if "num_classes" not in config["model_args"]:
-            # manually set `num_classes` in `model_args`
-            num_classes = config["num_classes"]
-            config["model_args"]["num_classes"] = num_classes
-
         super().setup_experiment(config)
+
+        if "num_classes" in config:
+            if "replay_classes" in config and "fast_and_slow_classes" in config:
+                self.logger.warn("Over-specified classes for meta-training.")
 
         self.epochs_to_validate = []
         self.tasks_per_epoch = config.get("tasks_per_epoch", 1)
-        self.num_classes = min(
-            config.get("num_classes", 50),
-            self.train_fast_loader.sampler.num_classes
-        )
+        self.num_classes = config.get("num_classes", 50)
+
+        replay_classes = config.get("replay_classes", range(0, self.num_classes))
+        fast_and_slow_classes = config.get("fast_and_slow_classes",
+                                           range(0, self.num_classes))
+        self.replay_classes = list(replay_classes)
+        self.fast_and_slow_classes = list(fast_and_slow_classes)
+
+        max_class = max(*self.replay_classes, *self.fast_and_slow_classes)
+        assert max_class < self.train_fast_loader.sampler.num_classes
 
         self.adaptation_lr = config.get("adaptation_lr", 0.03)
+        self.num_fast_steps = config.get("num_fast_steps", 1)
 
-        self.batch_size = config.get("batch_size", 5)
-        self.val_batch_size = config.get("val_batch_size", 15)
-        self.slow_batch_size = config.get("slow_batch_size", 64)
-        self.replay_batch_size = config.get("replay_batch_size", 64)
+        assert "fast_params" in config
+        fast_named_params = filter_params(self.model,
+                                          include_patterns=config["fast_params"])
+        self.fast_param_names = list(fast_named_params.keys())
+        self.logger.info(f"Setup: fast_param_names={self.fast_param_names}")
+
+        if self.num_fast_steps > len(self.train_fast_loader):
+            self.logger.warning(
+                "The num_fast_steps given is greater than the len of images available "
+                " for the inner loop. This should ideally be no more than:\n"
+                " train_train_sample_size * tasks_per_epoch / batch_size"
+            )
 
     def create_loaders(self, config):
         """Create train and val dataloaders."""
 
         main_set = self.load_dataset(config, train=True)
 
-        # All loaders share tasks and dataset, but different indices and batch sizes
+        # All loaders share tasks and dataset, but different indices and batch sizes.
         self.train_fast_loader = self.create_train_dataloader(config, main_set)
-        self.val_fast_loader = self.create_validation_dataloader(config, main_set)
         self.train_slow_loader = self.create_slow_train_dataloader(config, main_set)
         self.train_replay_loader = self.create_replay_dataloader(config, main_set)
+        self.val_fast_loader = self.create_validation_dataloader(config, main_set)
 
         # For pre/post epoch and batch processing slow loader is equiv to train loader
         self.train_loader = self.train_slow_loader
 
     @classmethod
     def create_train_sampler(cls, config, dataset):
-        return cls.create_task_sampler(config, dataset, mode="train")
+        """Sampler for meta-train training."""
+        sample_size = config.get("train_train_sample_size", 5)
+        class_indices = cls.compute_class_indices(config, dataset,
+                                                  mode="train",
+                                                  sample_size=sample_size)
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def create_validation_sampler(cls, config, dataset):
-        return cls.create_task_sampler(config, dataset, mode="test")
+    def create_train_slow_sampler(cls, config, dataset):
+        """Sampler for meta-train testing. Uses same images as for train-training."""
+        sample_size = config.get("train_train_sample_size", 5)
+        class_indices = cls.compute_class_indices(config, dataset,
+                                                  mode="train",
+                                                  sample_size=sample_size)
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
     def create_replay_sampler(cls, config, dataset):
-        return cls.create_task_sampler(config, dataset, mode="replay")
+        """Sampler used to augment meta-train testing; "replays" previous classes."""
+        class_indices = cls.compute_class_indices(config, dataset, mode="all")
+        return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def create_task_sampler(cls, config, dataset, mode="replay"):
-        """In meta continuous learning paradigm, one task equals one class"""
+    def create_validation_sampler(cls, config, dataset):
+        """Sampler used to validate meta-training phase."""
+        sample_size = config.get("train_train_sample_size", 5)
+        class_indices = cls.compute_class_indices(config, dataset,
+                                                  mode="test",
+                                                  sample_size=sample_size)
+        return cls.create_sampler(config, dataset, class_indices)
+
+    @classmethod
+    def compute_class_indices(cls, config, dataset, mode="all", sample_size=None):
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
 
         if mode == "train":
-            fast_sample_size = config.get("fast_sample_size", 5)
+            assert isinstance(sample_size, int)
             for c in class_indices:
-                class_indices[c] = class_indices[c][:fast_sample_size]
+                class_indices[c] = class_indices[c][:sample_size]
         elif mode == "test":
-            fast_sample_size = config.get("fast_sample_size", 5)
+            assert isinstance(sample_size, int)
             for c in class_indices:
-                class_indices[c] = class_indices[c][fast_sample_size:]
-        elif mode == "replay":
+                class_indices[c] = class_indices[c][sample_size:]
+        elif mode == "all":
             pass
-
-        distributed = config.get("distributed", False)
-        if distributed:
-            sampler = TaskDistributedSampler(
-                dataset,
-                class_indices
-            )
         else:
-            sampler = TaskRandomSampler(class_indices)
+            raise ValueError(f"Received unexpected mode: {mode}")
 
-        return sampler
+        return class_indices
+
+    @classmethod
+    def create_sampler(cls, config, dataset, class_indices):
+        """
+        Provides a hook for a distributed experiment.
+        """
+        return TaskRandomSampler(class_indices)
 
     @classmethod
     def create_slow_train_dataloader(cls, config, dataset):
-        sampler = cls.create_validation_sampler(config, dataset)
+        sampler = cls.create_train_slow_sampler(config, dataset)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("slow_batch_size", 64),
@@ -198,31 +243,44 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         self.pre_epoch()
 
-        timestep_begin = self.current_timestep
         self.optimizer.zero_grad()
+
+        # Sample tasks for inner loop.
+        tasks_train = np.random.choice(
+            self.fast_and_slow_classes,
+            size=self.tasks_per_epoch,
+            replace=False
+        )
+
+        # Run pre_task; For instance, may reset parameters as needed.
+        self.pre_task(tasks_train)
 
         # Clone model - clone fast params and the slow params. The latter will be frozen
         cloned_adaptation_net = self.clone_model()
 
-        tasks_train = np.random.choice(
-            self.num_classes, self.tasks_per_epoch, replace=False
-        )
+        # Inner loop: Train over sampled tasks.
         for task in tasks_train:
             self.run_task(task, cloned_adaptation_net)
 
-        # Concatenate slow and replay sets
-        self.train_slow_loader.sampler.set_active_tasks(tasks_train)
-        self.train_replay_loader.sampler.set_active_tasks(list(range(self.num_classes)))
-        slow_data, slow_target = next(iter(self.train_slow_loader))
+        # Sample from the replay set.
+        self.train_replay_loader.sampler.set_active_tasks(self.replay_classes)
         replay_data, replay_target = next(iter(self.train_replay_loader))
 
-        slow_data = torch.cat([slow_data, replay_data]).to(self.device)
-        slow_target = torch.cat([slow_target, replay_target]).to(self.device)
+        # Sample from the slow set.
+        slow_data, slow_target = [], []
+        for task in tasks_train:
+            self.train_slow_loader.sampler.set_active_tasks(task)
+            x, y = next(iter(self.train_slow_loader))
+            slow_data.append(x)
+            slow_target.append(y)
+
+        # Concatenate the slow and replay set.
+        slow_data = torch.cat(slow_data + [replay_data]).to(self.device)
+        slow_target = torch.cat(slow_target + [replay_target]).to(self.device)
 
         # Take step for outer loop. This will backprop through to the original
         # slow and fast params.
         output = cloned_adaptation_net(slow_data)
-        output = self.model(slow_data)
         loss = self._loss_function(output, slow_target)
         loss.backward()
 
@@ -237,39 +295,49 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             "total_tested": total,
             "mean_loss": loss.item(),
             "mean_accuracy": correct / total if total > 0 else 0,
+            "learning_rate": self.get_lr()[0],
         }
         self.logger.debug(results)
 
-        results.update(
-            timestep_begin=timestep_begin,
-            timestep_end=self.current_timestep,
-            learning_rate=self.get_lr()[0],
-            extra_val_results=self.extra_val_results,
-        )
+        self.post_epoch()
 
         self.current_epoch += 1
-        self.extra_val_results = []
-
-        self.post_epoch()
 
         return results
 
+    def pre_task(self, tasks):
+        """
+        Run any necessary pre-task logic for the upcoming tasks.
+
+        :param tasks: list of task about to be ran.
+        """
+        pass
+
     def run_task(self, task, cloned_adaptation_net):
         self.train_fast_loader.sampler.set_active_tasks(task)
-        self.val_fast_loader.sampler.set_active_tasks(task)
 
-        # Train, one batch
-        data, target = next(iter(self.train_fast_loader))
-        data = data.to(self.device)
-        target = target.to(self.device)
-        train_loss = self._loss_function(
-            cloned_adaptation_net(data), target
-        )
-        # Update in place
-        self.adapt(cloned_adaptation_net, train_loss)
+        # Meta-train training. Use no more than `num_fast_steps` sequential updates.
+        for i, (data, target) in enumerate(self.train_fast_loader):
+            if i >= self.num_fast_steps:
+                break
 
-        # Evaluate the adapted model
+            data = data.to(self.device)
+            target = target.to(self.device)
+            train_loss = self._loss_function(
+                cloned_adaptation_net(data), target
+            )
+            # Update in place
+            self.adapt(cloned_adaptation_net, train_loss)
+
+        # See if there are images to validate on. If 'train_train_sample_size'
+        # is equivalent to the number of images per class, then there won't be any.
+        if len(self.val_fast_loader) == 0:
+            return
+
+        # Run and log validation for given task.
         with torch.no_grad():
+            self.val_fast_loader.sampler.set_active_tasks(task)
+
             data, target = next(iter(self.val_fast_loader))
             data = data.to(self.device)
             target = target.to(self.device)
@@ -285,31 +353,34 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.logger.debug(f"Valid accuracy meta train training: {valid_accuracy}")
 
     @classmethod
-    def update_params(cls, params, loss, lr, distributed=False):
+    def update_params(cls, named_params, model, loss, lr):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
+        named_params = dict(named_params)
+        params = list(named_params.values())
         gradients = torch.autograd.grad(
             loss, params,
             retain_graph=True, create_graph=True
         )
 
-        if distributed:
-            size = float(dist.get_world_size())
-            for grad in gradients:
-                dist.all_reduce(grad.data, op=dist.reduce_op.SUM)
-                grad.data /= size
-
         if gradients is not None:
-            params = list(params)
-            for p, g in zip(params, gradients):
+            for g, (name, p) in zip(gradients, named_params.items()):
                 if g is not None:
-                    p.add_(g, alpha=-lr)
+                    updated = p.add(g, alpha=-lr)
+
+                    # Update in-place in a way that preserves grads.
+                    # TODO: Add a check at initilization that enforces the ability
+                    # to access the model's params by name.
+                    parent_module = get_parent_module(model, name)
+                    base_name = name.split(".")[-1]
+                    parent_module._parameters[base_name] = updated
 
     def adapt(self, cloned_adaptation_net, train_loss):
-        fast_params = list(self.get_fast_params(cloned_adaptation_net))
+        named_fast_params = self.get_named_fast_params(cloned_adaptation_net)
         self.update_params(
-            fast_params, train_loss, self.adaptation_lr, distributed=self.distributed
+            named_fast_params, cloned_adaptation_net, train_loss,
+            self.adaptation_lr
         )
 
     def clone_model(self, keep_as_reference=None):
@@ -317,34 +388,25 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         Clones self.model by cloning some of the params and keeping those listed
         specified `keep_as_reference` via reference.
         """
-        model = clone_model(self.model.module, keep_as_reference=None)
+        return clone_model(self.model, keep_as_reference=None)
 
-        if not self.distributed:
-            model = DataParallel(model)
-        else:
-            # Instead of using DistributedDataParallel, the grads will be reduced
-            # manually since we won't call loss.backward()
-            model
+    def get_named_fast_params(self, clone=None):
+        """Filter out the params from fast_param_names."""
+        return self._get_params_by_names(self.fast_param_names, clone=clone)
 
-        return model
+    def _get_params_by_names(self, names, clone=None):
+        """Filter out the params from names."""
+        model = self.get_model(clone=clone)
+        named_params = {}
+        for n, p in model.named_parameters():
+            if n in names:
+                named_params[n] = p
 
-    def get_slow_params(self):
-        if hasattr(self.model, "module"):
-            return self.model.module.slow_params
-        else:
-            return self.model.slow_params
+        return named_params
 
-    def get_fast_params(self, clone=None):
+    def get_model(self, clone=None):
         model = clone if clone is not None else self.model
-        if hasattr(model, "module"):
-            return model.module.fast_params
-        else:
-            return model.fast_params
-
-    @classmethod
-    def aggregate_results(cls, results):
-        """Run validation in single GPU"""
-        return results[0]
+        return model
 
     @classmethod
     def get_execution_order(cls):
@@ -352,17 +414,18 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         exp = "MetaContinualLearningExperiment"
         eo["create_loaders"] = [exp + ".create_loaders"]
         eo["create_fast_slow_loaders"] = [exp + ".create_fast_slow_loaders"]
+        eo["create_sampler"] = [exp + ".create_sampler"]
         eo["create_train_sampler"] = [exp + ".create_train_sampler"]
         eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
         eo["create_replay_sampler"] = [exp + ".create_replay_sampler"]
         eo["create_task_sampler"] = [exp + ".create_task_sampler"]
         eo["create_slow_train_dataloader"] = [exp + ".create_slow_train_dataloader"]
         eo["run_epoch"] = [exp + ".run_epoch"]
+        eo["pre_task"] = [exp + ".pre_task"]
         eo["run_task"] = [exp + ".run_task"]
         eo["update_params"] = [exp + ".update_params"]
         eo["adapt"] = [exp + ".adapt"]
         eo["clone_model"] = [exp + ".clone_model"]
-        eo["get_slow_params"] = [exp + ".get_slow_params"]
-        eo["get_fast_params"] = [exp + ".get_fast_params"]
-        eo["aggregate_results"] = [exp + ".aggregate_results"]
+        eo["get_named_fast_params"] = [exp + ".get_named_fast_params"]
+        eo["get_model"] = [exp + ".get_model"]
         return eo

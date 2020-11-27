@@ -24,11 +24,10 @@ from collections import defaultdict
 
 from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
-    TaskDistributedSampler,
-    TaskRandomSampler,
+from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
+from nupic.research.frameworks.vernon.experiments.components.evaluation_metrics import (
+    ContinualLearningMetrics,
 )
-from nupic.research.frameworks.vernon.evaluation_metrics import ContinualLearningMetrics
 from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment,
 )
@@ -38,7 +37,10 @@ __all__ = [
 ]
 
 
-class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment):
+class ContinualLearningExperiment(
+    ContinualLearningMetrics,
+    SupervisedExperiment,
+):
 
     def setup_experiment(self, config):
 
@@ -74,6 +76,9 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
             if not hasattr(self, metric):
                 raise ValueError(f"Metric {metric} not available.")
 
+    def run_iteration(self):
+        return self.run_task()
+
     def should_stop(self):
         """
         Whether or not the experiment should stop. Usually determined by the
@@ -100,33 +105,25 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
             for k, v in temp_ret.items():
                 ret[f"{metric}__{k}"] = v
 
-        # TODO: Fix aggregate results function to not
-        # require these parameters, in order to be more flexible
         ret.update(
-            timestep_begin=0,
-            timestep_end=1,
             learning_rate=self.get_lr()[0],
-            extra_val_results=[],
         )
 
         self.current_task += 1
         return ret
 
     @classmethod
-    def aggregate_results(cls, results):
-        """Run validation in single GPU"""
-        return results[0]
-
-    @classmethod
     def create_train_sampler(cls, config, dataset):
-        return cls.create_task_sampler(config, dataset, train=True)
+        task_indices = cls.compute_task_indices(config, dataset)
+        return TaskRandomSampler(task_indices)
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
-        return cls.create_task_sampler(config, dataset, train=False)
+        task_indices = cls.compute_task_indices(config, dataset)
+        return TaskRandomSampler(task_indices)
 
     @classmethod
-    def create_task_sampler(cls, config, dataset, train):
+    def compute_task_indices(cls, config, dataset):
         # Assume dataloaders are already created
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
@@ -142,30 +139,29 @@ class ContinualLearningExperiment(ContinualLearningMetrics, SupervisedExperiment
         for i in range(num_tasks):
             for j in range(num_classes_per_task):
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
-
-        # Change the sampler in the train loader
-        distributed = config.get("distributed", False)
-        if distributed and train:
-            sampler = TaskDistributedSampler(
-                dataset,
-                task_indices
-            )
-        else:
-            # TODO: implement a TaskDistributedUnpaddedSampler
-            # mplement the aggregate results
-            # after above are implemented, remove this if else
-            sampler = TaskRandomSampler(task_indices)
-
-        return sampler
+        return task_indices
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         exp = "ContinualLearningExperiment"
-        eo["create_train_sampler"] = [exp + ".create_train_sampler"]
-        eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
-        eo["create_task_sampler"] = [exp + ".create_task_sampler"]
-        eo["run_task"] = [exp + ".run_task"]
-        eo["should_stop"] = [exp + ".should_stop"]
-        eo["aggregate_results"] = [exp + ".aggregate_results"]
+
+        # Extended methods
+        eo["setup_experiment"].append(exp + ".setup_experiment")
+
+        eo.update(
+            # Overwritten methods
+            should_stop=[exp + ".should_stop"],
+            run_iteration=[exp + ": Call run_task"],
+            create_train_sampler=[exp + ".create_train_sampler"],
+            create_validation_sampler=[exp + ".create_validation_sampler"],
+            aggregate_results=[exp + ".aggregate_results"],
+            aggregate_pre_experiment_results=[
+                exp + ".aggregate_pre_experiment_results"
+            ],
+
+            # New methods
+            run_task=[exp + ".run_task"],
+        )
+
         return eo

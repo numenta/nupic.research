@@ -29,33 +29,28 @@ class Profile:
     Save cProfile traces for initialization and each run_epoch.
     """
     def setup_experiment(self, config):
-        self.use_cProfile = (self.rank == 0)
-        if self.use_cProfile:
-            pr = cProfile.Profile()
-            pr.enable()
-
+        pr = cProfile.Profile()
+        pr.enable()
         super().setup_experiment(config)
 
-        if self.use_cProfile:
-            pr.disable()
-            filepath = os.path.join(self.logdir,
-                                    "profile-initialization.profile")
-            pstats.Stats(pr).dump_stats(filepath)
-            self.logger.info(f"Saved {filepath}")
+        pr.disable()
+
+        filepath = os.path.join(self.logdir,
+                                "profile-initialization.profile")
+        pstats.Stats(pr).dump_stats(filepath)
+        self.logger.info(f"Saved {filepath}")
 
     def run_epoch(self):
-        if self.use_cProfile:
-            pr = cProfile.Profile()
-            pr.enable()
+        pr = cProfile.Profile()
+        pr.enable()
 
         result = super().run_epoch()
 
-        if self.use_cProfile:
-            pr.disable()
-            filepath = os.path.join(self.logdir,
-                                    f"profile-epoch{self.current_epoch}.profile")
-            pstats.Stats(pr).dump_stats(filepath)
-            self.logger.info(f"Saved {filepath}")
+        pr.disable()
+        filepath = os.path.join(self.logdir,
+                                f"profile-epoch{self.current_epoch}.profile")
+        pstats.Stats(pr).dump_stats(filepath)
+        self.logger.info(f"Saved {filepath}")
 
         return result
 

@@ -17,3 +17,5 @@
 #
 #  http://numenta.org/licenses/
 #
+
+from .regularization import l1_regularization_step

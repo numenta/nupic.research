@@ -26,7 +26,6 @@ import torch
 from nupic.research.frameworks.pytorch.datasets import omniglot
 from nupic.research.frameworks.pytorch.models import OMLNetwork
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
-from nupic.research.frameworks.vernon.trainables import SupervisedTrainable
 
 
 class OMLExperiment(mixins.OnlineMetaLearning,
@@ -46,15 +45,14 @@ def run_experiment(config):
 
 
 # Simple Omniglot Experiment
-metacl_test = dict(
+metacl_base = dict(
     # training infrastructure
-    ray_trainable=SupervisedTrainable,
     distributed=False,
     # problem specific
     experiment_class=MetaContinualLearningExperiment,
     dataset_class=omniglot,
     model_class=OMLNetwork,
-    model_args=dict(input_size=(105, 105)),
+    model_args=dict(num_classes=963),
     # metacl variables
     num_classes=963,
     num_classes_eval=660,
@@ -65,6 +63,8 @@ metacl_test = dict(
     epochs=1000,
     tasks_per_epoch=10,
     adaptation_lr=0.03,
+    fast_params=["adaptation.*"],
+    test_train_params=["adaptation.*"],
     # generic
     optimizer_class=torch.optim.Adam,
     optimizer_args=dict(lr=1e-4),
@@ -72,14 +72,15 @@ metacl_test = dict(
     local_dir=os.path.expanduser("~/nta/results/experiments/meta_cl"),
 )
 
-metacl_oml = copy.deepcopy(metacl_test)
+metacl_oml = copy.deepcopy(metacl_base)
 metacl_oml.update(
     experiment_class=OMLExperiment,
     run_meta_test=True,
 )
 
+
 # Export configurations in this file
 CONFIGS = dict(
-    metacl_test=metacl_test,
+    metacl_base=metacl_base,
     metacl_oml=metacl_oml,
 )

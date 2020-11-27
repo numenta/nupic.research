@@ -19,11 +19,14 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import gzip
+import io
 import pickle
 import random
 import re
 import sys
 import time
+import warnings
+from collections.abc import Collection
 
 import numpy as np
 import torch
@@ -352,17 +355,18 @@ def count_nonzero_params(model):
     return total_params, total_nonzero_params
 
 
-def serialize_state_dict(fileobj, state_dict, compresslevel=3):
+def serialize_state_dict(fileobj, state_dict, **kwargs):
     """
     Serialize the state dict to file object
     :param fileobj: file-like object such as :class:`io.BytesIO`
     :param state_dict: state dict to serialize. Usually the dict returned by
                        module.state_dict() but it can be any state dict.
-    :param compresslevel: compression level for gzip (lower equals faster but
-                          less compression).
    """
-    with gzip.GzipFile(fileobj=fileobj, mode="wb", compresslevel=compresslevel) as fout:
-        torch.save(state_dict, fout, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+    if "compresslevel" in kwargs:
+        warnings.warn("Checkpoints from pytorch >=1.6 are compressed by default."
+                      "The gzip compression is deprecated",
+                      DeprecationWarning)
+    torch.save(state_dict, fileobj, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def deserialize_state_dict(fileobj, device=None):
@@ -373,13 +377,24 @@ def deserialize_state_dict(fileobj, device=None):
     :param device: Device to map tensors to
     :return: the state dict stored in the file object
     """
-    try:
-        with gzip.GzipFile(fileobj=fileobj, mode="rb") as fin:
-            state_dict = torch.load(fin, map_location=device)
-    except OSError:
-        # FIXME: Backward compatibility with old uncompressed checkpoints
-        state_dict = torch.load(fileobj, map_location=device)
-    return state_dict
+    # Checks if the fileobj is compressed by checking for gzip's magic header
+    magic_number = fileobj.read(2)
+    fileobj.seek(-2, io.SEEK_CUR)
+    is_gzip = magic_number == b"\037\213"
+    if is_gzip:
+        warnings.warn("Checkpoints from pytorch >=1.6 are compressed by default."
+                      "Applying gzip compression on top of pytorch compression "
+                      "will slow down the deserialization significantly. Please "
+                      "convert this checkpoint to improve deserialization "
+                      "performance.",
+                      DeprecationWarning)
+        try:
+            with gzip.GzipFile(fileobj=fileobj, mode="rb") as fin:
+                return torch.load(fin, map_location=device)
+        except OSError:
+            pass
+
+    return torch.load(fileobj, map_location=device)
 
 
 def get_module_attr(module, name):
@@ -467,6 +482,72 @@ def _get_sub_module(module, name):
         return module[int(name)]
     else:
         return getattr(module, name)
+
+
+def filter_params(
+    model,
+    include_modules=None,
+    include_names=None,
+    include_patterns=None,
+):
+    """
+    This iterates through all a models parameters and returns a list of tuples (name,
+    param) for those matches any one of the following conditions
+        1. The param belongs to a module within 'include_modules'
+        2. The param has a name contained in 'include_names'
+        3. The param matches a regex pattern contained in 'include_patterns'
+
+    The regex macthing uses re.match which identifies whether zero or more characters at
+    the beginning of the param name match the regular expression pattern given.
+
+    Example:
+    ```
+    model = resnet50()
+    filter_params(
+        model,
+        include_modules=torch.nn.Linear,
+        include_names=["features.stem.weight"],
+        include_patterns=["features.*bn\\d"]
+    )
+    ```
+    """
+
+    include_modules = include_modules or []
+    include_names = include_names or []
+    include_patterns = include_patterns or []
+    assert isinstance(include_names, Collection)
+    assert isinstance(include_patterns, Collection)
+    assert isinstance(include_modules, Collection)
+
+    # Identify parameter pointers for all matching modules.
+    include_data_ptrs = []
+    if len(include_modules) > 0:
+        include_modules = tuple(include_modules)
+        for module in model.modules():
+            if isinstance(module, include_modules):
+                for param in module.parameters():
+                    include_data_ptrs.append(param.data_ptr())
+
+    filtered_named_params = dict()
+    for name, param in model.named_parameters():
+
+        # Case 1: The module matches
+        if param.data_ptr() in include_data_ptrs:
+            filtered_named_params[name] = param
+            continue
+
+        # Case 2: The name is in the white-list.
+        if name in include_names:
+            filtered_named_params[name] = param
+            continue
+
+        # Case 3: The name matches one of the allowed patterns.
+        for pattern in include_patterns:
+            if _is_match(pattern, name):
+                filtered_named_params[name] = param
+                continue
+
+    return filtered_named_params
 
 
 def _is_match(pattern, string):

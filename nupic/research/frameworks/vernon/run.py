@@ -25,7 +25,7 @@ import time
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from nupic.research.frameworks.vernon import ImagenetExperiment
+from nupic.research.frameworks.vernon.distributed import ImagenetExperiment
 from nupic.research.frameworks.vernon.experiment_utils import get_free_port
 
 # Disable HDF5 locking

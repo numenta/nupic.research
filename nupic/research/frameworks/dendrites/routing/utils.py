@@ -21,6 +21,8 @@
 
 import torch
 
+from nupic.research.frameworks.pytorch import l1_regularization_step
+
 
 def generate_context_vectors(num_contexts, n_dim, percent_on=0.2):
     """
@@ -63,8 +65,8 @@ def generate_random_binary_vectors(k, n_dim, sparsity_level=0.5):
     binary_vectors = torch.rand((k, n_dim))
     binary_vectors = torch.where(
         binary_vectors > sparsity_level,
-        torch.zeros((k, n_dim)),
-        torch.ones((k, n_dim))
+        torch.ones((k, n_dim)),
+        torch.zeros((k, n_dim))
     )
     return binary_vectors
 
@@ -105,7 +107,15 @@ def get_gating_context_weights(output_masks, context_vectors, num_dendrites):
     return context_weights
 
 
-def train_dendrite_model(model, loader, optimizer, device, criterion, concat=False):
+def train_dendrite_model(
+    model,
+    loader,
+    optimizer,
+    device,
+    criterion,
+    concat=False,
+    l1_weight_decay=0.0
+):
     """
     Trains a regular network model by iterating through all batches in the given
     dataloader
@@ -121,6 +131,7 @@ def train_dendrite_model(model, loader, optimizer, device, criterion, concat=Fal
                    and model takes just a single input to its `forward`, otherwise
                    assumes input and context vectors are separate and model's `forward`
                    function takes a regular input and contextual input separately
+    :param l1_weight_decay: L1 regularization coefficient
     """
     model.train()
 
@@ -148,6 +159,14 @@ def train_dendrite_model(model, loader, optimizer, device, criterion, concat=Fal
 
         loss.backward()
         optimizer.step()
+
+        # Perform L1 weight decay
+        if l1_weight_decay > 0.0:
+            l1_regularization_step(
+                params=model.parameters(),
+                lr=optimizer.param_groups[0]["lr"],
+                weight_decay=l1_weight_decay
+            )
 
 
 def evaluate_dendrite_model(model, loader, device, criterion, concat=False):

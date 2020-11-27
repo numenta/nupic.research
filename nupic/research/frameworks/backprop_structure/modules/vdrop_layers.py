@@ -158,9 +158,14 @@ class MaskedVDropCentralData(VDropCentralData):
         # sometimes useful during analysis.)
         self.pruned_logvar_sentinel = self.z_logvar_max - 0.00058
 
-    def register(self, module, z_mu, z_logvar, num_weights_per_z=1):
+    def register(self, module, z_mu, z_logvar, z_mask=None,
+                 num_weights_per_z=1):
         data_index = super().register(module, z_mu, z_logvar, num_weights_per_z)
-        self.all_z_mask.append(torch.ones(z_mu.numel(), dtype=torch.float16))
+        if z_mask is None:
+            z_mask = torch.ones(z_mu.numel(), dtype=torch.float16)
+        else:
+            z_mask = z_mask.half()
+        self.all_z_mask.append(z_mask)
         return data_index
 
     def finalize(self):
@@ -318,6 +323,168 @@ class VDropConv2d(nn.Module):
         else:
             return F.conv2d(x, self.get_w_mu(), self.bias, self.stride,
                             self.padding, self.dilation, self.groups)
+
+
+class VDropLinear2(nn.Module):
+    """
+    A self-contained VDropLinear (doesn't use the VDropCentralData)
+    """
+    def __init__(self, in_features, out_features, bias=True, w_logvar_init=-10):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+
+        self.w_logvar_min = min(w_logvar_init, -10)
+        self.w_logvar_max = 10.
+        self.pruned_logvar_sentinel = self.w_logvar_max - 0.00058
+        self.epsilon = 1e-8
+
+        self.w_mu = Parameter(torch.Tensor(self.out_features, self.in_features))
+        self.w_logvar = Parameter(torch.Tensor(self.out_features, self.in_features))
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_features))
+        else:
+            self.bias = None
+
+        self.w_logvar.data.fill_(w_logvar_init)
+        # Standard nn.Linear initialization.
+        init.kaiming_uniform_(self.w_mu, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.w_mu)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.bias, -bound, bound)
+
+        self.tensor_constructor = (torch.FloatTensor
+                                   if not torch.cuda.is_available()
+                                   else torch.cuda.FloatTensor)
+
+    def extra_repr(self):
+        s = f"{self.in_features}, {self.out_features}, "
+        if self.bias is None:
+            s += ", bias=False"
+        return s
+
+    def get_w_mu(self):
+        return self.w_mu
+
+    def get_w_var(self):
+        return self.w_logvar.exp()
+
+    def forward(self, x):
+        if self.training:
+            return vdrop_linear_forward(x, self.get_w_mu, self.get_w_var,
+                                        self.bias, self.tensor_constructor)
+        else:
+            return F.linear(x, self.get_w_mu(), self.bias)
+
+    def compute_w_logalpha(self):
+        return self.w_logvar - (self.w_mu.square() + self.epsilon).log()
+
+    def regularization(self):
+        return vdrop_regularization(self.compute_w_logalpha()).sum()
+
+    def constrain_parameters(self):
+        self.w_logvar.data.clamp_(min=self.w_logvar_min,
+                                  max=self.w_logvar_max)
+
+
+class MaskedVDropConv2d(nn.Module):
+    """
+    A self-contained masked Conv2d (doesn't use the VDropCentralData)
+    """
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=True, mask=None,
+                 w_logvar_init=-10):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = pair(kernel_size)
+        self.stride = pair(stride)
+        self.padding = pair(padding)
+        self.dilation = pair(dilation)
+        self.groups = groups
+
+        self.w_logvar_min = min(w_logvar_init, -10)
+        self.w_logvar_max = 10.
+        self.pruned_logvar_sentinel = self.w_logvar_max - 0.00058
+        self.epsilon = 1e-8
+
+        self.w_mu = Parameter(torch.Tensor(out_channels,
+                                           in_channels // groups,
+                                           *self.kernel_size))
+        self.w_logvar = Parameter(torch.Tensor(out_channels,
+                                               in_channels // groups,
+                                               *self.kernel_size))
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_channels))
+        else:
+            self.bias = None
+
+        self.w_logvar.data.fill_(w_logvar_init)
+
+        self.register_buffer("w_mask", torch.HalfTensor(out_channels,
+                                                        in_channels // groups,
+                                                        *self.kernel_size))
+
+        # Standard nn.Conv2d initialization.
+        init.kaiming_uniform_(self.w_mu, a=math.sqrt(5))
+
+        if mask is not None:
+            self.w_mask[:] = mask
+            self.w_mu.data *= self.w_mask
+            self.w_logvar.data[self.w_mask == 0.0] = self.pruned_logvar_sentinel
+        else:
+            self.w_mask.fill_(1.0)
+
+        # Standard nn.Conv2d initialization.
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.w_mu)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.bias, -bound, bound)
+
+        self.tensor_constructor = (torch.FloatTensor
+                                   if not torch.cuda.is_available()
+                                   else torch.cuda.FloatTensor)
+
+    def extra_repr(self):
+        s = (f"{self.in_channels}, {self.out_channels}, "
+             f"kernel_size={self.kernel_size}, stride={self.stride}")
+        if self.padding != (0,) * len(self.padding):
+            s += f", padding={self.padding}"
+        if self.dilation != (1,) * len(self.dilation):
+            s += f", dilation={self.dilation}"
+        if self.groups != 1:
+            s += f", groups={self.groups}"
+        if self.bias is None:
+            s += ", bias=False"
+        return s
+
+    def get_w_mu(self):
+        return self.w_mu * self.w_mask
+
+    def get_w_var(self):
+        return self.w_logvar.exp() * self.w_mask
+
+    def forward(self, x):
+        if self.training:
+            return vdrop_conv_forward(x, self.get_w_mu, self.get_w_var,
+                                      self.bias, self.stride, self.padding,
+                                      self.dilation, self.groups,
+                                      self.tensor_constructor)
+        else:
+            return F.conv2d(x, self.get_w_mu(), self.bias, self.stride,
+                            self.padding, self.dilation, self.groups)
+
+    def compute_w_logalpha(self):
+        return self.w_logvar - (self.w_mu.square() + self.epsilon).log()
+
+    def regularization(self):
+        return (vdrop_regularization(self.compute_w_logalpha())
+                * self.w_mask).sum()
+
+    def constrain_parameters(self):
+        self.w_logvar.data.clamp_(min=self.w_logvar_min,
+                                  max=self.w_logvar_max)
 
 
 class FixedAlphaVDropLinear(nn.Linear):
@@ -555,6 +722,8 @@ __all__ = [
     "MaskedVDropCentralData",
     "VDropLinear",
     "VDropConv2d",
+    "VDropLinear2",
+    "MaskedVDropConv2d",
     "FixedVDropConv2d",
     "FixedAlphaVDropConv2d",
     "FixedAlphaVDropLinear",

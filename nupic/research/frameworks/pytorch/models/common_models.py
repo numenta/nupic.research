@@ -49,7 +49,7 @@ class StandardMLP(nn.Module):
 
 class OmniglotCNN(nn.Module):
 
-    def __init__(self, num_classes, **kwargs):
+    def __init__(self, num_classes):
 
         super().__init__()
 
@@ -83,8 +83,15 @@ class OmniglotCNN(nn.Module):
 
 
 class OMLNetwork(nn.Module):
+    """
+    This reproduces the network from the `OML`_ repository.
 
-    def __init__(self, num_classes, **kwargs):
+    .. OML: https://github.com/khurramjaved96/mrcl
+
+    With `num_classes=963`, it uses 5,172,675 weights in total.
+    """
+
+    def __init__(self, num_classes):
 
         super().__init__()
 
@@ -119,12 +126,30 @@ class OMLNetwork(nn.Module):
         ]
 
     @property
-    def fast_params(self):
-        return self.adaptation.parameters()
+    def named_fast_params(self):
+        """
+        Returns named params of adaption network, being sure to prepend
+        the names with "adaptation."
+        """
+        named_parameters = self.adaptation.named_parameters()
+        prepended = {}
+        for n, p in named_parameters:
+            n = "adaptation." + n
+            prepended[n] = p
+        return prepended
 
     @property
-    def slow_params(self):
-        return self.representation.parameters()
+    def named_slow_params(self):
+        """
+        Returns named params of adaption network, being sure to prepend
+        the names with "representation."
+        """
+        named_parameters = self.representation.named_parameters()
+        prepended = {}
+        for n, p in named_parameters:
+            n = "representation." + n
+            prepended[n] = p
+        return prepended
 
     def forward(self, x):
         x = self.representation(x)
@@ -153,12 +178,12 @@ class MetaContinualLearningMLP(nn.Module):
         self.adaptation = nn.Linear(hidden_sizes[-1], num_classes)
 
     @property
-    def slow_params(self):
-        return self.representation.parameters()
+    def named_slow_params(self):
+        return self.representation.named_parameters()
 
     @property
-    def fast_params(self):
-        return self.adaptation.parameters()
+    def named_fast_params(self):
+        return self.adaptation.named_parameters()
 
     def forward(self, x):
         x = self.representation(x)

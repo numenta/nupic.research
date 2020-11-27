@@ -55,9 +55,9 @@ class NetworkConstructionTests(unittest.TestCase):
         make_dsnn(net, config)
 
         dynamic_layers = []
-        for l in net.modules():
-            if isinstance(l, (DSLinear, DSConv2d)):
-                dynamic_layers.append(l)
+        for layer in net.modules():
+            if isinstance(layer, (DSLinear, DSConv2d)):
+                dynamic_layers.append(layer)
 
         self.assertTrue(len(dynamic_layers) == 2)
         self.assertTrue(isinstance(dynamic_layers[0], DSConv2d))
