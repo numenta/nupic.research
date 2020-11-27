@@ -37,9 +37,10 @@ import inspect
 torch.manual_seed(18)
 np.random.seed(18)
 
-data_set = 'fashion_mnist'
-train_net_bool = False
-CROSS_VAL = True # If true, use cross-validation subset of training data
+data_set = 'mnist'
+train_net_bool = True
+CROSS_VAL = False # If true, use cross-validation subset of training data
+FINAL_EVAL = True
 CROSS_VAL_SPLIT = 0.1
 num_epochs = 10
 batch_size = 64
@@ -105,6 +106,16 @@ def initialize():
 
     traing_len = len(training_sources)
 
+    if FINAL_EVAL == True:
+        print("Using same image sources as for Cosyne evaluation")
+        val_indices = range(traing_len) 
+        val_split = int(np.floor(CROSS_VAL_SPLIT*traing_len))
+        val_idx = val_indices[val_split:]
+        print("\nNumber of images used to train auto-encoder")
+        print(len(val_idx))
+        training_sources = training_sources[val_idx]
+        testing_sources = datasets.MNIST('data', train=False, download=True, transform=normalize).train_data.float()/255
+
     if CROSS_VAL == True:
         print("Using hold-out cross-validation data-set for evaluating model")
         indices = range(traing_len) 
@@ -125,8 +136,8 @@ def initialize():
             testing_labels_comparison = datasets.FashionMNIST('data', train=True, download=True, transform=normalize).train_labels[test_idx]
 
 
-    elif CROSS_VAL == False:
-        assert 1 == 0, "Not implemented"
+    # elif CROSS_VAL == False:
+    #     assert 1 == 0, "Not implemented"
 
     print("Inputs")
     print(np.shape(training_input))
@@ -149,9 +160,9 @@ def initialize():
     print(np.shape(training_labels))
     print(np.shape(testing_labels))
     print(training_labels[0:10])
-    print(training_labels_comparison[0:10])
+    # print(training_labels_comparison[0:10])
     print(testing_labels[0:10])
-    print(testing_labels_comparison[0:10])
+    # print(testing_labels_comparison[0:10])
     # exit()
 
     return net, training_input, testing_input, training_sources, testing_sources, training_labels, testing_labels

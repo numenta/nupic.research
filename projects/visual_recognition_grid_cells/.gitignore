@@ -1,4 +1,5 @@
 *.npy
+*.png
 testing_ground.py
 data/
 output_images/
