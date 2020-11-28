@@ -18,221 +18,90 @@
 #  http://numenta.org/licenses/
 #
 '''
-Trains a decoder to reconstruct input images from SDRs
+Uses a pretrained decoder and the SDRs predicted by a GridCellNet classifier
+to visualise the networks representations.
+Note that up until inference takes place, representations include sensations
+received by the network in previous time-steps (i.e. 'ground-truth' features),
+but after inference, predicted SDR features are only based on the network's 
+own representation.
 '''
 
 import numpy as np
 import os
-import math
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 from PIL import Image
 from SDR_decoder import mlp_decoder
-from SDR_classifiers import load_data
 import random
 
 torch.manual_seed(18)
 np.random.seed(18)
 
-sequential_order = False
-arbitrary_SDR_order_bool = False
-
-DATA_SET = 'mnist'
-
-# # Visualise how much of an image is revealed after typical amounts of sensations required by 
-# # various networks to perform classification
-# def predict_general_sensations(net, num_sensations):
-
-#     random_indices = np.arange(25)
-
-#     num_samples_per_class = 10
-#     input_data_samples, label_samples = load_data(data_section='training', random_indices=random_indices, num_samples_per_class=num_samples_per_class, 
-#         sanity_check=None, data_set=DATA_SET)
-
-#     for image_iter in range(num_samples_per_class*10):   
-
-#         input_SDR = np.zeros([128, 5*5])
-
-#         current_image = np.reshape(input_data_samples[image_iter], (128, 5*5))
-
-#         sequence_order = list(range(num_sensations))
-
-#         if sequential_order == False:
-
-#             total_sequence = list(range(25))
-#             random.shuffle(total_sequence)
-#             sequence_order = total_sequence[0:num_sensations]
-
-#         for sequence_iter in sequence_order:
-
-#             print("Sequence iter:")
-#             print(sequence_iter)
-
-#             input_SDR[:, sequence_iter] = current_image[:, sequence_iter]
-
-
-#         input_SDR = torch.from_numpy(np.reshape(input_SDR, 128*5*5))
-#         input_SDR = input_SDR.type(torch.DoubleTensor)
-
-#         print("\nReconstructing:")
-#         reconstructed = net(input_SDR).detach().numpy()
-
-#         # reconstructed = np.clip(reconstructed.detach().numpy() + highlight_array, 0, 1)
-
-#         plt.imsave('predicted_images/label_' + str(label_samples[image_iter]) + '__example_' + str(image_iter) + '__num_sensations_' + 
-#             str(num_sensations) + '.png', reconstructed[0,:,:])
-
-#     # plt.imsave('predicted_images/label_' + str(label_samples[image_iter]) + '_ground_truth.png', 
-#     #     ground_truth)
-
-
+DATASET = 'mnist'
 
 def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, numSensationsToInference, ground_truth):
+    """
+    Output images corresponding to the network's representation as it progressively senses the input 
+    and makes predictions about the next sensation. Until inference has taken place, the representation
+    consists of all previously sensed features, and a prediction of the next step. Once inference has taken place, 
+    all additional features in the representation are based on predictions.
+    :param prediction_sequence : contains the predictions made by the network as well as previously sensed features
+    :param touch_sequence : contains the order of the networks sensations, which is needed to match the predicted
+    features to their correct spatial locations before feeding to the decoder
+    """
 
-    print("\n New prediction")
+    print("\nNew object")
     plt.imsave('predicted_images/' + label + '_ground_truth.png', ground_truth)
 
-    # for width_iter in range(5):
-    #     for height_iter in range(5):
     for touch_iter in range(len(prediction_sequence)):
 
-        # if touch_iter == 4:
-        #     exit()
-
-
-        print("Touch iter")
-        print(touch_iter)
-
-
-        # if touch_iter >= len(touch_sequence):
-        #     # *** note touch sequence does not actually track how many touches were performed
-        #     print("Completed all touches")
-        #     break
-
-        # touch_location = touch_sequence[touch_iter]
-        # print("Touch location and sequence")
-        # print(touch_location)
-        # print(touch_sequence)
+        print("Touch iter: " + str(touch_iter))
 
         input_SDR = np.zeros([128, 5*5])
-        # print("Initial SDR")
-        # print(np.shape(input_SDR))
-        # print(input_SDR)
-
-        # touch_indices = touch_sequence[0:touch_iter+1]
-        # # need to convert these indices to those of the expected SDR, may be easier to flattten it first **
-        # print("Touch indices")
-        # print(touch_indices)
-        # print(touch_indices[0])
-
-        # print("Prediction sequence")
-        # print(np.shape(prediction_sequence))
-        # print("\n\n")
-        # #print(prediction_sequence)
-        # print("\n\n")
         current_sequence = prediction_sequence[touch_iter]
-        # print(prediction_sequence[touch_iter])
-
-        # print("Current sequence")
-        # print(len(current_sequence))
-
-        # print(current_sequence)
-
 
         for sequence_iter in range(len(current_sequence)):
             if len(current_sequence[sequence_iter]) > 0:
-                # print("\nOn iter " + str(sequence_iter))
-                # print("Touch location")
-                # print(touch_sequence[sequence_iter])
-                # print("SDR indices")
-                # print(current_sequence[sequence_iter])
-                # print("SDR before modification")
-                # print(input_SDR[:, touch_sequence[sequence_iter]])
                 input_SDR[current_sequence[sequence_iter], touch_sequence[sequence_iter]] = 1
-                # print("SDR after modification")
-                # print(input_SDR[:, touch_sequence[sequence_iter]])
             else:
-                print("\nOn iter " + str(sequence_iter) + " of the sequence, there is no sensation or prediction to use")
+                print("On iter " + str(sequence_iter) + " of the sequence, there is no sensation or prediction to use")
 
-
-
-        if touch_iter == 7 or touch_iter == 24:
-
-            for sequence_iter in range(24):
-                print("Number of non-zero elements: " + str(np.sum(input_SDR[:, sequence_iter])))
-                # print("SDR after modification")
-                # print(input_SDR[:, touch_sequence[sequence_iter]])
-
-        # print("Predicted SDR")
-        # print(input_SDR)
-        # print(np.shape(input_SDR))
         input_SDR = torch.from_numpy(np.reshape(input_SDR, 128*5*5))
         input_SDR = input_SDR.type(torch.DoubleTensor)
-        # print(np.shape(input_SDR))
-        # print(input_SDR.dtype)
 
-        print("\nReconstructing:")
+        print("Reconstructing representation:")
         reconstructed = net(input_SDR)
-        # print(np.shape(reconstructed))
 
-        # *** highlight predicted location - note that as going from a 5*5 space to a 28*28 space, this is only approximate
+        # Highlight the location of where the current prediction is taking place
+        # Note that as going we're from a 5*5 feature space to a 28*28 space, this is only approximate
         current_touch = touch_sequence[touch_iter]
-        # print("Current touch")
-        # print(current_touch)
-        # print("Width and height iter")
         width_iter = current_touch//5
         height_iter = current_touch%5
         highlight_width_lower, highlight_width_upper = (1 + width_iter*5),  (1 + (width_iter+1)*5)
         highlight_height_lower, highlight_height_upper = (1 + height_iter*5),  (1 + (height_iter+1)*5)
 
-
         highlight_array = np.zeros((28,28))
         highlight_array[highlight_width_lower:highlight_width_upper, 
             highlight_height_lower:highlight_height_upper] = 0.5
 
-
         if numSensationsToInference != None:
             if touch_iter >= numSensationsToInference:
-                #Add highlight to borders to indicate inference successful, and all 
+                # Add highlight to borders to indicate inference successful, and that all 
                 # future representations are based on model predictions
                 highlight_array[0,:] = 1.0
                 highlight_array[27,:] = 1.0
                 highlight_array[:,0] = 1.0
                 highlight_array[:,27] = 1.0
 
-
-        # print("Highlight_array")
-        # print(np.shape(highlight_array))
-        # print(highlight_array)
-
         reconstructed = np.clip(reconstructed.detach().numpy() + highlight_array, 0, 1)
 
-
-        # *** #random comparison - change the current 
-        # print("Random control")
-        # print(touch_sequence[touch_iter])
-        # # random SDR (should have same sparsity as original SDRs)
-
-        # controlSDR = input_SDR[touch_sequence[touch_iter]][np.nonzero(np.random())]
-        # control_reconstructed = net(controlSDR)
         if numSensationsToInference != None:
             prediction = "correctly_classified"
         else:
             prediction = "misclassified"
 
-        # print(np.shape(reconstructed[0,:,:]))
-        # print(np.shape(ground_truth))
-
         plt.imsave('predicted_images/' + label + '_' + prediction + 
             '_touch_' + str(touch_iter) + '.png', reconstructed[0,:,:])
-
-    #Save the final prediction without the prediction window 
-    plt.imsave('predicted_images/' + label + '_' + prediction + 
-        '_touch_' + str(touch_iter) + '.png', reconstructed[0,:,:])
 
 
 if __name__ == '__main__':
@@ -246,23 +115,13 @@ if __name__ == '__main__':
     object_prediction_sequences = np.load('object_prediction_sequences.npy', allow_pickle=True, encoding='latin1')
 
     net = mlp_decoder().double()
-    net.load_state_dict(torch.load('saved_networks/' + DATA_SET + '_decoder.pt'))
-
-    # predict_general_sensations(net, num_sensations=25)
+    net.load_state_dict(torch.load('saved_networks/' + DATASET + '_decoder.pt'))
 
     for object_iter in range(len(object_prediction_sequences)):
 
         current_object = object_prediction_sequences[object_iter]
 
-        if current_object['name']=='4_0':
-
-            # print(current_object)
-
-            # for key in current_object.items():
-            #     print(key)
-            #     exit()
-
-            predict_column_plus_reps(net, prediction_sequence=current_object['prediction_sequence'], 
-                touch_sequence=current_object['touch_sequence'], label=current_object['name'], 
-                numSensationsToInference=current_object['numSensationsToInference'],
-                ground_truth=current_object['ground_truth_image'])
+        predict_column_plus_reps(net, prediction_sequence=current_object['prediction_sequence'], 
+            touch_sequence=current_object['touch_sequence'], label=current_object['name'], 
+            numSensationsToInference=current_object['numSensationsToInference'],
+            ground_truth=current_object['ground_truth_image'])

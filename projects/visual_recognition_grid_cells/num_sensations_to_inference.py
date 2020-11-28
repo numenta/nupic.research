@@ -18,7 +18,9 @@
 #  http://numenta.org/licenses/
 #
 '''
-Calculate how many sensations were required 
+Calculate accuracy of GridCellNet as a function of the number of sensations
+Can be used to compare performance with k-NN by using SDR_classifiers.py with
+KNN_PROGRESSIVE_SENSATIONS_BOOL=True
 '''
 
 import numpy as np
@@ -26,45 +28,16 @@ import os
 import math
 import matplotlib.pyplot as plt
 
-
-
-DATA_SET = 'mnist'
-
 def plot_sensations_to_inference(object_prediction_sequences):
 
     num_sensations_list = []
-    correctly_classified_list = []
-
-    # *** need to deal with "None" when it wasn't inferred ***
-
 
     for object_iter in range(len(object_prediction_sequences)):
 
-        print("\n\nNew object:")
-        print(object_prediction_sequences[object_iter]['numSensationsToInference'])
-        print(object_prediction_sequences[object_iter]['correctly_classified'])
-
         num_sensations_list.append(object_prediction_sequences[object_iter]['numSensationsToInference'])
-        correctly_classified_list.append(object_prediction_sequences[object_iter]['correctly_classified'])
-
-    print(np.shape(num_sensations_list))
-    print(num_sensations_list[0:5])
 
     cumm_percent_inferred = []
     num_correct = 0
-
-    print("Accuracy based on sensations == None")
-    print(np.nonzero(np.array(num_sensations_list)!=None))
-    print(np.shape(np.nonzero(np.array(num_sensations_list)!=None)))
-    print(len(np.nonzero(np.array(num_sensations_list)!=None)[0]))
-    print(len(np.nonzero(np.array(num_sensations_list)!=None)[0])/len(object_prediction_sequences))
-
-    print("Accuracy based correctly classified bool")
-    print(np.nonzero(np.array(correctly_classified_list)==True))
-    print(np.shape(np.nonzero(np.array(correctly_classified_list)==True)))
-    print(np.sum(np.nonzero(np.array(correctly_classified_list)==True))/len(object_prediction_sequences))
-
-    print("Number of objects " + str(len(object_prediction_sequences)))
 
     for num_sensation_iter in range(25):
 
@@ -72,25 +45,17 @@ def plot_sensations_to_inference(object_prediction_sequences):
     
         cumm_percent_inferred.append(num_correct/len(object_prediction_sequences))
 
-
     plt.scatter(list(range(1,26)), cumm_percent_inferred)
     plt.ylim(0,1)
     plt.show()
 
+    print("Cummulative ercent inferred as a function of the number of sensations")
     print(cumm_percent_inferred)
 
 
 if __name__ == '__main__':
 
-    if os.path.exists('predicted_images/') == False:
-        try:
-            os.mkdir('predicted_images/')
-        except OSError:
-            pass
-
     object_prediction_sequences = np.load('object_prediction_sequences.npy', allow_pickle=True, encoding='latin1')
-
 
     plot_sensations_to_inference(object_prediction_sequences)    
     
-
