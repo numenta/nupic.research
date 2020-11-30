@@ -111,7 +111,7 @@ class DendriticNetwork(nn.Module):
         return out
 
 
-class DendriticNetwork2(nn.Module):
+class ANMLDendriticNetwork(nn.Module):
     """
     Prototype of a dendritic network, based closely on `ANML`_. (The conv + max-pool
     layers are identical). One major difference, however, is that no batchnorm

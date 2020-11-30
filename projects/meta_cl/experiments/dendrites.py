@@ -20,7 +20,7 @@
 
 from copy import deepcopy
 
-from networks import DendriticNetwork, DendriticNetwork2
+from networks import DendriticNetwork, ANMLDendriticNetwork
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
 
 from .anml_replicate import ANMLTransform, metacl_anml_replicate
@@ -111,12 +111,12 @@ metacl_dendrites.update(
 # |            10 | 0.00 ± 0.00      | 0.00 ± 0.00       | 0.001 |
 # |--------------------------------------------------------------|
 #
-metacl_dendrites2 = deepcopy(metacl_anml_replicate)
-metacl_dendrites2.update(
+metacl_anml_dendrites = deepcopy(metacl_anml_replicate)
+metacl_anml_dendrites.update(
     experiment_class=DendritesExperiment,
 
     epochs=300,  # just 300 for now for debugging purposes.
-    model_class=DendriticNetwork2,
+    model_class=ANMLDendriticNetwork,
     model_args=dict(num_classes=963,
                     num_segments=20,
                     dim_context=100,
@@ -127,7 +127,7 @@ metacl_dendrites2.update(
     ),
 
     wandb_args=dict(
-        name="metacl_dendrites2",
+        name="metacl_anml_dendrites",
         project="metacl_dendrites_test",
         notes="""
         Dendritic Networks applied to OML Problem. Test 2: This employs a different
@@ -156,5 +156,5 @@ metacl_dendrites2.update(
 # Export configurations in this file
 CONFIGS = dict(
     metacl_dendrites=metacl_dendrites,
-    metacl_dendrites2=metacl_dendrites2,
+    metacl_anml_dendrites=metacl_anml_dendrites,
 )
