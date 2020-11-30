@@ -20,7 +20,7 @@
 
 from copy import deepcopy
 
-from networks import DendriticNetwork, ANMLDendriticNetwork
+from networks import ANMLDendriticNetwork, DendriticNetwork
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
 
 from .anml_replicate import ANMLTransform, metacl_anml_replicate
