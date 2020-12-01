@@ -16,6 +16,8 @@ Moving On to GridCellNet
 =================
 - To get up and running, navigate to python2_htm_docker and run the following, adjusting the absolute path of docker_dir as appropriate:
 ```
+docker pull numenta/htmpapers:doi_10.3389_fncir.2019.00022
+
 docker run -v ~/nta/nupic.research/projects/visual_recognition_grid_cells/python2_htm_docker/docker_dir:/home/host_dir -it numenta/htmpapers:doi_10.3389_fncir.2019.00022 /bin/bash
 ```
 - Once in the docker container, navigate to host_dir (you will see several other legacy directories and files outside of this that can be ignored); the data generated in the earlier steps is located in training_and_testing_data/ - note that data within host_dir in the docker and docker_dir on your local system is shared
