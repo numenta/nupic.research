@@ -35,9 +35,9 @@ torch.manual_seed(18)
 np.random.seed(18)
 
 DATASET = 'mnist'
-TRAIN_NEW_NET = False
-EPOCHS = 2
-BATCH_SIZE = 64
+TRAIN_NEW_NET = True
+EPOCHS = 10 # Recommend 10
+BATCH_SIZE = 64 # Recommend 64
 
 class mlp_decoder(torch.nn.Module):
     def __init__(self):
@@ -57,8 +57,8 @@ def initialize():
     net = mlp_decoder()
 
     # SDR inputs that the decoder needs to use to reconstruct images
-    training_input = torch.from_numpy(np.load(DATASET + '_SDRs_base_net_training.npy'))
-    testing_input = torch.from_numpy(np.load(DATASET + '_SDRs_SDR_classifiers_training.npy'))
+    training_input = torch.from_numpy(np.load('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + '_SDRs_base_net_training.npy'))
+    testing_input = torch.from_numpy(np.load('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + '_SDRs_SDR_classifiers_training.npy'))
 
     # The 'sources' are the original images that need to be reconstructed
     if DATASET == 'mnist':
@@ -82,11 +82,11 @@ def initialize():
     training_sources = total_sources[train_idx]
     testing_decoder_sources = total_sources[test_decoder_idx]
 
-    training_labels = torch.from_numpy(np.load(DATASET + '_labels_base_net_training.npy'))
-    testing_labels = torch.from_numpy(np.load(DATASET + '_labels_SDR_classifiers_training.npy'))
+    training_labels = torch.from_numpy(np.load('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + '_labels_base_net_training.npy'))
+    testing_labels = torch.from_numpy(np.load('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + '_labels_SDR_classifiers_training.npy'))
 
-    np.save(DATASET + "_images_SDR_classifiers_training", testing_decoder_sources)
-    np.save(DATASET + "_images_SDR_classifiers_testing", testing_SDR_classifiers_dataset)
+    np.save('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + "_images_SDR_classifiers_training", testing_decoder_sources)
+    np.save('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + "_images_SDR_classifiers_testing", testing_SDR_classifiers_dataset)
 
     return net, training_input, testing_input, training_sources, testing_decoder_sources, training_labels, testing_labels
 
@@ -134,17 +134,17 @@ def generate_images(net, net_input, sources, labels):
 
         for image_iter in range(len(batch_labels)):
 
-            plt.imsave('output_images/' + str(batch_iter) + '_' + str(image_iter) + '_original_label_' 
+            plt.imsave('decoder_reconstructed_images/' + str(batch_iter) + '_' + str(image_iter) + '_original_label_' 
                 + str(batch_labels[image_iter].item()) + '.png', batch_sources.detach().numpy()[image_iter])
-            plt.imsave('output_images/' + str(batch_iter) + '_' + str(image_iter) + '_reconstructed_label_' 
+            plt.imsave('decoder_reconstructed_images/' + str(batch_iter) + '_' + str(image_iter) + '_reconstructed_label_' 
                 + str(batch_labels[image_iter].item()) + '.png', reconstructed.detach().numpy()[image_iter])
 
 
 if __name__ == '__main__':
 
-    if os.path.exists('output_images/') == False:
+    if os.path.exists('decoder_reconstructed_images/') == False:
         try:
-            os.mkdir('output_images/')
+            os.mkdir('decoder_reconstructed_images/')
         except OSError:
             pass
 

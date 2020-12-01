@@ -49,13 +49,13 @@ def plot_sensations_to_inference(object_prediction_sequences):
     plt.ylim(0,1)
     plt.show()
 
-    print("Cummulative ercent inferred as a function of the number of sensations")
+    print("Cummulative percent inferred as a function of the number of sensations")
     print(cumm_percent_inferred)
 
 
 if __name__ == '__main__':
 
-    object_prediction_sequences = np.load('object_prediction_sequences.npy', allow_pickle=True, encoding='latin1')
+    object_prediction_sequences = np.load('python2_htm_docker/docker_dir/prediction_data/object_prediction_sequences.npy', allow_pickle=True, encoding='latin1')
 
     plot_sensations_to_inference(object_prediction_sequences)    
     

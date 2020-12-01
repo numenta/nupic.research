@@ -20,8 +20,8 @@
 '''
 This trains basic classifiers on SDRs derived from images
 '''
-
 import numpy as np
+import os
 import torch
 import torch.nn.functional as F
 import json
@@ -41,16 +41,16 @@ ARBITRARY_SDR_ORDER_BOOL = False # Option to shuffle the order of the SDRs for e
     # this is used to determine the robustness of a classifier to a stream of inputs of arbitrary order
 
 # Hyperparameters for RNN
-EPOCHS = 1 
+EPOCHS = 1
 WEIGHT_DECAY = 0.001 # Recommend 0.001
 LR_LIST = list(range(1, 2)) # Learning to try for the RNN; can specify just a single-value list 
     # if desired; for learning with only 1 epoch of training, recommend large learning rates (e.g. list(range(1,11)))
 
 # Hyperparameters for k-NN
-KNN_PROGRESSIVE_SENSATIONS_BOOL = True # Whether to evaluate the k-NN classifier where 
+KNN_PROGRESSIVE_SENSATIONS_BOOL = False # Whether to evaluate the k-NN classifier where 
     # progressively more input points are given (from just 1 up to the maximum of 25); this 
     # provides an indication of how many sensations are needed before classification is robust
-N_NEIGHBOURS_LIST = list(range(1, 2)) # Number of neighbours to try for the k-NN
+N_NEIGHBOURS_LIST = list(range(1, 2)) # Number of neighbours to try for the k-NN, e.g. list(range(1, 11))
 
 class RNN_model(torch.nn.Module):
     """
@@ -68,7 +68,10 @@ class RNN_model(torch.nn.Module):
     def forward(self, x):
 
         hidden = torch.zeros(self.num_layers, np.shape(x)[0], self.hidden_size)
-        x = x.reshape(-1, 5*5, 128)
+
+        x = x.reshape(-1, 128, 5*5)
+        x = torch.FloatTensor(np.moveaxis(x.numpy(), 2, 1)) # Swap feature and sequence axis
+
         out, hidden = self.rnn(x, hidden)
         out = out[:, -1, :] #Take the final representation
         out = self.fc(out)
@@ -123,7 +126,6 @@ def truncate_SDR_samples(input_data_samples, truncation_point):
     Truncate the input SDRs, so as to evaluate e.g. how well a k-NN performs when given only
     3 out of the total 25 input features
     """
-
     truncated_input_data_samples = []
 
     for image_iter in range(len(input_data_samples)):
@@ -136,8 +138,8 @@ def truncate_SDR_samples(input_data_samples, truncation_point):
 
 def load_data(data_section, random_indices, num_samples_per_class=5, sanity_check=None, DATASET=DATASET):
 
-    input_data = np.load(DATASET + '_SDRs_' + data_section + '.npy')
-    labels = np.load(DATASET + '_labels_' + data_section + '.npy')
+    input_data = np.load('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + '_SDRs_' + data_section + '.npy')
+    labels = np.load('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + '_labels_' + data_section + '.npy')
 
     print("\nLoading data from " + data_section)
 
@@ -235,9 +237,9 @@ def run_classifier(num_samples_per_class):
 
             for N_NEIGHBORS in N_NEIGHBOURS_LIST:
 
-                acc_dic[str(N_NEIGHBORS)] = kNN(N_NEIGHBORS, training_data, training_labels, testing_data, testing_labels)
+                acc_dic['n_neighbors_' + str(N_NEIGHBORS)] = kNN(N_NEIGHBORS, training_data, training_labels, testing_data, testing_labels)
 
-                with open('knn_parameter_resuts_' + str(num_samples_per_class) + '_samples_per_class.txt', 'w') as outfile:
+                with open('results/knn_parameter_resuts_' + str(num_samples_per_class) + '_samples_per_class.txt', 'w') as outfile:
                     json.dump(acc_dic, outfile)
 
 
@@ -247,13 +249,19 @@ def run_classifier(num_samples_per_class):
 
         for lr in LR_LIST:
 
-            acc_dic[str(lr)] = train_net(net, training_data, training_labels, testing_data, testing_labels, lr)
+            acc_dic['lr_' + str(lr)] = train_net(net, training_data, training_labels, testing_data, testing_labels, lr)
     
-            with open('rnn_parameter_resuts_' + str(num_samples_per_class) + '_samples_per_class.txt', 'w') as outfile:
+            with open('results/rnn_parameter_resuts_' + str(num_samples_per_class) + '_samples_per_class.txt', 'w') as outfile:
                 json.dump(acc_dic, outfile)
 
 
 if __name__ == '__main__':
+
+    if os.path.exists('results/') == False:
+        try:
+            os.mkdir('results/')
+        except OSError:
+            pass
 
     print("\nUsing a " + CLASSIFIER_TYPE + " classifier")
 

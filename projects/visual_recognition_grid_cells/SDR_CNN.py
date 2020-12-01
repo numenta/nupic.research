@@ -22,7 +22,7 @@ This trains a simple supervised CNN that can be used to output SDR features
 derived from images such as MNIST or Fashion-MNIST; these can subsequently
 be used by other classifiers including GridCellNet, or a decoder to reconstruct
 the images
-Several functions are based on the k-WTA sparse_cnn.ipynb example in
+Several functions are based on the k-WTA sparse_cnn.ipynb example in 
 nupic.torch/examples
 '''
 import numpy as np
@@ -37,6 +37,7 @@ from nupic.torch.modules import (
     KWinners2d, rezero_weights, update_boost_strength
 )
 import torch
+from PIL import Image
 
 torch.manual_seed(18)
 np.random.seed(18)
@@ -46,18 +47,18 @@ TRAIN_NEW_NET = False # To generate all the SDRs needed for down-stream use in o
 # programs, train a network and run this again with TRAIN_NEW_NET=False
 
 # k-WTA parameters
-PERCENT_ON = 0.15
-BOOST_STRENGTH = 20.0
+PERCENT_ON = 0.15 # Recommend 0.15
+BOOST_STRENGTH = 20.0 # Recommend 20
 
 DATASET = 'mnist' # Options are 'mnist' or 'fashion_mnist'; note in some cases
 # fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of SDRs
 # by downstream classifiers)
 
-LEARNING_RATE = 0.01
-MOMENTUM = 0.5
-EPOCHS = 1
+LEARNING_RATE = 0.01 # Recommend 0.01
+MOMENTUM = 0.5 # Recommend 0.5
+EPOCHS = 10 # Recommend 10
 FIRST_EPOCH_BATCH_SIZE = 4 # Used for optimizing k-WTA
-TRAIN_BATCH_SIZE = 128
+TRAIN_BATCH_SIZE = 128 # Recommend 128
 TEST_BATCH_SIZE = 1000
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -114,6 +115,7 @@ def test(model, loader, test_size, criterion, epoch, SDR_ouput_subset=None):
 
     with torch.no_grad():
         for data, target in loader:
+
             data, target = data.to(device), target.to(device)
             output = model(data)
 
@@ -134,7 +136,7 @@ def test(model, loader, test_size, criterion, epoch, SDR_ouput_subset=None):
     plt.ylabel('Count')
     plt.xlim(0,0.6)
     plt.ylim(0,70)
-    plt.savefig('duty_cycle_boost_' + str(BOOST_STRENGTH) + '_' + str(epoch) + '.png')
+    plt.savefig('duty_cycle_results/duty_cycle_boost_' + str(BOOST_STRENGTH) + '_' + str(epoch) + '.png')
     plt.clf()
 
     all_SDRs = np.concatenate(all_SDRs, axis=0)
@@ -142,8 +144,8 @@ def test(model, loader, test_size, criterion, epoch, SDR_ouput_subset=None):
 
     if SDR_ouput_subset != None:
         print("Saving generated SDR and label outputs from data sub-section: " + SDR_ouput_subset)
-        np.save(DATASET + '_SDRs_' + SDR_ouput_subset, all_SDRs)
-        np.save(DATASET + '_labels_' + SDR_ouput_subset, all_labels)
+        np.save('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + '_SDRs_' + SDR_ouput_subset, all_SDRs)
+        np.save('python2_htm_docker/docker_dir/training_and_testing_data/' + DATASET + '_labels_' + SDR_ouput_subset, all_labels)
 
     return {"accuracy": total_correct / test_size, 
             "loss": loss / test_size, 
@@ -185,7 +187,7 @@ class sdr_cnn_base(nn.Module):
         self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, padding=0)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.k_winner = KWinners2d(channels=128, percent_on=percent_on, boost_strength=boost_strength, local=True)
-        self.dense1 = nn.Linear(in_features=5*5*128, out_features=256)
+        self.dense1 = nn.Linear(in_features=128*5*5, out_features=256)
         self.dense2 = nn.Linear(in_features=256, out_features=128)
         self.output = nn.Linear(in_features=128, out_features=10)
         self.softmax = nn.LogSoftmax(dim=1)
@@ -196,7 +198,7 @@ class sdr_cnn_base(nn.Module):
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
         x = self.k_winner(x)
-        x = x.view(-1, 5*5*128)
+        x = x.view(-1, 128*5*5)
 
         return x
 
@@ -274,6 +276,18 @@ if __name__ == '__main__':
         except OSError:
             pass
 
+    if os.path.exists('duty_cycle_results/') == False:
+        try:
+            os.mkdir('duty_cycle_results/')
+        except OSError:
+            pass
+
+    if os.path.exists('python2_htm_docker/docker_dir/training_and_testing_data/') == False:
+        try:
+            os.mkdir('python2_htm_docker/docker_dir/training_and_testing_data/')
+        except OSError:
+            pass
+
     if TRAIN_NEW_NET == True:
 
         print("Performing first epoch for update-boost-strength")
@@ -295,15 +309,17 @@ if __name__ == '__main__':
         torch.save(sdr_cnn.state_dict(), 'saved_networks/sdr_cnn.pt')
 
     else:
+        print("Evaluating a pre-trained model:")
         sdr_cnn.load_state_dict(torch.load('saved_networks/sdr_cnn.pt'))
 
-        print("Evaluating a pre-trained model:")
-        print("\nResults from training data-set. The output SDRs are saved as base_net_training, and are used later to train the decoder")
-        results = test(model=sdr_cnn, loader=train_loader, test_size=training_len, epoch='final_train', criterion=F.nll_loss, SDR_ouput_subset='base_net_training') #Save SDRs from the training-data
-        print(results)
-        print("\nResults from data-set for evaluating CNN/decoder. The output SDRs are saved as SDR_classifiers_training")
-        results = test(model=sdr_cnn, loader=test_CNN_loader, test_size=testing_CNN_len, epoch='test_CNN', criterion=F.nll_loss, SDR_ouput_subset='SDR_classifiers_training')
-        print(results)
-        print("\nResults from data-set for evaluating later SDR-based classifiers. The output SDRs are saved as SDR_classifiers_testing")
-        results = test(model=sdr_cnn, loader=test_SDR_classifier_loader, test_size=testing_SDR_classifier_len, epoch='test_SDRs', criterion=F.nll_loss, SDR_ouput_subset='SDR_classifiers_testing')
-        print(results)
+    print("\nSaving SDR-representations for later use.")
+    print("\nResults from training data-set. The output SDRs are saved as base_net_training, and are used later to train the decoder")
+    results = test(model=sdr_cnn, loader=train_loader, test_size=training_len, epoch='final_train', criterion=F.nll_loss, SDR_ouput_subset='base_net_training') #Save SDRs from the training-data
+    print(results)
+    print("\nResults from data-set for evaluating CNN/decoder. The output SDRs are saved as SDR_classifiers_training")
+    results = test(model=sdr_cnn, loader=test_CNN_loader, test_size=testing_CNN_len, epoch='test_CNN', criterion=F.nll_loss, SDR_ouput_subset='SDR_classifiers_training')
+    print(results)
+    print("\nResults from data-set for evaluating later SDR-based classifiers. The output SDRs are saved as SDR_classifiers_testing")
+    results = test(model=sdr_cnn, loader=test_SDR_classifier_loader, test_size=testing_SDR_classifier_len, 
+        epoch='test_SDRs', criterion=F.nll_loss, SDR_ouput_subset='SDR_classifiers_testing')
+    print(results)

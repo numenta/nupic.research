@@ -49,13 +49,9 @@ def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, nu
     :param touch_sequence : contains the order of the networks sensations, which is needed to match the predicted
     features to their correct spatial locations before feeding to the decoder
     """
-
-    print("\nNew object")
     plt.imsave('predicted_images/' + label + '_ground_truth.png', ground_truth)
 
     for touch_iter in range(len(prediction_sequence)):
-
-        print("Touch iter: " + str(touch_iter))
 
         input_SDR = np.zeros([128, 5*5])
         current_sequence = prediction_sequence[touch_iter]
@@ -63,13 +59,10 @@ def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, nu
         for sequence_iter in range(len(current_sequence)):
             if len(current_sequence[sequence_iter]) > 0:
                 input_SDR[current_sequence[sequence_iter], touch_sequence[sequence_iter]] = 1
-            else:
-                print("On iter " + str(sequence_iter) + " of the sequence, there is no sensation or prediction to use")
 
         input_SDR = torch.from_numpy(np.reshape(input_SDR, 128*5*5))
         input_SDR = input_SDR.type(torch.DoubleTensor)
 
-        print("Reconstructing representation:")
         reconstructed = net(input_SDR)
 
         # Highlight the location of where the current prediction is taking place
@@ -112,10 +105,12 @@ if __name__ == '__main__':
         except OSError:
             pass
 
-    object_prediction_sequences = np.load('object_prediction_sequences.npy', allow_pickle=True, encoding='latin1')
+    object_prediction_sequences = np.load('python2_htm_docker/docker_dir/prediction_data/object_prediction_sequences.npy', allow_pickle=True, encoding='latin1')
 
     net = mlp_decoder().double()
     net.load_state_dict(torch.load('saved_networks/' + DATASET + '_decoder.pt'))
+
+    print("Visualising predictions from " + str(len(object_prediction_sequences)) + " objects")
 
     for object_iter in range(len(object_prediction_sequences)):
 
