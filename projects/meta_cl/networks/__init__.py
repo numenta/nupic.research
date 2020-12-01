@@ -20,4 +20,4 @@
 # ----------------------------------------------------------------------
 
 from .anml_networks import ANMLNetwork
-from .dendritic_networks import DendriticNetwork, DendriticNetwork2
+from .dendritic_networks import DendriticNetwork, ANMLDendriticNetwork
