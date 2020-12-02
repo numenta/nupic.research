@@ -22,12 +22,18 @@
 import torch
 import torch.nn.functional as F
 
+__all__ = [
+    "KnowledgeDistillation",
+    "KnowledgeDistillationCL",
+]
 
-class KnowledgeDistillation(object):
+
+class KnowledgeDistillation:
     """
     Sets the network to learn from a teacher model
     """
-    def setup_experiment(self, config):
+
+    def setup(self, stage):
         """
         Add following variables to config
 
@@ -64,57 +70,57 @@ class KnowledgeDistillation(object):
                                   kd_temperature_init and kd_temperature_end.
                                   If None, no decay is applied. Defaults to None.
         """
-        super().setup_experiment(config)
+        super().setup(stage)
 
         # Teacher model and knowledge distillation variables
-        teacher_model_class = config.get("teacher_model_class", None)
+        teacher_model_class = self.config.get("teacher_model_class", None)
         assert teacher_model_class is not None, \
             "teacher_model_class must be specified for KD experiments"
 
         # convert into a list of teachers
         if type(teacher_model_class) != list:
-            self.logger.info(f"KD single teacher class: {teacher_model_class}")
+            # self.logger.info(f"KD single teacher class: {teacher_model_class}")
             teacher_model_class = [teacher_model_class]
 
         self.teacher_models = [
             model().eval().to(self.device) for model in teacher_model_class
         ]
-        if len(self.teacher_models) > 1:
-            self.logger.info(f"KD teacher is ensemble of "
-                             f"{len(self.teacher_models)} models")
+        # if len(self.teacher_models) > 1:
+        #     self.logger.info(f"KD teacher is ensemble of "
+        #                      f"{len(self.teacher_models)} models")
 
         # initalize Knowledge Distillation factor
-        self.kd_factor_init = config.get("kd_factor_init", 1)
+        self.kd_factor_init = self.config.get("kd_factor_init", 1)
         assert 0 <= self.kd_factor_init <= 1, \
             "kd_factor_init should be >= 0 and <= 1"
-        self.kd_factor_end = config.get("kd_factor_end", None)
+        self.kd_factor_end = self.config.get("kd_factor_end", None)
         if self.kd_factor_end is not None:
             assert 0 <= self.kd_factor_end <= 1, \
                 "kd_factor_end should be >= 0 and <= 1"
         else:
             self.kd_factor = self.kd_factor_init
-        self.logger.info(f"KD factor: {self.kd_factor_init} {self.kd_factor_end}")
+        # self.logger.info(f"KD factor: {self.kd_factor_init} {self.kd_factor_end}")
 
         # initalize Knowledge softmax temperature factor
-        self.kd_temperature_init = config.get("kd_temperature_init", 1.0)
-        self.kd_temperature_end = config.get("kd_temperature_end", None)
+        self.kd_temperature_init = self.config.get("kd_temperature_init", 1.0)
+        self.kd_temperature_end = self.config.get("kd_temperature_end", None)
         if self.kd_temperature_end is None:
             self.kd_temperature = self.kd_temperature_init
-        self.logger.info("KD softmax temperature: "
-                         f"{self.kd_temperature_init} {self.kd_temperature_end}")
+        # self.logger.info("KD softmax temperature: "
+        #                  f"{self.kd_temperature_init} {self.kd_temperature_end}")
 
         # initialize ensemble weighting
-        self.kd_ensemble_weights = config.get("kd_ensemble_weights", None)
+        self.kd_ensemble_weights = self.config.get("kd_ensemble_weights", None)
         if self.kd_ensemble_weights is None:
             num_models = len(self.teacher_models)
             self.kd_ensemble_weights = [1. / num_models for _ in range(num_models)]
         else:
             assert len(self.kd_ensemble_weights) == len(self.teacher_models), \
                 "Number of ensemble weights should match number of teacher models"
-        self.logger.info(f"Ensemble weights: {self.kd_ensemble_weights}")
+        # self.logger.info(f"Ensemble weights: {self.kd_ensemble_weights}")
 
-    def pre_epoch(self):
-        super().pre_epoch()
+    def on_train_epoch_start(self):
+        super().on_train_epoch_start()
 
         # calculates kd factor based on a linear decay
         if self.kd_factor_end is not None:
@@ -122,8 +128,8 @@ class KnowledgeDistillation(object):
                                           last_epoch_value=self.kd_factor_end,
                                           current_epoch=self.current_epoch,
                                           total_epochs=self.epochs)
-            self.logger.debug(
-                f"KD factor: {self.kd_factor:.3f} @ epoch {self.current_epoch}")
+            # self.logger.debug(
+            #     f"KD factor: {self.kd_factor:.3f} @ epoch {self.current_epoch}")
 
         # calculates softmax temperature based on a linear decay
         if self.kd_temperature_end is not None:
@@ -133,23 +139,14 @@ class KnowledgeDistillation(object):
                 current_epoch=self.current_epoch,
                 total_epochs=self.epochs
             )
-            self.logger.debug(
-                f"KD temperature: {self.kd_temperature:.3f} @ epoch{self.current_epoch}"
-            )
+            # self.logger.debug(
+            #     f"KD temperature: {self.kd_temperature:.3f} "
+            #     f"@ epoch{self.current_epoch}"
+            # )
 
-    def transform_data_to_device(self, data, target, device, non_blocking):
-        """
-        :param data: input to the training function, as specified by dataloader
-        :param target: target to be matched by model, as specified by dataloader
-        :param device: identical to self.device
-        :param non_blocking: define whether or not to use
-                             asynchronous GPU copies when the memory is pinned
-        """
-        if not self.model.training:
-            return super().transform_data_to_device(data, target, device,
-                                                    non_blocking)
+    def training_step(self, batch, batch_idx):
+        data, target = batch
 
-        data = data.to(self.device, non_blocking=non_blocking)
         with torch.no_grad():
             # if ensemble, linearly combine outputs of softmax
             softmax_output_teacher = None
@@ -163,7 +160,6 @@ class KnowledgeDistillation(object):
 
             if self.kd_factor < 1:
                 # target is linear combination of teacher and target softmaxes
-                target = target.to(self.device, non_blocking=non_blocking)
                 one_hot_target = F.one_hot(target, num_classes=self.num_classes)
                 combined_target = (self.kd_factor * softmax_output_teacher
                                    + (1 - self.kd_factor) * one_hot_target)
@@ -171,7 +167,8 @@ class KnowledgeDistillation(object):
             else:
                 combined_target = softmax_output_teacher
 
-        return data, combined_target
+        new_batch = (data, combined_target)
+        return super().training_step(new_batch, batch_idx)
 
     def error_loss(self, output, target, reduction="mean"):
         """
@@ -179,7 +176,7 @@ class KnowledgeDistillation(object):
         :param target: target to be matched by model
         :param reduction: reduction to apply to the output ("sum" or "mean")
         """
-        if not self.model.training:
+        if not self.training:
             # Targets are from the dataloader
             return super().error_loss(output, target, reduction=reduction)
 
@@ -207,7 +204,7 @@ class KnowledgeDistillationCL(KnowledgeDistillation):
     instead of linearly combining the softmax outputs
     """
 
-    def transform_data_to_device(self, data, target, device, non_blocking):
+    def training_step(self, batch, batch_idx):
         """
         :param data: input to the training function, as specified by dataloader
         :param target: target to be matched by model, as specified by dataloader
@@ -215,12 +212,7 @@ class KnowledgeDistillationCL(KnowledgeDistillation):
         :param non_blocking: define whether or not to use
                              asynchronous GPU copies when the memory is pinned
         """
-        if not self.model.training:
-            return super().transform_data_to_device(data, target, device,
-                                                    non_blocking)
-
-        target = target.to(self.device, non_blocking=non_blocking)
-        data = data.to(self.device, non_blocking=non_blocking)
+        data, target = batch
 
         # calculate and return soft targets for each model
         with torch.no_grad():
