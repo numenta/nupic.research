@@ -32,8 +32,10 @@ import numpy as np
 import torch
 from torch.nn import init
 
+from nupic.torch.modules.sparse_weights import HasRezeroWeights
 
-class DendriteSegments(torch.nn.Module):
+
+class DendriteSegments(torch.nn.Module, HasRezeroWeights):
     """
     This implements dendrite segments over a set of units. Each unit has a set of
     segments modeled by a linear transformation from a context vector to output value
