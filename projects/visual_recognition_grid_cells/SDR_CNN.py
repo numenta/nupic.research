@@ -43,7 +43,7 @@ torch.manual_seed(18)
 np.random.seed(18)
 
 # Parameters
-TRAIN_NEW_NET = False # To generate all the SDRs needed for down-stream use in other
+TRAIN_NEW_NET = True # To generate all the SDRs needed for down-stream use in other
 # programs, train a network and run this again with TRAIN_NEW_NET=False
 
 # k-WTA parameters

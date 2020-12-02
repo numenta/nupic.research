@@ -19,7 +19,7 @@
 #
 
 """
-Load sparse-dynamic representations (SDRs) genereated from a k-Winner
+Load sparse distributed representations (SDRs) genereated from a k-Winner
 Take All convolutional neural network, and constructs 'objects' 
 compatible with the Columns Plus object-recognition algorithm
 """

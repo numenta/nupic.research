@@ -2,7 +2,7 @@ Purpose of the code
 ===============
 The following implements a network using grid-cell computations that can perform basic object recognition on visual tasks such as the MNIST data-set. It builds on the architecture described in [Lewis et al 2019](https://www.frontiersin.org/articles/10.3389/fncir.2019.00022/full), enabling similar principles to be applied to image-based tasks. 
 
-The basic approach is to first train supplementary networks (a CNN and a decoder) and generate data that can support learning in the proposed architecture (GridCellNet). As well as being used to train and evaluate GridCellNet,  sparse dynamic representations (SDRs) extracted from images can also be fed to other classifiers (k-nearest neighbour and recurrent neural networks). As such, the first stage is to create these SDRs. In addition to evaluating the accuracy of several classifiers, there are a few additional evaluations that can be run, outlined below.
+The basic approach is to first train supplementary networks (a CNN and a decoder) and generate data that can support learning in the proposed architecture (GridCellNet). As well as being used to train and evaluate GridCellNet,  sparse distributed representations (SDRs) extracted from images can also be fed to other classifiers (k-nearest neighbour and recurrent neural networks). As such, the first stage is to create these SDRs. In addition to evaluating the accuracy of several classifiers, there are a few additional evaluations that can be run, outlined below.
 
 Getting Started
 =================
