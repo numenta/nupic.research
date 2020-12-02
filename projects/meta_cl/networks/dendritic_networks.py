@@ -18,10 +18,12 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
+import torch
 from torch import nn
 
+from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.research.frameworks.dendrites.dendritic_layers import GatingDendriticLayer
+from nupic.research.frameworks.pytorch.model_utils import filter_params
 
 
 class DendriticNetwork(nn.Module):
@@ -106,4 +108,108 @@ class DendriticNetwork(nn.Module):
         mod = self.modulation(x)
         pred = self.prediction(x)
         out = self.gating_layer(pred, context=mod)
+        return out
+
+
+class ANMLDendriticNetwork(nn.Module):
+    """
+    Prototype of a dendritic network, based closely on `ANML`_. (The conv + max-pool
+    layers are identical). One major difference, however, is that no batchnorm
+    layers are included.
+
+    .. _ANML: nupic.research/projects/meta_cl/networks/anml_networks.py
+
+    Input shape expected is 3 x 28 x 28 (C x W x H) but an adaptive average pooling
+    layer helps accept other heights and width.
+
+    With default parameters and `num_classes-963`, it uses 5,118,291 weights-on
+    out of a total of 8,345,095 weights. In comparison, ANML uses 5,963,139 weights
+    and OML uses 5,172,675 weights. Thus, these is still room to add more.
+    """
+
+    def __init__(self, num_classes,
+                 num_segments=20,
+                 dim_context=100,
+                 dendrite_sparsity=0.70,
+                 **kwargs):
+
+        super().__init__()
+
+        self.segments = DendriteSegments(
+            num_units=2304,
+            num_segments=num_segments,
+            dim_context=dim_context,
+            sparsity=dendrite_sparsity,
+            bias=None,
+        )
+        self.classifier = nn.Linear(2304, num_classes)
+
+        self.prediction = nn.Sequential(
+            *self.conv_block(3, 256, 3, 1, 0),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            *self.conv_block(256, 256, 3, 1, 0),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            *self.conv_block(256, 256, 3, 1, 0),
+            nn.AdaptiveAvgPool2d(output_size=(3, 3)),
+            nn.Flatten(),
+        )
+
+        self.modulation = nn.Sequential(
+            *self.conv_block(3, 112, 3, 1, 0),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            *self.conv_block(112, 112, 3, 1, 0),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            *self.conv_block(112, 112, 3, 1, 0),
+            nn.AdaptiveAvgPool2d(output_size=(3, 3)),
+            nn.Flatten(),
+            nn.Linear(1008, dim_context)
+        )
+
+        # Apply Kaiming initialization
+        self.reset_params()
+
+    def reset_params(self):
+        # Apply Kaiming initialization to Linear and Conv2d params
+        named_params = filter_params(self, include_modules=[nn.Linear, nn.Conv2d])
+        for _, param in named_params.items():
+            if param.ndim > 1:
+                nn.init.kaiming_normal_(param)
+            else:
+                nn.init.zeros_(param)
+
+    @classmethod
+    def conv_block(cls, in_channels, out_channels, kernel_size, stride, padding):
+        return [
+            nn.Conv2d(
+                in_channels=in_channels, out_channels=out_channels,
+                kernel_size=kernel_size, stride=stride, padding=padding
+            ),
+            nn.ReLU(),
+        ]
+
+    def apply_dendrites(self, y, dendrite_activations):
+        """
+        Apply dendrites as a gating mechanism.
+
+        TODO: Decide best method to apply dendrites.
+        """
+        # # Multiple by the sigmoid of the max along each segment.
+        # return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
+
+        inds = dendrite_activations.abs().max(dim=2).indices
+        inds = inds.unsqueeze(dim=2)
+        dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
+        dendrite_activations = dendrite_activations.squeeze(dim=2)
+        dendrite_activations = torch.sigmoid(dendrite_activations)
+        return y * dendrite_activations
+
+    def forward(self, x):
+        mod = self.modulation(x)
+        pred = self.prediction(x)
+
+        dendrite_activations = self.segments(mod)
+        out = self.apply_dendrites(pred, dendrite_activations)
+
+        out = self.classifier(out)
+
         return out

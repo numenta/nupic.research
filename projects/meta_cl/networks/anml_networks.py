@@ -62,7 +62,7 @@ class ANMLNetwork(nn.Module):
         self.train()
 
     def reset_params(self):
-        # Apply Kaiming initialization to Linear and COnv2d params
+        # Apply Kaiming initialization to Linear and Conv2d params
         named_params = filter_params(self, include_modules=[nn.Linear, nn.Conv2d])
         for _, param in named_params.items():
             if param.ndim > 1:

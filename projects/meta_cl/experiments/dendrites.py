@@ -20,9 +20,21 @@
 
 from copy import deepcopy
 
-from networks import DendriticNetwork
+from networks import ANMLDendriticNetwork, DendriticNetwork
+from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
 
+from .anml_replicate import ANMLTransform, metacl_anml_replicate
 from .oml_replicate import metacl_oml_replicate
+
+
+class DendritesExperiment(mixins.RezeroWeights,
+                          mixins.OnlineMetaLearning,
+                          MetaContinualLearningExperiment):
+    """
+    This is similar to OMLExperiment from oml_replicate, but now
+    there is rezero weights.
+    """
+    pass
 
 
 # Alternative to run on a single GPU
@@ -92,7 +104,57 @@ metacl_dendrites.update(
 )
 
 
+# An updated version of the dendrites model.
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.00 ± 0.00      | 0.00 ± 0.00       | 0.001 |
+# |--------------------------------------------------------------|
+#
+metacl_anml_dendrites = deepcopy(metacl_anml_replicate)
+metacl_anml_dendrites.update(
+    experiment_class=DendritesExperiment,
+
+    epochs=300,  # just 300 for now for debugging purposes.
+    model_class=ANMLDendriticNetwork,
+    model_args=dict(num_classes=963,
+                    num_segments=20,
+                    dim_context=100,
+                    dendrite_sparsity=0.70),
+    dataset_args=dict(
+        root="~/nta/datasets",
+        transform=ANMLTransform(),
+    ),
+
+    wandb_args=dict(
+        name="metacl_anml_dendrites",
+        project="metacl_dendrites_test",
+        notes="""
+        Dendritic Networks applied to OML Problem. Test 2: This employs a different
+        series of average pooling for an architecture closer to ANML's.
+        """
+    ),
+
+    # Learning rate for inner loop.
+    adaptation_lr=0.03,
+    optimizer_args=dict(lr=1e-4),
+
+    # Run meta-testing over 10 classes.
+    num_meta_test_classes=[10],
+
+    # Update the prediction layer and the gating_layer during meta-train training.
+    fast_params=["prediction.*", "classifier.*"],
+
+    # Update only the linear module of the gating_layer during meta-test training.
+    test_train_params=["classifier.*"],
+
+    # Identify the params of the output layer.
+    output_layer_params=["classifier.module.weight", "classifier.module.bias"],
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
-    metacl_dendrites=metacl_dendrites
+    metacl_dendrites=metacl_dendrites,
+    metacl_anml_dendrites=metacl_anml_dendrites,
 )
