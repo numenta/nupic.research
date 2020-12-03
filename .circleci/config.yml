@@ -90,7 +90,7 @@ jobs:
           key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
       - run: pip install --user urllib3==1.25.11  # FIXME: Temporarily added for compatibility with awscli
       - run: pip install --user flake8-formatter-junit-xml
-      - run: pip install --prefix ~/.local -e ".[dev]"
+      - run: pip install --use-deprecated=legacy-resolver --prefix ~/.local -e ".[dev]"
       - save_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
           paths:
