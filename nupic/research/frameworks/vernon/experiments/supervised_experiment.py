@@ -446,7 +446,6 @@ class SupervisedExperiment(ExperimentBase):
             self.logger.debug("Timing: %s", time_string)
 
     def post_batch_wrapper(self, **kwargs):
-        # TODO: a soon-to-come PR will add the following line:
         self.post_optimizer_step(self.model)
         self.post_batch(**kwargs)
 
