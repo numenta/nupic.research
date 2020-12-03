@@ -298,6 +298,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         loss.backward()
 
         self.optimizer.step()
+        self.post_optimizer_step(self.model)
 
         # Report statistics for the outer loop
         pred = output.max(1, keepdim=True)[1]
@@ -341,6 +342,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             )
             # Update in place
             self.adapt(cloned_adaptation_net, train_loss)
+            self.post_optimizer_step(cloned_adaptation_net)
 
         # See if there are images to validate on. If 'train_train_sample_size'
         # is equivalent to the number of images per class, then there won't be any.
@@ -364,6 +366,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             preds = preds.argmax(dim=1).view(target.shape)
             valid_accuracy = (preds == target).sum().float() / target.size(0)
             self.logger.debug(f"Valid accuracy meta train training: {valid_accuracy}")
+
+    def post_optimizer_step(self, model):
+        pass
 
     @classmethod
     def update_params(cls, named_params, model, loss, lr):
@@ -436,6 +441,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo["run_epoch"] = [exp + ".run_epoch"]
         eo["pre_task"] = [exp + ".pre_task"]
         eo["run_task"] = [exp + ".run_task"]
+        eo["post_optimizer_step"] = [exp + ".post_optimizer_step"]
         eo["update_params"] = [exp + ".update_params"]
         eo["adapt"] = [exp + ".adapt"]
         eo["clone_model"] = [exp + ".clone_model"]
