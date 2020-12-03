@@ -49,7 +49,6 @@ class RezeroWeights:
 
     def post_optimizer_step(self, model):
         super().post_optimizer_step(model)
-        print("calling post_optimizer_step")
         model.apply(rezero_weights)
 
     def post_epoch(self):
