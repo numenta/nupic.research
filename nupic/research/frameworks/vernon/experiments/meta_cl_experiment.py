@@ -92,6 +92,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             data, also used to train the slow parameters (the replay batch is used to
             sample examples to update the slow parameters during meta-training testing
             to prevent the learner from forgetting other tasks)
+            - num_classes: number of classes in the dataset; this is optional if both
+                           of replay_classes and fast_and_slow_classes are given
             - replay_classes: list of classes to sample from for the replay set;
                               defaults to range(0, num_classes)
             - fast_and_slow_classes: list of classes to sample from for fast and slow
@@ -109,20 +111,27 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         if "num_classes" in config:
             if "replay_classes" in config and "fast_and_slow_classes" in config:
-                self.logger.warn("Over-specified classes for meta-training.")
+                self.logger.warn("The config is over-specified in terms of the classes "
+                                 "for meta-training. Pass either just num_classes or "
+                                 "both replay_classes and fast_and_slow_classes.")
 
         self.epochs_to_validate = []
         self.tasks_per_epoch = config.get("tasks_per_epoch", 1)
-        self.num_classes = config.get("num_classes", 50)
+        self.num_classes = config.get("num_classes", None)
 
-        replay_classes = config.get("replay_classes", range(0, self.num_classes))
-        fast_and_slow_classes = config.get("fast_and_slow_classes",
-                                           range(0, self.num_classes))
+        replay_classes = config.get("replay_classes") or range(0, self.num_classes)
+        fast_and_slow_classes = (
+            config.get("fast_and_slow_classes") or range(0, self.num_classes)
+        )
         self.replay_classes = list(replay_classes)
         self.fast_and_slow_classes = list(fast_and_slow_classes)
 
-        max_class = max(*self.replay_classes, *self.fast_and_slow_classes)
-        assert max_class < self.train_fast_loader.sampler.num_classes
+        replay_sampler_classes = self.train_replay_loader.sampler.task_indices.keys()
+        fast_sampler_classes = self.train_fast_loader.sampler.task_indices.keys()
+        slow_sampler_classes = self.train_slow_loader.sampler.task_indices.keys()
+        assert set(self.replay_classes) <= set(fast_sampler_classes)
+        assert set(self.fast_and_slow_classes) <= set(slow_sampler_classes)
+        assert set(self.fast_and_slow_classes) <= set(replay_sampler_classes)
 
         self.adaptation_lr = config.get("adaptation_lr", 0.03)
         self.num_fast_steps = config.get("num_fast_steps", 1)
@@ -135,7 +144,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
         if self.num_fast_steps > len(self.train_fast_loader):
             self.logger.warning(
-                "The num_fast_steps given is greater than the len of images available "
+                f"The num_fast_steps given ({self.num_fast_steps}) "
+                f"is greater than the images available ({len(self.train_fast_loader)})"
                 " for the inner loop. This should ideally be no more than:\n"
                 " train_train_sample_size * tasks_per_epoch / batch_size"
             )
