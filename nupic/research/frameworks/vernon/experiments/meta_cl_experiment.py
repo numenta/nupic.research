@@ -201,6 +201,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     def compute_class_indices(cls, config, dataset, mode="all", sample_size=None):
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
+            if isinstance(target, torch.Tensor):
+                target = target.item()
+            assert isinstance(target, int)
             class_indices[target].append(idx)
 
         if mode == "train":
