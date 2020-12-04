@@ -77,7 +77,7 @@ class ANMLNetwork(nn.Module):
                 in_channels=in_channels, out_channels=out_channels,
                 kernel_size=kernel_size, stride=stride, padding=padding
             ),
-            nn.BatchNorm2d(num_features=out_channels),
+            nn.GroupNorm(num_groups=out_channels, num_channels=out_channels),
             nn.ReLU(),
         ]
 
