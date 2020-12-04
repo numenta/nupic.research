@@ -111,7 +111,7 @@ meta_test_test_kwargs = dict(
     num_meta_testing_runs=10,
 
     # Run through meta-test testing 5 images at a time. No training occurs here.
-    test_test_batch_size=5,
+    test_test_batch_size=1,
 )
 
 
