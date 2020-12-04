@@ -88,9 +88,11 @@ jobs:
             git ls-remote git://github.com/numenta/nupic.tensorflow.git HEAD > nupic.tensorflow.sha
       - restore_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
-      - run: pip install --user urllib3==1.25.11  # FIXME: Temporarily added for compatibility with awscli
+      # FIXME: Downgrading pip to 20.2 until we resolve all the issues with the new pip dependency resolver
+      - run: pip install --user pip==20.2
       - run: pip install --user flake8-formatter-junit-xml
-      - run: pip install --prefix ~/.local -e ".[dev]"
+      # FIXME: PEP-517 doesn't allow for editable installs. See https://github.com/pypa/pip/issues/7953
+      - run: pip install --no-use-pep517 --user -e ".[dev]"
       - save_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
           paths:
