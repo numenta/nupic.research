@@ -149,7 +149,7 @@ metacl_anml_dendrites.update(
     test_train_params=["classifier.*"],
 
     # Identify the params of the output layer.
-    output_layer_params=["classifier.module.weight", "classifier.module.bias"],
+    output_layer_params=["classifier.weight", "classifier.bias"],
 )
 
 
