@@ -17,106 +17,121 @@
 #
 #  http://numenta.org/licenses/
 #
-'''
+
+"""
 Uses a pretrained decoder and the SDRs predicted by a GridCellNet classifier
 to visualise the networks representations.
 Note that up until inference takes place, representations include sensations
-received by the network in previous time-steps (i.e. 'ground-truth' features),
-but after inference, predicted SDR features are only based on the network's 
+received by the network in previous time-steps (i.e. "ground-truth" features),
+but after inference, predicted SDR features are only based on the network's
 own representation.
-'''
+"""
 
-import numpy as np
 import os
-import torch
+
 import matplotlib.pyplot as plt
-from PIL import Image
-from SDR_decoder import mlp_decoder
-import random
+import numpy as np
+import torch
+
+from SDR_decoder import MLPDecoder
 
 torch.manual_seed(18)
 np.random.seed(18)
 
-DATASET = 'mnist'
+DATASET = "mnist"
 
-def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label, numSensationsToInference, ground_truth):
+
+def predict_column_plus_reps(net, prediction_sequence, touch_sequence, label,
+                             num_sensations_to_inference, ground_truth):
     """
-    Output images corresponding to the network's representation as it progressively senses the input 
-    and makes predictions about the next sensation. Until inference has taken place, the representation
-    consists of all previously sensed features, and a prediction of the next step. Once inference has taken place, 
-    all additional features in the representation are based on predictions.
-    :param prediction_sequence : contains the predictions made by the network as well as previously sensed features
-    :param touch_sequence : contains the order of the networks sensations, which is needed to match the predicted
-    features to their correct spatial locations before feeding to the decoder
+    Output images corresponding to the network's representation as it progressively
+    senses the input and makes predictions about the next sensation. Until inference
+    has taken place, the representation consists of all previously sensed features,
+    and a prediction of the next step. Once inference has taken place, all additional
+    features in the representation are based on predictions.
+    :param prediction_sequence : contains the predictions made by the network as well
+    as previously sensed features
+    :param touch_sequence : contains the order of the networks sensations, which is
+    needed to match the predicted features to their correct spatial locations before
+    feeding to the decoder
     """
-    plt.imsave('predicted_images/' + label + '_ground_truth.png', ground_truth)
+    plt.imsave("predicted_images/" + label + "_ground_truth.png", ground_truth)
 
     for touch_iter in range(len(prediction_sequence)):
 
-        input_SDR = np.zeros([128, 5*5])
+        input_sdr = np.zeros([128, 5 * 5])
         current_sequence = prediction_sequence[touch_iter]
 
         for sequence_iter in range(len(current_sequence)):
             if len(current_sequence[sequence_iter]) > 0:
-                input_SDR[current_sequence[sequence_iter], touch_sequence[sequence_iter]] = 1
+                input_sdr[current_sequence[sequence_iter],
+                          touch_sequence[sequence_iter]] = 1
 
-        input_SDR = torch.from_numpy(np.reshape(input_SDR, 128*5*5))
-        input_SDR = input_SDR.type(torch.DoubleTensor)
+        input_sdr = torch.from_numpy(np.reshape(input_sdr, 128 * 5 * 5))
+        input_sdr = input_sdr.type(torch.DoubleTensor)
 
-        reconstructed = net(input_SDR)
+        reconstructed = net(input_sdr)
 
         # Highlight the location of where the current prediction is taking place
-        # Note that as going we're from a 5*5 feature space to a 28*28 space, this is only approximate
+        # Note that as going we're from a 5*5 feature space to a 28*28 space, this
+        # is only approximate
         current_touch = touch_sequence[touch_iter]
-        width_iter = current_touch//5
-        height_iter = current_touch%5
-        highlight_width_lower, highlight_width_upper = (1 + width_iter*5),  (1 + (width_iter+1)*5)
-        highlight_height_lower, highlight_height_upper = (1 + height_iter*5),  (1 + (height_iter+1)*5)
+        width_iter = current_touch // 5
+        height_iter = current_touch % 5
+        highlight_width_lower, highlight_width_upper = ((1 + width_iter * 5),
+                                                        (1 + (width_iter + 1) * 5))
+        highlight_height_lower, highlight_height_upper = ((1 + height_iter * 5),
+                                                          (1 + (height_iter + 1) * 5))
 
-        highlight_array = np.zeros((28,28))
-        highlight_array[highlight_width_lower:highlight_width_upper, 
-            highlight_height_lower:highlight_height_upper] = 0.5
+        highlight_array = np.zeros((28, 28))
+        highlight_array[highlight_width_lower:highlight_width_upper,
+                        highlight_height_lower:highlight_height_upper] = 0.5
 
-        if numSensationsToInference != None:
-            if touch_iter >= numSensationsToInference:
-                # Add highlight to borders to indicate inference successful, and that all 
-                # future representations are based on model predictions
-                highlight_array[0,:] = 1.0
-                highlight_array[27,:] = 1.0
-                highlight_array[:,0] = 1.0
-                highlight_array[:,27] = 1.0
+        if num_sensations_to_inference is not None:
+            if touch_iter >= num_sensations_to_inference:
+                # Add highlight to borders to indicate inference successful,
+                # and that all future representations are based on model predictions
+                highlight_array[0, :] = 1.0
+                highlight_array[27, :] = 1.0
+                highlight_array[:, 0] = 1.0
+                highlight_array[:, 27] = 1.0
 
         reconstructed = np.clip(reconstructed.detach().numpy() + highlight_array, 0, 1)
 
-        if numSensationsToInference != None:
+        if num_sensations_to_inference is not None:
             prediction = "correctly_classified"
         else:
             prediction = "misclassified"
 
-        plt.imsave('predicted_images/' + label + '_' + prediction + 
-            '_touch_' + str(touch_iter) + '.png', reconstructed[0,:,:])
+        plt.imsave("predicted_images/" + label + "_" + prediction
+                   + "_touch_" + str(touch_iter) + ".png", reconstructed[0, :, :])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    if os.path.exists('predicted_images/') == False:
+    if os.path.exists("predicted_images/") is False:
         try:
-            os.mkdir('predicted_images/')
+            os.mkdir("predicted_images/")
         except OSError:
             pass
 
-    object_prediction_sequences = np.load('python2_htm_docker/docker_dir/prediction_data/object_prediction_sequences.npy', allow_pickle=True, encoding='latin1')
+    object_prediction_sequences = np.load(
+        "python2_htm_docker/docker_dir/prediction_data/"
+        "object_prediction_sequences.npy", allow_pickle=True, encoding="latin1")
 
-    net = mlp_decoder().double()
-    net.load_state_dict(torch.load('saved_networks/' + DATASET + '_decoder.pt'))
+    net = MLPDecoder().double()
+    net.load_state_dict(torch.load("saved_networks/" + DATASET + "_decoder.pt"))
 
-    print("Visualising predictions from " + str(len(object_prediction_sequences)) + " objects")
+    print("Visualising predictions from " + str(len(object_prediction_sequences))
+          + " objects")
 
     for object_iter in range(len(object_prediction_sequences)):
 
         current_object = object_prediction_sequences[object_iter]
 
-        predict_column_plus_reps(net, prediction_sequence=current_object['prediction_sequence'], 
-            touch_sequence=current_object['touch_sequence'], label=current_object['name'], 
-            numSensationsToInference=current_object['numSensationsToInference'],
-            ground_truth=current_object['ground_truth_image'])
+        predict_column_plus_reps(
+            net, prediction_sequence=current_object["prediction_sequence"],
+            touch_sequence=current_object["touch_sequence"],
+            label=current_object["name"],
+            num_sensations_to_inference=current_object["numSensationsToInference"],
+            ground_truth=current_object["ground_truth_image"])

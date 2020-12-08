@@ -17,16 +17,16 @@
 #
 #  http://numenta.org/licenses/
 #
-'''
+
+"""
 Calculate accuracy of GridCellNet as a function of the number of sensations
 Can be used to compare performance with k-NN by using SDR_classifiers.py with
 KNN_PROGRESSIVE_SENSATIONS_BOOL=True
-'''
+"""
 
-import numpy as np
-import os
-import math
 import matplotlib.pyplot as plt
+import numpy as np
+
 
 def plot_sensations_to_inference(object_prediction_sequences):
 
@@ -34,28 +34,33 @@ def plot_sensations_to_inference(object_prediction_sequences):
 
     for object_iter in range(len(object_prediction_sequences)):
 
-        num_sensations_list.append(object_prediction_sequences[object_iter]['numSensationsToInference'])
+        num_sensations_list.append(
+            object_prediction_sequences[object_iter]["numSensationsToInference"])
 
     cumm_percent_inferred = []
     num_correct = 0
 
     for num_sensation_iter in range(25):
 
-        num_correct += len(np.nonzero(np.array(num_sensations_list)==(num_sensation_iter+1))[0])
-    
-        cumm_percent_inferred.append(num_correct/len(object_prediction_sequences))
+        num_correct += len(
+            np.nonzero(np.array(num_sensations_list) == (num_sensation_iter + 1))[0])
 
-    plt.scatter(list(range(1,26)), cumm_percent_inferred)
-    plt.ylim(0,1)
+        cumm_percent_inferred.append(num_correct
+                                     / len(object_prediction_sequences))
+
+    plt.scatter(list(range(1, 26)), cumm_percent_inferred)
+    plt.ylim(0, 1)
     plt.show()
 
     print("Cummulative percent inferred as a function of the number of sensations")
     print(cumm_percent_inferred)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    object_prediction_sequences = np.load('python2_htm_docker/docker_dir/prediction_data/object_prediction_sequences.npy', allow_pickle=True, encoding='latin1')
+    object_prediction_sequences = np.load(
+        "python2_htm_docker/docker_dir/prediction_data/"
+        "object_prediction_sequences.npy", allow_pickle=True,
+        encoding="latin1")
 
-    plot_sensations_to_inference(object_prediction_sequences)    
-    
+    plot_sensations_to_inference(object_prediction_sequences)
