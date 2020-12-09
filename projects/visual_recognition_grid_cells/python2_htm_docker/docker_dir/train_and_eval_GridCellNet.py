@@ -200,11 +200,11 @@ def object_learning_and_inference(
     ColumnPlusNet.features = test_features_dic
 
     print("\nGetting class and non-class targets")
-    allClassTargets = []  # noqa: N806
+    all_class_targets = []
 
     for class_iter in range(10):
         print("Targets of " + str(class_iter))
-        allClassTargets.append(ColumnPlusNet.getClassFeatures(
+        all_class_targets.append(ColumnPlusNet.getClassFeatures(
             objectClass=str(class_iter), featuresPerObject=featuresPerObject))
 
     object_iter = 0
@@ -217,7 +217,7 @@ def object_learning_and_inference(
             touch_sequence) = ColumnPlusNet.inferObjectWithRandomMovements(
                 objectDescription,
                 objectImage=object_images[object_iter],
-                allClassTargets=allClassTargets,
+                all_class_targets=all_class_targets,
                 cellsPerColumn=cellsPerColumn,
                 trial_iter=ii,
                 fixed_touch_sequence=FIXED_TOUCH_SEQUENCE)
