@@ -22,7 +22,7 @@
 import logging
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
-from nupic.torch.modules.sparse_weights import HasRezeroWeights
+from nupic.torch.modules.sparse_weights import rezero_weights
 
 
 class RezeroWeights:
@@ -31,10 +31,6 @@ class RezeroWeights:
     """
     def setup_experiment(self, config):
         super().setup_experiment(config)
-
-        self._rezero_modules = [module
-                                for module in self.model.modules()
-                                if isinstance(module, HasRezeroWeights)]
 
         if not self.logger.disabled:
             params_sparse, nonzero_params_sparse2 = count_nonzero_params(
@@ -48,15 +44,12 @@ class RezeroWeights:
         model = super().create_model(config, device)
         # Some initialization strategies can destroy sparsity, so we call rezero
         # here.
-        for module in model.modules():
-            if isinstance(module, HasRezeroWeights):
-                module.rezero_weights()
+        model.apply(rezero_weights)
         return model
 
-    def post_batch(self, **kwargs):
-        super().post_batch(**kwargs)
-        for module in self._rezero_modules:
-            module.rezero_weights()
+    def post_optimizer_step(self, model):
+        super().post_optimizer_step(model)
+        model.apply(rezero_weights)
 
     def post_epoch(self):
         super().post_epoch()
@@ -75,6 +68,6 @@ class RezeroWeights:
         eo = super().get_execution_order()
         eo["setup_experiment"].append("RezeroWeights logging")
         eo["create_model"].append("RezeroWeights")
-        eo["post_batch"].append("RezeroWeights")
+        eo["post_optimizer_step"].append("RezeroWeights")
         eo["post_epoch"].append("RezeroWeights logging")
         return eo

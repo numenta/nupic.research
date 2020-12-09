@@ -446,9 +446,11 @@ class SupervisedExperiment(ExperimentBase):
             self.logger.debug("Timing: %s", time_string)
 
     def post_batch_wrapper(self, **kwargs):
-        # TODO: a soon-to-come PR will add the following line:
-        # self.post_optimizer_step()
+        self.post_optimizer_step(self.model)
         self.post_batch(**kwargs)
+
+    def post_optimizer_step(self, model):
+        pass
 
     def post_epoch(self):
         self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s",
@@ -643,6 +645,7 @@ class SupervisedExperiment(ExperimentBase):
             post_epoch=[],
             pre_batch=[],
             post_batch=[exp + ": Logging"],
+            post_optimizer_step=[],
             transform_data_to_device=[exp + ".transform_data_to_device"],
             error_loss=[exp + ".error_loss"],
             complexity_loss=[],

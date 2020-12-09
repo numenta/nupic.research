@@ -7,7 +7,7 @@ channels:
 
 dependencies:
   - python=3.7
-  - pip
+  - pip=20.2
 
   # Dependencies not available in conda
   - pip:
