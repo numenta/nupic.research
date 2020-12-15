@@ -20,8 +20,12 @@
 # ----------------------------------------------------------------------
 
 import math
+import sys
+import time
 from collections import defaultdict
 
+import torch
+import torch.nn.functional as F
 from torchvision import transforms
 
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
@@ -64,9 +68,20 @@ class ContinualLearningExperiment(
         self.cl_experiment_type = config.get("cl_experiment_type", "class")
         if self.cl_experiment_type == "task":
             self.logger.info("Overriding target transform")
-            self.dataset_args["target_transform"] = (
-                transforms.Lambda(lambda y: y % self.num_classes_per_task)
+            target_transform = transforms.Lambda(
+                lambda y: y % self.num_classes_per_task
             )
+
+            self.train_loader.dataset.targets = target_transform(
+                self.train_loader.dataset.targets
+            )
+            self.val_loader.dataset.targets = target_transform(
+                self.val_loader.dataset.targets
+            )
+
+        # Set train and validate methods.
+        self.train_model = config.get("train_model_func", self.train_cl_model)
+        self.evaluate_model = config.get("evaluate_model_func", self.evaluate_cl_model)
 
         # Whitelist evaluation metrics
         self.evaluation_metrics = config.get(
@@ -140,6 +155,162 @@ class ContinualLearningExperiment(
             for j in range(num_classes_per_task):
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
         return task_indices
+
+    def get_active_classes(self, task_num):
+        """
+        Returns a list of label indices that are "active" during training under the
+        continual learning scenario specified by the config. In the "task" scenario,
+        only the classes that are being trained are active. In the "class" scenario,
+        all tasks that the model has previously observed are active. More information
+        about active classes can be found here: https://arxiv.org/abs/1904.07734
+
+        :param task_num: zero-based index of the task
+        """
+        if self.cl_experiment_type == "task":
+            return [label for label in range(
+                self.num_classes_per_task * task_num,
+                self.num_classes_per_task * (task_num + 1)
+            )]
+        elif self.cl_experiment_type == "class":
+            return [label for label in range(
+                self.num_classes_per_task * (task_num + 1)
+            )]
+        elif self.cl_experiment_type == "domain":
+            raise NotImplementedError
+
+    def train_cl_model(
+        self,
+        model,
+        loader,
+        optimizer,
+        device,
+        freeze_params=None,
+        criterion=F.nll_loss,
+        complexity_loss_fn=None,
+        batches_in_epoch=sys.maxsize,
+        pre_batch_callback=None,
+        post_batch_callback=None,
+        progress_bar=None,
+        transform_to_device_fn=None
+    ):
+        """
+        Trains a givn model over a single epoch similar to `train_model` used by
+        `SupervisedExperiment`, but this function is compatible with the "task" and
+        "class" continual learning scenarios.
+
+        Note that the parameters `complexity_loss_fn`, `progress_bar`, and
+        `transform_to_device_fn` are unused, yet still included in the function
+        signature to be consistent with that of `train_model`.
+        """
+        model.train()
+        async_gpu = loader.pin_memory
+        t0 = time.time()
+        for batch_idx, (data, target) in enumerate(loader):
+            if batch_idx >= batches_in_epoch:
+                break
+
+            num_images = len(target)
+            data = data.to(device, non_blocking=async_gpu)
+            target = target.to(device, non_blocking=async_gpu)
+            t1 = time.time()
+
+            if pre_batch_callback is not None:
+                pre_batch_callback(model=model, batch_idx=batch_idx)
+
+            optimizer.zero_grad()
+            # Compute loss only for "active" output units, and only backpropogate errors
+            # for these units when calling loss.backward()
+            active_classes = self.get_active_classes(self.current_task)
+            output = model(data)
+            output = output[:, active_classes]
+            error_loss = criterion(output, target)
+
+            del data, target, output
+
+            t2 = time.time()
+            error_loss.backward()
+
+            t3 = time.time()
+            optimizer.step()
+            t4 = time.time()
+
+            if post_batch_callback is not None:
+                time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
+                               + "weight update: {:.3f}s").format(t1 - t0, t2 - t1,
+                                                                  t3 - t2, t4 - t3)
+                post_batch_callback(model=model,
+                                    error_loss=error_loss.detach(),
+                                    complexity_loss=None,
+                                    batch_idx=batch_idx,
+                                    num_images=num_images,
+                                    time_string=time_string)
+            del error_loss
+            t0 = time.time()
+
+    def evaluate_cl_model(
+        self,
+        model,
+        loader,
+        device,
+        batches_in_epoch=sys.maxsize,
+        criterion=F.nll_loss,
+        complexity_loss_fn=None,
+        progress=None,
+        post_batch_callback=None,
+        transform_to_device_fn=None,
+    ):
+        """
+        Evaluates a given model similar to `evaluate_model` used by
+        `SupervisedExperiment`, but this function is compatible with the "task" and
+        "class" continual learning scenarios.
+
+        Note that the parameters `complexity_loss_fn`, `progress`, and
+        `transform_to_device_fn` are unused, yet still included in the function
+        signature to be consistent with that of `evaluate_model`.
+        """
+        model.eval()
+        total = 0
+
+        # Perform accumulation on device, avoid paying performance cost of .item()
+        loss = torch.tensor(0., device=device)
+        correct = torch.tensor(0, device=device)
+
+        async_gpu = loader.pin_memory
+
+        with torch.no_grad():
+            for batch_idx, (data, target) in enumerate(loader):
+                if batch_idx >= batches_in_epoch:
+                    break
+
+                data = data.to(device, non_blocking=async_gpu)
+                target = target.to(device, non_blocking=async_gpu)
+
+                # Compute loss only for "active" output units, and only backpropogate
+                # errors for these units when calling loss.backward()
+                active_classes = self.get_active_classes(self.current_task)
+                output = model(data)
+                output = output[:, active_classes]
+
+                loss += criterion(output, target, reduction="sum")
+                pred = output.max(1, keepdim=True)[1]
+                correct += pred.eq(target.view_as(pred)).sum()
+                total += len(data)
+
+                if post_batch_callback is not None:
+                    post_batch_callback(batch_idx=batch_idx, target=target,
+                                        output=output, pred=pred)
+
+        correct = correct.item()
+        loss = loss.item()
+
+        result = {
+            "total_correct": correct,
+            "total_tested": total,
+            "mean_loss": loss / total if total > 0 else 0,
+            "mean_accuracy": correct / total if total > 0 else 0,
+        }
+
+        return result
 
     @classmethod
     def get_execution_order(cls):
