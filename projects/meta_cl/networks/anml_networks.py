@@ -88,10 +88,6 @@ class ANMLNetwork(nn.Module):
         out = self.classifier(out)
         return out
 
-    def eval(self):  # noqa
-        """The ANML repo keeps its model always in training mode."""
-        self.train()
-
 
 class ANMLsOMLNetwork(nn.Module):
     """

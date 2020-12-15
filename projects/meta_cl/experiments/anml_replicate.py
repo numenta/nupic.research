@@ -110,20 +110,20 @@ meta_test_test_kwargs = dict(
     # Perform this many meta-testing runs to average over.
     num_meta_testing_runs=10,
 
-    # Run through meta-test testing 5 images at a time. No training occurs here.
-    test_test_batch_size=1,
+    # Run through meta-test testing 10 images at a time. No training occurs here.
+    test_test_batch_size=10,
 )
 
 
 # This attempts to replicate the results from the original ANML paper.
 # |----------------------------------------------------------------|
-# |   Num Classes | Meta-test test   | Meta-test train   |      LR |
-# |--------------:|:-----------------|:------------------|--------:|
-# |            10 | 0.71 ± 0.08      | 0.79 ± 0.05       | 0.001   |
-# |            50 | 0.76 ± 0.03      | 0.88 ± 0.02       | 0.0006  |
-# |           100 | 0.64 ± 0.03      | 0.79 ± 0.02       | 0.00035 |
-# |           200 | 0.49 ± 0.02      | 0.65 ± 0.02       | 0.0003  |
-# |           600 | 0.26 ± 0.01      | 0.39 ± 0.01       | 0.00015 |
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.88 ± 0.05      | 0.94 ± 0.03       | 0.001 |
+# |            50 | 0.88 ± 0.02      | 0.98 ± 0.01       | 0.001 |
+# |           100 | 0.85 ± 0.02      | 0.98 ± 0.01       | 0.001 |
+# |           200 | 0.80 ± 0.01      | 0.97 ± 0.01       | 0.001 |
+# |           600 | 0.66 ± 0.01      | 0.93 ± 0.00       | 0.001 |
 # |----------------------------------------------------------------|
 #
 metacl_anml_replicate = deepcopy(metacl_oml)
