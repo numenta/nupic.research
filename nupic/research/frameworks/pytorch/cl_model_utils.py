@@ -24,9 +24,7 @@ This module is similar to model_utils.py, except specific for training and evalu
 in continual learning scenarios.
 """
 
-import sys
 import time
-import numpy as np
 
 import torch
 import torch.nn.functional as F
@@ -142,10 +140,6 @@ def evaluate_cl_model(
 
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(loader):
-
-            open("/home/ec2-user/nta/nupic.research/values.txt", "a").write(
-                "{} {} {}\n".format(target.max().item(), target.min().item(), loader.sampler.active_tasks)
-            )
 
             data = data.to(device, non_blocking=async_gpu)
             target = target.to(device, non_blocking=async_gpu)

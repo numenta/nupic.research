@@ -20,14 +20,14 @@
 # ----------------------------------------------------------------------
 
 import math
-import sys
 from collections import defaultdict
 
-import torch
-import torch.nn.functional as F
 from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.cl_model_utils import train_cl_model, evaluate_cl_model
+from nupic.research.frameworks.pytorch.cl_model_utils import (
+    evaluate_cl_model,
+    train_cl_model,
+)
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
 from nupic.research.frameworks.vernon.experiments.components.evaluation_metrics import (
     ContinualLearningMetrics,
