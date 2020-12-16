@@ -47,7 +47,7 @@ def train_cl_model(
     output heads.
 
     :param model: pytorch model to be trained
-    :param scenario: continual learning scenario, one of "task", "domain", or "class"
+    :param scenario: continual learning scenario, either "task" or "class"
     :param num_classes_per_task: number of classes per task
     :param loader: train dataset loader
     :param optimizer: Optimizer object used to train the model. This function will
@@ -121,7 +121,7 @@ def evaluate_cl_model(
     "class" continual learning scenarios.
 
     :param model: pytorch model to be trained
-    :param scenario: continual learning scenario, one of "task", "domain", or "class"
+    :param scenario: continual learning scenario, either "task" or "class"
     :param num_classes_per_task: number of classes per task
     :param loader: train dataset loader
     :param device: device to use ('cpu' or 'cuda')
@@ -183,7 +183,7 @@ def get_active_classes(scenario, task_num, num_classes_per_task):
     classes can be found here: https://arxiv.org/abs/1904.07734
 
     :param task_num: zero-based index of the task
-    :param scenario: continual learning scenario, one of "task", "domain", or "class"
+    :param scenario: continual learning scenario, either "task" or "class"
     :param num_classes_per_task: the number of classes per task
     """
     if scenario == "task":
@@ -192,14 +192,10 @@ def get_active_classes(scenario, task_num, num_classes_per_task):
             num_classes_per_task * (task_num + 1)
         )]
 
-    elif scenario == "domain":
-        # TODO add domain scenario
-        raise NotImplementedError
-
     elif scenario == "class":
         return [label for label in range(
             num_classes_per_task * (task_num + 1)
         )]
 
     else:
-        raise Exception("`scenario` must be either 'task', 'domain', or 'class'")
+        raise Exception("`scenario` must be either 'task' or 'class'")
