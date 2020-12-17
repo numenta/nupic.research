@@ -19,21 +19,24 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .oml import CONFIGS as OML
-from .anml_replicate import CONFIGS as ANML_REPLICATE
-from .dendrites import CONFIGS as DENDRITES
-from .oml_replicate import CONFIGS as OML_REPLICATE
-from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
+from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
+__all__ = [
+    "RezeroWeights",
+]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(OML)
-CONFIGS.update(ANML_REPLICATE)
-CONFIGS.update(DENDRITES)
-CONFIGS.update(OML_REPLICATE)
-CONFIGS.update(OML_REGRESSION_TEST)
+
+class RezeroWeights:
+    """
+    Rezero the SparseWeights after every batch.
+    """
+    def __init__(self, config):
+        super().__init__(config)
+        self._rezero_modules = [module
+                                for module in self.model.modules()
+                                if isinstance(module, SparseWeightsBase)]
+
+    def on_train_batch_end(self, *args, **kwargs):
+        super().on_train_batch_end(*args, **kwargs)
+        for module in self._rezero_modules:
+            module.rezero_weights()

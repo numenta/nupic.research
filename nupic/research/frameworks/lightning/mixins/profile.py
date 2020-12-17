@@ -19,21 +19,25 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .oml import CONFIGS as OML
-from .anml_replicate import CONFIGS as ANML_REPLICATE
-from .dendrites import CONFIGS as DENDRITES
-from .oml_replicate import CONFIGS as OML_REPLICATE
-from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
+import cProfile
+import os
+import pstats
 
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
+__all__ = [
+    "Profile",
+]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(OML)
-CONFIGS.update(ANML_REPLICATE)
-CONFIGS.update(DENDRITES)
-CONFIGS.update(OML_REPLICATE)
-CONFIGS.update(OML_REGRESSION_TEST)
+
+class Profile:
+    def on_train_epoch_start(self):
+        super().on_train_epoch_start()
+        self.epoch_pr = cProfile.Profile()
+        self.epoch_pr.enable()
+
+    def on_train_epoch_end(self, outputs):
+        super().on_train_epoch_end(outputs)
+        self.epoch_pr.disable()
+        filepath = os.path.expanduser(f"~/profile-epoch{self.current_epoch}.profile")
+        pstats.Stats(self.epoch_pr).dump_stats(filepath)
+        print(f"Saved {filepath}")
+        del self.epoch_pr

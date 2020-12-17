@@ -19,21 +19,17 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .oml import CONFIGS as OML
-from .anml_replicate import CONFIGS as ANML_REPLICATE
-from .dendrites import CONFIGS as DENDRITES
-from .oml_replicate import CONFIGS as OML_REPLICATE
-from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
+from nupic.torch.modules import update_boost_strength
 
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
+__all__ = [
+    "UpdateBoostStrength",
+]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(OML)
-CONFIGS.update(ANML_REPLICATE)
-CONFIGS.update(DENDRITES)
-CONFIGS.update(OML_REPLICATE)
-CONFIGS.update(OML_REGRESSION_TEST)
+
+class UpdateBoostStrength:
+    """
+    Update the KWinners boost strength before every epoch.
+    """
+    def on_train_epoch_start(self):
+        super().on_train_epoch_start()
+        self.model.apply(update_boost_strength)
