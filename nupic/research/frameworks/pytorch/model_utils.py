@@ -142,6 +142,7 @@ def train_model(
                                                               t4 - t3, t5 - t4)
             post_batch_callback(model=model,
                                 error_loss=error_loss.detach(),
+                                complexity_loss=None,
                                 batch_idx=batch_idx,
                                 num_images=num_images,
                                 time_string=time_string)
