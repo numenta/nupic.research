@@ -141,7 +141,7 @@ def train_model(
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
                                                               t4 - t3, t5 - t4)
             post_batch_callback(model=model,
-                                error_loss=error_loss.detach()
+                                error_loss=error_loss.detach(),
                                 batch_idx=batch_idx,
                                 num_images=num_images,
                                 time_string=time_string)
