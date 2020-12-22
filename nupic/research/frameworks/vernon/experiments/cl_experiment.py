@@ -25,6 +25,7 @@ from collections import defaultdict
 from torchvision import transforms
 
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
+from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
 from nupic.research.frameworks.vernon.experiments.components.evaluation_metrics import (
     ContinualLearningMetrics,
 )
@@ -61,12 +62,23 @@ class ContinualLearningExperiment(
         # Applying target transform depending on type of CL task
         # Task - we know the task, so the network is multihead
         # Class - we don't know the task, network has as many heads as classes
-        self.cl_experiment_type = config.get("cl_experiment_type", "class")
-        if self.cl_experiment_type == "task":
+        self.scenario = config.get("scenario", "class")
+        if self.scenario == "task":
             self.logger.info("Overriding target transform")
-            self.dataset_args["target_transform"] = (
-                transforms.Lambda(lambda y: y % self.num_classes_per_task)
+            target_transform = transforms.Lambda(
+                lambda y: y % self.num_classes_per_task
             )
+
+            self.train_loader.dataset.targets = target_transform(
+                self.train_loader.dataset.targets
+            )
+            self.val_loader.dataset.targets = target_transform(
+                self.val_loader.dataset.targets
+            )
+
+        # Set train and validate methods.
+        self.train_model = config.get("train_model_func", train_model)
+        self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
         # Whitelist evaluation metrics
         self.evaluation_metrics = config.get(
@@ -140,6 +152,60 @@ class ContinualLearningExperiment(
             for j in range(num_classes_per_task):
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
         return task_indices
+
+    def validate(self, loader=None):
+        if loader is None:
+            loader = self.val_loader
+
+        active_classes = self.get_active_classes()
+        return self.evaluate_model(
+            model=self.model,
+            loader=loader,
+            device=self.device,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
+            active_classes=active_classes,
+            batches_in_epoch=self.batches_in_epoch_val,
+            transform_to_device_fn=self.transform_data_to_device,
+        )
+
+    def train_epoch(self):
+        active_classes = self.get_active_classes()
+        self.train_model(
+            model=self.model,
+            loader=self.train_loader,
+            optimizer=self.optimizer,
+            device=self.device,
+            criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
+            batches_in_epoch=self.batches_in_epoch,
+            active_classes=active_classes,
+            pre_batch_callback=self.pre_batch,
+            post_batch_callback=self.post_batch_wrapper,
+            transform_to_device_fn=self.transform_data_to_device,
+        )
+
+    def get_active_classes(self):
+        """
+        Returns a list of label indices that are "active" during training in the
+        continual learning scenario specified by the config. In the "task" scenario,
+        only the classes that are being trained are active. In the "class" scenario,
+        all tasks that the model has previously observed are active. More information
+        about active classes can be found here: https://arxiv.org/abs/1904.07734
+        """
+        if self.scenario == "task":
+            return [label for label in range(
+                self.num_classes_per_task * self.current_task,
+                self.num_classes_per_task * (self.current_task + 1)
+            )]
+
+        elif self.scenario == "class":
+            return [label for label in range(
+                self.num_classes_per_task * (self.current_task + 1)
+            )]
+
+        else:
+            raise Exception("`scenario` must be either 'task' or 'class'")
 
     @classmethod
     def get_execution_order(cls):
