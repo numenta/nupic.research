@@ -184,6 +184,7 @@ class ANMLDendriticNetwork(nn.Module):
                 in_channels=in_channels, out_channels=out_channels,
                 kernel_size=kernel_size, stride=stride, padding=padding
             ),
+            nn.InstanceNorm2d(num_features=out_channels, affine=True),
             nn.ReLU(),
         ]
 
