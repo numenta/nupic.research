@@ -105,17 +105,21 @@ metacl_dendrites.update(
 
 
 # An updated version of the dendrites model.
-# |--------------------------------------------------------------|
-# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
-# |--------------:|:-----------------|:------------------|------:|
-# |            10 | 0.00 ± 0.00      | 0.00 ± 0.00       | 0.001 |
-# |--------------------------------------------------------------|
+# |---------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |     LR |
+# |--------------:|:-----------------|:------------------|-------:|
+# |            10 | 0.78 ± 0.08      | 0.90 ± 0.04       | 0.001  |
+# |            50 | 0.76 ± 0.03      | 0.94 ± 0.02       | 0.001  |
+# |           100 | 0.71 ± 0.02      | 0.94 ± 0.01       | 0.0006 |
+# |           200 | 0.66 ± 0.02      | 0.93 ± 0.01       | 0.0006 |
+# |           600 | 0.49 ± 0.01      | 0.85 ± 0.01       | 0.0006 |
+# |---------------------------------------------------------------|
 #
 metacl_anml_dendrites = deepcopy(metacl_anml_replicate)
 metacl_anml_dendrites.update(
     experiment_class=DendritesExperiment,
 
-    epochs=300,  # just 300 for now for debugging purposes.
+    epochs=20000,
     model_class=ANMLDendriticNetwork,
     model_args=dict(num_classes=963,
                     num_segments=20,
@@ -128,7 +132,7 @@ metacl_anml_dendrites.update(
 
     wandb_args=dict(
         name="metacl_anml_dendrites",
-        project="metacl_dendrites_test",
+        project="metacl",
         notes="""
         Dendritic Networks applied to OML Problem. Test 2: This employs a different
         series of average pooling for an architecture closer to ANML's.
@@ -140,7 +144,7 @@ metacl_anml_dendrites.update(
     optimizer_args=dict(lr=1e-4),
 
     # Run meta-testing over 10 classes.
-    num_meta_test_classes=[10],
+    num_meta_test_classes=[10, 50, 100, 200, 600],
 
     # Update the prediction layer and the gating_layer during meta-train training.
     fast_params=["prediction.*", "classifier.*"],
