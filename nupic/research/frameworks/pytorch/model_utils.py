@@ -40,10 +40,12 @@ def train_model(
     optimizer,
     device,
     criterion=F.nll_loss,
+    complexity_loss_fn=None,
     batches_in_epoch=sys.maxsize,
     active_classes=None,
     pre_batch_callback=None,
     post_batch_callback=None,
+    transform_to_device_fn=None,
     progress_bar=None,
 ):
     """Train the given model by iterating through mini batches. An epoch ends
@@ -61,6 +63,8 @@ def train_model(
     :type device: :class:`torch.device
     :param criterion: loss function to use
     :type criterion: function
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
     :param batches_in_epoch: Max number of mini batches to test on
     :type batches_in_epoch: int
     :param active_classes: a list of indices of the heads that are active for a given
@@ -73,6 +77,12 @@ def train_model(
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters: model, batch_idx
     :type post_batch_callback: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
     :param progress_bar: Optional :class:`tqdm` progress bar args.
                          None for no progress bar
     :type progress_bar: dict or None
@@ -80,6 +90,7 @@ def train_model(
     :return: mean loss for epoch
     :rtype: float
     """
+
     model.train()
     # Use asynchronous GPU copies when the memory is pinned
     # See https://pytorch.org/docs/master/notes/cuda.html
@@ -107,8 +118,12 @@ def train_model(
             break
 
         num_images = len(target)
-        data = data.to(device, non_blocking=async_gpu)
-        target = target.to(device, non_blocking=async_gpu)
+        if transform_to_device_fn is None:
+            data = data.to(device, non_blocking=async_gpu)
+            target = target.to(device, non_blocking=async_gpu)
+        else:
+            data, target = transform_to_device_fn(data, target, device,
+                                                  non_blocking=async_gpu)
         t1 = time.time()
 
         if pre_batch_callback is not None:
@@ -131,6 +146,19 @@ def train_model(
 
         t3 = time.time()
 
+        # Compute and backpropagate the complexity loss. This happens after
+        # error loss has backpropagated, freeing its computation graph, so the
+        # two loss functions don't compete for memory.
+        complexity_loss = (complexity_loss_fn(model)
+                           if complexity_loss_fn is not None
+                           else None)
+        if complexity_loss is not None:
+            if use_amp:
+                with amp.scale_loss(complexity_loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                complexity_loss.backward()
+
         t4 = time.time()
         optimizer.step()
         t5 = time.time()
@@ -142,11 +170,13 @@ def train_model(
                                                               t4 - t3, t5 - t4)
             post_batch_callback(model=model,
                                 error_loss=error_loss.detach(),
-                                complexity_loss=None,
+                                complexity_loss=(complexity_loss.detach()
+                                                 if complexity_loss is not None
+                                                 else None),
                                 batch_idx=batch_idx,
                                 num_images=num_images,
                                 time_string=time_string)
-        del error_loss
+        del error_loss, complexity_loss
         t0 = time.time()
 
     if progress_bar is not None:
@@ -160,9 +190,11 @@ def evaluate_model(
     device,
     batches_in_epoch=sys.maxsize,
     criterion=F.nll_loss,
+    complexity_loss_fn=None,
     active_classes=None,
     progress=None,
     post_batch_callback=None,
+    transform_to_device_fn=None,
 ):
     """Evaluate pre-trained model using given test dataset loader.
 
@@ -176,6 +208,8 @@ def evaluate_model(
     :type batches_in_epoch: int
     :param criterion: loss function to use
     :type criterion: function
+    :param complexity_loss_fn: a regularization term for the loss function
+    :type complexity_loss_fn: function
     :param active_classes: a list of indices of the heads that are active for a given
                            task; only relevant if this function is being used in a
                            continual learning scenario
@@ -186,6 +220,12 @@ def evaluate_model(
                                 with the following parameters:
                                 batch_idx, target, output, pred
     :type post_batch_callback: function
+    :param transform_to_device_fn: Function for sending data and labels to the
+                                   device. This provides an extensibility point
+                                   for performing any final transformations on
+                                   the data or targets, and determining what
+                                   actually needs to get sent to the device.
+    :type transform_to_device_fn: function
 
     :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
     :rtype: dict
@@ -208,8 +248,12 @@ def evaluate_model(
             if batch_idx >= batches_in_epoch:
                 break
 
-            data = data.to(device, non_blocking=async_gpu)
-            target = target.to(device, non_blocking=async_gpu)
+            if transform_to_device_fn is None:
+                data = data.to(device, non_blocking=async_gpu)
+                target = target.to(device, non_blocking=async_gpu)
+            else:
+                data, target = transform_to_device_fn(data, target, device,
+                                                      non_blocking=async_gpu)
 
             output = model(data)
             if active_classes is not None:
@@ -223,6 +267,10 @@ def evaluate_model(
                 post_batch_callback(batch_idx=batch_idx, target=target, output=output,
                                     pred=pred)
 
+        complexity_loss = (complexity_loss_fn(model)
+                           if complexity_loss_fn is not None
+                           else None)
+
     if progress is not None:
         loader.close()
 
@@ -235,6 +283,9 @@ def evaluate_model(
         "mean_loss": loss / total if total > 0 else 0,
         "mean_accuracy": correct / total if total > 0 else 0,
     }
+
+    if complexity_loss is not None:
+        result["complexity_loss"] = complexity_loss.item()
 
     return result
 

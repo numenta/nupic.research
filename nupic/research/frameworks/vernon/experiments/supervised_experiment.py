@@ -369,7 +369,9 @@ class SupervisedExperiment(ExperimentBase):
             loader=loader,
             device=self.device,
             criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch_val,
+            transform_to_device_fn=self.transform_data_to_device,
         )
 
     def train_epoch(self):
@@ -379,9 +381,11 @@ class SupervisedExperiment(ExperimentBase):
             optimizer=self.optimizer,
             device=self.device,
             criterion=self.error_loss,
+            complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch_wrapper,
+            transform_to_device_fn=self.transform_data_to_device,
         )
 
     def run_epoch(self):
