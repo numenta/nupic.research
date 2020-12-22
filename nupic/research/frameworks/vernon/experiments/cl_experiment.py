@@ -62,8 +62,8 @@ class ContinualLearningExperiment(
         # Applying target transform depending on type of CL task
         # Task - we know the task, so the network is multihead
         # Class - we don't know the task, network has as many heads as classes
-        self.cl_experiment_type = config.get("cl_experiment_type", "class")
-        if self.cl_experiment_type == "task":
+        self.scenario = config.get("scenario", "class")
+        if self.scenario == "task":
             self.logger.info("Overriding target transform")
             target_transform = transforms.Lambda(
                 lambda y: y % self.num_classes_per_task
@@ -193,13 +193,13 @@ class ContinualLearningExperiment(
         all tasks that the model has previously observed are active. More information
         about active classes can be found here: https://arxiv.org/abs/1904.07734
         """
-        if self.cl_experiment_type == "task":
+        if self.scenario == "task":
             return [label for label in range(
                 self.num_classes_per_task * self.current_task,
                 self.num_classes_per_task * (self.current_task + 1)
             )]
 
-        elif self.cl_experiment_type == "class":
+        elif self.scenario == "class":
             return [label for label in range(
                 self.num_classes_per_task * (self.current_task + 1)
             )]
