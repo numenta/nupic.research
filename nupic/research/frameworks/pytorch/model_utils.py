@@ -90,7 +90,6 @@ def train_model(
     :return: mean loss for epoch
     :rtype: float
     """
-
     model.train()
     # Use asynchronous GPU copies when the memory is pinned
     # See https://pytorch.org/docs/master/notes/cuda.html
