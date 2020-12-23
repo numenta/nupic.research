@@ -24,7 +24,7 @@ import numpy as np
 import torch
 
 
-def plot_dendritic_activations(
+def plot_dendrite_activations(
     dendritic_weights,
     context_vectors,
     annotation_type,
