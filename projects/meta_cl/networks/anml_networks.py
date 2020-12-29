@@ -92,7 +92,7 @@ class ANMLNetwork(nn.Module):
 class ANMLsOMLNetwork(nn.Module):
     """
     ANML's implementation of OML's network. This differs from the OML repo
-    in that it has two linear layers in the prediction network as opposed to one.
+    in that it has two linear layers in the adaptation network as opposed to one.
     """
 
     def __init__(self, num_classes):
@@ -111,7 +111,7 @@ class ANMLsOMLNetwork(nn.Module):
             *self.conv_block(256, 256, 3, 2, 0),
             nn.Flatten(),
         )
-        self.prediction = nn.Sequential(
+        self.adaptation = nn.Sequential(
             nn.Linear(2304, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes),
@@ -139,5 +139,5 @@ class ANMLsOMLNetwork(nn.Module):
 
     def forward(self, x):
         out = self.representation(x)
-        out = self.prediction(x)
+        out = self.adaptation(x)
         return out
