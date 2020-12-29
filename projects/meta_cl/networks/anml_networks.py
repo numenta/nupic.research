@@ -99,15 +99,10 @@ class ANMLsOMLNetwork(nn.Module):
         super().__init__()
         self.representation = nn.Sequential(
             *self.conv_block(3, 256, 3, 1, 0),
-            nn.MaxPool2d(kernel_size=2, stride=2),
             *self.conv_block(256, 256, 3, 1, 0),
-            nn.MaxPool2d(kernel_size=2, stride=2),
             *self.conv_block(256, 256, 3, 1, 0),
-            nn.MaxPool2d(kernel_size=2, stride=2),
             *self.conv_block(256, 256, 3, 2, 0),
-            nn.MaxPool2d(kernel_size=2, stride=2),
             *self.conv_block(256, 256, 3, 1, 0),
-            nn.MaxPool2d(kernel_size=2, stride=2),
             *self.conv_block(256, 256, 3, 2, 0),
             nn.Flatten(),
         )
@@ -139,5 +134,5 @@ class ANMLsOMLNetwork(nn.Module):
 
     def forward(self, x):
         out = self.representation(x)
-        out = self.adaptation(x)
+        out = self.adaptation(out)
         return out
