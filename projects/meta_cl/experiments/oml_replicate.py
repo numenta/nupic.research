@@ -23,7 +23,7 @@ from copy import deepcopy
 
 from torchvision import transforms
 
-from .oml import metacl_oml
+from .metacl import metacl_oml
 
 # """
 # These experiments serves to further narrow the gap between our implementation

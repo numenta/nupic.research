@@ -29,7 +29,7 @@ from torchvision.transforms import Normalize, ToTensor
 
 from networks import ANMLNetwork
 
-from .oml import metacl_oml
+from .metacl import metacl_oml
 
 
 """
