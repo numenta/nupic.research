@@ -24,11 +24,11 @@ import numpy as np
 import torch
 
 
-def plot_dendritic_activations(
+def plot_dendrite_activations(
     dendritic_weights,
     context_vectors,
-    mask_values,
-    use_absolute_activations=False
+    annotation_type,
+    mask_values=None
 ):
     """
     Returns a heatmap of dendrite activations (given dendritic weights for a single
@@ -40,26 +40,30 @@ def plot_dendritic_activations(
 
     :param dendritic_weights: 2D torch tensor with shape (num_dendrites, dim_context)
     :param context_vectors: 2D torch tensor with shape (num_contexts, dim_context)
+    :param annotation_type: either "regular" or "absolute"; "regular" annotates the
+                            maxmimum activation per context, whereas "absolute"
+                            annotates the absolute maximum activation per context
     :param mask_values: list of the routing function's mask values for the output unit
-                        corresponding to `dendritic_weights`, across all contexts
-    :param use_absolute_activations: plots absolute activation values if True
+                        corresponding to `dendritic_weights` across all contexts;
+                        unused if None
     """
     assert dendritic_weights.size(1) == context_vectors.size(1)
+    assert annotation_type in ("regular", "absolute")
 
     plt.cla()
 
     activations = torch.matmul(dendritic_weights, context_vectors.T)
-    if use_absolute_activations:
-        activations = torch.abs(activations)
     activations = activations.detach().cpu().numpy()
 
     num_contexts = context_vectors.size(0)
     num_dendrites = dendritic_weights.size(0)
-    assert len(mask_values) == num_contexts
 
-    x_labels = [
-        "context {} [{}]".format(j, mask_values[j]) for j in range(num_contexts)
-    ]
+    x_labels = ["context {}".format(j) for j in range(num_contexts)]
+    if mask_values is not None:
+        assert len(mask_values) == num_contexts
+        x_labels = [
+            "{} [{}]".format(label, mask_values[j]) for j, label in enumerate(x_labels)
+        ]
     y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
 
     # Find the range of activation values to anchor the colorbar
@@ -79,8 +83,11 @@ def plot_dendritic_activations(
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
     plt.tight_layout()
 
-    # Annotate just the top absolute activation for each context
-    top_activation_dendrite_per_context = np.argmax(np.abs(activations), axis=0)
+    # Annotate just the maximum or absolute maximum activation for each context
+    top_activation_dendrite_per_context = np.argmax(
+        np.abs(activations) if annotation_type == "absolute" else activations,
+        axis=0
+    )
     for j, i in enumerate(top_activation_dendrite_per_context):
         val = np.round(activations[i, j], 2)
         ax.text(j, i, val, ha="center", va="center", color="w")
