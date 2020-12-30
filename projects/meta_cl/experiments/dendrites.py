@@ -20,7 +20,11 @@
 
 from copy import deepcopy
 
-from networks import ANMLDendriticNetwork, DendriticNetwork
+from networks import (
+    ANMLDendriticNetwork,
+    CloserToANMLDendriticNetwork,
+    DendriticNetwork,
+)
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
 
 from .anml_replicate import ANMLTransform, metacl_anml_replicate
@@ -157,8 +161,109 @@ metacl_anml_dendrites.update(
 )
 
 
+# A 2000 epoch model for quick iterations and debugging.
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.36 ± 0.05      | 0.40 ± 0.07       | 0.001 |
+# |            50 | 0.43 ± 0.03      | 0.69 ± 0.02       | 0.001 |
+# |--------------------------------------------------------------|
+#
+metacl_anml_dendrites_2000 = deepcopy(metacl_anml_dendrites)
+metacl_anml_dendrites_2000.update(
+    epochs=2000,
+    num_meta_test_classes=[50],
+    wandb_args=dict(name="metacl_anml_dendrites_2000", project="metacl"),
+)
+
+
+# The following adjust the lr to ensure it's identical to that used by ANML.
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.84 ± 0.06      | 0.92 ± 0.03       | 0.001 |
+# |            50 | 0.86 ± 0.02      | 0.98 ± 0.01       | 0.001 |
+# |           100 | 0.81 ± 0.02      | 0.98 ± 0.01       | 0.001 |
+# |           200 | 0.75 ± 0.02      | 0.97 ± 0.01       | 0.001 |
+# |           600 | 0.62 ± 0.01      | 0.94 ± 0.00       | 0.001 |
+# |--------------------------------------------------------------|
+#
+metacl_anml_dendrites_adjust_lr = deepcopy(metacl_anml_dendrites)
+metacl_anml_dendrites_adjust_lr.update(
+    # Learning rate for inner loop and outer loop.
+    adaptation_lr=0.1,  # applied in inner loop via SGD like update rule
+    optimizer_args=dict(lr=1e-3),
+    wandb_args=dict(
+        name="metacl_anml_dendrites_adjust_lr",
+        project="metacl",
+    ),
+)
+
+
+# A 2000 epoch model for quick iterations and debugging.
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            50 | 0.73 ± 0.02      | 0.95 ± 0.01       | 0.001 |
+# |--------------------------------------------------------------|
+#
+metacl_anml_dendrites_adjust_lr_2000 = deepcopy(metacl_anml_dendrites_adjust_lr)
+metacl_anml_dendrites_adjust_lr_2000.update(
+    epochs=2000,
+    num_meta_test_classes=[50],
+    wandb_args=dict(
+        name="metacl_anml_dendrites_adjust_lr_2000",
+        project="metacl",
+    ),
+)
+
+
+# This is a network closer in implementation to anml.
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.86 ± 0.05      | 0.92 ± 0.03       | 0.001 |
+# |            50 | 0.89 ± 0.03      | 0.98 ± 0.01       | 0.001 |
+# |           100 | 0.86 ± 0.02      | 0.98 ± 0.01       | 0.001 |
+# |           200 | 0.80 ± 0.01      | 0.97 ± 0.01       | 0.001 |
+# |           600 | 0.68 ± 0.01      | 0.93 ± 0.00       | 0.001 |
+# |--------------------------------------------------------------|
+#
+closer_to_anml_dendrites = deepcopy(metacl_anml_dendrites_adjust_lr)
+closer_to_anml_dendrites.update(
+    model_class=CloserToANMLDendriticNetwork,
+    model_args=dict(
+        num_classes=963,
+        num_segments=1,
+        dendrite_sparsity=0,
+        dendrite_bias=True,
+    ),
+    wandb_args=dict(name="closer_to_anml_dendrites", project="metacl"),
+)
+
+
+# A 2000 epoch model for quick iterations and debugging.
+# |--------------------------------------------------------------|
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            50 | 0.82 ± 0.02      | 0.94 ± 0.02       | 0.001 |
+# |--------------------------------------------------------------|#
+#
+closer_to_anml_dendrites_2000 = deepcopy(closer_to_anml_dendrites)
+closer_to_anml_dendrites_2000.update(
+    epochs=2000,
+    num_meta_test_classes=[50],
+    wandb_args=dict(name="closer_to_anml_dendrites_2000", project="metacl"),
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     metacl_dendrites=metacl_dendrites,
     metacl_anml_dendrites=metacl_anml_dendrites,
+    metacl_anml_dendrites_2000=metacl_anml_dendrites_2000,
+    metacl_anml_dendrites_adjust_lr=metacl_anml_dendrites_adjust_lr,
+    metacl_anml_dendrites_adjust_lr_2000=metacl_anml_dendrites_adjust_lr_2000,
+    closer_to_anml_dendrites=closer_to_anml_dendrites,
+    closer_to_anml_dendrites_2000=closer_to_anml_dendrites_2000,
 )
