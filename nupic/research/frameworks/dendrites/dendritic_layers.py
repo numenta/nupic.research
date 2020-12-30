@@ -70,7 +70,7 @@ class BiasingDendriticLayer(SparseWeights):
 
     def rezero_weights(self):
         super().rezero_weights()
-        if self.segments is not None:  # only none at beggining of init
+        if self.segments is not None:  # only none at beginning of init
             self.segments.rezero_weights()
 
     def apply_dendrites(self, y, dendrite_activations):
@@ -146,7 +146,7 @@ class GatingDendriticLayer2d(SparseWeights2d):
 
     def rezero_weights(self):
         super().rezero_weights()
-        if self.segments is not None:  # only none at beggining of init
+        if self.segments is not None:  # only none at beginning of init
             self.segments.rezero_weights()
 
     def apply_dendrites(self, y, dendrite_activations):
