@@ -39,10 +39,10 @@ def train_model(
     loader,
     optimizer,
     device,
-    freeze_params=None,
     criterion=F.nll_loss,
     complexity_loss_fn=None,
     batches_in_epoch=sys.maxsize,
+    active_classes=None,
     pre_batch_callback=None,
     post_batch_callback=None,
     transform_to_device_fn=None,
@@ -59,24 +59,24 @@ def train_model(
     :param optimizer: Optimizer object used to train the model.
            This function will train the model on every batch using this optimizer
            and the :func:`torch.nn.functional.nll_loss` function
-    :param batches_in_epoch: Max number of mini batches to train.
     :param device: device to use ('cpu' or 'cuda')
     :type device: :class:`torch.device
-    :param freeze_params: List of parameters to freeze at specified indices
-     For each parameter in the list:
-     - parameter[0] -> network module
-     - parameter[1] -> weight indices
-    :type param: list or tuple
     :param criterion: loss function to use
     :type criterion: function
     :param complexity_loss_fn: a regularization term for the loss function
     :type complexity_loss_fn: function
-    :param post_batch_callback: Callback function to be called after every batch
-                                with the following parameters: model, batch_idx
-    :type post_batch_callback: function
+    :param batches_in_epoch: Max number of mini batches to test on
+    :type batches_in_epoch: int
+    :param active_classes: a list of indices of the heads that are active for a given
+                           task; only relevant if this function is being used in a
+                           continual learning scenario
+    :type active_classes: list of int or None
     :param pre_batch_callback: Callback function to be called before every batch
                                with the following parameters: model, batch_idx
     :type pre_batch_callback: function
+    :param post_batch_callback: Callback function to be called after every batch
+                                with the following parameters: model, batch_idx
+    :type post_batch_callback: function
     :param transform_to_device_fn: Function for sending data and labels to the
                                    device. This provides an extensibility point
                                    for performing any final transformations on
@@ -130,6 +130,8 @@ def train_model(
 
         optimizer.zero_grad()
         output = model(data)
+        if active_classes is not None:
+            output = output[:, active_classes]
         error_loss = criterion(output, target)
 
         del data, target, output
@@ -155,13 +157,6 @@ def train_model(
                     scaled_loss.backward()
             else:
                 complexity_loss.backward()
-
-        if freeze_params is not None:
-            with torch.no_grad():
-                for param in freeze_params:
-                    param_module = param[0]
-                    param_indices = param[1]
-                    param_module.grad[param_indices, :] = 0.0
 
         t4 = time.time()
         optimizer.step()
@@ -195,6 +190,7 @@ def evaluate_model(
     batches_in_epoch=sys.maxsize,
     criterion=F.nll_loss,
     complexity_loss_fn=None,
+    active_classes=None,
     progress=None,
     post_batch_callback=None,
     transform_to_device_fn=None,
@@ -207,12 +203,16 @@ def evaluate_model(
     :type loader: :class:`torch.utils.data.DataLoader`
     :param device: device to use ('cpu' or 'cuda')
     :type device: :class:`torch.device`
-    :param batches_in_epoch: Max number of mini batches to test on.
+    :param batches_in_epoch: Max number of mini batches to test on
     :type batches_in_epoch: int
     :param criterion: loss function to use
     :type criterion: function
     :param complexity_loss_fn: a regularization term for the loss function
     :type complexity_loss_fn: function
+    :param active_classes: a list of indices of the heads that are active for a given
+                           task; only relevant if this function is being used in a
+                           continual learning scenario
+    :type active_classes: list of int or None
     :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
     :type progress: dict or None
     :param post_batch_callback: Callback function to be called after every batch
@@ -255,6 +255,8 @@ def evaluate_model(
                                                       non_blocking=async_gpu)
 
             output = model(data)
+            if active_classes is not None:
+                output = output[:, active_classes]
             loss += criterion(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum()
