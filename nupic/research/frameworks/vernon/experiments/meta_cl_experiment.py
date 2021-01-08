@@ -258,6 +258,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             pin_memory=torch.cuda.is_available(),
         )
 
+    def sample_slow_data(self, tasks):
+        slow_data, slow_target = [], []
+        for task in tasks:
+            self.train_slow_loader.sampler.set_active_tasks(task)
+            x, y = next(iter(self.train_slow_loader))
+            slow_data.append(x)
+            slow_target.append(y)
+        return slow_data, slow_target
+
     def run_epoch(self):
 
         self.pre_epoch()
@@ -286,12 +295,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         replay_data, replay_target = next(iter(self.train_replay_loader))
 
         # Sample from the slow set.
-        slow_data, slow_target = [], []
-        for task in tasks_train:
-            self.train_slow_loader.sampler.set_active_tasks(task)
-            x, y = next(iter(self.train_slow_loader))
-            slow_data.append(x)
-            slow_target.append(y)
+        slow_data, slow_target = self.sample_slow_data(tasks_train)
 
         # Concatenate the slow and replay set.
         slow_data = torch.cat(slow_data + [replay_data]).to(self.device)
@@ -447,6 +451,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo["create_replay_sampler"] = [exp + ".create_replay_sampler"]
         eo["create_task_sampler"] = [exp + ".create_task_sampler"]
         eo["create_slow_train_dataloader"] = [exp + ".create_slow_train_dataloader"]
+        eo["sample_slow_data"] = [exp + ".sample_slow_data"]
         eo["run_epoch"] = [exp + ".run_epoch"]
         eo["pre_task"] = [exp + ".pre_task"]
         eo["run_task"] = [exp + ".run_task"]
