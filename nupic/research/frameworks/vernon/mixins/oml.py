@@ -58,11 +58,14 @@ class OnlineMetaLearning(object):
             - lr_sweep_range: list of learning rates to attempt meta-test training.
                               The best one, according to the meta-test test set,
                               will be chosen and used for the meta-testing phase.
+            - run_lr_sweep: whether to run grid search over lr's for meta-test
+                                  training; if false, the first lr in lr_sweep_range
+                                  will be used; defaults to True.
             - num_meta_test_classes: list of number of classes to train and test over
                                      for meta-testing
-            - num_lr_search_runs: number of runs to attempt an lr-sweep. The one that
-                                  achieves the highest test-test accuracy the most
-                                  times, i.e. the mode, will be chosen for the
+            - num_lr_search_runs: number of runs to attempt in the lr grid search;
+                                  the one that achieves the highest test-test accuracy
+                                  the most times, i.e. the mode, will be chosen for the
                                   meta-testing phase.
             - num_meta_testing_runs: number of meta-testing phases to run
             - test_train_sample_size: number of images per class to sample from for
@@ -79,10 +82,12 @@ class OnlineMetaLearning(object):
         self.reset_output_params = config.get("reset_output_params", True)
         self.reset_task_params = config.get("reset_task_params", True)
         self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
+        self.run_lr_sweep = config.get("run_lr_sweep", True)
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
         self.num_meta_test_classes = config.get("num_meta_test_classes",
                                                 [10, 50, 100, 200, 600])
+        assert len(self.lr_sweep_range) > 0
 
         # Resolve the names of the meta-test training params.
         assert "test_train_params" in config
@@ -315,7 +320,11 @@ class OnlineMetaLearning(object):
         memorize without forgetting.
         """
 
-        lr = self.find_best_lr(num_classes_learned)
+        # Decide on the lr to use.
+        if self.run_lr_sweep:
+            lr = self.find_best_lr(num_classes_learned)
+        else:
+            lr = self.lr_sweep_range[0]
 
         meta_test_test_accuracies = []
         meta_test_train_accuracies = []
