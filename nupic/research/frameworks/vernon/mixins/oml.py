@@ -189,9 +189,9 @@ class OnlineMetaLearning(object):
                         task_weights = p[t, :].unsqueeze(0)
                         nn.init.kaiming_normal_(task_weights)
 
-    def post_epoch(self):
-        super().post_epoch()
-        if self.current_epoch == self.epochs - 1 and self.run_meta_test:
+    def run_epoch(self):
+        results = super().run_epoch()
+        if self.current_epoch == self.epochs and self.run_meta_test:
 
             # Accumulate results.
             table = []  # for printout
@@ -205,18 +205,21 @@ class OnlineMetaLearning(object):
                 if num_classes > self.num_classes_eval:
                     break
 
-                # TODO: log results in addition to simply printing them to stdout
-                results = self.run_meta_testing_phase(num_classes)
-                test_train_accs, test_test_accs, lr = results
+                meta_test_accs = self.run_meta_testing_phase(num_classes)
+                test_train_accs, test_test_accs, lr = meta_test_accs
 
                 print(f"Accuracy for meta-testing phase over {num_classes} num classes")
-
                 mu_test = np.mean(test_test_accs)
                 sd_test = np.std(test_test_accs)
                 mu_train = np.mean(test_train_accs)
                 sd_train = np.std(test_train_accs)
                 test_acc_str = f"{mu_test:0.2f} ± {sd_test:0.2f}"
                 train_acc_str = f"{mu_train:0.2f} ± {sd_train:0.2f}"
+
+                results.update(**{
+                    f"mean_test_test_acc_{num_classes}_classes": mu_test,
+                    f"mean_test_train_acc_{num_classes}_classes": mu_train,
+                })
 
                 print(f"  test accs: {test_acc_str}")
                 print(f"  train accs: {train_acc_str}")
@@ -234,9 +237,12 @@ class OnlineMetaLearning(object):
 
             # Save results to csv
             if self.logdir is not None:
-                results_path = os.path.join(self.logdir, "meta_test_accuracies.csv")
-                results_df = pd.DataFrame(dataframe, columns=headers)
-                results_df.to_csv(results_path)
+                meta_test_path = os.path.join(self.logdir, "meta_test_accuracies.csv")
+                meta_test_acc_df = pd.DataFrame(dataframe, columns=headers)
+                meta_test_acc_df.to_csv(meta_test_path)
+
+        # Return results. When it's not the last epoch, this is returned as is.
+        return results
 
     def find_best_lr(self, num_classes_learned):
         """
@@ -386,7 +392,7 @@ class OnlineMetaLearning(object):
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("OML meta-testing setup")
-        eo["post_epoch"].append("Run meta testing phase")
+        eo["run_epoch"].append("Run meta testing phase at end of training.")
         eo["create_loaders"].append("Create loaders for the meta testing phase")
         eo["pre_task"].append("Reset the output params for upcoming tasks.")
 
