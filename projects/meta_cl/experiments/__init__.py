@@ -21,8 +21,10 @@
 
 from .metacl import CONFIGS as METACL
 from .anml_replicate import CONFIGS as ANML_REPLICATE
+from .anml_variants import CONFIGS as ANML_VARIANTS
 from .dendrites import CONFIGS as DENDRITES
 from .oml_replicate import CONFIGS as OML_REPLICATE
+from .oml_variants import CONFIGS as OML_VARIANTS
 from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
 
 """
@@ -34,6 +36,8 @@ __all__ = ["CONFIGS"]
 CONFIGS = dict()
 CONFIGS.update(METACL)
 CONFIGS.update(ANML_REPLICATE)
+CONFIGS.update(ANML_VARIANTS)
 CONFIGS.update(DENDRITES)
 CONFIGS.update(OML_REPLICATE)
+CONFIGS.update(OML_VARIANTS)
 CONFIGS.update(OML_REGRESSION_TEST)

@@ -25,3 +25,19 @@ from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mi
 class OMLExperiment(mixins.OnlineMetaLearning,
                     MetaContinualLearningExperiment):
     pass
+
+
+class IIDTrainingOMLExperiment(OMLExperiment):
+    def sample_slow_data(self, tasks):
+        """
+        Return no data so that all of the images and targets
+        can be sampled i.i.d. from the replay set.
+        """
+        return [], []
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        exp = "IIDTrainingOMLExperiment: "
+        eo["sample_slow_data"] = [exp + "only use replay data in outer loop."]
+        return eo
