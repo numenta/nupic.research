@@ -207,6 +207,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         for idx, (_, target) in enumerate(dataset):
             if isinstance(target, torch.Tensor):
                 target = target.item()
+            elif isinstance(target, np.integer):
+                target = int(target)
             assert isinstance(target, int)
             class_indices[target].append(idx)
 
