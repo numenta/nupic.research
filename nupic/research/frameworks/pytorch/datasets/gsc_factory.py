@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 
-def preprocessed_gsc(root, train=True, noise=False, download=True):
+def preprocessed_gsc(root, train=True, validation=False, noise=False, download=True):
     """
     Create train or validation dataset from preprocessed GSC data, downloading if
     necessary.
@@ -46,7 +46,8 @@ def preprocessed_gsc(root, train=True, noise=False, download=True):
     will be reused.
 
     :param root: directory to store or load downloaded data
-    :param train: whether to load train of validation data
+    :param train: whether to load train or test data
+    :param validation: whether to load validation data
     :param noise: whether to load noise data
     :param download: whether to download the data
     """
@@ -58,12 +59,18 @@ def preprocessed_gsc(root, train=True, noise=False, download=True):
     if train:
         basename = "gsc_train"
         qualifiers = range(30)
+    elif validation:
+        # Load validation dataset
+        basename = "gsc_valid"
+        qualifiers = [""]
     elif noise:
+        # Load test dataset with preprocessed noise
         basename = "gsc_test_noise"
         qualifiers = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50"]
     else:
-        basename = "gsc_valid"
-        qualifiers = [""]
+        # Load test dataset with no noise
+        basename = "gsc_test_noise"
+        qualifiers = ["00"]
 
     dataset = PreprocessedDataset(
         cachefilepath=root,
