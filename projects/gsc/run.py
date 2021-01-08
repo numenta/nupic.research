@@ -23,8 +23,12 @@ import copy
 import ray  # noqa: F401
 
 from experiments import CONFIGS
-from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
+from nupic.research.frameworks.vernon.parser_utils import (
+    DEFAULT_PARSERS, process_args,
+    insert_experiment_mixin
+)
 from nupic.research.frameworks.vernon.run_with_raytune import run
+from mixins import GSCNoiseTest
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -32,7 +36,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("-e", "--experiment", dest="name", default="default_base",
                         help="Experiment to run", choices=CONFIGS.keys())
-
+    parser.add_argument("--evaluate-noise", action="store_true",
+                        help="Whether or not to run noise tests")
     args = parser.parse_args()
     if args.name is None:
         parser.print_help()
@@ -46,6 +51,10 @@ if __name__ == "__main__":
 
     # Process args and modify config appropriately.
     config = process_args(args, config)
+
+    # Add noise tests
+    if args.evaluate_noise:
+        insert_experiment_mixin(config=config, mixin=GSCNoiseTest)
 
     if config is None:
         pass
