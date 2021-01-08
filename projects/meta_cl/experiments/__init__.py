@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .oml import CONFIGS as OML
+from .metacl import CONFIGS as METACL
 from .anml_replicate import CONFIGS as ANML_REPLICATE
 from .dendrites import CONFIGS as DENDRITES
 from .oml_replicate import CONFIGS as OML_REPLICATE
@@ -32,7 +32,7 @@ __all__ = ["CONFIGS"]
 
 # Collect all configurations
 CONFIGS = dict()
-CONFIGS.update(OML)
+CONFIGS.update(METACL)
 CONFIGS.update(ANML_REPLICATE)
 CONFIGS.update(DENDRITES)
 CONFIGS.update(OML_REPLICATE)
