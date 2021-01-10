@@ -21,7 +21,14 @@
 
 from .dendrite_segments import DendriteSegments
 from .dendritic_layers import (
-    AbsoluteMaxGatingDendriticLayer, AbsoluteMaxGatingDendriticLayer2d,
-    BiasingDendriticLayer, GatingDendriticLayer, GatingDendriticLayer2d
+    AbsoluteMaxGatingDendriticLayer,
+    AbsoluteMaxGatingDendriticLayer2d,
+    BiasingDendriticLayer,
+    GatingDendriticLayer,
+    GatingDendriticLayer2d,
 )
-from .utils import plot_dendrite_activations
+from .utils import (
+    plot_dendrite_activations,
+    plot_mean_selected_activations,
+    plot_percent_active_dendrites,
+)
