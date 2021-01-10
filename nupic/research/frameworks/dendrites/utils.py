@@ -25,38 +25,38 @@ import torch
 
 
 def plot_dendrite_activations(
-    dendritic_weights,
+    dendrite_weights,
     context_vectors,
     annotation_type,
     mask_values=None
 ):
     """
-    Returns a heatmap of dendrite activations (given dendritic weights for a single
+    Returns a heatmap of dendrite activations (given dendrite weights for a single
     neuron and context vectors) plotted using matplotlib. Note that the user must be
     logged in to wandb on both browser and terminal to view the resulting plots, and
     this can be done via the following command:
 
     $ wandb login your-login-key
 
-    :param dendritic_weights: 2D torch tensor with shape (num_dendrites, dim_context)
+    :param dendrite_weights: 2D torch tensor with shape (num_dendrites, dim_context)
     :param context_vectors: 2D torch tensor with shape (num_contexts, dim_context)
     :param annotation_type: either "regular" or "absolute"; "regular" annotates the
                             maxmimum activation per context, whereas "absolute"
                             annotates the absolute maximum activation per context
     :param mask_values: list of the routing function's mask values for the output unit
-                        corresponding to `dendritic_weights` across all contexts;
+                        corresponding to `dendrite_weights` across all contexts;
                         unused if None
     """
-    assert dendritic_weights.size(1) == context_vectors.size(1)
+    assert dendrite_weights.size(1) == context_vectors.size(1)
     assert annotation_type in ("regular", "absolute")
 
     plt.cla()
 
-    activations = torch.matmul(dendritic_weights, context_vectors.T)
+    activations = torch.matmul(dendrite_weights, context_vectors.T)
     activations = activations.detach().cpu().numpy()
 
     num_contexts = context_vectors.size(0)
-    num_dendrites = dendritic_weights.size(0)
+    num_dendrites = dendrite_weights.size(0)
 
     x_labels = ["context {}".format(j) for j in range(num_contexts)]
     if mask_values is not None:
