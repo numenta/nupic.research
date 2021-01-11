@@ -27,8 +27,11 @@ from .dendritic_layers import (
     GatingDendriticLayer,
     GatingDendriticLayer2d,
 )
-from .utils import (
+from .plotting_utils import (
     plot_dendrite_activations,
     plot_mean_selected_activations,
     plot_percent_active_dendrites,
+)
+from .utils import (
+    percent_active_dendrites,
 )
