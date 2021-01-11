@@ -21,6 +21,7 @@ import argparse
 import copy
 
 import ray  # noqa: F401
+from ray import tune
 
 from experiments import CONFIGS
 from nupic.research.frameworks.vernon.parser_utils import (
@@ -38,6 +39,8 @@ if __name__ == "__main__":
                         help="Experiment to run", choices=CONFIGS.keys())
     parser.add_argument("--evaluate-noise", action="store_true",
                         help="Whether or not to run noise tests")
+    parser.add_argument("--num-samples", type=int, default=1,
+                        help="Number of samples to run")
     args = parser.parse_args()
     if args.name is None:
         parser.print_help()
@@ -49,13 +52,18 @@ if __name__ == "__main__":
     # Merge configuration with command line arguments
     config.update(vars(args))
 
-    # Process args and modify config appropriately.
-    config = process_args(args, config)
-
     # Add noise tests
     if args.evaluate_noise:
         insert_experiment_mixin(config=config, mixin=GSCNoiseTest)
 
+    # Replace static seed if using multiple samples
+    if args.num_samples > 1:
+        seed = config.get("seed", 0)
+        if isinstance(seed, int):
+            config.update(seed=tune.randint(args.num_samples * 100))
+
+    # Process args and modify config appropriately.
+    config = process_args(args, config)
     if config is None:
         pass
     else:
