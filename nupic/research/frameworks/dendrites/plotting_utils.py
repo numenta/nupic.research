@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from .utils import percent_active_dendrites
+from .utils import dendrite_overlap_matrix, percent_active_dendrites
 
 
 def plot_dendrite_activations(
@@ -227,6 +227,7 @@ def plot_mean_selected_activations(
         selected = 1.0 * (np.max(selected, axis=0) == selected)
 
         num_selected_per_dendrite = np.sum(selected, axis=1)
+        np.place(num_selected_per_dendrite, num_selected_per_dendrite == 0.0, 1.0)
 
         selected = activations * selected
         selected = np.sum(selected, axis=1) / num_selected_per_dendrite
@@ -261,6 +262,87 @@ def plot_mean_selected_activations(
     for i in range(mean_selected_activations.shape[0]):
         for j in range(mean_selected_activations.shape[1]):
             val = np.round(mean_selected_activations[i, j], 2)
+            ax.text(j, i, val, ha="center", va="center", color="w")
+
+    figure = plt.gcf()
+    return figure
+
+
+def plot_dendrite_overlap_matrix(
+    dendrite_weights,
+    context_vectors,
+    selection_criterion,
+    category_names=None
+):
+    """
+    Returns a heatmap with shape (number of categories, number of categories) where
+    cell i, j gives the overlap in dendrite activations between categories i and j. The
+    value in each cell can be interpreted as a similarity measure in dendrite
+    activations between categories i and j; if the exact same dendrites are active for
+    the same fraction of instances across both categories, the dendrite overlap is 1;
+    if any dendrite that is active for category i and inactive for category j (and
+    vice-versa), the dendrite overlap is 0. The resulting heatmap is symmetric. Note
+    that the user must be logged in to wandb on both browser and terminal to view the
+    resulting plots, and this can be done via the following command:
+
+    $ wandb login your-login-key
+
+    :param dendrite_weights: 2D torch tensor with shape (num_dendrites, dim_context)
+    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
+                            dim_context) where each 2D tensor gives a batch of context
+                            vectors from the same category
+    :param selection_criterion: the criterion for selecting which dendrites become
+                                active; either "regular" (for `GatingDendriticLayer`)
+                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
+    :param category_names: list of category names to label each column of the heatmap,
+                           and needs to align with category order in `context_vectors`;
+                           unused if None
+    """
+    assert all(
+        [dendrite_weights.size(1) == batch.size(1) for batch in context_vectors]
+    )
+    assert selection_criterion in ("regular", "absolute")
+    if category_names is not None:
+        assert len(context_vectors) == len(category_names)
+
+    num_categories = len(context_vectors)
+
+    labels = ["category {}".format(j) for j in range(len(context_vectors))]
+    if category_names is not None:
+        labels = category_names
+
+    overlap_matrix = dendrite_overlap_matrix(
+        dendrite_weights=dendrite_weights,
+        context_vectors=context_vectors,
+        selection_criterion=selection_criterion
+    )
+
+    plt.cla()
+
+    # `overlap_matrix` is symmetric, hence we can set all values above the main
+    # diagonal to np.NaN so they don't appear in the visualization
+    for i in range(num_categories):
+        for j in range(i + 1, num_categories):
+            overlap_matrix[i, j] = np.nan
+
+    # Anchor the colorbar to the range [0, 1]
+    # vmax = np.max(overlap_matrix)
+    fig, ax = plt.subplots()
+    ax.imshow(overlap_matrix, cmap="OrRd", vmin=0.0, vmax=1.0)
+
+    ax.set_xticks(np.arange(num_categories))
+    ax.set_yticks(np.arange(num_categories))
+
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
+
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    plt.tight_layout()
+
+    # Annotate all overlap values
+    for i in range(num_categories):
+        for j in range(i + 1):
+            val = np.round(overlap_matrix[i, j], 2)
             ax.text(j, i, val, ha="center", va="center", color="w")
 
     figure = plt.gcf()

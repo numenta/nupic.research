@@ -29,9 +29,11 @@ from .dendritic_layers import (
 )
 from .plotting_utils import (
     plot_dendrite_activations,
+    plot_dendrite_overlap_matrix,
     plot_mean_selected_activations,
     plot_percent_active_dendrites,
 )
 from .utils import (
     percent_active_dendrites,
+    dendrite_overlap,
 )
