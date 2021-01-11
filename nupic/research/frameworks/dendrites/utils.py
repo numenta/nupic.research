@@ -236,7 +236,7 @@ def plot_mean_selected_activations(
 
         selected = activations
         if selection_criterion == "absolute":
-            selection_criterion = np.abs(selected)
+            selected = np.abs(selected)
         selected = 1.0 * (np.max(selected, axis=0) == selected)
 
         num_selected_per_dendrite = np.sum(selected, axis=1)
