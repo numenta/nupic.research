@@ -50,14 +50,14 @@ class GSCNoiseTest(object):
             - noise_levels: list of noise levels to validate,
                             default ["05", "10", "15", "20", "25", "30", "45", "50"]
         """
-        super().setup_experiment(config)
         self.noise_levels = config.get("noise_levels",  ["05", "10", "15", "20",
                                                          "25", "30", "45", "50"])
+        super().setup_experiment(config)
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].append("GSCNoiseTest")
+        eo["setup_experiment"].insert(0, "GSCNoiseTest")
         eo["create_loaders"].append("GSCNoiseTest")
         eo["validate"].append("GSCNoiseTest")
 
@@ -80,7 +80,7 @@ class GSCNoiseTest(object):
         """
         super().create_loaders(config)
 
-        dataset_args = config.get("dataset_args", {})
-        dataset_args.update(noise=True)
+        dataset_args = dict(config.get("dataset_args", {}))
+        dataset_args.update(train=False, qualifiers=self.noise_levels)
         self.noise_loader = self.create_validation_dataloader(
             config={**config, "dataset_args": dataset_args})

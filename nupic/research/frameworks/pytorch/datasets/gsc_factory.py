@@ -36,19 +36,24 @@ __all__ = [
 ]
 
 
-def preprocessed_gsc(root, train=True, validation=False, noise=False, download=True):
+def preprocessed_gsc(root, train=True, qualifiers=None, download=True):
     """
-    Create train or validation dataset from preprocessed GSC data, downloading if
+    Create train or test dataset from preprocessed GSC data, downloading if
     necessary.
 
     Warning: Be sure to call dataset.load_next() following each epoch of training.
     Otherwise, no new augmentations will be loaded, and the same exact samples
     will be reused.
 
+    .. note:: To load the preprocessed noise dataset use noise levels
+              `["05", "10", ..., "50"]` as qualifiers on the test dataset.
+              Noise level "00" is equivalent to the regular "test" dataset
+    .. seealso:: PreprocessedDataset
+
     :param root: directory to store or load downloaded data
     :param train: whether to load train or test data
-    :param validation: whether to load validation data
-    :param noise: whether to load noise data
+    :param qualifiers: List of qualifiers for each preprocessed files in this dataset.
+           If None, `range(30)` will be used for training and "00" for testing.
     :param download: whether to download the data
     """
 
@@ -58,19 +63,13 @@ def preprocessed_gsc(root, train=True, validation=False, noise=False, download=T
 
     if train:
         basename = "gsc_train"
-        qualifiers = range(30)
-    elif validation:
-        # Load validation dataset
-        basename = "gsc_valid"
-        qualifiers = [""]
-    elif noise:
-        # Load test dataset with preprocessed noise
-        basename = "gsc_test_noise"
-        qualifiers = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50"]
+        if qualifiers is None:
+            qualifiers = range(30)
     else:
-        # Load test dataset with no noise
+        # Load test and noise dataset
         basename = "gsc_test_noise"
-        qualifiers = ["00"]
+        if qualifiers is None:
+            qualifiers = ["00"]
 
     dataset = PreprocessedDataset(
         cachefilepath=root,
