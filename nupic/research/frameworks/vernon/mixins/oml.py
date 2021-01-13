@@ -81,7 +81,7 @@ class OnlineMetaLearning(object):
         self.run_meta_test = config.get("run_meta_test", False)
         self.reset_output_params = config.get("reset_output_params", True)
         self.reset_task_params = config.get("reset_task_params", True)
-        self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3, 1e-4])
+        self.lr_sweep_range = config.get("lr_sweep_range", [1e-1, 1e-2, 1e-3])
         self.run_lr_sweep = config.get("run_lr_sweep", True)
         self.num_lr_search_runs = config.get("num_lr_search_runs", 5)
         self.num_meta_testing_runs = config.get("num_meta_testing_runs", 15)
@@ -324,7 +324,7 @@ class OnlineMetaLearning(object):
         if self.run_lr_sweep:
             lr = self.find_best_lr(num_classes_learned)
         else:
-            lr = self.lr_sweep_range[0]
+            lr = self.lr_sweep_range[-1]
 
         meta_test_test_accuracies = []
         meta_test_train_accuracies = []
