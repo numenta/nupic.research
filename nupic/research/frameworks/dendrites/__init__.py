@@ -30,10 +30,15 @@ from .dendritic_layers import (
 from .plotting_utils import (
     plot_dendrite_activations,
     plot_dendrite_overlap_matrix,
+    plot_entropy_distribution,
     plot_mean_selected_activations,
     plot_percent_active_dendrites,
 )
 from .utils import (
-    percent_active_dendrites,
+    dendrite_duty_cycle,
     dendrite_overlap,
+    dendrite_overlap_matrix,
+    entropy,
+    online_dendrite_duty_cycle,
+    percent_active_dendrites,
 )

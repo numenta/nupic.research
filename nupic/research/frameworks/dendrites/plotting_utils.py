@@ -23,7 +23,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from .utils import dendrite_overlap_matrix, percent_active_dendrites
+from .utils import (
+    dendrite_duty_cycle,
+    dendrite_overlap_matrix,
+    entropy,
+    percent_active_dendrites,
+)
 
 
 def plot_dendrite_activations(
@@ -344,6 +349,45 @@ def plot_dendrite_overlap_matrix(
         for j in range(i + 1):
             val = np.round(overlap_matrix[i, j], 2)
             ax.text(j, i, val, ha="center", va="center", color="w")
+
+    figure = plt.gcf()
+    return figure
+
+
+def plot_entropy_distribution(dendrite_segments, context_vectors, selection_criterion):
+    """
+    Returns a histogram which gives the distribution of entropy values of dendrite
+    segments over the examples specified by the context vectors. Each single data point
+    in the histogram is the observed entropy of a set of dendrite segments
+    corresponding to a single unit. The entropy is the computed using the empirical
+    distribution of the fraction of instances for which each dendrite became active.
+
+    :param dendrite_segments: `DendriteSegments` object
+    :param context_vectors: a single 2D torch tensor of context vectors across multiple
+                            classes, or iterable of 2D torch tensors with shape
+                            (num_examples, dim_context) where each 2D tensor gives a
+                            batch of context vectors from the same category
+    :param selection_criterion: the criterion for selecting which dendrites become
+                                active; either "regular" (for `GatingDendriticLayer`)
+                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
+    """
+    duty_cycle = dendrite_duty_cycle(dendrite_segments, context_vectors,
+                                     selection_criterion)
+
+    num_units = duty_cycle.shape[0]
+    entropies = [entropy(duty_cycle[unit, :]) for unit in range(num_units)]
+    max_entropy = entropies[0][1]
+    entropies = [ent[0] for ent in entropies]
+
+    plt.cla()
+    plt.hist(x=entropies, bins=np.arange(0.0, max_entropy, 0.1), color="g",
+             edgecolor="k")
+
+    plt.xlabel("entropy  (max entropy: {})".format(round(max_entropy, 2)))
+    plt.ylabel("Segment frequency")
+    plt.xlim(0.0, max_entropy)
+    plt.grid(True)
+    plt.tight_layout()
 
     figure = plt.gcf()
     return figure
