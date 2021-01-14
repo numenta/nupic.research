@@ -106,6 +106,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                                       images will be used for a validation step.
             - fast_params: list of regex patterns identifying which params to
                            update during meta-train training
+            - use_2nd_order_grads: whether to take 2nd order gradients over steps in
+                                   inner loop. Defaults to True.
         """
         super().setup_experiment(config)
 
@@ -141,6 +143,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
                                           include_patterns=config["fast_params"])
         self.fast_param_names = list(fast_named_params.keys())
         self.logger.info(f"Setup: fast_param_names={self.fast_param_names}")
+
+        self.use_2nd_order_grads = config.get("use_2nd_order_grads", True)
 
         if self.num_fast_steps > len(self.train_fast_loader):
             self.logger.warning(
@@ -203,6 +207,8 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         for idx, (_, target) in enumerate(dataset):
             if isinstance(target, torch.Tensor):
                 target = target.item()
+            elif isinstance(target, np.integer):
+                target = int(target)
             assert isinstance(target, int)
             class_indices[target].append(idx)
 
@@ -252,6 +258,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             pin_memory=torch.cuda.is_available(),
         )
 
+    def sample_slow_data(self, tasks):
+        slow_data, slow_target = [], []
+        for task in tasks:
+            self.train_slow_loader.sampler.set_active_tasks(task)
+            x, y = next(iter(self.train_slow_loader))
+            slow_data.append(x)
+            slow_target.append(y)
+        return slow_data, slow_target
+
     def run_epoch(self):
 
         self.pre_epoch()
@@ -280,12 +295,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         replay_data, replay_target = next(iter(self.train_replay_loader))
 
         # Sample from the slow set.
-        slow_data, slow_target = [], []
-        for task in tasks_train:
-            self.train_slow_loader.sampler.set_active_tasks(task)
-            x, y = next(iter(self.train_slow_loader))
-            slow_data.append(x)
-            slow_target.append(y)
+        slow_data, slow_target = self.sample_slow_data(tasks_train)
 
         # Concatenate the slow and replay set.
         slow_data = torch.cat(slow_data + [replay_data]).to(self.device)
@@ -371,16 +381,19 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         pass
 
     @classmethod
-    def update_params(cls, named_params, model, loss, lr):
+    def update_params(cls, named_params, model, loss, lr, use_2nd_order_grads=True):
         """
         Takes a gradient step on the loss and updates the cloned parameters in place.
         """
         named_params = dict(named_params)
         params = list(named_params.values())
-        gradients = torch.autograd.grad(
-            loss, params,
-            retain_graph=True, create_graph=True
-        )
+        if use_2nd_order_grads:
+            gradients = torch.autograd.grad(
+                loss, params,
+                retain_graph=True, create_graph=True
+            )
+        else:
+            gradients = torch.autograd.grad(loss, params)
 
         if gradients is not None:
             for g, (name, p) in zip(gradients, named_params.items()):
@@ -398,7 +411,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         named_fast_params = self.get_named_fast_params(cloned_adaptation_net)
         self.update_params(
             named_fast_params, cloned_adaptation_net, train_loss,
-            self.adaptation_lr
+            self.adaptation_lr, self.use_2nd_order_grads,
         )
 
     def clone_model(self, keep_as_reference=None):
@@ -438,6 +451,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo["create_replay_sampler"] = [exp + ".create_replay_sampler"]
         eo["create_task_sampler"] = [exp + ".create_task_sampler"]
         eo["create_slow_train_dataloader"] = [exp + ".create_slow_train_dataloader"]
+        eo["sample_slow_data"] = [exp + ".sample_slow_data"]
         eo["run_epoch"] = [exp + ".run_epoch"]
         eo["pre_task"] = [exp + ".pre_task"]
         eo["run_task"] = [exp + ".run_task"]
