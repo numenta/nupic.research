@@ -19,25 +19,25 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .metacl import CONFIGS as METACL
-from .anml_replicate import CONFIGS as ANML_REPLICATE
-from .anml_variants import CONFIGS as ANML_VARIANTS
-from .dendrites import CONFIGS as DENDRITES
-from .oml_replicate import CONFIGS as OML_REPLICATE
-from .oml_variants import CONFIGS as OML_VARIANTS
-from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
+from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
 
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(METACL)
-CONFIGS.update(ANML_REPLICATE)
-CONFIGS.update(ANML_VARIANTS)
-CONFIGS.update(DENDRITES)
-CONFIGS.update(OML_REPLICATE)
-CONFIGS.update(OML_VARIANTS)
-CONFIGS.update(OML_REGRESSION_TEST)
+class OMLExperiment(mixins.OnlineMetaLearning,
+                    MetaContinualLearningExperiment):
+    pass
+
+
+class IIDTrainingOMLExperiment(OMLExperiment):
+    def sample_slow_data(self, tasks):
+        """
+        Return no data so that all of the images and targets
+        can be sampled i.i.d. from the replay set.
+        """
+        return [], []
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        exp = "IIDTrainingOMLExperiment: "
+        eo["sample_slow_data"] = [exp + "only use replay data in outer loop."]
+        return eo
