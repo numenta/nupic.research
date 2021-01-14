@@ -25,3 +25,4 @@ from .dendritic_networks import (
     CloserToANMLDendriticNetwork,
     DendriticNetwork,
 )
+from .oml_networks import KWinnerOMLNetwork
