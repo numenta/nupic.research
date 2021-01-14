@@ -26,7 +26,8 @@ from nupic.torch.modules.k_winners import KWinners
 
 class KWinnerOMLNetwork(nn.Module):
     """
-    This reproduces the network from the `OML`_ repository.
+    This reproduces the network from the `OML`_ repository but with a kwinner
+    layer on the penultimate layer.
 
     .. OML: https://github.com/khurramjaved96/mrcl
 
