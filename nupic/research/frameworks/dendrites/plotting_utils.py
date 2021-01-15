@@ -27,6 +27,7 @@ from .utils import (
     dendrite_duty_cycle,
     dendrite_overlap_matrix,
     entropy,
+    mean_selected_activations,
     percent_active_dendrites,
 )
 
@@ -152,11 +153,11 @@ def plot_percent_active_dendrites(
     )
     percentage_activations = percentage_activations[0, :, :].detach().cpu().numpy()
 
-    plt.cla()
-
     # Find the maximum percentage activation value to anchor the colorbar, and use
     # matplotlib to plot the heatmap
     vmax = np.max(percentage_activations)
+
+    plt.cla()
     fig, ax = plt.subplots()
     ax.imshow(percentage_activations, cmap="copper", vmin=0.0, vmax=vmax)
 
@@ -180,117 +181,23 @@ def plot_percent_active_dendrites(
 
 
 def plot_mean_selected_activations(
-    dendrite_weights,
-    context_vectors,
-    selection_criterion,
-    category_names=None
-):
-    """
-    Returns a heatmap with shape (number of dendrites, number of categories) where cell
-    i, j in the heatmap gives the mean selected activation of dendrite i under category
-    j. That is, for all context inputs in category j such that dendrite i was selected,
-    the cell value gives the mean activation. Note that the user must be logged in to
-    wandb on both browser and terminal to view the resulting plots, and this can be
-    done via the following command:
-
-    $ wandb login your-login-key
-
-    :param dendrite_weights: 2D torch tensor with shape (num_dendrites, dim_context)
-    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
-                            dim_context) where each 2D tensor gives a batch of context
-                            vectors from the same category
-    :param selection_criterion: the criterion for selecting which dendrites become
-                                active; either "regular" (for `GatingDendriticLayer`)
-                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
-    :param category_names: list of category names to label each column of the heatmap,
-                           and needs to align with category order in `context_vectors`;
-                           unused if None
-    """
-    assert all(
-        [dendrite_weights.size(1) == batch.size(1) for batch in context_vectors]
-    )
-    assert selection_criterion in ("regular", "absolute")
-    if category_names is not None:
-        assert len(context_vectors) == len(category_names)
-
-    plt.cla()
-
-    num_categories = len(context_vectors)
-    num_dendrites = dendrite_weights.size(0)
-
-    x_labels = ["category {}".format(j) for j in range(len(context_vectors))]
-    if category_names is not None:
-        x_labels = category_names
-    y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
-
-    mean_selected_activations = np.zeros((num_dendrites, 0))
-    for j in range(len(context_vectors)):
-        activations = torch.matmul(dendrite_weights, context_vectors[j].T)
-        activations = activations.detach().cpu().numpy()
-
-        selected = activations
-        if selection_criterion == "absolute":
-            selected = np.abs(selected)
-        selected = 1.0 * (np.max(selected, axis=0) == selected)
-
-        num_selected_per_dendrite = np.sum(selected, axis=1)
-        np.place(num_selected_per_dendrite, num_selected_per_dendrite == 0.0, 1.0)
-
-        selected = activations * selected
-        selected = np.sum(selected, axis=1) / num_selected_per_dendrite
-
-        selected = selected.reshape(-1, 1)
-        mean_selected_activations = np.concatenate(
-            (mean_selected_activations, selected),
-            axis=1
-        )
-
-    assert mean_selected_activations.shape[0] == num_dendrites
-    assert mean_selected_activations.shape[1] == num_categories
-
-    # Find the largest absolute mean selected activation value to anchor the colorbar,
-    # and use matplotlib to plot the heatmap
-    vmax = np.nanmax(np.abs(mean_selected_activations))
-    print(vmax)
-    vmin = -vmax
-    fig, ax = plt.subplots()
-    ax.imshow(mean_selected_activations, cmap="coolwarm_r", vmin=vmin, vmax=vmax)
-
-    ax.set_xticks(np.arange(num_categories))
-    ax.set_yticks(np.arange(num_dendrites))
-
-    ax.set_xticklabels(x_labels)
-    ax.set_yticklabels(y_labels)
-
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-    plt.tight_layout()
-
-    # Annotate all mean selected activations
-    for i in range(mean_selected_activations.shape[0]):
-        for j in range(mean_selected_activations.shape[1]):
-            val = np.round(mean_selected_activations[i, j], 2)
-            ax.text(j, i, val, ha="center", va="center", color="w")
-
-    figure = plt.gcf()
-    return figure
-
-
-def plot_dendrite_overlap_matrix(
     dendrite_segments,
     context_vectors,
     selection_criterion,
-    category_names=None
+    category_names=None,
+    unit_to_plot=0
 ):
     """
-    Returns a heatmap with shape (number of categories, number of categories) where
-    cell i, j gives the overlap in dendrite activations between categories i and j. The
-    value in each cell can be interpreted as a similarity measure in dendrite
-    activations between categories i and j; if the exact same dendrites are active for
-    the same fraction of instances across both categories, the dendrite overlap is 1;
-    if any dendrite that is active for category i and inactive for category j (and
-    vice-versa), the dendrite overlap is 0. The resulting heatmap is symmetric. Note
-    that the user must be logged in to wandb on both browser and terminal to view the
-    resulting plots, and this can be done via the following command:
+    Returns a 3D torch tensor with shape (num_units, num_dendrites, num_categories)
+    where cell k, i, j gives the mean activation of the ith dendrite of unit k over all
+    instances of category j for which dendrite i became active.
+
+    Returns a heatmap with shape (number of dendrites, number of categories) where cell
+    i, j in the heatmap gives the mean activation of the dendrite i over all instances
+    of category j for which dendrite i became active. As there are multiple dendrite
+    segments, the heatmap is created for the specified unit. Note that the user must be
+    logged in to wandb on both browser and terminal to view the resulting plots, and
+    this can be done via the following command:
 
     $ wandb login your-login-key
 
@@ -304,6 +211,89 @@ def plot_dendrite_overlap_matrix(
     :param category_names: list of category names to label each column of the heatmap,
                            and needs to align with category order in `context_vectors`;
                            unused if None
+    :param unit_to_plot: index of the unit for which to plot dendrite activations;
+                         plots activations of unit 0 by default
+    """
+    assert selection_criterion in ("regular", "absolute")
+    if category_names is not None:
+        assert len(context_vectors) == len(category_names)
+
+    num_categories = len(context_vectors)
+    num_units, num_dendrites, _ = dendrite_segments.weights.size()
+
+    assert 0 <= unit_to_plot < num_units
+
+    x_labels = ["category {}".format(j) for j in range(len(context_vectors))]
+    if category_names is not None:
+        x_labels = category_names
+    y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
+
+    msa = mean_selected_activations(dendrite_segments, context_vectors,
+                                    selection_criterion)
+    msa = msa[unit_to_plot, :, :]
+    msa = msa.detach().cpu().numpy()
+
+    # Find the largest absolute mean selected activation value to anchor the colorbar,
+    # and use matplotlib to plot the heatmap
+    vmax = np.nanmax(np.abs(msa))
+    vmin = -vmax
+
+    plt.cla()
+    fig, ax = plt.subplots()
+    ax.imshow(msa, cmap="coolwarm_r", vmin=vmin, vmax=vmax)
+
+    ax.set_xticks(np.arange(num_categories))
+    ax.set_yticks(np.arange(num_dendrites))
+
+    ax.set_xticklabels(x_labels)
+    ax.set_yticklabels(y_labels)
+
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    plt.tight_layout()
+
+    # Annotate all mean selected activations
+    for i in range(msa.shape[0]):
+        for j in range(msa.shape[1]):
+            val = round(msa[i, j], 2)
+            ax.text(j, i, val, ha="center", va="center", color="w")
+
+    figure = plt.gcf()
+    return figure
+
+
+def plot_dendrite_overlap_matrix(
+    dendrite_segments,
+    context_vectors,
+    selection_criterion,
+    category_names=None,
+    unit_to_plot=0
+):
+    """
+    Returns a heatmap with shape (number of categories, number of categories) where
+    cell i, j gives the overlap in dendrite activations between categories i and j for
+    the dendrite segments of the specified unit. The value in each cell can be
+    interpreted as a similarity measure in dendrite activations between categories i
+    and j; if the exact same dendrites are active for the same fraction of instances
+    across both categories, the dendrite overlap is 1; if any dendrite that is active
+    for category i and inactive for category j (and vice-versa), the dendrite overlap
+    is 0. The resulting heatmap is symmetric. Note that the user must be logged in to
+    wandb on both browser and terminal to view the resulting plots, and this can be
+    done via the following command:
+
+    $ wandb login your-login-key
+
+    :param dendrite_segments: `DendriteSegments` object
+    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
+                            dim_context) where each 2D tensor gives a batch of context
+                            vectors from the same category
+    :param selection_criterion: the criterion for selecting which dendrites become
+                                active; either "regular" (for `GatingDendriticLayer`)
+                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
+    :param category_names: list of category names to label each column of the heatmap,
+                           and needs to align with category order in `context_vectors`;
+                           unused if None
+    :param unit_to_plot: index of the unit for which to plot dendrite activations;
+                         plots activations of unit 0 by default
     """
     assert selection_criterion in ("regular", "absolute")
     if category_names is not None:
@@ -320,8 +310,8 @@ def plot_dendrite_overlap_matrix(
         context_vectors=context_vectors,
         selection_criterion=selection_criterion
     )
-
-    plt.cla()
+    overlap_matrix = overlap_matrix[unit_to_plot, :, :]
+    overlap_matrix = overlap_matrix.detach().cpu().numpy()
 
     # `overlap_matrix` is symmetric, hence we can set all values above the main
     # diagonal to np.NaN so they don't appear in the visualization
@@ -331,6 +321,7 @@ def plot_dendrite_overlap_matrix(
 
     # Anchor the colorbar to the range [0, 1]
     # vmax = np.max(overlap_matrix)
+    plt.cla()
     fig, ax = plt.subplots()
     ax.imshow(overlap_matrix, cmap="OrRd", vmin=0.0, vmax=1.0)
 

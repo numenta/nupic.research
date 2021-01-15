@@ -57,6 +57,44 @@ def percent_active_dendrites(dendrite_segments, context_vectors, selection_crite
     return percentage_activations
 
 
+def mean_selected_activations(dendrite_segments, context_vectors, selection_criterion):
+    """
+    Returns a 3D torch tensor with shape (num_units, num_dendrites, num_categories)
+    where cell k, i, j gives the mean activation of the ith dendrite of unit k over all
+    instances of category j for which dendrite i became active.
+
+    :param dendrite_segments: `DendriteSegments` object
+    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
+                            dim_context) where each 2D tensor gives a batch of context
+                            vectors from the same category
+    :param selection_criterion: the criterion for selecting which dendrites become
+                                active; either "regular" (for `GatingDendriticLayer`)
+                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
+    """
+    num_units, num_dendrites, _ = dendrite_segments.weights.size()
+
+    mean_selected_activations = torch.zeros((num_units, num_dendrites, 0))
+    for j in range(len(context_vectors)):
+        activations = dendrite_segments(context_vectors[j])
+
+        selected = activations
+        if selection_criterion == "absolute":
+            selected = activations.abs()
+        selected = (selected.max(axis=2, keepdims=True).values == selected)
+
+        num_selected_per_dendrite = selected.sum(axis=0)
+        num_selected_per_dendrite[num_selected_per_dendrite == 0.0] = 1.0
+
+        msa_j = activations * selected
+        msa_j = msa_j.sum(axis=0, dtype=torch.float) / num_selected_per_dendrite
+
+        msa_j = msa_j.unsqueeze(2)
+        mean_selected_activations = torch.cat((mean_selected_activations, msa_j),
+                                              dim=2)
+
+    return mean_selected_activations
+
+
 def dendrite_overlap_matrix(dendrite_segments, context_vectors, selection_criterion):
     """ Returns a 3D torch tensor with shape (num_units, num_categories,
     num_categories) which represents num_units overlap matrices (one per unit) """
