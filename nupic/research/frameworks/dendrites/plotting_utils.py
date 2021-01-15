@@ -32,10 +32,11 @@ from .utils import (
 
 
 def plot_dendrite_activations(
-    dendrite_weights,
+    dendrite_segments,
     context_vectors,
-    annotation_type,
-    mask_values=None
+    selection_criterion,
+    mask_values=None,
+    unit_to_plot=0
 ):
     """
     Returns a heatmap of dendrite activations (given dendrite weights for a single
@@ -45,25 +46,26 @@ def plot_dendrite_activations(
 
     $ wandb login your-login-key
 
-    :param dendrite_weights: 2D torch tensor with shape (num_dendrites, dim_context)
+    :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: 2D torch tensor with shape (num_contexts, dim_context)
-    :param annotation_type: either "regular" or "absolute"; "regular" annotates the
-                            maxmimum activation per context, whereas "absolute"
-                            annotates the absolute maximum activation per context
-    :param mask_values: list of the routing function's mask values for the output unit
-                        corresponding to `dendrite_weights` across all contexts;
-                        unused if None
+    :param selection_criterion: either "regular" or "absolute"; "regular" annotates the
+                                maxmimum activation per context, whereas "absolute"
+                                annotates the absolute maximum activation per context
+    :param mask_values: list of the routing function's mask values for all contexts,
+                        for output unit `unit_to_plot`; unused if None
+    :param unit_to_plot: index of the unit for which to plot dendrite activations;
+                         plots activations of unit 0 by default
     """
-    assert dendrite_weights.size(1) == context_vectors.size(1)
-    assert annotation_type in ("regular", "absolute")
-
-    plt.cla()
-
-    activations = torch.matmul(dendrite_weights, context_vectors.T)
-    activations = activations.detach().cpu().numpy()
+    assert selection_criterion in ("regular", "absolute")
 
     num_contexts = context_vectors.size(0)
-    num_dendrites = dendrite_weights.size(0)
+    num_units, num_dendrites, _ = dendrite_segments.weights.size()
+
+    assert 0 <= unit_to_plot < num_units
+
+    # Compute activation values
+    activations = dendrite_segments(context_vectors)
+    activations = activations[:, unit_to_plot, :].T
 
     x_labels = ["context {}".format(j) for j in range(num_contexts)]
     if mask_values is not None:
@@ -74,12 +76,14 @@ def plot_dendrite_activations(
     y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
 
     # Find the range of activation values to anchor the colorbar
-    vmax = np.abs(activations).max()
+    vmax = activations.abs().max().item()
     vmin = -1.0 * vmax
 
     # Use matplotlib to plot the activation heatmap
+    plt.cla()
     fig, ax = plt.subplots()
-    ax.imshow(activations, cmap="coolwarm_r", vmin=vmin, vmax=vmax)
+    ax.imshow(activations.detach().cpu().numpy(), cmap="coolwarm_r", vmin=vmin,
+              vmax=vmax)
 
     ax.set_xticks(np.arange(num_contexts))
     ax.set_yticks(np.arange(num_dendrites))
@@ -91,12 +95,12 @@ def plot_dendrite_activations(
     plt.tight_layout()
 
     # Annotate just the maximum or absolute maximum activation for each context
-    top_activation_dendrite_per_context = np.argmax(
-        np.abs(activations) if annotation_type == "absolute" else activations,
+    top_activation_dendrite_per_context = torch.argmax(
+        activations.abs() if selection_criterion == "absolute" else activations,
         axis=0
     )
     for j, i in enumerate(top_activation_dendrite_per_context):
-        val = np.round(activations[i, j], 2)
+        val = round(activations[i, j].item(), 2)
         ax.text(j, i, val, ha="center", va="center", color="w")
 
     figure = plt.gcf()
@@ -104,7 +108,7 @@ def plot_dendrite_activations(
 
 
 def plot_percent_active_dendrites(
-    dendrite_weights,
+    dendrite_segments,
     context_vectors,
     selection_criterion,
     category_names=None
@@ -118,7 +122,7 @@ def plot_percent_active_dendrites(
 
     $ wandb login your-login-key
 
-    :param dendrite_weights: 2D torch tensor with shape (num_dendrites, dim_context)
+    :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
                             dim_context) where each 2D tensor gives a batch of context
                             vectors from the same category
@@ -129,15 +133,12 @@ def plot_percent_active_dendrites(
                            and needs to align with category order in `context_vectors`;
                            unused if None
     """
-    assert all(
-        [dendrite_weights.size(1) == batch.size(1) for batch in context_vectors]
-    )
     assert selection_criterion in ("regular", "absolute")
     if category_names is not None:
         assert len(context_vectors) == len(category_names)
 
     num_categories = len(context_vectors)
-    num_dendrites = dendrite_weights.size(0)
+    _, num_dendrites, _ = dendrite_segments.weights.size()
 
     x_labels = ["category {}".format(j) for j in range(len(context_vectors))]
     if category_names is not None:
@@ -145,10 +146,11 @@ def plot_percent_active_dendrites(
     y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
 
     percentage_activations = percent_active_dendrites(
-        dendrite_weights=dendrite_weights,
+        dendrite_segments=dendrite_segments,
         context_vectors=context_vectors,
         selection_criterion=selection_criterion
     )
+    percentage_activations = percentage_activations[0, :, :].detach().cpu().numpy()
 
     plt.cla()
 
@@ -274,7 +276,7 @@ def plot_mean_selected_activations(
 
 
 def plot_dendrite_overlap_matrix(
-    dendrite_weights,
+    dendrite_segments,
     context_vectors,
     selection_criterion,
     category_names=None
@@ -292,7 +294,7 @@ def plot_dendrite_overlap_matrix(
 
     $ wandb login your-login-key
 
-    :param dendrite_weights: 2D torch tensor with shape (num_dendrites, dim_context)
+    :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
                             dim_context) where each 2D tensor gives a batch of context
                             vectors from the same category
@@ -303,9 +305,6 @@ def plot_dendrite_overlap_matrix(
                            and needs to align with category order in `context_vectors`;
                            unused if None
     """
-    assert all(
-        [dendrite_weights.size(1) == batch.size(1) for batch in context_vectors]
-    )
     assert selection_criterion in ("regular", "absolute")
     if category_names is not None:
         assert len(context_vectors) == len(category_names)
@@ -317,7 +316,7 @@ def plot_dendrite_overlap_matrix(
         labels = category_names
 
     overlap_matrix = dendrite_overlap_matrix(
-        dendrite_weights=dendrite_weights,
+        dendrite_segments=dendrite_segments,
         context_vectors=context_vectors,
         selection_criterion=selection_criterion
     )
@@ -347,7 +346,7 @@ def plot_dendrite_overlap_matrix(
     # Annotate all overlap values
     for i in range(num_categories):
         for j in range(i + 1):
-            val = np.round(overlap_matrix[i, j], 2)
+            val = np.round(overlap_matrix[i, j].item(), 2)
             ax.text(j, i, val, ha="center", va="center", color="w")
 
     figure = plt.gcf()
