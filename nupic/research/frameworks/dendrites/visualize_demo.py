@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 """
-This module provides an example of how to visualize dendritic weight activations
+This module provides an example of how to visualize dendrite activations
 
 NOTE: Wandb will create and store files in ./wandb/ which will not be removed after
       this script has finished executing, and the new files must be manually deleted
@@ -31,7 +31,7 @@ import wandb
 
 from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
-    plot_dendritic_activations,
+    plot_dendrite_activations,
 )
 from nupic.research.frameworks.dendrites.routing import generate_context_vectors
 
@@ -39,9 +39,9 @@ from nupic.research.frameworks.dendrites.routing import generate_context_vectors
 def run_wandb_demo():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Initialize dendritic network with 10 input units, 10 output units, and 10
-    # dendritic weights per output unit
-    dendritic_network = AbsoluteMaxGatingDendriticLayer(
+    # Initialize dendrite network with 10 input units, 10 output units, and 10
+    # dendrite weights per output unit
+    dendrite_network = AbsoluteMaxGatingDendriticLayer(
         module=torch.nn.Linear(in_features=10, out_features=10),
         num_segments=10,
         dim_context=100,
@@ -56,21 +56,20 @@ def run_wandb_demo():
         percent_on=0.2
     )
 
-    dendritic_network = dendritic_network.to(device)
+    dendrite_network = dendrite_network.to(device)
     context_vectors = context_vectors.to(device)
-
-    dendritic_weight_tensor = dendritic_network.segments.weights.data
 
     # The routing function's mask value for a particular output unit, across all masks
     mask_values = [0, 1, 1, 0, 0, 1, 0, 1, 1, 0]
 
-    # Call `plot_dendritic_activations` to create a heatmap of just the first output
-    # unit's dendritic activations
-    visual = plot_dendritic_activations(
-        dendritic_weights=dendritic_weight_tensor[0, :, :],
+    # Call `plot_dendrite_activations` to create a heatmap of just the first output
+    # unit's dendrite activations; note that in a non-routing scenario, `mask_values`
+    # can be None
+    visual = plot_dendrite_activations(
+        dendrite_segments=dendrite_network.segments,
         context_vectors=context_vectors,
-        mask_values=mask_values,
-        use_absolute_activations=True
+        selection_criterion="absolute",
+        mask_values=mask_values
     )
 
     # Plot heatmap of dendrite activations using wandb
