@@ -24,10 +24,10 @@ A simple implementation of dendrite weights. This combines the output from a (sp
 linear layer with the output from a set of dendritic segments.
 """
 
-import torch
 
 from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
+import nupic.research.frameworks.dendrites.functional as dendrite_functions
 
 
 class BiasingDendriticLayer(SparseWeights):
@@ -75,7 +75,7 @@ class BiasingDendriticLayer(SparseWeights):
 
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return y + dendrite_activations.max(dim=2).values  # max along each segment
+        return dendrite_functions.dendritic_bias_1d(y, dendrite_activations)
 
     def forward(self, x, context):
         """
@@ -90,7 +90,7 @@ class GatingDendriticLayer(BiasingDendriticLayer):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a gating mechanism."""
         # Multiple by the sigmoid of the max along each segment.
-        return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
+        return dendrite_functions.dendritic_gate_1d(y, dendrite_activations)
 
 
 class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
@@ -102,12 +102,7 @@ class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
     """
 
     def apply_dendrites(self, y, dendrite_activations):
-        inds = dendrite_activations.abs().max(dim=2).indices
-        inds = inds.unsqueeze(dim=2)
-        dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
-        dendrite_activations = dendrite_activations.squeeze()
-        dendrite_activations = torch.sigmoid(dendrite_activations)
-        return y * dendrite_activations
+        return dendrite_functions.dendritic_absolute_max_gating_1d(y, dendrite_activations)
 
 
 class GatingDendriticLayer2d(SparseWeights2d):
@@ -164,16 +159,7 @@ class GatingDendriticLayer2d(SparseWeights2d):
                                      with shape (b, c) where the axes represent the
                                      batch and channel dimensions, respectively)
         """
-        dendrite_activations = dendrite_activations.max(dim=2).values
-        dendrite_activations = torch.sigmoid(dendrite_activations)
-
-        # The following operation uses `torch.einsum` to multiply each channel by a
-        # single scalar value
-        #    * b => the batch dimension
-        #    * i => the channel dimension
-        #    * jk => the width and height dimensions
-
-        return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
+        return dendrite_functions.dendritic_gate_2d(y, dendrite_activations)
 
     def forward(self, x, context):
         """
@@ -206,16 +192,5 @@ class AbsoluteMaxGatingDendriticLayer2d(GatingDendriticLayer2d):
                                      with shape (b, c) where the axes represent the
                                      batch and channel dimensions, respectively)
         """
-        inds = dendrite_activations.abs().max(dim=2).indices
-        inds = inds.unsqueeze(dim=2)
-        dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
-        dendrite_activations = dendrite_activations.squeeze(dim=2)
-        dendrite_activations = torch.sigmoid(dendrite_activations)
+        return dendrite_functions.dendritic_absolute_max_gating_2d(y, dendrite_activations)
 
-        # The following operation uses `torch.einsum` to multiply each channel by a
-        # single scalar value
-        #    * b => the batch dimension
-        #    * i => the channel dimension
-        #    * jk => the width and height dimensions
-
-        return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
