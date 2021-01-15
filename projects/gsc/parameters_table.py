@@ -21,7 +21,9 @@
 Use this script to analyze GSC experiments
 """
 import argparse
+
 from tabulate import tabulate
+
 from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.models import LeSparseNet
 from nupic.torch.models import GSCSparseCNN

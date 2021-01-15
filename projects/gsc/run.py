@@ -24,12 +24,13 @@ import ray  # noqa: F401
 from ray import tune
 
 from experiments import CONFIGS
+from mixins import GSCNoiseTest
 from nupic.research.frameworks.vernon.parser_utils import (
-    DEFAULT_PARSERS, process_args,
-    insert_experiment_mixin
+    DEFAULT_PARSERS,
+    insert_experiment_mixin,
+    process_args,
 )
 from nupic.research.frameworks.vernon.run_with_raytune import run
-from mixins import GSCNoiseTest
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

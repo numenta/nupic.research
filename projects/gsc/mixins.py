@@ -50,8 +50,8 @@ class GSCNoiseTest(object):
             - noise_levels: list of noise levels to validate,
                             default ["05", "10", "15", "20", "25", "30", "45", "50"]
         """
-        self.noise_levels = config.get("noise_levels",  ["05", "10", "15", "20",
-                                                         "25", "30", "45", "50"])
+        self.noise_levels = config.get("noise_levels", ["05", "10", "15", "20",
+                                                        "25", "30", "45", "50"])
         super().setup_experiment(config)
 
     @classmethod
