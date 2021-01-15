@@ -290,7 +290,7 @@ class SupervisedExperiment(ExperimentBase):
         if dataset_class is None:
             raise ValueError("Must specify 'dataset_class' in config.")
 
-        dataset_args = config.get("dataset_args", {})
+        dataset_args = dict(config.get("dataset_args", {}))
         dataset_args.update(train=train)
         return dataset_class(**dataset_args)
 
