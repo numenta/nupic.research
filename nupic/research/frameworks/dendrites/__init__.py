@@ -32,6 +32,7 @@ from .plotting_utils import (
     plot_dendrite_overlap_matrix,
     plot_entropy_distribution,
     plot_mean_selected_activations,
+    plot_overlap_scores_distribution,
     plot_percent_active_dendrites,
 )
 from .utils import (

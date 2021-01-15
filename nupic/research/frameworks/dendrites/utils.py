@@ -121,8 +121,8 @@ def dendrite_overlap_matrix(dendrite_segments, context_vectors, selection_criter
 
 def dendrite_overlap(dendrite_segments, context_vectors, selection_criterion):
     """
-    Returns a 1D torch tensor with shape (num_units,) where entry i gives the overlap
-    score for the dendrites of unit i in relation to the specified context veectors and
+    Returns a 1D torch tensor with shape (num_units,) where entry k gives the overlap
+    score for the dendrites of unit k in relation to the specified context veectors and
     specified classes/categories. The overlap score for a single unit is computed via
     the following procedure:
         - for each class/category, compute the categorical distribution that gives the

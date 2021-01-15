@@ -25,6 +25,7 @@ import torch
 
 from .utils import (
     dendrite_duty_cycle,
+    dendrite_overlap,
     dendrite_overlap_matrix,
     entropy,
     mean_selected_activations,
@@ -344,13 +345,47 @@ def plot_dendrite_overlap_matrix(
     return figure
 
 
+def plot_overlap_scores_distribution(dendrite_segments, context_vectors,
+                                     selection_criterion):
+    """
+    Returns a histogram which gives the distribution of dendrite overlap scores for all
+    units over the examples specified by the context vectors. Each data point in the
+    histogram is the overlap score corresponding to the dendrite segments of a single
+    unit. See `dendrite_overlap` for more details.
+
+    :param dendrite_segments: `DendriteSegments` object
+    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
+                            dim_context) where each 2D tensor gives a batch of context
+                            vectors from the same category
+    :param selection_criterion: the criterion for selecting which dendrites become
+                                active; either "regular" (for `GatingDendriticLayer`)
+                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
+    """
+    overlap_scores = dendrite_overlap(dendrite_segments, context_vectors,
+                                      selection_criterion)
+
+    plt.cla()
+    plt.hist(x=overlap_scores.tolist(), bins=np.arange(0.0, 1.0, 0.05),
+             color="m", edgecolor="k")
+
+    plt.xticks(np.arange(0.0, 1.0, 0.1))
+    plt.xlabel("Overlap score")
+    plt.ylabel("Segment frequency")
+    plt.xlim(0.0, 1.0)
+    plt.grid(True)
+    plt.tight_layout()
+
+    figure = plt.gcf()
+    return figure
+
+
 def plot_entropy_distribution(dendrite_segments, context_vectors, selection_criterion):
     """
     Returns a histogram which gives the distribution of entropy values of dendrite
-    segments over the examples specified by the context vectors. Each single data point
-    in the histogram is the observed entropy of a set of dendrite segments
-    corresponding to a single unit. The entropy is the computed using the empirical
-    distribution of the fraction of instances for which each dendrite became active.
+    segments over the examples specified by the context vectors. Each data point in the
+    histogram is the observed entropy of a set of dendrite segments corresponding to a
+    single unit. The entropy is the computed using the empirical distribution of the
+    fraction of instances for which each dendrite became active.
 
     :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: a single 2D torch tensor of context vectors across multiple
@@ -361,10 +396,10 @@ def plot_entropy_distribution(dendrite_segments, context_vectors, selection_crit
                                 active; either "regular" (for `GatingDendriticLayer`)
                                 or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
     """
+    num_units, _, _ = dendrite_segments.weights.size()
     duty_cycle = dendrite_duty_cycle(dendrite_segments, context_vectors,
                                      selection_criterion)
 
-    num_units = duty_cycle.shape[0]
     entropies = [entropy(duty_cycle[unit, :]) for unit in range(num_units)]
     max_entropy = entropies[0][1]
     entropies = [ent[0] for ent in entropies]
@@ -373,7 +408,8 @@ def plot_entropy_distribution(dendrite_segments, context_vectors, selection_crit
     plt.hist(x=entropies, bins=np.arange(0.0, max_entropy, 0.1), color="g",
              edgecolor="k")
 
-    plt.xlabel("entropy  (max entropy: {})".format(round(max_entropy, 2)))
+    plt.xticks(np.arange(0.0, 1.0, 0.2))
+    plt.xlabel("Entropy  (max entropy: {})".format(round(max_entropy, 2)))
     plt.ylabel("Segment frequency")
     plt.xlim(0.0, max_entropy)
     plt.grid(True)
