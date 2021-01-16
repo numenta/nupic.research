@@ -32,22 +32,24 @@ def dendritic_bias_1d(y, dendrite_activations):
     """
     Returns the sum of the feedforward output and the max of the dendrite
     activations along each segment.
-    :param y: torch Tensor with shape (b, n) where the axes represent the batch and vector
-              dimensions, respectively.
-    :param dendrite_activations: torch Tensor with shape (b, n, d) where the axes represent
-                                 batch, vector, and dendrite dimensions, respectively.
+    :param y: torch Tensor with shape (b, n) where the axes represent the batch
+              and vector dimensions, respectively.
+    :param dendrite_activations: torch Tensor with shape (b, n, d) where the
+                                 axes represent batch, vector, and dendrite
+                                 dimensions, respectively.
     """
     return y + dendrite_activations.max(dim=2).values  # max along each segment
 
 
 def dendritic_gate_1d(y, dendrite_activations):
     """
-    Returns the product of the feedforward output and sigmoid of the the max of the dendrite
-    activations along each segment.
-    :param y: torch Tensor with shape (b, n) where the axes represent the batch and vector
-              dimensions, respectively.
-    :param dendrite_activations: torch Tensor with shape (b, n, d) where the axes represent
-                                 batch, vector, and dendrite dimensions, respectively.
+    Returns the product of the feedforward output and sigmoid of the the max
+    of the dendrite activations along each segment.
+    :param y: torch Tensor with shape (b, n) where the axes represent the
+              batch and vector dimensions, respectively.
+    :param dendrite_activations: torch Tensor with shape (b, n, d) where the
+                                 axes represent batch, vector, and dendrite
+                                 dimensions, respectively.
     """
     # Multiple by the sigmoid of the max along each segment.
     return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
@@ -55,12 +57,13 @@ def dendritic_gate_1d(y, dendrite_activations):
 
 def dendritic_absolute_max_gating_1d(y, dendrite_activations):
     """
-    Returns the product of the feedforward output and the sigmoid of the absolute max of the dendrite
-    activations along each segment.
-    :param y: torch Tensor with shape (b, n) where the axes represent the batch and vector
-              dimensions, respectively.
-    :param dendrite_activations: torch Tensor with shape (b, n, d) where the axes represent
-                                 batch, vector, and dendrite dimensions, respectively.
+    Returns the product of the feedforward output and the sigmoid of the
+    absolute max of the dendrite activations along each segment.
+    :param y: torch Tensor with shape (b, n) where the axes represent
+              the batch and vector dimensions, respectively.
+    :param dendrite_activations: torch Tensor with shape (b, n, d) where
+                                 the axes represent batch, vector, and
+                                 dendrite dimensions, respectively.
     """
     inds = dendrite_activations.abs().max(dim=2).indices
     inds = inds.unsqueeze(dim=2)
@@ -127,4 +130,3 @@ def dendritic_absolute_max_gating_2d(y, dendrite_activations):
     #    * jk => the width and height dimensions
 
     return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
-

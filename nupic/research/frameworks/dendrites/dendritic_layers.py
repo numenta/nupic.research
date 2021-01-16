@@ -24,10 +24,9 @@ A simple implementation of dendrite weights. This combines the output from a (sp
 linear layer with the output from a set of dendritic segments.
 """
 
-
+import nupic.research.frameworks.dendrites.functional as dendrite_fxns
 from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
-import nupic.research.frameworks.dendrites.functional as dendrite_functions
 
 
 class BiasingDendriticLayer(SparseWeights):
@@ -75,7 +74,7 @@ class BiasingDendriticLayer(SparseWeights):
 
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return dendrite_functions.dendritic_bias_1d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_bias_1d(y, dendrite_activations)
 
     def forward(self, x, context):
         """
@@ -90,7 +89,7 @@ class GatingDendriticLayer(BiasingDendriticLayer):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a gating mechanism."""
         # Multiple by the sigmoid of the max along each segment.
-        return dendrite_functions.dendritic_gate_1d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_gate_1d(y, dendrite_activations)
 
 
 class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
@@ -102,7 +101,7 @@ class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
     """
 
     def apply_dendrites(self, y, dendrite_activations):
-        return dendrite_functions.dendritic_absolute_max_gating_1d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_absolute_max_gating_1d(y, dendrite_activations)
 
 
 class GatingDendriticLayer2d(SparseWeights2d):
@@ -159,7 +158,7 @@ class GatingDendriticLayer2d(SparseWeights2d):
                                      with shape (b, c) where the axes represent the
                                      batch and channel dimensions, respectively)
         """
-        return dendrite_functions.dendritic_gate_2d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_gate_2d(y, dendrite_activations)
 
     def forward(self, x, context):
         """
@@ -192,5 +191,4 @@ class AbsoluteMaxGatingDendriticLayer2d(GatingDendriticLayer2d):
                                      with shape (b, c) where the axes represent the
                                      batch and channel dimensions, respectively)
         """
-        return dendrite_functions.dendritic_absolute_max_gating_2d(y, dendrite_activations)
-
+        return dendrite_fxns.dendritic_absolute_max_gating_2d(y, dendrite_activations)
