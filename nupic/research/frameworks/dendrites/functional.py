@@ -77,10 +77,10 @@ def dendritic_gate_2d(y, dendrite_activations):
     """
     Returns the output of the max gating convolutional dendritic layer by
     multiplying all values in each output channel by the selected dendrite
-    activations. Dendrite activations are selected based on the absolute maximum
+    activations. Dendrite activations are selected based on the maximum
     activations (keeping the sign) across all segments for each channel. Each
     channel has its own set of dendritic weights, and the selected activation is
-    based on the the absolute max value.
+    based on the the max value.
 
     :param y: output of the convolution operation (a torch tensor with shape
               (b, c, h, w) where the axes represent the batch, channel, height, and
