@@ -31,3 +31,9 @@ Following are additional notes on attempted or otherwise incomplete work, which 
 - An alternative task which would be less realistic, but which would at least allow the question of translation invariance to be explored, would be to shift the features after extraction; unfortunately:
 	- This is made difficult due to no clear way of handling empty space from a feature point of view (i.e. it’s not trivial to just extend the feature space to accommodate translations in arbitrary directions)
 	- Assuming no empty space is added, and the features instead wrap around, the grid-cell activations would need to wrap around at the same point as the input features, which would imply that the grid-cells have some privileged knowledge about the input ahead of time, and this would limit the generalizability of the classifier
+
+### Catastrophic forgetting
+- GridCellNet should perform well regardless of whether particular classes are blocked or interleaved; demonstrating robustness to learning in this setting would be an interesting future direction.
+
+### Few-shot learning to predict features in a sequence
+- While this work focused on classification, another interesting direction in the future would be to compare GridCellNet's rapid ability to predict the next feature in a sequence to e.g. an RNN
