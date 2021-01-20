@@ -23,7 +23,7 @@ from copy import deepcopy
 
 from torchvision import transforms
 
-from .oml import metacl_oml
+from .metacl import metacl_oml
 
 # """
 # These experiments serves to further narrow the gap between our implementation
@@ -84,13 +84,13 @@ meta_test_test_kwargs = dict(
 # Results:
 #
 # |--------------------------------------------------------------|
-# |   Num Classes | Meta-test test   | Meta-test train   |  LR   |
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
 # |--------------:|:-----------------|:------------------|------:|
-# |            10 | 0.87 ± 0.07      | 0.95 ± 0.03       | 0.001 |
-# |            50 | 0.87 ± 0.02      | 0.96 ± 0.02       | 0.001 |
-# |           100 | 0.81 ± 0.02      | 0.94 ± 0.01       | 0.001 |
-# |           200 | 0.73 ± 0.02      | 0.91 ± 0.02       | 0.001 |
-# |           600 | 0.59 ± 0.01      | 0.85 ± 0.01       | 0.001 |
+# |            10 | 0.93 ± 0.04      | 0.97 ± 0.02       | 0.001 |
+# |            50 | 0.87 ± 0.02      | 0.96 ± 0.01       | 0.001 |
+# |           100 | 0.80 ± 0.03      | 0.94 ± 0.02       | 0.001 |
+# |           200 | 0.72 ± 0.03      | 0.90 ± 0.02       | 0.001 |
+# |           600 | 0.59 ± 0.01      | 0.84 ± 0.01       | 0.001 |
 # |--------------------------------------------------------------|
 #
 metacl_oml_replicate = deepcopy(metacl_oml)
