@@ -19,5 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .anml_networks import ANMLNetwork
-from .dendritic_networks import DendriticNetwork, ANMLDendriticNetwork
+from .anml_networks import ANMLNetwork, ANMLsOMLNetwork
+from .dendritic_networks import (
+    ANMLDendriticNetwork,
+    CloserToANMLDendriticNetwork,
+    DendriticNetwork,
+)
+from .oml_networks import KWinnerOMLNetwork

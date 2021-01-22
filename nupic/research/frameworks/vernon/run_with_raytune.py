@@ -68,9 +68,9 @@ def run_single_instance(config):
     # Get number of GPUs
     config.setdefault("num_gpus", torch.cuda.device_count())
     config.setdefault("workers", 4)
-    config["log_level"] = "INFO"
-    config["reuse_actors"] = False
-    config["dist_port"] = get_free_port()
+    config.setdefault("log_level", "INFO")
+    config.setdefault("reuse_actors", False)
+    config.setdefault("dist_port", get_free_port())
 
     # Get ray.tune kwargs for the given config.
     kwargs = get_tune_kwargs(config)

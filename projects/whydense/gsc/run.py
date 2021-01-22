@@ -211,7 +211,7 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
             num_samples=config.get("repetitions", 1),
             local_dir=config.get("path", None),
             upload_dir=config.get("upload_dir", None),
-            sync_function=config.get("sync_function", None),
+            sync_to_driver=config.get("sync_function", None),
             checkpoint_freq=config.get("checkpoint_freq", 0),
             checkpoint_at_end=config.get("checkpoint_at_end", False),
             export_formats=config.get("", None),

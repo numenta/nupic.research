@@ -85,6 +85,15 @@ class DendriteSegments(torch.nn.Module, HasRezeroWeights):
 
         self.rezero_weights()
 
+    def extra_repr(self):
+        return (
+            f"num_units={self.num_units}, "
+            f"num_segments={self.num_segments}, "
+            f"dim_context={self.dim_context}, "
+            f"sparsity={self.sparsity}, "
+            f"bias={self.biases is not None}"
+        )
+
     def reset_parameters(self):
         """Initialize the linear transformation for each unit."""
         for unit in range(self.num_units):
