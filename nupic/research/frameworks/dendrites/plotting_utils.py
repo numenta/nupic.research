@@ -54,55 +54,56 @@ def plot_dendrite_activations(
     :param unit_to_plot: index of the unit for which to plot dendrite activations;
                          plots activations of unit 0 by default
     """
-    assert selection_criterion in ("regular", "absolute")
+    with torch.no_grad():
 
-    num_contexts = context_vectors.size(0)
-    num_units, num_dendrites, _ = dendrite_segments.weights.size()
+        assert selection_criterion in ("regular", "absolute")
 
-    assert 0 <= unit_to_plot < num_units
+        num_contexts = context_vectors.size(0)
+        num_units, num_dendrites, _ = dendrite_segments.weights.size()
 
-    # Compute activation values
-    activations = dendrite_segments(context_vectors)
-    activations = activations[:, unit_to_plot, :].T
+        assert 0 <= unit_to_plot < num_units
 
-    x_labels = ["context {}".format(j) for j in range(num_contexts)]
-    if mask_values is not None:
-        assert len(mask_values) == num_contexts
-        x_labels = [
-            "{} [{}]".format(label, mask_values[j]) for j, label in enumerate(x_labels)
-        ]
-    y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
+        # Compute activation values
+        activations = dendrite_segments(context_vectors)
+        activations = activations[:, unit_to_plot, :].T
 
-    # Find the range of activation values to anchor the colorbar
-    vmax = activations.abs().max().item()
-    vmin = -1.0 * vmax
+        x_labels = ["context {}".format(j) for j in range(num_contexts)]
+        if mask_values is not None:
+            assert len(mask_values) == num_contexts
+            x_labels = ["{} [{}]".format(label, mask_values[j])
+                        for j, label in enumerate(x_labels)]
+        y_labels = ["dendrite {}".format(j) for j in range(num_dendrites)]
 
-    # Use matplotlib to plot the activation heatmap
-    plt.cla()
-    fig, ax = plt.subplots()
-    ax.imshow(activations.detach().cpu().numpy(), cmap="coolwarm_r", vmin=vmin,
-              vmax=vmax)
+        # Find the range of activation values to anchor the colorbar
+        vmax = activations.abs().max().item()
+        vmin = -1.0 * vmax
 
-    ax.set_xticks(np.arange(num_contexts))
-    ax.set_yticks(np.arange(num_dendrites))
+        # Use matplotlib to plot the activation heatmap
+        plt.cla()
+        fig, ax = plt.subplots()
+        ax.imshow(activations.detach().cpu().numpy(), cmap="coolwarm_r", vmin=vmin,
+                  vmax=vmax)
 
-    ax.set_xticklabels(x_labels)
-    ax.set_yticklabels(y_labels)
+        ax.set_xticks(np.arange(num_contexts))
+        ax.set_yticks(np.arange(num_dendrites))
 
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-    plt.tight_layout()
+        ax.set_xticklabels(x_labels)
+        ax.set_yticklabels(y_labels)
 
-    # Annotate just the maximum or absolute maximum activation for each context
-    top_activation_dendrite_per_context = torch.argmax(
-        activations.abs() if selection_criterion == "absolute" else activations,
-        axis=0
-    )
-    for j, i in enumerate(top_activation_dendrite_per_context):
-        val = round(activations[i, j].item(), 2)
-        ax.text(j, i, val, ha="center", va="center", color="w")
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        plt.tight_layout()
 
-    figure = plt.gcf()
-    return figure
+        # Annotate just the maximum or absolute maximum activation for each context
+        top_activation_dendrite_per_context = torch.argmax(
+            activations.abs() if selection_criterion == "absolute" else activations,
+            axis=0
+        )
+        for j, i in enumerate(top_activation_dendrite_per_context):
+            val = round(activations[i, j].item(), 2)
+            ax.text(j, i, val, ha="center", va="center", color="w")
+
+        figure = plt.gcf()
+        return figure
 
 
 def plot_percent_active_dendrites(
