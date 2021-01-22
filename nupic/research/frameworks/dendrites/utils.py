@@ -193,61 +193,6 @@ def dendrite_duty_cycle(dendrite_segments, context_vectors, selection_criterion)
     return duty_cycle
 
 
-def online_dendrite_duty_cycle(dendrite_segments, context_vectors, selection_criterion,
-                               online=False, batch_size=32, period=1000):
-    """
-    Returns a 2D torch tensor with shape (number of units, number of dendrites) where
-    entry i, j gives the duty cycle of dendrite j in the set of dendrite segments for
-    unit i, computed using the online formula for duty cycles. See Equation 8 in the
-    spatial pooling paper for more details:
-
-    https://www.biorxiv.org/content/10.1101/085035v2
-
-    :param dendrite_segments: `DendriteSegments` object
-    :param context_vectors: a single 2D torch tensor of context vectors across multiple
-                            classes, or iterable of 2D torch tensors with shape
-                            (num_examples, dim_context) where each 2D tensor gives a
-                            batch of context vectors from the same category
-    :param selection_criterion: the criterion for selecting which dendrites become
-                                active; either "regular" (for `GatingDendriticLayer`)
-                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
-    :param batch_size: the batch size used to calculate duty cycles; only relevant if
-                       `online` is `True`
-    :param period: the period used to calculate duty cycles; only relevant if `online`
-                   is `True`
-    """
-    if not isinstance(context_vectors, torch.Tensor):
-        context_vectors = torch.cat(context_vectors)
-    num_examples = context_vectors.size(0)
-
-    batch_start = 0
-    batch_end = min(num_examples, batch_size)
-
-    duty_cycle = torch.zeros((dendrite_segments.num_units,
-                              dendrite_segments.num_segments))
-
-    while batch_start < num_examples:
-        batch = context_vectors[batch_start:batch_end, :]
-        activations = dendrite_segments(batch)
-        if selection_criterion == "absolute":
-            activations = activations.abs()
-
-        num_activations = activations.max(axis=2, keepdims=True).values == activations
-        num_activations = num_activations.sum(axis=0, dtype=torch.float)
-
-        # Update the duty cycle using the formula:
-        # new_duty_cycle = ((period - batch_size) / period) * old_duty_cycle
-        #                  + (1 / period) * batch_active_count
-        duty_cycle = duty_cycle * (period - (batch_end - batch_start))
-        duty_cycle = duty_cycle + num_activations
-        duty_cycle = duty_cycle / period
-
-        batch_start = batch_start + batch_size
-        batch_end = min(num_examples, batch_start + batch_size)
-
-    return duty_cycle
-
-
 def entropy(x):
     """
     Returns a tuple of scalars (entropy value, maximum possible entropy value) which

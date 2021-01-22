@@ -41,6 +41,5 @@ from .utils import (
     dendrite_overlap_matrix,
     entropy,
     mean_selected_activations,
-    online_dendrite_duty_cycle,
     percent_active_dendrites,
 )
