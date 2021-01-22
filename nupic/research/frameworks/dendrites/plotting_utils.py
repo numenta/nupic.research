@@ -42,11 +42,7 @@ def plot_dendrite_activations(
 ):
     """
     Returns a heatmap of dendrite activations (given dendrite weights for a single
-    neuron and context vectors) plotted using matplotlib. Note that the user must be
-    logged in to wandb on both browser and terminal to view the resulting plots, and
-    this can be done via the following command:
-
-    $ wandb login your-login-key
+    neuron and context vectors) plotted using matplotlib.
 
     :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: 2D torch tensor with shape (num_contexts, dim_context)
@@ -118,11 +114,7 @@ def plot_percent_active_dendrites(
     """
     Returns a heatmap with shape (number of dendrites, number of categories) where cell
     i, j in the heatmap gives the percentage of inputs in category j for which dendrite
-    i is active (for a single unit). Note that the user must be logged in to wandb on
-    both browser and terminal to view the resulting plots, and this can be done via the
-    following command:
-
-    $ wandb login your-login-key
+    i is active (for a single unit).
 
     :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
@@ -196,11 +188,7 @@ def plot_mean_selected_activations(
     Returns a heatmap with shape (number of dendrites, number of categories) where cell
     i, j in the heatmap gives the mean activation of the dendrite i over all instances
     of category j for which dendrite i became active. As there are multiple dendrite
-    segments, the heatmap is created for the specified unit. Note that the user must be
-    logged in to wandb on both browser and terminal to view the resulting plots, and
-    this can be done via the following command:
-
-    $ wandb login your-login-key
+    segments, the heatmap is created for the specified unit.
 
     :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
@@ -277,11 +265,7 @@ def plot_dendrite_overlap_matrix(
     and j; if the exact same dendrites are active for the same fraction of instances
     across both categories, the dendrite overlap is 1; if any dendrite that is active
     for category i and inactive for category j (and vice-versa), the dendrite overlap
-    is 0. The resulting heatmap is symmetric. Note that the user must be logged in to
-    wandb on both browser and terminal to view the resulting plots, and this can be
-    done via the following command:
-
-    $ wandb login your-login-key
+    is 0. The resulting heatmap is symmetric.
 
     :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
