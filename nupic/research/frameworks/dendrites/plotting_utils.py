@@ -109,7 +109,8 @@ def plot_percent_active_dendrites(
     dendrite_segments,
     context_vectors,
     selection_criterion,
-    category_names=None
+    category_names=None,
+    unit_to_plot=0
 ):
     """
     Returns a heatmap with shape (number of dendrites, number of categories) where cell
@@ -126,6 +127,8 @@ def plot_percent_active_dendrites(
     :param category_names: list of category names to label each column of the heatmap,
                            and needs to align with category order in `context_vectors`;
                            unused if None
+    :param unit_to_plot: index of the unit for which to plot percent active dendrites;
+                         plots unit 0 by default
     """
     assert selection_criterion in ("regular", "absolute")
     if category_names is not None:
@@ -144,7 +147,8 @@ def plot_percent_active_dendrites(
         context_vectors=context_vectors,
         selection_criterion=selection_criterion
     )
-    percentage_activations = percentage_activations[0, :, :].detach().cpu().numpy()
+    percentage_activations = percentage_activations[unit_to_plot, :, :]
+    percentage_activations = percentage_activations.detach().cpu().numpy()
 
     # Find the maximum percentage activation value to anchor the colorbar, and use
     # matplotlib to plot the heatmap
@@ -200,8 +204,8 @@ def plot_mean_selected_activations(
     :param category_names: list of category names to label each column of the heatmap,
                            and needs to align with category order in `context_vectors`;
                            unused if None
-    :param unit_to_plot: index of the unit for which to plot dendrite activations;
-                         plots activations of unit 0 by default
+    :param unit_to_plot: index of the unit for which to plot mean selected activations;
+                         plots unit 0 by default
     """
     assert selection_criterion in ("regular", "absolute")
     if category_names is not None:
@@ -277,8 +281,8 @@ def plot_dendrite_overlap_matrix(
     :param category_names: list of category names to label each column of the heatmap,
                            and needs to align with category order in `context_vectors`;
                            unused if None
-    :param unit_to_plot: index of the unit for which to plot dendrite activations;
-                         plots activations of unit 0 by default
+    :param unit_to_plot: index of the unit for which to plot the overlap matrix; plots
+                         unit 0 by default
     """
     assert selection_criterion in ("regular", "absolute")
     if category_names is not None:
