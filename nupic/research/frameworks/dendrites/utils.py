@@ -41,8 +41,10 @@ def percent_active_dendrites(dendrite_segments, context_vectors, selection_crite
     with torch.no_grad():
 
         num_units, num_segments, _ = dendrite_segments.weights.size()
+        device = dendrite_segments.weights.device
 
         percentage_activations = torch.zeros((num_units, num_segments, 0))
+        percentage_activations = percentage_activations.to(device)
         for j in range(len(context_vectors)):
             num_examples = context_vectors[j].size(0)
 
@@ -77,8 +79,10 @@ def mean_selected_activations(dendrite_segments, context_vectors, selection_crit
     with torch.no_grad():
 
         num_units, num_segments, _ = dendrite_segments.weights.size()
+        device = dendrite_segments.weights.device
 
         mean_selected_activations = torch.zeros((num_units, num_segments, 0))
+        mean_selected_activations = mean_selected_activations.to(device)
         for j in range(len(context_vectors)):
             activations = dendrite_segments(context_vectors[j])
 
@@ -154,6 +158,7 @@ def dendrite_overlap(dendrite_segments, context_vectors, selection_criterion):
                                                  selection_criterion)
 
         num_units, num_categories, _ = overlap_matrix.size()
+        device = dendrite_segments.weights.device
 
         # The overlap score is simply the average of the off-diagonal entries of the
         # overlap matrix; in the ideal case with no dendrite overlap, the overlap
@@ -164,6 +169,7 @@ def dendrite_overlap(dendrite_segments, context_vectors, selection_criterion):
 
         # Mask for a lower triangular matrix
         ltril_mask = torch.ones((num_categories, num_categories))
+        ltril_mask = ltril_mask.to(device)
         ltril_mask = ltril_mask.tril(diagonal=-1)
         ltril_mask = ltril_mask.unsqueeze(0).repeat((num_units, 1, 1))
 
