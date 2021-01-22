@@ -26,23 +26,23 @@ import torch
 
 def percent_active_dendrites(dendrite_segments, context_vectors, selection_criterion):
     """
-    Returns a 3D torch tensor with shape (num_units, num_dendrites, num_categories)
-    where cell k, i, j gives the fraction of inputs in category j for which dendrite i
+    Returns a 3D torch tensor with shape (num_units, num_segments, num_categories)
+    where cell k, i, j gives the fraction of inputs in category j for which segment i
     of unit k is active.
 
     :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
                             dim_context) where each 2D tensor gives a batch of context
                             vectors from the same category
-    :param selection_criterion: the criterion for selecting which dendrites become
+    :param selection_criterion: the criterion for selecting which segments become
                                 active; either "regular" (for `GatingDendriticLayer`)
                                 or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
     """
     with torch.no_grad():
 
-        num_units, num_dendrites, _ = dendrite_segments.weights.size()
+        num_units, num_segments, _ = dendrite_segments.weights.size()
 
-        percentage_activations = torch.zeros((num_units, num_dendrites, 0))
+        percentage_activations = torch.zeros((num_units, num_segments, 0))
         for j in range(len(context_vectors)):
             num_examples = context_vectors[j].size(0)
 
@@ -62,23 +62,23 @@ def percent_active_dendrites(dendrite_segments, context_vectors, selection_crite
 
 def mean_selected_activations(dendrite_segments, context_vectors, selection_criterion):
     """
-    Returns a 3D torch tensor with shape (num_units, num_dendrites, num_categories)
-    where cell k, i, j gives the mean activation of the ith dendrite of unit k over all
-    instances of category j for which dendrite i became active.
+    Returns a 3D torch tensor with shape (num_units, num_segments, num_categories)
+    where cell k, i, j gives the mean activation of the ith segment of unit k over all
+    instances of category j for which segment i became active.
 
     :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
                             dim_context) where each 2D tensor gives a batch of context
                             vectors from the same category
-    :param selection_criterion: the criterion for selecting which dendrites become
+    :param selection_criterion: the criterion for selecting which segments become
                                 active; either "regular" (for `GatingDendriticLayer`)
                                 or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
     """
     with torch.no_grad():
 
-        num_units, num_dendrites, _ = dendrite_segments.weights.size()
+        num_units, num_segments, _ = dendrite_segments.weights.size()
 
-        mean_selected_activations = torch.zeros((num_units, num_dendrites, 0))
+        mean_selected_activations = torch.zeros((num_units, num_segments, 0))
         for j in range(len(context_vectors)):
             activations = dendrite_segments(context_vectors[j])
 
@@ -87,11 +87,11 @@ def mean_selected_activations(dendrite_segments, context_vectors, selection_crit
                 selected = activations.abs()
             selected = (selected.max(axis=2, keepdims=True).values == selected)
 
-            num_selected_per_dendrite = selected.sum(axis=0)
-            num_selected_per_dendrite[num_selected_per_dendrite == 0.0] = 1.0
+            num_selected_per_segment = selected.sum(axis=0)
+            num_selected_per_segment[num_selected_per_segment == 0.0] = 1.0
 
             msa_j = activations * selected
-            msa_j = msa_j.sum(axis=0, dtype=torch.float) / num_selected_per_dendrite
+            msa_j = msa_j.sum(axis=0, dtype=torch.float) / num_selected_per_segment
 
             msa_j = msa_j.unsqueeze(2)
             mean_selected_activations = torch.cat((mean_selected_activations, msa_j),
@@ -105,7 +105,7 @@ def dendrite_overlap_matrix(dendrite_segments, context_vectors, selection_criter
     num_categories) which represents num_units overlap matrices (one per unit) """
     with torch.no_grad():
 
-        _, num_dendrites, _ = dendrite_segments.weights.size()
+        _, num_segments, _ = dendrite_segments.weights.size()
 
         percentage_activations = percent_active_dendrites(
             dendrite_segments=dendrite_segments,
@@ -113,12 +113,12 @@ def dendrite_overlap_matrix(dendrite_segments, context_vectors, selection_criter
             selection_criterion=selection_criterion
         )
 
-        # `percentage_activations` is an array with shape (num_units, num_dendrites,
-        # num_categories); for each unit's dendrites, compute the dot product between
-        # all pairs of columns; the resulting tensor will have shape (num_units,
-        # num_categories, num_categories)
+        # `percentage_activations` is an array with shape (num_units, num_segments,
+        # num_categories); for each unit's dendrite segments, compute the dot product
+        # between all pairs of columns; the resulting tensor will have shape
+        # (num_units, num_categories, num_categories)
         l2_norm = percentage_activations.norm(p=2, dim=1)
-        l2_norm = l2_norm.unsqueeze(1).repeat((1, num_dendrites, 1))
+        l2_norm = l2_norm.unsqueeze(1).repeat((1, num_segments, 1))
         percentage_activations /= l2_norm
 
         overlap_matrix = torch.bmm(percentage_activations.transpose(1, 2),
@@ -129,11 +129,11 @@ def dendrite_overlap_matrix(dendrite_segments, context_vectors, selection_criter
 def dendrite_overlap(dendrite_segments, context_vectors, selection_criterion):
     """
     Returns a 1D torch tensor with shape (num_units,) where entry k gives the overlap
-    score for the dendrites of unit k in relation to the specified context veectors and
+    score for the segments of unit k in relation to the specified context veectors and
     specified classes/categories. The overlap score for a single unit is computed via
     the following procedure:
         - for each class/category, compute the categorical distribution that gives the
-          fraction of instances for which each dendrite becomes active (this function
+          fraction of instances for which each segment becomes active (this function
           calls `percent_active_dendrites`),
         - normalize each probability vector to have L2 norm equal to 1,
         - compute all pairwise similarity scores (i.e., dot products) of dendrite
@@ -144,7 +144,7 @@ def dendrite_overlap(dendrite_segments, context_vectors, selection_criterion):
     :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
                             dim_context) where each 2D tensor gives a batch of context
                             vectors from the same category
-    :param selection_criterion: the criterion for selecting which dendrites become
+    :param selection_criterion: the criterion for selecting which segments become
                                 active; either "regular" (for `GatingDendriticLayer`)
                                 or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
     """
@@ -174,16 +174,16 @@ def dendrite_overlap(dendrite_segments, context_vectors, selection_criterion):
 
 def dendrite_duty_cycle(dendrite_segments, context_vectors, selection_criterion):
     """
-    Returns a 2D torch tensor with shape (number of units, number of dendrites) where
-    entry i, j gives the duty cycle of dendrite j in the set of dendrite segments for
-    unit i. The duty cycle for each dendrite is computed offline.
+    Returns a 2D torch tensor with shape (number of units, number of segments) where
+    entry i, j gives the duty cycle of segment j in the set of dendrite segments for
+    unit i. The duty cycle for each segment is computed offline.
 
     :param dendrite_segments: `DendriteSegments` object
     :param context_vectors: a single 2D torch tensor of context vectors across multiple
                             classes, or iterable of 2D torch tensors with shape
                             (num_examples, dim_context) where each 2D tensor gives a
                             batch of context vectors from the same category
-    :param selection_criterion: the criterion for selecting which dendrites become
+    :param selection_criterion: the criterion for selecting which segments become
                                 active; either "regular" (for `GatingDendriticLayer`)
                                 or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
     """
@@ -207,19 +207,19 @@ def dendrite_duty_cycle(dendrite_segments, context_vectors, selection_criterion)
 def entropy(x):
     """
     Returns a tuple of scalars (entropy value, maximum possible entropy value) which
-    gives the entropy of dendrite segments and the maximmum entropy that can be
+    gives the entropy of dendrite segments and the maximum entropy that can be
     achieved, respectively.
 
     :param x: a 1D torch tensor representing a probability distribution where entry i
-              gives the number of times dendrite i became active
+              gives the number of times segment i became active
     """
-    num_dendrites = x.shape[0]
+    num_segments = x.shape[0]
     if not x.sum().item() == 1.0:
         x = x / x.sum()
 
     _entropy = -(x * x.log())
     _entropy[x == 0.0] = 0.0
     _entropy = _entropy.sum().item()
-    _max_entropy = math.log(num_dendrites)
+    _max_entropy = math.log(num_segments)
 
     return _entropy, _max_entropy
