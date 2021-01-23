@@ -21,7 +21,25 @@
 
 from .dendrite_segments import DendriteSegments
 from .dendritic_layers import (
-    AbsoluteMaxGatingDendriticLayer, AbsoluteMaxGatingDendriticLayer2d,
-    BiasingDendriticLayer, GatingDendriticLayer, GatingDendriticLayer2d
+    AbsoluteMaxGatingDendriticLayer,
+    AbsoluteMaxGatingDendriticLayer2d,
+    BiasingDendriticLayer,
+    GatingDendriticLayer,
+    GatingDendriticLayer2d,
 )
-from .utils import plot_dendrite_activations
+from .plotting_utils import (
+    plot_dendrite_activations,
+    plot_dendrite_overlap_matrix,
+    plot_entropy_distribution,
+    plot_mean_selected_activations,
+    plot_overlap_scores_distribution,
+    plot_percent_active_dendrites,
+)
+from .utils import (
+    dendrite_duty_cycle,
+    dendrite_overlap,
+    dendrite_overlap_matrix,
+    entropy,
+    mean_selected_activations,
+    percent_active_dendrites,
+)
