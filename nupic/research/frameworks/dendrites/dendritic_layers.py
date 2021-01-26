@@ -23,13 +23,14 @@
 A simple implementation of dendrite weights. This combines the output from a (sparse)
 linear layer with the output from a set of dendritic segments.
 """
+import abc
 
 import nupic.research.frameworks.dendrites.functional as dendrite_fxns
 from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
 
-class DendriticLayerBase(SparseWeights):
+class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
     """
     Base class for all Dendritic Layer modules.
 
@@ -40,8 +41,8 @@ class DendriticLayerBase(SparseWeights):
     """
 
     def __init__(
-            self, module, num_segments, dim_context,
-            module_sparsity, dendrite_sparsity, dendrite_bias=None
+        self, module, num_segments, dim_context,
+        module_sparsity, dendrite_sparsity, dendrite_bias=None
     ):
         """
         TODO: specify the type - what is module_sparsity type?
@@ -72,6 +73,7 @@ class DendriticLayerBase(SparseWeights):
         if self.segments is not None:  # only none at beginning of init
             self.segments.rezero_weights()
 
+    @abc.abstractmethod
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites using function specified by subclass"""
         raise NotImplementedError
@@ -108,7 +110,7 @@ class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
         return dendrite_fxns.dendritic_absolute_max_gating_1d(y, dendrite_activations)
 
 
-class DendriticLayer2dBase(SparseWeights2d):
+class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
     """
     Base class for all 2d Dendritic Layer modules.
 
@@ -118,8 +120,8 @@ class DendriticLayer2dBase(SparseWeights2d):
     """
 
     def __init__(
-            self, module, num_segments, dim_context,
-            module_sparsity, dendrite_sparsity, dendrite_bias=None
+        self, module, num_segments, dim_context,
+        module_sparsity, dendrite_sparsity, dendrite_bias=None
     ):
         """
         :param module: conv2d module which performs the forward pass
@@ -148,6 +150,7 @@ class DendriticLayer2dBase(SparseWeights2d):
         if self.segments is not None:  # only none at beginning of init
             self.segments.rezero_weights()
 
+    @abc.abstractmethod
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites using function specified by subclass"""
         raise NotImplementedError
