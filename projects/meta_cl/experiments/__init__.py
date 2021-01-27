@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .metacl import CONFIGS as METACL
+from .metacl_sigopt import CONFIGS as METACL_SIGOPT
 from .anml_replicate import CONFIGS as ANML_REPLICATE
 from .anml_variants import CONFIGS as ANML_VARIANTS
 from .dendrites import CONFIGS as DENDRITES
@@ -35,6 +36,7 @@ __all__ = ["CONFIGS"]
 # Collect all configurations
 CONFIGS = dict()
 CONFIGS.update(METACL)
+CONFIGS.update(METACL_SIGOPT)
 CONFIGS.update(ANML_REPLICATE)
 CONFIGS.update(ANML_VARIANTS)
 CONFIGS.update(DENDRITES)

@@ -23,16 +23,16 @@
 A simple implementation of dendrite weights. This combines the output from a (sparse)
 linear layer with the output from a set of dendritic segments.
 """
+import abc
 
 import nupic.research.frameworks.dendrites.functional as dendrite_fxns
 from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
 
-class BiasingDendriticLayer(SparseWeights):
+class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
     """
-    TODO: Mention it is a wrapper around any module and not a standalone module
-    maybe add an example of how to initialize it
+    Base class for all Dendritic Layer modules.
 
     This combines a DendriteSegments module with a SparseLinear module.
     The output from the dendrite segments (shape of num_units x num_segments)
@@ -68,31 +68,37 @@ class BiasingDendriticLayer(SparseWeights):
         self.rezero_weights()
 
     def rezero_weights(self):
+        """Set the previously selected weights to zero."""
         super().rezero_weights()
         if self.segments is not None:  # only none at beginning of init
             self.segments.rezero_weights()
 
+    @abc.abstractmethod
     def apply_dendrites(self, y, dendrite_activations):
-        """Apply dendrites as a bias."""
-        return dendrite_fxns.dendritic_bias_1d(y, dendrite_activations)
+        """Apply dendrites using function specified by subclass"""
+        raise NotImplementedError
 
     def forward(self, x, context):
-        """
-        Compute of linear layer and apply output of dendrite segments.
-        """
+        """Compute of linear layer and apply output of dendrite segments."""
         y = super().forward(x)
         dendrite_activations = self.segments(context)  # num_units x num_segments
         return self.apply_dendrites(y, dendrite_activations)
 
 
-class GatingDendriticLayer(BiasingDendriticLayer):
+class BiasingDendriticLayer(DendriticLayerBase):
+    def apply_dendrites(self, y, dendrite_activations):
+        """Apply dendrites as a bias."""
+        return dendrite_fxns.dendritic_bias_1d(y, dendrite_activations)
+
+
+class GatingDendriticLayer(DendriticLayerBase):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a gating mechanism."""
         # Multiple by the sigmoid of the max along each segment.
         return dendrite_fxns.dendritic_gate_1d(y, dendrite_activations)
 
 
-class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
+class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
     """
     This layer is similar to `GatingDendriticLayer`, but selects dendrite activations
     based on absolute max activation values instead of just max activation values. For
@@ -104,12 +110,13 @@ class AbsoluteMaxGatingDendriticLayer(BiasingDendriticLayer):
         return dendrite_fxns.dendritic_absolute_max_gating_1d(y, dendrite_activations)
 
 
-class GatingDendriticLayer2d(SparseWeights2d):
+class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
     """
-    A convolutional version of `GatingDendriticLayer`. The multiplicative dendrite
-    outputs are applied element-wise to each output channel. That is, for a given
-    output channel, all activation values (determined by the convolution operation) are
-    multiplied by a single value computed via dendrites.
+    Base class for all 2d Dendritic Layer modules.
+
+    Similar to the DendriticLayerBase class, the output from the dendrite segments
+    is applied to the output of each channel. Thus, each channel output gets
+    modulated by a set of dendritic segments.
     """
 
     def __init__(
@@ -143,6 +150,29 @@ class GatingDendriticLayer2d(SparseWeights2d):
         if self.segments is not None:  # only none at beginning of init
             self.segments.rezero_weights()
 
+    @abc.abstractmethod
+    def apply_dendrites(self, y, dendrite_activations):
+        """Apply dendrites using function specified by subclass"""
+        raise NotImplementedError
+
+    def forward(self, x, context):
+        """
+        Computes the forward pass through the `torch.nn.Conv2d` module and applies the
+        output of the dendrite segments.
+        """
+        y = super().forward(x)
+        dendrite_activations = self.segments(context)  # num_units x num_segments
+        return self.apply_dendrites(y, dendrite_activations)
+
+
+class GatingDendriticLayer2d(DendriticLayer2dBase):
+    """
+    A convolutional version of `GatingDendriticLayer`. The multiplicative dendrite
+    outputs are applied element-wise to each output channel. That is, for a given
+    output channel, all activation values (determined by the convolution operation) are
+    multiplied by a single value computed via dendrites.
+    """
+
     def apply_dendrites(self, y, dendrite_activations):
         """
         Returns the output of the gating convolutional dendritic layer by multiplying
@@ -160,17 +190,8 @@ class GatingDendriticLayer2d(SparseWeights2d):
         """
         return dendrite_fxns.dendritic_gate_2d(y, dendrite_activations)
 
-    def forward(self, x, context):
-        """
-        Computes the forward pass through the `torch.nn.Conv2d` module and applies the
-        output of the dendrite segments.
-        """
-        y = super().forward(x)
-        dendrite_activations = self.segments(context)  # num_units x num_segments
-        return self.apply_dendrites(y, dendrite_activations)
 
-
-class AbsoluteMaxGatingDendriticLayer2d(GatingDendriticLayer2d):
+class AbsoluteMaxGatingDendriticLayer2d(DendriticLayer2dBase):
     """
     A convolutional version of `AbsoluteMaxGatingDendriticLayer`.
     """
