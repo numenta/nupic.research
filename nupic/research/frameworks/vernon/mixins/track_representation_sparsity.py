@@ -45,11 +45,11 @@ class TrackRepresentationSparsity:
 
         :param config:
             - track_input_sparsity_args:
-                - include_modules a list of module types to track
-                - include_names a list of module names to track e.g. "features.stem"
-                - include_patterns a list of regex patterns to compare to the names; for
-                                   instance, all feature parameters in ResNet can be
-                                   included through "features.*"
+                - include_modules: a list of module types to track
+                - include_names: a list of module names to track e.g. "features.stem"
+                - include_patterns: a list of regex patterns to compare to the names;
+                                    for instance, all feature parameters in ResNet can
+                                    be included through "features.*"
             - track_output_sparsity_args: same as track_input_sparsity_args
 
         .. _filter_modules: nupic.research.frameworks.pytorch.model_utils.filter_modules
