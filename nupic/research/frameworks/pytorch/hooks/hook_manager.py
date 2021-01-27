@@ -19,17 +19,14 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.pytorch.model_utils import filter_modules
-
 from .base import TrackStatsHookBase
 
 
 class ModelHookManager:
     """
     This class registers and manages a set of hooks of subclassed from
-    `TrackStatsHookBase`. The given hook is registered on all modules matching the given
-    `include_*` criteria. By default, if no criteria is specified, all modules will be
-    tracked. See `filter_modules`_ for further details on the `include_*` params.
+    `TrackStatsHookBase`. The given hook is registered on all modules within
+    'named_modules'.
 
     Tracking is started and stopped for all hooks via `self.start_tracking()` and
     `self.stop_tracking()`. Alternatively, this class can be used a context manager to
@@ -43,34 +40,21 @@ class ModelHookManager:
 
     .. _filter_modules: nupic.research.frameworks.pytorch.model_utils.filter_modules
 
-    :param model: model to add hooks to
+    :param named_modules: dict mapping names to modules
     :param hook_class: class subclassed from `TrackStatsHookBase`
     :param hook_type: whether to register the hook as "forward" or "backward"
                       or "pre_forward"
-    :param include_modules: a list of module types to track
-    :param include_names: a list of module names to track e.g. "features.stem"
-    :param include_patterns: a list of regex patterns to compare to the names; for
-                             instance, all feature parameters in ResNet can be included
-                             through "features.*"
     """
 
-    def __init__(
-        self, model, hook_class,
-        hook_type="forward",
-        include_modules=None,
-        include_names=None,
-        include_patterns=None,
-    ):
+    def __init__(self, named_modules, hook_class, hook_type="forward"):
 
         assert hook_type in ["forward", "backward", "pre_forward"]
         assert issubclass(hook_class, TrackStatsHookBase)
 
         # Register the hooks via class method.
-        tracked_vals = self.register_storage_hooks(model, hook_class,
-                                                   hook_type=hook_type,
-                                                   include_modules=include_modules,
-                                                   include_names=include_names,
-                                                   include_patterns=include_patterns)
+        tracked_vals = self.register_storage_hooks(named_modules,
+                                                   hook_class=hook_class,
+                                                   hook_type=hook_type)
 
         # These are the functions that called every forward or backward pass.
         self.hooks = tracked_vals[0]
@@ -92,38 +76,20 @@ class ModelHookManager:
         self.stop_tracking()
 
     @classmethod
-    def register_storage_hooks(
-        cls, model, hook_class,
-        hook_type="forward",
-        include_modules=None,
-        include_names=None,
-        include_patterns=None,
-    ):
+    def register_storage_hooks(cls, named_modules, hook_class, hook_type="forward"):
         """
-        Register hooks on the model's filtered modules. The default is to track all
-        modules.
+        Register hook on each module in 'named_modules'.
 
-        :param model: model to add hooks to
+        :param named_modules: dict mapping names to modules
         :param hook_class: class subclassed from `TrackStatsHookBase`
         :param hook_type: whether to register the hook as "forward" or "backward"
-        :param include_modules: a list of module types to track
-        :param include_names: a list of module names to track e.g. "features.stem"
-        :param include_patterns: a list of regex patterns to include by name
+                          or "pre_forward"
         """
         assert hook_type in ["forward", "backward", "pre_forward"]
 
         hooks = []
         handles = []
         tracked_modules = dict()
-
-        # Filter out the modules so that only some of them are tracked.
-        named_modules = filter_modules(model,
-                                       include_modules=include_modules,
-                                       include_names=include_names,
-                                       include_patterns=include_patterns)
-
-        # By default, track all modules.
-        named_modules = named_modules or named_modules
 
         # Register hooks on the modules.
         for n, m in named_modules.items():

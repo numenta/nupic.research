@@ -144,8 +144,8 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
             exp.setup_experiment(no_tracking_config)
 
         # Validate that the hook managers are null.
-        self.assertIsInstance(exp.input_hook_manager, nullcontext)
-        self.assertIsInstance(exp.output_hook_manager, nullcontext)
+        self.assertEqual(len(exp.input_hook_manager.hooks), 0)
+        self.assertEqual(len(exp.output_hook_manager.hooks), 0)
 
         # Loop through some pseudo epochs.
         for _ in range(5):

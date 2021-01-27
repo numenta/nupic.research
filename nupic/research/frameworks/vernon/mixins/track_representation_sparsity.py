@@ -19,10 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from contextlib import nullcontext
 from pprint import pformat
 
 from nupic.research.frameworks.pytorch.hooks import ModelHookManager, TrackSparsityHook
+from nupic.research.frameworks.pytorch.model_utils import filter_modules
 
 
 class TrackRepresentationSparsity:
@@ -56,38 +56,26 @@ class TrackRepresentationSparsity:
         """
         super().setup_experiment(config)
 
-        # By default, neither the inputs or output will be tracked.
-        self.input_hook_manager = nullcontext()
-        self.output_hook_manager = nullcontext()
-
         # Register hooks to track input sparsities.
-        input_tracking_args = config.get("track_input_sparsity_args")
-        if input_tracking_args is not None:
+        input_tracking_args = config.get("track_input_sparsity_args", {})
+        named_modules = filter_modules(self.model, **input_tracking_args)
+        self.input_hook_manager = ModelHookManager(named_modules, TrackSparsityHook,)
 
-            # This manager will keep track of all input hooks.
-            self.input_hook_manager = ModelHookManager(self.model, TrackSparsityHook,
-                                                       **input_tracking_args)
-
-            # Log the names of the tracked modules.
-            tracked_modules = self.input_hook_manager.tracked_modules
-            tracked_names = pformat(list(tracked_modules.keys()))
-            self.logger.info(f"Tracking input sparsity of modules: {tracked_names}")
+        # Log the names of the tracked modules.
+        tracked_names = pformat(list(named_modules.keys()))
+        self.logger.info(f"Tracking input sparsity of modules: {tracked_names}")
 
         # Register hooks to track output sparsities.
-        output_tracking_args = config.get("track_output_sparsity_args")
-        if output_tracking_args is not None:
+        output_tracking_args = config.get("track_output_sparsity_args", {})
+        named_modules = filter_modules(self.model, **output_tracking_args)
+        self.output_hook_manager = ModelHookManager(named_modules, TrackSparsityHook,)
 
-            # This manager will keep track of all output hooks.
-            self.output_hook_manager = ModelHookManager(self.model, TrackSparsityHook,
-                                                        **output_tracking_args)
-
-            # Log the names of the tracked modules.
-            tracked_modules = self.output_hook_manager.tracked_modules
-            tracked_names = pformat(list(tracked_modules.keys()))
-            self.logger.info(f"Tracking output sparsity of modules: {tracked_names}")
+        # Log the names of the tracked modules.
+        tracked_names = pformat(list(named_modules.keys()))
+        self.logger.info(f"Tracking output sparsity of modules: {tracked_names}")
 
         # Throw a warning when no modules are being tracked.
-        if input_tracking_args is None and output_tracking_args is None:
+        if not input_tracking_args and not output_tracking_args:
             self.logger.warning("No modules specified to track input/output sparsity.")
 
     def run_epoch(self):
