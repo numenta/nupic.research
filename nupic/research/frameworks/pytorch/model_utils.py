@@ -547,7 +547,7 @@ def filter_params(
         for pattern in include_patterns:
             if _is_match(pattern, name):
                 filtered_named_params[name] = param
-                continue
+                break
 
     return filtered_named_params
 
@@ -605,7 +605,7 @@ def filter_modules(
         for pattern in include_patterns:
             if _is_match(pattern, name):
                 filtered_named_modules[name] = module
-                continue
+                break
 
     return filtered_named_modules
 
