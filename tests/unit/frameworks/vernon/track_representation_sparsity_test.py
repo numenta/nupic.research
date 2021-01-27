@@ -20,7 +20,6 @@
 # ----------------------------------------------------------------------
 # %%
 import unittest
-from contextlib import nullcontext
 from copy import deepcopy
 
 import numpy as np
