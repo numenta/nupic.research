@@ -41,6 +41,7 @@ from .regularize_loss import RegularizeLoss
 from .rezero_weights import RezeroWeights
 from .save_final_checkpoint import SaveFinalCheckpoint
 from .step_based_logging import *
+from .track_representation_sparsity import TrackRepresentationSparsity
 from .update_boost_strength import UpdateBoostStrength
 from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .composite_loss import CompositeLoss
