@@ -1,14 +1,37 @@
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+#
 # flake8: noqa
+"""
+Support functions for experiment.ipynb
+"""
+
 
 import math
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
 from sklearn import datasets
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 
 from nupic.research.frameworks.dendrites import DendriteSegments
@@ -27,6 +50,7 @@ __all__ = [
     "DendriticMLP",
 ]
 
+
 # ------ Dataset
 def split_data(X, Y, random_state=None):
     """Split with random selection
@@ -35,13 +59,30 @@ def split_data(X, Y, random_state=None):
         X, Y, test_size=0.2, random_state=random_state, stratify=Y)
     return (X_train, X_test), (Y_train, Y_test)
 
+
 def apply_target_transform(Y, offset=0):
     """Transform label for continual learning problems"""
     return [label + offset for label in Y]
 
 
 def add_task_embedding(X, task_num=1, units=2):
-    """Adds a task embedding to the input"""
+    """Adds a task embedding to the input
+    One hot encodes a task and append it to the input variables
+    of every sample.
+
+    In one hot encoding, all variables are set to 0, except the one
+    corresponding to the task number, which is set to 1.
+
+    :param units:
+        Number of bits in the encoding vector
+    :param task_num:
+        Determines which bit of the encoding is set to 1
+
+    Example:
+    If there are 6 units in the vector, and task_num is 1, the
+    vector [0, 1, 0, 0, 0, 0] is appended to the input vector
+    of every sample
+    """
     assert task_num < units, \
         "Task num are 0-indexed should be equal to max units-1"
 
@@ -75,7 +116,11 @@ def prep_dataset(datasets, embed_task=False, random_state=None,
 
 
 def load_datasets():
-    """Load Iris, Wine and Mixed datasets"""
+    """Load Iris, Wine and Mixed datasets
+    Returns three tuples, one for each dataset.
+    Each tuple contains (data, target, dataset_name)
+    data and target are numpy arrays, and dataset_name a string.
+    """
     # load datsets
     iris = datasets.load_iris()
     wine = datasets.load_wine()
@@ -110,6 +155,7 @@ def load_datasets():
 def evaluate(model, data, target, dataset_name=""):
     pred = torch.argmax(model(torch.FloatTensor(data)), dim=1).numpy()
     print(f"{dataset_name} Acc: {accuracy_score(target, pred):.4f}")
+
 
 def train(model, data, target, dataset_name, batch_size=1,
           epochs=10, lr=1e-2, weight_decay=0, verbose=True):
@@ -226,7 +272,7 @@ class DendriticMLP(nn.Module):
     def __init__(self, input_size, output_size,
                  hidden_sizes=(10, 10),
                  dim_context=2,
-                 num_segments=(5,5,5),
+                 num_segments=(5, 5, 5),
                  module_sparsity=(.75, .75, .75),
                  dendrite_sparsity=(.5, .5, .5),
                  dendrite_bias=(False, False, False),
@@ -334,22 +380,22 @@ class DendriticMLP(nn.Module):
 
         x = self.block0(x_input)
         dendrites0 = self.reduce_dendrites(self.segments0(context))
-        act_maps["block0"] = (torch.sum(x, dim=0)/n).detach().numpy()
-        act_maps["dendrites0"] = (torch.sum(dendrites0, dim=0)/n).detach().numpy()
+        act_maps["block0"] = (torch.sum(x, dim=0) / n).detach().numpy()
+        act_maps["dendrites0"] = (torch.sum(dendrites0, dim=0) / n).detach().numpy()
 
         x = x * dendrites0
 
         x = self.block1(x)
         dendrites1 = self.reduce_dendrites(self.segments1(context))
-        act_maps["block1"] = (torch.sum(x, dim=0)/n).detach().numpy()
-        act_maps["dendrites1"] = (torch.sum(dendrites1, dim=0)/n).detach().numpy()
+        act_maps["block1"] = (torch.sum(x, dim=0) / n).detach().numpy()
+        act_maps["dendrites1"] = (torch.sum(dendrites1, dim=0) / n).detach().numpy()
 
         x = x * dendrites1
 
         x = self.block2(x)
         dendrites2 = self.reduce_dendrites(self.segments2(context))
-        act_maps["block2"] = (torch.sum(x, dim=0)/n).detach().numpy()
-        act_maps["dendrites2"] = (torch.sum(dendrites2, dim=0)/n).detach().numpy()
+        act_maps["block2"] = (torch.sum(x, dim=0) / n).detach().numpy()
+        act_maps["dendrites2"] = (torch.sum(dendrites2, dim=0) / n).detach().numpy()
 
         x = x * dendrites2
 
@@ -361,6 +407,7 @@ class DendriticMLP(nn.Module):
                 m.weight.data.normal_(0, 0.01)
                 m.bias.data.zero_()
 
+
 def plot_activations(model, datasets):
 
     if type(datasets) != list:
@@ -371,13 +418,14 @@ def plot_activations(model, datasets):
         actmap = model.get_act_maps(torch.FloatTensor(np.concatenate(Xs)))
 
         # reorganize data - network is from bottom to top
-        subnet = np.vstack([v for k,v in sorted(actmap.items(), reverse=True) if "dendrites" in k])
+        subnet = np.vstack([v for k, v in sorted(actmap.items(), reverse=True)
+                            if "dendrites" in k])
 
         # plotting
-        fig, ax = plt.subplots(figsize=(8,8))
+        fig, ax = plt.subplots(figsize=(8, 8))
         ax.matshow(subnet, cmap=plt.cm.Blues)
         for i in range(subnet.shape[0]):
             for j in range(subnet.shape[1]):
-                ax.text(j, i, f"{subnet[i,j]:.2f}", va='center', ha='center')
+                ax.text(j, i, f"{subnet[i,j]:.2f}", va="center", ha="center")
 
         plt.title(dataset_name + "\n")
