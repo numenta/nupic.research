@@ -23,6 +23,7 @@ This trains basic classifiers on SDRs derived from images
 """
 
 import json
+import math
 import os
 
 import matplotlib.pyplot as plt
@@ -39,16 +40,21 @@ SAMPLES_PER_CLASS_LIST = [5]  # How many samples per class to use in training th
 # classifier; can be provided as a single-value list (e.g. [5]), or multi-valued list,
 # in which case a classifier will be trained for each number of sample classes
 CLASSIFIER_TYPE = "knn"  # Options are "rnn" and "knn"
+LOCATION_DATA_BOOL = False  # Concatenates the location of a feature (0:24) to the
+# features themselves, and provides this expanded feature to the classifier;
+# recommended for RNN comparison models
 ARBITRARY_SDR_ORDER_BOOL = False  # Option to shuffle the order of the SDRs for each
 # example; this is used to determine the robustness of a classifier to a stream of
 # inputs of arbitrary order
+USE_RASTER_BOOL = False  # Follow a fixed rastor sequence if True and
+# arbitrary order set to False
 
 # Hyperparameters for RNN
 EPOCHS = 1
 WEIGHT_DECAY = 0.001  # Recommend 0.001
-LR_LIST = list(range(1, 2))  # Learning to try for the RNN; can specify just a
-# single-value list if desired; for learning with only 1 epoch of training, recommend
-# large learning rates (e.g. list(range(1,11)))
+BATCH_SIZE = 128  # Recommend 128
+LR_LIST = [0.002, 0.005, 0.01, 0.02]  # Learning rates to try for the RNN; can specify
+# just a single-value list if desired
 
 # Hyperparameters for k-NN
 KNN_PROGRESSIVE_SENSATIONS_BOOL = False  # Whether to evaluate the k-NN classifier
@@ -66,22 +72,24 @@ class RNNModel(torch.nn.Module):
     def __init__(self):
         super(RNNModel, self).__init__()
 
-        self.hidden_size = 64
+        self.hidden_size = 128
         self.num_layers = 1
-        self.rnn = torch.nn.RNN(input_size=128, hidden_size=self.hidden_size,
-                                num_layers=self.num_layers,
-                                batch_first=True)
+        self.rnn = torch.nn.LSTM(input_size=128 + int(LOCATION_DATA_BOOL),
+                                 hidden_size=self.hidden_size,
+                                 num_layers=self.num_layers,
+                                 batch_first=True)
         self.fc = torch.nn.Linear(self.hidden_size, 10)
 
     def forward(self, x):
 
-        hidden = torch.zeros(self.num_layers, np.shape(x)[0], self.hidden_size)
+        hidden_t = torch.zeros(self.num_layers, np.shape(x)[0], self.hidden_size)
+        cell_t = torch.zeros(self.num_layers, np.shape(x)[0], self.hidden_size)
 
-        x = x.reshape(-1, 128, 5 * 5)
+        x = x.reshape(-1, 128 + int(LOCATION_DATA_BOOL), 5 * 5)
         x = torch.FloatTensor(np.moveaxis(x.numpy(), 2, 1))  # Swap feature and
         # sequence axis
 
-        out, hidden = self.rnn(x, hidden)
+        out, (hidden_t, cell_t) = self.rnn(x, (hidden_t, cell_t))
         out = out[:, -1, :]  # Take the final representation
         out = self.fc(out)
 
@@ -119,6 +127,8 @@ def shuffle_sdr_order(input_data_samples, random_indices):
     """
     sdr_shuffled_input_data_samples = []
 
+    feature_dim = 128 + int(LOCATION_DATA_BOOL)
+
     for image_iter in range(len(input_data_samples)):
 
         if ARBITRARY_SDR_ORDER_BOOL is True:
@@ -127,9 +137,15 @@ def shuffle_sdr_order(input_data_samples, random_indices):
             # Otherwise the same fixed sequence is used to re-order them
 
         temp_sdr_array = np.reshape(input_data_samples[image_iter], (128, 5 * 5))
+
+        # Include the location of the feature as a part of the feature itself
+        if LOCATION_DATA_BOOL is True:
+            temp_sdr_array = np.concatenate(
+                (temp_sdr_array, np.transpose(random_indices[:, None])), axis=0)
+
         random_sdr_array = temp_sdr_array[:, random_indices]
         sdr_shuffled_input_data_samples.append(np.reshape(random_sdr_array,
-                                                          (128 * 5 * 5)))
+                                                          (feature_dim * 5 * 5)))
 
     return sdr_shuffled_input_data_samples
 
@@ -143,10 +159,13 @@ def truncate_sdr_samples(input_data_samples, truncation_point):
 
     for image_iter in range(len(input_data_samples)):
 
-        temp_sdr_array = np.reshape(input_data_samples[image_iter], (128, 5 * 5))
+        temp_sdr_array = np.reshape(
+            input_data_samples[image_iter], (128 + int(LOCATION_DATA_BOOL), 5 * 5))
         truncated_sdr_array = temp_sdr_array[:, 0:truncation_point + 1]
-        truncated_input_data_samples.append(np.reshape(truncated_sdr_array,
-                                                       (128 * (truncation_point + 1))))
+        truncated_input_data_samples.append(
+            np.reshape(
+                truncated_sdr_array,
+                ((128 + int(LOCATION_DATA_BOOL)) * (truncation_point + 1))))
 
     return truncated_input_data_samples
 
@@ -164,6 +183,7 @@ def load_data(data_section, random_indices, samples_per_class=5, sanity_check=No
     input_data_samples, label_samples = sub_sample_classes(input_data, labels,
                                                            samples_per_class,
                                                            sanity_check=None)
+
     input_data_samples = shuffle_sdr_order(input_data_samples, random_indices)  # Note
     # this still maintains the order of the examples, just not their features
 
@@ -206,7 +226,57 @@ def knn_progressive_senations(n_neighbors, training_data, training_labels,
     return None
 
 
-def train_net(net, training_data, training_labels, testing_data, testing_labels, lr):
+def train(net, training_data, training_labels, optimizer, criterion, epoch):
+    net.train()
+
+    shuffle_indices = torch.randperm(len(training_labels))
+    training_data = training_data[shuffle_indices, :]
+    training_labels = training_labels[shuffle_indices]
+
+    for batch_i in range(math.ceil(len(training_labels) / BATCH_SIZE)):
+
+        training_batch_data = (
+            training_data[
+                batch_i
+                * BATCH_SIZE:min((batch_i + 1) * BATCH_SIZE, len(training_labels))])
+        training_batch_labels = (
+            training_labels[
+                batch_i
+                * BATCH_SIZE:min((batch_i + 1) * BATCH_SIZE, len(training_labels))])
+
+        optimizer.zero_grad()
+
+        outputs = net(training_batch_data)
+        loss = criterion(outputs, training_batch_labels)
+        loss.backward()
+
+        torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=1.0)
+
+        optimizer.step()
+
+    # Accuracy on all data
+    training_acc, total_loss = evaluate(net, training_data, training_labels, criterion)
+
+    return training_acc, total_loss
+
+
+def evaluate(net, testing_data, testing_labels, criterion):
+    net.eval()
+
+    with torch.no_grad():
+        outputs = net(testing_data)
+
+        testing_matches = torch.sum(torch.argmax(outputs,
+                                    dim=1) == testing_labels)
+        loss = criterion(outputs, testing_labels)
+
+        testing_acc = 100 * (testing_matches).item() / len(testing_labels)
+
+    return testing_acc, loss.item()
+
+
+def train_net(net, training_data, training_labels,
+              testing_data, testing_labels, lr, samples_per_class):
 
     (training_data, training_labels,
         testing_data, testing_labels) = (torch.FloatTensor(training_data),
@@ -215,31 +285,54 @@ def train_net(net, training_data, training_labels, testing_data, testing_labels,
                                          torch.LongTensor(testing_labels))
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9,
-                                weight_decay=WEIGHT_DECAY)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr,
+                                 weight_decay=WEIGHT_DECAY)
+
+    training_accuracies = []
+    testing_accuracies = []
+
+    training_losses = []
+    testing_losses = []
 
     for epoch in range(EPOCHS):
 
-        optimizer.zero_grad()
+        training_acc, training_loss = train(
+            net, training_data, training_labels, optimizer, criterion, epoch)
+        testing_acc, testing_loss = evaluate(
+            net, testing_data, testing_labels, criterion)
 
-        shuffle_indices = torch.randperm(len(training_labels))
-        training_data = training_data[shuffle_indices, :]
-        training_labels = training_labels[shuffle_indices]
-
-        outputs = net(training_data)
-        loss = criterion(outputs, training_labels)
-        loss.backward()
-        optimizer.step()
-
-        training_matchs = torch.sum(torch.argmax(outputs, dim=1) == training_labels)
-        training_acc = 100 * (training_matchs).item() / len(training_labels)
         print("\nEpoch:" + str(epoch))
         print("Training accuracy is " + str(training_acc))
-
-        testing_matches = torch.sum(torch.argmax(net(testing_data),
-                                    dim=1) == testing_labels)
-        testing_acc = 100 * (testing_matches).item() / len(testing_labels)
+        print("Training loss is " + str(training_loss))
         print("Testing accuracy is " + str(testing_acc))
+        print("Testing loss is " + str(testing_loss))
+
+        training_accuracies.append(training_acc)
+        testing_accuracies.append(testing_acc)
+
+        training_losses.append(training_loss)
+        testing_losses.append(testing_loss)
+
+    if os.path.exists("results/" + str(samples_per_class) + "_samples_plots") is False:
+        try:
+            os.mkdir("results/" + str(samples_per_class) + "_samples_plots")
+        except OSError:
+            pass
+
+    plt.plot(training_accuracies, label="Training")
+    plt.plot(testing_accuracies, label="Testing")
+    plt.legend()
+    plt.ylim(0, 100)
+    plt.savefig("results/" + str(samples_per_class) + "_samples_plots/"
+                + str(lr) + "_lr_accuracies.png")
+    plt.clf()
+
+    plt.plot(training_losses, label="Training")
+    plt.plot(testing_losses, label="Testing")
+    plt.legend()
+    plt.savefig("results/" + str(samples_per_class) + "_samples_plots/"
+                + str(lr) + str(lr) + "_lr_losses.png")
+    plt.clf()
 
     print("Finished Training")
     return testing_acc
@@ -250,7 +343,9 @@ def run_classifier(samples_per_class):
     # Note the same fixed, random sampling of the input is used across all examples
     # in both training and testing, unless ARBITRARY_SDR_ORDER_BOOL==True
     random_indices = np.arange(25)
-    np.random.shuffle(random_indices)
+
+    if USE_RASTER_BOOL is False:
+        np.random.shuffle(random_indices)
 
     training_data, training_labels = load_data(data_section="SDR_classifiers_training",
                                                random_indices=random_indices,
@@ -292,12 +387,13 @@ def run_classifier(samples_per_class):
 
     elif CLASSIFIER_TYPE == "rnn":
 
-        net = RNNModel()
-
         for lr in LR_LIST:
 
+            net = RNNModel()
+
             acc_dic["lr_" + str(lr)] = train_net(net, training_data, training_labels,
-                                                 testing_data, testing_labels, lr)
+                                                 testing_data, testing_labels, lr,
+                                                 samples_per_class)
 
             with open("results/rnn_parameter_resuts_" + str(samples_per_class)
                       + "_samples_per_class.txt", "w") as outfile:
