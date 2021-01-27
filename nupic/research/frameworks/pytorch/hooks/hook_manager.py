@@ -46,6 +46,7 @@ class ModelHookManager:
     :param model: model to add hooks to
     :param hook_class: class subclassed from `TrackStatsHookBase`
     :param hook_type: whether to register the hook as "forward" or "backward"
+                      or "pre_forward"
     :param include_modules: a list of module types to track
     :param include_names: a list of module names to track e.g. "features.stem"
     :param include_patterns: a list of regex patterns to compare to the names; for
@@ -61,7 +62,7 @@ class ModelHookManager:
         include_patterns=None,
     ):
 
-        assert hook_type in ["forward", "backward"]
+        assert hook_type in ["forward", "backward", "pre_forward"]
         assert issubclass(hook_class, TrackStatsHookBase)
 
         # Register the hooks via class method.
@@ -109,7 +110,7 @@ class ModelHookManager:
         :param include_names: a list of module names to track e.g. "features.stem"
         :param include_patterns: a list of regex patterns to include by name
         """
-        assert hook_type in ["forward", "backward"]
+        assert hook_type in ["forward", "backward", "pre_forward"]
 
         hooks = []
         handles = []
@@ -130,6 +131,8 @@ class ModelHookManager:
             hook = hook_class(name=n)
             if hook_type == "forward":
                 handle = m.register_forward_hook(hook)
+            elif hook_type == "pre_forward":
+                handle = m.register_forward_pre_hook(hook)
             else:
                 handle = m.register_backward_hook(hook)
 
