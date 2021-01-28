@@ -175,7 +175,7 @@ class TrackRepresentationSparsityMetaCL:
 
         return ret
 
-    def clone_model(self, keep_as_reference=None):
+    def clone_model(self):
         """
         Clones self.model and register forward hooks on new model.
         """

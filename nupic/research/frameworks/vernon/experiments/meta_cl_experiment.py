@@ -414,12 +414,9 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             self.adaptation_lr, self.use_2nd_order_grads,
         )
 
-    def clone_model(self, keep_as_reference=None):
-        """
-        Clones self.model by cloning some of the params and keeping those listed
-        specified `keep_as_reference` via reference.
-        """
-        return clone_model(self.model, keep_as_reference=None)
+    def clone_model(self):
+        """Create a deepcopy of self.model and then clones over each parameter."""
+        return clone_model(self.model)
 
     def get_named_fast_params(self, clone=None):
         """Filter out the params from fast_param_names."""
