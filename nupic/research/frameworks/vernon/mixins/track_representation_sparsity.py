@@ -87,7 +87,7 @@ class TrackRepresentationSparsity:
         with self.input_hook_manager, self.output_hook_manager:
             ret = super().run_epoch()
 
-            # Log sparsity statistics collected from input hooks.
+            # Log sparsity statistics collected from the input and output hooks.
             update_results_dict(ret, self.input_hook_manager, self.output_hook_manager)
 
         return ret
@@ -131,9 +131,6 @@ class TrackRepresentationSparsityMetaCL:
                                     for instance, all feature parameters in ResNet can
                                     be included through "features.*"
             - track_output_sparsity_args: same as track_input_sparsity_args
-
-        .. _filter_modules: nupic.research.frameworks.pytorch.model_utils.filter_modules
-
         """
         super().setup_experiment(config)
 
@@ -170,7 +167,7 @@ class TrackRepresentationSparsityMetaCL:
         # The start of super's run_epoch, will call `clone_model` to initiate tracking.
         ret = super().run_epoch()
 
-        # Log sparsity statistics collected from input hooks.
+        # Log sparsity statistics collected from the input and output hooks.
         update_results_dict(ret, self.input_hook_manager, self.output_hook_manager)
 
         return ret
@@ -237,7 +234,7 @@ def update_results_dict(results_dict, input_hook_manager, output_hook_manager):
 
 
 def get_modules_by_names(model, names):
-    """Retrieve all modules of a model by name."""
+    """Retrieve all modules of a model within the list of names."""
     named_modules = {}
     for name in names:
         module = get_module_attr(model, name)

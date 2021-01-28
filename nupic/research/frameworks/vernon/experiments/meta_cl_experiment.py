@@ -415,7 +415,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         )
 
     def clone_model(self):
-        """Create a deepcopy of self.model and then clones over each parameter."""
+        """Create a deepcopy of self.model and then clone over each parameter."""
         return clone_model(self.model)
 
     def get_named_fast_params(self, clone=None):

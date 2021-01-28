@@ -494,7 +494,7 @@ def filter_params(
 ):
     """
     This iterates through all a model's parameters and returns a list of tuples (name,
-    param) for those matches any one of the following conditions
+    param) for those matching any one of the following conditions
         1. The param belongs to a module within 'include_modules'
         2. The param has a name contained in 'include_names'
         3. The param matches a regex pattern contained in 'include_patterns'
@@ -560,7 +560,7 @@ def filter_modules(
 ):
     """
     This iterates through all a model's sub-modules and returns a list of tuples (name,
-    module) for those matches any one of the following conditions
+    module) for those matching any one of the following conditions
         1. The module a type is one in 'include_modules'
         2. The module has a name contained in 'include_names'
         3. The module's name matches a regex pattern contained in 'include_patterns'

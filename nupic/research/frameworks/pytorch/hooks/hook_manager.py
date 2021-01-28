@@ -35,10 +35,9 @@ class ModelHookManager:
     ```
     with hook_manager as hooks:
         ... # Train here
-         stats = hooks.get_statitics()
-    ```
 
-    .. _filter_modules: nupic.research.frameworks.pytorch.model_utils.filter_modules
+    stats = hooks.get_statitics()
+    ```
 
     :param named_modules: dict mapping names to modules
     :param hook_class: class subclassed from `TrackStatsHookBase`
