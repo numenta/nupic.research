@@ -28,11 +28,20 @@ from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
 from nupic.research.frameworks.pytorch.hooks import ModelHookManager
-from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
+from nupic.research.frameworks.vernon import (
+    MetaContinualLearningExperiment,
+    SupervisedExperiment,
+    mixins,
+)
 from nupic.torch.modules import KWinners, SparseWeights
 
 
-class TrackStatsMetaCLExperiment(mixins.TrackRepresentationSparsity,
+class TrackStatsSupervisedExperiment(mixins.TrackRepresentationSparsity,
+                                     SupervisedExperiment):
+    pass
+
+
+class TrackStatsMetaCLExperiment(mixins.TrackRepresentationSparsityMetaCL,
                                  MetaContinualLearningExperiment):
     pass
 
@@ -59,9 +68,9 @@ def fake_data(size=100, image_size=(1, 4, 4), train=False):
     return FakeData(size=size, image_size=image_size, transform=ToTensor())
 
 
-simple_metacl_config = dict(
+simple_supervised_config = dict(
 
-    experiment_class=TrackStatsMetaCLExperiment,
+    experiment_class=TrackStatsSupervisedExperiment,
     num_classes=10,
 
     # Dataset
@@ -80,7 +89,7 @@ simple_metacl_config = dict(
     ),
 
     track_input_sparsity_args=dict(
-        include_modules=[KWinners]
+        include_modules=[KWinners, torch.nn.Linear]
     ),
     track_output_sparsity_args=dict(
         include_modules=[torch.nn.Linear]
@@ -95,22 +104,28 @@ simple_metacl_config = dict(
 )
 
 
+simple_metacl_config = {**simple_supervised_config}
+simple_metacl_config.update(
+    experiment_class=TrackStatsMetaCLExperiment,
+    fast_params=[".*"],  # <- all params
+)
+
+
 class TrackRepresentationSparsityTest(unittest.TestCase):
+    """
+    This is a test class for the `TrackRepresentationSparsityMetaCL` and
+    `TrackRepresentationSparsity` mixins.
+    """
 
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
-    def test_input_and_output_sparsity_tracking(self):
+    def test_sparsity_tracking_supervised_experiment(self):
         """
-        Ensure both input and output sparsities can be tracked.
+        Ensure both input and output sparsities can be tracked during a supervised
+        experiment.
         """
 
         # Setup experiment and initialize model.
-        exp = simple_metacl_config["experiment_class"]()
-        exp.setup_experiment(simple_metacl_config)
+        exp = simple_supervised_config["experiment_class"]()
+        exp.setup_experiment(simple_supervised_config)
 
         # Validate that the hook managers are not null.
         self.assertIsInstance(exp.input_hook_manager, ModelHookManager)
@@ -123,13 +138,84 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
             # Validate the expected stats have been tracked.
             name = "input_sparsity kwinners (KWinners)"
             self.assertTrue(name in ret.keys())
+            name = "input_sparsity classifier.module (Linear)"
+            self.assertTrue(name in ret.keys())
+            sparsity = ret[name]
+            self.assertTrue(np.isclose(sparsity, 0.25, atol=1e-3))
 
             name = "output_sparsity classifier.module (Linear)"
             self.assertTrue(name in ret.keys())
+            sparsity = ret[name]
+            self.assertTrue(np.isclose(sparsity, 0, atol=1e-3))
 
-    def test_no_tracking_args_given(self):
+    def test_sparsity_tracking_metacl_experiment(self):
         """
-        Test the edge case where neither input and output sparsities are tracked.
+        Ensure both input and output sparsities can be tracked during a metacl
+        experiment.
+        """
+
+        # Setup experiment and initialize model.
+        exp = simple_metacl_config["experiment_class"]()
+        exp.setup_experiment(simple_metacl_config)
+
+        # Validate that the hook managers are null at the start of training.
+        self.assertIsNone(exp.input_hook_manager)
+        self.assertIsNone(exp.output_hook_manager)
+
+        # Loop through some pseudo epochs.
+        for _ in range(5):
+            ret = exp.run_epoch()
+
+            # Validate the expected stats have been tracked.
+            name = "input_sparsity kwinners (KWinners)"
+            self.assertTrue(name in ret.keys())
+            name = "input_sparsity classifier.module (Linear)"
+            self.assertTrue(name in ret.keys())
+            sparsity = ret[name]
+            self.assertTrue(np.isclose(sparsity, 0.25, atol=0.003))
+
+            name = "output_sparsity classifier.module (Linear)"
+            self.assertTrue(name in ret.keys())
+            sparsity = ret[name]
+            self.assertTrue(np.isclose(sparsity, 0, atol=1e-3))
+
+        # Validate that the hook managers are not null at the end of training.
+        self.assertIsInstance(exp.input_hook_manager, ModelHookManager)
+        self.assertIsInstance(exp.output_hook_manager, ModelHookManager)
+
+    def test_no_tracking_args_given_supervised_experiment(self):
+        """
+        Test the edge case for supervised experiment where neither input and output
+        sparsities are tracked.
+        """
+
+        # Remove tracking params.
+        no_tracking_config = deepcopy(simple_supervised_config)
+        no_tracking_config.pop("track_input_sparsity_args")
+        no_tracking_config.pop("track_output_sparsity_args")
+
+        # Setup experiment and initialize model.
+        exp = no_tracking_config["experiment_class"]()
+        with self.assertLogs("TrackStatsSupervisedExperiment", "WARNING"):
+            exp.setup_experiment(no_tracking_config)
+
+        # Validate that the hook managers are null.
+        self.assertEqual(len(exp.input_hook_manager.hooks), 0)
+        self.assertEqual(len(exp.output_hook_manager.hooks), 0)
+
+        # Loop through some pseudo epochs.
+        for _ in range(5):
+            ret = exp.run_epoch()
+
+            # Validate that nothing is being tracked.
+            for k in ret.keys():
+                self.assertTrue("input_sparsity" not in k)
+                self.assertTrue("output_sparsity" not in k)
+
+    def test_no_tracking_args_given_metacl_exp(self):
+        """
+        Test the edge case for metacl experiment where neither input and output
+        sparsities are tracked.
         """
 
         # Remove tracking params.
@@ -141,10 +227,6 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
         exp = no_tracking_config["experiment_class"]()
         with self.assertLogs("TrackStatsMetaCLExperiment", "WARNING"):
             exp.setup_experiment(no_tracking_config)
-
-        # Validate that the hook managers are null.
-        self.assertEqual(len(exp.input_hook_manager.hooks), 0)
-        self.assertEqual(len(exp.output_hook_manager.hooks), 0)
 
         # Loop through some pseudo epochs.
         for _ in range(5):
