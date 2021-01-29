@@ -94,9 +94,6 @@ metacl_experiment.update(
 )
 
 
-# metacl_experiment["experiment_class"]().setup_experiment(metacl_experiment)
-# supervised_experiment["experiment_class"]().setup_experiment(supervised_experiment)
-
 class RezeroWeightTest(unittest.TestCase):
 
     def setUp(self):
