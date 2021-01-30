@@ -93,8 +93,8 @@ def dendritic_gate_2d(y, dendrite_activations):
               (b, c, h, w) where the axes represent the batch, channel, height, and
               width dimensions respectively)
     :param dendrite_activations: the dendrite activation values (a torch tensor
-                                 with shape (b, c) where the axes represent the
-                                 batch and channel dimensions, respectively)
+                                 with shape (b, c, d) where the axes represent the
+                                 batch, channel, and dendrite dimensions, respectively)
     """
     winning_activations, indices = dendrite_activations.max(dim=2)
     winning_activations = torch.sigmoid(winning_activations)
@@ -105,7 +105,8 @@ def dendritic_gate_2d(y, dendrite_activations):
     #    * i => the channel dimension
     #    * jk => the width and height dimensions
 
-    return dendrite_output(torch.einsum("bijk,bi->bijk", y, winning_activations), indices)
+    y_gated = torch.einsum("bijk,bi->bijk", y, winning_activations)
+    return dendrite_output(y_gated, indices)
 
 
 def dendritic_absolute_max_gate_2d(y, dendrite_activations):
@@ -121,8 +122,8 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
               (b, c, h, w) where the axes represent the batch, channel, height, and
               width dimensions respectively)
     :param dendrite_activations: the dendrite activation values (a torch tensor
-                                 with shape (b, c) where the axes represent the
-                                 batch and channel dimensions, respectively)
+                                 with shape (b, c, d) where the axes represent the
+                                 batch, channel, and dendrite dimensions, respectively)
     """
     indices = dendrite_activations.abs().max(dim=2).indices
     unsqueezed = indices.unsqueeze(dim=2)
@@ -136,7 +137,8 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
     #    * i => the channel dimension
     #    * jk => the width and height dimensions
 
-    return dendrite_output(torch.einsum("bijk,bi->bijk", y, dendrite_activations), indices)
+    y_gated = torch.einsum("bijk,bi->bijk", y, dendrite_activations)
+    return dendrite_output(y_gated, indices)
 
 
 __all__ = [
