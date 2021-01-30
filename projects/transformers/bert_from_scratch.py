@@ -26,14 +26,12 @@ import os
 import random
 import sys
 
-from datasets import load_dataset, concatenate_datasets
-from datasets.dataset_dict import DatasetDict
-
 import transformers
+from datasets import concatenate_datasets, load_dataset
+from datasets.dataset_dict import DatasetDict
 from transformers import (
     AutoModelForMaskedLM,
     AutoTokenizer,
-    BertTokenizerFast,
     BertConfig,
     DataCollatorForLanguageModeling,
     Trainer,
@@ -41,7 +39,6 @@ from transformers import (
     set_seed,
 )
 from transformers.trainer_utils import is_main_process
-
 
 # ----- Configurable Params -----------
 

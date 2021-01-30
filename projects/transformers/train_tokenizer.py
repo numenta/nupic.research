@@ -26,9 +26,8 @@ using tokenizers lib
 import glob
 import os
 
-from tokenizers import (
-    BertWordPieceTokenizer,
-)
+from tokenizers import BertWordPieceTokenizer
+
 
 def load_pretrained_bert_tokenizer(vocab_file=None):
     """Create tokenizer from file, using Transformers library"""
@@ -59,7 +58,8 @@ def load_pretrained_bert_tokenizer(vocab_file=None):
 
 def load_from_files_bert_tokenizer(path_to_files=None, vocab_size=30000):
     """
-    Adapted from https://github.com/huggingface/tokenizers/tree/master/bindings/python/examples
+    Adapted from:
+    https://github.com/huggingface/tokenizers/tree/master/bindings/python/examples
     If used frequently, save the model to avoid reloading (see example above)
     """
 
@@ -101,7 +101,8 @@ def load_from_dataset_bert_tokenizer(
     vocab_size=30000
 ):
     """
-    Adapted from https://github.com/huggingface/tokenizers/tree/master/bindings/python/examples
+    Adapted from:
+    https://github.com/huggingface/tokenizers/tree/master/bindings/python/examples
     If used frequently, save the model to avoid reloading
 
     tokenizer 0.10.0 required to train from dataset, but not supported by stable version
