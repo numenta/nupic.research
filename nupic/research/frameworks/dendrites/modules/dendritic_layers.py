@@ -25,9 +25,16 @@ linear layer with the output from a set of dendritic segments.
 """
 import abc
 
-import nupic.research.frameworks.dendrites.functional as dendrite_fxns
+import nupic.research.frameworks.dendrites.modules as dendritic_modules
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
+from .apply_dendrites import (
+    DendriticAbsoluteMaxGate,
+    DendriticAbsoluteMaxGate2d,
+    DendriticBias,
+    DendriticGate,
+    DendriticGate2d,
+)
 from .dendrite_segments import DendriteSegments
 
 
@@ -87,16 +94,25 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
 
 
 class BiasingDendriticLayer(DendriticLayerBase):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dendritic_bias = DendriticBias()
+
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return dendrite_fxns.dendritic_bias(y, dendrite_activations)
+        return self.dendritic_bias(y, dendrite_activations)
 
 
 class GatingDendriticLayer(DendriticLayerBase):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dendritic_gate = DendriticGate()
+
     def apply_dendrites(self, y, dendrite_activations):
-        """Apply dendrites as a gating mechanism."""
-        # Multiple by the sigmoid of the max along each segment.
-        return dendrite_fxns.dendritic_gate(y, dendrite_activations)
+        """Apply dendrites as a bias."""
+        return self.dendritic_gate(y, dendrite_activations)
 
 
 class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
@@ -107,8 +123,13 @@ class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
     will be chosen, and its sign will be kept.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dendritic_absolute_max_gate = DendriticAbsoluteMaxGate()
+
     def apply_dendrites(self, y, dendrite_activations):
-        return dendrite_fxns.dendritic_absolute_max_gate(y, dendrite_activations)
+        """Apply dendrites as a bias."""
+        return self.dendritic_absolute_max_gate(y, dendrite_activations)
 
 
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
@@ -174,22 +195,13 @@ class GatingDendriticLayer2d(DendriticLayer2dBase):
     multiplied by a single value computed via dendrites.
     """
 
-    def apply_dendrites(self, y, dendrite_activations):
-        """
-        Returns the output of the gating convolutional dendritic layer by multiplying
-        all values in each output channel by the selected dendrite activations.
-        Dendrite activations are selected based on the maximum activations across all
-        segments for each channel. Each channel has its own set of dendritic weights,
-        and the selected activation is based on the the absolute max value.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dendritic_gate_2d = DendriticGate2d()
 
-        :param y: output of the convolution operation (a torch tensor with shape
-                  (b, c, h, w) where the axes represent the batch, channel, height, and
-                  width dimensions respectively)
-        :param dendrite_activations: the dendrite activation values (a torch tensor
-                                     with shape (b, c) where the axes represent the
-                                     batch and channel dimensions, respectively)
-        """
-        return dendrite_fxns.dendritic_gate_2d(y, dendrite_activations)
+    def apply_dendrites(self, y, dendrite_activations):
+        """Apply dendrites as a bias."""
+        return self.dendritic_gate_2d(y, dendrite_activations)
 
 
 class AbsoluteMaxGatingDendriticLayer2d(DendriticLayer2dBase):
@@ -197,20 +209,10 @@ class AbsoluteMaxGatingDendriticLayer2d(DendriticLayer2dBase):
     A convolutional version of `AbsoluteMaxGatingDendriticLayer`.
     """
 
-    def apply_dendrites(self, y, dendrite_activations):
-        """
-        Returns the output of the absolute max gating convolutional dendritic layer by
-        multiplying all values in each output channel by the selected dendrite
-        activations. Dendrite activations are selected based on the absolute maximum
-        activations (keeping the sign) across all segments for each channel. Each
-        channel has its own set of dendritic weights, and the selected activation is
-        based on the the absolute max value.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dendritic_absolute_max_gate_2d = DendriticAbsoluteMaxGate2d()
 
-        :param y: output of the convolution operation (a torch tensor with shape
-                  (b, c, h, w) where the axes represent the batch, channel, height, and
-                  width dimensions respectively)
-        :param dendrite_activations: the dendrite activation values (a torch tensor
-                                     with shape (b, c) where the axes represent the
-                                     batch and channel dimensions, respectively)
-        """
-        return dendrite_fxns.dendritic_absolute_max_gate_2d(y, dendrite_activations)
+    def apply_dendrites(self, y, dendrite_activations):
+        """Apply dendrites as a bias."""
+        return self.dendritic_absolute_max_gate_2d(y, dendrite_activations)
