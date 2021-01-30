@@ -26,8 +26,9 @@ linear layer with the output from a set of dendritic segments.
 import abc
 
 import nupic.research.frameworks.dendrites.functional as dendrite_fxns
-from nupic.research.frameworks.dendrites import DendriteSegments
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
+
+from .dendrite_segments import DendriteSegments
 
 
 class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
