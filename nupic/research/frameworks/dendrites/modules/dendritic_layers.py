@@ -110,7 +110,7 @@ class GatingDendriticLayer(DendriticLayerBase):
         self.dendritic_gate = DendriticGate()
 
     def apply_dendrites(self, y, dendrite_activations):
-        """Apply dendrites as a bias."""
+        """Apply dendrites as a gating mechanism."""
         return self.dendritic_gate(y, dendrite_activations).values
 
 
@@ -127,7 +127,7 @@ class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
         self.dendritic_absolute_max_gate = DendriticAbsoluteMaxGate()
 
     def apply_dendrites(self, y, dendrite_activations):
-        """Apply dendrites as a bias."""
+        """Apply dendrites as a gating mechanism."""
         return self.dendritic_absolute_max_gate(y, dendrite_activations).values
 
 
@@ -199,7 +199,7 @@ class GatingDendriticLayer2d(DendriticLayer2dBase):
         self.dendritic_gate_2d = DendriticGate2d()
 
     def apply_dendrites(self, y, dendrite_activations):
-        """Apply dendrites as a bias."""
+        """Apply dendrites as a gating mechanism."""
         return self.dendritic_gate_2d(y, dendrite_activations).values
 
 
@@ -213,5 +213,5 @@ class AbsoluteMaxGatingDendriticLayer2d(DendriticLayer2dBase):
         self.dendritic_absolute_max_gate_2d = DendriticAbsoluteMaxGate2d()
 
     def apply_dendrites(self, y, dendrite_activations):
-        """Apply dendrites as a bias."""
+        """Apply dendrites as a gating mechanism."""
         return self.dendritic_absolute_max_gate_2d(y, dendrite_activations).values
