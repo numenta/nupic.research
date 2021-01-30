@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .apply_dendrites import *
 from .dendrite_segments import DendriteSegments
 from .dendritic_layers import (
     AbsoluteMaxGatingDendriticLayer,
