@@ -18,7 +18,14 @@
 #  http://numenta.org/licenses/
 #
 
-"""Adapted from run_mlm.py plus other sources"""
+"""
+Adapted from run_mlm.py plus other sources
+
+Libraries required are `transformers` and `datasets`, both can be installed with pip
+
+To reuse cached datasets, set the following environment variable prior to running:
+HF_HOME=/mnt/efs/results/cache/huggingface
+"""
 
 import logging
 import math
