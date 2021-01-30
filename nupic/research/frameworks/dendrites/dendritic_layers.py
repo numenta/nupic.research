@@ -107,7 +107,7 @@ class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
     """
 
     def apply_dendrites(self, y, dendrite_activations):
-        return dendrite_fxns.dendritic_absolute_max_gating_1d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_absolute_max_gate_1d(y, dendrite_activations)
 
 
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
@@ -212,4 +212,4 @@ class AbsoluteMaxGatingDendriticLayer2d(DendriticLayer2dBase):
                                      with shape (b, c) where the axes represent the
                                      batch and channel dimensions, respectively)
         """
-        return dendrite_fxns.dendritic_absolute_max_gating_2d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_absolute_max_gate_2d(y, dendrite_activations)

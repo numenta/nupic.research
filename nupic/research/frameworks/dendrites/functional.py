@@ -55,7 +55,7 @@ def dendritic_gate_1d(y, dendrite_activations):
     return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
 
 
-def dendritic_absolute_max_gating_1d(y, dendrite_activations):
+def dendritic_absolute_max_gate_1d(y, dendrite_activations):
     """
     Returns the product of the feedforward output and the sigmoid of the
     absolute max of the dendrite activations along each segment.
@@ -101,7 +101,7 @@ def dendritic_gate_2d(y, dendrite_activations):
     return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
 
 
-def dendritic_absolute_max_gating_2d(y, dendrite_activations):
+def dendritic_absolute_max_gate_2d(y, dendrite_activations):
     """
     Returns the output of the absolute max gating convolutional dendritic layer by
     multiplying all values in each output channel by the selected dendrite
