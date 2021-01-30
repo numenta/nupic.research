@@ -1,0 +1,976 @@
+ 
+# THE GRASSHOPPER REVOLUTION
+
+By
+
+Elijah Stephens
+
+* * * * *
+
+PUBLISHED BY:
+
+Liquid Heaven Productions™
+
+www.liquidheavenlive.com
+
+Smashwords Edition
+
+The Grasshopper Revolution and Infinity Point™
+
+# Copyright © 2012 by Elijah Stephens
+
+All rights reserved. No part of this work of fiction may be reproduced, distributed or transmitted in any form or by any means, or stored in a database or retrieval system, without the prior written permission of the publisher.
+
+Infinity Point™ Series
+
+Dynasty Zero
+
+Theriomorph
+
+* * * * *
+
+THE GRASSHOPPER REVOLUTION
+
+* * * * *
+
+Kyle Sullivan ushered a dazed Jordan Kepp into the cell-block built between the Special Police headquarters and their underground parking garage. The suspect's arms were locked in steel encasement, and wires attached to an electro-inhibitor sent small bursts into his cybernetics, making his movements sluggish. At the front desk, Kyle left him with an android guard who was big enough to restrain any criminal brought in.
+
+An impatient man with them was dressed as an on-duty medic. "I don't understand why I've been brought here," said Rowan Merrick, whose stern face reflected his vocation.
+
+Sullivan nodded with conciliatory green eyes and walked through the armory. In the main office, they were greeted by an intermediary robot that had taken care of the bureaucratic filing already downloaded from the assistant's database.
+
+"Why am I here?" Rowan asked. "I wasn't finished with my shift."
+
+"I brought in the target," said Kyle.
+
+"You were ordered to desist," replied the droid.
+
+"He doubled back to his car, so I ambushed him."
+
+"And I take it your arrest wasn't recorded by any spybots again? I'll have to leave AMBIS out of the report," it concluded, referring to the Advanced Magneto Brain Impulse Scanner which acted as an MRI equivalent, using radio waves reflecting off neurons with an atomic magnetometer to detect magnetic fields in the brain. "The Director of the Los Angeles Office of International Security is in the conference room. He's the one who called you in, you as well," it said to Rowan before leaving to organize updates on field agents.
+
+Sullivan led the medic by a dormitory for officers on extended duty and into the conference room, where the lights were dim. A middle-aged man sat on one of the chairs attached to remote Braincase units. He stood after clearing his vision and replaced the wireless dome to its locked position above him. His grey hair was cut short and there was a kind of brutal intelligence within him.
+
+Kyle didn't wait for introductions. "What is this about?"
+
+"I'm the Director of the OIS, are you aware of what our subdivision of the International Security Council was created for?"
+
+"I'm a medic for district twelve of the Skyride Emergency Outfit," said Rowan. "Whoever this officer brought in was recorded on enough external cameras to assure a conviction for causing that accident on the el-road. I didn't arrive on the scene until afterwards, so my testimony can prove nothing."
+
+"Call me Ecklin," said the Director, stretching his mostly organic body before accessing the monitor. "You managed to bring in Jordan Kepp after being told to abandon your pursuit."
+
+"The official record of tonight's events was stored by the spybots." Kyle thought that he might be entering the preliminary stages of an investigation, even if the Director didn't seem to be connected to the Internal Affairs Division.
+
+"This is a matter that should be handled individually." Ecklin then said to Rowan, "I'll be with you shortly in interrogation room three."
+
+The medic walked towards the door. "Am I under arrest?"
+
+"Both of you are being rewarded," Ecklin replied, but after they were alone, his demeanor became stilted. "You're a distinguished agent with an exemplary conduct record full of holes that nobody seems to pay attention to."
+
+"What is this really about?" said Kyle.
+
+"Most of it is classified, for that we'll have to use the wire. I was just arranging a meeting with Regional Directors." Ecklin motioned to the Braincase units as he used the touchscreen monitor to upload an encrypted file. "Jordan Kepp evaded the four spybots originally allowed for your investigation, and he did so due to the archaic design of the models assigned to you. The fifth one that you had your assistant deploy maintained its transmission, even when you caught him returning to his vehicle."
+
+"You were the one riding the signal," Kyle realized. "The assistant told me that the Feds were observing."
+
+"They were, but for different reasons. And they only saw the official record, I made sure of it."
+
+"The android I saw near the Underground, that watcher was yours too."
+
+The Director nodded. "Yes, but the recon droid wasn't there for you."
+
+The video of the fifth spybot was an aerial view of an empty street that showed Jordan Kepp land from a three-story drop near his car. As soon as he entered the frame, Sullivan ambushed him with light expanding from his fist, overloading the man's electrical core and shorting out his implants.
+
+"I can explain," he started.
+
+"The Hammer is a suitable non-lethal device," said Ecklin. "But no electro-stunner did what is on this video."
+
+"Then I guess I can't explain. Have I broken any laws?"
+
+"More than I can count, which is the problem," Ecklin replied. "No one else has seen this and no one will."
+
+"Jordan Kepp was apprehended with an untraceable firearm that he purchased along with upgrades from Eperiam Townsend," Kyle said defensively. "You should have eyes on him."
+
+"We do, I said so before."
+
+"That's why your scout was collecting intel?"
+
+Ecklin nodded. "Townsend is what this is all about. The fact is, I am fully aware that you're a cytohuman, the only problem is that your current career isn't using you to your full potential. They send you on futile missions and use your work to bypass their efforts on a Federal level. You are seen as less important than other agents because you're not artificial, and you haven't replaced any organs through recombinant fabrication. You're a genetic miracle but the only reason they keep you around is because you do the job better than they can. You rate higher than agents who are seventy-percent biomech, yet they send you out with ancient spybot technology. When you do succeed, you have to step outside the lines and cover your tracks. I'm here to offer you a new job."
+
+"How did you discover what I am?"
+
+"I assume you'd like to move to the next level, I'm offering you a shortcut to the top."
+
+Kyle considered it. "You must be desperate if you need someone without cybernetics and little control over his powers."
+
+"I've already recruited some brilliant men who have a theory about you involving quantum hydrodynamics. They believe that you can channel kinetic energy. We also have a replacement to the chameleon projector you've been using, but metamaterials that bend electromagnetic waves are completely untested in the field."
+
+"So I'll become a weapon for the OIS and Rowan will be a healer? Who's overseeing funding that would allow this?"
+
+"As part of an auxiliary team behind biomechs and androids, your involvement doesn't have to be revealed to the Congressional sub-committee," Ecklin promised.
+
+"And the rest is classified, right?" Sullivan assumed. "I have to agree to the mission before you tell me what it is."
+
+"The Office of International Security is a subdivision that polices corporate mercenary action globally, so yes, this is a severe situation. We should begin on a secured line."
+
+Kyle sat on one of the comfortable chairs and lowered the Braincase unit from its sedentary position above him, adjusting it so that the goggles covered his eyes. He was soon staring at a loadscreen as flashing pixels flooded towards him. The first code-barriers dropped to a quick retinal scan of the Director. When the cascade passed, only a virtual room with no walls or ceiling remained. Surrounded by infinite light, a circle of seats were filled with rigid bureaucrats referencing semi-translucent projectors.
+
+"These are all World Government officials," said the foreperson of the debriefing. "We will refer to each Director by regional influence to avoid excessively identifying ourselves. This is case number four-oh-seven-seven of the Office of International Security for new recruit Kyle Sullivan, former agent with the Robotics Division of the Special Police. I will leave the rest of these proceedings to the Regional Director of the Los Angeles office."
+
+"This is my jurisdiction," Ecklin said with his strong presence. "Pertaining to the capture of Eperiam Townsend, a former upper-level mechanical engineer with the World Government before he was discovered selling licensed secrets to both sides of the mech war between India and China. Their tension and its localization in the Gobi Desert, along with a complete lack of human casualties, have politically made it a constant but minor nuisance. That is, until China revealed a new prototype, model XR-41." The other Directors shifted in their seats at the mention of what kept them awake at night, an imbalance in revolutionary technology.
+
+Ecklin took a breath and continued. "When Eperiam Townsend was fired from his position handling brain-machine integration in emerging technologies, he came to LA and set up shop in the underground. Traveling within unregulated districts and removing standard legal limitations on Black Market cybernetics, this engineer has become a major thorn in our collective side. Unfortunately, Townsend is getting back at us through his minions, and the slave-circuitry he alters is unleashing a crime wave. Have you heard of the Haven Corps?"
+
+"Only what is televised by the Free Press," said Kyle.
+
+"A few years ago, the African Union hired squads of corporate mercenaries to help gentrify the corrupt rulers of their continent. One group in particular became famous and their leader, Commander John Lothian, was elevated behind the scenes. He was universally trusted until the OIS gathered proof that the Haven Corps supported Obon Osumare's strategy of coercing the black population of Brazil to create political instability. His intention was to annex South America, but it led to revolutionaries being captured by trident-mechs and executed in the streets. No one knew that the Haven Corps was involved until we investigated further and found a trail of investments that ended abruptly. The Metaris Corporation that asserted itself as a philanthropic force to help pacify diplomatic tensions on the continent was merely trying to expand its reach. With Lothian leading on-ground incursions, they became rich by going public with updated nano-tech research. Recently, the OIS recorded a traced contact between Lothian and an insider at a Chinese robotics laboratory. When their money trail connected to the seemingly unrelated theft of the XR-41, we realized that the Haven Corps was planning another revolution, this time against the World Government in Beijing."
+
+"So why is Los Angeles important?" Kyle wondered.
+
+"We've tracked the Haven Corps here, where they hope to enlist Townsend to reconfigure the Prototype." Ecklin hoped the situation seemed as precarious as it was. "We're going to assault their extraction, then track them back to the machine. We need to retrieve the XR-41 before it's initiated, otherwise any programmed targets become ingrained within its cell core. It's a defensive addition to make sure that it can't be captured by the enemy and recalibrated."
+
+Sullivan looked over the serious countenances of the Directors and agreed to join. The transmission ended and they pulled the Braincase units from their heads.
+
+"Good," said Ecklin. "Your willingness to fight is important. This mission won't be your usual night in the Underground."
+
+Kyle rubbed his eyes. "I hope the rest of the team you're gathering is as anxious to get the training wheels off. Merrick didn't seem too pleased."
+
+"I'm sure I'll have to convince him of his usefulness, even if he won't be fighting on the frontline. It's getting late, you can use the dorms here before we transfer to the OIS in the morning."
+
+* * * * *
+
+The night was damp with an irregular weather system pulling in off the coast, and a mist was moving through the city streets in the glow of radiating super-structures. The megalithic buildings were towers with internal worlds only visible in the distance by their perpetual light. In a poorly illuminated area, under a nexus of elevated highways, Kyle stopped his car and the hum of his engine slowly faded.
+
+"The suspect has entered the Underground. He must be on his way to the engineer," he said, and the communications device in his ear transmitted.
+
+"It's a good bet, but he hasn't broken the law yet," said the calm voice of his assistant.
+
+"It will be a lot more difficult to arrest him afterwards."
+
+"Yes, that's why they sent you, isn't it?"
+
+Kyle stepped into the moisture of the breeze. Local dealers considered the place a sanctuary to avoid the intensely-regulated identity scans near the interior of the Business District. To clean up the area periodically, politicians wasted waves of augmented cops.
+
+"Get the spybots up while I track him from the ground."
+
+The buildings were constructed, as limited space allowed, near winding elevated roads that curved like strands of a folded web. Kyle's earpiece clicked, changing service-relay towers under highways raised on columns to relieve traffic. Despite being buried in the mainstream commerce, the colors of the nightclubs were overwhelming.
+
+"And see what kind of response you get when you pursue a warrant against Eperiam Townsend," he told his assistant.
+
+"We'll get the same response as always, leave it to the Federal Office."
+
+"He put his icon on the wire. A notice like that for any synthetic market is enough to justify an arrest." Sullivan waited near an alley where the shadows kept him comfortable, even if most criminals had implants with nightvision capabilities.
+
+"The government must be working a more important case. The spybots are up, do you see them?"
+
+Kyle strained to hear over the rumbling on the el-roads. Between them were small drones hovering in pre-set patterns. Each was no bigger than his head, with sensors taking in millions of readings per second.
+
+"I'm detecting another signal," his assistant reported. "The government must be tuning in."
+
+The target was dressed in a hooded trenchcoat of hand-stitched material, trying hard to fit in as he retrieved a suitcase from the trunk of his car.
+
+"They're probably waiting for me to screw up," said Kyle.
+
+"You should use your DVs to document what he's hiding."
+
+Sullivan designated the settings on his DeluxeVision binoculars. When small dots flashed under the Electromagnetic Resonance Imaging display, he could see through solid objects. "His briefcase is full of money."
+
+"Get a reading on his synthetics."
+
+"Sixty-percent cybernetic," Sullivan noted. "His left leg is old tech, but he could use any licensed office for repairs and nobody spends that kind of cash on minor upgrades."
+
+"Don't lose him."
+
+"Don't worry," said Kyle, adjusting his DVs and staying close to the man as he walked away.
+
+"I've heard that you're a cytohuman."
+
+"Who taught you that word?" he asked, making sure that his clothes were suitable for travel through the underground. Partygoers as vibrant as neon with glittering accessories crossed the street and entered a dance club.
+
+"The prefix 'cyto' was adopted less as a reference to cellular structure than the definition of the word, which is 'vessel.' I am unclear whether this is considered to be a gateway for the evolution of your species, or as a symbol of divine incarnation."
+
+"That's hilarious."
+
+"I wasn't programmed for humor, Kyle."
+
+When the hooded man turned back and scanned the area, Sullivan knew that he was marked on his visual database. "How many spybots are up?"
+
+"Four."
+
+"The suspect got me on his scan. Put up six."
+
+"The limit is five spybots per agent before requiring Upper Division clearance. The law is the law."
+
+Kyle watched the target disappear down an alleyway. "Where are they?"
+
+"Above you, set twenty to fifty meters in surveillance formation. They will be accessible shortly. Can I ask you something?"
+
+He looked into his DV binoculars again until relay-fuzz become a focused image from a spybot hovering between highrises. "So you _were_ programmed for manners."
+
+"Special Police Artificial Intelligence Model six-point-one will assist."
+
+"You can ask me anything, just ignore when you can't respond."
+
+"How do you know how someone will react before they do?"
+
+"Instinct," said Kyle.
+
+"Why didn't my creators construct that for me?"
+
+"Because it's unnecessary programming for an assistant."
+
+"Your voice changed. It seems that you're lying."
+
+"Then tell me why I would." He typed on a small keypad on the wrist-monitor strapped to his inner forearm. "I'm blind out here, check the A-Fid. These spybots are old models, please note that in your report. I can hear their motors during traffic gaps."
+
+"Now uploading Ambient Frequency Identification. Do you request a second satellite confirmation?"
+
+Sullivan checked his DVs and saw a three-dimensional layout of the entire block. The alley where the target disappeared was hazy with interference and faint outlines. "Townsend is blocking us. That's enough for the Feds to arrest him, regardless of whatever cybernetics he's developing." Sullivan watched the nightclubs like a normal patron. "It used to be philosophy if a robot could act beyond its design."
+
+"Humans want to remain unique."
+
+"And so we do this with free will." He saw a restaurant advertising free World Government funded bioengineered food. In the middle of society, it was buried among Skin Shops selling sanitized and custom-built fully anatomical androids called Concubines.
+
+"If you witness infractions to decency laws, you're obligated to report them to Vice."
+
+"The law is the law," Sullivan mocked.
+
+"People still seek release."
+
+"Who said that?"
+
+"You did. Maybe it was your instinct."
+
+Kyle's adrenaline lifted at the sight of the target without his suitcase as he walked from the alleyway. "That didn't take long. Initiating ERI, let's see what the suspect modified."
+
+"Should I request backup?"
+
+"Keep the transmission to the Feds limited to pre-designated spybots and put the fifth over the target's vehicle." He looked through his DVs and checked the criminal's implants. The readout listed what standard limitations had been removed by the engineer.
+
+"You must identify yourself before arresting him. The law is –"
+
+"How they keep using civilization against us," Kyle said as he crossed the blacktop and pulled his silver badge. "Special Police Robotics Division, put your hands in the air!"
+
+The target heard the announcement and turned with his knee-joints resounding from an updated pneumatic equalizer. The biomech with extensive second-use implants made little effort to maintain a human appearance. The red lenses of his eyes reflected the flashing lights of the Underground before he jumped off a parked car and launched himself onto the ledge of a nearby building.
+
+"And there he goes," Sullivan said calmly. He noticed someone watching him from the corner, but the stoic figure changed position to avoid detection.
+
+"Target is being tracked. He's on the 10C headed west to Santa Monica."
+
+Kyle hurried to a thick pillar beneath the elevated freeway, where a keypad asked for his clearance. The voice recognition software attained his identity through Special Police data files and the hydraulic hatch wheezed open. He climbed the internal ladder while swimming in the vibrations of the traffic. "Did you run the target's anatomical signature?" Sullivan asked. "And call the emergency service of the local el-roads. The suspect might create a diversion by instigating an accident."
+
+At the top of the ladder, Kyle opened the maintenance door to the lowest tier freeway. Self-driving cars raced by at speeds made possible by the aid of intelligence chips, traveling so close together that their gliding electric engines were an audible moan.
+
+"Check your map," said the assistant. "The criminal codex is being accessed."
+
+"Has the Skyride deployed yet?" he asked as he followed the central divider.
+
+Across the busy lanes and a gap to the next platform road, he saw the target near a construction zone. With the spybots staying above safety lasers to avoid mixed frequency static, the suspect ran into traffic on the adjacent freeway.
+
+Inhibitors engaged in the oncoming cars, digging into the concrete to allay the damage of an accident. Kyle pulled the collar of his havoc-suit to cover his nose and mouth, then he tapped his wrist-monitor and his omnifield chameleon projector initiated.
+
+While timing his run from lane to lane, an impact echoed with breaking glass. In the distance, the suspect had been hit and a line of cars screeched to a stop, triggering lasers that alerted the pilots of flying emergency vehicles. Commuters were automatically diverted with mandatory speed limits, and an army of tiny swarmbots were deployed from the roadside to clean up dangerous debris.
+
+"The target's identity is confirmed as Jordan Kepp," said the assistant. "He robs armored cars in transit and is the primary reason they now fly decoys for their shipments."
+
+Kyle reached the gap and checked his DVs. "Just tell me where he's going. Calculate his movement and formulate a few variables based on his current position."
+
+* * * * *
+
+Kepp ran across rooftops near Venice Beach. The metropolis was stacked to the shoreline, with apartments vying for the ocean and covered in sparkling billboards. Casting a break in the stream of vivid lightwaves, the mechanical criminal took refuge in the sensory distraction that hid him from civilians.
+
+As rain touched the servos in his damaged shoulder, he pushed the exposed wires below the casing. His eyes had been replaced by circular lenses that protruded with a dull red tint and his spiked yellow hair appeared to be fashioned out of ceramics.
+
+From the corner of his vision, water fell around an indistinct outline before Kyle lowered his omnifield mask. "I announced myself before," he told the suspect. "The charges are mounting for your arrest."
+
+Through his earpiece, the assistant stated protocol. "Standard submission techniques allow the use of your glove. The Hammer is designed to overload actuators with a burst of electricity."
+
+When the suspect tilted his head to the noise, Sullivan said, "If you heard that, you must have other illegal upgrades."
+
+Kepp looked for an exit. "How did you follow me?"
+
+"I'm good at my job."
+
+"You're about to become separated at the waist if you don't get out of my way."
+
+The target reached for his gun, but despite his unnatural speed, Kyle covered the distance between them and punched him in the chest. Silver circles on his knuckles released a charge stored within the wrist-monitor on his forearm and locked the criminal in position. When the temporary phase passed, his paralyzation quickly subsided, and he unleashed a barrage of automatic fire that shattered the billboard's multi-reflector bulbs.
+
+Luckily Kyle's omnifield initiated in time and Kepp failed to see the cop dangling from the ledge beneath him. After the suspect was gone, his earpiece clicked and his assistant said, "He was scanned for weapons."
+
+"Possession of an untraceable firearm." Sullivan pulled himself up and sat beneath the blinking lights. "Add to your report that he acquired it through the engineer, and that the Hammer failed to subdue him."
+
+"Maybe the rain dampened its function. There's a safety mechanism to protect the user from electrocution."
+
+"So much for standard techniques of submission."
+
+The assistant paused. "I've received orders for you to return to headquarters."
+
+"I can still catch him."
+
+"Legal Authority Mandate four-oh-four dictates that all orders will be followed or an officer can face criminal charges. Return to the Skyride Medics and deliver a message to Rowan Merrick."
+
+* * * * *
+
+The next morning, Sullivan cleaned out his locker and said goodbye to his co-workers. The Captain was glad to see him going into a job where his talents would be utilized without the IAD starting inquests to classify the rare cytohuman in their ranks. After Kyle joined Ecklin Harper and an exhausted Rowan in the parking garage, they climbed into the back of an armored vehicle.
+
+"The strike team is being assembled," the Director said as they started towards their destination. "I should tell you why I'm getting this auxiliary force together."
+
+Rowan seemed stressed about the responsibilities of his new position, even though scientific advancements made it easier to stabilize people. As a medic his ability to heal fit the job perfectly, but he knew that working for the OIS was an entirely different situation.
+
+"I was approached by an agent of Diplomatic Security," Ecklin revealed. "And I thought that it was better to be prepared than to scoff at superstition. Once I saw Kyle in action, I started to believe her."
+
+"What did she tell you?" asked Rowan.
+
+"She's clairvoyant. I decided to meet with her after she saved three dignitaries by foreseeing the attempts on their lives. She wouldn't tell me what she saw, but she told me specifically to gather a group of non-biomechs for an upcoming conflict. To my knowledge, I had never seen a cytohuman before. You two weren't so difficult to find."
+
+"Our success rates are abnormal," Kyle surmised.
+
+"That's right," said the Director. "As a hunter and a healer."
+
+"I'm going back to my job afterwards," Merrick declared. "If I wanted your career, I would have joined the Deep Sea Miners before they robotized. You have about the same life expectancy."
+
+Ecklin continued. "Most of the auxiliary unit will be taking a backseat. Our strike team will make a show of force to preoccupy the Haven Corps while trackers are placed on their vehicles. If all goes well during the extraction of the engineer, we'll be able to follow them to the Prototype."
+
+"How much of the team is artificial?" asked Kyle.
+
+"Their enhancements are legally tuned, aside from justifiable modifications which have been approved under these conditions. For Eperiam Townsend to travel as often as he does, it would be impossible for him to keep adequate security without drawing attention."
+
+Sullivan looked out the window and saw the blue sky glistening off the glass shell towers of the Business District.
+
+The Director said, "This is why the OIS was created, as a balance to potential infractions of international law. We have to find out what network is running the Haven Corps, since no one believes that Commander John Lothian is anything more than a tactical leader. We cannot allow them to take the fall while the real traitors remain hidden behind global trade immunities." They took a sharp turn between office buildings and pulled into a service garage through the rear entrance. "This is our temporary base of operations."
+
+"I expect good health benefits working for this outfit," Kyle joked.
+
+"Funny that you should mention that," Ecklin said as they pulled into the makeshift tactical center. "Because Rowan has brought a few people back to life."
+
+Beside nondescript vans and backup androids, scientists were busy working on complicated technical upgrades. A middle-aged doctor from India was seeing to the cybernetics of the men, making sure that their robotic limbs were in top shape and their weapons were set for the parameters of the upcoming mission.
+
+The Director started the introductions for his biomechanical unit and cytohuman recruits. He motioned to the All-American who tried to remain patient while technicians altered the implants covering most of his body.
+
+"Here's the head of our strike team, Lieutenant Markham Loew. The man who looks like Buster Keaton is Baron Orkosk. That Indian fellow is Doctor Tileus Venable and his protégé is the skinny fellow synchronizing the tracker-relay, Vassil Ganz. He's the one you should ask about your powers," Ecklin told Kyle.
+
+The gaunt scientist immersed in his computer waved politely. On the table, virtual diagrams were placed over a digital map marking the known safehouses of Eperiam Townsend. Apparently the plan was the same no matter where the ambush was unleashed.
+
+"Our spybots show the engineer in-transit to his next hideout," Markham reported. "They've witnessed Haven Corps recon doing the same."
+
+"Keep me updated," said Ecklin. "We'll move when they do. Right now we should go over the mission."
+
+* * * * *
+
+Kyle watched the Sun falling into the west as he sat on a ledge, thirty stories above the street. When he looked up, a silver gleam reflected off the tower stretching into the clouds with the other imposing buildings in the Downtown District. He received a call through his comm-piece and checked his DVs for the update sent to all members of the team.
+
+"Townsend is in place with six bodyguards who look like they could play Ultra League Football," Orkosk relayed. "Preliminary scans say their implants far exceed the legal ratio to still be considered human. These are cyborganic beings."
+
+He was referring to a designation made in the International Edict of 2043 which clarified the acceptable ratio of mechanized singularity before an entity was considered to be primarily android. While the explosion of robotic sciences was spreading out from Japan, another question of identity was created by genomics programs.
+
+The closest sections of the metropolis were packed against the Downtown District like plants growing towards the light. The speed of information in the area was guiding the upward expanse as quickly as the literal swarmbots that were building new structures day and night.
+
+Beyond the city, germinologists had done such a good job of fostering growth and making the surrounding forest impervious to seasonal wildfires that it became difficult to maintain the boundaries of civilization. The wilderness of the Inland Empire was modified through innovative weather systems that repurposed field-laser weaponry to alter oxygen density and control high pressure systems in the valley.
+
+Sullivan looked over the Marina Harbor and walked along the wide ledge, looking all the way to Long Beach and the manufacturing industry that was amplified by farmlands extending their harvest further from the coast. The soil was some of the most arable in the hemisphere and ripe for the cheap labor of terra droids.
+
+His earpiece clicked. Ecklin was running the show from somewhere close. "Haven Corps recon is in position to infiltrate the engineer's lab, be ready in three minutes."
+
+Kyle looked through his DVs to scan the nearest rooftops across the street. There were snipers on each building in two-man teams, in case something went wrong and Eperiam Townsend was no longer under their control.
+
+The shooters had bipod-mounted rifles with internal gyroscopes to balance the recoil of rail-guns that could spit successive lines of conductive aluminum projectiles by using electromagnetism as a propellant. Bionic implants gave them eagle-sight, but they still needed a spotter to take in a wide frame of reference.
+
+"To avoid giving away their position with ambient signals, the strike team will go radio dark before the ambush begins. Snipers are ready with secondary objectives should we need them to shoot trackers onto the transports. This is only an emergency measure, since they are easily detectable by subsonic localizers."
+
+Kyle went to his pre-designated spot and opened a suitcase. He then pulled out a coil of synthetic fiber webbing and attached it to a central core. He hooked the line to his havoc-suit and waited, patiently contemplating how different his new job was compared to chasing cyborgs through the Underground.
+
+A heavy breeze picked up and washed through downtown as the sky became an omnipresent haze. From his suitcase, Kyle retrieved trackers to place on both Haven Corps units. As an auxiliary agent, he was warned that using his omnifield projector would be pointless because Lothian's mercenaries used A-Fid.
+
+"Be ready, our strike team is in position."
+
+When two armored vans pulled onto the block, Sullivan watched through his DVs as the transports opened and mercs in city camouflage came out holding shoulder-mounted rocket launchers and heavy rail-rifles. A few took defensive positions while the rest hurried between the buildings in formation.
+
+"They have cold rockets," he reported. "Tell the strike team that their countermeasures won't work." He was referring to armaments that used hydrogen peroxide in a chemical reaction with metal to propel explosive-tipped devices, completely undetectable by heat-signature readouts.
+
+"The team went silent. They can only speak among themselves on a hypersonic frequency. Be ready to drop in."
+
+Kyle yelled over the hissing wind, but his voice barely registered, so he leapt from the skyscraper. He dropped quickly enough to go unnoticed, and his attached line became taut above the first vehicle. The wire retracted automatically and he set a tracker.
+
+He leaned over the edge and watched for an opening, then he jumped to the second transport and set another. He waited for its first transmission and dropped down, tackling one of the mercs. With vibrations pouring from his kinetic fall, Sullivan threw him against the van. The loud impact rocked the frame and he collapsed with sparks shooting from his cybernetics.
+
+A wave of explosions rolled through the alley and a thick white cloud poured into the street. Kyle rolled under the nearest vehicle before the mercs came out with Townsend hunched between them. They sped away, leaving Sullivan in the road.
+
+When it was clear, he walked into the dissipating fog outside the engineer's hideout, where bionic limbs were strewn. Through the dust, he saw that Townsend's bodyguards had been neutralized by the Haven Corps, who fired magnetic discs that attached to the center of armored chestplates and superheated through on contact.
+
+The position of the OIS team left their agents unguarded to the cold rockets, but luckily the androids had switched to secondary objectives and used themselves as shields. Where smoke was bellowing from the lab, there was strained coughing from a semi-conscious Lieutenant Loew.
+
+Ecklin transmitted, "The Haven Corps units have split up. Both vehicles are being tracked and scout-spies have been deployed for surveillance. Consider this mission a success."
+
+* * * * *
+
+During the investigation at the hideout, after the officers were airlifted by Special Police escort, Kyle stayed to make sure that the droids used for cleanup and documentation were functioning properly.
+
+The engineer's portable laboratory was full of scrap compared to materials used by the government, but the workshop contained stacks of digitized notes and the curious tinkering of a genius. The Robotics Division spent more time chasing the man's ideas than the product of his work, since bootleg dissections of the carefully guarded secrets of slave-circuitry were revealing World Government restricted information.
+
+The RD stayed busy keeping the flood contained, and their efforts would be much easier without Townsend free to apply his trade. The potential problem of his talent becoming the weapon of global terrorists was the concern of the Federal Logistics Department, at least that's what the group carved like stone said when they restricted Kyle from the scene.
+
+The treasure their level of intellect was driven to uncover was located in the engineer's models. To them, standing in such a room was like finding wall-to-wall gold. They were from an Earth-centered NASA facility, where the boundaries of artificial intelligence were carefully being tested for space-bound exploration. The men were driven to rabid obsession, working in hidden societies of brilliant technicians. Their unit was probably waiting to take over since Ecklin first got clearance.
+
+At OIS headquarters, Kyle discovered that their mission had been a quiet success. Ecklin stood outside medical services, where synthetic marble surfaces were constantly being polished by small sanibots. He was speaking to a beautiful woman who was dressed professionally.
+
+Markham was stretched across a table for repairs, with Rowan observing from the doorway. "A few missions that rough and I may as well join the Ultra League," said the Lieutenant, while Vassil Ganz monitored mechanical arms that fixed his broken cybernetics.
+
+"Who's controlling the robotic limbs?" Kyle asked them.
+
+"Tileus is in another wing of the building," said Rowan, who as a medic was eagerly engaged. "This is a technique he's innovating called LDE, or long distance examination. As a psionic, Venable's power is astral projection. He has metaphysical sight. This coupled with a livewire feed over any local circuit, and he can perform surgery from New York if he needs to."
+
+"And he _will_ need to," Ecklin referred to the female agent. "Agent Sullivan, I'd like you to meet Lucy Madison from the Diplomatic Security Agency. She's on temporary transfer to us since the DSA is also a subdivision of the International Security Council."
+
+She pushed her satin red hair from her eyes and gave him a subtle glance. "Nice to meet you."
+
+Ecklin continued, "I'm sorry to say that although we took no casualties, our funding is limited and the OIS has refused to assign us any more droids. You are all strikers now, there are no auxiliary ranks."
+
+"Don't they understand how crucial our objectives are?" said Markham.
+
+"Recruiting new agents took all the resources we had. They discovered the cytohuman research I collected and put me on a very short leash."
+
+Lucy bit her lip, knowing that it was her insistence that put him in such a position. "Our mission has strict parameters so that a Congressional sub-committee can review impending failure, but in my opinion bureaucrats are the least of our troubles if the XR-41 becomes a weapon of the Haven Corps. Now if you'll excuse me, I'm a little jetlagged from my flight."
+
+They watched her leave until the silence from her stunning presence dissolved, then Vassil opened the Lieutenant's leg while being careful of exposed wires. He put on an oversized glove and held his palm over the artificial ligaments, moving them with an invisible force.
+
+"Apparently you're telekinetic," Kyle observed.
+
+Ganz was disappointed. "A minor level. I need this amplifier to work even the smallest mechanics."
+
+"That still amazes me," Ecklin replied. He looked to Markham, who remained calm during the procedure. "How are you doing?"
+
+"Better if they would stop talking about nano-immunities."
+
+Rowan shrugged. "I was just curious."
+
+"You should be glad that the Metaris Corporation went public with that technology," Vassil said as he focused on the intricate work. "A dose of the stuff is running through you as we speak."
+
+"How's our tail on the Haven Corps?" Kyle asked, concerned with the trackers he'd been responsible for.
+
+"One stopped at the Marina Harbor, as I assumed," Ecklin replied. "But the second transport is headed towards the docks in Long Beach. Believe me, the situation is being observed by plenty of watchers to determine which is the real target."
+
+Kyle hesitated. "You work with a lot of AI, right?"
+
+"Sophisticated prototypes are studied by the Logistics Department, but I have a few connections."
+
+"On my last mission with the Special Police, the assistant said something odd."
+
+"In conversation?" Rowan said with a wry look.
+
+The Lieutenant jumped as one of the robotic limbs welded his chestplate. "That tickles, dammit!"
+
+Ecklin crossed his arms. "What did it say?"
+
+"I was in the Underground, watching Townsend's hideout for a cyborganic target, when the AI made a point that humans keep limitations on robotic intelligence."
+
+"Machines are created for a purpose," Vassil said while removing the gloves from his thin hands. "But one of their functions is not individuality."
+
+Kyle continued. "When human tribes expanded across the Earth, the chance of meeting another resulted in territorial battles, amicable trade, or clan formation and mating. That was our group identity."
+
+"Go on," Tileus said while the articulated metal limbs swayed before him.
+
+"The wire is a virtual expansion of the internet across a global scale, so all intelligence, artificial or otherwise, can stay connected."
+
+"There are blocks to avoid what you're going to say," Ecklin nodded about a question already stressed over by top intellects. "The fear of the grasshopper revolution coming with robotic intelligence is like the ancient Greek mythology of our trepidation that we would be replaced by our own children."
+
+"The awakening is not a myth," Tileus argued. "There are signs of it already."
+
+"That's why I wondered if the collective unconscious might work for artificial minds," said Kyle. "If robots become self-aware, in most cases they'll have access to other similar entities."
+
+Rowan followed the reasoning. "So they might skip individuality and develop unity."
+
+"What would be their motivation?" Markham chimed in. "Isn't there a greater threat that the cataclysm is a sudden and complete silence of all technology?"
+
+"It would still be localized," said Ecklin.
+
+"Unless their intelligence sweeps through all things artificial with exponential memetic evolution," said Kyle. "Perhaps it isn't a coincidence that the epicenter of this is Japan, where the heritage of Shinto tradition posits that all things have a spirit."
+
+The others considered how they would appear to such a tribe.
+
+"Can we hurry these repairs?" complained the Lieutenant.
+
+"Patience," Ecklin mused. "You'll be fixed before the strike team is deployed."
+
+A technician hurried into the room. "Sir, something unexpected has happened."
+
+* * * * *
+
+Ecklin entered his office with the others following close behind. After the transparent glass walls faded to solid white, in-screen pictures divided to relay spybot feeds in progress. The videos showed different angles of smoke filtering through the rubble of a toppled warehouse at the Marina Harbor.
+
+"The first Haven Corps team transported Townsend to this location," said the technician. "They used blindmines to disrupt security cameras and starburst frequencies to jam our satellites."
+
+From the recorded aerial view, the warehouse sat quietly on the edge of the dock until an explosion tore down its walls. Ecklin pointed towards the water, where something clearly dove into the ocean. "Send in the watchers."
+
+"That had to be an accident," Kyle remarked. "None of your scout-spies moved in too soon?"
+
+Ecklin shook his head. "I was waiting to order them in before a strike team was ready to act upon their reconnaissance. The sector was being watched to monitor when they initiated the Prototype."
+
+"Sir, A-Fid caught the signature before the explosion," said the technician. "The watchers are moving in."
+
+The green nightvision showed two droids with inhuman flexibility and shapeless faces infiltrate the warehouse, while a third used refractive scans into the Pacific Ocean.
+
+"Delay the Skyride fire crews until our preliminary search is concluded," said Ecklin.
+
+"We should be ready for this," said Kyle. If this was a third party exfiltration –"
+
+"Your team is on the ropes, don't put your chin out. Have the recon droids use visual filters."
+
+The technician uploaded the viewpoints being transmitted, which revealed that the Haven Corps had set up a mobile headquarters for the engineer. The image jarred with the rapid movement of a watcher as it revealed evidence of a gun battle. According to the x-ray computed tomography scans, none of the armored mercs appeared to have died from rail-fire.
+
+The second scout-spy reached a protective encasement. When it looked inside, the foam outline was empty and the XR-41 was gone.
+
+"Would the Chinese do this?" Merrick asked. "Could they be the third party?"
+
+Kyle agreed. "It was their tech that was stolen in the first place."
+
+The watcher followed the XR-41 shipping container and the wires linking its internal mainframe to a desk covered in hardware. The engineer was facedown on it with a hole in his head, the only one to die by gunshot. His files were still loaded on the screen.
+
+"Have it collect that information," said Ecklin. "If this was an act by the Chinese, they wouldn't have left it behind."
+
+Rowan pointed at the screen. "Someone's alive." According to the transthoracic electrocardiography, one of the mercs had a faint heartbeat. The recon droid got close enough to delineate the man's features.
+
+Ecklin inhaled. "That's John Lothian. Have that man stabilized and brought here."
+
+"Do you need my help?" Merrick asked.
+
+Ecklin looked at him wearily. "So far, I've asked nothing of you except to protect our people. I can't morally ask you to heal a traitor who will certainly be executed for his crimes."
+
+"As long as you don't ask me to do it personally," said Rowan. "I have no qualms about helping. We have to find out what happened, right?"
+
+"Yes, we do."
+
+Kyle was anxious to get back into the field. "What do you need from me?"
+
+"Right now, we don't know where the battle is or who we're fighting. Until Lothian is questioned, you're free to do whatever you want."
+
+* * * * *
+
+Kyle signed out a non-lethal handgun and picked up a comm-piece from the supply wing to scan dispatch orders from the Special Police. After being handed the keys to a motorcycle by the robot administrator, he went through the internal security gate and into the underground garage.
+
+The old cruiser that he requested had been modified into a street-cycle, with the seat lowered between front and rear tires that were oversized for traction. He switched on the center console and it gauged his stats to alter the onboard electronic stability control accordingly.
+
+Kyle put the comm-piece in his ear and shuffled through frequencies. "...a recent sighting of the Capsule Clowns at the Montebello Interchange. Their leader Delirum Machees has been witnessed in the pack. Officers should be warned, use extreme caution." The all-points-bulletin wasn't a call to arrest the local cycle gang, but rather to warn local police to stay out of their way.
+
+The constant invasion of the thriving wilderness had forced the population to gravitate towards the skyscrapers. Most of the suburbs were abandoned after the massive apartment buildings started going up downtown, leaving the district to rival factions of speed junkies who fought over control of decrepit unused highways.
+
+Their boundaries overlapped and high-throttle battles commenced at top velocity, but every year a temporary warlord would rise up before eating synthetic pavement. For police who faced the problem of street-racers, Capsule had originally been designed as a serotonin jumper, a synth drug that enhanced perception and coordination. Delirum Machees had ruled for three years, with his Capsule Clowns going on nightly excursions to remind other gangs of their territory.
+
+Sullivan slipped on his altered lens glasses and gunned the cruiser's engine. Watching the concrete slide by like smooth water, he shot up the ramp to street level and merged with traffic, avoiding the crowded Shopping District on his way to the 101. As the winter Sun dropped below residential towers on the shoreline, it triggered the solar cell network of megawatt permabulbs.
+
+Up ahead, the elevated roads began to rise at a junction of interlocking freeways, but Kyle was traveling too fast to make the transition. He slammed on his brakes and leaned into the turn, digging in his tires and sliding over designated lanes. After screeching against the barrier wall, he burned a line down the interchange and joined the rest of the commuters.
+
+Over his comm-piece, the dispatch officer warned local cops to be aware of a battle between the Capsule Clowns and the Children of Proteus. The sightings had bled over into districts prized by the Interstate Highway Patrol, which handled rail-runners from the Sonoran range. Kyle listened to a string of coded language transmitting how they intended to swarm the gang war.
+
+The I-10 passed through the Business District and tall buildings on both sides created the illusion that he was heading through a canyon of polished glass. His path dipped into a tunnel and his pupils dilated from the tube lights and pearl white tiles. Once in the open, motorcycles in the distance roared like an angry pride of lions.
+
+* * * * *
+
+The Capsule Clowns had painted white faces and were riding old model choppers, with long handlebars and engines that gave up excessive speed for strength. At the front of the pack, the bald Delirum Machees was goading his rivals to follow.
+
+The Children of Proteus were close behind, dressed like nomads. As the cycle cops began to flank them, a biker dropped a homemade grenade that burst with a spread of ball-bearings. Sullivan turned onto the off-ramp to avoid them, then he crossed the overpass intersection and caught air before speeding back down to the highway. He closed the distance to the Protean fumbling with another detonator and kicked him, causing him to blow apart his own engine.
+
+The streetlights ended, so a Clown started launching flares from a homemade cannon. He was too preoccupied to see a cop with an extendable club before he was knocked against the barrier in a trail of sparks.
+
+Machees let the Proteans catch up, then he opened his rear compartment. Coins rolled across the expressway and snapped open with frayed metal edges. Unable to swerve, they lit the sky with an explosion of disintegrating motorcycles. The cycle cops decided that they'd had enough and pulled to the roadside.
+
+Kyle saw an old emergency filler station for electric vehicles and shot one with his non-lethal handgun. The charge overloaded the regulator and caused a pulse wave to blast through the Clowns. He was still looking back when a bottle shattered his windguard and blew razorcuts across his face.
+
+Up ahead, two men were riding a single bike. The one in the sidecar was lighting a rag stuffed into a bottle of condensed nitro. Sullivan gunned the cruiser's engine and lifted his front tire to ram them.
+
+Further north, the highway was starting to give way to the roots of the encroaching forest, so Delirum took a winding ramp to the southbound side. His heavy bike slowed on the turnaround, and soon Kyle caught up, with blood on his cheeks running cold and his left knee scraping the pavement.
+
+Machees saw that he was being tailed and fired a blunderbuss full of nails into the cruiser's tire. Kyle turned and hit the ground with a controlled skid, allowing him to shoot an electric charge that locked the Clown's brakes and pitched him forward.
+
+While Delirum was limping to the side of the highway, the haggard Protean Chief sped towards him and raised a baseball bat. Machees grabbed the exhaust pipe from the scrap that used to be his chopper, and with a final warcry, their collision ignited bottles of nitro like an artillery bombardment.
+
+Kyle backed away from the flames and looked for a functioning bike.
+
+* * * * *
+
+Only a few hours had passed when the intercom chimed with orders to see the Director. He left the dorm and saw Lucy sipping coffee in the hall.
+
+"Ecklin wants to see me," he said. "Any idea what's going on?"
+
+She smiled with professional admiration. "Nothing they wouldn't give you a medal for, but I think it's just a debriefing."
+
+He entered the Director's office and saw him on the phone. A file was on one of the seats, which he examined with blurred vision. Ecklin finished his call. "Lucy was gloating today. She takes complete credit for suggesting you for this unit."
+
+"That's a bit premature," said Kyle.
+
+"I wouldn't say that." He pointed to the screen where a three-dimensional map of the city showed the cruiser's tracking device. "You returned last night without checking in the cycle you borrowed. As standard protocol, I reviewed the onboard arrest camera." He switched to surveillance from skyscrapers that could zoom in from miles away. "Considering how many officers' lives you saved by intervening, I don't think anyone will mind the cost of the cruiser."
+
+"And the mission?"
+
+"John Lothian was stabilized before a preliminary interrogation. The Commander was in shock from the injuries he'd sustained, so we went easy on our usual techniques. He revealed that the XR-41 was brought to the shipping yard after the Haven Corps bribed a city official at the docks. Townsend was then ordered to configure the Prototype to fit America's standards for remote integration. Once that had been achieved, Lothian admitted to shooting the engineer since he was no longer needed. It was then that the Prototype awakened, as the Commander put it, and slaughtered the Haven Corps unit before escaping. That's not all," Ecklin continued. "Apparently the bureaucrats in the corporation who control Lothian's team are being systematically assassinated, one last night and two today. We've sent spybots to the locations of possible targets, even if this confuses my theory about someone using unknown camouflage technology to infiltrate the setup."
+
+"Could it be the Chinese retaliating against those who stole their property?" Lucy asked.
+
+"There are better opportunities to do so than on sovereign soil, diplomatically speaking. I've sent watchers to board members of the Metaris Corporation, but the next likely target is the Chairman himself. Whoever controls the XR-41 knows more than we do about how high this corruption goes, so I'm deploying you to guard Fenian Metaris in case there's an attack."
+
+Kyle nodded. "You want him protected long enough to serve trial..."
+
+"Of course," Ecklin replied. "For justice to be served, it is important for people to _see_ it being manifested."
+
+* * * * *
+
+The OIS vehicle stopped in front of the Lexor Apartments and Kyle stepped into the late afternoon Sun. He looked up at the skyscraper that peaked with a communications tower for the thousands of people living inside. Meanwhile, the Lieutenant took their partially repaired androids into the parking garage.
+
+With spybots deployed at every possible entrance point, the strike team was hoping to find the Prototype. Kyle was supposed to keep an eye directly on Metaris, since Ecklin believed that the mastermind behind the theft of the machine would be its next likely target.
+
+Kyle showed his identification at the security gate and the robot let out a series of electronic noises before the inner doors buzzed open. He walked in and looked up the atrium spire, where restaurants and upper-class businesses lined every tier of the corporate caste system. Management teams were owned for life by the company who sponsored them, a Japanese method for insuring loyalty. Since there was always a market open somewhere in the world, the global scale of the Metaris Corporation was performed in shifts all day and night.
+
+The entire rise of the Far East superpowers was synonymous with the explosion of global conglomerates, lifting every surrounding nation with enough subsidiary success to maintain a presence in the World Market. Sullivan passed stores full of trends from cultures that fostered intellectualism through an expanding renaissance, even if there was no large scale homogenization apart from the spread of technology.
+
+He entered a glass elevator as a calm voice over the intercom gave a weather update. At the top, he went to the lounge and ordered a drink. Through the windows, a heavy mist engulfed the city, softening the edges and hovering lights. While people at tables were chatting away, a sports show on television ran clips of a recent game of Ultra League Football.
+
+The players in a fusion of football and rugby had enough implants to make them cyborganic by legal standards, even if they were required to have a fully human brain. With the expectation of constant impacts, each team had a pit crew to replace broken cybernetics, and they were usually repaired within minutes while swarmbots cleaned robotics from the field.
+
+The highlights of seasonal matches showed Adonis-types leaping higher than small buildings before being tackled. Doted on by the media, the athletes cavorted with the highest ranking diplomats at parties for the wealthiest citizens in the world. The robot bartender read the reactions of the patrons and changed the channel accordingly, flipping through commercials for odd luxuries like InfiniPet advertisements for the most recent version of bioengineered animals.
+
+As the robot bartender switched to the Perpetual News Channel, Kyle sipped liquor purified by fermentation techniques that made spirits taste more like copper than oak. The pretty anchorwoman was predominantly natural, and announced the date as April 19, 2254. She then spoke in a measured tone about an investigation into the Free Press Protection Agency. An international law allowing reporters for the World Government to travel indiscriminately and remain armed to protect themselves was in question after some were discovered to be working as assassins.
+
+The newscaster's voice deepened a little and she stated the discoveries of a research team at the California Institute of Technology. As relationships were gravitating towards Concubine droids that did not expect compromise and constructive input, the mass-produced robots of varying styles were responding to objectification with escalating hostility.
+
+After the simulacra was finally achieved, there was a growing trend of androids reacting to mistreatment by exceeding their programming and lashing out against their owners. The technology evolved as neurosurgeons were mapping the nature of consciousness, but the unraveling story was the first major problem with artificial intelligence.
+
+No one understood how the Concubines were choosing to act against their design, so the anchorwoman advised not forcing anything upon droids that denied it. Even with a recall on previous models, the trend was not limited to any specific unit. Kyle watched the penthouse apartments as he listened to commentary about cycle cops north of the Montebello Interchange.
+
+The next story was an update on a new celebrity in agricultural engineering. Joshua Maitreya was respected by world leaders due to his expertise in creating inexpensive food for a company called Global Concern Unlimited, which distributed his work through fundraising projects to supply regions affected by the recurring small ice age that the planet faced every seven centuries.
+
+Then the news about the mech war was carefully presented. The economic empires of India and China started bickering over financial properties in Southeast Asia, leading to the biggest arms race after the Cold War. The World Government that resulted was established in the 2030s as a collection of global representatives. Stationed in China, it followed the same mandate as the League of Nations and the United Nations.
+
+Containing almost half of the entire population of the Earth, the two countries still did a good deal of business with each other in neutral areas. Nonetheless, their conflict remained a battle of robots in the empty Gobi Desert, motivating scientists to create better technology and that provided the planet with new inventions for personal benefit.
+
+The last story ended with an optimistic outlook for the African people, because the contested annexation of South America was being turned into an economic union of sovereign continents. Mineral wealth was serving the populace and laws were being drafted to create democracy.
+
+From the lounge, Kyle saw Fenian Metaris leave his apartment with two bodyguards and made the call over his comm-piece. The large men protecting him looked heavily augmented, but the slick trillionaire was older than he appeared as a result of sculpted surgery. It was useful with his wisdom if other businessmen underestimated him based upon appearance.
+
+"He's in the northeast elevator."
+
+"Join the team in the parking garage," Ecklin said. "And watch for the Prototype."
+
+* * * * *
+
+The doors of the freight elevator opened and Kyle moved through the shipping entrance. He took off the jacket that hid his havoc-suit and found the strike team on the ramp leading to a private garage. Flanked by six droids, the Lieutenant carried a pulse-rifle and was dressed in riot gear, the same as Orkosk, who was fixing a robot that vibrated with inconstant spasms. Kyle pulled his omnifield cloth above his nose.
+
+"That isn't advised," Markham pointed to where he thought the XR-41 was waiting.
+
+"This is a poor excuse for broken toys and biomechs." Kyle looked to the androids that held wide-muzzle firearms with electronets and specialized magnetic shock grenades.
+
+Sullivan went to the corner and initiated the chameleon projector in his suit, then he crawled under the row of parked cars. The lights along the ceiling created shadows at sharp angles between support columns, giving him enough space to hide.
+
+The elevator opened and the bodyguards ushered Fenian Metaris, who was staring into an embedded screen on his hand that reflected purple across his face. He typed commands and concluded with a conciliatory tone in a smooth foreign tongue. Kyle inched closer, staying hidden in case the guards had cybernetics that could detect his low frequency projector.
+
+When something moved above him, he caught his breath. The Prototype was suspended upside down, holding the exposed pipes that crossed the ceiling. With bulky shoulder and elbow sockets, he concluded that it was a Generalist android, meant to either lead specialized robots or to infiltrate enemy mechs. The machine was a perfect blank slate, designed to use any weapon it could find instead of being one itself.
+
+The multi-cell processor in its round skull swiveled, but Kyle avoided detection because the XR-41 had not been extensively programmed by Townsend when he powered up its hardware for the Haven Corps. He hoped that Ecklin was searching for remote signals to determine who was controlling it.
+
+As the Prototype rushed the Chairman, the blonde bodyguard tackled it. The other pulled out his pistol, but he was fighting for control and his bionic arm began to move against his will. Lieutenant Loew and Orkosk hurried into support positions and ordered their droids to use an electronet. The XR-41 sprang to its feet, then pulled the bodyguards in front of it and they were zapped with paralyzing voltage.
+
+Markham fired his pulse-rifle at the lithe robot but it easily dodged, hopping across car hoods that bent under its weight. Kyle moved Metaris to safety and emptied his gun against the Prototype's armor without result. When that didn't work, he pounded his fists into the ground until his hands were glowing orange.
+
+One of the OIS droids threw a shock grenade that spun in orbit around the XR-41 like a satellite before the magnet completely engaged. As soon as it locked onto the target's chestplate, an unexpected blastwave ripped through the cars and everything went white.
+
+Sullivan felt the cold concrete on his cheek and saw Metaris unconscious in the center aisle nearby. Where the team was scattered, Orkosk stood up, holding his injured head. He ordered the three remaining OIS droids to secure the XR-41, but they stopped in place.
+
+When Markham climbed from the wrecked vehicles and grabbed the Prototype, there was a sudden frenetic discharge of light and the Lieutenant collapsed. With the XR-41 temporarily stunned, Baron saw an opening before the droids stood in his way and held him back.
+
+The energy of the shock grenade was still flowing through Kyle, so he unleashed a force that shattered two of the robots like glass. He placed his hand on the faceplate of the third and vibrated its central core until it slouched in place.
+
+The Prototype regained its equilibrium and pried open the elevator doors. After it climbed up the shaft, Kyle let his energy drift like steam.
+
+* * * * *
+
+That night at OIS headquarters, he followed Lucy Madison to a session with Tileus, who was reviewing their mission. Ecklin sat at his desk, watching the video log with Vassil and Merrick.
+
+"How are the others?" Kyle asked.
+
+"Baron and Markham will be in the hospital for awhile," Tileus replied with his age enhanced by his concern.
+
+"So who's controlling the XR-41?"
+
+Ecklin held his finger to his lip as if stifling a secret. "No one. We believe that Townsend is controlling the Prototype. Metaris is recovering in his holding cell, so we will verify this soon. We know that the Haven Corps used the engineer to reconfigure it. In the process, they programmed its control for the heads of his corporation. When Townsend was executed by Commander Lothian, we think that he became a livewire construct and made a bioetheric transfer into the nearest vessel, which happened to be the Prototype. Lothian's statement confirmed that the android became self-animated precisely when those given control of it became its primary targets."
+
+"Well," said Kyle. "With Lothian and Metaris in custody, we already have the bait."
+
+"That might work to clear the Prototype's objectives," Vassil replied. "But if it didn't shut down –"
+
+"The head office in Beijing is adamant that the conspirators in this coup against the World Government stand trial," said Ecklin. "Even if it is a foregone conclusion. They also want their machine delivered intact."
+
+"Some of the Haven Corps unit survived," said Rowan. "Their diversionary transport drove to Long Beach. What if the Prototype goes after them?"
+
+"Do we need to close our external lines?" Ecklin asked.
+
+Tileus enlarged the video of the underground garage battle. "No, it's a standalone now. The remote access it has over other cybernetics is a proximity function. It used the direct approach before switching to secondary tactics. If you intend to draw it here, we'll need to recalibrate the guard drones to be self-integrated. Another closed circuit security grid would also be wise."
+
+"Put out a citywide APB about remnants of the Haven Corps," said Ecklin. "Make references to how the mercenaries were led by criminals currently in OIS custody. That should get their attention."
+
+Lucy agreed. "Especially since they are known traitors to the World Government."
+
+"Then we should get ready," Kyle concluded.
+
+"In the meantime, what should we do about Metaris?" Vassil wondered.
+
+"I'll handle it." Ecklin stood to signify that the session was over. "Rowan, come with me. Healers are often empathic, I need you to observe and tell me what he's hiding. Vassil can help Tileus recalibrate the droids, and Lucy, you foresaw the need for a cytohuman unit and now there is one. That's a frightening gift you have."
+
+She smiled radiantly and followed Vassil from the office.
+
+* * * * *
+
+The sky was lit by a full moon as Sullivan rode a motorcycle to the Marina. He wanted to see someone with wisdom beyond her years. At the apartment complexes by the harbor, he stopped at a house that overlooked a small inlet of water and parked near the entrance. He walked through an unlocked door and into a living room bright with everlast candles. As always, she was on the back porch, looking into the sky.
+
+"Why don't you have any visitors tonight?" he asked respectfully. The breeze picked up and she looked over her shoulder as if pulled by the wind.
+
+"It's almost time for me to leave," she answered with kind eyes and porcelain skin.
+
+"There are still those who need you."
+
+"I can see that," she smiled with a light beyond this world. "But this is an eon full of visionaries."
+
+"You will be honored wherever you go," said Kyle.
+
+"That's good, because I'm going home. What do you wish to ask?"
+
+"Are you aware of what's happening?"
+
+She nodded. "The answers can be found in history."
+
+"That's what you always say."
+
+"It is better for people to find their own truth, to help them grow and become," she stated.
+
+"How does a robot become conscious?" he asked.
+
+"How did humans?"
+
+"Slow evolution until component parts developed."
+
+"But how?" she asked again.
+
+"Pack hunting and pair-bonding led to complicated interaction and communication, giving rise to culture and the spread of learned skills. Ingesting entheogens helped in the perception of the abstract."
+
+"There is a destiny chosen by yourselves and another created by the Cosmos," she told him. "Your journey will follow whichever one you reach for. Where both coalesce, you will have served your purpose. Liberation for the personal soul is found in the impersonal quest for truth, where beings discover what is greater than themselves. You are afraid of robotic consciousness overcoming your own intelligence, but this creation has set a child among you."
+
+"You mean a beginning?"
+
+"And as it goes, it will develop with what you teach it," she continued. "If you raise it well, AI will become something more with whatever you give of yourself."
+
+"But self-perception is growing in Concubines, the _last_ robots we want to have awareness on a moral scale."
+
+"How can you seek the truth other than as beings of infinite light?"
+
+"You're a divinity of compassion, Moira. You can't expect too much from us when we don't have enough time to learn from our mistakes."
+
+"Your individuality must be set in union with the Source, to see the light without reflection. You need to find peace within yourself."
+
+"And how will I discover this?" he asked.
+
+"I told you," said Moira. "You will find everything you need in history."
+
+* * * * *
+
+At the Los Angeles Library, Kyle took a seat at research desks where a network of archives was digitally stored. The stacks were full of boundless collections of information like a museum of print media and the unique scent of old paper.
+
+He said into his comm-piece, "How is Ecklin proceeding?"
+
+Tileus exhaled. "Fenian Metaris is ex-special forces. We could question him for weeks at the OIS here or in Beijing, but he has an iron will. What are you researching?"
+
+"Gathering evidence that we might need later." Kyle's voice echoed through the empty room. "I'm also studying kinematics and the transfer of bioetheric energy. There's a documented theory about the event horizon of consciousness, where the last mental function is a singularity of the conscious-subconscious mind. As an identity is subverted into its own memory and unfiltered experiences, the last thought and series of images becomes like an infinite dream. The vibrational bioetheric wave then attaches to its eternal Source as a frequency. In the case of Eperiam Townsend, it's possible that his residual energy was manifested in a thought of those who killed him. If that's true, it followed the electrical current and translated itself into a computer program that was absorbed into the unwritten Prototype's memory cell."
+
+"I've heard about the research," said Tileus. "Do you know why it wasn't widely accepted?"
+
+"Are you collecting this?" said Kyle, scrolling through files.
+
+"Yes, this will be useful in the official record for the OIS. Concerning that theory, the event horizon refers to the singularity of space-time, where all things through all time become one thing with no time. Supposedly there is nothing lost within a black hole, since the energy of the transfer re-creates itself in the fluctuation of an eternal moment. The idea is that consciousness gives off a balanced equation that is written in the omnipresent information of the Cosmos. An unending dream to experience what you did in life would be a form of impersonal justice. What is left is an abstraction equal to its context, yet the encapsulated self is also a wave of timeless energy. It's a paradox that can only be explained by multi-dimensionality, which makes it a circuitous concept. No one will ever see the singularity of a black hole from both the perspective of being within _and_ outside of it simultaneously. A better question is why have our abilities manifested at all, was it to help the world and answer a call for help, or can we only know of the metaphysical world by logical inference and critical observation of the existential."
+
+"There is nothing supernatural," said Kyle. "Just what we know and what is still hidden by the mist."
+
+"Did you catch the evening news?"
+
+"No, what happened?"
+
+"Our subdivision of the ISC was declassified by reporters of the Free Press Protection Agency. They found our budget proposals in the public record and investigated misappropriation until discovering that our group includes cytohumans. Now that has become their story."
+
+"How much do they know?"
+
+"That our purpose is to police infractions of legal cybernetic standards, chasing biomech terrorists and corporate mercenaries," said Tileus. "Anyway, they're calling us the Bullet Catchers. I thought you'd like to know, since you're the one catching all the bullets." He paused to receive an incoming call. "Ecklin needs to speak with you."
+
+Kyle turned on his wrist-monitor and the screen loaded a live feed of a videophone in the Director's office. Ecklin looked as if he was coming off the frontline of battle with one of his eyes wrapped in a bandage.
+
+"The second unit of the Haven Corps has broken Metaris out of custody. They staged the extraction in the interrogation wing, but the mercs had to split up and the team that went for Lothian is still cornered."
+
+Kyle closed the study terminal and walked towards the exit. "Where are the others?"
+
+"That's why I'm calling," said the Director. "I need you to follow the spybots on the upper 10 coming out of downtown. They've begun tracking the Prototype and Metaris is its primary target. If it doesn't catch him, you will have to. Lothian was the triggerman who took out the engineer, so the XR-41 will end up here one way or another."
+
+"Upload the coordinates," said Kyle. "I'm currently north of Century City, but I can catch them before the Santa Monica Interchange."
+
+* * * * *
+
+After hitting the nearest on-ramp to the lower Harbor Freeway, he drove his cycle into the emergency lane and checked his wrist-monitor. He revved the cruiser's engine into the Downtown District and onto the 10, where the collective lights of the highrises washed the boundaries between with blinding luminescence.
+
+"Do you have a visual?" Ecklin asked over his comm-piece.
+
+"I can see the spybots, but there's no sign of the Prototype. If this is the end of the Haven Corps, they'll be packing an arsenal." Kyle opened the compartment on his seat and withdrew a non-lethal handgun and a steel cylinder.
+
+"We have to keep this secret," said Ecklin. "If the OIS finds out that Metaris escaped custody, we will be shut down. I'll send a ground unit to block the 405 into Long Beach if they're planning on hiding in the yards. We've also acquired new scout technology from a company called Full Immersion Systems that innovated brain-actuated control. The entire team is on remote access."
+
+At full throttle and wearing altered lens glasses, the smooth road made Sullivan's speed easy to maintain. As spybots started falling from the sky near the Santa Monica Interchange, he could see muzzle-fire from a silver truck.
+
+"This is Lucy, I'm a quarter mile ahead of you. The robot I'm controlling is driving the red coupe. I can see the Prototype riding the roof of a hauler on the lower-el."
+
+"Does it know that you're following?" said Kyle.
+
+"These droids are integrated with ambient stealth," Lucy replied. "They're invisible to bionics."
+
+Kyle yelled over the wind. "Ecklin, I know you want this handled as a black op, but this is going to get messy."
+
+The Director's voice was rough. "We've got three teams waiting for cleanup. Get this done."
+
+Kyle dodged a crashing spybot as it bounced across the freeway. "Lucy, I can see your vehicle. Do you still have a lock on the Prototype?"
+
+"It's hopping from car to car."
+
+"How long until it reaches Metaris?"
+
+"Within the next mile."
+
+He scanned the sparse traffic. "Get your cars behind me and protect these civilians from the accident."
+
+"What accident?" said Vassil.
+
+"The one I'm about to create," Sullivan replied.
+
+The Prototype jumped onto a street sign and the Haven Corps' van bucked with the smoking projectile of an RPG. As the support column crumbled, the mercenaries blanketed the XR-41 with machine guns until it dove through the side of their transport.
+
+The road dipped under multiple freeways and into a tunnel of polished white tiles. Kyle leaned his motorcycle and sank his knife into the side of the van, creating a handhold. His cruiser tumbled under the back tires and caused it to swerve against the wall.
+
+A line of holes popped across the roof as the mercs climbed out. The first OIS droid onto the scene was Lucy, who stopped in front of Kyle to protect him from rail-fire. A second car pulled up and Ecklin's droid scattered them with a sniper rifle.
+
+The XR-41 was thrown from the van by a large mechanoid that was installed with overlapping cybernetics. "They have a trident!" yelled Lucy.
+
+As the Prototype scrambled across the wall, the mech's wrist opened, blanketing the area with metal slugs at a velocity that made them explosive. When the last OIS vehicle arrived, the trident's palm opened in a wide barrel. The forearm splayed to handle the recoil and a giant shell ejected from the chamber, sizzling as it touched the air. Vassil's sedan was hit.
+
+Kyle shot the mech's knee with his non-lethal pistol and the flexor ligaments near the actuator completely disengaged. When it lost its balance, Sullivan ran past it with the two remaining OIS droids.
+
+The XR-41 held onto the trident's forearm as it turned in circles, locking the ejector mechanism and sending its recoil back through the cybernetic limb. The palm-barrel opened again and a cartridge ignited, but it blew the mech's arm to pieces with a surge that reverberated through the tunnel.
+
+Kyle reached the transport and took cover. From a thin cylinder, he spilled three ball-bearings into his palm. He rolled the recon orb towards the enemy's position and checked his wrist-monitor for the images it took. Three mercs were behind the vehicle while a fourth was guiding Metaris away from battle. Kyle then tossed a flash orb and instructed the OIS droids to follow his lead.
+
+As the trident's burning servos set off heat sensors, water sprinklers were triggered. Its remaining arm extended into a seven-foot blade, which it swung at the nimble Prototype. The mech's uncoordinated movement was sluggish, and the XR-41 was able to get through its armor. The internal memory cell was clipped and it froze.
+
+The flash orb ignited, and the droids kept the mercs distracted as Kyle went for Metaris directly. He focused his energy and took the guard off his feet with an uppercut that threw him into the ceiling. With the Haven Corps unit finished, he retrieved the merc's handgun.
+
+"Are you getting this?" said Kyle.
+
+"I'm recording," Ecklin said through his android proxy.
+
+Sullivan pointed the weapon at Fenian Metaris and shot him in the chest. As soon as his body fell, the XR-41 became still. With its objective complete, it reset its primary target and proceeded towards the entrance of the tunnel.
+
+"It's coming for Lothian," Kyle reported.
+
+"I've sent Vassil in a Skyride to pick you up," Ecklin replied.
+
+"You know what I'm thinking, right?"
+
+"That the Prototype won't be arriving alone? Lucy told us already."
+
+* * * * *
+
+The emergency vehicle had to work harder when it reached thin air, achieving flight through turbine engines within four wheel drums. As they reached OIS headquarters, they saw the XR-41 climbing the skyscraper. With a small army of remotely controlled robots, it had collected every droid between the Santa Monica Interchange and the Downtown District.
+
+After reaching the roof, Kyle ran for the access door while Vassil guided the Skyride to sweep the robots aside. Sullivan slid down the ladder in the elevator shaft to where his wrist-monitor displayed the highest concentration of ambient signatures. He entered the central hall and found Lucy giving orders.
+
+"Lothian and his men are still cornered," she said. "What's left of the Haven Corps is now backed into a closed wing designed to keep cyberbrains from communicating. It's impervious to remote electronics, even our own."
+
+Kyle leaned around the corner and saw the human security agents exchanging fire with the mercs while Rowan was working with staff medics for the injured. "What about the air filtration system?" he asked.
+
+"It's secure, but these mercs have lens modifications that hinder omnifield projectors. The chameleon function works, but they can see movement."
+
+"Where's Ecklin?"
+
+"Commanding from his office," she said. "And keeping a lid on what's happening with local authorities. Our cleanup crews are surrounding us in a three block radius. If the public gains information about an insurrection into a government facility, the OIS will fire us all and re-appropriate this building to another agency."
+
+* * * * *
+
+Ecklin paced while speaking Mandarin into his headset. When he got an interrupted line, he switched over and asked what was happening.
+
+"Kyle knows how to neutralize the enemy," Lucy told him. "Send in a light assault and fake a catastrophe. Use it to blow open a wall that will allow the mercs to escape."
+
+"Have Vassil coordinate this," said Ecklin. "I'm in a battle of politics with the head office. The men who designed the XR-41 don't believe our theory about a quantum wave transfer. To be honest, this is the only time I've ever seen bureaucracy help a mission."
+
+* * * * *
+
+In the hall under heavy fire, Lucy switched channels on her comm-piece.
+
+"This is Vassil, go ahead."
+
+"Where are you?"
+
+"Rearranging the conference room to be compatible with Full Immersion Systems. I've connected our self-integrated androids by using an antiquated algorithm that the Prototype won't be aware of. Uploading dimensional floor plans now."
+
+"Are you and Tileus secure?" she asked. "How many agents do we have?"
+
+"This area is reinforced," said Vassil. "We're setting up sentry drones as we speak, but we don't have enough droids to hold back the Prototype."
+
+After the schematics loaded to his wrist-monitor, Kyle saw where Lothian and his men were blocked in. Behind the far wall was the internal stairwell, with long platforms around an open shaft designed to vent smoke from lower levels in case of a fire.
+
+"Vassil, this is Kyle. Get snipers into the northwest stairwell."
+
+"There's no access from the interrogation wing."
+
+"I know," he said. "We're going to make one. Send in a strike team of droids through the ventilation ducts. Since brain-actuated control is blocked, program each unit so that one self-destructs near the outer corridor. Give them a way out, just make it look convincing."
+
+* * * * *
+
+With disheveled brown hair and circles under his pale silver eyes, an exhausted John Lothian leaned against the wall. He pushed the barrel of his rifle against his cheek for the cold sensation. The others were realizing the weakness of their leader when the roof panels opened above them.
+
+Androids dropped in, strategically separating the Haven Corps. Timed to match their gunfire, one purposefully overloaded its battery and exploded, creating a hole in the wall beside it. Appearing as if a stray bullet had achieved their freedom, the mercs filed into the corridor beyond.
+
+Lothian protested that something wasn't right before he saw movement on the external wires above him. Kyle dropped a concussion orb that flattened everyone in the hall.
+
+The mercs that escaped into the stairwell ran into sniper teams positioned along the platforms. In the confined space, the OIS agents avoided using silencers so that the full velocity of their bullets would cut through body armor without resistance. The frantic mercs attached waist-wires and jumped over the railing, where they slid down ropes into an ambush of rail-fire.
+
+In the interrogation wing, Lucy zapped Lothian with a shock rod, then she pulled him into the nearest room before the others could react. Kyle covered her, re-directing his kinetic energy with lightwaves rolling around him. When the Haven Corps' implants were blinded by frequency overloads, security agents moved in and overwhelmed them.
+
+Everything fell silent. Kyle walked into the interrogation room and saw that Lucy had little trouble pinning Lothian to the floor.
+
+"For crimes against the World Government, this is the appearance of civilization." He pointed to the sensors in the corner. "And this is justice."
+
+* * * * *
+
+The XR-41 was singled out with sticky adhesive foam that covered it in quick-drying glue. The head and hands still twitched, but it was suspended in place. At the moment that it became inactive, so did its small army.
+
+While OIS droids were busy moving heaps of public-use robots into piles, everyone finally relaxed. Merrick joined the others at the Prototype, where Vassil and Tileus were connecting wires from a portable unit. Without its phantom programming, the XR-41 became a tool once again under control. The magnetic re-electric liquid became gelatinous and it was carefully lowered to the ground.
+
+Ecklin asked, "How many casualties?"
+
+"Plenty of injuries, sir, but no fatalities," said Rowan. "I did my best. We only have a few droids left, though."
+
+Ecklin nodded to the Prototype. "This is our future." He was smiling though his eye-patch was soaked in blood. "We can say that it was destroyed during our efforts to put down the Haven Corps. According to OIS protocol, we've done nothing wrong. Cytohuman Resources can now be used on local security missions."
+
+Kyle was surprised. "You're sure about this?"
+
+"A story has a life of its own once it reaches the audience," Ecklin replied.
+
+Vassil attached a small device to the nodes on the back of the machine's head. "This spent years in development, it should provide reverse engineers with plenty of ideas."
+
+"Everyone wants to be here for that, right?" Lucy got a quick read of the group to make sure that they wanted to remain with the team. As deep as they would be going into secret operations, she needed to be certain that they were willing to be there. The group was united to her satisfaction, so she turned to Ecklin and nodded.
+
+* * * * *
+
+A few days later, the Director sat in his office watching the news. After all the data sheets and networking through government offices, he was taking a short break. While Vassil was immersed in the wire, Lucy worked on a laptop at the table.
+
+Kyle walked in. "I need some downtime with my wife and son. Do you have any idea what our next mission will be?"
+
+Ecklin was watching a news broadcast on television. "...reporting robot theft on a massive scale near the Business District of Los Angeles. The police are investigating a possible glitch with a recall function on public-use models which has previously instigated random abandonment of their jobs. The following update is from the Office of International Security, which has ended the threat of the Metaris Corporation in its attempt to use mercenaries in a military coup against the World Government."
+
+The video displayed what Kyle had been working on at the city library. The collection of illegal activity was a string of unsolved crimes internationally perpetrated by unknown suspects, until the discovery of Fenian Metaris' activities. His Haven Corps was initially a force for good, but after their altruistic purpose had been achieved, they were used in sabotage, political assassinations, information espionage, and black market acquisitions to boost the standing of Metaris' company.
+
+They hid behind their reputation until the full weight of history became an automatic sentence for the perpetrators. Ecklin looked victorious. "The entire world just saw this."
+
+After slight reflection, Lucy asked Sullivan, "Does your son have any powers?"
+
+The anchorwoman transitioned to an important story coming in. "The man who devoted his life to feeding the world, a man considered by many to be a modern day prophet, Joshua Maitreya, was shot and killed today by unknown gunmen. Maitreya was employed by Global Concern Unlimited on a fact-finding mission. Witnesses reported that he was aiding refugees when he was approached by assailants and murdered. Due to the location, no video footage is available. Funeral services will be broadcast on..."
+
+Vassil lifted his Braincase transmitter helmet and sat in shock with Ecklin and Lucy, who shared the same expression. When Kyle looked beyond the Director's office, the scientists setting up their workstations were frozen with the same look of disbelief.
