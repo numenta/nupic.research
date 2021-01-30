@@ -89,14 +89,14 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
 class BiasingDendriticLayer(DendriticLayerBase):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return dendrite_fxns.dendritic_bias_1d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_bias(y, dendrite_activations)
 
 
 class GatingDendriticLayer(DendriticLayerBase):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a gating mechanism."""
         # Multiple by the sigmoid of the max along each segment.
-        return dendrite_fxns.dendritic_gate_1d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_gate(y, dendrite_activations)
 
 
 class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
@@ -108,7 +108,7 @@ class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
     """
 
     def apply_dendrites(self, y, dendrite_activations):
-        return dendrite_fxns.dendritic_absolute_max_gate_1d(y, dendrite_activations)
+        return dendrite_fxns.dendritic_absolute_max_gate(y, dendrite_activations)
 
 
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):

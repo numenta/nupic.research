@@ -51,19 +51,19 @@ import torch
 from nupic.research.frameworks.dendrites import functional as F
 
 
-class DendriticBias1d(torch.nn.Module):
+class DendriticBias(torch.nn.Module):
     def forward(self, y, dendrite_activations):
-        return F.dendritic_bias_1d(y, dendrite_activations)
+        return F.dendritic_bias(y, dendrite_activations)
 
 
-class DendriticGate1d(torch.nn.Module):
+class DendriticGate(torch.nn.Module):
     def forward(self, y, dendrite_activations):
-        return F.dendritic_gate_1d(y, dendrite_activations)
+        return F.dendritic_gate(y, dendrite_activations)
 
 
-class DendriticAbsoluteMaxGate1d(torch.nn.Module):
+class DendriticAbsoluteMaxGate(torch.nn.Module):
     def forward(self, y, dendrite_activations):
-        return F.dendritic_absolute_max_gate_1d(y, dendrite_activations)
+        return F.dendritic_absolute_max_gate(y, dendrite_activations)
 
 
 class DendriticGate2d(torch.nn.Module):
@@ -77,9 +77,9 @@ class DendriticAbsoluteMaxGate2d(torch.nn.Module):
 
 
 __all__ = [
-    "DendriticBias1d",
-    "DendriticGate1d",
-    "DendriticAbsoluteMaxGate1d",
+    "DendriticBias",
+    "DendriticGate",
+    "DendriticAbsoluteMaxGate",
     "DendriticGate2d",
     "DendriticAbsoluteMaxGate2d",
 ]

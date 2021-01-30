@@ -28,7 +28,7 @@ a set of dendritic segments.
 import torch
 
 
-def dendritic_bias_1d(y, dendrite_activations):
+def dendritic_bias(y, dendrite_activations):
     """
     Returns the sum of the feedforward output and the max of the dendrite
     activations along each segment.
@@ -41,7 +41,7 @@ def dendritic_bias_1d(y, dendrite_activations):
     return y + dendrite_activations.max(dim=2).values  # max along each segment
 
 
-def dendritic_gate_1d(y, dendrite_activations):
+def dendritic_gate(y, dendrite_activations):
     """
     Returns the product of the feedforward output and sigmoid of the the max
     of the dendrite activations along each segment.
@@ -55,7 +55,7 @@ def dendritic_gate_1d(y, dendrite_activations):
     return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
 
 
-def dendritic_absolute_max_gate_1d(y, dendrite_activations):
+def dendritic_absolute_max_gate(y, dendrite_activations):
     """
     Returns the product of the feedforward output and the sigmoid of the
     absolute max of the dendrite activations along each segment.
@@ -133,9 +133,9 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
 
 
 __all__ = [
-    "dendritic_bias_1d",
-    "dendritic_gate_1d",
-    "dendritic_absolute_max_gate_1d",
+    "dendritic_bias",
+    "dendritic_gate",
+    "dendritic_absolute_max_gate",
     "dendritic_gate_2d",
     "dendritic_absolute_max_gate_2d",
 ]
