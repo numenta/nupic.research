@@ -30,6 +30,14 @@ from collections import namedtuple
 import torch
 
 dendrite_output = namedtuple("dendrite_output", ["values", "indices"])
+dendrite_output.__doc__ = """
+A named tuple for outputs modified by `apply_dendrites`_.
+
+:attr values: output tensor after being modulated by dendrite activations
+:attr indices: the indices of the winning segments used to modulate the output tensor
+
+.. _apply_dendrites: nupic.research.frameworks.dendrites.functional.apply_dendrites
+"""
 
 
 def dendritic_bias(y, dendrite_activations):
