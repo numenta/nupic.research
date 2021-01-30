@@ -54,7 +54,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         module = DendriticBias()
         output_a = F.dendritic_bias(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
-        all_equal = (output_a == output_b).all()
+        all_equal = (output_a[0] == output_b[0]).all()
         self.assertTrue(all_equal)
 
     def test_dendritic_gate(self):
@@ -64,7 +64,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         module = DendriticGate()
         output_a = F.dendritic_gate(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
-        all_equal = (output_a == output_b).all()
+        all_equal = (output_a[0] == output_b[0]).all()
         self.assertTrue(all_equal)
 
     def test_dendritic_absolute_max_gate(self):
@@ -75,7 +75,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         module = DendriticAbsoluteMaxGate()
         output_a = F.dendritic_absolute_max_gate(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
-        all_equal = (output_a == output_b).all()
+        all_equal = (output_a[0] == output_b[0]).all()
         self.assertTrue(all_equal)
 
     def test_dendritic_gate_2d(self):
@@ -85,7 +85,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         module = DendriticGate2d()
         output_a = F.dendritic_gate_2d(self.y_2d, self.dendrite_activations_2d)
         output_b = module(self.y_2d, self.dendrite_activations_2d)
-        all_equal = (output_a == output_b).all()
+        all_equal = (output_a[0] == output_b[0]).all()
         self.assertTrue(all_equal)
 
     def test_dendritic_absolute_max_gate_2d(self):
@@ -97,7 +97,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         output_a = F.dendritic_absolute_max_gate_2d(self.y_2d,
                                                     self.dendrite_activations_2d)
         output_b = module(self.y_2d, self.dendrite_activations_2d)
-        all_equal = (output_a == output_b).all()
+        all_equal = (output_a[0] == output_b[0]).all()
         self.assertTrue(all_equal)
 
 

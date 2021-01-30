@@ -25,7 +25,6 @@ linear layer with the output from a set of dendritic segments.
 """
 import abc
 
-import nupic.research.frameworks.dendrites.modules as dendritic_modules
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
 from .apply_dendrites import (
@@ -101,7 +100,7 @@ class BiasingDendriticLayer(DendriticLayerBase):
 
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return self.dendritic_bias(y, dendrite_activations)
+        return self.dendritic_bias(y, dendrite_activations).values
 
 
 class GatingDendriticLayer(DendriticLayerBase):
@@ -112,7 +111,7 @@ class GatingDendriticLayer(DendriticLayerBase):
 
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return self.dendritic_gate(y, dendrite_activations)
+        return self.dendritic_gate(y, dendrite_activations).values
 
 
 class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
@@ -129,7 +128,7 @@ class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
 
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return self.dendritic_absolute_max_gate(y, dendrite_activations)
+        return self.dendritic_absolute_max_gate(y, dendrite_activations).values
 
 
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
@@ -201,7 +200,7 @@ class GatingDendriticLayer2d(DendriticLayer2dBase):
 
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return self.dendritic_gate_2d(y, dendrite_activations)
+        return self.dendritic_gate_2d(y, dendrite_activations).values
 
 
 class AbsoluteMaxGatingDendriticLayer2d(DendriticLayer2dBase):
@@ -215,4 +214,4 @@ class AbsoluteMaxGatingDendriticLayer2d(DendriticLayer2dBase):
 
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a bias."""
-        return self.dendritic_absolute_max_gate_2d(y, dendrite_activations)
+        return self.dendritic_absolute_max_gate_2d(y, dendrite_activations).values

@@ -25,7 +25,11 @@ a method to combine the output from a (sparse) linear layer with the output from
 a set of dendritic segments.
 """
 
+from collections import namedtuple
+
 import torch
+
+dendrite_output = namedtuple("dendrite_output", ["values", "indices"])
 
 
 def dendritic_bias(y, dendrite_activations):
@@ -38,7 +42,9 @@ def dendritic_bias(y, dendrite_activations):
                                  axes represent batch, vector, and dendrite
                                  dimensions, respectively.
     """
-    return y + dendrite_activations.max(dim=2).values  # max along each segment
+    # Take max along each segment.
+    winning_activations, indices = dendrite_activations.max(dim=2)
+    return dendrite_output(y + winning_activations, indices)
 
 
 def dendritic_gate(y, dendrite_activations):
@@ -52,7 +58,8 @@ def dendritic_gate(y, dendrite_activations):
                                  dimensions, respectively.
     """
     # Multiple by the sigmoid of the max along each segment.
-    return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
+    winning_activations, indices = dendrite_activations.max(dim=2)
+    return dendrite_output(y * torch.sigmoid(winning_activations), indices)
 
 
 def dendritic_absolute_max_gate(y, dendrite_activations):
@@ -65,12 +72,12 @@ def dendritic_absolute_max_gate(y, dendrite_activations):
                                  the axes represent batch, vector, and
                                  dendrite dimensions, respectively.
     """
-    inds = dendrite_activations.abs().max(dim=2).indices
-    inds = inds.unsqueeze(dim=2)
-    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
+    indices = dendrite_activations.abs().max(dim=2).indices
+    unsqueezed = indices.unsqueeze(dim=2)
+    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
     dendrite_activations = dendrite_activations.squeeze()
     dendrite_activations = torch.sigmoid(dendrite_activations)
-    return y * dendrite_activations
+    return dendrite_output(y * dendrite_activations, indices)
 
 
 def dendritic_gate_2d(y, dendrite_activations):
@@ -89,8 +96,8 @@ def dendritic_gate_2d(y, dendrite_activations):
                                  with shape (b, c) where the axes represent the
                                  batch and channel dimensions, respectively)
     """
-    dendrite_activations = dendrite_activations.max(dim=2).values
-    dendrite_activations = torch.sigmoid(dendrite_activations)
+    winning_activations, indices = dendrite_activations.max(dim=2)
+    winning_activations = torch.sigmoid(winning_activations)
 
     # The following operation uses `torch.einsum` to multiply each channel by a
     # single scalar value
@@ -98,7 +105,7 @@ def dendritic_gate_2d(y, dendrite_activations):
     #    * i => the channel dimension
     #    * jk => the width and height dimensions
 
-    return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
+    return dendrite_output(torch.einsum("bijk,bi->bijk", y, winning_activations), indices)
 
 
 def dendritic_absolute_max_gate_2d(y, dendrite_activations):
@@ -117,9 +124,9 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
                                  with shape (b, c) where the axes represent the
                                  batch and channel dimensions, respectively)
     """
-    inds = dendrite_activations.abs().max(dim=2).indices
-    inds = inds.unsqueeze(dim=2)
-    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
+    indices = dendrite_activations.abs().max(dim=2).indices
+    unsqueezed = indices.unsqueeze(dim=2)
+    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
     dendrite_activations = dendrite_activations.squeeze(dim=2)
     dendrite_activations = torch.sigmoid(dendrite_activations)
 
@@ -129,7 +136,7 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
     #    * i => the channel dimension
     #    * jk => the width and height dimensions
 
-    return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
+    return dendrite_output(torch.einsum("bijk,bi->bijk", y, dendrite_activations), indices)
 
 
 __all__ = [
