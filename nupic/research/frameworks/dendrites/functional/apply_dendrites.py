@@ -130,3 +130,12 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
     #    * jk => the width and height dimensions
 
     return torch.einsum("bijk,bi->bijk", y, dendrite_activations)
+
+
+__all__ = [
+    "dendritic_bias_1d",
+    "dendritic_gate_1d",
+    "dendritic_absolute_max_gate_1d",
+    "dendritic_gate_2d",
+    "dendritic_absolute_max_gate_2d",
+]
