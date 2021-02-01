@@ -45,10 +45,10 @@ def dendritic_bias(y, dendrite_activations):
     Returns the sum of the feedforward output and the max of the dendrite
     activations along each segment.
     :param y: torch Tensor with shape (b, n) where the axes represent the batch
-              and vector dimensions, respectively.
-    :param dendrite_activations: torch Tensor with shape (b, n, d) where the
-                                 axes represent batch, vector, and dendrite
-                                 dimensions, respectively.
+              size and number of units, respectively.
+    :param dendrite_activations: torch Tensor with shape (b, n, s) where the
+                                 axes represent the batch size, number of units, and
+                                 number of segments respectively.
     """
     # Take max along each segment.
     winning_activations, indices = dendrite_activations.max(dim=2)
@@ -59,11 +59,11 @@ def dendritic_gate(y, dendrite_activations):
     """
     Returns the product of the feedforward output and sigmoid of the the max
     of the dendrite activations along each segment.
-    :param y: torch Tensor with shape (b, n) where the axes represent the
-              batch and vector dimensions, respectively.
-    :param dendrite_activations: torch Tensor with shape (b, n, d) where the
-                                 axes represent batch, vector, and dendrite
-                                 dimensions, respectively.
+    :param y: torch Tensor with shape (b, n) where the axes represent the batch
+              size and number of units, respectively.
+    :param dendrite_activations: torch Tensor with shape (b, n, s) where the
+                                 axes represent the batch size, number of units, and
+                                 number of segments, respectively.
     """
     # Multiple by the sigmoid of the max along each segment.
     winning_activations, indices = dendrite_activations.max(dim=2)
@@ -74,11 +74,11 @@ def dendritic_absolute_max_gate(y, dendrite_activations):
     """
     Returns the product of the feedforward output and the sigmoid of the
     absolute max of the dendrite activations along each segment.
-    :param y: torch Tensor with shape (b, n) where the axes represent
-              the batch and vector dimensions, respectively.
-    :param dendrite_activations: torch Tensor with shape (b, n, d) where
-                                 the axes represent batch, vector, and
-                                 dendrite dimensions, respectively.
+    :param y: torch Tensor with shape (b, n) where the axes represent the batch
+              size and number of units, respectively.
+    :param dendrite_activations: torch Tensor with shape (b, n, s) where the
+                                 axes represent the batch size, number of units, and
+                                 number of segments, respectively.
     """
     indices = dendrite_activations.abs().max(dim=2).indices
     unsqueezed = indices.unsqueeze(dim=2)
@@ -102,7 +102,8 @@ def dendritic_gate_2d(y, dendrite_activations):
               width dimensions respectively)
     :param dendrite_activations: the dendrite activation values (a torch tensor
                                  with shape (b, c, d) where the axes represent the
-                                 batch, channel, and dendrite dimensions, respectively)
+                                 batch size, number of channels, and number of segments
+                                 respectively)
     """
     winning_activations, indices = dendrite_activations.max(dim=2)
     winning_activations = torch.sigmoid(winning_activations)
@@ -131,7 +132,8 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
               width dimensions respectively)
     :param dendrite_activations: the dendrite activation values (a torch tensor
                                  with shape (b, c, d) where the axes represent the
-                                 batch, channel, and dendrite dimensions, respectively)
+                                 batch size, number of channels, and number of segments
+                                 respectively)
     """
     indices = dendrite_activations.abs().max(dim=2).indices
     unsqueezed = indices.unsqueeze(dim=2)
