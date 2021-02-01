@@ -25,10 +25,10 @@ import torch
 
 import nupic.research.frameworks.dendrites.functional as F
 from nupic.research.frameworks.dendrites import (
-    DendriticAbsoluteMaxGate,
+    DendriticAbsoluteMaxGate1d,
     DendriticAbsoluteMaxGate2d,
-    DendriticBias,
-    DendriticGate,
+    DendriticBias1d,
+    DendriticGate1d,
     DendriticGate2d,
 )
 
@@ -49,31 +49,31 @@ class ApplyDendritesModulesTest(unittest.TestCase):
 
     def test_dendritic_bias(self):
         """
-        Ensure `dendritic_bias` and `DendriticBias` yield the same outputs.
+        Ensure `dendritic_bias_1d` and `DendriticBias1d` yield the same outputs.
         """
-        module = DendriticBias()
-        output_a = F.dendritic_bias(self.y, self.dendrite_activations)
+        module = DendriticBias1d()
+        output_a = F.dendritic_bias_1d(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
         all_equal = (output_a[0] == output_b[0]).all()
         self.assertTrue(all_equal)
 
     def test_dendritic_gate(self):
         """
-        Ensure `dendritic_gate` and `DendriticGate` yield the same outputs.
+        Ensure `dendritic_gate_1d` and `DendriticGate1d` yield the same outputs.
         """
-        module = DendriticGate()
-        output_a = F.dendritic_gate(self.y, self.dendrite_activations)
+        module = DendriticGate1d()
+        output_a = F.dendritic_gate_1d(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
         all_equal = (output_a[0] == output_b[0]).all()
         self.assertTrue(all_equal)
 
     def test_dendritic_absolute_max_gate(self):
         """
-        Ensure `dendritic_absolute_max_gate` and `DendriticAbsoluteMaxGate` yield the
-        same outputs.
+        Ensure `dendritic_absolute_max_gate_1d` and `DendriticAbsoluteMaxGate1d` yield
+        the same outputs.
         """
-        module = DendriticAbsoluteMaxGate()
-        output_a = F.dendritic_absolute_max_gate(self.y, self.dendrite_activations)
+        module = DendriticAbsoluteMaxGate1d()
+        output_a = F.dendritic_absolute_max_gate_1d(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
         all_equal = (output_a[0] == output_b[0]).all()
         self.assertTrue(all_equal)

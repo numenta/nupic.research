@@ -40,7 +40,7 @@ A named tuple for outputs modified by `apply_dendrites`_.
 """
 
 
-def dendritic_bias(y, dendrite_activations):
+def dendritic_bias_1d(y, dendrite_activations):
     """
     Returns the sum of the feedforward output and the max of the dendrite
     activations along each segment.
@@ -55,7 +55,7 @@ def dendritic_bias(y, dendrite_activations):
     return dendrite_output(y + winning_activations, indices)
 
 
-def dendritic_gate(y, dendrite_activations):
+def dendritic_gate_1d(y, dendrite_activations):
     """
     Returns the product of the feedforward output and sigmoid of the the max
     of the dendrite activations along each segment.
@@ -70,7 +70,7 @@ def dendritic_gate(y, dendrite_activations):
     return dendrite_output(y * torch.sigmoid(winning_activations), indices)
 
 
-def dendritic_absolute_max_gate(y, dendrite_activations):
+def dendritic_absolute_max_gate_1d(y, dendrite_activations):
     """
     Returns the product of the feedforward output and the sigmoid of the
     absolute max of the dendrite activations along each segment.
@@ -152,9 +152,9 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
 
 
 __all__ = [
-    "dendritic_bias",
-    "dendritic_gate",
-    "dendritic_absolute_max_gate",
+    "dendritic_bias_1d",
+    "dendritic_gate_1d",
+    "dendritic_absolute_max_gate_1d",
     "dendritic_gate_2d",
     "dendritic_absolute_max_gate_2d",
 ]
