@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from .utils import (
+from .metrics import (
     dendrite_duty_cycle,
     dendrite_overlap,
     dendrite_overlap_matrix,

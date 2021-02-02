@@ -19,19 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .plotting_utils import (
-    plot_dendrite_activations,
-    plot_dendrite_overlap_matrix,
-    plot_entropy_distribution,
-    plot_mean_selected_activations,
-    plot_overlap_scores_distribution,
-    plot_percent_active_dendrites,
-)
-from .utils import (
+from .metrics import (
     dendrite_duty_cycle,
     dendrite_overlap,
     dendrite_overlap_matrix,
     entropy,
     mean_selected_activations,
     percent_active_dendrites,
+)
+from .plotting import (
+    plot_dendrite_activations,
+    plot_dendrite_overlap_matrix,
+    plot_entropy_distribution,
+    plot_mean_selected_activations,
+    plot_overlap_scores_distribution,
+    plot_percent_active_dendrites,
 )
