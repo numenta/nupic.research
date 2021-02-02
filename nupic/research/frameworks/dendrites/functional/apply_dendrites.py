@@ -29,6 +29,15 @@ from collections import namedtuple
 
 import torch
 
+__all__ = [
+    "dendritic_bias_1d",
+    "dendritic_gate_1d",
+    "dendritic_absolute_max_gate_1d",
+    "dendritic_gate_2d",
+    "dendritic_absolute_max_gate_2d",
+]
+
+
 dendrite_output = namedtuple("dendrite_output", ["values", "indices"])
 dendrite_output.__doc__ = """
 A named tuple for outputs modified by `apply_dendrites`_.
@@ -149,12 +158,3 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
 
     y_gated = torch.einsum("bijk,bi->bijk", y, dendrite_activations)
     return dendrite_output(y_gated, indices)
-
-
-__all__ = [
-    "dendritic_bias_1d",
-    "dendritic_gate_1d",
-    "dendritic_absolute_max_gate_1d",
-    "dendritic_gate_2d",
-    "dendritic_absolute_max_gate_2d",
-]
