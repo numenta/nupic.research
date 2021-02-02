@@ -150,16 +150,10 @@ def plot_percent_active_dendrites(winning_mask, targets, category_names=None,
 def plot_mean_selected_activations(dendrite_activations, winning_mask, targets,
                                    category_names=None, unit_to_plot=0):
     """
-    # TODO rewrite docstring here
-
-    Returns a 3D torch tensor with shape (num_units, num_segments, num_categories)
-    where cell k, i, j gives the mean activation of the ith segment of unit k over all
-    instances of category j for which segment i became active.
-
     Returns a heatmap with shape (number of segments, number of categories) where cell
-    i, j in the heatmap gives the mean activation of the segment i over all instances
-    of category j for which segment i became active. As there are multiple dendrite
-    segments, the heatmap is created for the specified unit.
+    j, c in the heatmap gives the mean activation of the segment j over all instances
+    of category c for which segment j became active. As there are multiple dendrite
+    segments, the heatmap is created just for the specified unit.
 
     :param dendrite_activations: 3D torch tensor with shape (batch_size, num_units,
                                  num_segments) in which entry b, i, j gives the
