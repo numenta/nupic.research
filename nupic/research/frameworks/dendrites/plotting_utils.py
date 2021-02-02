@@ -33,58 +33,46 @@ from .utils import (
 )
 
 
-def plot_dendrite_activations(
-    dendrite_segments,
-    context_vectors,
-    selection_criterion,
-    mask_values=None,
-    unit_to_plot=0
-):
+def plot_dendrite_activations(dendrite_activations, winning_mask, mask_values=None,
+                              unit_to_plot=0):
     """
-    Returns a heatmap of dendrite activations (given dendrite weights for a single
-    neuron and context vectors) plotted using matplotlib.
+    Returns a heatmap of dendrite activations for a single unit, plotted using
+    matplotlib.
 
-    :param dendrite_segments: `DendriteSegments` object
-    :param context_vectors: 2D torch tensor with shape (num_contexts, dim_context)
-    :param selection_criterion: either "regular" or "absolute"; "regular" annotates the
-                                maxmimum activation per context, whereas "absolute"
-                                annotates the absolute maximum activation per context
-    :param mask_values: list of the routing function's mask values for all contexts,
-                        for output unit `unit_to_plot`; unused if None
+    param dendrite_activations: 3D torch tensor with shape (batch_size, num_units,
+                                 num_segments) in which entry b, i, j gives the
+                                 activation of the ith unit's jth dendrite segment for
+                                 example b
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :param mask_values: list of the routing function's mask values for output unit
+                        `unit_to_plot`; unused if None
     :param unit_to_plot: index of the unit for which to plot dendrite activations;
                          plots activations of unit 0 by default
     """
     with torch.no_grad():
 
-        assert selection_criterion in ("regular", "absolute")
+        num_examples, num_units, num_segments = dendrite_activations.size()
 
-        num_contexts = context_vectors.size(0)
-        num_units, num_segments, _ = dendrite_segments.weights.size()
-
-        assert 0 <= unit_to_plot < num_units
-
-        # Compute activation values
-        activations = dendrite_segments(context_vectors)
-        activations = activations[:, unit_to_plot, :].T
-
-        x_labels = ["context {}".format(j) for j in range(num_contexts)]
+        x_labels = ["example {}".format(j) for j in range(num_examples)]
         if mask_values is not None:
-            assert len(mask_values) == num_contexts
+            assert len(mask_values) == num_examples
             x_labels = ["{} [{}]".format(label, mask_values[j])
                         for j, label in enumerate(x_labels)]
         y_labels = ["segment {}".format(j) for j in range(num_segments)]
 
         # Find the range of activation values to anchor the colorbar
-        vmax = activations.abs().max().item()
+        vmax = dendrite_activations[:, unit_to_plot, :].abs().max().item()
         vmin = -1.0 * vmax
 
         # Use matplotlib to plot the activation heatmap
         plt.cla()
         fig, ax = plt.subplots()
-        ax.imshow(activations.detach().cpu().numpy(), cmap="coolwarm_r", vmin=vmin,
-                  vmax=vmax)
+        ax.imshow(dendrite_activations[:, unit_to_plot, :].T.detach().cpu().numpy(),
+                  cmap="coolwarm_r", vmin=vmin, vmax=vmax)
 
-        ax.set_xticks(np.arange(num_contexts))
+        ax.set_xticks(np.arange(num_examples))
         ax.set_yticks(np.arange(num_segments))
 
         ax.set_xticklabels(x_labels)
@@ -93,71 +81,52 @@ def plot_dendrite_activations(
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
         plt.tight_layout()
 
-        # Annotate just the maximum or absolute maximum activation for each context
-        top_activation_dendrite_per_context = torch.argmax(
-            activations.abs() if selection_criterion == "absolute" else activations,
-            axis=0
-        )
-        for j, i in enumerate(top_activation_dendrite_per_context):
-            val = round(activations[i, j].item(), 2)
-            ax.text(j, i, val, ha="center", va="center", color="w")
+        # Annotate the winning activation for each example
+        winning_segments = torch.argmax(winning_mask[:, unit_to_plot, :], dim=1)
+        for n, j in enumerate(winning_segments):
+            val = round(dendrite_activations[n, unit_to_plot, j].item(), 2)
+            ax.text(n, j, val, ha="center", va="center", color="w")
 
         figure = plt.gcf()
         return figure
 
 
-def plot_percent_active_dendrites(
-    dendrite_segments,
-    context_vectors,
-    selection_criterion,
-    category_names=None,
-    unit_to_plot=0
-):
+def plot_percent_active_dendrites(winning_mask, targets, category_names=None,
+                                  unit_to_plot=0):
     """
     Returns a heatmap with shape (number of segments, number of categories) where cell
-    i, j in the heatmap gives the percentage of inputs in category j for which segment
-    i is active (for a single unit).
+    j, c in the heatmap gives the percentage of inputs in category c for which segment
+    j is active (for a single unit).
 
-    :param dendrite_segments: `DendriteSegments` object
-    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
-                            dim_context) where each 2D tensor gives a batch of context
-                            vectors from the same category
-    :param selection_criterion: the criterion for selecting which segments become
-                                active; either "regular" (for `GatingDendriticLayer`)
-                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
-    :param category_names: list of category names to label each column of the heatmap,
-                           and needs to align with category order in `context_vectors`;
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
+              label for example b
+    :param category_names: list of category names to label each column of the heatmap;
                            unused if None
     :param unit_to_plot: index of the unit for which to plot percent active dendrites;
                          plots unit 0 by default
     """
-    assert selection_criterion in ("regular", "absolute")
-    if category_names is not None:
-        assert len(context_vectors) == len(category_names)
+    _, _, num_segments = winning_mask.size()
+    num_categories = 1 + targets.max().item()
 
-    num_categories = len(context_vectors)
-    _, num_segments, _ = dendrite_segments.weights.size()
-
-    x_labels = ["category {}".format(j) for j in range(len(context_vectors))]
+    x_labels = ["category {}".format(j) for j in range(num_categories)]
     if category_names is not None:
         x_labels = category_names
     y_labels = ["segment {}".format(j) for j in range(num_segments)]
 
-    percentage_activations = percent_active_dendrites(
-        dendrite_segments=dendrite_segments,
-        context_vectors=context_vectors,
-        selection_criterion=selection_criterion
-    )
-    percentage_activations = percentage_activations[unit_to_plot, :, :]
-    percentage_activations = percentage_activations.detach().cpu().numpy()
+    percent_active = percent_active_dendrites(winning_mask, targets)
+    percent_active = percent_active[unit_to_plot, :, :]
+    percent_active = percent_active.detach().cpu().numpy()
 
     # Find the maximum percentage activation value to anchor the colorbar, and use
     # matplotlib to plot the heatmap
-    vmax = np.max(percentage_activations)
+    vmax = np.max(percent_active)
 
     plt.cla()
     fig, ax = plt.subplots()
-    ax.imshow(percentage_activations, cmap="copper", vmin=0.0, vmax=vmax)
+    ax.imshow(percent_active, cmap="copper", vmin=0.0, vmax=vmax)
 
     ax.set_xticks(np.arange(num_categories))
     ax.set_yticks(np.arange(num_segments))
@@ -169,23 +138,20 @@ def plot_percent_active_dendrites(
     plt.tight_layout()
 
     # Annotate all percentage activations
-    for i in range(percentage_activations.shape[0]):
-        for j in range(percentage_activations.shape[1]):
-            val = np.round(percentage_activations[i, j], 2)
+    for i in range(percent_active.shape[0]):
+        for j in range(percent_active.shape[1]):
+            val = np.round(percent_active[i, j], 2)
             ax.text(j, i, val, ha="center", va="center", color="w")
 
     figure = plt.gcf()
     return figure
 
 
-def plot_mean_selected_activations(
-    dendrite_segments,
-    context_vectors,
-    selection_criterion,
-    category_names=None,
-    unit_to_plot=0
-):
+def plot_mean_selected_activations(dendrite_activations, winning_mask, targets,
+                                   category_names=None, unit_to_plot=0):
     """
+    # TODO rewrite docstring here
+
     Returns a 3D torch tensor with shape (num_units, num_segments, num_categories)
     where cell k, i, j gives the mean activation of the ith segment of unit k over all
     instances of category j for which segment i became active.
@@ -195,35 +161,31 @@ def plot_mean_selected_activations(
     of category j for which segment i became active. As there are multiple dendrite
     segments, the heatmap is created for the specified unit.
 
-    :param dendrite_segments: `DendriteSegments` object
-    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
-                            dim_context) where each 2D tensor gives a batch of context
-                            vectors from the same category
-    :param selection_criterion: the criterion for selecting which segments become
-                                active; either "regular" (for `GatingDendriticLayer`)
-                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
-    :param category_names: list of category names to label each column of the heatmap,
-                           and needs to align with category order in `context_vectors`;
+    :param dendrite_activations: 3D torch tensor with shape (batch_size, num_units,
+                                 num_segments) in which entry b, i, j gives the
+                                 activation of the ith unit's jth dendrite segment for
+                                 example b
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
+              label for example b
+    :param category_names: list of category names to label each column of the heatmap;
                            unused if None
     :param unit_to_plot: index of the unit for which to plot mean selected activations;
                          plots unit 0 by default
     """
-    assert selection_criterion in ("regular", "absolute")
-    if category_names is not None:
-        assert len(context_vectors) == len(category_names)
-
-    num_categories = len(context_vectors)
-    num_units, num_segments, _ = dendrite_segments.weights.size()
+    _, num_units, num_segments = dendrite_activations.size()
+    num_categories = 1 + targets.max().item()
 
     assert 0 <= unit_to_plot < num_units
 
-    x_labels = ["category {}".format(j) for j in range(len(context_vectors))]
+    x_labels = ["category {}".format(j) for j in range(num_categories)]
     if category_names is not None:
         x_labels = category_names
     y_labels = ["segment {}".format(j) for j in range(num_segments)]
 
-    msa = mean_selected_activations(dendrite_segments, context_vectors,
-                                    selection_criterion)
+    msa = mean_selected_activations(dendrite_activations, winning_mask, targets)
     msa = msa[unit_to_plot, :, :]
     msa = msa.detach().cpu().numpy()
 
@@ -255,51 +217,35 @@ def plot_mean_selected_activations(
     return figure
 
 
-def plot_dendrite_overlap_matrix(
-    dendrite_segments,
-    context_vectors,
-    selection_criterion,
-    category_names=None,
-    unit_to_plot=0
-):
+def plot_dendrite_overlap_matrix(winning_mask, targets, category_names=None,
+                                 unit_to_plot=0):
     """
     Returns a heatmap with shape (number of categories, number of categories) where
-    cell i, j gives the overlap in dendrite activations between categories i and j for
+    cell c, k gives the overlap in dendrite activations between categories c and k for
     the dendrite segments of the specified unit. The value in each cell can be
-    interpreted as a similarity measure in dendrite activations between categories i
-    and j; if the exact same segments are active for the same fraction of instances
+    interpreted as a similarity measure in dendrite activations between categories c
+    and k; if the exact same segments are active for the same fraction of instances
     across both categories, the dendrite overlap is 1; if any segment that is active
-    for category i and inactive for category j (and vice-versa), the dendrite overlap
+    for category c and inactive for category k (and vice-versa), the dendrite overlap
     is 0. The resulting heatmap is symmetric.
 
-    :param dendrite_segments: `DendriteSegments` object
-    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
-                            dim_context) where each 2D tensor gives a batch of context
-                            vectors from the same category
-    :param selection_criterion: the criterion for selecting which segments become
-                                active; either "regular" (for `GatingDendriticLayer`)
-                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
-    :param category_names: list of category names to label each column of the heatmap,
-                           and needs to align with category order in `context_vectors`;
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
+              label for example b
+    :param category_names: list of category names to label each column of the heatmap;
                            unused if None
     :param unit_to_plot: index of the unit for which to plot the overlap matrix; plots
                          unit 0 by default
     """
-    assert selection_criterion in ("regular", "absolute")
-    if category_names is not None:
-        assert len(context_vectors) == len(category_names)
+    num_categories = 1 + targets.max().item()
 
-    num_categories = len(context_vectors)
-
-    labels = ["category {}".format(j) for j in range(len(context_vectors))]
+    labels = ["category {}".format(j) for j in range(num_categories)]
     if category_names is not None:
         labels = category_names
 
-    overlap_matrix = dendrite_overlap_matrix(
-        dendrite_segments=dendrite_segments,
-        context_vectors=context_vectors,
-        selection_criterion=selection_criterion
-    )
+    overlap_matrix = dendrite_overlap_matrix(winning_mask, targets)
     overlap_matrix = overlap_matrix[unit_to_plot, :, :]
     overlap_matrix = overlap_matrix.detach().cpu().numpy()
 
@@ -334,28 +280,24 @@ def plot_dendrite_overlap_matrix(
     return figure
 
 
-def plot_overlap_scores_distribution(dendrite_segments, context_vectors,
-                                     selection_criterion):
+def plot_overlap_scores_distribution(winning_mask, targets):
     """
     Returns a histogram which gives the distribution of dendrite overlap scores for all
-    units over the examples specified by the context vectors. Each data point in the
-    histogram is the overlap score corresponding to the dendrite segments of a single
-    unit. See `dendrite_overlap` for more details.
+    units over an input batch. Each data point in the histogram is the overlap score
+    corresponding to the dendrite segments of a single unit. See `dendrite_overlap` for
+    more details.
 
-    :param dendrite_segments: `DendriteSegments` object
-    :param context_vectors: iterable of 2D torch tensors with shape (num_examples,
-                            dim_context) where each 2D tensor gives a batch of context
-                            vectors from the same category
-    :param selection_criterion: the criterion for selecting which segments become
-                                active; either "regular" (for `GatingDendriticLayer`)
-                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
+              label for example b
     """
-    overlap_scores = dendrite_overlap(dendrite_segments, context_vectors,
-                                      selection_criterion)
+    overlap_scores = dendrite_overlap(winning_mask, targets)
 
     plt.cla()
-    plt.hist(x=overlap_scores.tolist(), bins=np.arange(0.0, 1.0, 0.05),
-             color="m", edgecolor="k")
+    plt.hist(x=overlap_scores.tolist(), bins=np.arange(0.0, 1.0, 0.05), color="m",
+             edgecolor="k")
 
     plt.xticks(np.arange(0.0, 1.0, 0.1))
     plt.xlabel("Overlap score")
@@ -368,26 +310,21 @@ def plot_overlap_scores_distribution(dendrite_segments, context_vectors,
     return figure
 
 
-def plot_entropy_distribution(dendrite_segments, context_vectors, selection_criterion):
+def plot_entropy_distribution(winning_mask, targets):
     """
     Returns a histogram which gives the distribution of entropy values of dendrite
-    segments over the examples specified by the context vectors. Each data point in the
-    histogram is the observed entropy of a set of dendrite segments corresponding to a
-    single unit. The entropy is the computed using the empirical distribution of the
-    fraction of instances for which each segment became active.
+    segments over an input batch. Each data point in the histogram is the observed
+    entropy of a set of dendrite segments corresponding to a single unit. The entropy
+    is the computed using the empirical distribution of the fraction of instances for
+    which each segment became active.
 
-    :param dendrite_segments: `DendriteSegments` object
-    :param context_vectors: a single 2D torch tensor of context vectors across multiple
-                            classes, or iterable of 2D torch tensors with shape
-                            (num_examples, dim_context) where each 2D tensor gives a
-                            batch of context vectors from the same category
-    :param selection_criterion: the criterion for selecting which segments become
-                                active; either "regular" (for `GatingDendriticLayer`)
-                                or "absolute" (for `AbsoluteMaxGatingDendriticLayer`)
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
     """
-    num_units, _, _ = dendrite_segments.weights.size()
-    duty_cycle = dendrite_duty_cycle(dendrite_segments, context_vectors,
-                                     selection_criterion)
+    _, num_units, _ = winning_mask.size()
+
+    duty_cycle = dendrite_duty_cycle(winning_mask)
 
     entropies = [entropy(duty_cycle[unit, :]) for unit in range(num_units)]
     max_entropy = entropies[0][1]
