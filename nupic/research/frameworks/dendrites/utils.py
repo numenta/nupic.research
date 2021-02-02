@@ -33,8 +33,8 @@ def percent_active_dendrites(winning_mask, targets):
     :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
                          num_segments) in which entry b, i, j is 1 iff the ith unit's
                          jth dendrite segment won for example b, 0 otherwise
-    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
-              label for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
     """
     with torch.no_grad():
 
@@ -75,8 +75,8 @@ def mean_selected_activations(dendrite_activations, winning_mask, targets):
     :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
                          num_segments) in which entry b, i, j is 1 iff the ith unit's
                          jth dendrite segment won for example b, 0 otherwise
-    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
-              label for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
     """
     with torch.no_grad():
 
@@ -144,8 +144,8 @@ def dendrite_overlap(winning_mask, targets):
     :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
                          num_segments) in which entry b, i, j is 1 iff the ith unit's
                          jth dendrite segment won for example b, 0 otherwise
-    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
-              label for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
     """
     with torch.no_grad():
 

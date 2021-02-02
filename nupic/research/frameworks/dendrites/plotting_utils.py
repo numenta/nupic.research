@@ -39,7 +39,7 @@ def plot_dendrite_activations(dendrite_activations, winning_mask, mask_values=No
     Returns a heatmap of dendrite activations for a single unit, plotted using
     matplotlib.
 
-    param dendrite_activations: 3D torch tensor with shape (batch_size, num_units,
+    :param dendrite_activations: 3D torch tensor with shape (batch_size, num_units,
                                  num_segments) in which entry b, i, j gives the
                                  activation of the ith unit's jth dendrite segment for
                                  example b
@@ -101,8 +101,8 @@ def plot_percent_active_dendrites(winning_mask, targets, category_names=None,
     :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
                          num_segments) in which entry b, i, j is 1 iff the ith unit's
                          jth dendrite segment won for example b, 0 otherwise
-    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
-              label for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
     :param category_names: list of category names to label each column of the heatmap;
                            unused if None
     :param unit_to_plot: index of the unit for which to plot percent active dendrites;
@@ -162,8 +162,8 @@ def plot_mean_selected_activations(dendrite_activations, winning_mask, targets,
     :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
                          num_segments) in which entry b, i, j is 1 iff the ith unit's
                          jth dendrite segment won for example b, 0 otherwise
-    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
-              label for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
     :param category_names: list of category names to label each column of the heatmap;
                            unused if None
     :param unit_to_plot: index of the unit for which to plot mean selected activations;
@@ -226,8 +226,8 @@ def plot_dendrite_overlap_matrix(winning_mask, targets, category_names=None,
     :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
                          num_segments) in which entry b, i, j is 1 iff the ith unit's
                          jth dendrite segment won for example b, 0 otherwise
-    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
-              label for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
     :param category_names: list of category names to label each column of the heatmap;
                            unused if None
     :param unit_to_plot: index of the unit for which to plot the overlap matrix; plots
@@ -284,8 +284,8 @@ def plot_overlap_scores_distribution(winning_mask, targets):
     :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
                          num_segments) in which entry b, i, j is 1 iff the ith unit's
                          jth dendrite segment won for example b, 0 otherwise
-    :targets: 1D torch tensor with shape (batch_size,) where entry b gives the target
-              label for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
     """
     overlap_scores = dendrite_overlap(winning_mask, targets)
 
