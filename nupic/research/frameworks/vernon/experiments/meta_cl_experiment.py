@@ -304,7 +304,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         # Take step for outer loop. This will backprop through to the original
         # slow and fast params.
         output = cloned_adaptation_net(slow_data)
-        loss = self._loss_function(output, slow_target)
+        loss = self.error_loss(output, slow_target)
         loss.backward()
 
         self.optimizer.step()
@@ -347,7 +347,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
 
             data = data.to(self.device)
             target = target.to(self.device)
-            train_loss = self._loss_function(
+            train_loss = self.error_loss(
                 cloned_adaptation_net(data), target
             )
             # Update in place
@@ -368,7 +368,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             target = target.to(self.device)
 
             preds = cloned_adaptation_net(data)
-            valid_error = self._loss_function(preds, target)
+            valid_error = self.error_loss(preds, target)
             valid_error /= len(data)
             self.logger.debug(f"Valid error meta train training: {valid_error}")
 
