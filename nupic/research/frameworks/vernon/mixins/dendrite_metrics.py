@@ -77,6 +77,16 @@ class TrackDendriteMetricsInterface(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError
 
+    @property
+    @abc.abstractmethod
+    def log_prefix(self):
+        """
+        The name of the prefix to use when logging to results. For example,
+        "mean_selected" would yield entries such as
+        `{"mean_selected\\module_name": <visualization>}`
+        """
+        raise NotImplementedError
+
     @abc.abstractmethod
     def plot_activations(self, dendrite_activations, winning_mask):
         """
@@ -94,10 +104,12 @@ class TrackDendriteMetricsInterface(metaclass=abc.ABCMeta):
         with self.dendrite_hooks:
             results = super().run_epoch()
 
+        # TODO: We should be able to configure how often plotting happens.
+
         # Gather and plot the statistics.
         for name, _, activations, winning_mask in self.dendrite_hooks.get_statistics():
             visual = self.plot_activations(activations, winning_mask)
-            results.update({f"mean_selected/{name}": visual})
+            results.update({f"{self.log_prefix}/{name}": visual})
 
         return results
 
@@ -125,6 +137,9 @@ class TrackMeanSelectedActivations(TrackDendriteMetricsInterface):
 
     # The name of the args dict within config.
     args_name = "track_mean_selected_activations_args"
+
+    # The prefix of all results logged.
+    log_prefix = "mean_selected"
 
     def plot_activations(self, dendrite_activations, winning_mask):
         return plot_mean_selected_activations(dendrite_activations,
