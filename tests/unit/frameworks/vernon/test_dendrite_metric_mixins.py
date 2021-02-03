@@ -92,7 +92,8 @@ simple_supervised_config = dict(
     ),
 
     track_mean_selected_activations_args=dict(
-        include_modules=[DendriticAbsoluteMaxGate1d]
+        include_modules=[DendriticAbsoluteMaxGate1d],
+        num_samples_to_track=5,
     ),
 
     # Optimizer class class arguments passed to the constructor

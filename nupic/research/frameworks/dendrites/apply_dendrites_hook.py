@@ -34,7 +34,7 @@ class ApplyDendritesHook(TrackStatsHookBase):
     Hook for tracking an `apply_dendrites` module.
     """
 
-    def __init__(self, name, num_samples_to_track=100):
+    def __init__(self, name, num_samples_to_track):
         super().__init__(name=name)
 
         self.num_samples = num_samples_to_track
