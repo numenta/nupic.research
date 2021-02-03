@@ -65,6 +65,13 @@ class ModelHookManager:
         # These are the filtered modules that will be tracked.
         self.tracked_modules = tracked_vals[2]
 
+        # Keep track of whether tracking is on.
+        self._tracking = False
+
+    @property
+    def tracking(self):
+        return self._tracking
+
     def __enter__(self):
         """Start tracking when `with` is called."""
         self.start_tracking()
@@ -108,10 +115,12 @@ class ModelHookManager:
         return hooks, handles, tracked_modules
 
     def start_tracking(self):
+        self._tracking = True
         for hook in self.hooks:
             hook.start_tracking()
 
     def stop_tracking(self):
+        self._tracking = False
         for hook in self.hooks:
             hook.stop_tracking()
 
