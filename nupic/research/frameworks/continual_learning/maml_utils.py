@@ -23,7 +23,7 @@ from copy import deepcopy
 from nupic.research.frameworks.pytorch.model_utils import get_parent_module
 
 
-def clone_model(model, keep_as_reference=None):
+def clone_model(model, keep_params=None, keep_hooks=True):
     """
     Clones a model by creating a deepcopy and then for each param either
         1) cloning it from the original to the copied model
@@ -32,8 +32,11 @@ def clone_model(model, keep_as_reference=None):
     This implementation is largely based on
     https://github.com/learnables/learn2learn/blob/master/learn2learn/utils.py
 
-    :param keep_as_reference: which params to pass as a reference
-    :type keep_as_reference: list of names
+    :param keep_params: a list params to keep by reference, instead of cloning
+    :type keep_params: list of names
+    :param keep_hooks: whether to keep the models original module hooks; this is
+                       useful when the hooks continuously track some updated state.
+    :type keep_params: list of names
     """
 
     try:
@@ -45,9 +48,9 @@ def clone_model(model, keep_as_reference=None):
             "You can't deepcopy non-leaf tensors."
         )
 
-    keep_as_reference = keep_as_reference or []
+    keep_params = keep_params or []
     for (name, old_param) in model.named_parameters():
-        if name in keep_as_reference:
+        if name in keep_params:
             # Keep param as reference.
             new_param = old_param
         else:
@@ -58,4 +61,18 @@ def clone_model(model, keep_as_reference=None):
         base_name = name.split(".")[-1]
         parent_module._parameters[base_name] = new_param
 
+    if keep_hooks:
+        _copy_over_hooks(model, new_model)
+
     return new_model
+
+
+def _copy_over_hooks(old_model, new_model):
+    """
+    Since the parameters are cloned, in `clone_module`, there hooks are maintained. Only
+    the module hooks need to be copied over.
+    """
+    for old_module, new_module in zip(old_model.modules(), new_model.modules()):
+        new_module._backward_hooks = old_module._backward_hooks
+        new_module._forward_hooks = old_module._forward_hooks
+        new_module._forward_pre_hooks = old_module._forward_pre_hooks
