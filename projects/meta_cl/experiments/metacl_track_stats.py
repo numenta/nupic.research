@@ -28,7 +28,7 @@ from nupic.research.frameworks.vernon import mixins
 from .oml_replicate import metacl_oml_replicate
 
 
-class TrackStatsMetaCLExperiment(mixins.TrackRepresentationSparsityMetaCL,
+class TrackStatsMetaCLExperiment(mixins.TrackRepresentationSparsity,
                                  OMLExperiment):
     pass
 
