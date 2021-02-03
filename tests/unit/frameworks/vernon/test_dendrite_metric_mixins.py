@@ -41,6 +41,11 @@ class TrackStatsSupervisedExperiment(mixins.TrackMeanSelectedActivations,
     pass
 
 
+class TrackStatsMetaCLExperiment(mixins.TrackMeanSelectedActivations,
+                                 MetaContinualLearningExperiment):
+    pass
+
+
 class SimpleMLP(torch.nn.Module):
     def __init__(self, num_classes, input_shape):
         super().__init__()
@@ -105,28 +110,40 @@ simple_supervised_config = dict(
 )
 
 
-# simple_metacl_config = {**simple_supervised_config}
-# simple_metacl_config.update(
-#     experiment_class=TrackStatsMetaCLExperiment,
-#     fast_params=[".*"],  # <- all params
-# )
+simple_metacl_config = {**simple_supervised_config}
+simple_metacl_config.update(
+    experiment_class=TrackStatsMetaCLExperiment,
+    fast_params=[".*"],  # <- all params
+)
 
 
 class TrackRepresentationSparsityTest(unittest.TestCase):
     """
-    This is a test class for the `TrackRepresentationSparsityMetaCL` and
-    `TrackRepresentationSparsity` mixins.
+    This is a test class for the `TrackDendriteMetricsInterface` based mixins.
     """
 
     def test_sparsity_tracking_supervised_experiment(self):
         """
-        Ensure both input and output sparsities can be tracked during a supervised
-        experiment.
+        Test whether TrackMeanSelectedActivations works in the supervised setting.
         """
 
         # Setup experiment and initialize model.
         exp = simple_supervised_config["experiment_class"]()
         exp.setup_experiment(simple_supervised_config)
+
+        # Loop through some pseudo epochs.
+        for _ in range(5):
+            ret = exp.run_epoch()
+            self.assertTrue("mean_selected/dendritic_gate" in ret)
+
+    def test_sparsity_tracking_metacl_experiment(self):
+        """
+        Test whether TrackMeanSelectedActivations works in the metacl setting.
+        """
+
+        # Setup experiment and initialize model.
+        exp = simple_metacl_config["experiment_class"]()
+        exp.setup_experiment(simple_metacl_config)
 
         # Loop through some pseudo epochs.
         for _ in range(5):

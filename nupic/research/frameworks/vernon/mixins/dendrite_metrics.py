@@ -31,7 +31,7 @@ from nupic.research.frameworks.pytorch.hooks import ModelHookManager
 from nupic.research.frameworks.pytorch.model_utils import filter_modules
 
 __all__ = [
-    "TrackMeanSelectedActivations"
+    "TrackMeanSelectedActivations",
 ]
 
 
@@ -90,18 +90,16 @@ class TrackDendriteMetricsInterface(metaclass=abc.ABCMeta):
         and 'winning_masks' collected by these hooks are plotted via 'plot_activations'.
         """
 
+        # Run the epoch with tracking enabled.
         with self.dendrite_hooks:
             results = super().run_epoch()
 
+        # Gather and plot the statistics.
         for name, _, activations, winning_mask in self.dendrite_hooks.get_statistics():
             visual = self.plot_activations(activations, winning_mask)
             results.update({f"mean_selected/{name}": visual})
 
         return results
-
-    @property
-    def tracking(self):
-        return self.dendrite_hooks.tracking
 
     def error_loss(self, output, target, reduction="mean"):
         """
@@ -110,7 +108,7 @@ class TrackDendriteMetricsInterface(metaclass=abc.ABCMeta):
         forward pass.
         """
         loss = super().error_loss(output, target, reduction=reduction)
-        if self.tracking:
+        if self.dendrite_hooks.tracking:
             self.targets = torch.cat([target, self.targets], dim=0)
             self.targets = self.targets[:self.num_samples_to_track]
         return loss
