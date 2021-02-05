@@ -50,6 +50,6 @@ def indices_to_mask(indices, shape, dim):
                        device=indices.device)
     ones = torch.ones_like(mask)
 
-    # Every location within 'indices' will add-accumulate a one to the 'mask'.
+    # Every location within 'indices' will give a one to the 'mask'.
     mask.scatter_(dim=dim, index=indices.unsqueeze(dim), src=ones)
     return mask

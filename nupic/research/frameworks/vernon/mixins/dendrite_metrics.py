@@ -62,11 +62,12 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
 
             # The following arguments specify which modules of type `ApplyDendritesBase`
             # to track and create plots. The same modules are used for each 'plot_func'.
-            - include_modules: a list of module types to track
-            - include_names: a list of module names to track e.g. "features.stem"
-            - include_patterns: a list of regex patterns to compare to the names;
-                                for instance, all feature parameters in ResNet can
-                                be included through "features.*"
+            - include_modules: (optional) a list of module types to track
+            - include_names: (optional) a list of module names to track e.g.
+                             "features.stem"
+            - include_patterns: (optional) a list of regex patterns to compare to the
+                                names; for instance, all feature parameters in ResNet
+                                can be included through "features.*"
 
             <plot_name>: This can be any string and maps to a dictionary of arguments
                          for each desired plot. The resulting plot will be logged under

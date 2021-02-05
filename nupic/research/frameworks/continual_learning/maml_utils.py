@@ -69,7 +69,7 @@ def clone_model(model, keep_params=None, keep_hooks=True):
 
 def _copy_over_hooks(old_model, new_model):
     """
-    Since the parameters are cloned, in `clone_module`, there hooks are maintained. Only
+    Since the parameters are cloned, in `clone_module`, their hooks are maintained. Only
     the module hooks need to be copied over.
     """
     for old_module, new_module in zip(old_model.modules(), new_model.modules()):
