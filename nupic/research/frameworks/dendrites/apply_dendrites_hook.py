@@ -34,24 +34,23 @@ class ApplyDendritesHook(TrackStatsHookBase):
     Hook for tracking an `apply_dendrites` module.
     """
 
-    def __init__(self, name, num_samples_to_track):
+    def __init__(self, name, max_samples_to_track):
         super().__init__(name=name)
 
-        self.num_samples = num_samples_to_track
-        self.dendrite_activations = torch.tensor([])  # num_samples x num_units
-        self.winning_mask = torch.tensor([])  # num_samples x num_units x num_segments
+        self.num_samples = max_samples_to_track
+
+        # Activations of num_samples x num_units
+        self.dendrite_activations = torch.tensor([])
+
+        # Mask of num_samples x num_units x num_segments
+        self.winning_mask = torch.tensor([]).bool()
 
     def get_statistics(self):
         return (self.dendrite_activations, self.winning_mask)
 
-    def start_tracking(self):
-        super().start_tracking()
-        self.dendrite_activations = torch.tensor([])
-        self.winning_mask = torch.tensor([])
-
     def __call__(self, module, x, y):
         """
-        Save up to the last 'num_samples_to_track' of the dendrite activations and the
+        Save up to the last 'max_samples_to_track' of the dendrite activations and the
         corresponding winning mask.
 
         :param x: input to an `apply_dendrites` modules; this is tuple
@@ -64,6 +63,16 @@ class ApplyDendritesHook(TrackStatsHookBase):
 
         dendrite_activations = x[1]
         winning_mask = indices_to_mask(y.indices, shape=x[1].shape, dim=2)
+
+        # The `self` tensors were initialized on the cpu which could differ from the
+        # values collected during the forward pass.
+        device = winning_mask.device
+        self.winning_mask = self.winning_mask.to(device)
+        self.dendrite_activations = self.dendrite_activations.to(device)
+
+        # MetaCL creates a deepcopy of the model, but this isn't allowed on non-leaf
+        # tensors. In detaching it, this will always be the case.
+        dendrite_activations = dendrite_activations.detach()
 
         # Prepend the newest activations and winning masks.
         self.winning_mask = torch.cat((winning_mask, self.winning_mask), dim=0)

@@ -23,19 +23,31 @@ from copy import deepcopy
 import torch
 
 from experiment_classes import OMLExperiment
+from nupic.research.frameworks.dendrites import (
+    DendriticAbsoluteMaxGate1d,
+    plot_entropy_distribution,
+)
 from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.wandb import ray_wandb
 
+from .dendrites import DendritesExperiment, metacl_anml_dendrites
 from .oml_replicate import metacl_oml_replicate
 
 
-class TrackStatsMetaCLExperiment(mixins.TrackRepresentationSparsity,
-                                 OMLExperiment):
+class TrackSparsityMetaCLExperiment(mixins.TrackRepresentationSparsity,
+                                    OMLExperiment):
     pass
 
 
+class TrackDendritesMetaCLExperiment(mixins.PlotDendriteMetrics,
+                                     DendritesExperiment):
+    pass
+
+
+# AN example config using the TrackRepresentationSparsity mixin.
 metacl_with_sparse_stats = deepcopy(metacl_oml_replicate)
 metacl_with_sparse_stats.update(
-    experiment_class=TrackStatsMetaCLExperiment,
+    experiment_class=TrackSparsityMetaCLExperiment,
 
     # Track sparsity statistics.
     track_input_sparsity_args=dict(
@@ -53,7 +65,42 @@ metacl_with_sparse_stats.update(
 )
 
 
+def plot_entropy_distribution_(_, winning_mask, targets):
+    """
+    This adjusts the function's signature to align with the mixin.
+    """
+    return plot_entropy_distribution(winning_mask, targets)
+
+
+# AN example config using the PlotDendriteMetrics mixin.
+metacl_with_dendrite_stats = deepcopy(metacl_anml_dendrites)
+metacl_with_dendrite_stats.update(
+    epochs=200,
+    run_meta_test=False,
+    experiment_class=TrackDendritesMetaCLExperiment,
+
+    plot_dendrite_metrics_args=dict(
+        include_modules=[DendriticAbsoluteMaxGate1d],
+        entropy_distribution=dict(
+            max_samples_to_plot=1000,
+            plot_freq=50,
+            # A wrapper will be placed around the function
+            # to facilitate logging to wandb.
+            plot_func=ray_wandb.prep_plot_for_wandb(
+                plot_entropy_distribution_
+            )
+        )
+    ),
+
+    # Log results to wandb.
+    wandb_args=dict(
+        name="metacl_with_dendrite_stats",
+        project="test_metacl",
+    ),
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     metacl_with_sparse_stats=metacl_with_sparse_stats,
+    metacl_with_dendrite_stats=metacl_with_dendrite_stats,
 )

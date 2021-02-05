@@ -26,7 +26,10 @@ import torch
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
-from nupic.research.frameworks.dendrites import DendriticAbsoluteMaxGate1d
+from nupic.research.frameworks.dendrites import (
+    DendriticAbsoluteMaxGate1d,
+    plot_mean_selected_activations,
+)
 from nupic.research.frameworks.vernon import (
     MetaContinualLearningExperiment,
     SupervisedExperiment,
@@ -35,12 +38,12 @@ from nupic.research.frameworks.vernon import (
 from nupic.torch.modules import KWinners, SparseWeights
 
 
-class TrackStatsSupervisedExperiment(mixins.TrackMeanSelectedActivations,
+class TrackStatsSupervisedExperiment(mixins.PlotDendriteMetrics,
                                      SupervisedExperiment):
     pass
 
 
-class TrackStatsMetaCLExperiment(mixins.TrackMeanSelectedActivations,
+class TrackStatsMetaCLExperiment(mixins.PlotDendriteMetrics,
                                  MetaContinualLearningExperiment):
     pass
 
@@ -95,9 +98,13 @@ simple_supervised_config = dict(
         input_shape=(1, 4, 4),
     ),
 
-    track_mean_selected_activations_args=dict(
+    plot_dendrite_metrics_args=dict(
         include_modules=[DendriticAbsoluteMaxGate1d],
-        num_samples_to_track=5,
+        mean_selected=dict(
+            max_samples_to_plot=400,
+            plot_freq=2,
+            plot_func=plot_mean_selected_activations
+        )
     ),
 
     # Optimizer class class arguments passed to the constructor
@@ -130,10 +137,27 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
         exp = simple_supervised_config["experiment_class"]()
         exp.setup_experiment(simple_supervised_config)
 
+        # Only one module should be tracked.
+        self.assertTrue(len(exp.dendrite_hooks.hooks) == 1)
+
         # Loop through some pseudo epochs.
-        for _ in range(5):
+        for i in range(6):
             ret = exp.run_epoch()
-            self.assertTrue("mean_selected/dendritic_gate" in ret)
+
+            # The plot frequency is 2 and should be logged every 2 epochs.
+            if i % 2 == 0:
+                self.assertTrue("mean_selected/dendritic_gate" in ret)
+
+            # All the the tensors tracked should be of the same batch size.
+            batch_size1 = exp.targets.shape[0]
+            batch_size2 = exp.dendrite_hooks.hooks[0].winning_mask.shape[0]
+            batch_size3 = exp.dendrite_hooks.hooks[0].dendrite_activations.shape[0]
+
+            if i == 0:
+                self.assertTrue(batch_size1 == batch_size2 == batch_size3 == 200)
+            else:
+                # These should cap off at `num_samples_to_track=400`
+                self.assertTrue(batch_size1 == batch_size2 == batch_size3 == 400)
 
     def test_sparsity_tracking_metacl_experiment(self):
         """
@@ -145,9 +169,12 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
         exp.setup_experiment(simple_metacl_config)
 
         # Loop through some pseudo epochs.
-        for _ in range(5):
+        for i in range(5):
             ret = exp.run_epoch()
-            self.assertTrue("mean_selected/dendritic_gate" in ret)
+
+            # The plot frequency is 2 and should be logged every 2 epochs.
+            if i % 2 == 0:
+                self.assertTrue("mean_selected/dendritic_gate" in ret)
 
 
 if __name__ == "__main__":
