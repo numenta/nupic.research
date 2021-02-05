@@ -48,6 +48,11 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
                         batch_size x num_units
         - targets: the targets that correspond to each sample in the batch
 
+    Plots can be configured to use fewer samples (helpful for plotting a small batches
+    of individual samples) and to plot every so many epochs (so that training isn't
+    slowed down too much). Whenever a plot is made, the raw data used to create it s
+    saved so it may be reproduced and edited off-line.
+
     .. warning:: When using this mixin with Ray, be careful to have 'plot_func' return
                  an object that can be logged. Often, Ray will attempt to create a
                  deepcopy prior to logging which can't be done on most plots. Try
@@ -171,7 +176,8 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
     def run_epoch(self):
         """
         This runs the epoch with the hooks in tracking mode. The resulting 'activations'
-        and 'winning_masks' collected by these hooks are plotted via each 'plot_func'.
+        and 'winning_masks' collected by these hooks are plotted via each 'plot_func'
+        along with their corresponding targets.
         """
 
         # Run the epoch with tracking enabled.
@@ -181,20 +187,23 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
         # The epoch was iterated in `run_epoch` so epoch 0 is really epoch 1 here.
         iteration = self.current_epoch - 1
 
-        # Each 'plot_func' will be applied to each module being tracked.
-        for metric_name, plotting_args in self.metric_args.items():
+        # Gather and plot the statistics.
+        for name, _, activations, winners in self.dendrite_hooks.get_statistics():
 
-            # All of the defaults were set in `process_args`.
-            plot_func = plotting_args["plot_func"]
-            plot_freq = plotting_args["plot_freq"]
-            plot_args = plotting_args["plot_args"]
-            max_samples_to_plot = plotting_args["max_samples_to_plot"]
+            # Keep track of whether a plot is made below. If so, save the raw data.
+            plot_made = False
 
-            if iteration % plot_freq != 0:
-                continue
+            # Each 'plot_func' will be applied to each module being tracked.
+            for metric_name, plotting_args in self.metric_args.items():
 
-            # Gather and plot the statistics.
-            for name, _, activations, winners in self.dendrite_hooks.get_statistics():
+                # All of the defaults were set in `process_args`.
+                plot_func = plotting_args["plot_func"]
+                plot_freq = plotting_args["plot_freq"]
+                plot_args = plotting_args["plot_args"]
+                max_samples_to_plot = plotting_args["max_samples_to_plot"]
+
+                if iteration % plot_freq != 0:
+                    continue
 
                 # Only use up the the max number of samples for plotting.
                 targets = self.targets[:max_samples_to_plot]
@@ -205,6 +214,16 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
                 # Here, "{name}" is the name of the module.
                 visual = plot_func(activations, winners, targets, **plot_args)
                 results.update({f"{metric_name}/{name}": visual})
+                plot_made = True
+
+            # Log the raw data.
+            if plot_made:
+                targets = self.targets[:self.max_samples_to_track].cpu().numpy()
+                activations = activations[:self.max_samples_to_track].cpu().numpy()
+                winners = winners[:self.max_samples_to_track].cpu().numpy()
+                results.update({f"targets/{name}": targets})
+                results.update({f"dendrite_activations/{name}": activations})
+                results.update({f"winning_mask/{name}": winners})
 
         return results
 

@@ -147,6 +147,17 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
             # The plot frequency is 2 and should be logged every 2 epochs.
             if i % 2 == 0:
                 self.assertTrue("mean_selected/dendritic_gate" in ret)
+                self.assertTrue("targets/dendritic_gate" in ret)
+                self.assertTrue("dendrite_activations/dendritic_gate" in ret)
+                self.assertTrue("winning_mask/dendritic_gate" in ret)
+
+                targets = ret["targets/dendritic_gate"]
+                activations = ret["dendrite_activations/dendritic_gate"]
+                winners = ret["winning_mask/dendritic_gate"]
+
+                self.assertTrue(isinstance(targets, np.ndarray))
+                self.assertTrue(isinstance(activations, np.ndarray))
+                self.assertTrue(isinstance(winners, np.ndarray))
 
             # All the the tensors tracked should be of the same batch size.
             batch_size1 = exp.targets.shape[0]
@@ -175,6 +186,20 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
             # The plot frequency is 2 and should be logged every 2 epochs.
             if i % 2 == 0:
                 self.assertTrue("mean_selected/dendritic_gate" in ret)
+
+                # Raw data should be logged whenever a plot is logged.
+                self.assertTrue("targets/dendritic_gate" in ret)
+                self.assertTrue("dendrite_activations/dendritic_gate" in ret)
+                self.assertTrue("winning_mask/dendritic_gate" in ret)
+
+                # The raw data should be a numpy array.
+                targets = ret["targets/dendritic_gate"]
+                activations = ret["dendrite_activations/dendritic_gate"]
+                winners = ret["winning_mask/dendritic_gate"]
+
+                self.assertTrue(isinstance(targets, np.ndarray))
+                self.assertTrue(isinstance(activations, np.ndarray))
+                self.assertTrue(isinstance(winners, np.ndarray))
 
 
 if __name__ == "__main__":
