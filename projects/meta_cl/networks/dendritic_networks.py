@@ -18,7 +18,7 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-import torch
+
 from torch import nn
 
 from nupic.research.frameworks.dendrites import (
