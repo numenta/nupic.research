@@ -52,6 +52,7 @@ class InidicesToMaskTest(unittest.TestCase):
         ])
         indices = self.tensor.max(dim=0).indices
         actual_mask = indices_to_mask(indices, self.tensor.shape, dim=0)
+        self.assertTrue(actual_mask.dtype == torch.bool)
 
         all_equal = (actual_mask == expected_mask).all()
         self.assertTrue(all_equal)
@@ -69,6 +70,7 @@ class InidicesToMaskTest(unittest.TestCase):
         ])
         indices = self.tensor.max(dim=1).indices
         actual_mask = indices_to_mask(indices, self.tensor.shape, dim=1)
+        self.assertTrue(actual_mask.dtype == torch.bool)
 
         all_equal = (actual_mask == expected_mask).all()
         self.assertTrue(all_equal)
@@ -86,6 +88,7 @@ class InidicesToMaskTest(unittest.TestCase):
         ])
         indices = self.tensor.max(dim=2).indices
         actual_mask = indices_to_mask(indices, self.tensor.shape, dim=2)
+        self.assertTrue(actual_mask.dtype == torch.bool)
 
         all_equal = (actual_mask == expected_mask).all()
         self.assertTrue(all_equal)

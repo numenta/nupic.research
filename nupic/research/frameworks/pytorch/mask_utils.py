@@ -45,7 +45,7 @@ def indices_to_mask(indices, shape, dim):
 
     # The 'mask' is zeros by default and 'ones' is a helper tensor for tallying.
     mask = torch.zeros(shape,
-                       dtype=indices.dtype,
+                       dtype=bool,
                        layout=indices.layout,
                        device=indices.device)
     ones = torch.ones_like(mask)
