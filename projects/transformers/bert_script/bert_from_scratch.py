@@ -19,7 +19,8 @@
 #
 
 """
-Adapted from run_mlm.py plus other sources
+Adapted from huggingface/transformers/blob/master/examples/language-modeling/run_mlm.py
+plus other sources
 
 Libraries required are `transformers` and `datasets`, both can be installed with pip
 
@@ -55,7 +56,7 @@ from transformers.trainer_utils import is_main_process
 # not all datasets can be concatenated without preprocessing, features must align
 datasets_args = [
     dict(path="wikitext", name="wikitext-2-raw-v1"),  # 12.91 MB
-    dict(path="wikitext", name="wikitext-103-raw-v1"),  # 524 MB
+    # dict(path="wikitext", name="wikitext-103-raw-v1"),  # 524 MB
     # dict(path="ptb_text_only"), # 5.7 MB
     # dict(path="bookcorpus"),  # 4.63 GB
     # dict(path="wikipedia"),  # 35.38 GB
@@ -63,6 +64,7 @@ datasets_args = [
 
 # Training params
 # note: in V100 bs=8 uses 11/16 of available gpu mem, bs=12 uses 15/16
+local_rank = 0
 output_dir = os.path.expanduser("~/nta/results/bert")
 training_args = TrainingArguments(
     output_dir=output_dir,
@@ -74,7 +76,10 @@ training_args = TrainingArguments(
     lr_scheduler_type="linear",
     warmup_steps=500,
     weight_decay=1e-6,
+    # local_rank=local_rank
 )
+if hasattr(training_args, "_n_gpu"):
+    print(f"************* {training_args._n_gpu} ******")
 
 # Evaluate refers to evaluating perplexity on trained model in the validation set
 # doesn't refer to finetuning and evaluating on downstream tasks such as GLUE
@@ -96,7 +101,6 @@ logging.basicConfig(
     datefmt="%m/%d/%Y %H:%M:%S",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
-local_rank = -1
 logger.setLevel(logging.INFO if is_main_process(local_rank) else logging.WARN)
 
 # Set the verbosity to info of the Transformers logger (on main process only):
@@ -229,7 +233,6 @@ trainer = Trainer(
 
 # Train model to given number of epochs
 train_result = trainer.train(resume_from_checkpoint=None)
-
 if save_model:
     # Saves model and tokenizer
     trainer.save_model()
