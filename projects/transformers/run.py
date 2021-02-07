@@ -34,7 +34,8 @@ import math
 import os
 import sys
 
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
+from datasets.dataset_dict import DatasetDict
 
 import transformers
 from transformers import (
@@ -143,22 +144,62 @@ def main():
     #
     # In distributed training, the load_dataset function guarantee that only one local process can concurrently
     # download the dataset.
-    # TODO: add option to concatenate compatible datasets for LM
+    # TODO: incorporate more arguments into dataset besides config. See bert_from_scratch.py script
+
+    from collections.abc import Iterable
+
     if data_args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        datasets = load_dataset(data_args.dataset_name, data_args.dataset_config_name)
-        if "validation" not in datasets.keys():
-            datasets["validation"] = load_dataset(
-                data_args.dataset_name,
-                data_args.dataset_config_name,
-                split=f"train[:{data_args.validation_split_percentage}%]",
-            )
-            datasets["train"] = load_dataset(
-                data_args.dataset_name,
-                data_args.dataset_config_name,
-                split=f"train[{data_args.validation_split_percentage}%:]",
-            )
+        # Account for when a single dataset is passed as argument
+        if not(isinstance(data_args.dataset_name, Iterable)):
+            data_args.dataset_name = [data_args.dataset_name]
+        if not (isinstance(data_args.dataset_config_name, Iterable)):
+            data_args.dataset_config_name = [data_args.dataset_config_name]
+
+        assert len(data_args.dataset_name) == len(data_args.dataset_config_name), \
+            "If using more than one dataset, length of dataset_name and dataset_config_name must match"
+
+        # Load and concatenate multiple compatible datasets
+        train_datasets, validation_datasets = [], []
+        for name, config in zip(data_args.dataset_name, data_args.dataset_config_name):
+
+            dataset = load_dataset(name, config)
+            if "validation" not in dataset.keys():
+                validation_ds = load_dataset(
+                    name, config,
+                    split=f"train[:{data_args.validation_split_percentage}%]",
+                )
+                train_ds = load_dataset(
+                    name, config,
+                    split=f"train[{data_args.validation_split_percentage}%:]",
+                )
+            else:
+                validation_ds = dataset["validation"]
+                train_ds = dataset["train"]
+
+            # Some specific preprocessing to align fields on known datasets
+            # extraneous fields not used in language modelling are also removed
+            # after preprocessing
+            if name == "wikipedia":
+                train_ds.remove_columns_("title")
+                validation_ds.remove_columns_("title")
+            elif name == "ptb_text_only":
+                train_ds.rename_column_("sentence", "text")
+                validation_ds.rename_column_("sentence", "text")
+
+            train_datasets.append(train_ds)
+            validation_datasets.append(validation_ds)
+
+        for ds_idx in range(1, len(train_datasets)):
+            assert train_datasets[ds_idx].features.type == \
+                train_datasets[ds_idx - 1].features.type, \
+                "Features name and type must match between all datasets"
+
+        datasets = DatasetDict()
+        datasets["train"] = concatenate_datasets(train_datasets)
+        datasets["validation"] = concatenate_datasets(validation_datasets)
+
     else:
+        # If dataset not available in Hub, look for train and validation files.
         data_files = {}
         if data_args.train_file is not None:
             data_files["train"] = data_args.train_file
@@ -311,6 +352,11 @@ def main():
             num_proc=data_args.preprocessing_num_workers,
             load_from_cache_file=not data_args.overwrite_cache,
         )
+
+    # Verifying fingerprint for caching
+    print("******************* Fingerprint: ")
+    print(tokenized_datasets["train"]._fingerprint)
+    print("*******************")
 
     # Data collator
     # This one will take care of randomly masking the tokens.
