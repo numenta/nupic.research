@@ -26,6 +26,7 @@ import os
 from copy import deepcopy
 import random
 
+
 transformers_base = dict(
 
     # Model arguments
@@ -43,8 +44,8 @@ transformers_base = dict(
     seed=random.randint(0, 1000000),
     do_train=True,
     do_eval=True,
+    dataloader_drop_last=True,  # keeps consistent batch size
     num_train_epochs=3  # is overriden if max_steps is defined
-
 )
 
 bert_base = deepcopy(transformers_base)
@@ -78,6 +79,7 @@ bert_base.update(
 
 )
 
+"""Configs used to debug single and multiple datasets loading and training"""
 debug_bert = deepcopy(bert_base)
 debug_bert.update(
 
@@ -94,9 +96,34 @@ debug_bert.update(
 
 )
 
+debug_bert_multiple_data = deepcopy(debug_bert)
+debug_bert_multiple_data.update(
+
+    # Training Arguments
+    run_name="debug_run_multiple_data",
+    dataset_name=["wikitext", "ptb_text_only"],
+    dataset_config_name=["wikitext-2-raw-v1", None],
+
+)
+
+"""Only load and tokenize english version of wikipedia and Toronto BookCorpus"""
+full_data_load = deepcopy(debug_bert)
+full_data_load.update(
+
+    # Training Arguments
+    run_name="data_load_only",
+    dataset_name=["wikipedia", "bookcorpus"],
+    dataset_config_name=["20200501.en", None],
+    do_train=False,
+    do_eval=False,
+
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     transformers_base=transformers_base,
     bert_base=bert_base,
     debug_bert=debug_bert,
+    debug_bert_multiple_data=debug_bert_multiple_data,
+    full_data_load=full_data_load,
 )

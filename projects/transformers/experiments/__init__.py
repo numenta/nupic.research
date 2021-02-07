@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .base import CONFIGS as BASE
+from .bert_replication import CONFIGS as BERT_REPLICATION
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -29,3 +30,4 @@ __all__ = ["CONFIGS"]
 # Collect all configurations
 CONFIGS = dict()
 CONFIGS.update(BASE)
+CONFIGS.update(BERT_REPLICATION)
