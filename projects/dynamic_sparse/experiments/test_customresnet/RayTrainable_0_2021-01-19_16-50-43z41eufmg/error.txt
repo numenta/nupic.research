@@ -1,0 +1,22 @@
+Failure # 1 (occurred at 2021-01-19_16-50-46)
+Traceback (most recent call last):
+  File "/Users/acuozzo/miniconda3/envs/nupic.research/lib/python3.7/site-packages/ray/tune/trial_runner.py", line 458, in _process_trial
+    result = self.trial_executor.fetch_result(trial)
+  File "/Users/acuozzo/miniconda3/envs/nupic.research/lib/python3.7/site-packages/ray/tune/ray_trial_executor.py", line 381, in fetch_result
+    result = ray.get(trial_future[0], DEFAULT_GET_TIMEOUT)
+  File "/Users/acuozzo/miniconda3/envs/nupic.research/lib/python3.7/site-packages/ray/worker.py", line 1502, in get
+    raise value.as_instanceof_cause()
+ray.exceptions.RayTaskError(TypeError): [36mray::RayTrainable.__init__()[39m (pid=69692, ip=172.18.13.55)
+  File "python/ray/_raylet.pyx", line 430, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 442, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 443, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 445, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 423, in ray._raylet.execute_task.function_executor
+  File "/Users/acuozzo/nta/nupic.research/nupic/research/frameworks/dynamic_sparse/common/experiments.py", line 37, in __init__
+    tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
+  File "/Users/acuozzo/miniconda3/envs/nupic.research/lib/python3.7/site-packages/ray/tune/trainable.py", line 174, in __init__
+    self._setup(copy.deepcopy(self.config))
+  File "/Users/acuozzo/nta/nupic.research/nupic/research/frameworks/dynamic_sparse/common/experiments.py", line 40, in _setup
+    network = getattr(networks, config["network"])(config=config)
+TypeError: __init__() got an unexpected keyword argument 'config'
+
