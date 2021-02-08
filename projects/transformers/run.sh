@@ -1,20 +1,51 @@
 #!/bin/bash
 
-# Accepts two arguments:
-#   1 - number of the cluster. Expect cluster files to have following path:
-#       ~/nta/ray_config/ray_user<cluster_number>.yaml
-#   2 - experiment name as defined in one of the configs
+: '
+Two ways of running this script:
 
-# ------ Sync latest to experiment -------------
+1 - RAY_CONFIG_FILE is an existing environment variable
 
-# TODO: sync files with all the nodes
+    This is the prefered way. You can set the environment variable prior to running the script by running:
+    export RAY_CONFIG_FILE=<path to you ray config file>
+
+    In this scenario, the script only takes one argument:
+    ./run.sh <experiment_name>
+
+    Wait a minute or two. The output of all instances will be redirected to the local terminal.
+
+2 - RAY_CONFIG_FILE is not an existing environment variable
+
+    In may be the case you have multiple ray config files. RAY_CONFIG_FILE should be non-existing or set to empty string.
+
+    In this scenario, the script takes two arguments:
+    ./run.sh <cluster_number> <experiment_name>
+
+    This script assumes the config files follow the same path and naming convention:
+    ~/nta/ray_config/ray_user<cluster_number>.yaml
+    If you would like to use different folder of filenames, make a local copy of the run script and change it accordingly
+'
+
+# ------ Find config file -------------
+
+if [ -z "$RAY_CONFIG_FILE" ]
+then
+    ray_config_file="~/nta/ray_config/ray_user$1.yaml"
+    exp_name=$2
+else
+    ray_config_file=$RAY_CONFIG_FILE
+    exp_name=$1
+fi
+
+echo "ray config" $ray_config_file
+echo "exp name" $exp_name
+
 
 # ------ Get head private IP -------------
 
 get_head_private_ip() {
     local ip=$(ssh -o "StrictHostKeyChecking no" -i \
               ~/.ssh/ray-autoscaler_us-west-2.pem \
-              ec2-user@$(ray get-head-ip ~/nta/ray_config/ray_user$1.yaml) \
+              ec2-user@$(ray get-head-ip $ray_config_file) \
               hostname -I | awk '{print $1}')
     echo $ip
 }
@@ -24,12 +55,12 @@ echo "Head private IP: $head_private_ip"
 
 # ------ Get head and workers public IP -------------
 
-head_public_ip=$(ray get-head-ip ~/nta/ray_config/ray_user$1.yaml)
+head_public_ip=$(ray get-head-ip $ray_config_file)
 echo "Head public IP: $head_public_ip"
 
 get_worker_public_ips() {
     local counter=0
-    for ip in $(ray get-worker-ips ~/nta/ray_config/ray_user$1.yaml)
+    for ip in $(ray get-worker-ips $ray_config_file)
     do
         (( counter++ ))
         echo $ip
@@ -39,20 +70,15 @@ get_worker_public_ips() {
 worker_public_ips=$(get_worker_public_ips $1)
 echo "Worker public IPs: ${worker_public_ips}"
 
-# ------ Get number of workers -------------
+# ------ Get number of active workers -------------
 
-get_num_workers() {
-    local max_workers=$(cat ~/nta/ray_config/ray_user$1.yaml | grep max_workers)
-    echo ${max_workers: -1}
-}
-
-num_workers=$(get_num_workers $1)
+num_workers=$(echo "$worker_public_ips" | wc -w)
 echo "Number of (max) workers: $num_workers"
 
 # ------ Get number of GPUs -------------
 
 get_num_gpus() {
-    local instance_type=$(cat ~/nta/ray_config/ray_user$1.yaml | grep "  InstanceType" | sed -n '2p' | awk '{print $2}')
+    local instance_type=$(cat $ray_config_file | grep "  InstanceType" | sed -n '2p' | awk '{print $2}')
     case $instance_type in
         p3.2xlarge)
             echo 1
@@ -109,6 +135,4 @@ run_file() {
 
 }
 
-run_file $2
-
-# find a way to get the process id and kill all of them if I need it
+run_file $exp_name
