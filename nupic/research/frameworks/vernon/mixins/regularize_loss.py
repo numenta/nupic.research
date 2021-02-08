@@ -21,8 +21,10 @@
 
 import torch
 
+from nupic.research.frameworks.vernon.mixins.step_based_logging import StepBasedLogging
 
-class RegularizeLoss(object):
+
+class RegularizeLoss(StepBasedLogging):
     """
     Implement the complexity_loss as the sum all module.regularization()
     functions, times some specified scalar.
