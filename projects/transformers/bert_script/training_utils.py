@@ -20,16 +20,18 @@
 
 """Training and eval functions"""
 
-import os
 import logging
-import transformers
+import math
+import os
+import sys
 
 import ray
+import transformers
 from ray import tune
-
 from transformers.integrations import TensorBoardCallback
-
 from transformers.trainer_utils import is_main_process
+
+import logger
 
 __all__ = [
     "run_hf",
@@ -151,25 +153,6 @@ def run_ray_single_instance(trainer, **kwargs):
 
     # run tune
     tune.run(_objective, **kwargs)
-
-
-# Train model to given number of epochs
-train_result = trainer.train(resume_from_checkpoint=None)
-if save_model:
-    # Saves model and tokenizer
-    trainer.save_model()
-
-    # Save results
-    output_train_file = os.path.join(output_dir, "train_results.txt")
-    if trainer.is_world_process_zero():
-        with open(output_train_file, "w") as writer:
-            logger.info("***** Train results *****")
-            for key, value in sorted(train_result.metrics.items()):
-                logger.info(f"  {key} = {value}")
-                writer.write(f"{key} = {value}\n")
-
-        # Need to save the state, Trainer.save_model saves only tokenizer and model
-        trainer.state.save_to_json(os.path.join(output_dir, "trainer_state.json"))
 
 
 def run_ray_distributed(trainer, **kwargs):

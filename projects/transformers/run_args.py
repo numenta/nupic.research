@@ -26,10 +26,12 @@ from transformers import MODEL_FOR_MASKED_LM_MAPPING
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
+
 @dataclass
 class ModelArguments:
     """
-    Arguments pertaining to which model/config/tokenizer we are going to fine-tune, or train from scratch.
+    Arguments pertaining to which model/config/tokenizer we are going to fine-tune,
+    or train from scratch.
     """
 
     model_name_or_path: Optional[str] = field(
@@ -41,33 +43,49 @@ class ModelArguments:
     )
     model_type: Optional[str] = field(
         default="bert",
-        metadata={"help": "If training from scratch, pass a model type from the list: " + ", ".join(MODEL_TYPES)},
+        metadata={
+            "help": "If training from scratch, pass a model type from the list: "
+                    ", ".join(MODEL_TYPES)
+        },
     )
     config_name: Optional[str] = field(
         default=None,
-        metadata={"help": "Pretrained config name or path if not the same as model_name"}
+        metadata={
+            "help": "Pretrained config name or path if not the same as model_name"
+        }
     )
     tokenizer_name: Optional[str] = field(
         default="bert-base-cased",
-        metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+        metadata={
+            "help": "Pretrained tokenizer name or path if not the same as model_name"
+        }
     )
     cache_dir: Optional[str] = field(
         default="/mnt/efs/results/pretrained-models/huggingface",
-        metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
+        metadata={
+            "help": "Where do you want to store the pretrained models downloaded "
+                    "from huggingface.co"},
     )
     use_fast_tokenizer: bool = field(
         default=True,
-        metadata={"help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
+        metadata={
+            "help": "Whether to use one of the fast tokenizer (backed by the "
+                    "tokenizers library) or not."
+        },
     )
     model_revision: str = field(
         default="main",
-        metadata={"help": "The specific model version to use (can be a branch name, tag name or commit id)."},
+        metadata={
+            "help": "The specific model version to use (can be a branch name, "
+                    "tag name or commit id)."
+        },
     )
     use_auth_token: bool = field(
         default=False,
         metadata={
-            "help": "Will use the token generated when running `transformers-cli login` (necessary to use this script "
-            "with private models)."
+            "help": "Will use the token generated when running "
+                    "`transformers-cli login` (necessary to use this script "
+                    "with private models)."
         },
     )
 
@@ -75,7 +93,8 @@ class ModelArguments:
 @dataclass
 class DataTrainingArguments:
     """
-    Arguments pertaining to what data we are going to input our model for training and eval.
+    Arguments pertaining to what data we are going to input our model for
+    training and eval.
     """
 
     dataset_name: Optional[str] = field(
@@ -84,7 +103,10 @@ class DataTrainingArguments:
     )
     dataset_config_name: Optional[str] = field(
         default="wikitext-2-raw-v1",
-        metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
+        metadata={
+            "help": "The configuration name of the dataset to use "
+                    "(via the datasets library)."
+        }
     )
     train_file: Optional[str] = field(
         default=None,
@@ -92,7 +114,10 @@ class DataTrainingArguments:
     )
     validation_file: Optional[str] = field(
         default=None,
-        metadata={"help": "An optional input evaluation data file to evaluate the perplexity on (a text file)."},
+        metadata={
+            "help": "An optional input evaluation data file to evaluate the "
+                    "perplexity on (a text file)."
+        },
     )
     overwrite_cache: bool = field(
         default=False,
@@ -101,14 +126,15 @@ class DataTrainingArguments:
     validation_split_percentage: Optional[int] = field(
         default=5,
         metadata={
-            "help": "The percentage of the train set used as validation set in case there's no validation split"
+            "help": "The percentage of the train set used as validation set in "
+                    "case there's no validation split. "
         },
     )
     max_seq_length: Optional[int] = field(
         default=None,
         metadata={
-            "help": "The maximum total input sequence length after tokenization. Sequences longer "
-            "than this will be truncated."
+            "help": "The maximum total input sequence length after tokenization. "
+                    "Sequences longer than this will be truncated."
         },
     )
     preprocessing_num_workers: Optional[int] = field(
@@ -121,24 +147,38 @@ class DataTrainingArguments:
     )
     line_by_line: bool = field(
         default=False,
-        metadata={"help": "Whether distinct lines of text in the dataset are to be handled as distinct sequences."},
+        metadata={
+            "help": "Whether distinct lines of text in the dataset are to be "
+                    "handled as distinct sequences."
+        },
     )
     pad_to_max_length: bool = field(
         default=False,
         metadata={
             "help": "Whether to pad all samples to `max_seq_length`. "
-            "If False, will pad the samples dynamically when batching to the maximum length in the batch."
+            "If False, will pad the samples dynamically when batching to the maximum "
+            "length in the batch."
+        },
+    )
+    data_collator: str = field(
+        default="DataCollatorForLanguageModeling",
+        metadata={
+            "help": "Which data collator to use, define how masking is applied."
         },
     )
 
-
     def __post_init__(self):
-        if self.dataset_name is None and self.train_file is None and self.validation_file is None:
-            raise ValueError("Need either a dataset name or a training/validation file.")
+        if (self.dataset_name is None and self.train_file is None
+           and self.validation_file is None):
+            raise ValueError(
+                "Need either a dataset name or a training/validation file."
+            )
         else:
             if self.train_file is not None:
                 extension = self.train_file.split(".")[-1]
-                assert extension in ["csv", "json", "txt"], "`train_file` should be a csv, a json or a txt file."
+                assert extension in ["csv", "json", "txt"], \
+                    "`train_file` should be a csv, a json or a txt file."
             if self.validation_file is not None:
                 extension = self.validation_file.split(".")[-1]
-                assert extension in ["csv", "json", "txt"], "`validation_file` should be a csv, a json or a txt file."
+                assert extension in ["csv", "json", "txt"], \
+                    "`validation_file` should be a csv, a json or a txt file."

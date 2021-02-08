@@ -28,12 +28,10 @@ To reuse cached datasets, set the following environment variable prior to runnin
 HF_HOME=/mnt/efs/results/cache/huggingface
 """
 
-import math
+import argparse
 import os
 import random
-import sys
 
-import transformers
 from datasets import concatenate_datasets, load_dataset
 from datasets.dataset_dict import DatasetDict
 from transformers import (
@@ -46,10 +44,10 @@ from transformers import (
     set_seed,
 )
 
-from training_utils import *
-import argparse
+from training_utils import run_hf, run_ray_distributed, run_ray_single_instance
 
-def main():
+
+def main(train_function):
 
     # ----- Parse local_rank for torch.distributed.launch -----------
 
@@ -62,9 +60,9 @@ def main():
     # ----- Configurable Params -----------
 
     # List of dicts with configuration for each dataset to be loaded
-    # see available datasets in the Hub: https://huggingface.co/datasets
-    # sizes are of generated dataset, can be an order of magnitude larger after tokenization
-    # not all datasets can be concatenated without preprocessing, features must align
+    # see available datasets in the Hub: https://huggingface.co/datasets. sizes
+    # are of generated dataset, can be an order of magnitude larger after tokenization.
+    # Not all datasets can be concatenated without preprocessing, features must align
     datasets_args = [
         dict(path="wikitext", name="wikitext-2-raw-v1"),  # 12.91 MB
         # dict(path="wikitext", name="wikitext-103-raw-v1"),  # 524 MB
@@ -85,7 +83,7 @@ def main():
         eval_steps=10,  # is it evaluating? where are results?
         max_steps=30,
         disable_tqdm=True,
-        run_name="debug_run", # used for wandb, not for Ray
+        run_name="debug_run",  # used for wandb, not for Ray
         # hyperparams
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
@@ -100,8 +98,6 @@ def main():
 
     # Evaluate refers to evaluating perplexity on trained model in the validation set
     # doesn't refer to finetuning and evaluating on downstream tasks such as GLUE
-    save_model = True
-    evaluate = True
     seed = random.randint(0, 1000000)
 
     # Changing the tokenizer will result in re-tokenizing the dataset.
@@ -118,14 +114,13 @@ def main():
 
     # Load multiple datasets and concatenate.
     # using only 'train' and 'validation' sets, could also include 'test'
-    # if no split is defined, load_dataset returns a DatasetDict with all available splits
+    # if no split is defined, load_dataset returns DatasetDict with all available splits
     train_datasets = [load_dataset(**args, split="train") for args in datasets_args]
     val_datasets = [load_dataset(**args, split="validation") for args in datasets_args]
 
     dataset = DatasetDict()
     dataset["train"] = concatenate_datasets(train_datasets)
     dataset["validation"] = concatenate_datasets(val_datasets)
-
 
     def load_and_split_dataset(dataset_args, split_percentage=5):
         """Alternative: if no validation set available, manuallly split the train set"""
@@ -138,7 +133,6 @@ def main():
             **dataset_args, split=f"train[:{split_percentage}%]"
         )
         return dataset
-
 
     # ----- Load Model -----------
 
@@ -164,13 +158,12 @@ def main():
     overwrite_cache = False
     preprocessing_num_workers = None
 
-
     # We tokenize every text, then concatenate them together before splitting in smaller
-    # parts. We use `return_special_tokens_mask=True` given DataCollatorForLanguageModeling
-    # (see below) is more efficient when it receives the `special_tokens_mask`.
+    # parts. We use `return_special_tokens_mask=True` given
+    # DataCollatorForLanguageModeling is more efficient when it
+    # receives the `special_tokens_mask`.
     def tokenize_function(examples):
         return tokenizer(examples[text_column_name], return_special_tokens_mask=True)
-
 
     tokenized_dataset = dataset.map(
         tokenize_function,
@@ -180,11 +173,9 @@ def main():
         load_from_cache_file=not overwrite_cache,
     )
 
-
     # Main data processing function that will concatenate all texts from our dataset and
     # generate chunks of max_seq_length.
     max_seq_length = tokenizer.model_max_length
-
 
     def group_texts(examples):
         # Concatenate all texts.
@@ -195,15 +186,15 @@ def main():
         total_length = (total_length // max_seq_length) * max_seq_length
         # Split by chunks of max_len.
         result = {
-            k: [t[i : i + max_seq_length] for i in range(0, total_length, max_seq_length)]
+            k: [t[i : i + max_seq_length] for i in
+                range(0, total_length, max_seq_length)]
             for k, t in concatenated_examples.items()
         }
         return result
 
-
     # Note that with `batched=True`, this map processes 1,000 texts together, so
     # group_texts throws away a remainder for each of those groups of 1,000 texts.
-    # You can adjust that batch_size here but a higher value might be slower to preprocess.
+    # You can adjust batch_size here but a higher value will be slower to preprocess.
     tokenized_dataset = tokenized_dataset.map(
         group_texts,
         batched=True,
@@ -233,11 +224,11 @@ def main():
 
     # ----- Functions to train and evaluate -----------
 
-    if train_function=="huggingface":
+    if train_function == "huggingface":
         # Tested
         run_hf(trainer, output_dir, local_rank, save_model=True, evaluate=True)
 
-    elif train_function=="ray_single_node":
+    elif train_function == "ray_single_node":
         # Tested
         run_ray_single_instance(
             trainer,
@@ -250,7 +241,7 @@ def main():
             # note: checkpoint arguments cannot be used with a checkpointable function
         )
 
-    elif train_function=="ray_multiple_nodes":
+    elif train_function == "ray_multiple_nodes":
         # Untested
         run_ray_distributed(
             trainer,
@@ -263,6 +254,7 @@ def main():
             verbose=2,
             resources_per_trial={"gpu": 4},
         )
+
 
 if __name__ == "__main__":
     main(train_function="huggingface")
