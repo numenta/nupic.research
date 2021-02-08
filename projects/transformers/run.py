@@ -32,10 +32,9 @@ import math
 import os
 import sys
 
-from datasets import load_dataset, concatenate_datasets
-from datasets.dataset_dict import DatasetDict
-
 import transformers
+from datasets import concatenate_datasets, load_dataset
+from datasets.dataset_dict import DatasetDict
 from transformers import (
     CONFIG_MAPPING,
     MODEL_FOR_MASKED_LM_MAPPING,
@@ -50,26 +49,22 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
-from run_args import ModelArguments, DataTrainingArguments
+from run_args import DataTrainingArguments, ModelArguments
 
 logger = logging.getLogger(__name__)
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
 
-def main():
+def main():    # noqa: C901
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
-
-    print("*******************")
-    print(sys.argv)
-    print("*******************")
-
-    # Add options to run from local experiment file
     parser = HfArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
+
+    # Add option to run from local experiment file
     parser.add_argument("-e", "--experiment", dest="experiment",
                         choices=list(CONFIGS.keys()),
                         help="Available experiments")
@@ -77,7 +72,7 @@ def main():
 
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
-        # let's parse it to get our arguments.
+        # parse it to get our arguments.
         model_args, data_args, training_args = parser.parse_json_file(
             json_file=os.path.abspath(sys.argv[1])
         )
@@ -88,13 +83,6 @@ def main():
         model_args, data_args, training_args = parser.parse_dict(config_dict)
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    print("model_args: ", model_args)
-    print("*******************")
-    print("data_args: ", data_args)
-    print("*******************")
-    print("training_args: ", training_args)
-    print("*******************")
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -135,6 +123,8 @@ def main():
         transformers.utils.logging.enable_default_handler()
         transformers.utils.logging.enable_explicit_format()
     logger.info("Training/evaluation parameters %s", training_args)
+    logger.info("Model parameters: %s", model_args)
+    logger.info("Data parameters: %s", data_args)
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
@@ -152,14 +142,13 @@ def main():
     # process can concurrently download the dataset.
     # TODO: incorporate more arguments into dataset besides config.
 
-    from collections.abc import Iterable
-
     if data_args.dataset_name is not None:
+
         # Account for when a single dataset is passed as argument
-        if not(isinstance(data_args.dataset_name, Iterable)):
-            data_args.dataset_name = [data_args.dataset_name]
-        if not (isinstance(data_args.dataset_config_name, Iterable)):
-            data_args.dataset_config_name = [data_args.dataset_config_name]
+        if not(isinstance(data_args.dataset_name, tuple)):
+            data_args.dataset_name = (data_args.dataset_name, )
+        if not (isinstance(data_args.dataset_config_name, tuple)):
+            data_args.dataset_config_name = (data_args.dataset_config_name, )
 
         assert len(data_args.dataset_name) == len(data_args.dataset_config_name), \
             ("If using more than one dataset, length of dataset_name and "
@@ -373,7 +362,6 @@ def main():
         #
         # To speed up this part, we use multiprocessing. See the documentation of the
         # map method for more information:
-        # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.Dataset.map  # noqa: E501
         tokenized_datasets = tokenized_datasets.map(
             group_texts,
             batched=True,
@@ -382,9 +370,7 @@ def main():
         )
 
     # Verifying fingerprint for caching
-    print("******************* Fingerprint: ")
-    print(tokenized_datasets["train"]._fingerprint)
-    print("*******************")
+    logger.info(f"Dataset fingerprint: {tokenized_datasets['train']._fingerprint}")
 
     # Data collator will take care of randomly masking the tokens.
     assert hasattr(transformers, data_args.data_collator), \
@@ -394,7 +380,7 @@ def main():
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
-    # Initialize our Trainer
+    # Initialize Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -409,8 +395,8 @@ def main():
     if training_args.do_train:
         if last_checkpoint is not None:
             checkpoint = last_checkpoint
-        elif (model_args.model_name_or_path is not None and
-              os.path.isdir(model_args.model_name_or_path):
+        elif (model_args.model_name_or_path is not None
+              and os.path.isdir(model_args.model_name_or_path)):
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None

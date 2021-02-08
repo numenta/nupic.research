@@ -23,9 +23,8 @@ Base Transformers Experiment configuration.
 """
 
 import os
-from copy import deepcopy
 import random
-
+from copy import deepcopy
 
 transformers_base = dict(
 
@@ -35,7 +34,7 @@ transformers_base = dict(
     use_auth_token=False,
 
     # Data training arguments
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/transformers_base"),
+    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/transformers_base"),  # noqa: E501
     overwrite_output_dir=True,
     overwrite_cache=False,
 
@@ -89,9 +88,9 @@ debug_bert.update(
     logging_steps=30,  # also define eval_steps, redundant
     eval_steps=30,
     warmup_steps=30,
-    max_steps=600,
+    max_steps=300,
     disable_tqdm=False,  # default False
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/debug_bert"),
+    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/debug_bert"),  # noqa: E501
     overwrite_output_dir=True,
 
 )
@@ -101,8 +100,8 @@ debug_bert_multiple_data.update(
 
     # Training Arguments
     run_name="debug_run_multiple_data",
-    dataset_name=["wikitext", "ptb_text_only"],
-    dataset_config_name=["wikitext-2-raw-v1", None],
+    dataset_name=("wikitext", "ptb_text_only"),
+    dataset_config_name=("wikitext-2-raw-v1", None),
 
 )
 
@@ -112,8 +111,8 @@ full_data_load.update(
 
     # Training Arguments
     run_name="data_load_only",
-    dataset_name=["wikipedia", "bookcorpus"],
-    dataset_config_name=["20200501.en", None],
+    dataset_name=("wikipedia", "bookcorpus"),
+    dataset_config_name=("20200501.en", None),
     do_train=False,
     do_eval=False,
 

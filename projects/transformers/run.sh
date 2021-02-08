@@ -29,15 +29,15 @@ Two ways of running this script:
 
 if [ -z "$RAY_CONFIG_FILE" ]
 then
-    ray_config_file="~/nta/ray_config/ray_user$1.yaml"
+    ray_config_file="nta/ray_config/ray_user$1.yaml"
     exp_name=$2
 else
     ray_config_file=$RAY_CONFIG_FILE
     exp_name=$1
 fi
 
-echo "ray config" $ray_config_file
-echo "exp name" $exp_name
+echo "Ray config file: " $ray_config_file
+echo "Experiment name: " $exp_name
 
 
 # ------ Get head private IP -------------
@@ -45,7 +45,7 @@ echo "exp name" $exp_name
 get_head_private_ip() {
     local ip=$(ssh -o "StrictHostKeyChecking no" -i \
               ~/.ssh/ray-autoscaler_us-west-2.pem \
-              ec2-user@$(ray get-head-ip $ray_config_file) \
+              ec2-user@$(ray get-head-ip ~/"$ray_config_file") \
               hostname -I | awk '{print $1}')
     echo $ip
 }
@@ -55,12 +55,12 @@ echo "Head private IP: $head_private_ip"
 
 # ------ Get head and workers public IP -------------
 
-head_public_ip=$(ray get-head-ip $ray_config_file)
+head_public_ip=$(ray get-head-ip ~/"$ray_config_file")
 echo "Head public IP: $head_public_ip"
 
 get_worker_public_ips() {
     local counter=0
-    for ip in $(ray get-worker-ips $ray_config_file)
+    for ip in $(ray get-worker-ips ~/"$ray_config_file")
     do
         (( counter++ ))
         echo $ip
@@ -78,7 +78,7 @@ echo "Number of (max) workers: $num_workers"
 # ------ Get number of GPUs -------------
 
 get_num_gpus() {
-    local instance_type=$(cat $ray_config_file | grep "  InstanceType" | sed -n '2p' | awk '{print $2}')
+    local instance_type=$(cat ~/"$ray_config_file" | grep "  InstanceType" | sed -n '2p' | awk '{print $2}')
     case $instance_type in
         p3.2xlarge)
             echo 1

@@ -20,18 +20,12 @@
 
 """Training and eval functions"""
 
-import logging
 import math
 import os
-import sys
 
 import ray
-import transformers
 from ray import tune
 from transformers.integrations import TensorBoardCallback
-from transformers.trainer_utils import is_main_process
-
-import logger
 
 __all__ = [
     "run_hf",
@@ -40,23 +34,8 @@ __all__ = [
 ]
 
 
-def run_hf(trainer, output_dir, local_rank, save_model=True, evaluate=True):
+def run_hf(trainer, logger, output_dir, save_model=True, evaluate=True):
     """Use only hugging face to train and evaluate. Default"""
-
-    # Setup logging
-    logger = logging.getLogger(__name__)
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-    logger.setLevel(logging.INFO if is_main_process(local_rank) else logging.WARN)
-
-    # Set the verbosity to info of the Transformers logger (on main process only):
-    if is_main_process(local_rank):
-        transformers.utils.logging.set_verbosity_info()
-        transformers.utils.logging.enable_default_handler()
-        transformers.utils.logging.enable_explicit_format()
 
     # Train model to given number of epochs
     train_result = trainer.train(resume_from_checkpoint=None)
@@ -100,7 +79,7 @@ def run_hf(trainer, output_dir, local_rank, save_model=True, evaluate=True):
 # ----- Ray Distriuted Training -----------
 
 
-def run_ray_single_instance(trainer, **kwargs):
+def run_ray_single_instance(trainer, logger, **kwargs):
     """Run with ray in a single instance. Tested."""
 
     # adapted from HF integrations
@@ -155,7 +134,7 @@ def run_ray_single_instance(trainer, **kwargs):
     tune.run(_objective, **kwargs)
 
 
-def run_ray_distributed(trainer, **kwargs):
+def run_ray_distributed(trainer, logger, **kwargs):
     """Run with ray in a multiple instances. Not tested."""
 
     # Connect to ray

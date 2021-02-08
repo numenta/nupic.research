@@ -82,8 +82,8 @@ bert_100k.update(
     tokenizer_name="bert-base-cased",
 
     #  Data Training arguments
-    dataset_name=["wikipedia", "bookcorpus"],
-    dataset_config_name=["20200501.en", None],
+    dataset_name=("wikipedia", "bookcorpus"),
+    dataset_config_name=("20200501.en", None),
     mlm_probability=0.15,
     validation_split_percentage=5,
     max_seq_length=None,

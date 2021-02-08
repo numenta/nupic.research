@@ -29,9 +29,12 @@ HF_HOME=/mnt/efs/results/cache/huggingface
 """
 
 import argparse
+import logging
 import os
 import random
+import sys
 
+import transformers
 from datasets import concatenate_datasets, load_dataset
 from datasets.dataset_dict import DatasetDict
 from transformers import (
@@ -43,6 +46,7 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
+from transformers.trainer_utils import is_main_process
 
 from training_utils import run_hf, run_ray_distributed, run_ray_single_instance
 
@@ -56,6 +60,22 @@ def main(train_function):
     local_rank = parser.parse_args().local_rank
     if local_rank is None:
         local_rank = 0
+
+    # ----- Setup logging -----------
+
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+    logger.setLevel(logging.INFO if is_main_process(local_rank) else logging.WARN)
+
+    # Set the verbosity to info of the Transformers logger (on main process only):
+    if is_main_process(local_rank):
+        transformers.utils.logging.set_verbosity_info()
+        transformers.utils.logging.enable_default_handler()
+        transformers.utils.logging.enable_explicit_format()
 
     # ----- Configurable Params -----------
 
@@ -80,8 +100,8 @@ def main(train_function):
         output_dir=output_dir,
         logging_first_step=True,
         logging_steps=10,  # also define eval_steps
-        eval_steps=10,  # is it evaluating? where are results?
-        max_steps=30,
+        eval_steps=10,
+        max_steps=30,  # num_train_epochs replaced by steps
         disable_tqdm=True,
         run_name="debug_run",  # used for wandb, not for Ray
         # hyperparams
@@ -91,9 +111,6 @@ def main(train_function):
         lr_scheduler_type="linear",
         warmup_steps=500,
         weight_decay=1e-6,
-        # train epochs replaced by steps
-        # num_train_epochs=3,
-        # logging_dir=None
     )
 
     # Evaluate refers to evaluating perplexity on trained model in the validation set
@@ -226,12 +243,13 @@ def main(train_function):
 
     if train_function == "huggingface":
         # Tested
-        run_hf(trainer, output_dir, local_rank, save_model=True, evaluate=True)
+        run_hf(trainer, logger, output_dir, save_model=True, evaluate=True)
 
     elif train_function == "ray_single_node":
         # Tested
         run_ray_single_instance(
             trainer,
+            logger,
             name="bert_test",
             config=None,
             num_samples=1,
@@ -245,6 +263,7 @@ def main(train_function):
         # Untested
         run_ray_distributed(
             trainer,
+            logger,
             name="bert_test",
             config=None,
             num_samples=1,
