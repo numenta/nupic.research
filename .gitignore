@@ -105,7 +105,7 @@ venv.bak/
 
 # IDE
 .idea
-.vscode 
+.vscode
 
 # MacOS hidden files
 .DS_Store
@@ -122,3 +122,5 @@ checkcode.sh
 /projects/ray_tune_example/mnist/data
 /projects/whydense/cifar/results
 /projects/whydense/cifar/results1
+/projects/transformers/sample_files
+/projects/transformers/results

@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 """
-This module provides an example of how to visualize dendritic weight activations
+This module provides an example of how to visualize dendrite activations
 
 NOTE: Wandb will create and store files in ./wandb/ which will not be removed after
       this script has finished executing, and the new files must be manually deleted
@@ -29,48 +29,48 @@ NOTE: Wandb will create and store files in ./wandb/ which will not be removed af
 import torch
 import wandb
 
-from nupic.research.frameworks.dendrites import (
-    AbsoluteMaxGatingDendriticLayer,
-    plot_dendritic_activations,
-)
-from nupic.research.frameworks.dendrites.routing import generate_context_vectors
+from nupic.research.frameworks.dendrites import plot_dendrite_activations
 
 
 def run_wandb_demo():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Initialize dendritic network with 10 input units, 10 output units, and 10
-    # dendritic weights per output unit
-    dendritic_network = AbsoluteMaxGatingDendriticLayer(
-        module=torch.nn.Linear(in_features=10, out_features=10),
-        num_segments=10,
-        dim_context=100,
-        module_sparsity=0.7,
-        dendrite_sparsity=0.0
+    # Dendrite activations for a dendritic layer which has 1 unit, and 7 segments per
+    # unit; the input consists of a batch of 5 examples
+    dendrite_activations = torch.tensor(
+        [
+            [[-0.2114, 0.1766, 0.6050, 0.6600, -0.9530, 0.4609, -0.1015]],
+            [[-0.2442, -0.7882, 0.3758, -0.0182, -0.5847, 0.0360, -0.2504]],
+            [[0.8437, 0.2504, 0.2197, 0.4834, 0.2731, -0.3862, -0.1709]],
+            [[-0.3383, 0.7264, 0.1994, -0.6035, 0.3236, 0.0790, 0.2049]],
+            [[0.5494, -0.4031, 0.6324, 0.1556, -0.2197, 0.2124, 0.0208]]
+        ]
     )
+    dendrite_activations = dendrite_activations.to(device)
 
-    # Initialize 10 different context vectors that each have 100 dimensions
-    context_vectors = generate_context_vectors(
-        num_contexts=10,
-        n_dim=100,
-        percent_on=0.2
+    # Binary mask of winning activations
+    winning_mask = torch.tensor(
+        [
+            [[0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]],
+            [[0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
+            [[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]]
+        ]
     )
-
-    dendritic_network = dendritic_network.to(device)
-    context_vectors = context_vectors.to(device)
-
-    dendritic_weight_tensor = dendritic_network.segments.weights.data
+    winning_mask = winning_mask.to(device)
 
     # The routing function's mask value for a particular output unit, across all masks
-    mask_values = [0, 1, 1, 0, 0, 1, 0, 1, 1, 0]
+    mask_values = [0, 1, 1, 0, 0]
 
-    # Call `plot_dendritic_activations` to create a heatmap of just the first output
-    # unit's dendritic activations
-    visual = plot_dendritic_activations(
-        dendritic_weights=dendritic_weight_tensor[0, :, :],
-        context_vectors=context_vectors,
+    # Call `plot_dendrite_activations` to create a heatmap of just the first output
+    # unit's dendrite activations; note that in a non-routing scenario, `mask_values`
+    # can be None
+    visual = plot_dendrite_activations(
+        dendrite_activations=dendrite_activations,
+        winning_mask=winning_mask,
         mask_values=mask_values,
-        use_absolute_activations=True
+        unit_to_plot=0
     )
 
     # Plot heatmap of dendrite activations using wandb
