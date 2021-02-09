@@ -97,6 +97,29 @@ class DataTrainingArguments:
     training and eval.
     """
 
+    tokenized_data_cache_dir: str = field(
+        default="/mnt/efs/results/preprocessed-datasets/text",
+        metadata={"help": "Directory to save tokenized datasets."}
+    )
+    reuse_tokenized_data: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to look for a compatible tokenized version of the dataset "
+                    "Contrary to huggingface caching approach, that takes into account "
+                    "the entire preprocessing pipeline to calculate a fingerprint, this"
+                    "only takes into account the dataset names, config names and "
+                    "their respective order."
+        }
+    )
+    save_tokenized_data: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to save a copy of the tokenized data in the location "
+                    "defined in tokenized_data_cache_dir. This is in addition to "
+                    "HF/datasets caching process. If this is True, consider "
+                    "turning off caching in the datasets lib to avoid redundancy. "
+        }
+    )
     dataset_name: Optional[str] = field(
         default="wikitext",
         metadata={"help": "The name of the dataset to use (via the datasets library)."}

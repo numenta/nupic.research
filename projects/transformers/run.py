@@ -31,9 +31,10 @@ import logging
 import math
 import os
 import sys
+from hashlib import blake2b
 
 import transformers
-from datasets import concatenate_datasets, load_dataset
+from datasets import concatenate_datasets, load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
 from transformers import (
     CONFIG_MAPPING,
@@ -140,8 +141,8 @@ def main():    # noqa: C901
     #
     # In distributed training, the load_dataset function guarantee that only one local
     # process can concurrently download the dataset.
-    # TODO: incorporate more arguments into dataset besides config.
 
+    tokenized_datasets, dataset_path = None, None
     if data_args.dataset_name is not None:
 
         # Account for when a single dataset is passed as argument
@@ -154,45 +155,23 @@ def main():    # noqa: C901
             ("If using more than one dataset, length of dataset_name and "
              "dataset_config_name must match")
 
-        # Load and concatenate multiple compatible datasets
-        train_datasets, validation_datasets = [], []
-        for name, config in zip(data_args.dataset_name, data_args.dataset_config_name):
+        # Verifies if dataset is already saved
+        dataset_folder = "-".join([
+            f"{name}_{config}" for name, config in
+            zip(data_args.dataset_name, data_args.dataset_config_name)
+        ])
+        dataset_folder = blake2b(dataset_folder.encode(), digest_size=20).hexdigest()
+        dataset_path = os.path.join(
+            os.path.abspath(data_args.tokenized_data_cache_dir),
+            str(dataset_folder)
+        )
+        logger.info(f"Tokenized dataset cache folder: {dataset_path}")
 
-            dataset = load_dataset(name, config)
-            if "validation" not in dataset.keys():
-                validation_ds = load_dataset(
-                    name, config,
-                    split=f"train[:{data_args.validation_split_percentage}%]",
-                )
-                train_ds = load_dataset(
-                    name, config,
-                    split=f"train[{data_args.validation_split_percentage}%:]",
-                )
-            else:
-                validation_ds = dataset["validation"]
-                train_ds = dataset["train"]
-
-            # Some specific preprocessing to align fields on known datasets
-            # extraneous fields not used in language modelling are also removed
-            # after preprocessing
-            if name == "wikipedia":
-                train_ds.remove_columns_("title")
-                validation_ds.remove_columns_("title")
-            elif name == "ptb_text_only":
-                train_ds.rename_column_("sentence", "text")
-                validation_ds.rename_column_("sentence", "text")
-
-            train_datasets.append(train_ds)
-            validation_datasets.append(validation_ds)
-
-        for ds_idx in range(1, len(train_datasets)):
-            assert train_datasets[ds_idx].features.type == \
-                train_datasets[ds_idx - 1].features.type, \
-                "Features name and type must match between all datasets"
-
-        datasets = DatasetDict()
-        datasets["train"] = concatenate_datasets(train_datasets)
-        datasets["validation"] = concatenate_datasets(validation_datasets)
+        if os.path.exists(dataset_path) and data_args.reuse_tokenized_data:
+            logger.info(f"Loading cached tokenized data ...")
+            tokenized_datasets = load_from_disk(dataset_path)
+        else:
+            datasets = load_datasets(data_args)
 
     else:
         # If dataset not available in Hub, look for train and validation files.
@@ -205,6 +184,7 @@ def main():    # noqa: C901
         if extension == "txt":
             extension = "text"
         datasets = load_dataset(extension, data_files=data_files)
+
     # See more about loading any type of standard or custom dataset
     # (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
@@ -265,13 +245,147 @@ def main():    # noqa: C901
 
     model.resize_token_embeddings(len(tokenizer))
 
-    # Preprocessing the datasets.
-    # First we tokenize all the texts.
+    # Preprocessing the datasets. First tokenize all the texts, if not already tokenized
+    if tokenized_datasets is None:
+        if training_args.do_train:
+            column_names = datasets["train"].column_names
+        else:
+            column_names = datasets["validation"].column_names
+        text_column_name = "text" if "text" in column_names else column_names[0]
+
+        logger.info(f"Tokenizing datasets ...")
+        tokenized_datasets = preprocess_datasets(
+            datasets, tokenizer, column_names, text_column_name, data_args
+        )
+
+        # Save only if a dataset_path has been defined in the previous steps
+        # that will be True only when loading from dataset hub
+        if data_args.save_tokenized_data and dataset_path is not None:
+            logger.info(f"Saving tokenized dataset to {dataset_path}")
+            tokenized_datasets.save_to_disk(dataset_path)
+
+    # Verifying fingerprint for caching
+    logger.info(f"Dataset fingerprint: {tokenized_datasets['train']._fingerprint}")
+
+    # Data collator will take care of randomly masking the tokens.
+    assert hasattr(transformers, data_args.data_collator), \
+        f"Data collator {data_args.data_collator} not available"
+
+    data_collator = getattr(transformers, data_args.data_collator)(
+        tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
+    )
+
+    # Initialize Trainer
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_datasets["train"] if training_args.do_train else None,
+        eval_dataset=(tokenized_datasets["validation"] if training_args.do_eval
+                      else None),
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+    )
+
+    # Training
     if training_args.do_train:
-        column_names = datasets["train"].column_names
-    else:
-        column_names = datasets["validation"].column_names
-    text_column_name = "text" if "text" in column_names else column_names[0]
+        if last_checkpoint is not None:
+            checkpoint = last_checkpoint
+        elif (model_args.model_name_or_path is not None
+              and os.path.isdir(model_args.model_name_or_path)):
+            checkpoint = model_args.model_name_or_path
+        else:
+            checkpoint = None
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        trainer.save_model()  # Saves the tokenizer too for easy upload
+
+        output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
+        if trainer.is_world_process_zero():
+            with open(output_train_file, "w") as writer:
+                logger.info("***** Train results *****")
+                for key, value in sorted(train_result.metrics.items()):
+                    logger.info(f"  {key} = {value}")
+                    writer.write(f"{key} = {value}\n")
+
+            # Need to save the state, since Trainer.save_model saves only the tokenizer
+            # with the model
+            trainer.state.save_to_json(
+                os.path.join(training_args.output_dir, "trainer_state.json")
+            )
+
+    # Evaluation
+    results = {}
+    if training_args.do_eval:
+        logger.info("*** Evaluate ***")
+
+        eval_output = trainer.evaluate()
+
+        perplexity = math.exp(eval_output["eval_loss"])
+        results["perplexity"] = perplexity
+
+        output_eval_file = os.path.join(
+            training_args.output_dir, "eval_results_mlm.txt"
+        )
+        if trainer.is_world_process_zero():
+            with open(output_eval_file, "w") as writer:
+                logger.info("***** Eval results *****")
+                for key, value in sorted(results.items()):
+                    logger.info(f"  {key} = {value}")
+                    writer.write(f"{key} = {value}\n")
+
+    return results
+
+
+def _mp_fn(index):
+    # For xla_spawn (TPUs)
+    main()
+
+
+def load_datasets(data_args):
+    """Load and concatenate multiple compatible datasets"""
+    train_datasets, validation_datasets = [], []
+    for name, config in zip(data_args.dataset_name, data_args.dataset_config_name):
+
+        dataset = load_dataset(name, config)
+        if "validation" not in dataset.keys():
+            validation_ds = load_dataset(
+                name, config,
+                split=f"train[:{data_args.validation_split_percentage}%]",
+            )
+            train_ds = load_dataset(
+                name, config,
+                split=f"train[{data_args.validation_split_percentage}%:]",
+            )
+        else:
+            validation_ds = dataset["validation"]
+            train_ds = dataset["train"]
+
+        # Some specific preprocessing to align fields on known datasets
+        # extraneous fields not used in language modelling are also removed
+        # after preprocessing
+        if name == "wikipedia":
+            train_ds.remove_columns_("title")
+            validation_ds.remove_columns_("title")
+        elif name == "ptb_text_only":
+            train_ds.rename_column_("sentence", "text")
+            validation_ds.rename_column_("sentence", "text")
+
+        train_datasets.append(train_ds)
+        validation_datasets.append(validation_ds)
+
+    for ds_idx in range(1, len(train_datasets)):
+        assert train_datasets[ds_idx].features.type == \
+            train_datasets[ds_idx - 1].features.type, \
+            "Features name and type must match between all datasets"
+
+    datasets = DatasetDict()
+    datasets["train"] = concatenate_datasets(train_datasets)
+    datasets["validation"] = concatenate_datasets(validation_datasets)
+
+    return datasets
+
+
+def preprocess_datasets(datasets, tokenizer, column_names, text_column_name, data_args):
+    """Tokenize datasets and applies remaining preprocessing steps"""
 
     if data_args.line_by_line:
         # When using line_by_line, we just tokenize each nonempty line.
@@ -369,80 +483,9 @@ def main():    # noqa: C901
             load_from_cache_file=not data_args.overwrite_cache,
         )
 
-    # Verifying fingerprint for caching
-    logger.info(f"Dataset fingerprint: {tokenized_datasets['train']._fingerprint}")
-
-    # Data collator will take care of randomly masking the tokens.
-    assert hasattr(transformers, data_args.data_collator), \
-        f"Data collator {data_args.data_collator} not available"
-
-    data_collator = getattr(transformers, data_args.data_collator)(
-        tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
-    )
-
-    # Initialize Trainer
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=tokenized_datasets["train"] if training_args.do_train else None,
-        eval_dataset=(tokenized_datasets["validation"] if training_args.do_eval
-                      else None),
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-    )
-
-    # Training
-    if training_args.do_train:
-        if last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        elif (model_args.model_name_or_path is not None
-              and os.path.isdir(model_args.model_name_or_path)):
-            checkpoint = model_args.model_name_or_path
-        else:
-            checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
-
-        output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
-        if trainer.is_world_process_zero():
-            with open(output_train_file, "w") as writer:
-                logger.info("***** Train results *****")
-                for key, value in sorted(train_result.metrics.items()):
-                    logger.info(f"  {key} = {value}")
-                    writer.write(f"{key} = {value}\n")
-
-            # Need to save the state, since Trainer.save_model saves only the tokenizer
-            # with the model
-            trainer.state.save_to_json(
-                os.path.join(training_args.output_dir, "trainer_state.json")
-            )
-
-    # Evaluation
-    results = {}
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-
-        eval_output = trainer.evaluate()
-
-        perplexity = math.exp(eval_output["eval_loss"])
-        results["perplexity"] = perplexity
-
-        output_eval_file = os.path.join(
-            training_args.output_dir, "eval_results_mlm.txt"
-        )
-        if trainer.is_world_process_zero():
-            with open(output_eval_file, "w") as writer:
-                logger.info("***** Eval results *****")
-                for key, value in sorted(results.items()):
-                    logger.info(f"  {key} = {value}")
-                    writer.write(f"{key} = {value}\n")
-
-    return results
+    return tokenized_datasets
 
 
-def _mp_fn(index):
-    # For xla_spawn (TPUs)
-    main()
 
 
 if __name__ == "__main__":

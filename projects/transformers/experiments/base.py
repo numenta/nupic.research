@@ -30,6 +30,9 @@ transformers_base = dict(
 
     # Model arguments
     cache_dir="/mnt/efs/results/pretrained-models/huggingface",
+    tokenized_data_cache_dir="/mnt/efs/results/preprocessed-datasets/text",
+    reuse_tokenized_data=True,
+    save_tokenized_data=True,
     use_fast_tokenizer=True,
     use_auth_token=False,
 
@@ -82,13 +85,17 @@ bert_base.update(
 debug_bert = deepcopy(bert_base)
 debug_bert.update(
 
+    #  Data Training arguments
+    dataset_name="wikitext",
+    dataset_config_name="wikitext-2-raw-v1",
+
     # Training Arguments
     run_name="debug_run",
     logging_first_step=True,
     logging_steps=30,  # also define eval_steps, redundant
     eval_steps=30,
     warmup_steps=30,
-    max_steps=300,
+    max_steps=90,
     disable_tqdm=False,  # default False
     output_dir=os.path.expanduser("~/nta/results/experiments/transformers/debug_bert"),  # noqa: E501
     overwrite_output_dir=True,
@@ -117,6 +124,7 @@ full_data_load.update(
     do_eval=False,
 
 )
+
 
 # Export configurations in this file
 CONFIGS = dict(
