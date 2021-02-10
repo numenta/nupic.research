@@ -44,12 +44,14 @@ from transformers import (
     AutoTokenizer,
     HfArgumentParser,
     Trainer,
+    TrainerCallback,
     TrainingArguments,
     set_seed,
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
+from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from run_args import DataTrainingArguments, ModelArguments
 
 logger = logging.getLogger(__name__)
@@ -71,6 +73,7 @@ def main():    # noqa: C901
                         help="Available experiments")
     args = parser.parse_args()
 
+    trainer_callbacks = None
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # parse it to get our arguments.
@@ -82,6 +85,9 @@ def main():    # noqa: C901
         config_dict = CONFIGS[args.experiment]
         config_dict["local_rank"] = args.local_rank  # added by torch.distributed.launch
         model_args, data_args, training_args = parser.parse_dict(config_dict)
+        # Callbacks can only be passed when using experiment
+        if "trainer_callbacks" in config_dict:
+            trainer_callbacks = config_dict["trainer_callbacks"]
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -275,6 +281,11 @@ def main():    # noqa: C901
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
+    if trainer_callbacks is not None:
+        for cb in trainer_callbacks:
+            assert isinstance(cb, TrainerCallback), \
+                "Trainer callbacks must be an instance of TrainerCallback"
+
     # Initialize Trainer
     trainer = Trainer(
         model=model,
@@ -284,7 +295,12 @@ def main():    # noqa: C901
                       else None),
         tokenizer=tokenizer,
         data_collator=data_collator,
+        callbacks=trainer_callbacks,
     )
+
+    logger.info("Total params: {:,} Non zero params: {:,}".format(
+        *count_nonzero_params(trainer.model)
+    ))
 
     # Training
     if training_args.do_train:
@@ -484,8 +500,6 @@ def preprocess_datasets(datasets, tokenizer, column_names, text_column_name, dat
         )
 
     return tokenized_datasets
-
-
 
 
 if __name__ == "__main__":
