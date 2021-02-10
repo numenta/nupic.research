@@ -98,7 +98,7 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
         plot_dendrite_metrics_args=dict(
             include_modules=[DendriticGate1d],
             mean_selected=dict(
-                plot_func=mean_selected_activations,
+                plot_func=plot_mean_selected_activations,
             )
         )
     )
@@ -165,7 +165,7 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
             assert callable(plot_func)
             assert isinstance(plot_freq, int)
             assert isinstance(max_samples_to_plot, int)
-            assert plot_freq > 1
+            assert plot_freq > 0
             assert max_samples_to_plot > 0
 
             # The arguments may be given as a callable; useful for sampling random
