@@ -29,7 +29,6 @@ from copy import deepcopy
 import torch
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
-from nupic.research.frameworks.pytorch.models.common_models import SparseMLP
 from nupic.research.frameworks.vernon import (
     RezeroedKWinnersGSCExperiment,
     VariedRezeroedKWinnersGSCExperiment,
@@ -180,30 +179,8 @@ DEFAULT_SPARSE_CNN.update(
     epochs_to_validate=range(0, 30),
 )
 
-from nupic.research.frameworks.vernon import experiments, mixins
-
-
-class SampledKWinnersGSCExperiment(mixins.VaryBatchSize, mixins.RezeroWeights, mixins.UpdateKWinnerTemperature,
-                                   mixins.LoadPreprocessedData,
-                                   experiments.SupervisedExperiment):
-    pass
-
-
-SAMPLED_KWINNERS_MLP = deepcopy(DEFAULT_SPARSE_CNN)
-SAMPLED_KWINNERS_MLP.update(
-    experiment_class=SampledKWinnersGSCExperiment,
-    model_class=SparseMLP,
-    model_args = dict(
-        input_size=32*32,
-        output_size=12
-    ),
-
-    loss_function=torch.nn.functional.cross_entropy,
-)
-
 # Export configurations in this file
 CONFIGS = dict(
     default_base=DEFAULT_BASE,
     default_sparse_cnn=DEFAULT_SPARSE_CNN,
-    sampled_kwinners_mlp=SAMPLED_KWINNERS_MLP
 )
