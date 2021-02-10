@@ -65,7 +65,7 @@ metacl_with_sparse_stats.update(
 )
 
 
-def plot_entropy_distribution_(_, winning_mask, targets):
+def _plot_entropy_distribution(_dendrite_activations, winning_mask, targets):
     """
     This adjusts the function's signature to align with the mixin.
     """
@@ -87,7 +87,7 @@ metacl_with_dendrite_stats.update(
             # A wrapper will be placed around the function
             # to facilitate logging to wandb.
             plot_func=ray_wandb.prep_plot_for_wandb(
-                plot_entropy_distribution_
+                _plot_entropy_distribution
             )
         )
     ),
