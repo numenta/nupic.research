@@ -62,11 +62,10 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
     .. _prep_plot_for_wandb: nupic/reasearch/frameworks/wandb/ray_wandb
 
 
-    :param config:
-        - plot_dendrite_metrics_args:
+    :param config: a dict containing the following
 
-            # The following arguments specify which modules of type `ApplyDendritesBase`
-            # to track and create plots. The same modules are used for each 'plot_func'.
+        - plot_dendrite_metrics_args: a dict containing the following
+
             - include_modules: (optional) a list of module types to track
             - include_names: (optional) a list of module names to track e.g.
                              "features.stem"
@@ -74,9 +73,11 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
                                 names; for instance, all feature parameters in ResNet
                                 can be included through "features.*"
 
-            <plot_name>: This can be any string and maps to a dictionary of arguments
-                         for each desired plot. The resulting plot will be logged under
-                         "<plot_name>/<module_name>" in the results dictionary.
+            <insert any plot name here>: This can be any string and maps to a dictionary
+                                         of the plot arguments below. The
+                                         resulting plot will be logged under
+                                         "<plot_name>/<module_name>" in the results
+                                         dictionary.
 
                 - plot_func: the function called for plotting; must take three
                              arguments: 'dendrite_activations', 'winning_mask', and
@@ -90,6 +91,18 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
                 - max_samples_to_track: (optional) how many of samples to use for
                                         plotting; only the newest will be used;
                                         defaults to 1000
+
+    Example config:
+    ```
+    config=dict(
+        plot_dendrite_metrics_args=dict(
+            include_modules=[DendriticGate1d],
+            mean_selected=dict(
+                plot_func=mean_selected_activations,
+            )
+        )
+    )
+    ```
     """
 
     def setup_experiment(self, config):
