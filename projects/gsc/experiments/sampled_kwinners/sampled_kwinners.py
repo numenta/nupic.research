@@ -40,7 +40,6 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         temperature=10.0,
         temperature_decay_rate=0.01,
         eval_temperature=1.0,
-        with_replacement=False
     ):
         super(SampledKWinnersBase, self).__init__()
         assert 0.0 < percent_on < 1.0
@@ -52,7 +51,6 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         self.temperature = temperature
         self.temperature_decay_rate = temperature_decay_rate
         self.eval_temperature = eval_temperature
-        self.with_replacement = with_replacement
         self.learning_iterations = 0
         self.n = 0
         self.k = 0
@@ -115,9 +113,9 @@ class SampledKWinners(SampledKWinnersBase):
             self.k_inference = int(round(self.n * self.percent_on_inference))
 
         if self.training:
-            x = F.sampled_kwinners(x, self.k, self.temperature, with_replacement=self.with_replacement, relu=self.relu)
+            x = F.sampled_kwinners(x, self.k, self.temperature, relu=self.relu)
         else:
-            x = F.sampled_kwinners(x, self.k_inference, self.eval_temperature, with_replacement=self.with_replacement, relu=self.relu)
+            x = F.sampled_kwinners(x, self.k_inference, self.eval_temperature, relu=self.relu)
         return x
 
     def extra_repr(self):

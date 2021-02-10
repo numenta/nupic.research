@@ -30,7 +30,7 @@ from nupic.torch.modules import (
     SparseWeights,
     SparseWeights2d,
 )
-from sampled_kwinners import SampledKWinners, SampledKWinners2d
+from .sampled_kwinners import SampledKWinners, SampledKWinners2d
 
 
 
@@ -178,7 +178,7 @@ def add_sparse_linear_layer(
         network.add_module("linear{}_dropout".format(suffix), nn.Dropout(dropout))
 
 
-class LeSparseNet(nn.Sequential):
+class SampledLeSparseNet(nn.Sequential):
     """
     A generic LeNet style sparse CNN network as described in `How Can We Be So Dense?`_
     paper. The network has a set of CNN blocks, followed by a set of linear blocks,
@@ -227,7 +227,7 @@ class LeSparseNet(nn.Sequential):
                  consolidated_sparse_weights=False,
                  use_softmax=True,
                  ):
-        super(LeSparseNet, self).__init__()
+        super(SampledLeSparseNet, self).__init__()
 
         # Add CNN Layers
         current_input_shape = input_shape

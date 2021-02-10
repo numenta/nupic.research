@@ -3,7 +3,7 @@ from torch.nn.functional import softmax
 from torch.distributions.multinomial import Multinomial
 
 
-def sampled_kwinners(x, k, temperature, with_replacement=True, relu=False, inplace=False):
+def sampled_kwinners(x, k, temperature, relu=False, inplace=False):
     if k == 0:
         return torch.zeros_like(x)
     probs = softmax(x / temperature, dim=-1)
