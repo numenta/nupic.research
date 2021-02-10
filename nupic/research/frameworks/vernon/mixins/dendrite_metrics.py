@@ -50,7 +50,7 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
 
     Plots can be configured to use fewer samples (helpful for plotting a small batches
     of individual samples) and to plot every so many epochs (so that training isn't
-    slowed down too much). Whenever a plot is made, the raw data used to create it s
+    slowed down too much). Whenever a plot is made, the raw data used to create it is
     saved so it may be reproduced and edited off-line.
 
     .. warning:: When using this mixin with Ray, be careful to have 'plot_func' return
