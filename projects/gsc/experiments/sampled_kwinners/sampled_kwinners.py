@@ -23,7 +23,7 @@ import abc
 import numpy as np
 import torch.nn as nn
 
-import kwinner_functions as F
+from .kwinner_functions import sampled_kwinners, sampled_kwinners2d
 from nupic.torch.duty_cycle_metrics import max_entropy
 
 
@@ -55,8 +55,6 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         self.n = 0
         self.k = 0
         self.k_inference = 0
-        # will be updated during forward passes
-        self.total_entropy = -1.0
 
     def _load_from_state_dict(self, *args, **kwargs):
         super()._load_from_state_dict(*args, **kwargs)
@@ -74,8 +72,7 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
 
     def entropy(self):
         """Returns the current total entropy of this layer."""
-        # TODO: update this
-        return self.total_entropy
+        raise NotImplementedError
 
     def max_entropy(self):
         """Returns the maximum total entropy we can expect from this layer."""
@@ -112,10 +109,9 @@ class SampledKWinners(SampledKWinnersBase):
             self.k_inference = int(round(self.n * self.percent_on_inference))
 
         if self.training:
-            x, entropy = F.sampled_kwinners(x, self.k, self.temperature, relu=self.relu)
+            x = sampled_kwinners(x, self.k, self.temperature, relu=self.relu)
         else:
-            x, entropy = F.sampled_kwinners(x, self.k_inference, self.eval_temperature, relu=self.relu)
-        self.total_entropy = entropy
+            x = sampled_kwinners(x, self.k_inference, self.eval_temperature, relu=self.relu)
         return x
 
     def extra_repr(self):
@@ -158,14 +154,10 @@ class SampledKWinners2d(SampledKWinnersBase):
             self.k_inference = int(round(self.n * self.percent_on_inference))
 
         if self.training:
-            x, entropy = F.sampled_kwinners2d(x, self.k, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
+            x = sampled_kwinners2d(x, self.k, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
         else:
-            x, entropy = F.sampled_kwinners2d(x, self.k_inference, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
-        self.total_entropy = entropy
+            x = sampled_kwinners2d(x, self.k_inference, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
         return x
-
-    def entropy(self):
-        return self.total_entropy
 
     def extra_repr(self):
         s = super().extra_repr()
