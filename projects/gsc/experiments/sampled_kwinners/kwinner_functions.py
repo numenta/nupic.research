@@ -1,6 +1,25 @@
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see htt"://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+#
 import torch
-from torch.nn.functional import softmax
 from torch.distributions.multinomial import Multinomial
+from torch.nn.functional import softmax
 
 
 def sampled_kwinners(x, k, temperature, relu=False, inplace=False):
@@ -45,7 +64,7 @@ def sampled_kwinners(x, k, temperature, relu=False, inplace=False):
 
 def sampled_kwinners2d(x, k, temperature, relu=False, inplace=False):
     """
-    A stochastic K-winner take all function for creating Conv2d layers with sparse output.
+    A stochastic K-winner take all function for Conv2d layers with sparse output.
     Keeps only k units which are sampled according to a softmax distribution over
     the activations.
 
@@ -84,6 +103,7 @@ def sampled_kwinners2d(x, k, temperature, relu=False, inplace=False):
         return x.masked_fill_(off_mask, 0)
     else:
         return x.masked_fill(off_mask, 0)
+
 
 __all__ = [
     "sampled_kwinners",

@@ -25,11 +25,8 @@ from nupic.research.frameworks.pytorch.modules.consolidated_sparse_weights impor
     ConsolidatedSparseWeights,
     ConsolidatedSparseWeights2D,
 )
-from nupic.torch.modules import (
-    Flatten,
-    SparseWeights,
-    SparseWeights2d,
-)
+from nupic.torch.modules import Flatten, SparseWeights, SparseWeights2d
+
 from .sampled_kwinners import SampledKWinners, SampledKWinners2d
 
 

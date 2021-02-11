@@ -24,17 +24,20 @@ Run a GSC experiment using SparseLeNet with SampledKWinners.
 
 from copy import deepcopy
 
-from .sampled_kwinners.sampled_le_sparse_net import SampledLeSparseNet
-from .sampled_kwinners.update_kwinner_temperature import UpdateKWinnerTemperature
-from .base import DEFAULT_SPARSE_CNN
-
 from nupic.research.frameworks.vernon import experiments, mixins
 
+from .base import DEFAULT_SPARSE_CNN
+from .sampled_kwinners.sampled_le_sparse_net import SampledLeSparseNet
+from .sampled_kwinners.update_kwinner_temperature import UpdateKWinnerTemperature
 
-class SampledKWinnersGSCExperiment(mixins.VaryBatchSize, mixins.RezeroWeights, UpdateKWinnerTemperature,
+
+class SampledKWinnersGSCExperiment(mixins.VaryBatchSize,
+                                   mixins.RezeroWeights,
+                                   UpdateKWinnerTemperature,
                                    mixins.LoadPreprocessedData,
                                    experiments.SupervisedExperiment):
     pass
+
 
 SPARSE_CNN_SAMPLED_KWINNER = deepcopy(DEFAULT_SPARSE_CNN)
 SPARSE_CNN_SAMPLED_KWINNER.update(

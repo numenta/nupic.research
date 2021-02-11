@@ -23,8 +23,9 @@ import abc
 import numpy as np
 import torch.nn as nn
 
-from .kwinner_functions import sampled_kwinners, sampled_kwinners2d
 from nupic.torch.duty_cycle_metrics import max_entropy
+
+from .kwinner_functions import sampled_kwinners, sampled_kwinners2d
 
 
 def update_temperature(m):
@@ -96,8 +97,16 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
 
     def extra_repr(self):
         return (
-            "n={0}, percent_on={1}, temperature={2}, tempreature_decay_rate={3}, eval_temperature={4}".format(
-                self.n, self.percent_on, self.temperature, self.temperature_decay_rate, self.eval_temperature
+            "n={0},"
+            " percent_on={1},"
+            " temperature={2},"
+            " tempreature_decay_rate={3},"
+            " eval_temperature={4}".format(
+                self.n,
+                self.percent_on,
+                self.temperature,
+                self.temperature_decay_rate,
+                self.eval_temperature
             )
         )
 
@@ -159,7 +168,8 @@ class SampledKWinners(SampledKWinnersBase):
         if self.training:
             x = sampled_kwinners(x, self.k, self.temperature, relu=self.relu)
         else:
-            x = sampled_kwinners(x, self.k_inference, self.eval_temperature, relu=self.relu)
+            x = sampled_kwinners(x, self.k_inference, self.eval_temperature,
+                                 relu=self.relu)
         return x
 
     def extra_repr(self):
@@ -207,7 +217,6 @@ class SampledKWinners2d(SampledKWinnersBase):
         self.inplace = inplace
         self.relu = relu
 
-
     def forward(self, x):
         if self.n == 0:
             self.n = np.prod(x.shape[1:])
@@ -215,9 +224,17 @@ class SampledKWinners2d(SampledKWinnersBase):
             self.k_inference = int(round(self.n * self.percent_on_inference))
 
         if self.training:
-            x = sampled_kwinners2d(x, self.k, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
+            x = sampled_kwinners2d(x,
+                                   self.k,
+                                   temperature=self.temperature,
+                                   relu=self.relu,
+                                   inplace=self.inplace)
         else:
-            x = sampled_kwinners2d(x, self.k_inference, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
+            x = sampled_kwinners2d(x,
+                                   self.k_inference,
+                                   temperature=self.temperature,
+                                   relu=self.relu,
+                                   inplace=self.inplace)
         return x
 
     def extra_repr(self):
