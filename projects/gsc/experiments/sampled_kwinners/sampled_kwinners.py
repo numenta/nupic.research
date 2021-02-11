@@ -55,14 +55,16 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         self.n = 0
         self.k = 0
         self.k_inference = 0
+        # will be updated during forward passes
+        self.total_entropy = -1.0
 
     def _load_from_state_dict(self, *args, **kwargs):
         super()._load_from_state_dict(*args, **kwargs)
 
     def extra_repr(self):
         return (
-            "n={0}, percent_on={1}, temperature={2}".format(
-                self.n, self.percent_on, self.temperature
+            "n={0}, percent_on={1}, temperature={2}, tempreature_decay_rate={3}, eval_temperature={4}".format(
+                self.n, self.percent_on, self.temperature, self.temperature_decay_rate, self.eval_temperature
             )
         )
 
@@ -73,8 +75,7 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
     def entropy(self):
         """Returns the current total entropy of this layer."""
         # TODO: update this
-        _, entropy = binary_entropy(self.duty_cycle)
-        return entropy
+        return self.total_entropy
 
     def max_entropy(self):
         """Returns the maximum total entropy we can expect from this layer."""
@@ -89,7 +90,6 @@ class SampledKWinners(SampledKWinnersBase):
         temperature=10.0,
         eval_temperature=1.0,
         temperature_decay_rate=0.01,
-        with_replacement=False,
         relu=False,
         inplace=False,
     ):
@@ -100,7 +100,6 @@ class SampledKWinners(SampledKWinnersBase):
             temperature=temperature,
             eval_temperature=eval_temperature,
             temperature_decay_rate=temperature_decay_rate,
-            with_replacement=with_replacement
         )
 
         self.inplace = inplace
@@ -113,9 +112,10 @@ class SampledKWinners(SampledKWinnersBase):
             self.k_inference = int(round(self.n * self.percent_on_inference))
 
         if self.training:
-            x = F.sampled_kwinners(x, self.k, self.temperature, relu=self.relu)
+            x, entropy = F.sampled_kwinners(x, self.k, self.temperature, relu=self.relu)
         else:
-            x = F.sampled_kwinners(x, self.k_inference, self.eval_temperature, relu=self.relu)
+            x, entropy = F.sampled_kwinners(x, self.k_inference, self.eval_temperature, relu=self.relu)
+        self.total_entropy = entropy
         return x
 
     def extra_repr(self):
@@ -158,24 +158,19 @@ class SampledKWinners2d(SampledKWinnersBase):
             self.k_inference = int(round(self.n * self.percent_on_inference))
 
         if self.training:
-            x = F.sampled_kwinners2d(x, self.k, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
+            x, entropy = F.sampled_kwinners2d(x, self.k, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
         else:
-            x = F.sampled_kwinners2d(x, self.k_inference, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
+            x, entropy = F.sampled_kwinners2d(x, self.k_inference, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
+        self.total_entropy = entropy
         return x
 
     def entropy(self):
-        # TODO: update
-        # entropy = super(KWinners2d, self).entropy()
-        # return entropy * self.n / self.channels
-        return 0.0
+        return self.total_entropy
 
     def extra_repr(self):
-        # TODO: update
-        s = (f"channels={self.channels}, local={self.local}"
-             f", break_ties={self.break_ties}")
+        s = super().extra_repr()
         if self.relu:
             s += ", relu=True"
         if self.inplace:
             s += ", inplace=True"
-        s += ", {}".format(super().extra_repr())
         return s
