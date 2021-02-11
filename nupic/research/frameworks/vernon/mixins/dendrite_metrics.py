@@ -66,7 +66,8 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
 
         - plot_dendrite_metrics_args: a dict containing the following
 
-            - include_modules: (optional) a list of module types to track
+            - include_modules: (optional) a list of module types to track; defaults to
+                                          include all `ApplyDendritesBase` modules
             - include_names: (optional) a list of module names to track e.g.
                              "features.stem"
             - include_patterns: (optional) a list of regex patterns to compare to the
@@ -143,7 +144,7 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
 
         # Remove and collect information about which modules to track.
         include_names = metric_args.pop("include_names", [])
-        include_modules = metric_args.pop("include_modules", [])
+        include_modules = metric_args.pop("include_modules", [ApplyDendritesBase])
         include_patterns = metric_args.pop("include_patterns", [])
         filter_args = dict(
             include_names=include_names,
