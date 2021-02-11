@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.torch.modules import update_temperature
+from .sampled_kwinners import update_temperature
 
 
 class UpdateKWinnerTemperature:
