@@ -20,25 +20,15 @@
 
 from copy import deepcopy
 
+from experiment_classes import DendritesExperiment
 from networks import (
     ANMLDendriticNetwork,
     CloserToANMLDendriticNetwork,
     DendriticNetwork,
 )
-from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
 
 from .anml_replicate import ANMLTransform, metacl_anml_replicate
 from .oml_replicate import metacl_oml_replicate
-
-
-class DendritesExperiment(mixins.RezeroWeights,
-                          mixins.OnlineMetaLearning,
-                          MetaContinualLearningExperiment):
-    """
-    This is similar to OMLExperiment from oml_replicate, but now
-    there is rezero weights.
-    """
-    pass
 
 
 # Alternative to run on a single GPU

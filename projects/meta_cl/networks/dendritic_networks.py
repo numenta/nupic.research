@@ -28,6 +28,12 @@ from nupic.research.frameworks.dendrites import (
 )
 from nupic.research.frameworks.pytorch.model_utils import filter_params
 
+__all__ = [
+    "ANMLDendriticNetwork",
+    "CloserToANMLDendriticNetwork",
+    "DendriticNetwork",
+]
+
 
 class DendriticNetwork(nn.Module):
     """
@@ -225,16 +231,13 @@ class CloserToANMLDendriticNetwork(nn.Module):
 
     With default parameters and `num_classes-963`, it uses 5,132,832 weights-on
     out of a total of 13,960,323 weights. In comparison, ANML uses 5,963,139 weights
-    and OML uses 5,172,675 weights. Thus, these is still room to add more.
-
-    The default parameters are chosen so that the number of on weights for this network
-    is close to that of ANMLDendriticNetwork.
+    and OML uses 5,172,675 weights.
     """
 
     def __init__(self, num_classes,
                  num_segments=10,
                  dendrite_sparsity=0.856,
-                 dendrite_bias=None):
+                 dendrite_bias=True):
 
         super().__init__()
 
