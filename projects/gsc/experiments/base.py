@@ -27,7 +27,6 @@ import sys
 from copy import deepcopy
 
 import torch
-
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.vernon import (
@@ -154,7 +153,6 @@ DEFAULT_BASE = dict(
     # a succinct version of the result dict.
     verbose=1,
 )
-
 
 # This config is based off the example from `nupic.torch\examples\gsc\run_gsc_model.py`
 # That example model achieves an average of 96.003% acc while the config below
