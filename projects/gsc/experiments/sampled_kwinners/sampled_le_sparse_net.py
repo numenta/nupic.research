@@ -33,7 +33,6 @@ from nupic.torch.modules import (
 from .sampled_kwinners import SampledKWinners, SampledKWinners2d
 
 
-
 def add_sparse_cnn_layer(
     network,
     suffix,
