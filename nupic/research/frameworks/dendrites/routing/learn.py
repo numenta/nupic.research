@@ -247,7 +247,8 @@ def learn_to_route(
         dim_out=dim_out,
         num_contexts=num_contexts,
         dim_context=dim_context,
-        dendrite_module=dendrite_module, sparse_context_model=sparse_context_model,
+        dendrite_module=dendrite_module,
+        sparse_context_model=sparse_context_model,
         onehot=onehot
     )
 

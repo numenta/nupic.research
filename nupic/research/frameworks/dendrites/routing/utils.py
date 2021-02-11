@@ -21,6 +21,7 @@
 
 import torch
 from nupic.research.frameworks.pytorch import l1_regularization_step
+from nupic.torch.modules.sparse_weights import rezero_weights
 
 
 def generate_context_integers(num_contexts):
@@ -171,6 +172,11 @@ def train_dendrite_model(
         loss.backward()
         optimizer.step()
 
+        model.apply(rezero_weights)
+        if context_model:
+            context_model.apply(rezero_weights)
+
+
         # Perform L1 weight decay
         if l1_weight_decay > 0.0:
             l1_regularization_step(
@@ -178,6 +184,7 @@ def train_dendrite_model(
                 lr=optimizer.param_groups[0]["lr"],
                 weight_decay=l1_weight_decay
             )
+
 
 
 def evaluate_dendrite_model(model, loader, device, criterion, context_model=None, concat=False):
