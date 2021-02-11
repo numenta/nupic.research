@@ -23,8 +23,8 @@ import abc
 import numpy as np
 import torch.nn as nn
 
-import nupic.torch.functions as F
-from nupic.torch.duty_cycle_metrics import binary_entropy, max_entropy
+import kwinner_functions as F
+from nupic.torch.duty_cycle_metrics import max_entropy
 
 
 def update_temperature(m):

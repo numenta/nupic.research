@@ -13,9 +13,9 @@ def sampled_kwinners(x, k, temperature, relu=False, inplace=False):
         on_mask |= (x <= 0)
     off_mask = ~on_mask
     if inplace:
-        return x.masked_fill_(off_mask, 0)
+        return x.masked_fill_(off_mask, 0), dist.entropy()
     else:
-        return x.masked_fill(off_mask, 0)
+        return x.masked_fill(off_mask, 0), dist.entropy()
 
 
 def sampled_kwinners2d(x, k, temperature, relu=False, inplace=False):
@@ -31,9 +31,9 @@ def sampled_kwinners2d(x, k, temperature, relu=False, inplace=False):
     off_mask = ~on_mask
     off_mask = off_mask.view(x.shape)
     if inplace:
-        return x.masked_fill_(off_mask, 0)
+        return x.masked_fill_(off_mask, 0), dist.entropy()
     else:
-        return x.masked_fill(off_mask, 0)
+        return x.masked_fill(off_mask, 0), dist.entropy()
 
 __all__ = [
     "sampled_kwinners",
