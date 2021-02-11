@@ -24,23 +24,26 @@ Perform the routing task with a dendrite layer by either (a) learning just the
 dendrite weights, (b) learning both the feed-forward and dendrite weights together,
 or (c) learning the feed-forward and dendrite weights, and context generation
 """
-import torch.autograd
-
-import torch
-import numpy as np
-import torch.nn.functional as F
 import os
+
+import numpy as np
+import torch
+import torch.autograd
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
-from nupic.research.frameworks.pytorch.models.common_models import StandardMLP, SparseMLP
 from nupic.research.frameworks.dendrites.routing import (
     RoutingDataset,
     RoutingFunction,
     evaluate_dendrite_model,
-    generate_context_vectors,
     generate_context_integers,
+    generate_context_vectors,
     train_dendrite_model,
+)
+from nupic.research.frameworks.pytorch.models.common_models import (
+    SparseMLP,
+    StandardMLP,
 )
 
 
@@ -62,7 +65,8 @@ def init_test_scenario(
                  "dendrites" -> learn only dendrite weights while setting feed-forward
                  weights to those of the routing function
                  "all" -> learn both feed-forward and dendrite weights
-                 "learn_context" -> learn feed-forward, dendrite weights, and context generation function
+                 "learn_context" -> learn feed-forward, dendrite weights,
+                                    and context generation function
     :param dim_in: the number of dimensions in the input to the routing function and
                    test module
     :param dim_out: the number of dimensions in the sparse linear output of the routing
@@ -73,10 +77,10 @@ def init_test_scenario(
     :param dim_context: the number of dimensions in the context vectors
     :param dendrite_module: a torch.nn.Module subclass that implements a dendrite
                             module in addition to a linear feed-forward module
-    :param sparse_context_model: whether the context generation module should be a sparse MLP
-                                (only applies if mode == "learn_context")
-    :param onehot: if mode=="learn_context", whether the integer input to the context model
-                    should be onehot encoded.
+    :param sparse_context_model: whether the context generation module should be
+                            a sparse MLP (only applies if mode == "learn_context")
+    :param onehot: if mode=="learn_context", whether the integer input to
+                    the context model should be onehot encoded.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Initialize routing function that this task will try to hardcode, and set
@@ -101,7 +105,9 @@ def init_test_scenario(
         dendrite_layer_forward_module = r.sparse_weights.module
         context_model = None
     elif mode == "all":
-        dendrite_layer_forward_module = torch.nn.Linear(dim_context, dim_out, bias=False)
+        dendrite_layer_forward_module = torch.nn.Linear(dim_context,
+                                                        dim_out,
+                                                        bias=False)
         context_model = None
     elif mode == "learn_context":
         # input is just the context integer
@@ -110,14 +116,17 @@ def init_test_scenario(
             context_model = SparseMLP(input_size, dim_context, hidden_sizes=[100])
         else:
             context_model = StandardMLP(input_size, dim_context, hidden_sizes=[100])
-        dendrite_layer_forward_module = torch.nn.Linear(dim_context, dim_out, bias=False)
+        dendrite_layer_forward_module = torch.nn.Linear(dim_context,
+                                                        dim_out,
+                                                        bias=False)
     else:
         raise Exception("Invalid value for `mode`: {}".format(mode))
 
     # Initialize context vectors, where each context vector corresponds to an output
     # mask in the routing function
     if mode == "learn_context":
-        context_vectors = torch.eye(num_contexts) if onehot else generate_context_integers(num_contexts)
+        context_vectors = torch.eye(num_contexts) if onehot \
+            else generate_context_integers(num_contexts)
     else:
         context_vectors = generate_context_vectors(
             num_contexts=num_contexts,
@@ -193,7 +202,9 @@ def init_optimizer(layer, mode, context_model=None):
     elif mode == "all":
         return torch.optim.Adam(layer.parameters(), lr=1e-5)
     elif mode == "learn_context":
-        return torch.optim.Adam(list(layer.parameters()) + list(context_model.parameters()), lr=1e-5)
+        return torch.optim.Adam(list(layer.parameters())
+                                + list(context_model.parameters()), lr=1e-5)
+
 
 def learn_to_route(
     mode,
@@ -208,7 +219,7 @@ def learn_to_route(
     onehot=False,
     plot=False,
     save_interval=100,
-    save_path = './models/'
+    save_path="./models/"
 ):
     """
     Trains a dendrite layer to match an arbitrary routing function
@@ -270,7 +281,9 @@ def learn_to_route(
         x_max=6.0,
     )
 
-    optimizer = init_optimizer(mode=mode, layer=dendrite_layer, context_model=context_model)
+    optimizer = init_optimizer(mode=mode,
+                               layer=dendrite_layer,
+                               context_model=context_model)
 
     print("epoch,mean_loss,mean_abs_err")
     losses = []
@@ -315,15 +328,17 @@ def learn_to_route(
         if save_interval and epoch % save_interval == 0:
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
-            torch.save(dendrite_layer.state_dict(), save_path + "dendrite_" + str(epoch))
+            torch.save(dendrite_layer.state_dict(),
+                       save_path + "dendrite_" + str(epoch))
             if context_model:
-                torch.save(context_model.state_dict(), save_path + "context_" + str(epoch))
+                torch.save(context_model.state_dict(),
+                           save_path + "context_" + str(epoch))
 
     if plot:
         import matplotlib.pyplot as plt
         losses = np.array(losses)
-        plt.scatter(x=np.arange(1, num_training_epochs+1), y=losses)
-        plt.savefig('training_curve.png')
+        plt.scatter(x=np.arange(1, num_training_epochs + 1), y=losses)
+        plt.savefig("training_curve.png")
         plt.show()
 
 

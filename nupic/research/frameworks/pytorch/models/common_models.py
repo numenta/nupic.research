@@ -20,14 +20,16 @@
 
 import numpy as np
 import torch.nn as nn
-from nupic.research.frameworks.pytorch.models.le_sparse_net import add_sparse_linear_layer
+
+from nupic.research.frameworks.pytorch.models.le_sparse_net import (
+    add_sparse_linear_layer,
+)
 
 
 class StandardMLP(nn.Module):
 
     def __init__(self, input_size, num_classes,
                  hidden_sizes=(100, 100)):
-
         super().__init__()
 
         layers = [
@@ -80,7 +82,7 @@ class SparseMLP(nn.Sequential):
                  use_batch_norm=True,
                  dropout=0.0,
                  consolidated_sparse_weights=False,
-                 hidden_sizes=(100, )):
+                 hidden_sizes=(100,)):
         super().__init__()
         self.add_module("flatten", nn.Flatten())
         # Add Sparse Linear layers
@@ -104,10 +106,9 @@ class SparseMLP(nn.Sequential):
         self.add_module("output", nn.Linear(input_size, output_size))
 
 
-class OmniglotCNN(nn. Module):
+class OmniglotCNN(nn.Module):
 
     def __init__(self, num_classes):
-
         super().__init__()
 
         self.features = nn.Sequential(
@@ -218,7 +219,6 @@ class MetaContinualLearningMLP(nn.Module):
 
     def __init__(self, input_size, num_classes,
                  hidden_sizes=(100, 100)):
-
         super().__init__()
 
         layers = [

@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 import torch
+
 from nupic.research.frameworks.pytorch import l1_regularization_step
 from nupic.torch.modules.sparse_weights import rezero_weights
 
@@ -176,7 +177,6 @@ def train_dendrite_model(
         if context_model:
             context_model.apply(rezero_weights)
 
-
         # Perform L1 weight decay
         if l1_weight_decay > 0.0:
             l1_regularization_step(
@@ -186,8 +186,14 @@ def train_dendrite_model(
             )
 
 
-
-def evaluate_dendrite_model(model, loader, device, criterion, context_model=None, concat=False):
+def evaluate_dendrite_model(
+        model,
+        loader,
+        device,
+        criterion,
+        context_model=None,
+        concat=False
+):
     """
     Evaluates a model on a specified criterion by iterating through all batches in the
     given dataloader, and returns a dict of metrics that give evaluation performance
@@ -198,7 +204,7 @@ def evaluate_dendrite_model(model, loader, device, criterion, context_model=None
     :param loader: a torch dataloader that iterates over all train and test batches
     :param device: device to use ('cpu' or 'cuda')
     :param criterion: loss function to minimize
-    :param context_model: if not None, a torch.nn.Module which produces a context vector.
+    :param context_model: if not None, a torch.nn.Module which produces context vectors.
     :param concat: if True, assumes input and context vectors are concatenated together
                    and model takes just a single input to its `forward`, otherwise
                    assumes input and context vectors are separate and model's `forward`
