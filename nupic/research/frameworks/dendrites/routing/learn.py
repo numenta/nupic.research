@@ -101,7 +101,7 @@ def init_test_scenario(
         dendrite_layer_forward_module = r.sparse_weights.module
         context_model = None
     elif mode == "all":
-        dendrite_layer_forward_module = torch.nn.Linear(dim_in, dim_out, bias=False) # should this by context_dim???
+        dendrite_layer_forward_module = torch.nn.Linear(dim_context, dim_out, bias=False)
         context_model = None
     elif mode == "learn_context":
         # input is just the context integer
@@ -318,7 +318,6 @@ def learn_to_route(
             if context_model:
                 torch.save(context_model.state_dict(), save_path + "context_" + str(epoch))
 
-
     if plot:
         import matplotlib.pyplot as plt
         losses = np.array(losses)
@@ -332,8 +331,10 @@ if __name__ == "__main__":
     # Learn dendrite weights that learn to route, while keeping feedforward weights
     # fixed
 
+    mode = "all"
+    # whether input to context model should be a onehot vector
     onehot = True
-    mode = "learn_context"
+    # whether context model should be a sparse MLP
     sparse_context_model = True
 
     learn_to_route(

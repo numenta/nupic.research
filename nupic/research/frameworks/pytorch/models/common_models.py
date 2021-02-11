@@ -80,8 +80,9 @@ class SparseMLP(nn.Sequential):
                  use_batch_norm=True,
                  dropout=0.0,
                  consolidated_sparse_weights=False,
-                 hidden_sizes=(100, 100)):
+                 hidden_sizes=(100, )):
         super().__init__()
+        self.add_module("flatten", nn.Flatten())
         # Add Sparse Linear layers
         for i in range(len(hidden_sizes)):
             add_sparse_linear_layer(

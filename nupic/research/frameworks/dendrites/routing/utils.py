@@ -20,11 +20,12 @@
 # ----------------------------------------------------------------------
 
 import torch
-
 from nupic.research.frameworks.pytorch import l1_regularization_step
+
 
 def generate_context_integers(num_contexts):
     return torch.arange(num_contexts, dtype=torch.float32).reshape(num_contexts, 1)
+
 
 def generate_context_vectors(num_contexts, n_dim, percent_on=0.2):
     """
