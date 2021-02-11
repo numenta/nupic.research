@@ -59,14 +59,13 @@ def add_sparse_cnn_layer(
     :param weight_sparsity: Pct of weights that are allowed to be non-zero
     :param percent_on: Pct of ON (non-zero) units
     :param k_inference_factor: During inference we increase percent_on by this factor
-    :param boost_strength: boost strength (0.0 implies no boosting)
-    :param boost_strength_factor:
-        boost strength is multiplied by this factor after each epoch
+    :param temperature: temperature to use when computing softmax in SampledKWinners.
+    :param eval_temperature:
+        temperature to use when computing softmax during evaluation in SampledKWinners.
+    :param temperature_decay_rate:
+        amount to decrease the temperature after each epoch of training.
     :param activation_fct_before_max_pool:
         If true ReLU/K-winners will be placed before the max_pool step
-    :param use_kwinners_local:
-        Whether or not to choose the k-winners 2d locally only across the
-        channels instead of the whole input
     """
     cnn = nn.Conv2d(
         in_channels=in_channels,
@@ -137,9 +136,12 @@ def add_sparse_linear_layer(
     :param weight_sparsity: Pct of weights that are allowed to be non-zero
     :param percent_on: Pct of ON (non-zero) units
     :param k_inference_factor: During inference we increase percent_on by this factor
-    :param boost_strength: boost strength (0.0 implies no boosting)
-    :param boost_strength_factor:
-        boost strength is multiplied by this factor after each epoch
+    :param temperature: temperature to use when computing softmax in SampledKWinners.
+    :param eval_temperature:
+        temperature to use when computing softmax during evaluation in SampledKWinners.
+    :param temperature_decay_rate:
+        amount to decrease the temperature after each epoch of training.
+
     """
     linear = nn.Linear(input_size, linear_n)
     if 0 < weight_sparsity < 1.0:
@@ -200,12 +202,11 @@ class SampledLeSparseNet(nn.Sequential):
                                    non-zero in the linear layer
     :param k_inference_factor: During inference (training=False) we increase
                                `percent_on` in all sparse layers by this factor
-    :param boost_strength: boost strength (0.0 implies no boosting)
-    :param boost_strength_factor: Boost strength factor to use [0..1]
-    :param duty_cycle_period: The period used to calculate duty cycles
-    :param use_kwinners_local:
-        Whether or not to choose the k-winners 2d locally only across the
-        channels instead of the whole input
+    :param temperature: temperature to use when computing softmax in SampledKWinners.
+    :param eval_temperature:
+        temperature to use when computing softmax during evaluation in SampledKWinners.
+    :param temperature_decay_rate:
+        amount to decrease the temperature after each epoch of training.
     """
 
     def __init__(self,

@@ -28,11 +28,46 @@ from nupic.torch.duty_cycle_metrics import max_entropy
 
 
 def update_temperature(m):
+    """Function used to update SampledKWinner modules temperature. This is typically done
+    during training at the beginning of each epoch.
+
+    Call using :meth:`torch.nn.Module.apply` after each epoch if required
+    For example: ``m.apply(update_boost_strength)``
+
+    :param m: KWinner module
+    """
     if isinstance(m, SampledKWinnersBase):
         m.update_temperature()
 
 
 class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
+    """Base SampledKWinners class.
+
+    :param percent_on:
+      k = percent_on * number of input units will be sampled, with replacement, from
+      categorial softmax distribution over the layer activations
+    :type percent_on: float
+
+    :param k_inference_factor:
+      During inference (training=False) we increase percent_on by this factor.
+      percent_on * k_inference_factor must be strictly less than 1.0, ideally much
+      lower than 1.0
+    :type k_inference_factor: float
+
+    :param temperature:
+      temperature to use when passing activations through softmax. Must be >= 1.0
+    :type temperature: float
+
+    :param temperature_decay_rate:
+      reduce the temperature by this much after each epoch, until it hits 1.0.
+    :type temperature_decay_rate: float
+
+    :param eval_temperature:
+      The temperature to use when passing activations through softmax during evaluation.
+      Must be >= 1.0.
+    :type eval_temperature: float
+    """
+
     def __init__(
         self,
         percent_on,
@@ -44,7 +79,7 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         super(SampledKWinnersBase, self).__init__()
         assert 0.0 < percent_on < 1.0
         assert 0.0 < percent_on * k_inference_factor < 1.0
-        assert eval_temperature > 0.0
+        assert eval_temperature >= 1.0
 
         self.percent_on = percent_on
         self.percent_on_inference = percent_on * k_inference_factor
@@ -80,6 +115,19 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
 
 
 class SampledKWinners(SampledKWinnersBase):
+    """
+    Applies sampled K-winner function to the input.
+    See parent class.
+
+    :param relu:
+        This will simulate the effect of having a ReLU before the KWinners.
+    :type relu: bool
+
+    :param inplace:
+       Modify the input in-place.
+    :type inplace: bool
+    """
+
     def __init__(
         self,
         percent_on,
@@ -124,6 +172,19 @@ class SampledKWinners(SampledKWinnersBase):
 
 
 class SampledKWinners2d(SampledKWinnersBase):
+    """
+     Applies K-Winner function to the input tensor.
+     See parent class.
+
+    :param relu:
+        This will simulate the effect of having a ReLU before the KWinners.
+    :type relu: bool
+
+    :param inplace:
+       Modify the input in-place.
+    :type inplace: bool
+    """
+
     def __init__(
         self,
         percent_on=0.1,

@@ -19,15 +19,13 @@
 #
 
 """
-Run a simple GSC experiment using OneCycleLR. The parameters used here
-have been optimized by OneCycleLr, and achieved an accuracy of 0.964
-averaged over 5 model examples.
+Run a GSC experiment using SparseLeNet with SampledKWinners.
 """
 
 from copy import deepcopy
 
 from .sampled_kwinners.sampled_le_sparse_net import SampledLeSparseNet
-from .base import DEFAULT_BASE, DEFAULT_SPARSE_CNN
+from .base import DEFAULT_SPARSE_CNN
 
 from nupic.research.frameworks.vernon import experiments, mixins
 
