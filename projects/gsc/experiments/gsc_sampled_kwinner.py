@@ -27,7 +27,8 @@ from copy import deepcopy
 from nupic.research.frameworks.vernon import experiments, mixins
 
 from .base import DEFAULT_SPARSE_CNN
-from .sampled_kwinners.sampled_le_sparse_net import SampledLeSparseNet
+from .sampled_kwinners.sampled_kwinner_gsc_cnn import SampledKWinnerGSCSparseCNN
+from .sampled_kwinners.sampled_kwinner_le_sparse_net import SampledKWinnerLeSparseNet
 from .sampled_kwinners.update_kwinner_temperature import UpdateKWinnerTemperature
 
 
@@ -42,7 +43,14 @@ class SampledKWinnersGSCExperiment(mixins.VaryBatchSize,
 SPARSE_CNN_SAMPLED_KWINNER = deepcopy(DEFAULT_SPARSE_CNN)
 SPARSE_CNN_SAMPLED_KWINNER.update(
     experiment_class=SampledKWinnersGSCExperiment,
-    model_class=SampledLeSparseNet,
+    model_class=SampledKWinnerGSCSparseCNN,
+    epochs_to_validate=range(30),
+)
+
+SPARSE_LENET_SAMPLED_KWINNER = deepcopy(DEFAULT_SPARSE_CNN)
+SPARSE_LENET_SAMPLED_KWINNER.update(
+    experiment_class=SampledKWinnersGSCExperiment,
+    model_class=SampledKWinnerLeSparseNet,
     model_args=dict(
         input_shape=(1, 32, 32),
         cnn_out_channels=(64, 64),
@@ -67,4 +75,5 @@ SPARSE_CNN_SAMPLED_KWINNER.update(
 
 CONFIGS = dict(
     sparse_cnn_sampled_kwinner=SPARSE_CNN_SAMPLED_KWINNER,
+    sparse_lenet_sampled_kwinner=SPARSE_LENET_SAMPLED_KWINNER,
 )
