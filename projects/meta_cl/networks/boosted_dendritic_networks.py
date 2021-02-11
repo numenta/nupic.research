@@ -25,15 +25,11 @@ import torch
 from nupic.research.frameworks.dendrites import DendriticAbsoluteMaxGate1d
 from nupic.research.frameworks.pytorch.mask_utils import indices_to_mask
 
-from .dendritic_networks import (
-    CloserToANMLDendriticNetwork,
-    WiderVisualANMLDendriticNetwork,
-)
+from .dendritic_networks import ReplicateANMLDendriticNetwork
 
 __all__ = [
     "BoostedANMLDendriticNetwork",
     "DendriteSegementsBooster",
-    "WiderVisualBoostedANMLDendriticNetwork",
 ]
 
 
@@ -123,62 +119,7 @@ class DendriteSegementsBooster(torch.nn.Module):
         self.boost_strength.mul_(self.boost_strength_factor)
 
 
-class BoostedANMLDendriticNetwork(CloserToANMLDendriticNetwork):
-    """
-    Similar to the parent network, but with boosting applied to the dendrites.
-
-    Input shape expected is 3 x 28 x 28 (C x W x H) but an adaptive average pooling
-    layer helps accept other heights and width.
-
-    With default parameters and `num_classes-963`, it uses 5,118,291 weights-on
-    out of a total of 8,345,095 weights.
-    """
-
-    def __init__(
-        self,
-        num_classes,
-        num_segments=10,
-        dendrite_sparsity=0.856,
-        dendrite_bias=True,
-        boost_strength=1.0,
-        boost_strength_factor=0.995,
-        duty_cycle_period=1000,
-    ):
-
-        super().__init__(
-            num_classes=num_classes,
-            num_segments=num_segments,
-            dendrite_sparsity=dendrite_sparsity,
-            dendrite_bias=dendrite_bias,
-        )
-
-        num_units = self.segments.num_units
-        num_segments = self.segments.num_segments
-        self.segments_booster = DendriteSegementsBooster(
-            num_units,
-            num_segments,
-            boost_strength=boost_strength,
-            boost_strength_factor=boost_strength_factor,
-            duty_cycle_period=duty_cycle_period,
-        )
-
-        self.dendritic_gate = DendriticAbsoluteMaxGate1d()
-
-    def apply_dendrites(self, y, dendrite_activations):
-        """
-        Apply dendrites as a gating mechanism and update boost strength.
-        """
-
-        boosted = self.segments_booster.boost_activations(dendrite_activations)
-        output, indices = self.dendritic_gate(y, boosted)
-
-        if self.training:
-            self.segments_booster.update_duty_cylces(indices)
-
-        return output
-
-
-class WiderVisualBoostedANMLDendriticNetwork(WiderVisualANMLDendriticNetwork):
+class BoostedANMLDendriticNetwork(ReplicateANMLDendriticNetwork):
     """
     Similar to the parent network, but with boosting applied to the dendrites.
 

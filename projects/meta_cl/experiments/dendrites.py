@@ -22,9 +22,9 @@ from copy import deepcopy
 
 from experiment_classes import DendritesExperiment
 from networks import (
-    ANMLDendriticNetwork,
-    CloserToANMLDendriticNetwork,
     DendriticNetwork,
+    MimicANMLDendriticNetwork,
+    ReplicateANMLDendriticNetwork,
 )
 
 from .anml_replicate import ANMLTransform, metacl_anml_replicate
@@ -114,7 +114,7 @@ metacl_anml_dendrites.update(
     experiment_class=DendritesExperiment,
 
     epochs=20000,
-    model_class=ANMLDendriticNetwork,
+    model_class=MimicANMLDendriticNetwork,
     model_args=dict(num_classes=963,
                     num_segments=20,
                     dim_context=100,
@@ -219,16 +219,16 @@ metacl_anml_dendrites_adjust_lr_2000.update(
 # |           600 | 0.68 ± 0.01      | 0.93 ± 0.00       | 0.001 |
 # |--------------------------------------------------------------|
 #
-closer_to_anml_dendrites = deepcopy(metacl_anml_dendrites_adjust_lr)
-closer_to_anml_dendrites.update(
-    model_class=CloserToANMLDendriticNetwork,
+anml_replicated_with_dendrites = deepcopy(metacl_anml_dendrites_adjust_lr)
+anml_replicated_with_dendrites.update(
+    model_class=ReplicateANMLDendriticNetwork,
     model_args=dict(
         num_classes=963,
         num_segments=1,
         dendrite_sparsity=0,
         dendrite_bias=True,
     ),
-    wandb_args=dict(name="closer_to_anml_dendrites", project="metacl"),
+    wandb_args=dict(name="anml_replicated_with_dendrites", project="metacl"),
 )
 
 
@@ -239,11 +239,11 @@ closer_to_anml_dendrites.update(
 # |            50 | 0.82 ± 0.02      | 0.94 ± 0.02       | 0.001 |
 # |--------------------------------------------------------------|#
 #
-closer_to_anml_dendrites_2000 = deepcopy(closer_to_anml_dendrites)
-closer_to_anml_dendrites_2000.update(
+anml_replicated_with_dendrites_2000 = deepcopy(anml_replicated_with_dendrites)
+anml_replicated_with_dendrites_2000.update(
     epochs=2000,
     num_meta_test_classes=[50],
-    wandb_args=dict(name="closer_to_anml_dendrites_2000", project="metacl"),
+    wandb_args=dict(name="anml_replicated_with_dendrites_2000", project="metacl"),
 )
 
 
@@ -254,6 +254,6 @@ CONFIGS = dict(
     metacl_anml_dendrites_2000=metacl_anml_dendrites_2000,
     metacl_anml_dendrites_adjust_lr=metacl_anml_dendrites_adjust_lr,
     metacl_anml_dendrites_adjust_lr_2000=metacl_anml_dendrites_adjust_lr_2000,
-    closer_to_anml_dendrites=closer_to_anml_dendrites,
-    closer_to_anml_dendrites_2000=closer_to_anml_dendrites_2000,
+    anml_replicated_with_dendrites=anml_replicated_with_dendrites,
+    anml_replicated_with_dendrites_2000=anml_replicated_with_dendrites_2000,
 )

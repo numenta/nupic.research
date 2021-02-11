@@ -29,8 +29,8 @@ from nupic.research.frameworks.dendrites import (
 from nupic.research.frameworks.pytorch.model_utils import filter_params
 
 __all__ = [
-    "ANMLDendriticNetwork",
-    "CloserToANMLDendriticNetwork",
+    "MimicANMLDendriticNetwork",
+    "ReplicateANMLDendriticNetwork",
     "DendriticNetwork",
 ]
 
@@ -119,7 +119,7 @@ class DendriticNetwork(nn.Module):
         return out
 
 
-class ANMLDendriticNetwork(nn.Module):
+class MimicANMLDendriticNetwork(nn.Module):
     """
     Prototype of a dendritic network, based closely on `ANML`_. (The conv + max-pool
     layers are identical).
@@ -216,13 +216,13 @@ class ANMLDendriticNetwork(nn.Module):
         return out
 
 
-class CloserToANMLDendriticNetwork(nn.Module):
+class ReplicateANMLDendriticNetwork(nn.Module):
     """
     An iteration of a dendritic network, based closely on `ANML`_. (The conv + max-pool
-    layers are identical). It's similar to ANMLDendriticNetwork, but does not include a
-    linear layer atop the modulation network. This makes it more similar to ANML's
-    original network. In fact, with `num_segments=1, dendrite_sparsity=0`, they should
-    be identical.
+    layers are identical). It's similar to MimicANMLDendriticNetwork, but does not
+    include a linear layer atop the modulation network. This makes it more similar to
+    ANML's original network. In fact, with `num_segments=1, dendrite_sparsity=0`, they
+    should be identical.
 
     .. _ANML: nupic.research/projects/meta_cl/networks/anml_networks.py
 

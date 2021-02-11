@@ -24,11 +24,7 @@ from copy import deepcopy
 import torch
 
 from experiment_classes import BoostedDendritesExperiment
-from networks import (
-    BoostedANMLDendriticNetwork,
-    CloserToANMLDendriticNetwork,
-    WiderVisualBoostedANMLDendriticNetwork,
-)
+from networks import BoostedANMLDendriticNetwork, ReplicateANMLDendriticNetwork
 from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.wandb import ray_wandb
 from plot_metrics import plot_winning_segment_distributions
@@ -77,7 +73,7 @@ plot_winning_segment_distributions_wandb = ray_wandb.prep_plot_for_wandb(
 anml_dendrites_multi_segments = deepcopy(metacl_anml_dendrites_adjust_lr)
 anml_dendrites_multi_segments.update(
     experiment_class=TrackBoostedDendritesExperiment,
-    model_class=CloserToANMLDendriticNetwork,
+    model_class=ReplicateANMLDendriticNetwork,
     model_args=dict(
         num_classes=963,
         num_segments=10,
