@@ -164,6 +164,7 @@ def add_sparse_linear_layer(
     if 0 < percent_on < 1.0:
         network.add_module(
             "linear{}_kwinners".format(suffix),
+
             KWinners(
                 n=linear_n,
                 percent_on=percent_on,
