@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,6 +19,17 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .modules import *
-from .metrics import *
-from .apply_dendrites_hook import *
+from .base import CONFIGS as BASE
+from .bert_replication import CONFIGS as BERT_REPLICATION
+from .sparse_bert import CONFIGS as SPARSE_BERT
+
+"""
+Import and collect all experiment configurations into one CONFIG
+"""
+__all__ = ["CONFIGS"]
+
+# Collect all configurations
+CONFIGS = dict()
+CONFIGS.update(BASE)
+CONFIGS.update(BERT_REPLICATION)
+CONFIGS.update(SPARSE_BERT)

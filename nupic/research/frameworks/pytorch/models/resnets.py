@@ -196,7 +196,7 @@ class Bottleneck(nn.Module):
             f"shortcut.{k}" for k, v in self.shortcut.named_modules()
             if isinstance(v, (nn.Conv2d, nn.BatchNorm2d))
         ]
-        if len(cnn_bn) > 0:
+        if len(cnn_bn) > 1:
             modules_to_fuse.append(cnn_bn)
 
         fuse_modules(self, modules_to_fuse=modules_to_fuse, inplace=True)

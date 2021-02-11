@@ -43,9 +43,18 @@ class ModelHookManager:
     :param hook_class: class subclassed from `TrackStatsHookBase`
     :param hook_type: whether to register the hook as "forward" or "backward"
                       or "pre_forward"
+    :param hook_args: either a dictionary of args to pass to hook, or a function that
+                      takes a name and module as inputs and then outputs a dictionary of
+                      arguments to pass to the hook
     """
 
-    def __init__(self, named_modules, hook_class, hook_type="forward"):
+    def __init__(
+        self,
+        named_modules,
+        hook_class,
+        hook_type="forward",
+        hook_args=None,
+    ):
 
         assert hook_type in ["forward", "backward", "pre_forward"]
         assert issubclass(hook_class, TrackStatsHookBase)
@@ -53,7 +62,8 @@ class ModelHookManager:
         # Register the hooks via class method.
         tracked_vals = self.register_storage_hooks(named_modules,
                                                    hook_class=hook_class,
-                                                   hook_type=hook_type)
+                                                   hook_type=hook_type,
+                                                   hook_args=hook_args)
 
         # These are the functions that called every forward or backward pass.
         self.hooks = tracked_vals[0]
@@ -65,6 +75,13 @@ class ModelHookManager:
         # These are the filtered modules that will be tracked.
         self.tracked_modules = tracked_vals[2]
 
+        # Keep track of whether tracking is on.
+        self._tracking = False
+
+    @property
+    def tracking(self):
+        return self._tracking
+
     def __enter__(self):
         """Start tracking when `with` is called."""
         self.start_tracking()
@@ -75,7 +92,13 @@ class ModelHookManager:
         self.stop_tracking()
 
     @classmethod
-    def register_storage_hooks(cls, named_modules, hook_class, hook_type="forward"):
+    def register_storage_hooks(
+        cls,
+        named_modules,
+        hook_class,
+        hook_type="forward",
+        hook_args=None,
+    ):
         """
         Register hook on each module in 'named_modules'.
 
@@ -83,6 +106,9 @@ class ModelHookManager:
         :param hook_class: class subclassed from `TrackStatsHookBase`
         :param hook_type: whether to register the hook as "forward" or "backward"
                           or "pre_forward"
+        :param hook_args: either a dictionary of args to pass to hook, or a function
+                          that takes a name and module as inputs and then outputs a
+                          dictionary of arguments to pass to the hook
         """
         assert hook_type in ["forward", "backward", "pre_forward"]
 
@@ -93,7 +119,12 @@ class ModelHookManager:
         # Register hooks on the modules.
         for n, m in named_modules.items():
 
-            hook = hook_class(name=n)
+            if callable(hook_args):
+                args = hook_args(n, m)
+            else:
+                args = hook_args or {}
+
+            hook = hook_class(name=n, **args)
             if hook_type == "forward":
                 handle = m.register_forward_hook(hook)
             elif hook_type == "pre_forward":
@@ -108,10 +139,12 @@ class ModelHookManager:
         return hooks, handles, tracked_modules
 
     def start_tracking(self):
+        self._tracking = True
         for hook in self.hooks:
             hook.start_tracking()
 
     def stop_tracking(self):
+        self._tracking = False
         for hook in self.hooks:
             hook.stop_tracking()
 
