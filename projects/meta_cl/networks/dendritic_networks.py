@@ -18,11 +18,14 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-import torch
+
 from torch import nn
 
-from nupic.research.frameworks.dendrites import DendriteSegments
-from nupic.research.frameworks.dendrites.dendritic_layers import GatingDendriticLayer
+from nupic.research.frameworks.dendrites import (
+    DendriteSegments,
+    DendriticAbsoluteMaxGate1d,
+    GatingDendriticLayer,
+)
 from nupic.research.frameworks.pytorch.model_utils import filter_params
 
 
@@ -163,6 +166,8 @@ class ANMLDendriticNetwork(nn.Module):
             nn.Linear(1008, dim_context)
         )
 
+        self.dendritic_gate = DendriticAbsoluteMaxGate1d()
+
         # Apply Kaiming initialization
         self.reset_params()
 
@@ -189,18 +194,8 @@ class ANMLDendriticNetwork(nn.Module):
     def apply_dendrites(self, y, dendrite_activations):
         """
         Apply dendrites as a gating mechanism.
-
-        TODO: Decide best method to apply dendrites.
         """
-        # # Multiple by the sigmoid of the max along each segment.
-        # return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
-
-        inds = dendrite_activations.abs().max(dim=2).indices
-        inds = inds.unsqueeze(dim=2)
-        dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
-        dendrite_activations = dendrite_activations.squeeze(dim=2)
-        dendrite_activations = torch.sigmoid(dendrite_activations)
-        return y * dendrite_activations
+        return self.dendritic_gate(y, dendrite_activations).values
 
     def forward(self, x):
 
@@ -272,6 +267,8 @@ class CloserToANMLDendriticNetwork(nn.Module):
             nn.Flatten(),
         )
 
+        self.dendritic_gate = DendriticAbsoluteMaxGate1d()
+
         # Apply Kaiming initialization
         self.reset_params()
 
@@ -298,18 +295,8 @@ class CloserToANMLDendriticNetwork(nn.Module):
     def apply_dendrites(self, y, dendrite_activations):
         """
         Apply dendrites as a gating mechanism.
-
-        TODO: Decide best method to apply dendrites.
         """
-        # # Multiple by the sigmoid of the max along each segment.
-        # return y * torch.sigmoid(dendrite_activations.max(dim=2).values)
-
-        inds = dendrite_activations.abs().max(dim=2).indices
-        inds = inds.unsqueeze(dim=2)
-        dendrite_activations = torch.gather(dendrite_activations, dim=2, index=inds)
-        dendrite_activations = dendrite_activations.squeeze(dim=2)
-        dendrite_activations = torch.sigmoid(dendrite_activations)
-        return y * dendrite_activations
+        return self.dendritic_gate(y, dendrite_activations).values
 
     def forward(self, x):
         mod = self.modulation(x)

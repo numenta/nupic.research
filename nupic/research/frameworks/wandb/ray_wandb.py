@@ -35,6 +35,7 @@ __all__ = [
     "log",
     "WandbLogger",
     "WorkerLogger",
+    "prep_plot_for_wandb",
 ]
 
 # Find directory of where wandb save its results.
@@ -136,12 +137,10 @@ class WandbLogger(tune.logger.Logger):
     """
 
     # Only the following types are able to be logged through this class.
-    # See https://docs.wandb.com/library/log for wandb data-types.
-    # Others types may be included later.
+    # See https://docs.wandb.com/library/log for all wandb data-types.
     accepted_types = (
         numbers.Number,
-        wandb.Image,
-        wandb.Histogram,
+        wandb.data_types.WBValue,  # Base class for all wandb values
     )
 
     def _init(self):
@@ -282,6 +281,34 @@ class WorkerLogger(object):
 # ---------
 # Utils
 # ---------
+
+
+def is_matplotlib_plot(value):
+    typename = wandb.util.get_full_typename(value)
+    return wandb.util.is_matplotlib_typename(typename)
+
+
+def prep_plot_for_wandb(plot_func):
+    """
+    This wraps a plotting function to alter it's return value to be of type wandb.Image.
+    This way, the plot can be logged through ray, specifically the ray WandbLogger,
+    without error. Ray typically tries to deepcopy all logged objects; however, plots
+    cannot be deepcopied.
+
+    :param plot_func: callable with arbitrary arguments that returns a matplotlib
+                      figure, axes object, or anything related.
+    """
+    def plot_and_make_wandb_image(*args, **kwargs):
+        plot = plot_func(*args, **kwargs)
+        if is_matplotlib_plot(plot):
+            plot = wandb.Image(plot)
+        else:
+            warnings.warn(f"Unable to convert object of type {type(plot)}"
+                          " to `wandb.Image`.")
+        return plot
+
+    return plot_and_make_wandb_image
+
 
 def enable_run_resume(wandb_config):
     """
