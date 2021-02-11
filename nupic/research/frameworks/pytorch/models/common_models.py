@@ -20,6 +20,7 @@
 
 import numpy as np
 import torch.nn as nn
+from nupic.research.frameworks.pytorch.models.le_sparse_net import add_sparse_linear_layer
 
 
 class StandardMLP(nn.Module):
@@ -47,7 +48,63 @@ class StandardMLP(nn.Module):
         return self.classifier(x)
 
 
-class OmniglotCNN(nn.Module):
+class SparseMLP(nn.Sequential):
+    input_ = """
+    A sparse MLP network which contains sparse linear hidden layers followed by a dense
+    linear output layer. Each hidden layer contains a sparse linear layer, optional
+    batch norm, and a k-winner
+    :param input_size: Input dimension to the network.
+    :param output_size: Output dimension of the network.
+    :param linear_activity_percent_on: Percent of ON (non-zero) units
+    :param linear_weight_percent_on: Percent of weights that are allowed to be
+                                   non-zero in the linear layer
+    :param boost_strength: boost strength (0.0 implies no boosting)
+    :param boost_strength_factor: Boost strength factor to use [0..1]
+    :param duty_cycle_period: The period used to calculate duty cycles
+    :param k_inference_factor: During inference (training=False) we increase
+                               `percent_on` in all sparse layers by this factor
+    :param use_batch_norm: whether to use batch norm
+    :param dropout: dropout value
+    :param consolidated_sparse_weights: whether to use consolidated sparse weights
+    :param hidden_sizes: hidden layer dimensions of MLP
+    """
+
+    def __init__(self, input_size,
+                 output_size,
+                 linear_activity_percent_on=(0.1,),
+                 linear_weight_percent_on=(0.4,),
+                 boost_strength=1.67,
+                 boost_strength_factor=0.9,
+                 duty_cycle_period=1000,
+                 k_inference_factor=1.5,
+                 use_batch_norm=True,
+                 dropout=0.0,
+                 consolidated_sparse_weights=False,
+                 hidden_sizes=(100, )):
+        super().__init__()
+        self.add_module("flatten", nn.Flatten())
+        # Add Sparse Linear layers
+        for i in range(len(hidden_sizes)):
+            add_sparse_linear_layer(
+                network=self,
+                suffix=i + 1,
+                input_size=input_size,
+                linear_n=hidden_sizes[i],
+                dropout=dropout,
+                use_batch_norm=use_batch_norm,
+                weight_sparsity=linear_weight_percent_on[i],
+                percent_on=linear_activity_percent_on[i],
+                k_inference_factor=k_inference_factor,
+                boost_strength=boost_strength,
+                boost_strength_factor=boost_strength_factor,
+                duty_cycle_period=duty_cycle_period,
+                consolidated_sparse_weights=consolidated_sparse_weights,
+            )
+            input_size = hidden_sizes[i]
+        self.add_module("output", nn.Linear(input_size, output_size))
+
+
+class OmniglotCNN(nn. Module):
 
     def __init__(self, num_classes):
 
