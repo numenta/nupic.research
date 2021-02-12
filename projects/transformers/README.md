@@ -10,9 +10,7 @@ Other accepted ways are passing arguments directly in command line or through a 
 
 ## How to run - multiple nodes
 
-To run it in multiple nodes, you will require the run script from transformers-cli-utils. It can be found in nta/NumentaCorp/infrastructure/ray/transformers-cli-utils. Make sure to add it to the PATH after downloading.
-
-`export PATH=$PATH:~/nta/infrastructure/ray/transformers-cli-utils`
+To run it in multiple nodes, you will require the run script from transformers-cli-utils (it can be found under ray folder in the nta/infrastructure repository). Make sure to add it to the PATH after downloading.
 
 First define the location of your cluster yaml file in `RAY_CONFIG_FILE` and the location of your AWS certification file (.pem file) in `AWS_CERT_FILE`:
 
@@ -57,4 +55,4 @@ After accessing the head node via ssh or attaching a screen, run an experiment u
 
 ### Additional notes:
 
-If you don't have access to numenta infrastructure repository and would like to use transformers-cli-utils, feel free to drop me an email: lsouza at numenta dot com.
+transformers-cli-utils is in a private repository. If you woud like to use it, feel free to drop me an email at lsouza at numenta dot com.
