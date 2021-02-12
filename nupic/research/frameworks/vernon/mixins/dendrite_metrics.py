@@ -67,7 +67,8 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
         - plot_dendrite_metrics_args: a dict containing the following
 
             - include_modules: (optional) a list of module types to track; defaults to
-                                          include all `ApplyDendritesBase` modules
+                                          include all `ApplyDendritesBase` modules if no
+                                          other `include_*` arguments are given.
             - include_names: (optional) a list of module names to track e.g.
                              "features.stem"
             - include_patterns: (optional) a list of regex patterns to compare to the
@@ -144,8 +145,13 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
 
         # Remove and collect information about which modules to track.
         include_names = metric_args.pop("include_names", [])
-        include_modules = metric_args.pop("include_modules", [ApplyDendritesBase])
+        include_modules = metric_args.pop("include_modules", [])
         include_patterns = metric_args.pop("include_patterns", [])
+
+        # Default to track all `ApplyDendritesBase` modules.
+        if len(include_names) == len(include_modules) == len(include_patterns) == 0:
+            include_modules = [ApplyDendritesBase]
+
         filter_args = dict(
             include_names=include_names,
             include_modules=include_modules,
@@ -203,6 +209,11 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
 
         # Gather and plot the statistics.
         for name, _, activations, winners in self.dendrite_hooks.get_statistics():
+
+            if len(activations) == 0 or len(winners) == 0:
+                self.logger.warning(f"Skipping plots for module '{name}';"
+                                    " no data could be collected.")
+                continue
 
             # Keep track of whether a plot is made below. If so, save the raw data.
             plot_made = False
