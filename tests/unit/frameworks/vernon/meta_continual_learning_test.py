@@ -194,6 +194,67 @@ class CloneModelTest(unittest.TestCase):
         fast_data_ptrs = [p.data_ptr() for n, p in oml_clone.named_fast_params.items()]
         self.assertTrue(set(fast_data_ptrs) <= set(clone_data_ptrs))
 
+    def test_copy_hooks_test(self):
+        """
+        Test whether all model hooks are persevered when `keep_hooks=True` is passed to
+        `clone_model`.
+        """
+
+        # Define module and param hook, both forward and backward.
+        class Hook:
+            """Stateful hook"""
+            def __init__(self):
+                self.state = torch.tensor([0])
+
+            def __call__(self, *args):
+                self.state.add_(1)
+
+        forward_hook = Hook()
+        backward_hook = Hook()
+        forward_pre_hook = Hook()
+        weight_hook = Hook()
+
+        # Save the state for later reference.
+        s1 = forward_hook.state
+        s2 = backward_hook.state
+        s3 = forward_pre_hook.state
+        s4 = weight_hook.state
+
+        # Register these hooks.
+        quad = torch.nn.Linear(2, 2)
+        quad.register_forward_hook(forward_hook)
+        quad.register_backward_hook(backward_hook)
+        quad.register_forward_pre_hook(forward_pre_hook)
+        quad.weight.register_hook(weight_hook)
+
+        # Clone the model and copy none of it's hooks.
+        cloned = clone_model(quad, keep_hooks=False)
+
+        # Run one forward and backward pass.
+        x = torch.rand(2 , 2)
+        y = cloned(x)
+        y.sum().backward()
+
+        # Validate that none of the original state has been updated.
+        self.assertEqual(s1.item(), 0)
+        self.assertEqual(s2.item(), 0)
+        self.assertEqual(s3.item(), 0)
+        self.assertEqual(s4.item(), 1)  # keep_hooks only refers to module hooks
+
+        # Clone the model and copy all of it's hooks.
+        cloned = clone_model(quad, keep_hooks=True)
+
+        # Run one forward and backward pass.
+        x = torch.rand(2 , 2)
+        y = cloned(x)
+        y.sum().backward()
+
+        # Validate that the original state has been updated.
+        self.assertEqual(s1.item(), 1)
+        self.assertEqual(s2.item(), 1)
+        self.assertEqual(s3.item(), 1)
+        self.assertEqual(s4.item(), 2)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -41,7 +41,7 @@ class TrackStatsSupervisedExperiment(mixins.TrackRepresentationSparsity,
     pass
 
 
-class TrackStatsMetaCLExperiment(mixins.TrackRepresentationSparsityMetaCL,
+class TrackStatsMetaCLExperiment(mixins.TrackRepresentationSparsity,
                                  MetaContinualLearningExperiment):
     pass
 
@@ -113,8 +113,7 @@ simple_metacl_config.update(
 
 class TrackRepresentationSparsityTest(unittest.TestCase):
     """
-    This is a test class for the `TrackRepresentationSparsityMetaCL` and
-    `TrackRepresentationSparsity` mixins.
+    This is a test class for the `TrackRepresentationSparsity` mixin.
     """
 
     def test_sparsity_tracking_supervised_experiment(self):
@@ -136,14 +135,14 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
             ret = exp.run_epoch()
 
             # Validate the expected stats have been tracked.
-            name = "input_sparsity kwinners (KWinners)"
+            name = "input_sparsity/kwinners (KWinners)"
             self.assertTrue(name in ret.keys())
-            name = "input_sparsity classifier.module (Linear)"
+            name = "input_sparsity/classifier.module (Linear)"
             self.assertTrue(name in ret.keys())
             sparsity = ret[name]
             self.assertTrue(np.isclose(sparsity, 0.25, atol=1e-3))
 
-            name = "output_sparsity classifier.module (Linear)"
+            name = "output_sparsity/classifier.module (Linear)"
             self.assertTrue(name in ret.keys())
             sparsity = ret[name]
             self.assertTrue(np.isclose(sparsity, 0, atol=1e-3))
@@ -158,30 +157,26 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
         exp = simple_metacl_config["experiment_class"]()
         exp.setup_experiment(simple_metacl_config)
 
-        # Validate that the hook managers are null at the start of training.
-        self.assertIsNone(exp.input_hook_manager)
-        self.assertIsNone(exp.output_hook_manager)
+        # Validate that the hook managers are not null at the start of training.
+        self.assertIsInstance(exp.input_hook_manager, ModelHookManager)
+        self.assertIsInstance(exp.output_hook_manager, ModelHookManager)
 
         # Loop through some pseudo epochs.
         for _ in range(5):
             ret = exp.run_epoch()
 
             # Validate the expected stats have been tracked.
-            name = "input_sparsity kwinners (KWinners)"
+            name = "input_sparsity/kwinners (KWinners)"
             self.assertTrue(name in ret.keys())
-            name = "input_sparsity classifier.module (Linear)"
+            name = "input_sparsity/classifier.module (Linear)"
             self.assertTrue(name in ret.keys())
             sparsity = ret[name]
             self.assertTrue(np.isclose(sparsity, 0.25, atol=0.003))
 
-            name = "output_sparsity classifier.module (Linear)"
+            name = "output_sparsity/classifier.module (Linear)"
             self.assertTrue(name in ret.keys())
             sparsity = ret[name]
             self.assertTrue(np.isclose(sparsity, 0, atol=1e-3))
-
-        # Validate that the hook managers are not null at the end of training.
-        self.assertIsInstance(exp.input_hook_manager, ModelHookManager)
-        self.assertIsInstance(exp.output_hook_manager, ModelHookManager)
 
     def test_no_tracking_args_given_supervised_experiment(self):
         """
