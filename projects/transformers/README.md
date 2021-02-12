@@ -52,7 +52,3 @@ If required, you can reboot all instances by selecting all of them in EC2 consol
 There is also an option of running the multiple nodes scripts from a ray head node instead of local. In this case, the head node will play the part of local and only the worker nodes will run the commands. For this scenario it is advised to have a simple non-GPU head node, since it will only be used to issue commands to the workers.
 
 After accessing the head node via ssh or attaching a screen, run an experiment using the same command described above: `run.sh <experiment_name>`. See transformers-cli-utils readme for more information on how to use and what modifications are required to the yaml file.
-
-### Additional notes:
-
-transformers-cli-utils is in a private repository. If you woud like to use it, feel free to drop me an email at lsouza at numenta dot com.
