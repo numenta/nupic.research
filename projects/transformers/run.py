@@ -96,6 +96,7 @@ def main():    # noqa: C901
     if (os.path.isdir(training_args.output_dir) and training_args.do_train
        and not training_args.overwrite_output_dir):
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        logger.warning(f"Loading from checkpoint: {last_checkpoint} ")
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and "
@@ -298,7 +299,7 @@ def main():    # noqa: C901
         callbacks=trainer_callbacks,
     )
 
-    logger.info("Total params: {:,} Non zero params: {:,}".format(
+    logger.info("Before training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
 
@@ -327,6 +328,10 @@ def main():    # noqa: C901
             trainer.state.save_to_json(
                 os.path.join(training_args.output_dir, "trainer_state.json")
             )
+
+    logger.info("After training: total params: {:,} non zero params: {:,}".format(
+        *count_nonzero_params(trainer.model)
+    ))
 
     # Evaluation
     results = {}
@@ -451,7 +456,7 @@ def preprocess_datasets(datasets, tokenizer, column_names, text_column_name, dat
         if data_args.max_seq_length is None:
             max_seq_length = tokenizer.model_max_length
             if max_seq_length > 1024:
-                logger.warn(
+                logger.warning(
                     f"The tokenizer picked seems to have a very large "
                     f"`model_max_length` ({tokenizer.model_max_length}). "
                     f"Picking 1024 instead. You can change that default value by "
@@ -460,7 +465,7 @@ def preprocess_datasets(datasets, tokenizer, column_names, text_column_name, dat
                 max_seq_length = 1024
         else:
             if data_args.max_seq_length > tokenizer.model_max_length:
-                logger.warn(
+                logger.warning(
                     f"The max_seq_length passed ({data_args.max_seq_length}) is larger "
                     f"than the maximum length for the model "
                     f"({tokenizer.model_max_length}). "
