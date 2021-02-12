@@ -174,8 +174,6 @@ def train_dendrite_model(
         optimizer.step()
 
         model.apply(rezero_weights)
-        if context_model:
-            context_model.apply(rezero_weights)
 
         # Perform L1 weight decay
         if l1_weight_decay > 0.0:
