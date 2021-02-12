@@ -27,8 +27,9 @@ from .sampled_kwinners import SampledKWinners, SampledKWinners2d
 
 
 class SampledKWinnerGSCSparseCNN(nn.Sequential):
-    """Sparse CNN model used to classify `Google Speech Commands` dataset as
-    described in `How Can We Be So Dense?`_ paper.
+    """Sparse CNN model using Sampled K winners used to classify
+     `Google Speech Commands` dataset as described in
+      `How Can We Be So Dense?`_ paper.
 
     .. _`How Can We Be So Dense?`: https://arxiv.org/abs/1903.11257
 
@@ -61,7 +62,7 @@ class SampledKWinnerGSCSparseCNN(nn.Sequential):
         linear_weight_sparsity=None,
         temperature=10.0,
         eval_temperature=1.0,
-        temperature_decay_rate=0.01,
+        temperature_decay_rate=0.99,
         k_inference_factor=1.0,
         cnn_sparsity=(0.5, 0.8),
         linear_sparsity=0.9,

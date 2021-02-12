@@ -61,7 +61,7 @@ SPARSE_LENET_SAMPLED_KWINNER.update(
         linear_weight_percent_on=(0.1,),
         temperature=10.0,
         eval_temperature=1.0,
-        temperature_decay_rate=0.01,
+        temperature_decay_rate=0.99,
         use_batch_norm=True,
         dropout=0.0,
         num_classes=12,

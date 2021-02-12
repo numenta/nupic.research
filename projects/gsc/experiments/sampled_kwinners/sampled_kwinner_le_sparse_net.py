@@ -178,9 +178,9 @@ def add_sparse_linear_layer(
 
 class SampledKWinnerLeSparseNet(nn.Sequential):
     """
-    A generic LeNet style sparse CNN network as described in `How Can We Be So Dense?`_
-    paper. The network has a set of CNN blocks, followed by a set of linear blocks,
-    followed by a linear output layer.
+    A generic LeNet style sparse CNN network using Sampled KWinners
+    as described in `How Can We Be So Dense?` paper. The network has a set of CNN
+    blocks, followed by a set of linear blocks, followed by a linear output layer.
 
     Each CNN block contains a CNN layer, optional batch norm, k-winner or ReLU, followed
     by maxpool.  Each linear block contains a linear layer, optional batch norm, and a
@@ -216,7 +216,7 @@ class SampledKWinnerLeSparseNet(nn.Sequential):
                  num_classes=10,
                  temperature=10.0,
                  eval_temperature=1.0,
-                 temperature_decay_rate=0.01,
+                 temperature_decay_rate=0.99,
                  k_inference_factor=1.5,
                  use_batch_norm=True,
                  dropout=0.0,

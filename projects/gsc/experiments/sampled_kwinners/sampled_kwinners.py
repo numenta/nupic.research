@@ -42,7 +42,9 @@ def update_temperature(m):
 
 
 class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
-    """Base SampledKWinners class.
+    """Base SampledKWinners class. Instead of deterministcally choosing the top-k
+        units, the k units are chosen by sampling (with replacement) from the
+        softmax distribution over the output units.
 
     :param percent_on:
       k = percent_on * number of input units will be sampled, with replacement, from
@@ -74,7 +76,7 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         percent_on,
         k_inference_factor=1.0,
         temperature=10.0,
-        temperature_decay_rate=0.01,
+        temperature_decay_rate=0.99,
         eval_temperature=1.0,
     ):
         super(SampledKWinnersBase, self).__init__()
@@ -111,8 +113,7 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         )
 
     def update_temperature(self):
-        new_temp = self.temperature - self.temperature_decay_rate
-        self.temperature = max(1.0, new_temp)
+        self.temperature *= self.temperature_decay_rate
 
     def entropy(self):
         """Returns the current total entropy of this layer."""
