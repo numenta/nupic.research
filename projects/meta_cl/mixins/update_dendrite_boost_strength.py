@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 
-from networks import DendriteSegementsBooster
+from nupic.research.frameworks.dendrites import DendriteSegementsBooster
 
 __all__ = [
     "UpdateDendriteBoostStrength"
@@ -37,7 +37,6 @@ def update_dendrite_boost_stregth(m):
     :param m: DendriteSegementsBooster module
     """
     if isinstance(m, DendriteSegementsBooster):
-        print("Updating dendrite segments booster.")
         m.update_boost_strength()
 
 

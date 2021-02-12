@@ -37,7 +37,7 @@ class DendriteSegementsBooster(torch.nn.Module):
     the duty-cycles and boosts the activations of an associated `DedriteSegments` module
     accordingly.
 
-    At the end of each batch, be sure to call `update_duty_cylces` with the indices of
+    At the end of each batch, be sure to call `update_duty_cycles` with the indices of
     the winning segments. At the end of each epoch, be sure to call
     `update_boost_strength` to multiply the boost strength by the
     `boost_strength_factor`.
@@ -59,7 +59,7 @@ class DendriteSegementsBooster(torch.nn.Module):
     y_new, winning_indices = apply_dendrites(boosted_activations)
 
     # Update duty_cylces after each batch.
-    dendrite_segments.update_duty_cylces(winning_indices)
+    dendrite_segments.update_duty_cycles(winning_indices)
 
     # Update boost_strength after each epoch.
     segments_booster.update_boost_strength()
@@ -124,7 +124,7 @@ class DendriteSegementsBooster(torch.nn.Module):
         boosted *= torch.exp(-self.boost_strength * self.duty_cycles)
         return boosted
 
-    def update_duty_cylces(self, indices):
+    def update_duty_cycles(self, indices):
         """
         Update the moving average of winning segments.
 
