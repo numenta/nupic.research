@@ -134,9 +134,9 @@ def train_dendrite_model(
     :param device: device to use ('cpu' or 'cuda')
     :param criterion: loss function to minimize
     :param context_model: a torch.nn.Module subclass which generates context vectors.
-                          If the context vector should be learned, then
-                          the contexts in the dataset are integers from which a context
-                          will be generated.
+                          If the context vector should be learned, then the contexts in
+                          the dataset are integers from which a context will be
+                          generated.
     :param concat: if True, assumes input and context vectors are concatenated together
                    and model takes just a single input to its `forward`, otherwise
                    assumes input and context vectors are separate and model's `forward`
@@ -185,12 +185,12 @@ def train_dendrite_model(
 
 
 def evaluate_dendrite_model(
-        model,
-        loader,
-        device,
-        criterion,
-        context_model=None,
-        concat=False
+    model,
+    loader,
+    device,
+    criterion,
+    context_model=None,
+    concat=False
 ):
     """
     Evaluates a model on a specified criterion by iterating through all batches in the

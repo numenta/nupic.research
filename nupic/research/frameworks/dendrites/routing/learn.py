@@ -26,6 +26,7 @@ or (c) learning the feed-forward and dendrite weights, and context generation
 """
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.autograd
@@ -78,9 +79,9 @@ def init_test_scenario(
     :param dendrite_module: a torch.nn.Module subclass that implements a dendrite
                             module in addition to a linear feed-forward module
     :param sparse_context_model: whether the context generation module should be
-                            a sparse MLP (only applies if mode == "learn_context")
+                                 a sparse MLP (only applies if mode == "learn_context")
     :param onehot: if mode=="learn_context", whether the integer input to
-                    the context model should be onehot encoded.
+                   the context model should be onehot encoded.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Initialize routing function that this task will try to hardcode, and set
@@ -335,11 +336,9 @@ def learn_to_route(
                            save_path + "context_" + str(epoch))
 
     if plot:
-        import matplotlib.pyplot as plt
         losses = np.array(losses)
         plt.scatter(x=np.arange(1, num_training_epochs + 1), y=losses)
         plt.savefig("training_curve.png")
-        plt.show()
 
 
 if __name__ == "__main__":
