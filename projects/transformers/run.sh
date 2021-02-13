@@ -26,7 +26,15 @@ Two ways of running this script:
     ray_user<cluster_number>.yaml
 
     If you would like to use different filename, make a local copy of the run script
+
+Both scenarios require a AWS_CERT_FILE environment variable with the path to the .pem file
+export AWS_CERT_FILE=<path to your AWS certificatin file (.pem)>
+
+Set the environment variables in ~/.bash_profile to load it every time a new bash terminal is open
 '
+
+aws_ec2_user="ec2-user"
+run_file="~/nta/nupic.research/projects/transformers/run.py"
 
 # ------ Find config file -------------
 
@@ -47,8 +55,8 @@ echo "Experiment name: " $exp_name
 
 get_head_private_ip() {
     local ip=$(ssh -o "StrictHostKeyChecking no" -i \
-              ~/.ssh/ray-autoscaler_us-west-2.pem \
-              ec2-user@$(ray get-head-ip "$ray_config_file") \
+              "$AWS_CERT_FILE" \
+              "$aws_ec2_user"@$(ray get-head-ip "$ray_config_file") \
               hostname -I | awk '{print $1}')
     echo $ip
 }
@@ -113,7 +121,7 @@ echo "Random port selected: $random_port"
 
 # ------ Run file -------------
 
-run_file() {
+run_experiment() {
 
     local counter=0
     local all_ips="${head_public_ip} ${worker_public_ips}"
@@ -122,15 +130,15 @@ run_file() {
         echo "Running command in instance $counter : $ip"
 
         ssh -o "StrictHostKeyChecking no" -i \
-        ~/.ssh/ray-autoscaler_us-west-2.pem \
-        ec2-user@$ip \
+        "$AWS_CERT_FILE" \
+        "$aws_ec2_user"@$ip \
         python -m torch.distributed.launch \
             --nproc_per_node $num_gpus \
             --nnodes $(( num_workers+1 )) \
             --node_rank $counter \
             --master_addr $head_private_ip \
             --master_port $random_port \
-            "~/nta/nupic.research/projects/transformers/run.py" \
+            "$run_file" \
             --experiment $1 &
 
         (( counter++ ))
@@ -138,4 +146,4 @@ run_file() {
 
 }
 
-run_file $exp_name
+run_experiment $exp_name
