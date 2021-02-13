@@ -45,16 +45,17 @@ class LearnToRouteTest(unittest.TestCase):
         should be modified when `mode == "all"`
         """
 
-        for mode in ("dendrites", "all"):
+        for mode in ("dendrites", "all", "learn_context"):
 
-            r, dendrite_layer, context_vectors, device = init_test_scenario(
-                mode=mode,
-                dim_in=100,
-                dim_out=100,
-                num_contexts=10,
-                dim_context=100,
-                dendrite_module=AbsoluteMaxGatingDendriticLayer
-            )
+            r, dendrite_layer, context_model, context_vectors, device = \
+                init_test_scenario(
+                    mode=mode,
+                    dim_in=100,
+                    dim_out=100,
+                    num_contexts=10,
+                    dim_context=100,
+                    dendrite_module=AbsoluteMaxGatingDendriticLayer
+                )
 
             dataloader = init_dataloader(
                 routing_function=r,
@@ -65,7 +66,9 @@ class LearnToRouteTest(unittest.TestCase):
                 x_max=2.0
             )
 
-            optimizer = init_optimizer(mode=mode, layer=dendrite_layer)
+            optimizer = init_optimizer(
+                mode=mode, layer=dendrite_layer, context_model=context_model
+            )
 
             forward_weights_before = copy.deepcopy(
                 dendrite_layer.module.weight.data
@@ -74,6 +77,7 @@ class LearnToRouteTest(unittest.TestCase):
             # Perform a single training epoch
             train_dendrite_model(
                 model=dendrite_layer,
+                context_model=context_model,
                 loader=dataloader,
                 optimizer=optimizer,
                 device=device,
@@ -88,7 +92,7 @@ class LearnToRouteTest(unittest.TestCase):
 
             # If training both feed-forward and dendrite weights, we expect the
             # dendrite weights to change
-            if mode == "all":
+            if mode == "all" or "learn_context":
                 expected = not expected
 
             self.assertTrue(expected)
@@ -99,16 +103,17 @@ class LearnToRouteTest(unittest.TestCase):
         `mode == "all"`
         """
 
-        for mode in ("dendrites", "all"):
+        for mode in ("dendrites", "all", "learn_context"):
 
-            r, dendrite_layer, context_vectors, device = init_test_scenario(
-                mode=mode,
-                dim_in=100,
-                dim_out=100,
-                num_contexts=10,
-                dim_context=100,
-                dendrite_module=AbsoluteMaxGatingDendriticLayer
-            )
+            r, dendrite_layer, context_model, context_vectors, device = \
+                init_test_scenario(
+                    mode=mode,
+                    dim_in=100,
+                    dim_out=100,
+                    num_contexts=10,
+                    dim_context=100,
+                    dendrite_module=AbsoluteMaxGatingDendriticLayer
+                )
 
             dataloader = init_dataloader(
                 routing_function=r,
@@ -119,7 +124,9 @@ class LearnToRouteTest(unittest.TestCase):
                 x_max=2.0
             )
 
-            optimizer = init_optimizer(mode=mode, layer=dendrite_layer)
+            optimizer = init_optimizer(
+                mode=mode, layer=dendrite_layer, context_model=context_model
+            )
 
             dendrite_weights_before = copy.deepcopy(
                 dendrite_layer.segments.weights.data
@@ -128,6 +135,7 @@ class LearnToRouteTest(unittest.TestCase):
             # Perform a single training epoch
             train_dendrite_model(
                 model=dendrite_layer,
+                context_model=context_model,
                 loader=dataloader,
                 optimizer=optimizer,
                 device=device,
@@ -140,6 +148,58 @@ class LearnToRouteTest(unittest.TestCase):
 
             expected = (dendrite_weights_before != dendrite_weights_after).any()
             self.assertTrue(expected)
+
+    def test_context_model(self):
+        """
+        Context model should be learned only when `mode == "learn_context"`
+        """
+        for mode in ("dendrites", "all", "learn_context"):
+
+            r, dendrite_layer, context_model, context_vectors, device =\
+                init_test_scenario(
+                    mode=mode,
+                    dim_in=100,
+                    dim_out=100,
+                    num_contexts=10,
+                    dim_context=100,
+                    dendrite_module=AbsoluteMaxGatingDendriticLayer
+                )
+
+            dataloader = init_dataloader(
+                routing_function=r,
+                context_vectors=context_vectors,
+                device=device,
+                batch_size=64,
+                x_min=-2.0,
+                x_max=2.0
+            )
+
+            optimizer = init_optimizer(
+                mode=mode, layer=dendrite_layer, context_model=context_model
+            )
+
+            if mode != "learn_context":
+                assert context_model is None
+            else:
+                context_weights_before = copy.deepcopy(
+                    context_model.linear1.weight.data
+                )
+                # Perform a single training epoch
+                train_dendrite_model(
+                    model=dendrite_layer,
+                    context_model=context_model,
+                    loader=dataloader,
+                    optimizer=optimizer,
+                    device=device,
+                    criterion=F.l1_loss
+                )
+
+                context_weights_after = copy.deepcopy(
+                    context_model.linear1.weight.data
+                )
+
+                expected = (context_weights_before != context_weights_after).any()
+                self.assertTrue(expected)
 
 
 if __name__ == "__main__":
