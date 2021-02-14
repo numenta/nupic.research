@@ -109,18 +109,24 @@ bert_100k.update(
     logging_first_step=True,
     save_steps=5000,
     save_total_limit=5,
-    # this should be enough to load from checkpoint - why not loading?
     output_dir=os.path.expanduser("~/nta/results/experiments/transformers/bert_100k"),
     overwrite_output_dir=False,
 
     # speeding up
     # fp16=True,
-    dataloader_num_workers=7,
+    dataloader_num_workers=4,
 
 )
 
+bert_1mi = deepcopy(bert_100k)
+bert_1mi.update(
+    run_name="bert_1mi",
+    max_steps=1000000,
+    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/bert_1mi"),
+)
 
 # Export configurations in this file
 CONFIGS = dict(
     bert_100k=bert_100k,
+    bert_1mi=bert_1mi
 )
