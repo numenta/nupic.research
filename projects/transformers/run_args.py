@@ -26,7 +26,7 @@ from transformers import MODEL_FOR_MASKED_LM_MAPPING
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
-task_to_keys = {
+TASK_TO_KEYS = {
     "cola": ("sentence", None),
     "mnli": ("premise", "hypothesis"),
     "mrpc": ("sentence1", "sentence2"),
@@ -38,6 +38,7 @@ task_to_keys = {
     "wnli": ("sentence1", "sentence2"),
 }
 
+
 @dataclass
 class ModelArguments:
     """
@@ -47,8 +48,8 @@ class ModelArguments:
     finetuning: bool = field(
         default=False,
         metadata={
-            "help": "Whether to finetune the model for downstream tasks. If false, will
-                    "attempt to pretrain a masked language model instead."
+            "help": "Whether to finetune the model for downstream tasks. If false, "
+                    "will attempt to pretrain a masked language model instead."
         },
     )
     model_name_or_path: Optional[str] = field(
@@ -210,7 +211,7 @@ class DataTrainingArguments:
         default=None,
         metadata={
             "help": "The name of the task to train on: " + ", ".join(
-                task_to_keys.keys()
+                TASK_TO_KEYS.keys()
             )
         },
     )
@@ -220,11 +221,11 @@ class DataTrainingArguments:
         if self.task_name is not None:
             # Checks if it is a valid task
             self.task_name = self.task_name.lower()
-            if self.task_name not in task_to_keys.keys():
+            if self.task_name not in TASK_TO_KEYS.keys():
                 raise ValueError("Unknown task, you should pick one in "
-                                 + ",".join(task_to_keys.keys()))
+                                 + ",".join(TASK_TO_KEYS.keys()))
         elif (self.dataset_name is None and self.train_file is None
-           and self.validation_file is None):
+              and self.validation_file is None):
             # If no task is set, validates if a dataset is given
             raise ValueError(
                 "Need either a GLUE task, a dataset name or a training/validation file."

@@ -21,19 +21,27 @@
 Auxiliary functions to run.py file
 """
 
-import os
-import numpy as np
 import logging
-from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
+import math
+import os
+from hashlib import blake2b
+
+import numpy as np
 from datasets import concatenate_datasets, load_dataset, load_from_disk, load_metric
 from datasets.dataset_dict import DatasetDict
-from hashlib import blake2b
 from transformers import (
     CONFIG_MAPPING,
+    AutoConfig,
+    AutoModelForMaskedLM,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    EvalPrediction,
     PretrainedConfig,
     Trainer,
     TrainerCallback,
 )
+
+from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +69,7 @@ TASK_TO_KEYS = {
     "wnli": ("sentence1", "sentence2"),
 }
 
+
 def train(trainer, training_args, model_args, last_checkpoint):
     """Trainig function applicable to pretraining language models and finetuning."""
 
@@ -74,7 +83,7 @@ def train(trainer, training_args, model_args, last_checkpoint):
         if last_checkpoint is not None:
             checkpoint = last_checkpoint
         elif (model_args.model_name_or_path is not None
-            and os.path.isdir(model_args.model_name_or_path)):
+              and os.path.isdir(model_args.model_name_or_path)):
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
@@ -100,8 +109,8 @@ def train(trainer, training_args, model_args, last_checkpoint):
     ))
 
 
-def evaluate_tasks(trainer, training_args, data_args, eval_dataset,
-                   test_dataset, is_regression, label_list):
+def evaluate_tasks(trainer, training_args, data_args, datasets,
+                   eval_dataset, test_dataset, is_regression, label_list):
     """
     Evaluate tasks after finetuning.
     Returns evaluation dict with results.
@@ -148,8 +157,8 @@ def evaluate_tasks(trainer, training_args, data_args, eval_dataset,
             # and Trainer won't like that.
             test_dataset.remove_columns_("label")
             predictions = trainer.predict(test_dataset=test_dataset).predictions
-            predictions = np.squeeze(predictions) if is_regression else \
-                          np.argmax(predictions, axis=1)
+            predictions = (np.squeeze(predictions) if is_regression
+                           else np.argmax(predictions, axis=1))
 
             output_test_file = os.path.join(
                 training_args.output_dir, f"test_results_{task}.txt"
@@ -375,7 +384,9 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
         # Some have all caps in their config, some don't.
         label_name_to_id = {k.lower(): v for k, v in model.config.label2id.items()}
         if list(sorted(label_name_to_id.keys())) == list(sorted(label_list)):
-            label_to_id = {i: label_name_to_id[label_list[i]] for i in range(num_labels)}
+            label_to_id = {
+                i: label_name_to_id[label_list[i]] for i in range(num_labels)
+            }
         else:
             logger.warn(
                 "Your model seems to have been trained with labels, but they don't "
@@ -418,6 +429,7 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
     )
 
     return tokenized_datasets
+
 
 def init_datasets_mlm(data_args):
     """
@@ -489,8 +501,7 @@ def init_datasets_mlm(data_args):
 
 def init_datasets_task(data_args, training_args):
     """
-    Get the datasets for finetuning on tasks
-    Returns a regular version of dataset and a tokenized version if exists.
+    Get the datasets for finetuning on tasks. Returns dataset.
 
     You can either provide your own CSV/JSON training and evaluation files (see below)
     or specify a GLUE benchmark task (the dataset will be downloaded automatically
@@ -513,8 +524,6 @@ def init_datasets_task(data_args, training_args):
     TODO: implement recovering tokenized version
     """
 
-    datasets, tokenized_datasets = None, None
-
     if data_args.task_name is not None:
         # Downloading and loading a dataset from the hub.
         datasets = load_dataset("glue", data_args.task_name)
@@ -525,25 +534,7 @@ def init_datasets_task(data_args, training_args):
             "train": data_args.train_file, "validation": data_args.validation_file
         }
 
-        # Get the test dataset: you    # Labels
-    if data_args.task_name is not None:
-        is_regression = data_args.task_name == "stsb"
-        if not is_regression:
-            label_list = datasets["train"].features["label"].names
-            num_labels = len(label_list)
-        else:
-            num_labels = 1
-    else:
-        # Trying to have good defaults here, don't hesitate to tweak to your needs.
-        is_regression = datasets["train"].features["label"].dtype in ["float32", "float64"]
-        if is_regression:
-            num_labels = 1
-        else:
-            # A useful fast method:
-            # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.Dataset.unique
-            label_list = datasets["train"].unique("label")
-            label_list.sort()  # Let's sort it for determinism
-            num_labels = len(label_list) can provide your own CSV/JSON test file (see below)
+        # Get the test dataset: you can provide your own CSV/JSON test file (see below)
         # when you use `do_predict` without specifying a GLUE benchmark task.
         if training_args.do_predict:
             if data_args.test_file is not None:
@@ -568,10 +559,10 @@ def init_datasets_task(data_args, training_args):
             # Loading a dataset from local json files
             datasets = load_dataset("json", data_files=data_files)
 
-    return datasets, tokenized_datasets
+    return datasets
 
 
-def get_labels(data_args):
+def get_labels(datasets, data_args):
     if data_args.task_name is not None:
         is_regression = data_args.task_name == "stsb"
         if not is_regression:
@@ -581,8 +572,9 @@ def get_labels(data_args):
             num_labels = 1
     else:
         # Trying to have good defaults here, don't hesitate to tweak to your needs.
-        is_regression = (datasets["train"].features["label"].dtype in
-                        ["float32", "float64"])
+        is_regression = (
+            datasets["train"].features["label"].dtype in ["float32", "float64"]
+        )
         if is_regression:
             num_labels = 1
         else:
@@ -663,13 +655,13 @@ def init_model(model_args, config, tokenizer, finetuning=False):
     if finetuning:
         # For finetuning, only option is to load pretrained
         model = AutoModelForSequenceClassification.from_pretrained(
-            model_args.model_name_or_path
+            model_args.model_name_or_path, **model_kwargs
         )
     else:
         # Load pretrained or start a model from scratch
         if model_args.model_name_or_path:
             model = AutoModelForMaskedLM.from_pretrained(
-                model_args.model_name_or_path,
+                model_args.model_name_or_path, **model_kwargs
             )
         else:
             logger.info("Training new model from scratch")
@@ -682,7 +674,7 @@ def init_model(model_args, config, tokenizer, finetuning=False):
 
 
 def init_trainer(model, tokenizer, data_collator, training_args,
-                train_dataset, eval_dataset, trainer_callbacks,
+                 train_dataset, eval_dataset, trainer_callbacks,
                  finetuning=False, task_name=None, is_regression=False):
     """Initialize Trainer, main class that controls the experiment"""
     if trainer_callbacks is not None:
@@ -714,7 +706,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
                 field) and has to return a dictionary string to float.
 
                 Requires is_regression, data_args and metric in outer scope
-                TODO: this version eliminate the outer scope variables
+                TODO: remove dependency on outer scope variables
                 """
                 preds = (eval_prediction.predictions[0]
                          if isinstance(eval_prediction.predictions, tuple)
@@ -745,7 +737,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
                 field) and has to return a dictionary string to float.
 
                 Requires is_regression in outer scope
-                TODO: can we eliminate the outer scope variables
+                TODO: remove dependency on outer scope variables
                 """
                 preds = (eval_prediction.predictions[0]
                          if isinstance(eval_prediction.predictions, tuple)
@@ -760,8 +752,6 @@ def init_trainer(model, tokenizer, data_collator, training_args,
                         "accuracy": (preds == eval_prediction.label_ids).
                         astype(np.float32).mean().item()
                     }
-            # TODO: When datasets metrics include regular accuracy, make an else here and remove special branch from
-            # compute_metrics
 
         trainer_kwargs.update(
             compute_metrics=compute_metrics,

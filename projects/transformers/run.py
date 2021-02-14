@@ -28,21 +28,13 @@ Adapted from huggingface/transformers/examples/run_mlm.py
 """
 
 import logging
-import math
 import os
 import sys
 
 import transformers
-from datasets import concatenate_datasets, load_dataset, load_from_disk
 from transformers import (
-    CONFIG_MAPPING,
     MODEL_FOR_MASKED_LM_MAPPING,
-    AutoConfig,
-    AutoModelForMaskedLM,
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
     DataCollatorWithPadding,
-    EvalPrediction,
     HfArgumentParser,
     TrainingArguments,
     default_data_collator,
@@ -52,20 +44,19 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
 from run_args import DataTrainingArguments, ModelArguments
-from run_functions import (
-    train,
-    evaluate_tasks,
+from run_utils import (
     evaluate_language_model,
+    evaluate_tasks,
+    get_labels,
     init_config,
-    init_tokenizer,
-    init_model,
-    init_trainer,
     init_datasets_mlm,
     init_datasets_task,
-    get_labels,
-    load_and_concatenate_datasets,
+    init_model,
+    init_tokenizer,
+    init_trainer,
     preprocess_datasets_mlm,
-    preprocess_datasets_task
+    preprocess_datasets_task,
+    train,
 )
 
 logger = logging.getLogger(__name__)
@@ -154,12 +145,17 @@ def main():    # noqa: C901
 
     if model_args.finetuning:
         logger.info(f"Finetuning model for downstream tasks.")
-        run_finetuning(model_args, data_args, training_args,
-                       trainer_callbacks=None, last_checkpoint=None)
+        run_finetuning(
+            model_args, data_args, training_args,
+            trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
+        )
     else:
         logger.info(f"Pre-training a masked language model.")
-        run_pretraining(model_args, data_args, training_args,
-                        trainer_callbacks=None, last_checkpoint=None)
+        run_pretraining(
+            model_args, data_args, training_args,
+            trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
+        )
+
 
 def run_pretraining(model_args, data_args, training_args,
                     trainer_callbacks=None, last_checkpoint=None):
@@ -217,8 +213,8 @@ def run_pretraining(model_args, data_args, training_args,
 def run_finetuning(model_args, data_args, training_args,
                    trainer_callbacks=None, last_checkpoint=None):
 
-    datasets, tokenized_datasets = init_datasets_task(data_args, training_args)
-    is_regression, label_list, num_labels = get_labels(data_args)
+    datasets = init_datasets_task(data_args, training_args)
+    is_regression, label_list, num_labels = get_labels(datasets, data_args)
 
     # For finetuning required to add labels and task name to config kwargs
     extra_config_kwargs = dict(
@@ -269,7 +265,7 @@ def run_finetuning(model_args, data_args, training_args,
     )
     train(trainer, training_args, model_args, last_checkpoint)
     evaluate_tasks(
-        trainer, training_args, data_args,
+        trainer, training_args, data_args, datasets,
         eval_dataset, test_dataset, is_regression, label_list
     )
 
