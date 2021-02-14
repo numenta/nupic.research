@@ -63,11 +63,7 @@ debug_finetuning.update(
 
 
 """
-Expected for qnli 0.9066 acc, 41 min training time. seed may affect result
-Achieved ~0.8896 acc, 11min training time on 4 GPUs.
-
-Effective batch size was 128 with 1/4 the number of steps, so results were expected to
-be lower than baseline.
+Acc for bert 100k: 0.8641
 """
 debug_finetuning_bert100k = deepcopy(debug_finetuning)
 debug_finetuning_bert100k.update(

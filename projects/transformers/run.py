@@ -24,7 +24,9 @@ Pre-train or finetune HuggingFace models for masked language modeling
 Here is the full list of checkpoints on the hub that can be fine-tuned by this script:
 https://huggingface.co/models?filter=masked-lm
 
-Adapted from huggingface/transformers/examples/run_mlm.py
+Adapted from:
+github.com/huggingface/transformers/blob/master/examples/language-modeling/run_mlm.py
+github.com/huggingface/transformers/blob/master/examples/text-classification/run_glue.py
 """
 
 import logging
