@@ -23,20 +23,10 @@ from typing import Optional
 
 from transformers import MODEL_FOR_MASKED_LM_MAPPING
 
+from run_utils import TASK_TO_KEYS
+
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
-
-TASK_TO_KEYS = {
-    "cola": ("sentence", None),
-    "mnli": ("premise", "hypothesis"),
-    "mrpc": ("sentence1", "sentence2"),
-    "qnli": ("question", "sentence"),
-    "qqp": ("question1", "question2"),
-    "rte": ("sentence1", "sentence2"),
-    "sst2": ("sentence", None),
-    "stsb": ("sentence1", "sentence2"),
-    "wnli": ("sentence1", "sentence2"),
-}
 
 
 @dataclass
@@ -57,6 +47,7 @@ class ModelArguments:
         metadata={
             "help": "The model checkpoint for weights initialization."
             "Don't set if you want to train a model from scratch."
+            "Config and tokenizers will also be determined from the model_name_or_path."
         },
     )
     model_type: Optional[str] = field(

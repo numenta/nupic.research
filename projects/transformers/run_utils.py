@@ -48,13 +48,16 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "evaluate_language_model",
     "evaluate_tasks",
+    "get_labels",
+    "init_config",
     "init_datasets_mlm",
     "init_datasets_task",
-    "load_and_concatenate_datasets",
+    "init_model",
+    "init_tokenizer",
+    "init_trainer",
     "preprocess_datasets_mlm",
     "preprocess_datasets_task",
     "train",
-
 ]
 
 TASK_TO_KEYS = {
@@ -643,32 +646,40 @@ def init_tokenizer(model_args):
 
 
 def init_model(model_args, config, tokenizer, finetuning=False):
+    """"
+    Initialize a model for pretraining or finetuning
+    # TODO: investigate why resize_token_embeddings are not required in finetuning
+    """
 
     # Load model
-    model_kwargs = dict(
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
-    if finetuning:
-        # For finetuning, only option is to load pretrained
-        model = AutoModelForSequenceClassification.from_pretrained(
-            model_args.model_name_or_path, **model_kwargs
+    if model_args.model_name_or_path is not None:
+        model_kwargs = dict(
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
         )
-    else:
-        # Load pretrained or start a model from scratch
-        if model_args.model_name_or_path:
-            model = AutoModelForMaskedLM.from_pretrained(
+        if finetuning:
+            logger.info("Loading a pretrained model from HF for finetuning")
+            model = AutoModelForSequenceClassification.from_pretrained(
                 model_args.model_name_or_path, **model_kwargs
             )
         else:
-            logger.info("Training new model from scratch")
+            logger.info("Loading a pretrained model from HF to continue pretraining")
+            model = AutoModelForMaskedLM.from_pretrained(
+                model_args.model_name_or_path, **model_kwargs
+            )
+            model.resize_token_embeddings(len(tokenizer))
+    else:
+        if finetuning:
+            raise ValueError(
+                "Finetuning models must be loaded from pretrained models."
+            )
+        else:
+            logger.info("Pretraining new model from scratch")
             model = AutoModelForMaskedLM.from_config(config)
-
-        # Q: not required in tasks/finetuning?
-        model.resize_token_embeddings(len(tokenizer))
+            model.resize_token_embeddings(len(tokenizer))
 
     return model
 
@@ -729,7 +740,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
                         astype(np.float32).mean().item()
                     }
         else:
-            # Compute metrics wont't include the inner if that looks for metric
+            # Compute metrics doesn't include extra if clause if task name is not given
             def compute_metrics(eval_prediction: EvalPrediction):
                 """
                 You can define your custom compute_metrics function. It takes an
