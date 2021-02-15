@@ -19,21 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .base import CONFIGS as BASE
-from .test_sigopt import CONFIGS as TEST_SIGOPT
-from .gsc_onecyclelr import CONFIGS as SPARSE_CNN_ONECYCLELR
-from .gsc_onecyclelr_sigopt import CONFIGS as SIGOPT_SPARSE_CNN_ONECYCLELR
-from .gsc_sampled_kwinner import CONFIGS as SAMPLED_K_WINNER
+from .sampled_kwinners import update_temperature
 
-"""
-Import and collect all Imagenet experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(BASE)
-CONFIGS.update(TEST_SIGOPT)
-CONFIGS.update(SPARSE_CNN_ONECYCLELR)
-CONFIGS.update(SIGOPT_SPARSE_CNN_ONECYCLELR)
-CONFIGS.update(SAMPLED_K_WINNER)
+class UpdateKWinnerTemperature:
+    """
+    Update the KWinners boost strength before every epoch.
+    """
+    def pre_epoch(self):
+        super().pre_epoch()
+        self.model.apply(update_temperature)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["pre_epoch"].append("UpdateKWinnerTemperature")
+        return eo
