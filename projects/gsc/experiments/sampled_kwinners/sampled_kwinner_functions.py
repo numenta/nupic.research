@@ -20,7 +20,9 @@
 import torch
 from torch.distributions.multinomial import Multinomial
 from torch.nn.functional import softmax
+
 from nupic.torch.functions.k_winners import kwinners, kwinners2d
+
 
 def sampled_kwinners(x, k, temperature, relu=False, inplace=False):
     """
@@ -58,7 +60,8 @@ def sampled_kwinners(x, k, temperature, relu=False, inplace=False):
     if ((probs != 0).sum(dim=1) < k).any():
         # Use kwinners as default; at low temperatures, this is equivalent
         return kwinners(x,
-                        duty_cycles=None,k=k,
+                        duty_cycles=None,
+                        k=k,
                         boost_strength=0.0,  # no boosting
                         break_ties=False,
                         relu=relu,
