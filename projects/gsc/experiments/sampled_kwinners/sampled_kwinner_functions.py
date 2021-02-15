@@ -20,7 +20,7 @@
 import torch
 from torch.distributions.multinomial import Multinomial
 from torch.nn.functional import softmax
-
+from nupic.torch.functions.k_winners import kwinners, kwinners2d
 
 def sampled_kwinners(x, k, temperature, relu=False, inplace=False):
     """
@@ -51,6 +51,19 @@ def sampled_kwinners(x, k, temperature, relu=False, inplace=False):
     if k == 0:
         return torch.zeros_like(x)
     probs = softmax(x / temperature, dim=-1)
+
+    # Default to kwinners when sampling k is not possible. A low enough temperature
+    # has only one non-zero in the softmax distribution. However, Multinomial only
+    # can sample the non-zero probabilites.
+    if ((probs != 0).sum(dim=1) < k).any():
+        # Use kwinners as default; at low temperatures, this is equivalent
+        return kwinners(x,
+                        duty_cycles=None,k=k,
+                        boost_strength=0.0,  # no boosting
+                        break_ties=False,
+                        relu=relu,
+                        inplace=inplace)
+
     dist = Multinomial(total_count=k, probs=probs)
     on_mask = dist.sample().bool()
     if relu:
@@ -93,6 +106,21 @@ def sampled_kwinners2d(x, k, temperature, relu=False, inplace=False):
     shape2 = (x.shape[0], x.shape[1] * x.shape[2] * x.shape[3])
     logits = x.view(shape2)
     probs = softmax(logits / temperature, dim=-1)
+
+    # Default to 2dkwinners when sampling k is not possible. A low enough temperature
+    # has only one non-zero in the softmax distribution. However, Multinomial only
+    # can sample the non-zero probabilites.
+    if ((probs != 0).sum(dim=1) < k).any():
+        # Use kwinners as default; at low temperatures, this is equivalent
+        return kwinners2d(x,
+                          duty_cycles=None,
+                          k=k,
+                          boost_strength=0.0,  # no boosting
+                          local=False,
+                          break_ties=False,
+                          relu=relu,
+                          inplace=inplace)
+
     dist = Multinomial(total_count=k, probs=probs)
     on_mask = dist.sample().bool()
     if relu:

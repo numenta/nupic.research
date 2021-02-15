@@ -25,7 +25,7 @@ import torch.nn as nn
 
 from nupic.torch.duty_cycle_metrics import max_entropy
 
-from .kwinner_functions import sampled_kwinners, sampled_kwinners2d
+from .sampled_kwinner_functions import sampled_kwinners, sampled_kwinners2d
 
 
 def update_temperature(m):
@@ -42,13 +42,13 @@ def update_temperature(m):
 
 
 class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
-    """Base SampledKWinners class. Instead of deterministcally choosing the top-k
+    """Base SampledKWinners class. Instead of deterministically choosing the top-k
         units, the k units are chosen by sampling (with replacement) from the
         softmax distribution over the output units.
 
     :param percent_on:
       k = percent_on * number of input units will be sampled, with replacement, from
-      categorial softmax distribution over the layer activations
+      categorical softmax distribution over the layer activations
     :type percent_on: float
 
     :param k_inference_factor:
@@ -93,9 +93,6 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         self.n = 0
         self.k = 0
         self.k_inference = 0
-
-    def _load_from_state_dict(self, *args, **kwargs):
-        super()._load_from_state_dict(*args, **kwargs)
 
     def extra_repr(self):
         return (
