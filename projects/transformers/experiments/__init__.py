@@ -22,6 +22,7 @@
 from .base import CONFIGS as BASE
 from .bert_replication import CONFIGS as BERT_REPLICATION
 from .sparse_bert import CONFIGS as SPARSE_BERT
+from .finetuning import CONFIGS as FINETUNING
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -33,3 +34,4 @@ CONFIGS = dict()
 CONFIGS.update(BASE)
 CONFIGS.update(BERT_REPLICATION)
 CONFIGS.update(SPARSE_BERT)
+CONFIGS.update(FINETUNING)
