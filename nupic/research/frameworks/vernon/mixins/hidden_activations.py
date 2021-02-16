@@ -53,8 +53,8 @@ class PlotHiddenActivations(metaclass=abc.ABCMeta):
                                 can be included through "features.*"
             - plot_freq: (optional) how often to create the plot, measured in training
                          iterations; defaults to 1
-            - max_samples_to_track: (optional) how many of samples to use for plotting;
-                                    only the newest will be used; defaults to 5000
+            - max_samples_to_plot: (optional) how many of samples to use for plotting;
+                                   only the newest will be used; defaults to 5000
 
     Example config:
     ```
@@ -62,7 +62,7 @@ class PlotHiddenActivations(metaclass=abc.ABCMeta):
         plot_hidden_activations_args=dict(
             include_modules=[torch.nn.Linear, KWinners],
             plot_freq=1,
-            max_samples_to_track=2000
+            max_samples_to_plot=2000
         )
     )
     ```
@@ -109,7 +109,7 @@ class PlotHiddenActivations(metaclass=abc.ABCMeta):
 
         # Others args
         plot_freq = ha_args.get("plot_freq", 1)
-        max_samples = ha_args.get("max_samples_to_track", 1000)
+        max_samples = ha_args.get("max_samples_to_plot", 1000)
 
         assert isinstance(plot_freq, int)
         assert isinstance(max_samples, int)
