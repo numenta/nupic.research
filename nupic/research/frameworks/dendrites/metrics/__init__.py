@@ -25,6 +25,7 @@ from .metrics import (
     dendrite_overlap,
     dendrite_overlap_matrix,
     entropy,
+    hidden_activations_by_unit,
     mean_selected_activations,
     percent_active_dendrites,
 )
@@ -33,6 +34,7 @@ from .plotting import (
     plot_dendrite_activations_by_unit,
     plot_dendrite_overlap_matrix,
     plot_entropy_distribution,
+    plot_hidden_activations_by_unit,
     plot_mean_selected_activations,
     plot_overlap_scores_distribution,
     plot_percent_active_dendrites,

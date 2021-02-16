@@ -29,6 +29,7 @@ from .metrics import (
     dendrite_overlap,
     dendrite_overlap_matrix,
     entropy,
+    hidden_activations_by_unit,
     mean_selected_activations,
     percent_active_dendrites,
 )
@@ -257,6 +258,42 @@ def plot_dendrite_activations_by_unit(dendrite_activations, winning_mask, target
     plt.cla()
     fig, ax = plt.subplots()
     ax.imshow(activations, cmap="coolwarm_r", vmin=0.0, vmax=1.0)
+
+    ax.set_xlabel("hidden unit")
+    ax.set_ylabel("category")
+
+    plt.tight_layout()
+    figure = plt.gcf()
+    return figure
+
+
+def plot_hidden_activations_by_unit(activations, targets, category_names=None,
+                                    num_units_to_plot=128):
+    """
+    Returns a heatmap with shape (num_categories, num_units) where cell c, i gives the
+    mean value of hidden activations for unit i over all given examples from category
+    c.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    :param category_names: list of category names to label each column of the heatmap;
+                           unused if None
+    :param num_units_to_plot: an integer which gives how many columns to show, for ease
+                              of visualization; only the first num_units_to_plot units
+                              are shown
+    """
+    activations = hidden_activations_by_unit(activations, targets)
+
+    if num_units_to_plot is not None:
+        activations = activations[:, :num_units_to_plot]
+    activations = activations.detach().cpu().numpy()
+
+    plt.cla()
+    fig, ax = plt.subplots()
+    max_val = np.abs(activations).max()
+    ax.imshow(activations, cmap="PiYG", vmin=-max_val, vmax=max_val)
 
     ax.set_xlabel("hidden unit")
     ax.set_ylabel("category")
