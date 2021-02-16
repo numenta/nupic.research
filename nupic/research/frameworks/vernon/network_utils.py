@@ -61,12 +61,17 @@ def get_compatible_state_dict(state_dict, model):
     """
     Make sure checkpoint is compatible with model
     """
+    # Copy metadata attribute inserted into the OrderedDict by pytorch serializer
+    metadata = getattr(state_dict, "_metadata", None)
     state_dict = upgrade_to_masked_sparseweights(state_dict)
 
     if model.state_dict().keys() != state_dict.keys():
         state_dict = OrderedDict(
             zip(model.state_dict().keys(), state_dict.values()))
 
+    # Restore pytorch serializer metadata
+    if metadata is not None:
+        state_dict._metadata = metadata
     return state_dict
 
 
