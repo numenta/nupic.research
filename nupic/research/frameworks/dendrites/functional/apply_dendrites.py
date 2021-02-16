@@ -30,6 +30,7 @@ from collections import namedtuple
 import torch
 
 __all__ = [
+    "dendrite_output",
     "dendritic_bias_1d",
     "dendritic_gate_1d",
     "dendritic_absolute_max_gate_1d",
@@ -90,9 +91,7 @@ def dendritic_absolute_max_gate_1d(y, dendrite_activations):
                                  number of segments, respectively.
     """
     indices = dendrite_activations.abs().max(dim=2).indices
-    unsqueezed = indices.unsqueeze(dim=2)
-    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
-    dendrite_activations = dendrite_activations.squeeze()
+    dendrite_activations = gather_activations(dendrite_activations, indices)
     dendrite_activations = torch.sigmoid(dendrite_activations)
     return dendrite_output(y * dendrite_activations, indices)
 
@@ -145,9 +144,7 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
                                  respectively)
     """
     indices = dendrite_activations.abs().max(dim=2).indices
-    unsqueezed = indices.unsqueeze(dim=2)
-    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
-    dendrite_activations = dendrite_activations.squeeze(dim=2)
+    dendrite_activations = gather_activations(dendrite_activations, indices)
     dendrite_activations = torch.sigmoid(dendrite_activations)
 
     # The following operation uses `torch.einsum` to multiply each channel by a
@@ -158,3 +155,18 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
 
     y_gated = torch.einsum("bijk,bi->bijk", y, dendrite_activations)
     return dendrite_output(y_gated, indices)
+
+
+def gather_activations(dendrite_activations, indices):
+    """
+    Gathers dendritic activations from the given indices.
+
+    :param indices: tensor of indices of winning segments;
+                    shape of batch_size x num_units
+    :param indices: tensor of dendritic activations;
+                    shape of batch_size x num_units x num_segments
+    """
+    unsqueezed = indices.unsqueeze(dim=2)
+    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
+    dendrite_activations = dendrite_activations.squeeze(dim=2)
+    return dendrite_activations
