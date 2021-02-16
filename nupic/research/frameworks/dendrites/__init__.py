@@ -22,4 +22,3 @@
 from .modules import *
 from .metrics import *
 from .apply_dendrites_hook import *
-from .dendrite_segments_booster import *

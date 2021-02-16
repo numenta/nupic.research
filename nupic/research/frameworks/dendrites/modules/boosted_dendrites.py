@@ -23,12 +23,13 @@ import abc
 
 import torch
 
-from nupic.research.frameworks.dendrites import ApplyDendritesBase
 from nupic.research.frameworks.dendrites.functional import (
     dendrite_output,
     dendritic_gate_1d,
 )
 from nupic.research.frameworks.pytorch.mask_utils import indices_to_mask
+
+from .apply_dendrites import ApplyDendritesBase
 
 __all__ = [
     "BoostedDendritesBase",
