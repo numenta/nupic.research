@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 
-from nupic.research.frameworks.dendrites import DendriteSegementsBooster
+from nupic.research.frameworks.dendrites import BoostedDendritesBase
 
 __all__ = [
     "UpdateDendriteBoostStrength"
@@ -28,21 +28,21 @@ __all__ = [
 
 
 def update_dendrite_boost_stregth(m):
-    """Function used to update DendriteSegementsBooster modules boost strength. This is
+    """Function used to update BoostedDendritesBase modules boost strength. This is
     typically done during training at the beginning of each epoch.
 
     Call using :meth:`torch.nn.Module.apply` after each epoch if required
     For example: ``m.apply(update_boost_strength)``
 
-    :param m: DendriteSegementsBooster module
+    :param m: BoostedDendritesBase module
     """
-    if isinstance(m, DendriteSegementsBooster):
+    if isinstance(m, BoostedDendritesBase):
         m.update_boost_strength()
 
 
 class UpdateDendriteBoostStrength:
     """
-    Update the DendriteSegementsBooster boost strength before every epoch.
+    Update the BoostedDendrites boost strength before every epoch.
     """
     def pre_epoch(self):
         """Apply update boost strength."""
@@ -54,7 +54,7 @@ class UpdateDendriteBoostStrength:
 
         results = super().run_epoch()
         for name, module in self.model.named_modules():
-            if isinstance(module, DendriteSegementsBooster):
+            if isinstance(module, BoostedDendritesBase):
                 results.update({
                     f"boost_strength/{name}": module.boost_strength.item()
                 })

@@ -43,7 +43,7 @@ class BoostedDendritesExperiment(UpdateDendriteBoostStrength,
                                  MetaContinualLearningExperiment):
     """
     This is similar to DendritesExperiment, but with an added mixin to update the boost
-    strength of a DendriteSegementsBooster module.
+    strength of a BoostedDendrites module.
     """
     pass
 

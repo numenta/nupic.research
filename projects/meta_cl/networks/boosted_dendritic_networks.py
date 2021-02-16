@@ -19,10 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.dendrites import (
-    DendriteSegementsBooster,
-    DendriticAbsoluteMaxGate1d,
-)
+from nupic.research.frameworks.dendrites import BoostedDendritesAbsMaxGate1d
 
 from .dendritic_networks import ReplicateANMLDendriticNetwork
 
@@ -62,7 +59,7 @@ class BoostedANMLDendriticNetwork(ReplicateANMLDendriticNetwork):
 
         num_units = self.segments.num_units
         num_segments = self.segments.num_segments
-        self.segments_booster = DendriteSegementsBooster(
+        self.apply_boosted_dendrites = BoostedDendritesAbsMaxGate1d(
             num_units,
             num_segments,
             boost_strength=boost_strength,
@@ -70,17 +67,8 @@ class BoostedANMLDendriticNetwork(ReplicateANMLDendriticNetwork):
             duty_cycle_period=duty_cycle_period,
         )
 
-        self.dendritic_gate = DendriticAbsoluteMaxGate1d()
-
     def apply_dendrites(self, y, dendrite_activations):
         """
         Apply dendrites as a gating mechanism and update boost strength.
         """
-
-        boosted = self.segments_booster.boost_activations(dendrite_activations)
-        output, indices = self.dendritic_gate(y, boosted)
-
-        if self.training:
-            self.segments_booster.update_duty_cylces(indices)
-
-        return output
+        return self.apply_boosted_dendrites(y, dendrite_activations).values

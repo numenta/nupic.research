@@ -100,14 +100,14 @@ anml_dendrites_multi_segments.update(
 )
 
 
-# |---------------------------------------------------------------|
-# |   Num Classes | Meta-test test   | Meta-test train   |     LR |
 # |--------------:|:-----------------|:------------------|-------:|
-# |            10 | 0.91 ± 0.04      | 0.96 ± 0.03       | 0.001  |
-# |            50 | 0.88 ± 0.03      | 0.98 ± 0.02       | 0.0006 |
-# |           100 | 0.86 ± 0.02      | 0.97 ± 0.01       | 0.0004 |
-# |           200 | 0.82 ± 0.01      | 0.97 ± 0.01       | 0.0004 |
-# |           600 | 0.67 ± 0.01      | 0.92 ± 0.01       | 0.0006 |
+# |   Num Classes | Meta-test test   | Meta-test train   |    LR |
+# |--------------:|:-----------------|:------------------|------:|
+# |            10 | 0.84 ± 0.03      | 0.92 ± 0.03       | 0.001 |
+# |            50 | 0.85 ± 0.03      | 0.99 ± 0.01       | 0.001 |
+# |           100 | 0.81 ± 0.03      | 0.98 ± 0.01       | 0.001 |
+# |           200 | 0.76 ± 0.02      | 0.98 ± 0.01       | 0.001 |
+# |           600 | 0.62 ± 0.01      | 0.96 ± 0.00       | 0.001 |
 # |---------------------------------------------------------------|
 #
 anml_dendrites_multi_segments_boosted = deepcopy(anml_dendrites_multi_segments)
@@ -128,6 +128,16 @@ anml_dendrites_multi_segments_boosted.update(
         include_modules=[torch.nn.Linear]
     ),
 
+    # Plotting args.
+    plot_dendrite_metrics_args=dict(
+        winning_segments=dict(
+            plot_func=plot_winning_segment_distributions_wandb,
+            plot_freq=50,
+            plot_args=get_plot_args,
+            max_samples_to_track=2000,
+        )
+    ),
+
     wandb_args=dict(name="anml_dendrites_multi_segments_boosted", project="metacl"),
 )
 
@@ -137,11 +147,11 @@ anml_dendrites_multi_segments_boosted.update(
 # |---------------------------------------------------------------|
 # |   Num Classes | Meta-test test   | Meta-test train   |     LR |
 # |--------------:|:-----------------|:------------------|-------:|
-# |            10 | 0.92 ± 0.05      | 0.96 ± 0.03       | 0.001  |
-# |            50 | 0.90 ± 0.01      | 0.98 ± 0.01       | 0.0006 |
-# |           100 | 0.86 ± 0.02      | 0.98 ± 0.00       | 0.0004 |
-# |           200 | 0.82 ± 0.01      | 0.98 ± 0.01       | 0.0004 |
-# |           600 | 0.67 ± 0.01      | 0.92 ± 0.00       | 0.0006 |
+# |            10 | 0.88 ± 0.03      | 0.94 ± 0.03       | 0.001  |
+# |            50 | 0.87 ± 0.02      | 0.98 ± 0.01       | 0.001  |
+# |           100 | 0.83 ± 0.03      | 0.97 ± 0.02       | 0.001  |
+# |           200 | 0.76 ± 0.01      | 0.98 ± 0.00       | 0.0006 |
+# |           600 | 0.63 ± 0.00      | 0.94 ± 0.00       | 0.001  |
 # |---------------------------------------------------------------|
 #
 anml_dendrites_segments_boosted_09998 = deepcopy(anml_dendrites_multi_segments_boosted)

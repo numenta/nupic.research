@@ -19,47 +19,45 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import abc
+
 import torch
 
+from nupic.research.frameworks.dendrites import ApplyDendritesBase
+from nupic.research.frameworks.dendrites.functional import (
+    dendrite_output,
+    dendritic_gate_1d,
+)
 from nupic.research.frameworks.pytorch.mask_utils import indices_to_mask
 
 __all__ = [
-    "DendriteSegementsBooster"
+    "BoostedDendritesBase",
+    "BoostedDendritesAbsMaxGate1d",
 ]
 
 
-class DendriteSegementsBooster(torch.nn.Module):
+class BoostedDendritesBase(ApplyDendritesBase, metaclass=abc.ABCMeta):
     """
-    This class boosts the dendritic activations yielded by a `DendriteSegments` class.
-    This is similar to the `KWinners`_ boosting functionality; however, the
-    implementation differs in that the boosting mechanism is kept separate from the
-    associated module. Thus, this class is a stand alone `torch.nn.Module` which tracks
-    the duty-cycles and boosts the activations of an associated `DedriteSegments` module
-    accordingly.
-
-    At the end of each batch, be sure to call `update_duty_cycles` with the indices of
-    the winning segments. At the end of each epoch, be sure to call
-    `update_boost_strength` to multiply the boost strength by the
-    `boost_strength_factor`.
+    This class applies boosted dendritic activations to an output. Similarly to
+    `KWinners`_, this class tracks the duty-cycles of the segments and boosts the
+    activations depending on how often the segments wins. Thus, less frequently winning
+    segments get promoted and more frequently winning segments get inhibited. This
+    effect is greater with a higher boost strength, and diminishes overtime as the boost
+    strength decays through calling `update_boost_strength`. Typically, the user makes
+    sure to call this at the end of every epoch,
 
     Example usage:
     ```
-    # Instantiate segments and booster separately.
+    # Instantiate segments and booster; done independently.
     dendrite_segments = DendriteSegments(num_units, num_segments, ...)
-    dendrite_booster = DendriteSegementsBooster(num_units, num_segments, ...)
+    apply_boosted = BoostedDendrites(num_units, num_segments, ...)
 
-    # Run forward pass.
+    # Run forward pass given input x and context.
     y = net(x)
     dendrite_activations = dendrite_segments(context)
 
-    # Boost activations.
-    boosted_activations = dendrite_booster.boost_activations(dendrite_activations)
-
-    # Modulate output with boosted activations.
-    y_new, winning_indices = apply_dendrites(boosted_activations)
-
-    # Update duty_cylces after each batch.
-    dendrite_segments.update_duty_cycles(winning_indices)
+    # Apply boosted activations; duty cycles are automatically updated in training mode.
+    y_new, winning_indices = apply_boosted(y, dendrite_activations)
 
     # Update boost_strength after each epoch.
     segments_booster.update_boost_strength()
@@ -152,3 +150,45 @@ class DendriteSegementsBooster(torch.nn.Module):
         This is typically done during training at the beginning of each epoch.
         """
         self.boost_strength.mul_(self.boost_strength_factor)
+
+    @abc.abstractmethod
+    def get_winning_indices(self, dendrite_activations):
+        """
+        Select and return the winning indices activations.
+
+        :return: indices of shape batch_size x num_units
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def apply_dendrites(self, y, dendrite_activations, indices):
+        """
+        Apply activations of the given indices to modulate the output y.
+
+        :return: tensor of modulated values; shape batch_size x num_units
+        """
+        raise NotImplementedError
+
+    def forward(self, y, dendrite_activations):
+        boosted = self.boost_activations(dendrite_activations)
+        indices = self.get_winning_indices(boosted)
+        y_new = self.apply_dendrites(y, dendrite_activations, indices)
+
+        if self.training:
+            self.update_duty_cycles(indices)
+
+        return dendrite_output(y_new, indices)
+
+
+class BoostedDendritesAbsMaxGate1d(BoostedDendritesBase):
+    """
+    Boosted dendrites in which segments are chosen by their absolute maximum values and
+    the activations are applies via gating (i.e. sigmoid and then element-wise
+    multiplied).
+    """
+
+    def get_winning_indices(self, dendrite_activations):
+        return dendrite_activations.abs().max(dim=2).indices
+
+    def apply_dendrites(self, y, dendrite_activations, indices):
+        return dendritic_gate_1d(y, dendrite_activations, indices=indices).values
