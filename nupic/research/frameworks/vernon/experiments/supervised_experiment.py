@@ -243,7 +243,7 @@ class SupervisedExperiment(ExperimentBase):
     @classmethod
     def create_optimizer(cls, config, model):
         """
-        Create optimize from an experiment config
+        Create optimizer from an experiment config.
 
         :param optimizer_class: Callable or class to instantiate optimizer. Must return
                                 object inherited from "torch.optim.Optimizer"
