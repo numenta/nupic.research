@@ -22,6 +22,9 @@
 
 import copy
 
+import torch
+from torch.nn.modules.batchnorm import _BatchNorm
+
 from nupic.research.frameworks.pytorch import datasets
 from nupic.research.frameworks.vernon import interfaces
 
@@ -36,7 +39,16 @@ class LegacyImagenetConfig(
     """
     Converts the SupervisedExperiment into the ImagenetExperiment that many
     experiments are configured to use.
+
+    The following arguments are added to the base experiment config.
+
+        - batch_norm_weight_decay: Whether or not to apply weight decay to
+                                   batch norm modules parameters
+                                   See https://arxiv.org/abs/1807.11205
+        - bias_weight_decay: Whether or not to apply weight decay to
+                                   bias parameters
     """
+
     @classmethod
     def load_dataset(cls, config, train=True):
         config = copy.copy(config)
@@ -54,6 +66,34 @@ class LegacyImagenetConfig(
             )
 
         return super().load_dataset(config, train)
+
+    @classmethod
+    def should_decay_parameter(cls, module, parameter_name, parameter, config):
+        if isinstance(module, _BatchNorm):
+            return config.get("batch_norm_weight_decay", True)
+        elif parameter_name == "bias":
+            return config.get("bias_weight_decay", True)
+        else:
+            return True
+
+    @classmethod
+    def create_optimizer(cls, config, model):
+        # Configure optimizer
+        group_decay, group_no_decay = [], []
+        for module in model.modules():
+            for name, param in module.named_parameters(recurse=False):
+                if cls.should_decay_parameter(module, name, param, config):
+                    group_decay.append(param)
+                else:
+                    group_no_decay.append(param)
+
+        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+        optimizer_args = config.get("optimizer_args", {})
+        optimizer = optimizer_class([dict(params=group_decay),
+                                     dict(params=group_no_decay,
+                                          weight_decay=0.)],
+                                    **optimizer_args)
+        return optimizer
 
     @classmethod
     def get_execution_order(cls):

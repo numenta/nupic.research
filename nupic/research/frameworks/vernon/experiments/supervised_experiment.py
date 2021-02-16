@@ -26,7 +26,6 @@ from pprint import pformat
 
 import torch
 from torch.backends import cudnn
-from torch.nn.modules.batchnorm import _BatchNorm
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 
@@ -103,11 +102,6 @@ class SupervisedExperiment(ExperimentBase):
                                Must inherit from "torch.optim.Optimizer"
             - optimizer_args: Optimizer class class arguments passed to the
                               constructor
-            - batch_norm_weight_decay: Whether or not to apply weight decay to
-                                       batch norm modules parameters
-                                       See https://arxiv.org/abs/1807.11205
-            - bias_weight_decay: Whether or not to apply weight decay to
-                                       bias parameters
             - lr_scheduler_class: Learning rate scheduler class.
                                  Must inherit from "_LRScheduler"
             - lr_scheduler_args: Learning rate scheduler class class arguments
@@ -159,21 +153,8 @@ class SupervisedExperiment(ExperimentBase):
 
         self.logger.debug(self.model)
 
-        # Configure optimizer
-        group_decay, group_no_decay = [], []
-        for module in self.model.modules():
-            for name, param in module.named_parameters(recurse=False):
-                if self.should_decay_parameter(module, name, param, config):
-                    group_decay.append(param)
-                else:
-                    group_no_decay.append(param)
-
-        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-        optimizer_args = config.get("optimizer_args", {})
-        self.optimizer = optimizer_class([dict(params=group_decay),
-                                          dict(params=group_no_decay,
-                                               weight_decay=0.)],
-                                         **optimizer_args)
+        # Configure and create optimizer
+        self.optimizer = self.create_optimizer(config, self.model)
 
         # Validate mixed precision requirements
         self.mixed_precision = config.get("mixed_precision", False)
@@ -235,7 +216,7 @@ class SupervisedExperiment(ExperimentBase):
     @classmethod
     def create_model(cls, config, device):
         """
-        Create imagenet model from an ImagenetExperiment config
+        Create `torch.nn.Module` model from an experiment config
         :param config:
             - model_class: Model class. Must inherit from "torch.nn.Module"
             - model_args: model model class arguments passed to the constructor
@@ -260,9 +241,22 @@ class SupervisedExperiment(ExperimentBase):
         )
 
     @classmethod
+    def create_optimizer(cls, config, model):
+        """
+        Create optimize from an experiment config
+
+        :param optimizer_class: Callable or class to instantiate optimizer. Must return
+                                object inherited from "torch.optim.Optimizer"
+        :param optimizer_args: Arguments to pass to the optimizer.
+        """
+        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+        optimizer_args = config.get("optimizer_args", {})
+        return optimizer_class(model.parameters(), **optimizer_args)
+
+    @classmethod
     def create_lr_scheduler(cls, config, optimizer, total_batches):
         """
-        Create lr scheduler from an ImagenetExperiment config
+        Create lr scheduler from the experiment config
         :param config:
             - lr_scheduler_class: (optional) Class of lr-scheduler
             - lr_scheduler_args: (optional) dict of args to pass to lr-class
@@ -345,14 +339,6 @@ class SupervisedExperiment(ExperimentBase):
     def transform_model(self):
         """Placeholder for any model transformation required prior to training"""
         pass
-
-    def should_decay_parameter(self, module, parameter_name, parameter, config):
-        if isinstance(module, _BatchNorm):
-            return config.get("batch_norm_weight_decay", True)
-        elif parameter_name == "bias":
-            return config.get("bias_weight_decay", True)
-        else:
-            return True
 
     def run_pre_experiment(self):
         """Run validation before training."""
@@ -632,6 +618,8 @@ class SupervisedExperiment(ExperimentBase):
 
             # New methods
             create_model=[exp + ".create_model"],
+            create_lr_scheduler=[exp + ".create_lr_scheduler"],
+            create_optimizer=[exp + ".create_optimizer"],
             transform_model=[exp + ".transform_model"],
             validate=[exp + ".validate"],
             create_loaders=[exp + ".create_loaders"],
@@ -649,7 +637,6 @@ class SupervisedExperiment(ExperimentBase):
             transform_data_to_device=[exp + ".transform_data_to_device"],
             error_loss=[exp + ".error_loss"],
             complexity_loss=[],
-            should_decay_parameter=[exp + ".should_decay_parameter"],
             load_dataset=[exp + ".load_dataset"],
         )
 
