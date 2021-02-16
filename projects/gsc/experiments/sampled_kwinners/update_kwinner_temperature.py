@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,19 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .base import CONFIGS as BASE
-from .bert_replication import CONFIGS as BERT_REPLICATION
-from .sparse_bert import CONFIGS as SPARSE_BERT
-from .finetuning import CONFIGS as FINETUNING
+from .sampled_kwinners import update_temperature
 
-"""
-Import and collect all experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(BASE)
-CONFIGS.update(BERT_REPLICATION)
-CONFIGS.update(SPARSE_BERT)
-CONFIGS.update(FINETUNING)
+class UpdateKWinnerTemperature:
+    """
+    Update the KWinners boost strength before every epoch.
+    """
+    def pre_epoch(self):
+        super().pre_epoch()
+        self.model.apply(update_temperature)
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["pre_epoch"].append("UpdateKWinnerTemperature")
+        return eo
