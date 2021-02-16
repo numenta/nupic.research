@@ -22,7 +22,6 @@
 
 import copy
 
-import torch
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from nupic.research.frameworks.pytorch import datasets
@@ -68,35 +67,45 @@ class LegacyImagenetConfig(
         return super().load_dataset(config, train)
 
     @classmethod
-    def should_decay_parameter(cls, module, parameter_name, parameter, config):
-        if isinstance(module, _BatchNorm):
-            return config.get("batch_norm_weight_decay", True)
-        elif parameter_name == "bias":
-            return config.get("bias_weight_decay", True)
-        else:
-            return True
-
-    @classmethod
     def create_optimizer(cls, config, model):
-        # Configure optimizer
-        group_decay, group_no_decay = [], []
-        for module in model.modules():
-            for name, param in module.named_parameters(recurse=False):
-                if cls.should_decay_parameter(module, name, param, config):
-                    group_decay.append(param)
-                else:
-                    group_no_decay.append(param)
+        """
+        Modify config to work with `ConfigureOptimizerParamGroups` mixin.
+        """
+        no_decay_params = dict()
 
-        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-        optimizer_args = config.get("optimizer_args", {})
-        optimizer = optimizer_class([dict(params=group_decay),
-                                     dict(params=group_no_decay,
-                                          weight_decay=0.)],
-                                    **optimizer_args)
-        return optimizer
+        # Turn off weight decay for batch_norm modules.
+        if not config.get("batch_norm_weight_decay", True):
+            no_decay_params.update(
+                include_modules=[_BatchNorm]
+            )
+
+        # Turn off weight decay for bias parameters.
+        if not config.get("bias_weight_decay", True):
+            no_decay_params.update(
+                include_patterns=[".*bias"]
+            )
+
+        # Add `optim_args_groups` to configure no weight decay on batchnorm and bias
+        # parameters.
+        if no_decay_params:
+            config.update(
+                optim_args_groups=[
+                    dict(
+                        group_args=dict(
+                            weight_decay=0,
+                        ),
+                        **no_decay_params
+                    )
+                ]
+            )
+
+        return super().create_optimizer(config, model)
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["load_dataset"].insert(0, "ImagenetExperiment: Set default dataset")
+        name = "ImagenetExperiment: "
+        eo["load_dataset"].insert(0, name + "Set default dataset")
+        eo["create_optimizer"].insert(0, name + "Modify config to work with "
+                                                "ConfigureOptimizerParamGroups mixin.")
         return eo

@@ -128,3 +128,4 @@ class ConfigureOptimizerParamGroups:
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["create_optimizer"].append("Configure optimizer param groups.")
+        return eo
