@@ -20,21 +20,19 @@
 # ----------------------------------------------------------------------
 
 import os
-import sys
 import unittest
-from os.path import expanduser
 
 import numpy as np
 import torch
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
-from nupic.research.frameworks.dendrites import DendriticAbsoluteMaxGate1d
+from nupic.research.frameworks.dendrites import (
+    DendriticAbsoluteMaxGate1d,
+    plot_winning_segment_distributions,
+)
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
 from nupic.torch.modules import KWinners, SparseWeights
-
-sys.path.insert(0, expanduser("~/nta/nupic.research/projects/meta_cl"))
-from plot_metrics import plot_winning_segment_distributions  # noqa
 
 
 class TrackedSegmentsMetaCLExperiment(mixins.PlotDendriteMetrics,

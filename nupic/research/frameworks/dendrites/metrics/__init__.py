@@ -34,4 +34,5 @@ from .plotting import (
     plot_mean_selected_activations,
     plot_overlap_scores_distribution,
     plot_percent_active_dendrites,
+    plot_winning_segment_distributions,
 )
