@@ -88,9 +88,9 @@ class PlotDendriteMetrics(metaclass=abc.ABCMeta):
                              arguments and returns a dictionary; for instance this may
                              be used to return a random sample of integers specifying
                              units to plot; called only once at setup
-                - max_samples_to_track: (optional) how many of samples to use for
-                                        plotting; only the newest will be used;
-                                        defaults to 1000
+                - max_samples_to_plot: (optional) how many of samples to use for
+                                       plotting; only the newest will be used;
+                                       defaults to 1000
 
     Example config:
     ```
