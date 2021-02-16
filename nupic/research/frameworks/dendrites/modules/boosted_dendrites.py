@@ -34,7 +34,21 @@ from .apply_dendrites import ApplyDendritesBase
 __all__ = [
     "BoostedDendritesBase",
     "BoostedDendritesAbsMaxGate1d",
+    "update_dendrite_boost_stregth",
 ]
+
+
+def update_dendrite_boost_stregth(m):
+    """Function used to update BoostedDendritesBase modules boost strength. This is
+    typically done during training at the beginning of each epoch.
+
+    Call using :meth:`torch.nn.Module.apply` after each epoch if required
+    For example: ``m.apply(update_boost_strength)``
+
+    :param m: BoostedDendritesBase module
+    """
+    if isinstance(m, BoostedDendritesBase):
+        m.update_boost_strength()
 
 
 class BoostedDendritesBase(ApplyDendritesBase, metaclass=abc.ABCMeta):
