@@ -82,7 +82,7 @@ class BoostedDendritesBase(ApplyDendritesBase, metaclass=abc.ABCMeta):
                       each unit has it's own set of dendrite segments
     :param num_segments: number of dendrite segments per unit
     :param boost_strength: initial boost strength; segments that rarely win will be
-                           promoted, and the high the boost strength, the greater this
+                           promoted, and the higher the boost strength, the greater this
                            effect
     :param boost_strength_factor: the boost_strength decay factor; the user calls
                                   `update_boost_strength` to multiply this factor by the
