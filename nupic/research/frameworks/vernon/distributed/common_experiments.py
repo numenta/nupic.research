@@ -23,6 +23,7 @@ from nupic.research.frameworks.vernon.distributed import experiments, mixins
 
 
 class ImagenetExperiment(mixins.LegacyImagenetConfig,
+                         mixins.ConfigureOptimizerParamGroups,
                          experiments.SupervisedExperiment):
     pass
 
