@@ -21,6 +21,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import torch
 
 from .metrics import (
@@ -31,6 +32,7 @@ from .metrics import (
     entropy,
     mean_selected_activations,
     percent_active_dendrites,
+    winning_segment_indices,
 )
 
 
@@ -399,3 +401,69 @@ def plot_entropy_distribution(winning_mask, targets):
 
     figure = plt.gcf()
     return figure
+
+
+def plot_winning_segment_distributions(
+    winning_mask,
+    num_units_to_plot=1,
+    seed=0
+):
+    """
+    Plot the distribution of winning segments for the list of units (defaults to just
+    the first):
+
+    :param winning_mask: the winning mask of segments;
+                         shape num_samples x num_units x num_segments
+    :param num_units_to_plot: the number of units to plot
+    :param seed: set the random seed for reproducibility.
+    """
+
+    # Randomly sample 'num_units_to_plot'.
+    assert num_units_to_plot > 0
+    num_units = winning_mask.shape[1]
+    units = torch.randperm(num_units, generator=get_random_generator(seed))
+    units = units[:num_units_to_plot].tolist()
+
+    # Deduce winnings indices.
+    winning_indices = winning_segment_indices(winning_mask, units)
+
+    # Generate subplots.
+    fig, axs = plt.subplots(1, num_units_to_plot, figsize=(6 * num_units_to_plot, 4))
+    if num_units_to_plot == 1:
+        axs = [axs]  # ensure this is subscriptable
+
+    # Generate a plot for each unit.
+    num_segments = winning_mask.shape[2]
+    for i, unit in enumerate(units):
+        indices = winning_indices[:, i].cpu().numpy()
+        plot_winning_segment_distribution(indices, num_segments, unit=unit, ax=axs[i])
+
+    fig.tight_layout()
+    return fig
+
+
+# ----------------
+# Helper functions
+# ----------------
+
+def get_random_generator(seed):
+    g = torch.Generator()
+    g.manual_seed(seed)
+    return g
+
+
+def plot_winning_segment_distribution(winning_indices, num_segments, unit=0, ax=None):
+    binrange = (0, num_segments)
+    if ax is None:
+        _, ax = plt.subplots()
+    sns.histplot(
+        winning_indices,
+        kde=True,
+        stat="probability",
+        binwidth=1,
+        binrange=binrange,
+        ax=ax,
+    )
+    ax.set_xlabel("Segment")
+    ax.set_title(f"Probability of Activation of Unit {unit}")
+    return ax

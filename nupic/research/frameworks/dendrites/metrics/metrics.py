@@ -238,6 +238,21 @@ def dendrite_duty_cycle(winning_mask):
         return winning_mask.sum(dim=0, dtype=torch.float) / num_examples
 
 
+def winning_segment_indices(winning_mask, units=None):
+    """
+    Returns the indices of the winning segments for the given units.
+
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :param units: (optional) a list of units; winning indices will only be returned
+                  for these units; default to all units.
+    """
+    units = units or ...  # the ellipses is equivalent to all units
+    winning_indices = winning_mask.max(dim=2).indices  # shape batch_size x num_units
+    return winning_indices[:, units]
+
+
 def entropy(x):
     """
     Returns a tuple of scalars (entropy value, maximum possible entropy value) which

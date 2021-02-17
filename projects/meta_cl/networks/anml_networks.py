@@ -23,6 +23,11 @@ import torch.nn as nn
 
 from nupic.research.frameworks.pytorch.model_utils import filter_params
 
+__all__ = [
+    "ANMLNetwork",
+    "ANMLsOMLNetwork",
+]
+
 
 class ANMLNetwork(nn.Module):
     """

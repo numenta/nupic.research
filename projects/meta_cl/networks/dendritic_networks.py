@@ -28,6 +28,12 @@ from nupic.research.frameworks.dendrites import (
 )
 from nupic.research.frameworks.pytorch.model_utils import filter_params
 
+__all__ = [
+    "MimicANMLDendriticNetwork",
+    "ReplicateANMLDendriticNetwork",
+    "DendriticNetwork",
+]
+
 
 class DendriticNetwork(nn.Module):
     """
@@ -113,7 +119,7 @@ class DendriticNetwork(nn.Module):
         return out
 
 
-class ANMLDendriticNetwork(nn.Module):
+class MimicANMLDendriticNetwork(nn.Module):
     """
     Prototype of a dendritic network, based closely on `ANML`_. (The conv + max-pool
     layers are identical).
@@ -210,13 +216,13 @@ class ANMLDendriticNetwork(nn.Module):
         return out
 
 
-class CloserToANMLDendriticNetwork(nn.Module):
+class ReplicateANMLDendriticNetwork(nn.Module):
     """
     An iteration of a dendritic network, based closely on `ANML`_. (The conv + max-pool
-    layers are identical). It's similar to ANMLDendriticNetwork, but does not include a
-    linear layer atop the modulation network. This makes it more similar to ANML's
-    original network. In fact, with `num_segments=1, dendrite_sparsity=0`, they should
-    be identical.
+    layers are identical). It's similar to MimicANMLDendriticNetwork, but does not
+    include a linear layer atop the modulation network. This makes it more similar to
+    ANML's original network. In fact, with `num_segments=1, dendrite_sparsity=0`, they
+    should be identical.
 
     .. _ANML: nupic.research/projects/meta_cl/networks/anml_networks.py
 
@@ -225,16 +231,13 @@ class CloserToANMLDendriticNetwork(nn.Module):
 
     With default parameters and `num_classes-963`, it uses 5,132,832 weights-on
     out of a total of 13,960,323 weights. In comparison, ANML uses 5,963,139 weights
-    and OML uses 5,172,675 weights. Thus, these is still room to add more.
-
-    The default parameters are chosen so that the number of on weights for this network
-    is close to that of ANMLDendriticNetwork.
+    and OML uses 5,172,675 weights.
     """
 
     def __init__(self, num_classes,
                  num_segments=10,
                  dendrite_sparsity=0.856,
-                 dendrite_bias=None):
+                 dendrite_bias=True):
 
         super().__init__()
 
