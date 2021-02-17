@@ -32,6 +32,8 @@ github.com/huggingface/transformers/blob/master/examples/text-classification/run
 import logging
 import os
 import sys
+import pickle
+from copy import deepcopy
 
 import transformers
 from transformers import (
@@ -147,10 +149,44 @@ def main():
 
     if model_args.finetuning:
         logger.info(f"Finetuning model for downstream tasks.")
-        run_finetuning(
-            model_args, data_args, training_args,
-            trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
-        )
+        # Can run multiple tasks
+
+        results = {}
+        base_training_args = deepcopy(training_args)
+        for task_name in data_args.task_names:
+            data_args.task_name = task_name
+            training_args = deepcopy(base_training_args)
+            # For each task, save to a subfolder within run's root folder
+            training_args.run_name = f"{base_training_args.run_name}_{task_name}"
+            training_args.output_dir = os.path.join(
+                base_training_args.output_dir, task_name
+            )
+            # Update any custom training hyperparameter
+            if task_name in model_args.task_hyperparams:
+                for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
+                    setattr(training_args, hp_key, hp_val)
+            # Run finetuning and save results
+            eval_results = run_finetuning(
+                model_args, data_args, training_args,
+                trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
+            )
+            results[task_name] = eval_results
+
+        # Pickle and save results
+        if is_main_process(base_training_args.local_rank):
+            # Save specific hyperparameters along with results
+            # TODO: when doing hyperparam search, get best option only
+            for task_name in results.keys():
+                if task_name in model_args.task_hyperparams:
+                    results[task_name]["task_hyperparams"] = \
+                        model_args.task_hyperparams[task_name]
+
+            results_path = os.path.join(
+                base_training_args.output_dir, "task_results.p"
+            )
+            logger.info(f"Saving task_results to {results_path}")
+            with open(results_path, "wb") as file:
+                pickle.dump(results, file)
     else:
         logger.info(f"Pre-training a masked language model.")
         run_pretraining(
@@ -266,10 +302,12 @@ def run_finetuning(model_args, data_args, training_args,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
     train(trainer, training_args, model_args, last_checkpoint)
-    evaluate_tasks(
+    eval_results = evaluate_tasks(
         trainer, training_args, data_args, datasets,
         eval_dataset, test_dataset, is_regression, label_list
     )
+
+    return eval_results
 
 
 def _mp_fn(index):

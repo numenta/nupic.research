@@ -60,9 +60,19 @@ __all__ = [
     "train",
 ]
 
+"""
+GLUE:
+- SentencePair: (entailment, question answering)
+    - 2 classes: QQP (question pairing), QNLI (adapted q&A), MRPC (paraphrase),
+      RTE (adapted entailment from 3 to 2), WNLI (adapted multiple choice)
+    - 3 classes: MNLI (entailment, neutral or contradiction)
+    - 1 variable regresssion: STS-B  (similarity, from 0 to 5)
+- Single Sentence, 2 classes: SST-2 (sentiment), COLA (grammatically correct)
+"""
+
 TASK_TO_KEYS = {
     "cola": ("sentence", None),
-    "mnli": ("premise", "hypothesis"),
+    "mnli": ("premise", "hypothesis"),  # includes matched and mismatched
     "mrpc": ("sentence1", "sentence2"),
     "qnli": ("question", "sentence"),
     "qqp": ("question1", "question2"),
@@ -566,6 +576,7 @@ def init_datasets_task(data_args, training_args):
 
 
 def get_labels(datasets, data_args):
+    label_list = None
     if data_args.task_name is not None:
         is_regression = data_args.task_name == "stsb"
         if not is_regression:
