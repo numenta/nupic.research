@@ -404,9 +404,7 @@ def plot_entropy_distribution(winning_mask, targets):
 
 
 def plot_winning_segment_distributions(
-    dendrite_activations_,
     winning_mask,
-    targets_,
     num_units_to_plot=1,
     seed=0
 ):
