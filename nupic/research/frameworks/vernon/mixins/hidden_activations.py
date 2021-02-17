@@ -135,11 +135,11 @@ class PlotHiddenActivations(metaclass=abc.ABCMeta):
         # Create visualization, and update results dict.
         if iteration % self.ha_plot_freq == 0:
 
-            for name, _, hidden_activations in self.ha_hook.get_statistics():
+            for name, _, ha in self.ha_hook.get_statistics():
 
-                visual = plot_hidden_activations_by_unit(hidden_activations,
-                                                         self.ha_targets)
+                visual = plot_hidden_activations_by_unit(ha, self.ha_targets)
                 results.update({f"hidden_activations/{name}": visual})
+                results.update({f"_activations/{name}": ha.detach().cpu().numpy()})
 
         return results
 

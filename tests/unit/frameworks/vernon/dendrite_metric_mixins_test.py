@@ -123,12 +123,12 @@ simple_metacl_config.update(
 )
 
 
-class TrackRepresentationSparsityTest(unittest.TestCase):
+class PlotDendriteMetricsTest(unittest.TestCase):
     """
-    This is a test class for the `TrackDendriteMetricsInterface` based mixins.
+    This is a test class for the `PlotDendriteMetrics` mixin.
     """
 
-    def test_sparsity_tracking_supervised_experiment(self):
+    def test_dendrite_metrics_tracking_supervised_experiment(self):
         """
         Test whether TrackMeanSelectedActivations works in the supervised setting.
         """
@@ -170,7 +170,7 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
                 # These should cap off at `num_samples_to_track=400`
                 self.assertTrue(batch_size1 == batch_size2 == batch_size3 == 400)
 
-    def test_sparsity_tracking_metacl_experiment(self):
+    def test_dendrite_metrics_tracking_metacl_experiment(self):
         """
         Test whether TrackMeanSelectedActivations works in the metacl setting.
         """
