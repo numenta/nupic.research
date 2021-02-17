@@ -31,6 +31,7 @@ from .metrics import (
     entropy,
     mean_selected_activations,
     percent_active_dendrites,
+    winning_segment_indices,
 )
 
 
@@ -351,10 +352,8 @@ def plot_winning_segment_distributions(
     Plot the distribution of winning segments for the list of units (defaults to just
     the first):
 
-    :param dendrite_activations_: unused
     :param winning_mask: the winning mask of segments;
                          shape num_samples x num_units x num_segments
-    :param targets_: unused
     :param num_units_to_plot: the number of units to plot
     :param seed: set the random seed for reproducibility.
     """

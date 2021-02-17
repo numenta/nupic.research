@@ -25,9 +25,9 @@ import torch
 
 from experiment_classes import BoostedDendritesExperiment
 from networks import BoostedANMLDendriticNetwork, ReplicateANMLDendriticNetwork
+from nupic.research.frameworks.dendrites import plot_winning_segment_distributions
 from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.wandb import ray_wandb
-from plot_metrics import plot_winning_segment_distributions
 
 from .dendrites import metacl_anml_dendrites_adjust_lr
 
@@ -55,9 +55,15 @@ def get_plot_args():
 
 
 # Wrap function to make output plot wandb compatible.
-plot_winning_segment_distributions_wandb = ray_wandb.prep_plot_for_wandb(
-    plot_winning_segment_distributions
-)
+@ray_wandb.prep_plot_for_wandb
+def plot_winning_segment_distributions_wandb(
+    dendrite_activations_,
+    winning_mask,
+    targets_,
+    **kwargs
+):
+    # Adjust signature to work with `PlotDendriteMetrics` mixin.
+    return plot_winning_segment_distributions(winning_mask, **kwargs)
 
 
 # |--------------------------------------------------------------|

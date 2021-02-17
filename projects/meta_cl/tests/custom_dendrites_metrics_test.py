@@ -77,6 +77,16 @@ def get_plot_args():
     )
 
 
+def plot_winning_segment_distributions_(
+    dendrite_activations_,
+    winning_mask,
+    targets_,
+    **kwargs
+):
+    """Adjust signature to work with `PlotDendriteMetrics` mixin."""
+    return plot_winning_segment_distributions(winning_mask, **kwargs)
+
+
 simple_metacl_config = dict(
 
     experiment_class=TrackedSegmentsMetaCLExperiment,
