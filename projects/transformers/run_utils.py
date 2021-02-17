@@ -88,6 +88,9 @@ def train(trainer, training_args, model_args, last_checkpoint=None):
         *count_nonzero_params(trainer.model)
     ))
 
+    # Training
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
