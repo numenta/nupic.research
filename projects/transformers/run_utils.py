@@ -26,6 +26,12 @@ import math
 import os
 from hashlib import blake2b
 
+from functools import partial
+from collections import Counter
+
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics import f1_score, matthews_corrcoef
+
 import numpy as np
 from datasets import concatenate_datasets, load_dataset, load_from_disk, load_metric
 from datasets.dataset_dict import DatasetDict
@@ -704,72 +710,79 @@ def init_trainer(model, tokenizer, data_collator, training_args,
         callbacks=trainer_callbacks,
     )
 
+    # Add specific metrics for finetuning task
     if finetuning:
-        # Get the metric function and add compute_metrics to trainer_kwargs
-        # If there is no task name, metric is not required
-        if task_name is not None:
-            logging.info(f"Setting up custom metric for task {task_name}")
-            metric = load_metric("glue", task_name)
-
-            # Compute metrics includes extra if clause that uses metrics
-            def compute_metrics(eval_prediction: EvalPrediction):
-                """
-                You can define your custom compute_metrics function. It takes an
-                `EvalPrediction` object (a namedtuple with a predictions and label_ids
-                field) and has to return a dictionary string to float.
-
-                Requires is_regression, data_args and metric in outer scope
-                TODO: remove dependency on outer scope variables
-                """
-                preds = (eval_prediction.predictions[0]
-                         if isinstance(eval_prediction.predictions, tuple)
-                         else eval_prediction.predictions)
-                preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
-                if task_name is not None:
-                    result = metric.compute(
-                        predictions=preds, references=eval_prediction.label_ids
-                    )
-                    if len(result) > 1:
-                        result["combined_score"] = np.mean(list(result.values())).item()
-                    return result
-                elif is_regression:
-                    return {
-                        "mse": ((preds - eval_prediction.label_ids) ** 2).mean().item()
-                    }
-                else:
-                    return {
-                        "accuracy": (preds == eval_prediction.label_ids).
-                        astype(np.float32).mean().item()
-                    }
-        else:
-            # Compute metrics doesn't include extra if clause if task name is not given
-            def compute_metrics(eval_prediction: EvalPrediction):
-                """
-                You can define your custom compute_metrics function. It takes an
-                `EvalPrediction` object (a namedtuple with a predictions and label_ids
-                field) and has to return a dictionary string to float.
-
-                Requires is_regression in outer scope
-                TODO: remove dependency on outer scope variables
-                """
-                preds = (eval_prediction.predictions[0]
-                         if isinstance(eval_prediction.predictions, tuple)
-                         else eval_prediction.predictions)
-                preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
-                if is_regression:
-                    return {
-                        "mse": ((preds - eval_prediction.label_ids) ** 2).mean().item()
-                    }
-                else:
-                    return {
-                        "accuracy": (preds == eval_prediction.label_ids).
-                        astype(np.float32).mean().item()
-                    }
-
-        trainer_kwargs.update(
-            compute_metrics=compute_metrics,
+        compute_metrics = partial(
+            compute_metrics_task, task_name=task_name, is_regression=is_regression,
         )
+        trainer_kwargs.update(compute_metrics=compute_metrics)
 
     trainer = Trainer(**trainer_kwargs)
 
     return trainer
+
+def compute_metrics_task(ep: EvalPrediction, metric=None,
+                         task_name=None, is_regression=None):
+    """
+    You can define your custom compute_metrics function. It takes an
+    `EvalPrediction` object (a namedtuple with a predictions and label_ids
+    field) and has to return a dictionary string to float.
+    """
+    preds = (ep.predictions[0] if isinstance(ep.predictions, tuple) else ep.predictions)
+    preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
+
+    logging.info(f"Label distribution for {task_name} before cleaning")
+    logging.info(f"Predictions: {Counter(preds).most_common()}")
+    logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
+
+    # Ignore the -100 labels - not able to tokenize?
+    # TODO: investigate why a few labels are -100 in all tasks
+    label_ids = ep.label_ids[np.where(ep.label_ids != -100)]
+    preds = preds[np.where(ep.label_ids != -100)]
+    logging.info(f"Removing {1-(len(label_ids) / len(ep.label_ids)):.2%} samples "
+                 "from evaluation set where label == -100")
+
+    logging.info(f"Label distribution for {task_name} after cleaning")
+    logging.info(f"Predictions: {Counter(preds).most_common()}")
+    logging.info(f"Labels: {Counter(label_ids).most_common()}")
+
+    if task_name is not None:
+        if task_name == "cola":
+            result = {"matthews_correlation": matthews_corrcoef(label_ids, preds)}
+        elif task_name == "stsb":
+            result = pearson_and_spearman(preds, label_ids)
+        elif task_name in ["mrpc", "qqp"]:
+            result = acc_and_f1(preds, label_ids)
+        elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
+                           "qnli", "rte", "wnli", "hans"]:
+            result = {"accuracy": simple_accuracy(preds, label_ids)}
+        # Consolidate if more than one metric
+        if len(result) > 1:
+            result["combined_score"] = np.mean(list(result.values())).item()
+        return result
+    elif is_regression:
+        return {"mse": ((preds - label_ids) ** 2).mean().item()}
+    else:
+        return {"accuracy": (preds == label_ids).astype(np.float32).mean().item()}
+
+
+def simple_accuracy(preds, labels):
+    return (preds == labels).mean()
+
+
+def acc_and_f1(preds, labels):
+    acc = simple_accuracy(preds, labels)
+    f1 = f1_score(y_true=labels, y_pred=preds, average="micro")
+    return {
+        "accuracy": acc,
+        "f1": f1,
+    }
+
+
+def pearson_and_spearman(preds, labels):
+    pearson_corr = pearsonr(preds, labels)[0]
+    spearman_corr = spearmanr(preds, labels)[0]
+    return {
+        "pearson": pearson_corr,
+        "spearmanr": spearman_corr,
+    }
