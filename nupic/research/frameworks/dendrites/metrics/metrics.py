@@ -160,8 +160,11 @@ def dendrite_activations_by_unit(dendrite_activations, winning_mask, targets):
 def hidden_activations_by_unit(activations, targets):
     """
     Returns a 2D torch tensor with shape (num_categories, num_units) where cell c, i
-    gives the mean value (post-sigmoid) of the selected dendrite activation for unit i
-    over all given examples from category c.
+    gives the mean value of hidden activations for unit i over all given examples from
+    category c.
+
+    NOTE: This function is not specific to dendrites, and can be used with modules that
+    both include and don't include dendrite segments.
 
     :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
                         b, i gives the activation of unit i for example b
