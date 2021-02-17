@@ -30,6 +30,7 @@ from collections import namedtuple
 import torch
 
 __all__ = [
+    "dendrite_output",
     "dendritic_bias_1d",
     "dendritic_gate_1d",
     "dendritic_absolute_max_gate_1d",
@@ -64,7 +65,7 @@ def dendritic_bias_1d(y, dendrite_activations):
     return dendrite_output(y + winning_activations, indices)
 
 
-def dendritic_gate_1d(y, dendrite_activations):
+def dendritic_gate_1d(y, dendrite_activations, indices=None):
     """
     Returns the product of the feedforward output and sigmoid of the the max
     of the dendrite activations along each segment.
@@ -73,9 +74,16 @@ def dendritic_gate_1d(y, dendrite_activations):
     :param dendrite_activations: torch Tensor with shape (b, n, s) where the
                                  axes represent the batch size, number of units, and
                                  number of segments, respectively.
+    :param indices: (optional) indices of winning segments;
+                    shape of batch_size x num_units
     """
+    # Select winner by max activations, or use given indices as winners.
+    if indices is None:
+        winning_activations, indices = dendrite_activations.max(dim=2)
+    else:
+        winning_activations = gather_activations(dendrite_activations, indices)
+
     # Multiple by the sigmoid of the max along each segment.
-    winning_activations, indices = dendrite_activations.max(dim=2)
     return dendrite_output(y * torch.sigmoid(winning_activations), indices)
 
 
@@ -90,14 +98,10 @@ def dendritic_absolute_max_gate_1d(y, dendrite_activations):
                                  number of segments, respectively.
     """
     indices = dendrite_activations.abs().max(dim=2).indices
-    unsqueezed = indices.unsqueeze(dim=2)
-    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
-    dendrite_activations = dendrite_activations.squeeze()
-    dendrite_activations = torch.sigmoid(dendrite_activations)
-    return dendrite_output(y * dendrite_activations, indices)
+    return dendritic_gate_1d(y, dendrite_activations, indices=indices)
 
 
-def dendritic_gate_2d(y, dendrite_activations):
+def dendritic_gate_2d(y, dendrite_activations, indices=None):
     """
     Returns the output of the max gating convolutional dendritic layer by
     multiplying all values in each output channel by the selected dendrite
@@ -113,9 +117,13 @@ def dendritic_gate_2d(y, dendrite_activations):
                                  with shape (b, c, d) where the axes represent the
                                  batch size, number of channels, and number of segments
                                  respectively)
+    :param indices: (optional) indices of winning segments;
+                    shape of batch_size x num_units
     """
-    winning_activations, indices = dendrite_activations.max(dim=2)
-    winning_activations = torch.sigmoid(winning_activations)
+    if indices is None:
+        winning_activations, indices = dendrite_activations.max(dim=2)
+    else:
+        winning_activations = gather_activations(dendrite_activations, indices)
 
     # The following operation uses `torch.einsum` to multiply each channel by a
     # single scalar value
@@ -123,7 +131,8 @@ def dendritic_gate_2d(y, dendrite_activations):
     #    * i => the channel dimension
     #    * jk => the width and height dimensions
 
-    y_gated = torch.einsum("bijk,bi->bijk", y, winning_activations)
+    sigmoid_activations = torch.sigmoid(winning_activations)
+    y_gated = torch.einsum("bijk,bi->bijk", y, sigmoid_activations)
     return dendrite_output(y_gated, indices)
 
 
@@ -145,16 +154,19 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
                                  respectively)
     """
     indices = dendrite_activations.abs().max(dim=2).indices
+    return dendritic_gate_2d(y, dendrite_activations, indices=indices)
+
+
+def gather_activations(dendrite_activations, indices):
+    """
+    Gathers dendritic activations from the given indices.
+
+    :param indices: tensor of indices of winning segments;
+                    shape of batch_size x num_units
+    :param indices: tensor of dendritic activations;
+                    shape of batch_size x num_units x num_segments
+    """
     unsqueezed = indices.unsqueeze(dim=2)
     dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
     dendrite_activations = dendrite_activations.squeeze(dim=2)
-    dendrite_activations = torch.sigmoid(dendrite_activations)
-
-    # The following operation uses `torch.einsum` to multiply each channel by a
-    # single scalar value
-    #    * b => the batch dimension
-    #    * i => the channel dimension
-    #    * jk => the width and height dimensions
-
-    y_gated = torch.einsum("bijk,bi->bijk", y, dendrite_activations)
-    return dendrite_output(y_gated, indices)
+    return dendrite_activations

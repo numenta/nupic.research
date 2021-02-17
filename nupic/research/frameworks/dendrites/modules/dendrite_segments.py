@@ -45,7 +45,7 @@ class DendriteSegments(torch.nn.Module, HasRezeroWeights):
     def __init__(self, num_units, num_segments, dim_context, sparsity, bias=None):
         """
         :param num_units: number of units i.e. neurons;
-                        each unit will have it's own set of dendrite segments
+                          each unit will have it's own set of dendrite segments
         :param dim_context: length of the context vector;
                             the same context will be applied to each segment
         :param num_segments: number of dendrite segments per unit
