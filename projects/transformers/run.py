@@ -63,7 +63,6 @@ from run_utils import (
     train,
 )
 
-logger = logging.getLogger(__name__)
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
@@ -105,14 +104,14 @@ def main():
     if (os.path.isdir(training_args.output_dir) and training_args.do_train
        and not training_args.overwrite_output_dir):
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        logger.warning(f"Loading from checkpoint: {last_checkpoint} ")
+        logging.warning(f"Loading from checkpoint: {last_checkpoint} ")
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and "
                 "is not empty. Use --overwrite_output_dir to overcome."
             )
         elif last_checkpoint is not None:
-            logger.info(
+            logging.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To "
                 "avoid this behavior, change the `--output_dir` or add "
                 "`--overwrite_output_dir` to train from scratch."
@@ -123,32 +122,32 @@ def main():
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
+        level=(logging.INFO if is_main_process(training_args.local_rank)
+               else logging.WARN)
     )
-    logger.setLevel(logging.INFO if is_main_process(training_args.local_rank)
-                    else logging.WARN)
 
     # Log on each process the small summary:
-    logger.warning(
+    logging.warning(
         f"Process rank: {training_args.local_rank}, "
         f"device: {training_args.device}, n_gpu: {training_args.n_gpu} "
         f"distributed training: {bool(training_args.local_rank != -1)}, "
         f"16-bits training: {training_args.fp16}"
     )
-    # Set the verbosity to info of the Transformers logger (on main process only):
+    # Set the verbosity to info of the Transformers logging (on main process only):
     if is_main_process(training_args.local_rank):
         transformers.utils.logging.set_verbosity_info()
         transformers.utils.logging.enable_default_handler()
         transformers.utils.logging.enable_explicit_format()
-    logger.info("Training/evaluation parameters %s", training_args)
-    logger.info("Model parameters: %s", model_args)
-    logger.info("Data parameters: %s", data_args)
+    logging.info("Training/evaluation parameters %s", training_args)
+    logging.info("Model parameters: %s", model_args)
+    logging.info("Data parameters: %s", data_args)
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
-    logger.info(f"Seed to reproduce: {training_args.seed}")
+    logging.info(f"Seed to reproduce: {training_args.seed}")
 
     if model_args.finetuning:
-        logger.info(f"Finetuning model for downstream tasks.")
+        logging.info(f"Finetuning model for downstream tasks.")
         # Can run multiple tasks
 
         results = {}
@@ -184,11 +183,11 @@ def main():
             results_path = os.path.join(
                 base_training_args.output_dir, "task_results.p"
             )
-            logger.info(f"Saving task_results to {results_path}")
+            logging.info(f"Saving task_results to {results_path}")
             with open(results_path, "wb") as file:
                 pickle.dump(results, file)
     else:
-        logger.info(f"Pre-training a masked language model.")
+        logging.info(f"Pre-training a masked language model.")
         run_pretraining(
             model_args, data_args, training_args,
             trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
@@ -212,7 +211,7 @@ def run_pretraining(model_args, data_args, training_args,
             column_names = datasets["validation"].column_names
         text_column_name = "text" if "text" in column_names else column_names[0]
 
-        logger.info(f"Tokenizing datasets for pretraining ...")
+        logging.info(f"Tokenizing datasets for pretraining ...")
         tokenized_datasets = preprocess_datasets_mlm(
             datasets, tokenizer, data_args,
             column_names, text_column_name
@@ -221,7 +220,7 @@ def run_pretraining(model_args, data_args, training_args,
         # Save only if a dataset_path has been defined in the previous steps
         # that will be True only when loading from dataset hub
         if data_args.save_tokenized_data and dataset_path is not None:
-            logger.info(f"Saving tokenized dataset to {dataset_path}")
+            logging.info(f"Saving tokenized dataset to {dataset_path}")
             tokenized_datasets.save_to_disk(dataset_path)
 
     # Separate into train, eval and test
@@ -229,7 +228,7 @@ def run_pretraining(model_args, data_args, training_args,
     eval_dataset = tokenized_datasets["validation"]
 
     # Log fingerprint used in HF smart caching
-    logger.info(f"Dataset fingerprint: {train_dataset._fingerprint}")
+    logging.info(f"Dataset fingerprint: {train_dataset._fingerprint}")
 
     # Data collator will take care of randomly masking the tokens.
     # argument defined in experiment config
@@ -253,6 +252,7 @@ def run_finetuning(model_args, data_args, training_args,
 
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
+    logging.info(f"Training {data_args.task_name} with {num_labels} labels")
 
     # For finetuning required to add labels and task name to config kwargs
     extra_config_kwargs = dict(
@@ -265,7 +265,7 @@ def run_finetuning(model_args, data_args, training_args,
 
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
-    logger.info(f"Tokenizing datasets for finetuning ...")
+    logging.info(f"Tokenizing datasets for finetuning ...")
     tokenized_datasets = preprocess_datasets_task(
         datasets, tokenizer, data_args,
         model, num_labels, label_list, is_regression
@@ -284,7 +284,7 @@ def run_finetuning(model_args, data_args, training_args,
         ]
 
     # Log fingerprint used in HF smart caching
-    logger.info(f"Dataset fingerprint: {train_dataset._fingerprint}")
+    logging.info(f"Dataset fingerprint: {train_dataset._fingerprint}")
 
     # Data collator will default to DataCollatorWithPadding,
     # so we change it if we already did the padding.

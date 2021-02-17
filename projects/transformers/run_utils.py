@@ -43,8 +43,6 @@ from transformers import (
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
-logger = logging.getLogger(__name__)
-
 __all__ = [
     "evaluate_language_model",
     "evaluate_tasks",
@@ -86,7 +84,7 @@ TASK_TO_KEYS = {
 def train(trainer, training_args, model_args, last_checkpoint):
     """Trainig function applicable to pretraining language models and finetuning."""
 
-    logger.info("Before training: total params: {:,} non zero params: {:,}".format(
+    logging.info("Before training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
 
@@ -106,9 +104,9 @@ def train(trainer, training_args, model_args, last_checkpoint):
         output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
         if trainer.is_world_process_zero():
             with open(output_train_file, "w") as writer:
-                logger.info("***** Train results *****")
+                logging.info("***** Train results *****")
                 for key, value in sorted(train_result.metrics.items()):
-                    logger.info(f"  {key} = {value}")
+                    logging.info(f"  {key} = {value}")
                     writer.write(f"{key} = {value}\n")
 
             # Need to save the state, since Trainer.save_model saves only the tokenizer
@@ -117,7 +115,7 @@ def train(trainer, training_args, model_args, last_checkpoint):
                 os.path.join(training_args.output_dir, "trainer_state.json")
             )
 
-    logger.info("After training: total params: {:,} non zero params: {:,}".format(
+    logging.info("After training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
 
@@ -131,7 +129,7 @@ def evaluate_tasks(trainer, training_args, data_args, datasets,
     # Evaluation
     eval_results = {}
     if training_args.do_eval:
-        logger.info("*** Evaluate ***")
+        logging.info("*** Evaluate ***")
 
         # Loop to handle MNLI double evaluation (matched, mis-matched)
         tasks = [data_args.task_name]
@@ -148,15 +146,15 @@ def evaluate_tasks(trainer, training_args, data_args, datasets,
             )
             if trainer.is_world_process_zero():
                 with open(output_eval_file, "w") as writer:
-                    logger.info(f"***** Eval results {task} *****")
+                    logging.info(f"***** Eval results {task} *****")
                     for key, value in sorted(eval_result.items()):
-                        logger.info(f"  {key} = {value}")
+                        logging.info(f"  {key} = {value}")
                         writer.write(f"{key} = {value}\n")
 
             eval_results.update(eval_result)
 
     if training_args.do_predict:
-        logger.info("*** Test ***")
+        logging.info("*** Test ***")
 
         # Loop to handle MNLI double evaluation (matched, mis-matched)
         tasks = [data_args.task_name]
@@ -178,7 +176,7 @@ def evaluate_tasks(trainer, training_args, data_args, datasets,
             )
             if trainer.is_world_process_zero():
                 with open(output_test_file, "w") as writer:
-                    logger.info(f"***** Test results {task} *****")
+                    logging.info(f"***** Test results {task} *****")
                     writer.write("index\tprediction\n")
                     for index, item in enumerate(predictions):
                         if is_regression:
@@ -193,7 +191,7 @@ def evaluate_language_model(trainer, training_args):
     """Evaluate language model. Returns dict with results on perplexity metric. """
     results = {}
     if training_args.do_eval:
-        logger.info("*** Evaluate ***")
+        logging.info("*** Evaluate ***")
 
         eval_output = trainer.evaluate()
 
@@ -205,9 +203,9 @@ def evaluate_language_model(trainer, training_args):
         )
         if trainer.is_world_process_zero():
             with open(output_eval_file, "w") as writer:
-                logger.info("***** Eval results *****")
+                logging.info("***** Eval results *****")
                 for key, value in sorted(results.items()):
-                    logger.info(f"  {key} = {value}")
+                    logging.info(f"  {key} = {value}")
                     writer.write(f"{key} = {value}\n")
 
         return results
@@ -309,7 +307,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
         if data_args.max_seq_length is None:
             max_seq_length = tokenizer.model_max_length
             if max_seq_length > 1024:
-                logger.warning(
+                logging.warning(
                     f"The tokenizer picked seems to have a very large "
                     f"`model_max_length` ({tokenizer.model_max_length}). "
                     f"Picking 1024 instead. You can change that default value by "
@@ -318,7 +316,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
                 max_seq_length = 1024
         else:
             if data_args.max_seq_length > tokenizer.model_max_length:
-                logger.warning(
+                logging.warning(
                     f"The max_seq_length passed ({data_args.max_seq_length}) is larger "
                     f"than the maximum length for the model "
                     f"({tokenizer.model_max_length}). "
@@ -401,7 +399,7 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
                 i: label_name_to_id[label_list[i]] for i in range(num_labels)
             }
         else:
-            logger.warn(
+            logging.warn(
                 "Your model seems to have been trained with labels, but they don't "
                 "match the dataset: ",
                 f"model labels: {list(sorted(label_name_to_id.keys()))}, " ,
@@ -412,7 +410,7 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
         label_to_id = {v: i for i, v in enumerate(label_list)}
 
     if data_args.max_seq_length > tokenizer.model_max_length:
-        logger.warn(
+        logging.warn(
             f"The max_seq_length passed ({data_args.max_seq_length}) is larger than ",
             "the maximum length for the ",
             f"model ({tokenizer.model_max_length}). ",
@@ -489,10 +487,10 @@ def init_datasets_mlm(data_args):
             os.path.abspath(data_args.tokenized_data_cache_dir),
             str(dataset_folder)
         )
-        logger.info(f"Tokenized dataset cache folder: {dataset_path}")
+        logging.info(f"Tokenized dataset cache folder: {dataset_path}")
 
         if os.path.exists(dataset_path) and data_args.reuse_tokenized_data:
-            logger.info(f"Loading cached tokenized data ...")
+            logging.info(f"Loading cached tokenized data ...")
             tokenized_datasets = load_from_disk(dataset_path)
         else:
             datasets = load_and_concatenate_datasets(data_args)
@@ -563,7 +561,7 @@ def init_datasets_task(data_args, training_args):
                 )
 
         for key in data_files.keys():
-            logger.info(f"load a local file for {key}: {data_files[key]}")
+            logging.info(f"load a local file for {key}: {data_files[key]}")
 
         if data_args.train_file.endswith(".csv"):
             # Loading a dataset from local csv files
@@ -621,7 +619,7 @@ def init_config(model_args, extra_config_kwargs=None):
         )
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
-        logger.warning("You are instantiating a new config instance from scratch.")
+        logging.warning("You are instantiating a new config instance from scratch.")
 
     return config
 
@@ -672,12 +670,12 @@ def init_model(model_args, config, tokenizer, finetuning=False):
             use_auth_token=True if model_args.use_auth_token else None,
         )
         if finetuning:
-            logger.info("Loading a pretrained model from HF for finetuning")
+            logging.info("Loading a pretrained model from HF for finetuning")
             model = AutoModelForSequenceClassification.from_pretrained(
                 model_args.model_name_or_path, **model_kwargs
             )
         else:
-            logger.info("Loading a pretrained model from HF to continue pretraining")
+            logging.info("Loading a pretrained model from HF to continue pretraining")
             model = AutoModelForMaskedLM.from_pretrained(
                 model_args.model_name_or_path, **model_kwargs
             )
@@ -688,7 +686,7 @@ def init_model(model_args, config, tokenizer, finetuning=False):
                 "Finetuning models must be loaded from pretrained models."
             )
         else:
-            logger.info("Pretraining new model from scratch")
+            logging.info("Pretraining new model from scratch")
             model = AutoModelForMaskedLM.from_config(config)
             model.resize_token_embeddings(len(tokenizer))
 
@@ -718,6 +716,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
         # Get the metric function and add compute_metrics to trainer_kwargs
         # If there is no task name, metric is not required
         if task_name is not None:
+            logging.info(f"Setting up custom metric for task {task_name}")
             metric = load_metric("glue", task_name)
 
             # Compute metrics includes extra if clause that uses metrics
