@@ -107,6 +107,56 @@ def mean_selected_activations(dendrite_activations, winning_mask, targets):
         return msa
 
 
+def dendrite_activations_by_unit(dendrite_activations, winning_mask, targets):
+    """
+    Returns a 2D torch tensor with shape (num_categories, num_units) where cell c, i
+    gives the mean value (post-sigmoid) of the selected dendrite activation for unit i
+    over all given examples from category c.
+
+    :param dendrite_activations: 3D torch tensor with shape (batch_size, num_units,
+                                 num_segments) in which entry b, i, j gives the
+                                 activation of the ith unit's jth dendrite segment for
+                                 example b
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    with torch.no_grad():
+
+        device = dendrite_activations.device
+
+        # Assume the following:
+        # - target values are zero-based
+        # - the largest target value in the batch is that amongst all data
+        num_categories = 1 + targets.max().item()
+        _, num_units, _ = dendrite_activations.size()
+
+        raw_winners = dendrite_activations * winning_mask
+
+        selected_activations = torch.zeros((0, num_units))
+        selected_activations = selected_activations.to(device)
+
+        for t in range(num_categories):
+            inds_t = torch.nonzero(1.0 * (targets == t)).flatten()
+
+            # 'Select' dendrite activation for each example and each unit by summing
+            # out segments; the sum on axis 2 only includes one non-zero entry
+            selected_activations_t = raw_winners[inds_t, ...]
+            selected_activations_t = selected_activations_t.sum(dim=2)
+
+            # Apply sigmoid and average across all examples
+            selected_activations_t = torch.sigmoid(selected_activations_t)
+            selected_activations_t = selected_activations_t.mean(dim=0)
+
+            selected_activations_t = selected_activations_t.unsqueeze(0)
+            selected_activations = torch.cat((selected_activations,
+                                              selected_activations_t))
+
+        return selected_activations
+
+
 def dendrite_overlap_matrix(winning_mask, targets):
     """ Returns a 3D torch tensor with shape (num_units, num_categories,
     num_categories) which represents num_units overlap matrices (one per unit) """

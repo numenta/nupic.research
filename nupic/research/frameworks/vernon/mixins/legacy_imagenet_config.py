@@ -22,6 +22,8 @@
 
 import copy
 
+from torch.nn.modules.batchnorm import _BatchNorm
+
 from nupic.research.frameworks.pytorch import datasets
 from nupic.research.frameworks.vernon import interfaces
 
@@ -36,7 +38,16 @@ class LegacyImagenetConfig(
     """
     Converts the SupervisedExperiment into the ImagenetExperiment that many
     experiments are configured to use.
+
+    The following arguments are added to the base experiment config.
+
+        - batch_norm_weight_decay: Whether or not to apply weight decay to
+                                   batch norm modules parameters
+                                   See https://arxiv.org/abs/1807.11205
+        - bias_weight_decay: Whether or not to apply weight decay to
+                                   bias parameters
     """
+
     @classmethod
     def load_dataset(cls, config, train=True):
         config = copy.copy(config)
@@ -56,7 +67,45 @@ class LegacyImagenetConfig(
         return super().load_dataset(config, train)
 
     @classmethod
+    def create_optimizer(cls, config, model):
+        """
+        Modify config to work with `ConfigureOptimizerParamGroups` mixin.
+        """
+        no_decay_params = dict()
+
+        # Turn off weight decay for batch_norm modules.
+        if not config.get("batch_norm_weight_decay", True):
+            no_decay_params.update(
+                include_modules=[_BatchNorm]
+            )
+
+        # Turn off weight decay for bias parameters.
+        if not config.get("bias_weight_decay", True):
+            no_decay_params.update(
+                include_patterns=[".*bias"]
+            )
+
+        # Add `optim_args_groups` to configure no weight decay on batchnorm and bias
+        # parameters.
+        if no_decay_params:
+            config.update(
+                optim_args_groups=[
+                    dict(
+                        group_args=dict(
+                            weight_decay=0,
+                        ),
+                        **no_decay_params
+                    )
+                ]
+            )
+
+        return super().create_optimizer(config, model)
+
+    @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["load_dataset"].insert(0, "ImagenetExperiment: Set default dataset")
+        name = "ImagenetExperiment: "
+        eo["load_dataset"].insert(0, name + "Set default dataset")
+        eo["create_optimizer"].insert(0, name + "Modify config to work with "
+                                                "ConfigureOptimizerParamGroups mixin.")
         return eo

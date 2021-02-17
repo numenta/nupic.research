@@ -23,6 +23,8 @@ from typing import Optional
 
 from transformers import MODEL_FOR_MASKED_LM_MAPPING
 
+from run_utils import TASK_TO_KEYS
+
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
@@ -33,12 +35,19 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune,
     or train from scratch.
     """
-
+    finetuning: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to finetune the model for downstream tasks. If false, "
+                    "will attempt to pretrain a masked language model instead."
+        },
+    )
     model_name_or_path: Optional[str] = field(
         default=None,
         metadata={
             "help": "The model checkpoint for weights initialization."
             "Don't set if you want to train a model from scratch."
+            "Config and tokenizers will also be determined from the model_name_or_path."
         },
     )
     model_type: Optional[str] = field(
@@ -189,14 +198,31 @@ class DataTrainingArguments:
             "help": "Which data collator to use, define how masking is applied."
         },
     )
+    task_name: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The name of the task to train on: " + ", ".join(
+                TASK_TO_KEYS.keys()
+            )
+        },
+    )
 
     def __post_init__(self):
-        if (self.dataset_name is None and self.train_file is None
-           and self.validation_file is None):
+        """Input validation"""
+        if self.task_name is not None:
+            # Checks if it is a valid task
+            self.task_name = self.task_name.lower()
+            if self.task_name not in TASK_TO_KEYS.keys():
+                raise ValueError("Unknown task, you should pick one in "
+                                 + ",".join(TASK_TO_KEYS.keys()))
+        elif (self.dataset_name is None and self.train_file is None
+              and self.validation_file is None):
+            # If no task is set, validates if a dataset is given
             raise ValueError(
-                "Need either a dataset name or a training/validation file."
+                "Need either a GLUE task, a dataset name or a training/validation file."
             )
         else:
+            # If a train file is given, verify if extensions are compatible
             if self.train_file is not None:
                 extension = self.train_file.split(".")[-1]
                 assert extension in ["csv", "json", "txt"], \

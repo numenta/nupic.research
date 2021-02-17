@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .metrics import (
+    dendrite_activations_by_unit,
     dendrite_duty_cycle,
     dendrite_overlap,
     dendrite_overlap_matrix,
@@ -30,6 +31,7 @@ from .metrics import (
 )
 from .plotting import (
     plot_dendrite_activations,
+    plot_dendrite_activations_by_unit,
     plot_dendrite_overlap_matrix,
     plot_entropy_distribution,
     plot_mean_selected_activations,
