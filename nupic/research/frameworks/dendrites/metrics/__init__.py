@@ -26,6 +26,7 @@ from .metrics import (
     entropy,
     mean_selected_activations,
     percent_active_dendrites,
+    winning_segment_indices,
 )
 from .plotting import (
     plot_dendrite_activations,

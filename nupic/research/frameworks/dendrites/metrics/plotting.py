@@ -363,10 +363,10 @@ def plot_winning_segment_distributions(
     assert num_units_to_plot > 0
     num_units = winning_mask.shape[1]
     units = torch.randperm(num_units, generator=get_random_generator(seed))
-    units = units[:num_units_to_plot]
+    units = units[:num_units_to_plot].tolist()
 
     # Deduce winnings indices.
-    winning_indices = winning_mask.max(dim=2).indices
+    winning_indices = winning_segment_indices(winning_mask, units)
 
     # Generate subplots.
     fig, axs = plt.subplots(1, num_units_to_plot, figsize=(6 * num_units_to_plot, 4))
@@ -376,7 +376,7 @@ def plot_winning_segment_distributions(
     # Generate a plot for each unit.
     num_segments = winning_mask.shape[2]
     for i, unit in enumerate(units):
-        indices = winning_indices[:, unit].cpu().numpy()
+        indices = winning_indices[:, i].cpu().numpy()
         plot_winning_segment_distribution(indices, num_segments, unit=unit, ax=axs[i])
 
     fig.tight_layout()
