@@ -50,10 +50,10 @@ def percent_active_dendrites(winning_mask, targets):
         percent_active = percent_active.to(device)
 
         for t in range(num_categories):
-            inds_t = torch.nonzero(1.0 * (targets == t)).flatten()
-            num_examples_t = len(inds_t)
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
+            num_examples_t = len(inds_t[0])
 
-            percent_active_t = winning_mask[inds_t, :, :].sum(dim=0, dtype=torch.float)
+            percent_active_t = winning_mask[inds_t].sum(dim=0, dtype=torch.float)
             percent_active_t = percent_active_t / num_examples_t
 
             percent_active_t = percent_active_t.unsqueeze(2)
@@ -92,13 +92,13 @@ def mean_selected_activations(dendrite_activations, winning_mask, targets):
         msa = msa.to(device)
 
         for t in range(num_categories):
-            inds_t = torch.nonzero(1.0 * (targets == t)).flatten()
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
 
-            num_selected_per_segment = winning_mask[inds_t, :, :].sum(dim=0)
+            num_selected_per_segment = winning_mask[inds_t].sum(dim=0)
             num_selected_per_segment[num_selected_per_segment == 0.0] = 1.0
 
             msa_t = dendrite_activations * winning_mask
-            msa_t = msa_t[inds_t, :, :].sum(dim=0, dtype=torch.float)
+            msa_t = msa_t[inds_t].sum(dim=0, dtype=torch.float)
             msa_t = msa_t / num_selected_per_segment
 
             msa_t = msa_t.unsqueeze(2)
@@ -139,11 +139,11 @@ def dendrite_activations_by_unit(dendrite_activations, winning_mask, targets):
         selected_activations = selected_activations.to(device)
 
         for t in range(num_categories):
-            inds_t = torch.nonzero(1.0 * (targets == t)).flatten()
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
 
             # 'Select' dendrite activation for each example and each unit by summing
             # out segments; the sum on axis 2 only includes one non-zero entry
-            selected_activations_t = raw_winners[inds_t, ...]
+            selected_activations_t = raw_winners[inds_t]
             selected_activations_t = selected_activations_t.sum(dim=2)
 
             # Apply sigmoid and average across all examples
@@ -155,6 +155,47 @@ def dendrite_activations_by_unit(dendrite_activations, winning_mask, targets):
                                               selected_activations_t))
 
         return selected_activations
+
+
+def hidden_activations_by_unit(activations, targets):
+    """
+    Returns a 2D torch tensor with shape (num_categories, num_units) where cell c, i
+    gives the mean value of hidden activations for unit i over all given examples from
+    category c.
+
+    NOTE: This function is not specific to dendrites, and can be used with modules that
+    both include and don't include dendrite segments.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    with torch.no_grad():
+
+        device = activations.device
+
+        # Assume the following:
+        # - target values are zero-based
+        # - the largest target value in the batch is that amongst all data
+        num_categories = 1 + targets.max().item()
+        _, num_units = activations.size()
+
+        # 'habu' is an abbreviation for 'hidden activations by unit'
+        habu = torch.zeros((0, num_units))
+        habu = habu.to(device)
+
+        for t in range(num_categories):
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
+            habu_t = activations[inds_t]
+
+            # Average activations across all examples with the same label
+            habu_t = habu_t.mean(dim=0)
+
+            habu_t = habu_t.unsqueeze(0)
+            habu = torch.cat((habu, habu_t))
+
+        return habu
 
 
 def dendrite_overlap_matrix(winning_mask, targets):

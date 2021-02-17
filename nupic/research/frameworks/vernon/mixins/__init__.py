@@ -53,3 +53,4 @@ from .vary_batch_size import VaryBatchSize
 from .ewc import ElasticWeightConsolidation
 from .oml import OnlineMetaLearning
 from .dendrite_metrics import *
+from .hidden_activations import *
