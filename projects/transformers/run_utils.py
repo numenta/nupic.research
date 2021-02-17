@@ -81,24 +81,13 @@ TASK_TO_KEYS = {
 }
 
 
-def train(trainer, training_args, model_args, last_checkpoint):
+def train(trainer, training_args, model_args, last_checkpoint=None):
     """Trainig function applicable to pretraining language models and finetuning."""
 
     logging.info("Before training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
 
-    # This here is all the same - can separate into a separate function?
-    # Training
-    if training_args.do_train:
-        if last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        elif (model_args.model_name_or_path is not None
-              and os.path.isdir(model_args.model_name_or_path)):
-            checkpoint = model_args.model_name_or_path
-        else:
-            checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
