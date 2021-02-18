@@ -21,15 +21,19 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import torch
 
 from .metrics import (
+    dendrite_activations_by_unit,
     dendrite_duty_cycle,
     dendrite_overlap,
     dendrite_overlap_matrix,
     entropy,
+    hidden_activations_by_unit,
     mean_selected_activations,
     percent_active_dendrites,
+    winning_segment_indices,
 )
 
 
@@ -92,7 +96,7 @@ def plot_dendrite_activations(dendrite_activations, winning_mask, mask_values=No
 
 
 def plot_percent_active_dendrites(winning_mask, targets, category_names=None,
-                                  unit_to_plot=0):
+                                  unit_to_plot=0, annotate=True):
     """
     Returns a heatmap with shape (number of segments, number of categories) where cell
     j, c in the heatmap gives the percentage of inputs in category c for which segment
@@ -104,17 +108,14 @@ def plot_percent_active_dendrites(winning_mask, targets, category_names=None,
     :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
                     target label for example b
     :param category_names: list of category names to label each column of the heatmap;
-                           unused if None
+                           unused if None or `annotate` is False
     :param unit_to_plot: index of the unit for which to plot percent active dendrites;
                          plots unit 0 by default
+    :param annotate: boolean value indicating whether to annotate all items along the x
+                     and y axes, as well as individual cell values
     """
     _, _, num_segments = winning_mask.size()
     num_categories = 1 + targets.max().item()
-
-    x_labels = ["category {}".format(j) for j in range(num_categories)]
-    if category_names is not None:
-        x_labels = category_names
-    y_labels = ["segment {}".format(j) for j in range(num_segments)]
 
     percent_active = percent_active_dendrites(winning_mask, targets)
     percent_active = percent_active[unit_to_plot, :, :]
@@ -128,27 +129,37 @@ def plot_percent_active_dendrites(winning_mask, targets, category_names=None,
     fig, ax = plt.subplots()
     ax.imshow(percent_active, cmap="copper", vmin=0.0, vmax=vmax)
 
-    ax.set_xticks(np.arange(num_categories))
-    ax.set_yticks(np.arange(num_segments))
+    if annotate:
 
-    ax.set_xticklabels(x_labels)
-    ax.set_yticklabels(y_labels)
+        x_labels = ["category {}".format(j) for j in range(num_categories)]
+        if category_names is not None:
+            x_labels = category_names
+        y_labels = ["segment {}".format(j) for j in range(num_segments)]
 
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        ax.set_xticks(np.arange(num_categories))
+        ax.set_yticks(np.arange(num_segments))
+
+        ax.set_xticklabels(x_labels)
+        ax.set_yticklabels(y_labels)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+        # Annotate all percentage activations
+        for i in range(percent_active.shape[0]):
+            for j in range(percent_active.shape[1]):
+                val = np.round(percent_active[i, j], 2)
+                ax.text(j, i, val, ha="center", va="center", color="w")
+
+    else:
+        ax.set_xlabel("category")
+        ax.set_ylabel("segment")
+
     plt.tight_layout()
-
-    # Annotate all percentage activations
-    for i in range(percent_active.shape[0]):
-        for j in range(percent_active.shape[1]):
-            val = np.round(percent_active[i, j], 2)
-            ax.text(j, i, val, ha="center", va="center", color="w")
-
     figure = plt.gcf()
     return figure
 
 
 def plot_mean_selected_activations(dendrite_activations, winning_mask, targets,
-                                   category_names=None, unit_to_plot=0):
+                                   category_names=None, unit_to_plot=0, annotate=True):
     """
     Returns a heatmap with shape (number of segments, number of categories) where cell
     j, c in the heatmap gives the mean activation of the segment j over all instances
@@ -165,19 +176,16 @@ def plot_mean_selected_activations(dendrite_activations, winning_mask, targets,
     :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
                     target label for example b
     :param category_names: list of category names to label each column of the heatmap;
-                           unused if None
+                           unused if None or `annotate` is False
     :param unit_to_plot: index of the unit for which to plot mean selected activations;
                          plots unit 0 by default
+    :param annotate: boolean value indicating whether to annotate all items along the x
+                     and y axes, as well as individual cell values
     """
     _, num_units, num_segments = dendrite_activations.size()
     num_categories = 1 + targets.max().item()
 
     assert 0 <= unit_to_plot < num_units
-
-    x_labels = ["category {}".format(j) for j in range(num_categories)]
-    if category_names is not None:
-        x_labels = category_names
-    y_labels = ["segment {}".format(j) for j in range(num_segments)]
 
     msa = mean_selected_activations(dendrite_activations, winning_mask, targets)
     msa = msa[unit_to_plot, :, :]
@@ -192,27 +200,113 @@ def plot_mean_selected_activations(dendrite_activations, winning_mask, targets,
     fig, ax = plt.subplots()
     ax.imshow(msa, cmap="coolwarm_r", vmin=vmin, vmax=vmax)
 
-    ax.set_xticks(np.arange(num_categories))
-    ax.set_yticks(np.arange(num_segments))
+    if annotate:
 
-    ax.set_xticklabels(x_labels)
-    ax.set_yticklabels(y_labels)
+        x_labels = ["category {}".format(j) for j in range(num_categories)]
+        if category_names is not None:
+            x_labels = category_names
+        y_labels = ["segment {}".format(j) for j in range(num_segments)]
 
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        ax.set_xticks(np.arange(num_categories))
+        ax.set_yticks(np.arange(num_segments))
+
+        ax.set_xticklabels(x_labels)
+        ax.set_yticklabels(y_labels)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+        # Annotate all mean selected activations
+        for i in range(msa.shape[0]):
+            for j in range(msa.shape[1]):
+                val = round(msa[i, j], 2)
+                ax.text(j, i, val, ha="center", va="center", color="w")
+
+    else:
+        ax.set_xlabel("category")
+        ax.set_ylabel("segment")
+
     plt.tight_layout()
+    figure = plt.gcf()
+    return figure
 
-    # Annotate all mean selected activations
-    for i in range(msa.shape[0]):
-        for j in range(msa.shape[1]):
-            val = round(msa[i, j], 2)
-            ax.text(j, i, val, ha="center", va="center", color="w")
 
+def plot_dendrite_activations_by_unit(dendrite_activations, winning_mask, targets,
+                                      category_names=None, num_units_to_plot=128):
+    """
+    Returns a heatmap with shape (num_categories, num_units) where cell c, i gives the
+    mean value (post-sigmoid) of the selected dendrite activation for unit i over all
+    given examples from category c.
+
+    :param dendrite_activations: 3D torch tensor with shape (batch_size, num_units,
+                                 num_segments) in which entry b, i, j gives the
+                                 activation of the ith unit's jth dendrite segment for
+                                 example b
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    :param category_names: list of category names to label each column of the heatmap;
+                           unused if None
+    :param num_units_to_plot: an integer which gives how many columns to show, for ease
+                              of visualization; only the first num_units_to_plot units
+                              are shown
+    """
+    activations = dendrite_activations_by_unit(dendrite_activations, winning_mask,
+                                               targets)
+    if num_units_to_plot is not None:
+        activations = activations[:, :num_units_to_plot]
+    activations = activations.detach().cpu().numpy()
+
+    plt.cla()
+    fig, ax = plt.subplots()
+    ax.imshow(activations, cmap="coolwarm_r", vmin=0.0, vmax=1.0)
+
+    ax.set_xlabel("hidden unit")
+    ax.set_ylabel("category")
+
+    plt.tight_layout()
+    figure = plt.gcf()
+    return figure
+
+
+def plot_hidden_activations_by_unit(activations, targets, category_names=None,
+                                    num_units_to_plot=128):
+    """
+    Returns a heatmap with shape (num_categories, num_units) where cell c, i gives the
+    mean value of hidden activations for unit i over all given examples from category
+    c.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    :param category_names: list of category names to label each column of the heatmap;
+                           unused if None
+    :param num_units_to_plot: an integer which gives how many columns to show, for ease
+                              of visualization; only the first num_units_to_plot units
+                              are shown
+    """
+    activations = hidden_activations_by_unit(activations, targets)
+
+    if num_units_to_plot is not None:
+        activations = activations[:, :num_units_to_plot]
+    activations = activations.detach().cpu().numpy()
+
+    plt.cla()
+    fig, ax = plt.subplots()
+    max_val = np.abs(activations).max()
+    ax.imshow(activations, cmap="PiYG", vmin=-max_val, vmax=max_val)
+
+    ax.set_xlabel("hidden unit")
+    ax.set_ylabel("category")
+
+    plt.tight_layout()
     figure = plt.gcf()
     return figure
 
 
 def plot_dendrite_overlap_matrix(winning_mask, targets, category_names=None,
-                                 unit_to_plot=0):
+                                 unit_to_plot=0, annotate=True):
     """
     Returns a heatmap with shape (number of categories, number of categories) where
     cell c, k gives the overlap in dendrite activations between categories c and k for
@@ -229,15 +323,13 @@ def plot_dendrite_overlap_matrix(winning_mask, targets, category_names=None,
     :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
                     target label for example b
     :param category_names: list of category names to label each column of the heatmap;
-                           unused if None
+                           unused if None or `annotate` is False
     :param unit_to_plot: index of the unit for which to plot the overlap matrix; plots
                          unit 0 by default
+    :param annotate: boolean value indicating whether to annotate all items along the x
+                     and y axes, as well as individual cell values
     """
     num_categories = 1 + targets.max().item()
-
-    labels = ["category {}".format(j) for j in range(num_categories)]
-    if category_names is not None:
-        labels = category_names
 
     overlap_matrix = dendrite_overlap_matrix(winning_mask, targets)
     overlap_matrix = overlap_matrix[unit_to_plot, :, :]
@@ -255,21 +347,30 @@ def plot_dendrite_overlap_matrix(winning_mask, targets, category_names=None,
     fig, ax = plt.subplots()
     ax.imshow(overlap_matrix, cmap="OrRd", vmin=0.0, vmax=1.0)
 
-    ax.set_xticks(np.arange(num_categories))
-    ax.set_yticks(np.arange(num_categories))
+    if annotate:
 
-    ax.set_xticklabels(labels)
-    ax.set_yticklabels(labels)
+        labels = ["category {}".format(j) for j in range(num_categories)]
+        if category_names is not None:
+            labels = category_names
 
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        ax.set_xticks(np.arange(num_categories))
+        ax.set_yticks(np.arange(num_categories))
+
+        ax.set_xticklabels(labels)
+        ax.set_yticklabels(labels)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+        # Annotate all overlap values
+        for i in range(num_categories):
+            for j in range(i + 1):
+                val = np.round(overlap_matrix[i, j].item(), 2)
+                ax.text(j, i, val, ha="center", va="center", color="w")
+
+    else:
+        ax.set_xlabel("category")
+        ax.set_ylabel("category")
+
     plt.tight_layout()
-
-    # Annotate all overlap values
-    for i in range(num_categories):
-        for j in range(i + 1):
-            val = np.round(overlap_matrix[i, j].item(), 2)
-            ax.text(j, i, val, ha="center", va="center", color="w")
-
     figure = plt.gcf()
     return figure
 
@@ -337,3 +438,69 @@ def plot_entropy_distribution(winning_mask, targets):
 
     figure = plt.gcf()
     return figure
+
+
+def plot_winning_segment_distributions(
+    winning_mask,
+    num_units_to_plot=1,
+    seed=0
+):
+    """
+    Plot the distribution of winning segments for the list of units (defaults to just
+    the first):
+
+    :param winning_mask: the winning mask of segments;
+                         shape num_samples x num_units x num_segments
+    :param num_units_to_plot: the number of units to plot
+    :param seed: set the random seed for reproducibility.
+    """
+
+    # Randomly sample 'num_units_to_plot'.
+    assert num_units_to_plot > 0
+    num_units = winning_mask.shape[1]
+    units = torch.randperm(num_units, generator=get_random_generator(seed))
+    units = units[:num_units_to_plot].tolist()
+
+    # Deduce winnings indices.
+    winning_indices = winning_segment_indices(winning_mask, units)
+
+    # Generate subplots.
+    fig, axs = plt.subplots(1, num_units_to_plot, figsize=(6 * num_units_to_plot, 4))
+    if num_units_to_plot == 1:
+        axs = [axs]  # ensure this is subscriptable
+
+    # Generate a plot for each unit.
+    num_segments = winning_mask.shape[2]
+    for i, unit in enumerate(units):
+        indices = winning_indices[:, i].cpu().numpy()
+        plot_winning_segment_distribution(indices, num_segments, unit=unit, ax=axs[i])
+
+    fig.tight_layout()
+    return fig
+
+
+# ----------------
+# Helper functions
+# ----------------
+
+def get_random_generator(seed):
+    g = torch.Generator()
+    g.manual_seed(seed)
+    return g
+
+
+def plot_winning_segment_distribution(winning_indices, num_segments, unit=0, ax=None):
+    binrange = (0, num_segments)
+    if ax is None:
+        _, ax = plt.subplots()
+    sns.histplot(
+        winning_indices,
+        kde=True,
+        stat="probability",
+        binwidth=1,
+        binrange=binrange,
+        ax=ax,
+    )
+    ax.set_xlabel("Segment")
+    ax.set_title(f"Probability of Activation of Unit {unit}")
+    return ax

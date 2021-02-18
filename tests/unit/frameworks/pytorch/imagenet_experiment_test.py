@@ -44,7 +44,7 @@ class ImagenetExperimentTest(unittest.TestCase):
             # Model class. Must inherit from "torch.nn.Module"
             model_class=resnet50,
             # model model class arguments passed to the constructor
-            model_args=dict(),
+            model_args=dict(num_classes=10),
 
             # Optimizer class. Must inherit from "torch.optim.Optimizer"
             optimizer_class=torch.optim.SGD,
@@ -56,6 +56,8 @@ class ImagenetExperimentTest(unittest.TestCase):
                 dampening=0,
                 nesterov=True
             ),
+            batch_norm_weight_decay=False,
+            bias_weight_decay=False,
 
             # Learning rate scheduler class. Must inherit from "_LRScheduler"
             lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
@@ -122,6 +124,14 @@ class ImagenetExperimentTest(unittest.TestCase):
         # Validate data was deleted.
         data_exists = os.path.exists(temp_data_path)
         self.assertFalse(data_exists)
+
+        # Validate optimizer.
+        optim = exp.optimizer
+        no_decay_group = optim.param_groups[0]
+        weight_decay = no_decay_group["weight_decay"]
+        num_params = len(no_decay_group["params"])
+        self.assertEqual(weight_decay, 0)
+        self.assertEqual(num_params, 107)
 
 
 if __name__ == "__main__":

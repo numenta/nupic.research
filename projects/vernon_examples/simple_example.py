@@ -65,4 +65,5 @@ def run_experiment(config):
     print(f"....Training finished")
 
 
-run_experiment(mnist_mlp)
+if __name__ == "__main__":
+    run_experiment(mnist_mlp)
