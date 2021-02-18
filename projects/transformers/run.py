@@ -150,6 +150,7 @@ def main():
         logging.info(f"Finetuning model for downstream tasks.")
         # Can run multiple tasks
 
+        # TODO: open results file if already existing and only replace entries
         results = {}
         base_training_args = deepcopy(training_args)
         for task_name in data_args.task_names:

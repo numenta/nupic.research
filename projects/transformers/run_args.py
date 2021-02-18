@@ -229,7 +229,7 @@ class DataTrainingArguments:
                 "Define either a single task_name or multiple tasks using task_names"
             )
         if self.task_name:
-            if self.task_name == "GLUE":
+            if self.task_name.lower() == "glue":
                 self.task_names = list(TASK_TO_KEYS.keys())
             else:
                 self.task_names = [self.task_name]
