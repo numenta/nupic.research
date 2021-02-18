@@ -27,6 +27,26 @@ class OMLExperiment(mixins.OnlineMetaLearning,
     pass
 
 
+class DendritesExperiment(mixins.RezeroWeights,
+                          mixins.OnlineMetaLearning,
+                          MetaContinualLearningExperiment):
+    """
+    This is similar to OMLExperiment, but now there is rezero weights.
+    """
+    pass
+
+
+class BoostedDendritesExperiment(mixins.UpdateDendriteBoostStrength,
+                                 mixins.RezeroWeights,
+                                 mixins.OnlineMetaLearning,
+                                 MetaContinualLearningExperiment):
+    """
+    This is similar to DendritesExperiment, but with an added mixin to update the boost
+    strength of a BoostedDendrites module.
+    """
+    pass
+
+
 class IIDTrainingOMLExperiment(OMLExperiment):
     def sample_slow_data(self, tasks):
         """

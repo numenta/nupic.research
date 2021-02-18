@@ -72,7 +72,7 @@ def _plot_entropy_distribution(_dendrite_activations, winning_mask, targets):
     return plot_entropy_distribution(winning_mask, targets)
 
 
-# AN example config using the PlotDendriteMetrics mixin.
+# An example config using the PlotDendriteMetrics mixin.
 metacl_with_dendrite_stats = deepcopy(metacl_anml_dendrites)
 metacl_with_dendrite_stats.update(
     epochs=200,

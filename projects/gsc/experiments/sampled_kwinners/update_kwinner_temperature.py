@@ -19,34 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.vernon.distributed import experiments, mixins
+from .sampled_kwinners import update_temperature
 
 
-class ImagenetExperiment(mixins.LegacyImagenetConfig,
-                         mixins.ConfigureOptimizerParamGroups,
-                         experiments.SupervisedExperiment):
-    pass
+class UpdateKWinnerTemperature:
+    """
+    Update the KWinners boost strength before every epoch.
+    """
+    def pre_epoch(self):
+        super().pre_epoch()
+        self.model.apply(update_temperature)
 
-
-class RezeroedKWinnersImagenetExperiment(mixins.RezeroWeights,
-                                         mixins.UpdateBoostStrength,
-                                         ImagenetExperiment):
-    pass
-
-
-class KnowledgeDistillationImagenetExperiment(mixins.KnowledgeDistillation,
-                                              RezeroedKWinnersImagenetExperiment):
-    pass
-
-
-class KnowledgeDistillationCLExperiment(mixins.KnowledgeDistillationCL,
-                                        RezeroedKWinnersImagenetExperiment):
-    pass
-
-
-__all__ = [
-    "ImagenetExperiment",
-    "RezeroedKWinnersImagenetExperiment",
-    "KnowledgeDistillationImagenetExperiment",
-    "KnowledgeDistillationCLExperiment",
-]
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["pre_epoch"].append("UpdateKWinnerTemperature")
+        return eo

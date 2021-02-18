@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .constrain_parameters import ConstrainParameters
+from .configure_optimizer_param_groups import ConfigureOptimizerParamGroups
 from .delay_load_checkpoint import *
 from .export_model import ExportModel
 from .extra_validations_per_epoch import *
@@ -43,6 +44,7 @@ from .save_final_checkpoint import SaveFinalCheckpoint
 from .step_based_logging import *
 from .track_representation_sparsity import *
 from .update_boost_strength import UpdateBoostStrength
+from .update_dendrite_boost_strength import UpdateDendriteBoostStrength
 from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .composite_loss import CompositeLoss
 from .quantization_aware import QuantizationAware
@@ -51,3 +53,4 @@ from .vary_batch_size import VaryBatchSize
 from .ewc import ElasticWeightConsolidation
 from .oml import OnlineMetaLearning
 from .dendrite_metrics import *
+from .hidden_activations import *

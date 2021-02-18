@@ -20,18 +20,24 @@
 # ----------------------------------------------------------------------
 
 from .metrics import (
+    dendrite_activations_by_unit,
     dendrite_duty_cycle,
     dendrite_overlap,
     dendrite_overlap_matrix,
     entropy,
+    hidden_activations_by_unit,
     mean_selected_activations,
     percent_active_dendrites,
+    winning_segment_indices,
 )
 from .plotting import (
     plot_dendrite_activations,
+    plot_dendrite_activations_by_unit,
     plot_dendrite_overlap_matrix,
     plot_entropy_distribution,
+    plot_hidden_activations_by_unit,
     plot_mean_selected_activations,
     plot_overlap_scores_distribution,
     plot_percent_active_dendrites,
+    plot_winning_segment_distributions,
 )
