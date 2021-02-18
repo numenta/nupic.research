@@ -24,17 +24,15 @@ Auxiliary functions to run.py file
 import logging
 import math
 import os
+from collections import Counter
+from functools import partial
 from hashlib import blake2b
 
-from functools import partial
-from collections import Counter
-
+import numpy as np
+from datasets import concatenate_datasets, load_dataset, load_from_disk
+from datasets.dataset_dict import DatasetDict
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import f1_score, matthews_corrcoef
-
-import numpy as np
-from datasets import concatenate_datasets, load_dataset, load_from_disk, load_metric
-from datasets.dataset_dict import DatasetDict
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -721,6 +719,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
     trainer = Trainer(**trainer_kwargs)
 
     return trainer
+
 
 def compute_metrics_task(ep: EvalPrediction, metric=None,
                          task_name=None, is_regression=None):

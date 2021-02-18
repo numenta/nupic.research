@@ -31,8 +31,8 @@ github.com/huggingface/transformers/blob/master/examples/text-classification/run
 
 import logging
 import os
-import sys
 import pickle
+import sys
 from copy import deepcopy
 
 import transformers
