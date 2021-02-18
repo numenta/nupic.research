@@ -84,8 +84,8 @@ After accessing the head node via ssh or attaching a screen, run an experiment u
 
 ## Installing
 
-You will require the libraries `dataset` and `transformers`.
-* `dataset` can be installed using pip or from source
+You will require the libraries `datasets` and `transformers`.
+* `datasets` can be installed using pip or from source
 * install `transformers` from source, by cloning and running `pip install -e .`
 
 The `requirement.txt` file contains a specific SHA if you want to reproduce a tested environment. We are using the latest features from these libraries and will incorporate others which are soon to be released, so for the moment those might change at a fast pace. Once we have the need to establish reproducible results we should consider more stable requirements.
