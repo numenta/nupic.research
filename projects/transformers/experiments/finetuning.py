@@ -120,10 +120,40 @@ finetuning_bert700k_glue.update(
 
 )
 
+finetuning_bert100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_bert100k_glue.update(
+    # logging
+    task_name="glue",
+    run_name="finetuning_bert100k_glue",
+    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/finetuning_bert100k_glue"),  # noqa: E501
+    overwrite_output_dir=True,
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
+)
+
+finetuning_bert100k_single_task = deepcopy(finetuning_bert100k_glue)
+finetuning_bert100k_single_task.update(
+    # logging
+    task_name="qqp",
+    run_name="finetuning_bert100k_single_task",
+    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/finetuning_bert100k_single_task"),  # noqa: E501
+)
+
+
+finetuning_bert700k_single_task = deepcopy(finetuning_bert700k_glue)
+finetuning_bert700k_single_task.update(
+    # logging
+    task_name="qqp",
+    run_name="finetuning_bert700k_single_task",
+    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/finetuning_bert700k_single_task"),  # noqa: E501
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     debug_finetuning=debug_finetuning,
     debug_finetuning_bert100k=debug_finetuning_bert100k,
     debug_finetuning_bert100k_ntasks=debug_finetuning_bert100k_ntasks,
     finetuning_bert700k_glue=finetuning_bert700k_glue,
+    finetuning_bert100k_glue=finetuning_bert100k_glue,
+    finetuning_bert100k_single_task=finetuning_bert100k_single_task,
+    finetuning_bert700k_single_task=finetuning_bert700k_single_task,
 )
