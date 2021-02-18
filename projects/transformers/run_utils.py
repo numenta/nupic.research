@@ -132,9 +132,10 @@ def evaluate_tasks(trainer, training_args, data_args, datasets,
         # Loop to handle MNLI double evaluation (matched, mis-matched)
         tasks = [data_args.task_name]
         eval_datasets = [eval_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            eval_datasets.append(datasets["validation_mismatched"])
+        # TODO: fix mismatched MNLI
+        # if data_args.task_name == "mnli":
+        #     tasks.append("mnli-mm")
+        #     eval_datasets.append(datasets["validation_mismatched"])
 
         for eval_dataset, task in zip(eval_datasets, tasks):
             eval_result = trainer.evaluate(eval_dataset=eval_dataset)
