@@ -82,6 +82,14 @@ There is also an option of running the multiple nodes scripts from a ray head no
 
 After accessing the head node via ssh or attaching a screen, run an experiment using the same command described above: `run.sh <experiment_name>`. See transformers-cli-utils readme for more information on how to use and what modifications are required to the yaml file.
 
+## Installing
+
+You will require the libraries `dataset` and `transformers`.
+* `dataset` can be installed using pip or from source
+* install `transformers` from source, by cloning and running `pip install -e .`
+
+The `requirement.txt` file contains a specific SHA if you want to reproduce a tested environment. We are using the latest features from these libraries and will incorporate others which are soon to be released, so for the moment those might change at a fast pace. Once we have the need to establish reproducible results we should consider more stable requirements.
+
 ## Additional notes
 
 `transformers-cli-utils` is in a private repository. If you woud like to use it, feel free to drop me an email at lsouza at numenta dot com.
