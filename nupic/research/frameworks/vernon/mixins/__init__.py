@@ -19,11 +19,16 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .constrain_parameters import ConstrainParameters
+from .composite_loss import CompositeLoss
 from .configure_optimizer_param_groups import ConfigureOptimizerParamGroups
+from .constrain_parameters import ConstrainParameters
+from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .delay_load_checkpoint import *
+from .dendrite_metrics import *
+from .ewc import ElasticWeightConsolidation
 from .export_model import ExportModel
 from .extra_validations_per_epoch import *
+from .hidden_activations import *
 from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
 from .legacy_imagenet_config import LegacyImagenetConfig
 from .load_preprocessed_data import LoadPreprocessedData
@@ -32,25 +37,21 @@ from .log_covariance import LogCovariance
 from .log_every_learning_rate import LogEveryLearningRate
 from .log_every_loss import LogEveryLoss
 from .lr_range_test import LRRangeTest, create_lr_test_experiment
-from .maxup import MaxupStandard, MaxupPerSample
+from .maxup import MaxupPerSample, MaxupStandard
 from .multi_cycle_lr import MultiCycleLR
+from .oml import OnlineMetaLearning
 from .profile import Profile
 from .profile_autograd import ProfileAutograd
 from .prune_low_magnitude import PruneLowMagnitude
 from .prune_low_snr import PruneLowSNR
+from .quantization_aware import QuantizationAware
+from .reduce_lr_after_task import ReduceLRAfterTask
 from .regularize_loss import RegularizeLoss
+from .representation_overlap import *
 from .rezero_weights import RezeroWeights
 from .save_final_checkpoint import SaveFinalCheckpoint
 from .step_based_logging import *
 from .track_representation_sparsity import *
 from .update_boost_strength import UpdateBoostStrength
 from .update_dendrite_boost_strength import UpdateDendriteBoostStrength
-from .cutmix import CutMix, CutMixKnowledgeDistillation
-from .composite_loss import CompositeLoss
-from .quantization_aware import QuantizationAware
-from .reduce_lr_after_task import ReduceLRAfterTask
 from .vary_batch_size import VaryBatchSize
-from .ewc import ElasticWeightConsolidation
-from .oml import OnlineMetaLearning
-from .dendrite_metrics import *
-from .hidden_activations import *
