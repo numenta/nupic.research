@@ -33,6 +33,8 @@ from .metrics import (
     hidden_activations_by_unit,
     mean_selected_activations,
     percent_active_dendrites,
+    repr_overlap_distributions,
+    repr_overlap_matrix,
     winning_segment_indices,
 )
 
@@ -437,6 +439,99 @@ def plot_entropy_distribution(winning_mask, targets):
 
     figure = plt.gcf()
     return figure
+
+
+def plot_repr_overlap_matrix(activations, targets, category_names=None, annotate=True):
+    """
+    Returns a heatmap with shape (num_categories, num_categories) where cell c1, c2
+    gives the mean value of pairwise representation overlaps across all pairs of
+    examples between classes c1 and c2.  Each individual pairwise representation
+    overlap is simply the fraction of hidden units that are active in both examples.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    :param category_names: list of category names to label each column of the heatmap;
+                           unused if None or `annotate` is False
+    :param annotate: boolean value indicating whether to annotate all items along the x
+                     and y axes, as well as individual cell values
+    """
+    num_categories = 1 + targets.max().item()
+
+    overlap_matrix = repr_overlap_matrix(activations, targets)
+    overlap_matrix = overlap_matrix.detach().cpu().numpy()
+
+    # `overlap_matrix` is symmetric, hence we can set all values above the main
+    # diagonal to np.NaN so they don't appear in the visualization
+    for i in range(num_categories):
+        for j in range(i + 1, num_categories):
+            overlap_matrix[i, j] = np.nan
+
+    # Anchor the colorbar to the range [0, 1]
+    plt.cla()
+    fig, ax = plt.subplots()
+    ax.imshow(overlap_matrix, cmap="YlOrBr", vmin=0.0, vmax=1.0)
+
+    if annotate:
+
+        labels = ["category {}".format(j) for j in range(num_categories)]
+        if category_names is not None:
+            labels = category_names
+
+        ax.set_xticks(np.arange(num_categories))
+        ax.set_yticks(np.arange(num_categories))
+
+        ax.set_xticklabels(labels)
+        ax.set_yticklabels(labels)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+        # Annotate all overlap values
+        for i in range(num_categories):
+            for j in range(i + 1):
+                val = np.round(overlap_matrix[i, j].item(), 2)
+                ax.text(j, i, val, ha="center", va="center", color="w")
+
+    else:
+        ax.set_xlabel("category")
+        ax.set_ylabel("category")
+
+    plt.tight_layout()
+    figure = plt.gcf()
+    return figure
+
+
+def plot_repr_overlap_distributions(activations, targets):
+    """
+    Returns a tuple of histograms that show pairwise representation overlaps between
+    samples whose representations are given by `activations`. The first histogram
+    includes only inter-class pairs, while the second histogram only intra-class pairs;
+    self-paired examples are excluded in the latter case.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    inter_class_ol, intra_class_ol = repr_overlap_distributions(activations, targets)
+    figures = []
+
+    for fig_num, ol in enumerate((inter_class_ol, intra_class_ol)):
+
+        plt.figure(fig_num)
+        plt.hist(x=ol, bins=np.arange(0.0, 1.0, 0.02), color="tab:blue",
+                 edgecolor="k")
+
+        plt.xticks(np.arange(0.0, 1.0, 0.2))
+        plt.xlabel("Fraction of overlap")
+        plt.ylabel("Pairwise frequency")
+        plt.xlim(0.0, 1.0)
+        plt.grid(True)
+        plt.tight_layout()
+
+        figures.append(plt.gcf())
+
+    return tuple(figures)
 
 
 def plot_winning_segment_distributions(winning_mask, num_units_to_plot=1, seed=0):

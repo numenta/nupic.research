@@ -21,6 +21,7 @@
 
 import math
 
+import numpy as np
 import torch
 
 
@@ -313,3 +314,126 @@ def entropy(x):
     _max_entropy = math.log(num_segments)
 
     return _entropy, _max_entropy
+
+
+def repr_overlap_matrix(activations, targets):
+    """
+    Returns a 2D torch tensor with shape (num_categories, num_categories) where cell
+    c1, c2 gives the mean value of pairwise representation overlap across all pairs of
+    examples between classes c1 and c2. Each individual pairwise representation overlap
+    is simply the fraction of hidden units that are active in both examples.
+
+    NOTE: This function is not specific to dendrites, and can be used with modules that
+    both include and don't include dendrite segments.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    with torch.no_grad():
+
+        repr_overlaps = repr_overlap_stats(activations, targets)
+
+        # Assume the following:
+        # - target values are zero-based
+        # - the largest target value in the batch is that amongst all data
+        num_categories = 1 + targets.max().item()
+
+        overlap_matrix = torch.zeros((num_categories, num_categories))
+
+        # For each pair of categories, compute the mean value of pairwise
+        # representation overlaps using all pairs of the form (x1, x2) where x1 belongs
+        # to category c1, and x2 belongs to category c2
+        for t1 in range(num_categories):
+            for t2 in range(1 + t1):
+
+                mean_overlap_val = np.mean(repr_overlaps[t1][t2])
+                overlap_matrix[t1, t2] = mean_overlap_val
+
+        return overlap_matrix
+
+
+def repr_overlap_distributions(activations, targets):
+    """
+    Returns (list of floats, list of floats) where the first list gives representation
+    overlap values between all pairs of samples in different classes, and the second
+    list gives representation overlaps values between all pairs of samples in the same
+    class.
+
+    NOTE: This function is not specific to dendrites, and can be used with modules that
+    both include and don't include dendrite segments.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    repr_overlaps = repr_overlap_stats(activations, targets)
+
+    # Assume the following:
+    # - target values are zero-based
+    # - the largest target value in the batch is that amongst all data
+    num_categories = 1 + targets.max().item()
+
+    inter_class_overlaps = []
+    intra_class_overlaps = []
+
+    for t1 in range(num_categories):
+        for t2 in range(1 + t1):
+
+            if t1 == t2:
+                intra_class_overlaps.extend(repr_overlaps[t1][t2])
+            else:
+                inter_class_overlaps.extend(repr_overlaps[t1][t2])
+
+    return inter_class_overlaps, intra_class_overlaps
+
+
+def repr_overlap_stats(activations, targets):
+    """
+    Returns `repr_overlaps`: a dict of dicts, where
+    repr_overlaps[class_id_1][class_id_2] is list of representation overlap values
+    between all pairs in class_id_1 and class_id_2; self-paired examples are excluded
+    in the case where the two classes are the same.
+    """
+    with torch.no_grad():
+
+        num_categories = 1 + targets.max().item()
+        _, num_units = activations.size()
+
+        repr_overlaps = {}
+
+        for t1 in range(num_categories):
+
+            repr_overlaps[t1] = {}
+
+            for t2 in range(1 + t1):
+
+                inds_1 = torch.nonzero((targets == t1).float(), as_tuple=True)
+                activations_1 = activations[inds_1]
+                activations_1 = (activations_1 != 0.0).float()
+
+                inds_2 = torch.nonzero((targets == t2).float(), as_tuple=True)
+                activations_2 = activations[inds_2]
+                activations_2 = (activations_2 != 0.0).float()
+
+                overlap_vals = torch.matmul(activations_1, activations_2.T)
+                overlap_vals /= num_units
+
+                # If `overlap_vals` gives intra-class representation overlaps, only
+                # consider elements below the main diagonal to ignore duplicates and
+                # identical pairs
+                if t1 == t2:
+                    num_examples, _ = overlap_vals.size()
+
+                    overlap_vals = overlap_vals.tolist()
+                    overlap_vals = [overlap_vals[x1][x2] for x1 in range(num_examples)
+                                    for x2 in range(x1)]
+
+                else:
+                    overlap_vals = overlap_vals.flatten().tolist()
+
+                repr_overlaps[t1][t2] = overlap_vals
+
+        return repr_overlaps
