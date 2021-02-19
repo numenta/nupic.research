@@ -59,6 +59,7 @@ __all__ = [
     "init_trainer",
     "preprocess_datasets_mlm",
     "preprocess_datasets_task",
+    "test_tasks",
     "train",
 ]
 
@@ -116,96 +117,74 @@ def train(trainer, training_args, model_args, last_checkpoint=None):
     ))
 
 
-def evaluate_tasks(trainer, training_args, data_args, datasets,
-                   eval_dataset, test_dataset, is_regression, label_list):
+def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     """
     Evaluate tasks after finetuning.
     Returns evaluation dict with results.
     """
-    # Evaluation
     eval_results = {}
-    if training_args.do_eval:
-        logging.info("*** Evaluate ***")
-
-        # Loop to handle MNLI double evaluation (matched, mis-matched)
-        tasks = [data_args.task_name]
-        eval_datasets = [eval_dataset]
-        # TODO: fix mismatched MNLI
-        # if data_args.task_name == "mnli":
-        #     tasks.append("mnli-mm")
-        #     eval_datasets.append(datasets["validation_mismatched"])
-
-        for eval_dataset, task in zip(eval_datasets, tasks):
-            eval_result = trainer.evaluate(eval_dataset=eval_dataset)
-
-            output_eval_file = os.path.join(
-                training_args.output_dir, f"eval_results_{task}.txt"
-            )
-            if trainer.is_world_process_zero():
-                with open(output_eval_file, "w") as writer:
-                    logging.info(f"***** Eval results {task} *****")
-                    for key, value in sorted(eval_result.items()):
-                        logging.info(f"  {key} = {value}")
-                        writer.write(f"{key} = {value}\n")
-
-            eval_results.update(eval_result)
-
-    if training_args.do_predict:
-        logging.info("*** Test ***")
-
-        # Loop to handle MNLI double evaluation (matched, mis-matched)
-        tasks = [data_args.task_name]
-        test_datasets = [test_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            test_datasets.append(datasets["test_mismatched"])
-
-        for test_dataset, task in zip(test_datasets, tasks):
-            # Removing the `label` columns because it contains -1
-            # and Trainer won't like that.
-            test_dataset.remove_columns_("label")
-            predictions = trainer.predict(test_dataset=test_dataset).predictions
-            predictions = (np.squeeze(predictions) if is_regression
-                           else np.argmax(predictions, axis=1))
-
-            output_test_file = os.path.join(
-                training_args.output_dir, f"test_results_{task}.txt"
-            )
-            if trainer.is_world_process_zero():
-                with open(output_test_file, "w") as writer:
-                    logging.info(f"***** Test results {task} *****")
-                    writer.write("index\tprediction\n")
-                    for index, item in enumerate(predictions):
-                        if is_regression:
-                            writer.write(f"{index}\t{item:3.3f}\n")
-                        else:
-                            item = label_list[item]
-                            writer.write(f"{index}\t{item}\n")
-    return eval_results
-
-
-def evaluate_language_model(trainer, training_args):
-    """Evaluate language model. Returns dict with results on perplexity metric. """
-    results = {}
-    if training_args.do_eval:
-        logging.info("*** Evaluate ***")
-
-        eval_output = trainer.evaluate()
-
-        perplexity = math.exp(eval_output["eval_loss"])
-        results["perplexity"] = perplexity
+    for eval_dataset, task in zip(eval_datasets, tasks):
+        eval_result = trainer.evaluate(eval_dataset=eval_dataset)
 
         output_eval_file = os.path.join(
-            training_args.output_dir, "eval_results_mlm.txt"
+            output_dir, f"eval_results_{task}.txt"
         )
         if trainer.is_world_process_zero():
             with open(output_eval_file, "w") as writer:
-                logging.info("***** Eval results *****")
-                for key, value in sorted(results.items()):
+                logging.info(f"***** Eval results {task} *****")
+                for key, value in sorted(eval_result.items()):
                     logging.info(f"  {key} = {value}")
                     writer.write(f"{key} = {value}\n")
 
-        return results
+        eval_results.update(eval_result)
+
+    return eval_results
+
+
+def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_list):
+    """
+    Test tasks after finetuning.
+    """
+    for test_dataset, task in zip(test_datasets, tasks):
+        # Removing the `label` columns because it contains -1
+        # and Trainer won't like that.
+        test_dataset.remove_columns_("label")
+        predictions = trainer.predict(test_dataset=test_dataset).predictions
+        predictions = (np.squeeze(predictions) if is_regression
+                        else np.argmax(predictions, axis=1))
+
+        output_test_file = os.path.join(
+            output_dir, f"test_results_{task}.txt"
+        )
+        if trainer.is_world_process_zero():
+            with open(output_test_file, "w") as writer:
+                logging.info(f"***** Test results {task} *****")
+                writer.write("index\tprediction\n")
+                for index, item in enumerate(predictions):
+                    if is_regression:
+                        writer.write(f"{index}\t{item:3.3f}\n")
+                    else:
+                        item = label_list[item]
+                        writer.write(f"{index}\t{item}\n")
+
+
+def evaluate_language_model(trainer, output_dir):
+    """Evaluate language model. Returns dict with results on perplexity metric. """
+    results = {}
+    eval_output = trainer.evaluate()
+
+    perplexity = math.exp(eval_output["eval_loss"])
+    results["perplexity"] = perplexity
+
+    output_eval_file = os.path.join(output_dir, "eval_results_mlm.txt")
+    if trainer.is_world_process_zero():
+        with open(output_eval_file, "w") as writer:
+            logging.info("***** Eval results *****")
+            for key, value in sorted(results.items()):
+                logging.info(f"  {key} = {value}")
+                writer.write(f"{key} = {value}\n")
+
+    return results
 
 
 def load_and_concatenate_datasets(data_args):
@@ -398,9 +377,9 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
         else:
             logging.warn(
                 "Your model seems to have been trained with labels, but they don't "
-                "match the dataset: ",
+                "match the dataset. ",
                 f"model labels: {list(sorted(label_name_to_id.keys()))}, " ,
-                "dataset labels: {list(sorted(label_list))}.",
+                f"dataset labels: {list(sorted(label_list))}.",
                 "\nIgnoring the model labels as a result.",
             )
     elif data_args.task_name is None and not is_regression:
@@ -409,8 +388,7 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
     if data_args.max_seq_length > tokenizer.model_max_length:
         logging.warn(
             f"The max_seq_length passed ({data_args.max_seq_length}) is larger than ",
-            "the maximum length for the ",
-            f"model ({tokenizer.model_max_length}). ",
+            f"the maximum length for the model ({tokenizer.model_max_length}). ",
             f"Using max_seq_length={tokenizer.model_max_length}."
         )
     max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)

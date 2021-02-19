@@ -60,6 +60,7 @@ from run_utils import (
     init_trainer,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
+    test_tasks,
     train,
 )
 
@@ -245,7 +246,10 @@ def run_pretraining(model_args, data_args, training_args,
         train_dataset, eval_dataset, trainer_callbacks,
     )
     train(trainer, training_args, model_args, last_checkpoint)
-    evaluate_language_model(trainer, training_args)
+
+    if training_args.do_eval:
+        logging.info("*** Evaluate ***")
+        evaluate_language_model(trainer, training_args.output_dir)
 
 
 def run_finetuning(model_args, data_args, training_args,
@@ -296,17 +300,45 @@ def run_finetuning(model_args, data_args, training_args,
     else:
         data_collator = None
 
-    # Train and evaluate
+    # Train
     trainer = init_trainer(
         model, tokenizer, data_collator, training_args,
         train_dataset, eval_dataset, trainer_callbacks,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
     train(trainer, training_args, model_args, last_checkpoint)
-    eval_results = evaluate_tasks(
-        trainer, training_args, data_args, datasets,
-        eval_dataset, test_dataset, is_regression, label_list
-    )
+
+    # Evaluate
+    eval_results = {}
+    if training_args.do_eval:
+        logging.info("*** Evaluate ***")
+
+        # Handle special case of extra validation dataset for MNLI
+        tasks = [data_args.task_name]
+        eval_datasets = [eval_dataset]
+        if data_args.task_name == "mnli":
+            tasks.append("mnli-mm")
+            eval_datasets.append(tokenized_datasets["validation_mismatched"])
+
+        eval_results = evaluate_tasks(
+            trainer, training_args.output_dir, tasks, eval_datasets
+        )
+
+    # Test/Predict
+    if training_args.do_predict:
+        logging.info("*** Test ***")
+
+        # Handle special case of extra test dataset for MNLI
+        tasks = [data_args.task_name]
+        test_datasets = [test_dataset]
+        if data_args.task_name == "mnli":
+            tasks.append("mnli-mm")
+            test_datasets.append(tokenized_datasets["test_mismatched"])
+
+        test_tasks(
+            trainer, training_args.output_dir, tasks, test_datasets,
+            is_regression, label_list
+        )
 
     return eval_results
 
