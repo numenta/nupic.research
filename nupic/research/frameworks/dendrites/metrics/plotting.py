@@ -342,7 +342,6 @@ def plot_dendrite_overlap_matrix(winning_mask, targets, category_names=None,
             overlap_matrix[i, j] = np.nan
 
     # Anchor the colorbar to the range [0, 1]
-    # vmax = np.max(overlap_matrix)
     plt.cla()
     fig, ax = plt.subplots()
     ax.imshow(overlap_matrix, cmap="OrRd", vmin=0.0, vmax=1.0)
@@ -440,11 +439,7 @@ def plot_entropy_distribution(winning_mask, targets):
     return figure
 
 
-def plot_winning_segment_distributions(
-    winning_mask,
-    num_units_to_plot=1,
-    seed=0
-):
+def plot_winning_segment_distributions(winning_mask, num_units_to_plot=1, seed=0):
     """
     Plot the distribution of winning segments for the list of units (defaults to just
     the first):
