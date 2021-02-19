@@ -39,6 +39,8 @@ from nupic.research.frameworks.dendrites import (
     plot_mean_selected_activations,
     plot_overlap_scores_distribution,
     plot_percent_active_dendrites,
+    plot_repr_overlap_distributions,
+    plot_repr_overlap_matrix,
 )
 from nupic.research.frameworks.dendrites.routing import generate_context_vectors
 from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
@@ -46,7 +48,8 @@ from nupic.torch.modules import KWinners, SparseWeights
 
 
 # ------ Dendrites experiment classes
-class DendritesSupermaskExperiment(mixins.PlotHiddenActivations,
+class DendritesSupermaskExperiment(mixins.PlotRepresentationOverlap,
+                                   mixins.PlotHiddenActivations,
                                    mixins.TrackRepresentationSparsity,
                                    mixins.PlotDendriteMetrics,
                                    mixins.RezeroWeights,
@@ -203,6 +206,23 @@ def plot_hidden_activations_from_hooks():
     return results
 
 
+def plot_representation_overlap_from_hooks():
+    results = {}
+
+    # Here, "{name}" is the name of the module.
+    for name, _, activations in exp.ro_hook.get_statistics():
+
+        targets = exp.ro_targets
+
+        visual = plot_repr_overlap_matrix(activations, targets)
+        results.update({f"repr_overlap_matrix/{name}": visual})
+        visual_1, visual_2 = plot_repr_overlap_distributions(activations, targets)
+        results.update({f"repr_overlap_inter/{name}": visual_1})
+        results.update({f"repr_overlap_intra/{name}": visual_2})
+
+    return results
+
+
 def plot_dendrite_metrics_from_hooks():
 
     results = {}
@@ -327,6 +347,14 @@ if __name__ == "__main__":
             max_samples_to_plot=5000
         ),
 
+        # Representation overlap
+        plot_representation_overlap_args=dict(
+            include_modules=[nn.ReLU, KWinners],
+            plot_freq=1,
+            plot_args=dict(annotate=False),
+            max_samples_to_plot=5000
+        ),
+
         batch_size=1500,
         distributed=False,
         num_classes=10,
@@ -345,6 +373,7 @@ if __name__ == "__main__":
     hook_managers = [
         exp.dendrite_hooks,
         exp.ha_hook,
+        exp.ro_hook,
         exp.input_hook_manager,
         exp.output_hook_manager
     ]
@@ -379,6 +408,7 @@ if __name__ == "__main__":
     results.update(plot_sparsity_metrics_from_hooks())
     results.update(plot_dendrite_metrics_from_hooks())
     results.update(plot_hidden_activations_from_hooks())
+    results.update(plot_representation_overlap_from_hooks())
 
     print("Successfully retrieved metric results for:")
     for key in results.keys():
