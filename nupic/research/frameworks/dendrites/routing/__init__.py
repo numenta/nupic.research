@@ -19,6 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .routing import RoutingDataset, RoutingFunction
-from .utils import *
 from .init_functions import *
+from .routing import *
+from .utils import *

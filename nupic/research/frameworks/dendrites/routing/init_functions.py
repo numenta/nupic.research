@@ -30,6 +30,12 @@ from nupic.research.frameworks.pytorch.models.common_models import (
 from .routing import RoutingDataset, RoutingFunction
 from .utils import generate_context_integers, generate_context_vectors
 
+__all__ = [
+    "init_dataloader",
+    "init_optimizer",
+    "init_test_scenario",
+]
+
 ###############################################
 # Functions that return initialized variables #
 ###############################################
