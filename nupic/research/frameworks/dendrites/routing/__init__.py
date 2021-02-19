@@ -21,3 +21,4 @@
 
 from .routing import RoutingDataset, RoutingFunction
 from .utils import *
+from .init_functions import *

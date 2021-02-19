@@ -194,7 +194,7 @@ def evaluate_dendrite_model(
 ):
     """
     Evaluates a model on a specified criterion by iterating through all batches in the
-    given dataloader, and returns a dict of metrics that give evaluation performance
+    given dataloader, and returns a dict of metrics that give evaluation performance.
 
     :param model: a torch.nn.Module subclass that implements a dendrite module in
                   addition to a linear feed-forward module, and takes both feedforward
