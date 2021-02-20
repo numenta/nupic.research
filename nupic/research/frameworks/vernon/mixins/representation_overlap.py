@@ -81,7 +81,7 @@ class PlotRepresentationOverlap(metaclass=abc.ABCMeta):
 
         # Process config args
         ro_args = config.get("plot_representation_overlap_args", {})
-        ro_plot_freq, filter_args, ro_max_samples = self.process_ro_args(ro_args)
+        ro_plot_freq, filter_args, ro_max_samples = process_ro_args(ro_args)
 
         self.ro_plot_freq = ro_plot_freq
         self.ro_max_samples = ro_max_samples
@@ -102,32 +102,6 @@ class PlotRepresentationOverlap(metaclass=abc.ABCMeta):
         # to the tensors being collected by the hooks.
         self.ro_targets = torch.tensor([]).long()
 
-    def process_ro_args(self, ro_args):
-
-        ro_args = deepcopy(ro_args)
-
-        # Collect information about which modules to apply hooks to
-        include_names = ro_args.pop("include_names", [])
-        include_modules = ro_args.pop("include_modules", [])
-        include_patterns = ro_args.pop("include_patterns", [])
-        filter_args = dict(
-            include_names=include_names,
-            include_modules=include_modules,
-            include_patterns=include_patterns,
-        )
-
-        # Others args
-        plot_freq = ro_args.get("plot_freq", 1)
-        plot_args = ro_args.get("plot_args", {})
-        max_samples = ro_args.get("max_samples_to_plot", 1000)
-
-        assert isinstance(plot_freq, int)
-        assert isinstance(plot_args, dict)
-        assert isinstance(max_samples, int)
-        assert plot_freq > 0
-        assert max_samples > 0
-
-        return plot_freq, filter_args, max_samples
 
     def run_epoch(self):
 
@@ -179,3 +153,31 @@ class PlotRepresentationOverlap(metaclass=abc.ABCMeta):
             self.ro_targets = self.ro_targets[:self.ro_max_samples]
 
         return loss
+
+
+def process_ro_args(ro_args):
+
+    ro_args = deepcopy(ro_args)
+
+    # Collect information about which modules to apply hooks to
+    include_names = ro_args.pop("include_names", [])
+    include_modules = ro_args.pop("include_modules", [])
+    include_patterns = ro_args.pop("include_patterns", [])
+    filter_args = dict(
+        include_names=include_names,
+        include_modules=include_modules,
+        include_patterns=include_patterns,
+    )
+
+    # Others args
+    plot_freq = ro_args.get("plot_freq", 1)
+    plot_args = ro_args.get("plot_args", {})
+    max_samples = ro_args.get("max_samples_to_plot", 1000)
+
+    assert isinstance(plot_freq, int)
+    assert isinstance(plot_args, dict)
+    assert isinstance(max_samples, int)
+    assert plot_freq > 0
+    assert max_samples > 0
+
+    return plot_freq, filter_args, max_samples

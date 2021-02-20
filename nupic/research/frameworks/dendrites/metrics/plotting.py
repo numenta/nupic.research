@@ -525,7 +525,7 @@ def plot_representation_overlap_distributions(activations, targets):
 
         plt.xticks(np.arange(0.0, 1.0, 0.2))
         plt.xlabel("Fraction of overlap")
-        plt.ylabel("Pairwise frequency")
+        plt.ylabel("Number of pairs")
         plt.xlim(0.0, 1.0)
         plt.grid(True)
         plt.tight_layout()
