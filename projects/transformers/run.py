@@ -177,8 +177,15 @@ def run_finetuning_multiple_tasks(
 
     logging.info(f"Finetuning model for downstream tasks.")
 
-    # TODO: open results file if already existing and only replace entries
-    results = {}
+    # If results file already exists, open it and only update keys
+    results_path = os.path.join(training_args.output_dir, "task_results.p")
+    if os.path.exists(results_path) and not data_args.override_finetuning_results:
+        logging.info(f"Updating existing task_results in {results_path}")
+        with open(results_path, "rb") as f:
+            results = pickle.load(f)
+    else:
+        results = {}
+
     base_training_args = deepcopy(training_args)
     for task_name in data_args.task_names:
         data_args.task_name = task_name

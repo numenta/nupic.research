@@ -219,6 +219,13 @@ class DataTrainingArguments:
                     f"Available tasks: {', '.join(TASK_TO_KEYS.keys())}"
         },
     )
+    override_finetuning_results: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to create a new results file. If set to False, will only"
+                    "attempt to update existing entries"
+        },
+    )
 
     def __post_init__(self):
         """Input validation"""
