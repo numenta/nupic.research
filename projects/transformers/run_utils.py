@@ -125,6 +125,7 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     eval_results = {}
     for eval_dataset, task in zip(eval_datasets, tasks):
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
+        eval_results[task] = eval_result
 
         output_eval_file = os.path.join(
             output_dir, f"eval_results_{task}.txt"
@@ -135,8 +136,6 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
                 for key, value in sorted(eval_result.items()):
                     logging.info(f"  {key} = {value}")
                     writer.write(f"{key} = {value}\n")
-
-        eval_results.update(eval_result)
 
     return eval_results
 

@@ -148,56 +148,71 @@ def main():
     logging.info(f"Seed to reproduce: {training_args.seed}")
 
     if model_args.finetuning:
-        logging.info(f"Finetuning model for downstream tasks.")
-        # Can run multiple tasks
-
-        # TODO: open results file if already existing and only replace entries
-        results = {}
-        base_training_args = deepcopy(training_args)
-        for task_name in data_args.task_names:
-            data_args.task_name = task_name
-            training_args = deepcopy(base_training_args)
-            # For each task, save to a subfolder within run's root folder
-            training_args.run_name = f"{base_training_args.run_name}_{task_name}"
-            training_args.output_dir = os.path.join(
-                base_training_args.output_dir, task_name
-            )
-            # Update any custom training hyperparameter
-            if task_name in model_args.task_hyperparams:
-                for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
-                    setattr(training_args, hp_key, hp_val)
-            # Run finetuning and save results
-            eval_results = run_finetuning(
-                model_args, data_args, training_args,
-                trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
-            )
-            results[task_name] = eval_results
-
-        # Pickle and save results
-        if is_main_process(base_training_args.local_rank):
-            # Save specific hyperparameters along with results
-            # TODO: when doing hyperparam search, get best option only
-            for task_name in results.keys():
-                if task_name in model_args.task_hyperparams:
-                    results[task_name]["task_hyperparams"] = \
-                        model_args.task_hyperparams[task_name]
-
-            results_path = os.path.join(
-                base_training_args.output_dir, "task_results.p"
-            )
-            logging.info(f"Saving task_results to {results_path}")
-            with open(results_path, "wb") as file:
-                pickle.dump(results, file)
+        run_finetuning_multiple_tasks(
+            model_args, data_args, training_args,
+            trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
+        )
     else:
-        logging.info(f"Pre-training a masked language model.")
         run_pretraining(
             model_args, data_args, training_args,
             trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
         )
 
 
-def run_pretraining(model_args, data_args, training_args,
-                    trainer_callbacks=None, last_checkpoint=None):
+def run_finetuning_multiple_tasks(
+    model_args, data_args, training_args,
+    trainer_callbacks=None, last_checkpoint=None
+):
+    """Loop through all tasks, train, evaluate, and save results"""
+
+    logging.info(f"Finetuning model for downstream tasks.")
+
+    # TODO: open results file if already existing and only replace entries
+    results = {}
+    base_training_args = deepcopy(training_args)
+    for task_name in data_args.task_names:
+        data_args.task_name = task_name
+        training_args = deepcopy(base_training_args)
+        # For each task, save to a subfolder within run's root folder
+        training_args.run_name = f"{base_training_args.run_name}_{task_name}"
+        training_args.output_dir = os.path.join(
+            base_training_args.output_dir, task_name
+        )
+        # Update any custom training hyperparameter
+        if task_name in model_args.task_hyperparams:
+            for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
+                setattr(training_args, hp_key, hp_val)
+        # Run finetuning and save results
+        eval_results = run_finetuning_single_task(
+            model_args, data_args, training_args,
+            trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
+        )
+        results.update(eval_results)
+
+    # Pickle and save results
+    if is_main_process(base_training_args.local_rank):
+        # Save specific hyperparameters along with results
+        # TODO: when doing hyperparam search, get best option only
+        for task_name in results.keys():
+            if task_name in model_args.task_hyperparams:
+                results[task_name]["task_hyperparams"] = \
+                    model_args.task_hyperparams[task_name]
+
+        results_path = os.path.join(
+            base_training_args.output_dir, "task_results.p"
+        )
+        logging.info(f"Saving task_results to {results_path}")
+        with open(results_path, "wb") as file:
+            pickle.dump(results, file)
+
+
+def run_pretraining(
+    model_args, data_args, training_args,
+    trainer_callbacks=None, last_checkpoint=None
+):
+    """Pretrain and evaluate a language model"""
+
+    logging.info(f"Pre-training a masked language model.")
 
     datasets, tokenized_datasets, dataset_path = init_datasets_mlm(data_args)
 
@@ -252,8 +267,12 @@ def run_pretraining(model_args, data_args, training_args,
         evaluate_language_model(trainer, training_args.output_dir)
 
 
-def run_finetuning(model_args, data_args, training_args,
-                   trainer_callbacks=None, last_checkpoint=None):
+def run_finetuning_single_task(
+    model_args, data_args, training_args,
+    trainer_callbacks=None, last_checkpoint=None
+):
+    """On a single task train, evaluate, and save results"""
+
 
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
