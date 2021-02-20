@@ -37,7 +37,7 @@ transformers_base = dict(
     use_auth_token=False,
 
     # Data training arguments
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/transformers_base"),  # noqa: E501
+    output_dir=os.path.expanduser("~/nta/results/experiments/transformers"),  # noqa: E501
     overwrite_output_dir=True,
     overwrite_cache=False,
 
@@ -69,7 +69,6 @@ bert_base.update(
 
     # Training Arguments
     run_name="bert_base",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/bert_base"),
     overwrite_output_dir=True,
     per_device_train_batch_size=8,
     per_device_eval_batch_size=8,
@@ -90,14 +89,13 @@ debug_bert.update(
     dataset_config_name="wikitext-2-raw-v1",
 
     # Training Arguments
-    run_name="debug_run",
+    run_name="debug_bert",
     logging_first_step=True,
     logging_steps=30,  # also define eval_steps, redundant
     eval_steps=30,
     warmup_steps=30,
     max_steps=90,
     disable_tqdm=False,  # default False
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/debug_bert"),  # noqa: E501
     overwrite_output_dir=True,
 
 )

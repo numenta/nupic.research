@@ -38,7 +38,6 @@ debug_finetuning = deepcopy(transformers_base)
 debug_finetuning.update(
     # logging
     run_name="debug_finetuning",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/debug_finetuning"),  # noqa: E501
 
     # Data arguments
     task_name="qnli",
@@ -72,14 +71,12 @@ debug_finetuning_bert100k.update(
 
     # logging
     run_name="debug_finetuning_bert100k",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/debug_finetuning_bert100k"),  # noqa: E501
 )
 
 debug_finetuning_bert100k_ntasks = deepcopy(debug_finetuning_bert100k)
 debug_finetuning_bert100k_ntasks.update(
     # logging
     run_name="debug_finetuning_bert100k_ntasks",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/debug_finetuning_bert100k_ntasks"),  # noqa: E501
     report_to="tensorboard",
     task_names=["cola", "stsb"],
     task_hyperparams=dict(
@@ -96,7 +93,6 @@ finetuning_bert700k_glue = deepcopy(transformers_base)
 finetuning_bert700k_glue.update(
     # logging
     run_name="finetuning_bert700k_glue",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/finetuning_bert700k_glue"),  # noqa: E501
     overwrite_output_dir=True,
 
     # Data arguments
@@ -125,7 +121,6 @@ finetuning_bert100k_glue.update(
     # logging
     task_name="glue",
     run_name="finetuning_bert100k_glue",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/finetuning_bert100k_glue"),  # noqa: E501
     overwrite_output_dir=True,
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
 )
@@ -135,7 +130,6 @@ finetuning_bert100k_single_task.update(
     # logging
     task_name="qqp",
     run_name="finetuning_bert100k_single_task",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/finetuning_bert100k_single_task"),  # noqa: E501
 )
 
 
@@ -144,7 +138,6 @@ finetuning_bert700k_single_task.update(
     # logging
     task_name="qqp",
     run_name="finetuning_bert700k_single_task",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/finetuning_bert700k_single_task"),  # noqa: E501
 )
 
 # Export configurations in this file

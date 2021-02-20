@@ -100,6 +100,16 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    # Appending run name to output dir, avoids double assignment
+    if not training_args.run_name:
+        raise ValueError(
+            "Please define a run_name, which will be used to determine the subfolder "
+            "of output_dir where the results and checkpoints will be saved."
+        )
+    training_args.output_dir = os.path.join(
+        training_args.output_dir, training_args.run_name
+    )
+
     # Detecting last checkpoint.
     last_checkpoint = None
     if (os.path.isdir(training_args.output_dir) and training_args.do_train
