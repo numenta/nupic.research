@@ -86,31 +86,29 @@ TASK_TO_KEYS = {
 }
 
 
-def train(trainer, training_args, model_args, last_checkpoint=None):
+def train(trainer, output_dir, last_checkpoint=None):
     """Trainig function applicable to pretraining language models and finetuning."""
 
     logging.info("Before training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
 
-    # Training
-    if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+    train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
+    trainer.save_model()  # Saves the tokenizer too for easy upload
 
-        output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
-        if trainer.is_world_process_zero():
-            with open(output_train_file, "w") as writer:
-                logging.info("***** Train results *****")
-                for key, value in sorted(train_result.metrics.items()):
-                    logging.info(f"  {key} = {value}")
-                    writer.write(f"{key} = {value}\n")
+    output_train_file = os.path.join(output_dir, "train_results.txt")
+    if trainer.is_world_process_zero():
+        with open(output_train_file, "w") as writer:
+            logging.info("***** Train results *****")
+            for key, value in sorted(train_result.metrics.items()):
+                logging.info(f"  {key} = {value}")
+                writer.write(f"{key} = {value}\n")
 
-            # Need to save the state, since Trainer.save_model saves only the tokenizer
-            # with the model
-            trainer.state.save_to_json(
-                os.path.join(training_args.output_dir, "trainer_state.json")
-            )
+        # Need to save the state, since Trainer.save_model saves only the tokenizer
+        # with the model
+        trainer.state.save_to_json(
+            os.path.join(output_dir, "trainer_state.json")
+        )
 
     logging.info("After training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
@@ -150,7 +148,7 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
         test_dataset.remove_columns_("label")
         predictions = trainer.predict(test_dataset=test_dataset).predictions
         predictions = (np.squeeze(predictions) if is_regression
-                        else np.argmax(predictions, axis=1))
+                       else np.argmax(predictions, axis=1))
 
         output_test_file = os.path.join(
             output_dir, f"test_results_{task}.txt"

@@ -260,7 +260,9 @@ def run_pretraining(
         model, tokenizer, data_collator, training_args,
         train_dataset, eval_dataset, trainer_callbacks,
     )
-    train(trainer, training_args, model_args, last_checkpoint)
+
+    if training_args.do_train:
+        train(trainer, training_args.output_dir, last_checkpoint)
 
     if training_args.do_eval:
         logging.info("*** Evaluate ***")
@@ -325,7 +327,8 @@ def run_finetuning_single_task(
         train_dataset, eval_dataset, trainer_callbacks,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
-    train(trainer, training_args, model_args, last_checkpoint)
+    if training_args.do_train:
+        train(trainer, training_args.output_dir, last_checkpoint)
 
     # Evaluate
     eval_results = {}
