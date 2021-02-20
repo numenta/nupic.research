@@ -354,7 +354,7 @@ def representation_overlap_matrix(activations, targets):
         return overlap_matrix
 
 
-def representation_overlap_distributions(activations, targets):
+def representation_overlap_values(activations, targets):
     """
     Returns (list of floats, list of floats) where the first list gives representation
     overlap values between all pairs of samples in different classes, and the second

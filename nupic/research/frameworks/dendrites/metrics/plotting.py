@@ -33,8 +33,8 @@ from .metrics import (
     hidden_activations_by_unit,
     mean_selected_activations,
     percent_active_dendrites,
-    representation_overlap_distributions,
     representation_overlap_matrix,
+    representation_overlap_values,
     winning_segment_indices,
 )
 
@@ -514,15 +514,14 @@ def plot_representation_overlap_distributions(activations, targets):
     :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
                     target label for example b
     """
-    inter_class_ol, intra_class_ol = representation_overlap_distributions(activations,
-                                                                          targets)
+    inter_class_ol, intra_class_ol = representation_overlap_values(activations,
+                                                                   targets)
     figures = []
 
     for fig_num, ol in enumerate((inter_class_ol, intra_class_ol)):
 
         plt.figure(fig_num)
-        plt.hist(x=ol, bins=np.arange(0.0, 1.0, 0.02), color="tab:blue",
-                 edgecolor="k")
+        plt.hist(x=ol, bins=np.arange(0.0, 1.0, 0.02), color="tab:blue", edgecolor="k")
 
         plt.xticks(np.arange(0.0, 1.0, 0.2))
         plt.xlabel("Fraction of overlap")

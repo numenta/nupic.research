@@ -28,9 +28,9 @@ from .metrics import (
     hidden_activations_by_unit,
     mean_selected_activations,
     percent_active_dendrites,
-    representation_overlap_distributions,
     representation_overlap_matrix,
     representation_overlap_stats,
+    representation_overlap_values,
     winning_segment_indices,
 )
 from .plotting import (
