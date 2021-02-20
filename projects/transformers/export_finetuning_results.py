@@ -20,7 +20,12 @@
 # ----------------------------------------------------------------------
 """
 Parse results folder and prints it as markdown to add it to leaderboard
+Requires as arguments path to one or more task_results.p files and
+an optional model name (-m)
 
+Can parse several results file at once
+It is gonna parse in order, so later entries in the list will update earlier entries.
+Useful if you only need to rerun one or more tasks instead of all
 """
 
 import argparse
@@ -42,10 +47,19 @@ metrics = {
 }
 
 
-def results_to_markdown(model_name, results_file):
+def results_to_markdown(model_name, results_files):
+    results = {}
+    for results_file in results_files:
+        with open(results_file, "rb") as f:
+            results.update(pickle.load(f))
 
-    with open(results_file, "rb") as f:
-        results = pickle.load(f)
+    # Handle special case of double of MNLI matched/mismatched evaluation
+    if "mnli-mm" in results.keys():
+        results["mnli"].update(
+            eval_accuracy_mm=results["mnli-mm"]["eval_accuracy"]
+        )
+        metrics["mnli"].append("eval_accuracy_mm")
+        del results["mnli-mm"]
 
     report_results = defaultdict(list)
     consolidated_results = defaultdict(int)
@@ -57,14 +71,15 @@ def results_to_markdown(model_name, results_file):
         report_results[task] = "/".join(report_results[task])
         consolidated_results[task] /= len(metrics[task])
 
+    num_tasks_bert = len(results) - 1 if "wnli" in results else len(results)
     average_bert = sum(
         [value for task, value in consolidated_results.items() if task != "wnli"]
-    ) / 8
-    average_glue = sum(consolidated_results.values()) / 9
+    ) / num_tasks_bert
+
+    average_glue = sum(consolidated_results.values()) / len(results)
 
     report_results["average_bert"] = f"{average_bert*100:.2f}"
     report_results["average_glue"] = f"{average_glue*100:.2f}"
-    report_results["mnli"] = f"{report_results['mnli']}/-"
 
     df = pd.DataFrame.from_dict({model_name: report_results}).transpose()
     print(df.to_markdown())
@@ -72,9 +87,10 @@ def results_to_markdown(model_name, results_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("results_file", type=str,
+    parser.add_argument("results_files", type=str, nargs="+",
                         help="Path to pickle file with finetuning results")
-    parser.add_argument("model_name", type=str,
+    parser.add_argument("-m", "--model_name", type=str,
+                        default="model",
                         help="Name of the model to save")
     args = parser.parse_args()
     results_to_markdown(**args.__dict__)
