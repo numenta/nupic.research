@@ -33,7 +33,11 @@ Known issues, to be investigated/fixed:
 
 Local implementation using Huggingface. To run, create a new experiment dict under experiments and run using:
 
-`python run.py -e <experiment_name>`
+`python run.py <experiment_name>`
+
+You can also run multiple experiments in sequence:
+
+`python run.py <experiment_name_A>  <experiment_name_B>`
 
 Other accepted ways are passing arguments directly in command line or through a json file. See run.py for more details.
 
@@ -58,6 +62,10 @@ Then initialize your cluster:
 After the head and worker nodes are initialized, run using the bash script provided in transformers-cli-utils:
 
 `run.sh <experiment_name>`
+
+As in single node, you can run multiple experiments in sequence. When using the script with multiple experiments, wrap the experiment names in quotes so it is read as a single argument:
+
+`run.sh "<experiment_name_A> <experiment_name_B>"`
 
 Wait a few minutes and the output of all instances will be redirected to your local terminal.
 You can follow up the experiments in the wandb link shown when training starts.

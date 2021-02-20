@@ -29,12 +29,14 @@ github.com/huggingface/transformers/blob/master/examples/language-modeling/run_m
 github.com/huggingface/transformers/blob/master/examples/text-classification/run_glue.py
 """
 
+import argparse
 import logging
 import os
 import pickle
 import sys
 from copy import deepcopy
 
+import torch.distributed
 import transformers
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
@@ -70,109 +72,96 @@ MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
 
 def main():
-    # See all possible arguments in src/transformers/training_args.py
-    # or by passing the --help flag to this script.
-    # We now keep distinct sets of args, for a cleaner separation of concerns.
-    parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments)
-    )
+    cmd_parser = argparse.ArgumentParser()
+    cmd_parser.add_argument("experiments", nargs="+", choices=list(CONFIGS.keys()),
+                            help="Available experiments")
+    cmd_parser.add_argument("--local_rank", default=None,
+                            help="added by torch.distributed.launch")
 
-    # Add option to run from local experiment file
-    parser.add_argument("-e", "--experiment", dest="experiment",
-                        choices=list(CONFIGS.keys()),
-                        help="Available experiments")
-    args = parser.parse_args()
+    cmd_args = cmd_parser.parse_args()
 
-    trainer_callbacks = None
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        # If we pass only one argument to the script and it's the path to a json file,
-        # parse it to get our arguments.
-        model_args, data_args, training_args = parser.parse_json_file(
-            json_file=os.path.abspath(sys.argv[1])
+    for experiment in cmd_args.experiments:
+        config_dict = CONFIGS[experiment]
+        config_dict["local_rank"] = int(cmd_args.local_rank or -1)
+        # See all possible arguments in transformers/training_args.py and ./run_args.py
+        exp_parser = HfArgumentParser(
+            (ModelArguments, DataTrainingArguments, TrainingArguments)
         )
-    elif "experiment" in args:
-        # If experiment given, use arguments from experiment file instead
-        config_dict = CONFIGS[args.experiment]
-        config_dict["local_rank"] = args.local_rank  # added by torch.distributed.launch
-        model_args, data_args, training_args = parser.parse_dict(config_dict)
-        # Callbacks can only be passed when using experiment
-        if "trainer_callbacks" in config_dict:
-            trainer_callbacks = config_dict["trainer_callbacks"]
-    else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        model_args, data_args, training_args = exp_parser.parse_dict(config_dict)
 
-    # Appending run name to output dir, avoids double assignment
-    if not training_args.run_name:
-        raise ValueError(
-            "Please define a run_name, which will be used to determine the subfolder "
-            "of output_dir where the results and checkpoints will be saved."
+        # Overrides default behavior of TrainingArguments of setting run name
+        # equal to output_dir when not available
+        if training_args.run_name == training_args.output_dir:
+            training_args.run_name = experiment
+        # Run name (or experiment name) is added to the output_dir
+        training_args.output_dir = os.path.join(
+            training_args.output_dir, training_args.run_name
         )
-    training_args.output_dir = os.path.join(
-        training_args.output_dir, training_args.run_name
-    )
 
-    # Detecting last checkpoint.
-    last_checkpoint = None
-    if (os.path.isdir(training_args.output_dir) and training_args.do_train
-       and not training_args.overwrite_output_dir):
-        last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        logging.warning(f"Loading from checkpoint: {last_checkpoint} ")
-        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
-            raise ValueError(
-                f"Output directory ({training_args.output_dir}) already exists and "
-                "is not empty. Use --overwrite_output_dir to overcome."
+        # Detecting last checkpoint.
+        last_checkpoint = None
+        if (os.path.isdir(training_args.output_dir) and training_args.do_train
+           and not training_args.overwrite_output_dir):
+            last_checkpoint = get_last_checkpoint(training_args.output_dir)
+            logging.warning(f"Loading from checkpoint: {last_checkpoint} ")
+            if (last_checkpoint is None
+               and len(os.listdir(training_args.output_dir)) > 0):
+                raise ValueError(
+                    f"Output directory ({training_args.output_dir}) already exists and "
+                    "is not empty. Use --overwrite_output_dir to overcome."
+                )
+            elif last_checkpoint is not None:
+                logging.info(
+                    f"Checkpoint detected, resuming training at {last_checkpoint}. To "
+                    "avoid this behavior, change the `--output_dir` or add "
+                    "`--overwrite_output_dir` to train from scratch."
+                )
+
+        # Setup logging
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+            datefmt="%m/%d/%Y %H:%M:%S",
+            handlers=[logging.StreamHandler(sys.stdout)],
+            level=(logging.INFO if is_main_process(training_args.local_rank)
+                else logging.WARN)
+        )
+
+        # Log on each process the small summary:
+        logging.warning(
+            f"Process rank: {training_args.local_rank}, "
+            f"device: {training_args.device}, n_gpu: {training_args.n_gpu} "
+            f"distributed training: {bool(training_args.local_rank != -1)}, "
+            f"16-bits training: {training_args.fp16}"
+        )
+        # Set the verbosity to info of the Transformers logging (on main process only):
+        if is_main_process(training_args.local_rank):
+            transformers.utils.logging.set_verbosity_info()
+            transformers.utils.logging.enable_default_handler()
+            transformers.utils.logging.enable_explicit_format()
+        logging.info("Training/evaluation parameters %s", training_args)
+        logging.info("Model parameters: %s", model_args)
+        logging.info("Data parameters: %s", data_args)
+
+        # Set seed before initializing model.
+        set_seed(training_args.seed)
+        logging.info(f"Seed to reproduce: {training_args.seed}")
+
+        if model_args.finetuning:
+            run_finetuning_multiple_tasks(
+                model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
-        elif last_checkpoint is not None:
-            logging.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To "
-                "avoid this behavior, change the `--output_dir` or add "
-                "`--overwrite_output_dir` to train from scratch."
+        else:
+            run_pretraining(
+                model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
 
-    # Setup logging
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
-        level=(logging.INFO if is_main_process(training_args.local_rank)
-               else logging.WARN)
-    )
-
-    # Log on each process the small summary:
-    logging.warning(
-        f"Process rank: {training_args.local_rank}, "
-        f"device: {training_args.device}, n_gpu: {training_args.n_gpu} "
-        f"distributed training: {bool(training_args.local_rank != -1)}, "
-        f"16-bits training: {training_args.fp16}"
-    )
-    # Set the verbosity to info of the Transformers logging (on main process only):
-    if is_main_process(training_args.local_rank):
-        transformers.utils.logging.set_verbosity_info()
-        transformers.utils.logging.enable_default_handler()
-        transformers.utils.logging.enable_explicit_format()
-    logging.info("Training/evaluation parameters %s", training_args)
-    logging.info("Model parameters: %s", model_args)
-    logging.info("Data parameters: %s", data_args)
-
-    # Set seed before initializing model.
-    set_seed(training_args.seed)
-    logging.info(f"Seed to reproduce: {training_args.seed}")
-
-    if model_args.finetuning:
-        run_finetuning_multiple_tasks(
-            model_args, data_args, training_args,
-            trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
-        )
-    else:
-        run_pretraining(
-            model_args, data_args, training_args,
-            trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
-        )
+        # destroy process group before launching another experiment
+        if cmd_args.local_rank:
+            torch.distributed.destroy_process_group()
 
 
 def run_finetuning_multiple_tasks(
-    model_args, data_args, training_args,
-    trainer_callbacks=None, last_checkpoint=None
+    model_args, data_args, training_args, last_checkpoint=None
 ):
     """Loop through all tasks, train, evaluate, and save results"""
 
@@ -212,8 +201,7 @@ def run_finetuning_multiple_tasks(
         # Run finetuning and save results
         for _ in range(num_runs):
             eval_results = run_finetuning_single_task(
-                model_args, data_args, training_args,
-                trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
+                model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
             # Eval results contains nested subtasks, e.g. MNLI matched/mismatched
             print(eval_results)
@@ -232,8 +220,7 @@ def run_finetuning_multiple_tasks(
 
 
 def run_pretraining(
-    model_args, data_args, training_args,
-    trainer_callbacks=None, last_checkpoint=None
+    model_args, data_args, training_args, last_checkpoint=None
 ):
     """Pretrain and evaluate a language model"""
 
@@ -283,7 +270,8 @@ def run_pretraining(
     # Train and evaluate
     trainer = init_trainer(
         model, tokenizer, data_collator, training_args,
-        train_dataset, eval_dataset, trainer_callbacks,
+        train_dataset, eval_dataset,
+        trainer_callbacks=model_args.trainer_callbacks or None
     )
 
     if training_args.do_train:
@@ -295,11 +283,9 @@ def run_pretraining(
 
 
 def run_finetuning_single_task(
-    model_args, data_args, training_args,
-    trainer_callbacks=None, last_checkpoint=None
+    model_args, data_args, training_args, last_checkpoint=None
 ):
     """On a single task train, evaluate, and save results"""
-
 
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
@@ -349,7 +335,8 @@ def run_finetuning_single_task(
     # Train
     trainer = init_trainer(
         model, tokenizer, data_collator, training_args,
-        train_dataset, eval_dataset, trainer_callbacks,
+        train_dataset, eval_dataset,
+        trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
     if training_args.do_train:

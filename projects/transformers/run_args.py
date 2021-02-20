@@ -103,6 +103,13 @@ class ModelArguments:
             "help": "Allow user to define custom training arguments per task."
         },
     )
+    trainer_callbacks: Dict = field(
+        default_factory=dict,
+        metadata={
+            "help": "Whether to create a new results file. If set to False, will only"
+                    "attempt to update existing entries"
+        },
+    )
 
 
 @dataclass
@@ -226,6 +233,7 @@ class DataTrainingArguments:
                     "attempt to update existing entries"
         },
     )
+
 
     def __post_init__(self):
         """Input validation"""
