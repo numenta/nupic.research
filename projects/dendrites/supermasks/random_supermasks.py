@@ -39,8 +39,8 @@ from nupic.research.frameworks.dendrites import (
     plot_mean_selected_activations,
     plot_overlap_scores_distribution,
     plot_percent_active_dendrites,
-    plot_repr_overlap_distributions,
-    plot_repr_overlap_matrix,
+    plot_representation_overlap_distributions,
+    plot_representation_overlap_matrix,
 )
 from nupic.research.frameworks.dendrites.routing import generate_context_vectors
 from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
@@ -214,11 +214,12 @@ def plot_representation_overlap_from_hooks():
 
         targets = exp.ro_targets
 
-        visual = plot_repr_overlap_matrix(activations, targets)
-        results.update({f"repr_overlap_matrix/{name}": visual})
-        visual_1, visual_2 = plot_repr_overlap_distributions(activations, targets)
-        results.update({f"repr_overlap_inter/{name}": visual_1})
-        results.update({f"repr_overlap_intra/{name}": visual_2})
+        visual = plot_representation_overlap_matrix(activations, targets)
+        results.update({f"representation_overlap_matrix/{name}": visual})
+        visual_1, visual_2 = plot_representation_overlap_distributions(activations,
+                                                                       targets)
+        results.update({f"representation_overlap_inter/{name}": visual_1})
+        results.update({f"representation_overlap_intra/{name}": visual_2})
 
     return results
 

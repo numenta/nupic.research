@@ -316,7 +316,7 @@ def entropy(x):
     return _entropy, _max_entropy
 
 
-def repr_overlap_matrix(activations, targets):
+def representation_overlap_matrix(activations, targets):
     """
     Returns a 2D torch tensor with shape (num_categories, num_categories) where cell
     c1, c2 gives the mean value of pairwise representation overlap across all pairs of
@@ -333,7 +333,7 @@ def repr_overlap_matrix(activations, targets):
     """
     with torch.no_grad():
 
-        repr_overlaps = repr_overlap_stats(activations, targets)
+        overlap_values = representation_overlap_stats(activations, targets)
 
         # Assume the following:
         # - target values are zero-based
@@ -348,13 +348,13 @@ def repr_overlap_matrix(activations, targets):
         for t1 in range(num_categories):
             for t2 in range(1 + t1):
 
-                mean_overlap_val = np.mean(repr_overlaps[t1][t2])
+                mean_overlap_val = np.mean(overlap_values[t1][t2])
                 overlap_matrix[t1, t2] = mean_overlap_val
 
         return overlap_matrix
 
 
-def repr_overlap_distributions(activations, targets):
+def representation_overlap_distributions(activations, targets):
     """
     Returns (list of floats, list of floats) where the first list gives representation
     overlap values between all pairs of samples in different classes, and the second
@@ -369,7 +369,7 @@ def repr_overlap_distributions(activations, targets):
     :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
                     target label for example b
     """
-    repr_overlaps = repr_overlap_stats(activations, targets)
+    overlap_values = representation_overlap_stats(activations, targets)
 
     # Assume the following:
     # - target values are zero-based
@@ -383,17 +383,17 @@ def repr_overlap_distributions(activations, targets):
         for t2 in range(1 + t1):
 
             if t1 == t2:
-                intra_class_overlaps.extend(repr_overlaps[t1][t2])
+                intra_class_overlaps.extend(overlap_values[t1][t2])
             else:
-                inter_class_overlaps.extend(repr_overlaps[t1][t2])
+                inter_class_overlaps.extend(overlap_values[t1][t2])
 
     return inter_class_overlaps, intra_class_overlaps
 
 
-def repr_overlap_stats(activations, targets):
+def representation_overlap_stats(activations, targets):
     """
-    Returns `repr_overlaps`: a dict of dicts, where
-    repr_overlaps[class_id_1][class_id_2] is list of representation overlap values
+    Returns `overlap_values`: a dict of dicts, where
+    overlap_values[class_id_1][class_id_2] is list of representation overlap values
     between all pairs in class_id_1 and class_id_2; self-paired examples are excluded
     in the case where the two classes are the same.
     """
@@ -402,11 +402,11 @@ def repr_overlap_stats(activations, targets):
         num_categories = 1 + targets.max().item()
         _, num_units = activations.size()
 
-        repr_overlaps = {}
+        overlap_values = {}
 
         for t1 in range(num_categories):
 
-            repr_overlaps[t1] = {}
+            overlap_values[t1] = {}
 
             for t2 in range(1 + t1):
 
@@ -434,6 +434,6 @@ def repr_overlap_stats(activations, targets):
                 else:
                     overlap_vals = overlap_vals.flatten().tolist()
 
-                repr_overlaps[t1][t2] = overlap_vals
+                overlap_values[t1][t2] = overlap_vals
 
-        return repr_overlaps
+        return overlap_values

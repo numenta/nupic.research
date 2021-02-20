@@ -26,8 +26,8 @@ from pprint import pformat
 import torch
 
 from nupic.research.frameworks.dendrites import (
-    plot_repr_overlap_distributions,
-    plot_repr_overlap_matrix,
+    plot_representation_overlap_distributions,
+    plot_representation_overlap_matrix,
 )
 from nupic.research.frameworks.pytorch.hooks import (
     ModelHookManager,
@@ -143,17 +143,21 @@ class PlotRepresentationOverlap(metaclass=abc.ABCMeta):
 
             for name, _, activations in self.ro_hook.get_statistics():
 
+                metric_str = "representation_overlap"
+
                 # Representation overlap matrix
-                visual = plot_repr_overlap_matrix(activations, self.ro_targets)
-                results.update({f"repr_overlap_matrix/{name}": visual})
+                visual = plot_representation_overlap_matrix(activations,
+                                                            self.ro_targets)
+                results.update({f"{metric_str}_matrix/{name}": visual})
 
                 # Representation overlap distributions:
                 #  * inter-class pairs
                 #  * intra-class pairs
-                inter_ol, intra_ol = plot_repr_overlap_distributions(activations,
-                                                                     self.ro_targets)
-                results.update({f"repr_overlap_interclass/{name}": inter_ol})
-                results.update({f"repr_overlap_intraclass/{name}": intra_ol})
+                plots = plot_representation_overlap_distributions(activations,
+                                                                  self.ro_targets)
+                inter_overlaps, intra_overlaps = plots
+                results.update({f"{metric_str}_interclass/{name}": inter_overlaps})
+                results.update({f"{metric_str}_intraclass/{name}": intra_overlaps})
 
         return results
 

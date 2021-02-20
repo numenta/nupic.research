@@ -99,7 +99,7 @@ class PlotRepresentationOverlapTest(unittest.TestCase):
     This is a test class for the `PlotRepresentationOverlap` mixin.
     """
 
-    def test_repr_overlap_tracking_supervised_experiment(self):
+    def test_representation_overlap_tracking_supervised_experiment(self):
         """
         Test whether the mixin tracks representation overlap values in the supervised
         setting.
@@ -118,9 +118,9 @@ class PlotRepresentationOverlapTest(unittest.TestCase):
 
             # The plot frequency is 2 and should be logged every 2 epochs.
             if i % 2 == 0:
-                self.assertTrue("repr_overlap_matrix/kwinners" in ret)
-                self.assertTrue("repr_overlap_interclass/kwinners" in ret)
-                self.assertTrue("repr_overlap_intraclass/kwinners" in ret)
+                self.assertTrue("representation_overlap_matrix/kwinners" in ret)
+                self.assertTrue("representation_overlap_interclass/kwinners" in ret)
+                self.assertTrue("representation_overlap_intraclass/kwinners" in ret)
 
             # All the the tensors tracked should be of the same batch size.
             batch_size1 = exp.ro_targets.size(0)
@@ -155,7 +155,7 @@ class PlotRepresentationOverlapTest(unittest.TestCase):
 
             # Validate that nothing is being tracked.
             for k in ret.keys():
-                self.assertTrue("repr_overlap" not in k)
+                self.assertTrue("representation_overlap" not in k)
 
 
 if __name__ == "__main__":

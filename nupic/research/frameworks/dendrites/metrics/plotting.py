@@ -33,8 +33,8 @@ from .metrics import (
     hidden_activations_by_unit,
     mean_selected_activations,
     percent_active_dendrites,
-    repr_overlap_distributions,
-    repr_overlap_matrix,
+    representation_overlap_distributions,
+    representation_overlap_matrix,
     winning_segment_indices,
 )
 
@@ -441,7 +441,8 @@ def plot_entropy_distribution(winning_mask, targets):
     return figure
 
 
-def plot_repr_overlap_matrix(activations, targets, category_names=None, annotate=True):
+def plot_representation_overlap_matrix(activations, targets, category_names=None,
+                                       annotate=True):
     """
     Returns a heatmap with shape (num_categories, num_categories) where cell c1, c2
     gives the mean value of pairwise representation overlaps across all pairs of
@@ -459,7 +460,7 @@ def plot_repr_overlap_matrix(activations, targets, category_names=None, annotate
     """
     num_categories = 1 + targets.max().item()
 
-    overlap_matrix = repr_overlap_matrix(activations, targets)
+    overlap_matrix = representation_overlap_matrix(activations, targets)
     overlap_matrix = overlap_matrix.detach().cpu().numpy()
 
     # `overlap_matrix` is symmetric, hence we can set all values above the main
@@ -501,7 +502,7 @@ def plot_repr_overlap_matrix(activations, targets, category_names=None, annotate
     return figure
 
 
-def plot_repr_overlap_distributions(activations, targets):
+def plot_representation_overlap_distributions(activations, targets):
     """
     Returns a tuple of histograms that show pairwise representation overlaps between
     samples whose representations are given by `activations`. The first histogram
@@ -513,7 +514,8 @@ def plot_repr_overlap_distributions(activations, targets):
     :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
                     target label for example b
     """
-    inter_class_ol, intra_class_ol = repr_overlap_distributions(activations, targets)
+    inter_class_ol, intra_class_ol = representation_overlap_distributions(activations,
+                                                                          targets)
     figures = []
 
     for fig_num, ol in enumerate((inter_class_ol, intra_class_ol)):
