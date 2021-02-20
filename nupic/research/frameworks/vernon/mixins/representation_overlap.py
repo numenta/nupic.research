@@ -102,7 +102,6 @@ class PlotRepresentationOverlap(metaclass=abc.ABCMeta):
         # to the tensors being collected by the hooks.
         self.ro_targets = torch.tensor([]).long()
 
-
     def run_epoch(self):
 
         # Run the epoch with tracking enabled.
