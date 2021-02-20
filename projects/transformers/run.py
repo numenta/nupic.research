@@ -49,6 +49,7 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 from experiments import CONFIGS
 from run_args import DataTrainingArguments, ModelArguments
 from run_utils import (
+    TaskResults,
     evaluate_language_model,
     evaluate_tasks,
     get_labels,
@@ -195,29 +196,36 @@ def run_finetuning_multiple_tasks(
         training_args.output_dir = os.path.join(
             base_training_args.output_dir, task_name
         )
+        task_results = TaskResults(task_name)
         # Update any custom training hyperparameter
+        # TODO: allow hyperparameter search for each task
+        num_runs = 1
         if task_name in model_args.task_hyperparams:
-            for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
-                setattr(training_args, hp_key, hp_val)
+            task_results.custom_hyperparams = model_args.task_hyperparams[task_name]
+            for hp_key, hp_val in task_results.custom_hyperparams.items():
+                if hp_key == "num_runs":
+                    # allows averaging over several runs per finetuning task
+                    num_runs = max(1, hp_val)
+                else:
+                    setattr(training_args, hp_key, hp_val)
+
         # Run finetuning and save results
-        eval_results = run_finetuning_single_task(
-            model_args, data_args, training_args,
-            trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
-        )
-        results.update(eval_results)
+        for _ in range(num_runs):
+            eval_results = run_finetuning_single_task(
+                model_args, data_args, training_args,
+                trainer_callbacks=trainer_callbacks, last_checkpoint=last_checkpoint
+            )
+            # Eval results contains nested subtasks, e.g. MNLI matched/mismatched
+            print(eval_results)
+            task_results.append(eval_results)
+
+        task_results.reduce_metrics(reduction="mean")
+        logging.info(f"{task_name} results: {task_results.to_string()}")
+        logging.info(f"{task_name} consolidated: {task_results.consolidate()}")
+        results[task_name] = task_results
 
     # Pickle and save results
     if is_main_process(base_training_args.local_rank):
-        # Save specific hyperparameters along with results
-        # TODO: when doing hyperparam search, get best option only
-        for task_name in results.keys():
-            if task_name in model_args.task_hyperparams:
-                results[task_name]["task_hyperparams"] = \
-                    model_args.task_hyperparams[task_name]
-
-        results_path = os.path.join(
-            base_training_args.output_dir, "task_results.p"
-        )
         logging.info(f"Saving task_results to {results_path}")
         with open(results_path, "wb") as file:
             pickle.dump(results, file)

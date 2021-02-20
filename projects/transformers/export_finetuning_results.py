@@ -30,21 +30,8 @@ Useful if you only need to rerun one or more tasks instead of all
 
 import argparse
 import pickle
-from collections import defaultdict
 
 import pandas as pd
-
-metrics = {
-    "cola": ["eval_matthews_correlation"],
-    "mnli": ["eval_accuracy"],
-    "mrpc": ["eval_f1", "eval_accuracy"],
-    "qnli": ["eval_accuracy"],
-    "qqp": ["eval_accuracy", "eval_f1"],
-    "rte": ["eval_accuracy"],
-    "sst2": ["eval_accuracy"],
-    "stsb": ["eval_pearson", "eval_spearmanr"],
-    "wnli": ["eval_accuracy"]
-}
 
 
 def results_to_markdown(model_name, results_files):
@@ -52,24 +39,10 @@ def results_to_markdown(model_name, results_files):
     for results_file in results_files:
         with open(results_file, "rb") as f:
             results.update(pickle.load(f))
+    print(results)
 
-    # Handle special case of double of MNLI matched/mismatched evaluation
-    if "mnli-mm" in results.keys():
-        results["mnli"].update(
-            eval_accuracy_mm=results["mnli-mm"]["eval_accuracy"]
-        )
-        metrics["mnli"].append("eval_accuracy_mm")
-        del results["mnli-mm"]
-
-    report_results = defaultdict(list)
-    consolidated_results = defaultdict(int)
-    for task, result_dict in results.items():
-        for metric in metrics[task]:
-            report_results[task].append(f"{result_dict[metric]*100:.2f}")
-            consolidated_results[task] += result_dict[metric]
-
-        report_results[task] = "/".join(report_results[task])
-        consolidated_results[task] /= len(metrics[task])
+    report_results = {t: r.to_string() for t, r in results.items()}
+    consolidated_results = {t: r.consolidate() for t, r in results.items()}
 
     num_tasks_bert = len(results) - 1 if "wnli" in results else len(results)
     average_bert = sum(

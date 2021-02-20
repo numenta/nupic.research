@@ -24,7 +24,7 @@ Auxiliary functions to run.py file
 import logging
 import math
 import os
-from collections import Counter
+from collections import defaultdict, Counter
 from functools import partial
 from hashlib import blake2b
 
@@ -123,7 +123,9 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     eval_results = {}
     for eval_dataset, task in zip(eval_datasets, tasks):
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
-        eval_results[task] = eval_result
+        if task == "mnli-mm":
+            eval_result = {f"mm_{k}": v for k, v in eval_result.items()}
+        eval_results.update(eval_result)
 
         output_eval_file = os.path.join(
             output_dir, f"eval_results_{task}.txt"
@@ -706,20 +708,22 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
     preds = (ep.predictions[0] if isinstance(ep.predictions, tuple) else ep.predictions)
     preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
 
-    logging.info(f"Label distribution for {task_name} before cleaning")
-    logging.info(f"Predictions: {Counter(preds).most_common()}")
-    logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
+    if not is_regression:
+        logging.info(f"Label distribution for {task_name} before cleaning")
+        logging.info(f"Predictions: {Counter(preds).most_common()}")
+        logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
 
     # Ignore the -100 labels - not able to tokenize?
     # TODO: investigate why a few labels are -100 in all tasks
     label_ids = ep.label_ids[np.where(ep.label_ids != -100)]
     preds = preds[np.where(ep.label_ids != -100)]
     logging.info(f"Removing {1-(len(label_ids) / len(ep.label_ids)):.2%} samples "
-                 "from evaluation set where label == -100")
+                "from evaluation set where label == -100")
 
-    logging.info(f"Label distribution for {task_name} after cleaning")
-    logging.info(f"Predictions: {Counter(preds).most_common()}")
-    logging.info(f"Labels: {Counter(label_ids).most_common()}")
+    if not is_regression:
+        logging.info(f"Label distribution for {task_name} after cleaning")
+        logging.info(f"Predictions: {Counter(preds).most_common()}")
+        logging.info(f"Labels: {Counter(label_ids).most_common()}")
 
     if task_name is not None:
         if task_name == "cola":
@@ -761,3 +765,63 @@ def pearson_and_spearman(preds, labels):
         "pearson": pearson_corr,
         "spearmanr": spearman_corr,
     }
+
+
+class TaskResults():
+    """
+    Collects and reports results for each finetuning task
+    """
+
+    reporting_metrics_per_task = {
+        "cola": ["eval_matthews_correlation"],
+        "mnli": ["eval_accuracy", "mm_eval_accuracy"],
+        "mrpc": ["eval_f1", "eval_accuracy"],
+        "qnli": ["eval_accuracy"],
+        "qqp": ["eval_accuracy", "eval_f1"],
+        "rte": ["eval_accuracy"],
+        "sst2": ["eval_accuracy"],
+        "stsb": ["eval_pearson", "eval_spearmanr"],
+        "wnli": ["eval_accuracy"]
+    }
+
+    def __init__(self, task_name):
+        self.task_name = task_name
+        self.reporting_metrics = self.reporting_metrics_per_task[task_name]
+        self.all_results = []
+        self._results = None
+        self.custom_hyperparams = None
+
+    def append(self, results):
+        self.all_results.append(results)
+
+    def reduce_metrics(self, reduction="mean"):
+        aggregated_results = defaultdict(list)
+        for results in self.all_results:
+            for metric, value in results.items():
+                aggregated_results[metric].append(value)
+
+        if reduction == "mean":
+            self._results = {k: np.average(v) for k, v in aggregated_results.items()}
+
+        elif reduction == "max":
+            argmax_idx = np.argmax(aggregated_results[self.reporting_metrics[0]])
+            self._results = self.all_results[argmax_idx]
+
+    @property
+    def results(self):
+        if self._results is not None:
+            return self._results
+        elif len(self.all_results) > 0:
+            return self.all_results[0]
+        else:
+            raise AttributeError(f"Results not available for {self.task_name}")
+
+    def consolidate(self):
+        return np.average([self.results[m] for m in self.reporting_metrics])
+
+    def to_string(self):
+        print(self.task_name, self.reporting_metrics)
+        results_to_string = [
+            f"{self.results[m]*100:.2f}" for m in self.reporting_metrics
+        ]
+        return "/".join(results_to_string)
