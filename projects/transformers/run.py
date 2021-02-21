@@ -123,7 +123,7 @@ def main():
             datefmt="%m/%d/%Y %H:%M:%S",
             handlers=[logging.StreamHandler(sys.stdout)],
             level=(logging.INFO if is_main_process(training_args.local_rank)
-                else logging.WARN)
+                   else logging.WARN)
         )
 
         # Log on each process the small summary:

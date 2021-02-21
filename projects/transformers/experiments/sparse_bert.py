@@ -22,7 +22,6 @@
 Base Transformers Experiment configuration.
 """
 
-import os
 from copy import deepcopy
 
 from callbacks import SparsifyFCLayersCallback

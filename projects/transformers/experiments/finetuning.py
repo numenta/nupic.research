@@ -22,7 +22,6 @@
 Base Transformers Experiment configuration.
 """
 
-import os
 from copy import deepcopy
 
 from .base import transformers_base

@@ -24,7 +24,7 @@ Auxiliary functions to run.py file
 import logging
 import math
 import os
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from functools import partial
 from hashlib import blake2b
 
@@ -718,7 +718,7 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
     label_ids = ep.label_ids[np.where(ep.label_ids != -100)]
     preds = preds[np.where(ep.label_ids != -100)]
     logging.info(f"Removing {1-(len(label_ids) / len(ep.label_ids)):.2%} samples "
-                "from evaluation set where label == -100")
+                 "from evaluation set where label == -100")
 
     if not is_regression:
         logging.info(f"Label distribution for {task_name} after cleaning")
