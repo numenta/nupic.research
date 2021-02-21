@@ -77,13 +77,17 @@ debug_finetuning_bert100k_ntasks.update(
     # logging
     run_name="debug_finetuning_bert100k_ntasks",
     report_to="tensorboard",
-    task_names=["cola", "stsb"],
+    task_name="glue",
+    # task_name=None,
+    # task_names=["cola", "stsb", "mnli"],
+    override_finetuning_results=False,
     task_hyperparams=dict(
-        cola=dict(
-            learning_rate=1e-4
-        )
+        wnli=dict(num_runs=2, learning_rate=2e-4),
+        rte=dict(num_runs=0),
+        cola=dict(num_runs=2),
+        stsb=dict(num_runs=1),
     ),
-    max_steps=80,
+    max_steps=300,
     do_predict=False,
 )
 
@@ -93,6 +97,7 @@ finetuning_bert700k_glue.update(
     # logging
     run_name="finetuning_bert700k_glue",
     overwrite_output_dir=True,
+    override_finetuning_results=True,
 
     # Data arguments
     task_name="glue",
@@ -109,8 +114,11 @@ finetuning_bert700k_glue.update(
     learning_rate=2e-5,
     num_train_epochs=3,
     task_hyperparams=dict(
-        mrpc=dict(num_train_epochs=5),
-        wlni=dict(num_train_epochs=5)
+        mrpc=dict(num_train_epochs=5, num_runs=3),
+        wnli=dict(num_train_epochs=5, num_runs=5),
+        cola=dict(num_runs=5),
+        stsb=dict(num_runs=3),
+        rte=dict(num_runs=5),
     ),
 
 )
@@ -118,16 +126,24 @@ finetuning_bert700k_glue.update(
 finetuning_bert100k_glue = deepcopy(finetuning_bert700k_glue)
 finetuning_bert100k_glue.update(
     # logging
-    task_name="glue",
     run_name="finetuning_bert100k_glue",
     overwrite_output_dir=True,
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
 )
 
+finetuning_bert1mi_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_bert1mi_glue.update(
+    # logging
+    run_name="finetuning_bert1mi_glue",
+    overwrite_output_dir=True,
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
+)
+
 finetuning_bert100k_single_task = deepcopy(finetuning_bert100k_glue)
 finetuning_bert100k_single_task.update(
     # logging
-    task_name="qqp",
+    task_name=None,
+    task_names=["mnli"],
     run_name="finetuning_bert100k_single_task",
 )
 
@@ -135,7 +151,8 @@ finetuning_bert100k_single_task.update(
 finetuning_bert700k_single_task = deepcopy(finetuning_bert700k_glue)
 finetuning_bert700k_single_task.update(
     # logging
-    task_name="qqp",
+    task_name=None,
+    task_names=["mnli", "cola"],
     run_name="finetuning_bert700k_single_task",
 )
 
@@ -144,8 +161,9 @@ CONFIGS = dict(
     debug_finetuning=debug_finetuning,
     debug_finetuning_bert100k=debug_finetuning_bert100k,
     debug_finetuning_bert100k_ntasks=debug_finetuning_bert100k_ntasks,
-    finetuning_bert700k_glue=finetuning_bert700k_glue,
     finetuning_bert100k_glue=finetuning_bert100k_glue,
     finetuning_bert100k_single_task=finetuning_bert100k_single_task,
+    finetuning_bert700k_glue=finetuning_bert700k_glue,
     finetuning_bert700k_single_task=finetuning_bert700k_single_task,
+    finetuning_bert1mi_glue=finetuning_bert1mi_glue,
 )
