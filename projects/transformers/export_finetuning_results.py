@@ -34,21 +34,26 @@ import pickle
 import pandas as pd
 
 
-def results_to_markdown(model_name, results_files):
+def results_to_markdown(results_files, model_name, reduction):
     results = {}
     for results_file in results_files:
         with open(results_file, "rb") as f:
             results.update(pickle.load(f))
-    print(results)
 
+    # Aggregate using chosen reduction method
+    for _, task_results in results.items():
+        task_results.reduce_metrics(reduction=reduction)
+        print(task_results.task_name, task_results.all_results)
+
+    # Get results in string format and consolidated per task
     report_results = {t: r.to_string() for t, r in results.items()}
     consolidated_results = {t: r.consolidate() for t, r in results.items()}
 
+    # Calculate totals for bert and glue
     num_tasks_bert = len(results) - 1 if "wnli" in results else len(results)
     average_bert = sum(
         [value for task, value in consolidated_results.items() if task != "wnli"]
     ) / num_tasks_bert
-
     average_glue = sum(consolidated_results.values()) / len(results)
 
     report_results["average_bert"] = f"{average_bert*100:.2f}"
@@ -65,5 +70,9 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model_name", type=str,
                         default="model",
                         help="Name of the model to save")
+    parser.add_argument("-r", "--reduction", type=str,
+                        default="max", choices=["mean", "max"],
+                        help="Reduction method to use to aggregate results"
+                             "from multiple runs")
     args = parser.parse_args()
     results_to_markdown(**args.__dict__)
