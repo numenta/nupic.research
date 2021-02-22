@@ -21,12 +21,25 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from transformers import MODEL_FOR_MASKED_LM_MAPPING
+from transformers import MODEL_FOR_MASKED_LM_MAPPING, TrainingArguments
 
 from run_utils import TASK_TO_KEYS
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+
+
+@dataclass
+class CustomTrainingArguments(TrainingArguments):
+    """
+    Additional arguments to HF TrainingArguments
+    """
+    num_runs: int = field(
+        default=1,
+        metadata={
+            "help": "How many runs per task. Currently only used for finetuning."
+        },
+    )
 
 
 @dataclass

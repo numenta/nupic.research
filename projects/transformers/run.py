@@ -49,7 +49,7 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
-from run_args import DataTrainingArguments, ModelArguments
+from run_args import DataTrainingArguments, ModelArguments, CustomTrainingArguments
 from run_utils import (
     TaskResults,
     evaluate_language_model,
@@ -85,7 +85,7 @@ def main():
         config_dict["local_rank"] = int(cmd_args.local_rank or -1)
         # See all possible arguments in transformers/training_args.py and ./run_args.py
         exp_parser = HfArgumentParser(
-            (ModelArguments, DataTrainingArguments, TrainingArguments)
+            (ModelArguments, DataTrainingArguments, CustomTrainingArguments)
         )
         model_args, data_args, training_args = exp_parser.parse_dict(config_dict)
 
