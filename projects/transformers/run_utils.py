@@ -73,16 +73,17 @@ GLUE:
 - Single Sentence, 2 classes: SST-2 (sentiment), COLA (grammatically correct)
 """
 
+# Tasks ordered by training time
 TASK_TO_KEYS = {
-    "cola": ("sentence", None),
-    "mnli": ("premise", "hypothesis"),  # includes matched and mismatched
+    "wnli": ("sentence1", "sentence2"),
+    "rte": ("sentence1", "sentence2"),
+    "stsb": ("sentence1", "sentence2"),
     "mrpc": ("sentence1", "sentence2"),
+    "cola": ("sentence", None),
+    "sst2": ("sentence", None),
     "qnli": ("question", "sentence"),
     "qqp": ("question1", "question2"),
-    "rte": ("sentence1", "sentence2"),
-    "sst2": ("sentence", None),
-    "stsb": ("sentence1", "sentence2"),
-    "wnli": ("sentence1", "sentence2"),
+    "mnli": ("premise", "hypothesis"),  # includes matched and mismatched
 }
 
 
@@ -644,12 +645,12 @@ def init_model(model_args, config, tokenizer, finetuning=False):
             use_auth_token=True if model_args.use_auth_token else None,
         )
         if finetuning:
-            logging.info("Loading a pretrained model from HF for finetuning")
+            logging.info("Loading a pretrained model for finetuning")
             model = AutoModelForSequenceClassification.from_pretrained(
                 model_args.model_name_or_path, **model_kwargs
             )
         else:
-            logging.info("Loading a pretrained model from HF to continue pretraining")
+            logging.info("Loading a pretrained model to continue pretraining")
             model = AutoModelForMaskedLM.from_pretrained(
                 model_args.model_name_or_path, **model_kwargs
             )

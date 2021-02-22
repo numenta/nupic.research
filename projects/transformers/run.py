@@ -160,65 +160,6 @@ def main():
             torch.distributed.destroy_process_group()
 
 
-def run_finetuning_multiple_tasks(
-    model_args, data_args, training_args, last_checkpoint=None
-):
-    """Loop through all tasks, train, evaluate, and save results"""
-
-    logging.info(f"Finetuning model for downstream tasks.")
-
-    # If results file already exists, open it and only update keys
-    results_path = os.path.join(training_args.output_dir, "task_results.p")
-    if os.path.exists(results_path) and not data_args.override_finetuning_results:
-        logging.info(f"Updating existing task_results in {results_path}")
-        with open(results_path, "rb") as f:
-            results = pickle.load(f)
-    else:
-        results = {}
-
-    base_training_args = deepcopy(training_args)
-    for task_name in data_args.task_names:
-        data_args.task_name = task_name
-        training_args = deepcopy(base_training_args)
-        # For each task, save to a subfolder within run's root folder
-        training_args.run_name = f"{base_training_args.run_name}_{task_name}"
-        training_args.output_dir = os.path.join(
-            base_training_args.output_dir, task_name
-        )
-        task_results = TaskResults(task_name)
-        # Update any custom training hyperparameter
-        # TODO: allow hyperparameter search for each task
-        num_runs = 1
-        if task_name in model_args.task_hyperparams:
-            task_results.custom_hyperparams = model_args.task_hyperparams[task_name]
-            for hp_key, hp_val in task_results.custom_hyperparams.items():
-                if hp_key == "num_runs":
-                    # allows averaging over several runs per finetuning task
-                    num_runs = max(1, hp_val)
-                else:
-                    setattr(training_args, hp_key, hp_val)
-
-        # Run finetuning and save results
-        for _ in range(num_runs):
-            eval_results = run_finetuning_single_task(
-                model_args, data_args, training_args, last_checkpoint=last_checkpoint
-            )
-            # Eval results contains nested subtasks, e.g. MNLI matched/mismatched
-            print(eval_results)
-            task_results.append(eval_results)
-
-        task_results.reduce_metrics(reduction="mean")
-        logging.info(f"{task_name} results: {task_results.to_string()}")
-        logging.info(f"{task_name} consolidated: {task_results.consolidate()}")
-        results[task_name] = task_results
-
-    # Pickle and save results
-    if is_main_process(base_training_args.local_rank):
-        logging.info(f"Saving task_results to {results_path}")
-        with open(results_path, "wb") as file:
-            pickle.dump(results, file)
-
-
 def run_pretraining(
     model_args, data_args, training_args, last_checkpoint=None
 ):
@@ -383,6 +324,63 @@ def run_finetuning_single_task(
     model.to("cpu")
 
     return eval_results
+
+
+def run_finetuning_multiple_tasks(
+    model_args, data_args, training_args, last_checkpoint=None
+):
+    """Loop through all tasks, train, evaluate, and save results"""
+
+    logging.info(f"Finetuning model for downstream tasks.")
+
+    # If results file already exists, open it and only update keys
+    results_path = os.path.join(training_args.output_dir, "task_results.p")
+    if os.path.exists(results_path) and not data_args.override_finetuning_results:
+        logging.info(f"Updating existing task_results in {results_path}")
+        with open(results_path, "rb") as f:
+            results = pickle.load(f)
+    else:
+        results = {}
+
+    base_training_args = deepcopy(training_args)
+    for task_name in data_args.task_names:
+        data_args.task_name = task_name
+        training_args = deepcopy(base_training_args)
+        # For each task, save to a subfolder within run's root folder
+        training_args.run_name = f"{base_training_args.run_name}_{task_name}"
+        training_args.output_dir = os.path.join(
+            base_training_args.output_dir, task_name
+        )
+        task_results = TaskResults(task_name)
+        # Update any custom training hyperparameter
+        # TODO: allow hyperparameter search for each task
+        num_runs = 1
+        if task_name in model_args.task_hyperparams:
+            task_results.custom_hyperparams = model_args.task_hyperparams[task_name]
+            for hp_key, hp_val in task_results.custom_hyperparams.items():
+                if hp_key == "num_runs":
+                    # allows averaging over several runs per finetuning task
+                    num_runs = max(1, hp_val)
+                else:
+                    setattr(training_args, hp_key, hp_val)
+
+        # Run finetuning and save results
+        for _ in range(num_runs):
+            eval_results = run_finetuning_single_task(
+                model_args, data_args, training_args, last_checkpoint=last_checkpoint
+            )
+            task_results.append(eval_results)
+
+        task_results.reduce_metrics(reduction="mean")
+        logging.info(f"{task_name} results: {task_results.to_string()}")
+        logging.info(f"{task_name} consolidated: {task_results.consolidate()}")
+        results[task_name] = task_results
+
+        # Pickle and save results
+        if is_main_process(base_training_args.local_rank):
+            logging.info(f"Saving task_results to {results_path}")
+            with open(results_path, "wb") as file:
+                pickle.dump(results, file)
 
 
 def _mp_fn(index):
