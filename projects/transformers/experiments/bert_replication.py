@@ -103,7 +103,6 @@ bert_100k.update(
     lr_scheduler_type="linear",
 
     # Training Arguments - checkpointing
-    run_name="bert_100k",
     logging_steps=500,
     logging_first_step=True,
     save_steps=5000,
@@ -118,7 +117,6 @@ bert_100k.update(
 
 bert_1mi = deepcopy(bert_100k)
 bert_1mi.update(
-    run_name="bert_1mi",
     max_steps=1000000,
 )
 

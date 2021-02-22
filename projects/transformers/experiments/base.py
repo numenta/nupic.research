@@ -42,7 +42,6 @@ transformers_base = dict(
     overwrite_cache=False,
 
     # Training Arguments
-    run_name="transformers_base",
     seed=random.randint(0, 1000000),
     do_train=True,
     do_eval=True,
@@ -68,7 +67,6 @@ bert_base.update(
     pad_to_max_length=False,
 
     # Training Arguments
-    run_name="bert_base",
     overwrite_output_dir=True,
     per_device_train_batch_size=8,
     per_device_eval_batch_size=8,
@@ -89,7 +87,6 @@ debug_bert.update(
     dataset_config_name="wikitext-2-raw-v1",
 
     # Training Arguments
-    run_name="debug_bert",
     logging_first_step=True,
     logging_steps=30,  # also define eval_steps, redundant
     eval_steps=30,
@@ -104,7 +101,6 @@ debug_bert_multiple_data = deepcopy(debug_bert)
 debug_bert_multiple_data.update(
 
     # Training Arguments
-    run_name="debug_run_multiple_data",
     dataset_name=("wikitext", "ptb_text_only"),
     dataset_config_name=("wikitext-2-raw-v1", None),
 
@@ -115,7 +111,6 @@ full_data_load = deepcopy(debug_bert)
 full_data_load.update(
 
     # Training Arguments
-    run_name="data_load_only",
     dataset_name=("wikipedia", "bookcorpus"),
     dataset_config_name=("20200501.en", None),
     do_train=False,
