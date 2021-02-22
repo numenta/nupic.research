@@ -29,6 +29,7 @@ Useful if you only need to rerun one or more tasks instead of all
 """
 
 import argparse
+import os
 import pickle
 
 import pandas as pd
@@ -37,6 +38,8 @@ import pandas as pd
 def results_to_markdown(results_files, model_name, reduction):
     results = {}
     for results_file in results_files:
+        if os.path.isdir(results_file):
+            results_file = os.path.join(results_file, "task_results.p")
         with open(results_file, "rb") as f:
             results.update(pickle.load(f))
 
