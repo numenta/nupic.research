@@ -49,7 +49,7 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
-from run_args import DataTrainingArguments, ModelArguments, CustomTrainingArguments
+from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
     evaluate_language_model,

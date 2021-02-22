@@ -46,7 +46,6 @@ def results_to_markdown(results_files, model_name, reduction):
     # Aggregate using chosen reduction method
     for _, task_results in results.items():
         task_results.reduce_metrics(reduction=reduction)
-        print(task_results.task_name, task_results.all_results)
 
     # Get results in string format and consolidated per task
     report_results = {t: r.to_string() for t, r in results.items()}
