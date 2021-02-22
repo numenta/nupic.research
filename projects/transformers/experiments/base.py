@@ -42,7 +42,7 @@ transformers_base = dict(
     overwrite_cache=False,
 
     # Training Arguments
-    seed=random.randint(0, 1000000),
+    seed=random.randint(0, 1000000000),
     do_train=True,
     do_eval=True,
     dataloader_drop_last=True,  # keeps consistent batch size

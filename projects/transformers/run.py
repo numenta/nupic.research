@@ -33,6 +33,7 @@ import argparse
 import logging
 import os
 import pickle
+import random
 import sys
 from copy import deepcopy
 
@@ -42,7 +43,6 @@ from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     DataCollatorWithPadding,
     HfArgumentParser,
-    TrainingArguments,
     default_data_collator,
     set_seed,
 )
@@ -351,21 +351,20 @@ def run_finetuning_multiple_tasks(
         training_args.output_dir = os.path.join(
             base_training_args.output_dir, task_name
         )
-        task_results = TaskResults(task_name)
         # Update any custom training hyperparameter
         # TODO: allow hyperparameter search for each task
-        num_runs = 1
         if task_name in model_args.task_hyperparams:
-            task_results.custom_hyperparams = model_args.task_hyperparams[task_name]
-            for hp_key, hp_val in task_results.custom_hyperparams.items():
-                if hp_key == "num_runs":
-                    # allows averaging over several runs per finetuning task
-                    num_runs = max(1, hp_val)
-                else:
-                    setattr(training_args, hp_key, hp_val)
+            for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
+                setattr(training_args, hp_key, hp_val)
+        # create Task Results
+        task_results = TaskResults(task_name, training_args=training_args)
 
         # Run finetuning and save results
-        for _ in range(num_runs):
+        for _ in range(training_args.num_runs):
+            # reset seed per run
+            training_args.seed = random.randint(0, 1000000000)
+            set_seed(training_args.seed)
+
             eval_results = run_finetuning_single_task(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )

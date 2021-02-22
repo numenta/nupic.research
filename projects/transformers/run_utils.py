@@ -785,12 +785,12 @@ class TaskResults():
         "wnli": ["eval_accuracy"]
     }
 
-    def __init__(self, task_name):
+    def __init__(self, task_name, training_args=None):
         self.task_name = task_name
         self.reporting_metrics = self.reporting_metrics_per_task[task_name]
         self.all_results = []
         self._results = None
-        self.custom_hyperparams = None
+        self.training_args = training_args
 
     def append(self, results):
         self.all_results.append(results)
