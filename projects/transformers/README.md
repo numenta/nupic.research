@@ -8,9 +8,10 @@ In progress, current results:
 |:-----------|:-----------------|:------------------|:---------------|:-----------------------------|:------------|:---------|:------------|:---------|:---------|:----------------------|:---------|
 |            | Average w/o wnli | Average all tasks | Matthew's corr | Matched acc./Mismatched acc. | F1/Accuracy | Accuracy | Accuracy/F1 | Accuracy | Accuracy | Person/Spearman corr. | Accuracy |
 | bert_HF    | 81.67            | 78.85             | 56.53          | 83.91/84.10                  | 88.85/84.07 | 90.66    | 90.71/87.49 | 65.70    | 92.32    | 88.64/88.48           | 56.34    |
-| bert_paper | 79.60            | -                 | 52.10          | 84.60/83.40                  | 88.9        | 90.5     | 71.2        | 66.4     | 93.5     | 85.8                  | -        |
-| bert_700k  | 78.59            | 74.54             | 41.73          | 83.76/-                      | -/84.90 | 91.51    | 90.53/-    | 58.59    | 91.20    | 86.67/86.31           | 42.19    |
-| bert_100k  | 69.26            | 65.21             | 32.02          | 78.89/-                      | -/77.86 | 50.57    | 89.15/-    | 53.91    | 88.08    | 83.66/83.55           | 32.81    |
+| bert_paper|          79.60 |             -  |  52.10 | 84.60/83.40          | 88.90/- | 90.50     | 71.20/-     | 66.40     | 93.50     | 85.80        |      - |
+| bert_1mi |          78.81 |          74.22 |  45.36 | 79.51/80.58 | 88.63/84.64 |  91.67 | 90.82/87.60 | 58.59 |   91.90 | 87.13/87.00 |   37.50 |
+| bert_700k |          79.44 |          74.25 |  47.33 | 83.43/83.67 | 88.93/84.38 |  91.75 | 90.38/86.94 |  58.20 |  92.48 | 86.88/86.85 |  32.81 |
+| bert_100k |          74.45 |      68.07 |  40.12 |    78.89/-   | 83.39/75.52 |  88.05 | 89.10/85.31 |  54.30 |  88.08 | 83.99/83.82 |  23.44 |
 
 </br>
 </br>
@@ -18,11 +19,11 @@ In progress, current results:
 Model description:
 * bert_HF: reported by HuggingFace, see https://github.com/huggingface/transformers/tree/master/examples/text-classification. No inner loop of hyperparameter optimization for each finetuning task. Pretrained for 1mi steps of batch size 256.
 * bert_paper: reported in BERT paper, see https://arxiv.org/abs/1810.04805. Hyperparameters for each task are chosen in a grid search with 18 different variations per task, and best results reported. Pretrained for 1mi steps of batch size 256.
-* bert_Nk: where N is the number of steps in pretraining. These refer to models trained by ourselves for less than or more than 1mi steps. They might be intermediate checkpoints of longer runs or a shorter run executed to completion. Batch size is 256 unless specified otherwise in the model name. No inner loop of hyperparameter optimization for each finetuning task, follow same finetuning hyperparameters defined by bert_HF.
+* bert_Nk: where N is the number of steps in pretraining. These refer to models trained by ourselves for less than or more than 1mi steps. They might be intermediate checkpoints of longer runs or a shorter run executed to completion. Batch size is 256 unless specified otherwise in the model name. No inner loop of hyperparameter optimization for each finetuning task, follows same finetuning hyperparameters defined by bert_HF. Results for cola, rte and wnli are a max over two runs, remaining tasks are single runs.
 
 Known issues, to be investigated/fixed:
-* Currently we don't have results for mnli mismatched acc.
-* Missing f1 values for QQP and MRPC. Already available in code, require rerunning those specific tasks to get values or evaluating from final checkpoint.
+* A lot of variance in finetuning, specially in small datasets, like rte and wnli, and highly unbalanced datasets such as cola. In cola for example, same model will output results from 14 to 47 using exact similar finetuning regimes.
+* When running multiple times, after the second run the results are identical, even though the models are being loaded pretrained and finetuned (not just evaluating from checkpoint). Likely a bug, might be related to caching, requires investigation.
 * We don't have 100% coverage of validation set. Some samples of the validation set are given the label "-100", most likely for the tokenizer not being able to process them. These samples are excluded for validation. That coverage varies from 95-100%, with most tasks being close to 100%, but cola and mnli specifically have ~95% coverage. Not clear whether the coverage for bert_paper and bert_hf is 100%.
 * Only GLUE tasks included in the table. GLUE covers sequence classification or other tasks such as Q&A or multiple choice reframed as sequence classification. BERT also reports results on SQuaD (question answering), SWAG (multiple choice) and CoNLL (named entity recognition).
 * To add to the table perplexity of the original pretrained models.
