@@ -374,6 +374,14 @@ def run_finetuning_single_task(
             is_regression, label_list
         )
 
+    # There is an existing issue on training multiple models in sequence in this code
+    # There is a memory leakage on the model, a small amount of GPU memory remains after
+    # the run and accumulates over several runs. It fails with OOM after about 20 runs,
+    # even when all tensors on GPU are explicitly deleted, garbage is collected and
+    # cache is cleared. Tried multiple solutions but this weird little hack is the only
+    # thing that worked.
+    model.to("cpu")
+
     return eval_results
 
 
