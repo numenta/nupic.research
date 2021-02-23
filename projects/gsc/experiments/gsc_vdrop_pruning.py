@@ -378,6 +378,8 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
 # how should the learning rate and momentum change? (how high LR should go)
 # how high should the regularization warmup go?
 
+
+
 SIGOPT_GSC_VDROP_SNR_PRUNING = deepcopy(GSC_VDROP_SNR_PRUNING)
 SIGOPT_GSC_VDROP_SNR_PRUNING.update(
     sigopt_experiment_class=SNRPruningGSCVDropSIGOPT,
@@ -415,9 +417,8 @@ SIGOPT_GSC_VDROP_SNR_PRUNING.update(
         project="gsc_snr_pruning",
     ),
     sigopt_experiment_id=374528,
-    api_key = os.environ("SIGOPT_KEY")
+    api_key = os.environ['SIGOPT_KEY']
 )
-
 
 CONFIGS = dict(
     gsc_vdrop=GSC_VDROP,
