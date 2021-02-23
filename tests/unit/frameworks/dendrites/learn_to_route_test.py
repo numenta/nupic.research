@@ -25,11 +25,11 @@ import unittest
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
-from nupic.research.frameworks.dendrites.routing import train_dendrite_model
-from nupic.research.frameworks.dendrites.routing.learn import (
+from nupic.research.frameworks.dendrites.routing import (
     init_dataloader,
     init_optimizer,
     init_test_scenario,
+    train_dendrite_model,
 )
 
 
