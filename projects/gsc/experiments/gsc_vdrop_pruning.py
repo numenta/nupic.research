@@ -33,7 +33,6 @@ from nupic.research.frameworks.backprop_structure.networks import VDropLeNet, \
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
-from nupic.research.frameworks.sigopt.mixins import SNRPruningParams
 
 
 class GSCVDropExperiment(mixins.RegularizeLoss,
@@ -158,6 +157,8 @@ SUBSEQUENT_LR_SCHED_ARGS = dict(
 
 NUM_EPOCHS = 120
 
+
+#94% accuracy, ~170k params = 10% sparsity
 GSC_VDROP_SNR_PRUNING = deepcopy(GSC_VDROP)
 GSC_VDROP_SNR_PRUNING.update(dict(
     name="GSC_VDROP_INITIAL_MULTICYCLE",
@@ -214,7 +215,7 @@ GSC_VDROP_SNR_PRUNING.update(dict(
 
 
 GSC_VDROP_SNR_PRUNING_SUPER_SPARSE = deepcopy(GSC_VDROP_SNR_PRUNING)
-GSC_VDROP_SNR_PRUNING.update(dict(
+GSC_VDROP_SNR_PRUNING_SUPER_SPARSE.update(dict(
     name="GSC_VDROP_SNR_PRUNING_SUPER_SPARSE",
     wandb_args=dict(
         project="gsc-snr-pruning-sparse",
