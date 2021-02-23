@@ -108,6 +108,7 @@ finetuning_bert700k_glue.update(
     per_device_eval_batch_size=32,
     learning_rate=2e-5,
     num_train_epochs=3,
+    num_runs=1,
     task_hyperparams=dict(
         mrpc=dict(num_train_epochs=5, num_runs=3),
         wnli=dict(num_train_epochs=5, num_runs=10),
@@ -115,7 +116,6 @@ finetuning_bert700k_glue.update(
         stsb=dict(num_runs=3),
         rte=dict(num_runs=10),
     ),
-
 )
 
 finetuning_bert100k_glue = deepcopy(finetuning_bert700k_glue)
@@ -136,7 +136,7 @@ finetuning_bert100k_single_task = deepcopy(finetuning_bert100k_glue)
 finetuning_bert100k_single_task.update(
     # logging
     task_name=None,
-    task_names=["mnli"],
+    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
 )
 
 
@@ -144,22 +144,14 @@ finetuning_bert700k_single_task = deepcopy(finetuning_bert700k_glue)
 finetuning_bert700k_single_task.update(
     # logging
     task_name=None,
-    task_names=["rte", "wnli"],
+    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
 )
 
 finetuning_bert1mi_single_task = deepcopy(finetuning_bert1mi_glue)
 finetuning_bert1mi_single_task.update(
     # logging
     task_name=None,
-    task_names=["rte", "wnli"],
-    overwrite_output_dir=True,
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
-)
-
-finetuning_bert1mi_cola = deepcopy(finetuning_bert1mi_glue)
-finetuning_bert1mi_cola.update(
-    # logging
-    task_name="cola",
+    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
     overwrite_output_dir=True,
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
 )
@@ -176,5 +168,4 @@ CONFIGS = dict(
     finetuning_bert700k_single_task=finetuning_bert700k_single_task,
     finetuning_bert1mi_glue=finetuning_bert1mi_glue,
     finetuning_bert1mi_single_task=finetuning_bert1mi_single_task,
-    finetuning_bert1mi_cola=finetuning_bert1mi_cola,
 )

@@ -821,7 +821,6 @@ class TaskResults():
         return np.average([self.results[m] for m in self.reporting_metrics])
 
     def to_string(self):
-        print(self.task_name, self.reporting_metrics)
         results_to_string = [
             f"{self.results[m]*100:.2f}" for m in self.reporting_metrics
         ]
