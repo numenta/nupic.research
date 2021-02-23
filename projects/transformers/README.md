@@ -39,8 +39,6 @@ You can also run multiple experiments in sequence:
 
 `python run.py <experiment_name_A>  <experiment_name_B>`
 
-Other accepted ways are passing arguments directly in command line or through a json file. See run.py for more details.
-
 ## How to run - multiple nodes
 
 To run it in multiple nodes, you will require the run script from transformers-cli-utils (it can be found under ray folder in the infrastructure repository). Make sure to add transformers-cli-utils root folder to PATH after downloading.
