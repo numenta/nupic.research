@@ -24,6 +24,15 @@ import torch
 from nupic.research.frameworks.pytorch import l1_regularization_step
 from nupic.torch.modules.sparse_weights import rezero_weights
 
+__all__ = [
+    "evaluate_dendrite_model",
+    "generate_context_integers",
+    "generate_context_vectors",
+    "generate_random_binary_vectors",
+    "get_gating_context_weights",
+    "train_dendrite_model",
+]
+
 
 def generate_context_integers(num_contexts):
     return torch.arange(num_contexts, dtype=torch.float32).reshape(num_contexts, 1)
@@ -194,7 +203,7 @@ def evaluate_dendrite_model(
 ):
     """
     Evaluates a model on a specified criterion by iterating through all batches in the
-    given dataloader, and returns a dict of metrics that give evaluation performance
+    given dataloader, and returns a dict of metrics that give evaluation performance.
 
     :param model: a torch.nn.Module subclass that implements a dendrite module in
                   addition to a linear feed-forward module, and takes both feedforward
