@@ -10,7 +10,7 @@ In progress, current results:
 | bert_HF    | 81.67            | 78.85             | 56.53          | 83.91/84.10                  | 88.85/84.07 | 90.66    | 90.71/87.49 | 65.70    | 92.32    | 88.64/88.48           | 56.34    |
 | bert_paper|          79.60 |             -  |  52.10 | 84.60/83.40          | 88.90/- | 90.50     | 71.20/-     | 66.40     | 93.50     | 85.80        |      - |
 | bert_1mi |          80.76 |          76.82 |  48.87 | 84.08/84.57 | 89.76/85.68 |  91.19 | 90.58/87.17 | 66.02 |  91.44 | 87.67/87.54 |  45.31 |
-| bert_700k |          79.44 |          74.25 |  47.33 | 83.43/83.67 | 88.93/84.38 |  91.75 | 90.38/86.94 |  58.20 |  92.48 | 86.88/86.85 |  32.81 |
+| bert_700k |          79.77 |          75.25 |  47.73 | 83.91/84.22 | 88.27/83.59 |  91.51 | 90.37/86.90 | 62.11 |  91.44 | 86.88/86.70 |  39.06 |
 | bert_100k |          74.45 |      68.07 |  40.12 |    78.89/-   | 83.39/75.52 |  88.05 | 89.10/85.31 |  54.30 |  88.08 | 83.99/83.82 |  23.44 |
 
 </br>
@@ -19,7 +19,7 @@ In progress, current results:
 Model description:
 * bert_HF: reported by HuggingFace, see https://github.com/huggingface/transformers/tree/master/examples/text-classification. No inner loop of hyperparameter optimization for each finetuning task. Pretrained for 1mi steps of batch size 256.
 * bert_paper: reported in BERT paper, see https://arxiv.org/abs/1810.04805. Hyperparameters for each task are chosen in a grid search with 18 different variations per task, and best results reported. Pretrained for 1mi steps of batch size 256.
-* bert_Nk: where N is the number of steps in pretraining. These refer to models trained by ourselves for less than or more than 1mi steps. They might be intermediate checkpoints of longer runs or a shorter run executed to completion. Batch size is 256 unless specified otherwise in the model name. No inner loop of hyperparameter optimization for each finetuning task, follows same finetuning hyperparameters defined by bert_HF. Results for cola, rte and wnli are a max over two runs, remaining tasks are single runs.
+* bert_Nk: where N is the number of steps in pretraining. These refer to models trained by ourselves for less than or more than 1mi steps. They might be intermediate checkpoints of longer runs or a shorter run executed to completion. Batch size is 256 unless specified otherwise in the model name. No inner loop of hyperparameter optimization for each finetuning task, follows same finetuning hyperparameters defined by bert_HF. Results for {cola, rte, wnli} are a max over 10 runs, {sstb, mrpc} are a max over 3 runs, and the remaining tasks are single runs.
 
 Known issues, to be investigated/fixed:
 * A lot of variance in finetuning, specially in small datasets, like rte and wnli, and highly unbalanced datasets such as cola. In cola for example, same model will output results from 14 to 47 using exact similar finetuning regimes. Maxing over several runs helps in stabilizing finetuning results, making it easier to compare across different models.
