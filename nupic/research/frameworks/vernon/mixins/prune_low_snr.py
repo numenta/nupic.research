@@ -102,11 +102,23 @@ class PruneLowSNR:
                     (self.current_timestep, result)
                 )
 
+    def run_epoch(self):
+        results = super().run_epoch()
+        vdrop_data = self.model.module.vdrop_data
+        total_prunable_parameters = vdrop_data.z_mask.size(0)
+        remaining_nonzero_parameters = vdrop_data.z_mask.double().sum().item()
+        model_sparsity = remaining_nonzero_parameters/total_prunable_parameters
+        results["total_prunable_parameters"] = total_prunable_parameters
+        results["remaining_nonzero_parameters"] = remaining_nonzero_parameters
+        results["model_sparsity"] = model_sparsity
+        return results
+
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
         eo["setup_experiment"].append("PruneLowSNR: Initialize")
         eo["pre_epoch"].append("PruneLowSNR: Maybe prune")
+        eo["run_epoch"].append("PruneLowSNR: Log parameter sparsity")
         return eo
 
 

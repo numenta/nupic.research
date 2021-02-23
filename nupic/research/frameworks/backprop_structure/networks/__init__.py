@@ -25,3 +25,4 @@ from .lenet_backpropstructure import *
 from .lesparsenet import *
 from .lenet_vdrop import *
 from .vdrop_resnet import *
+from .vdrop_lenet import *

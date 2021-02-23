@@ -22,3 +22,4 @@
 from .one_cycle_lr_params import OneCycleLRParams
 from .sgd_params import SGDParams
 from .step_lr_params import StepLRParams
+from .snr_pruning_params import SNRPruningParams
