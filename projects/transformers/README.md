@@ -1,5 +1,34 @@
 # Transformers
 
+## Results Bert
+
+In progress, current results:
+
+|            | average_bert     | average_glue      | cola           | mnli                         | mrpc        | qnli     | qqp         | rte      | sst2     | stsb                  | wnli     |
+|:-----------|:-----------------|:------------------|:---------------|:-----------------------------|:------------|:---------|:------------|:---------|:---------|:----------------------|:---------|
+|            | Average w/o wnli | Average all tasks | Matthew's corr | Matched acc./Mismatched acc. | F1/Accuracy | Accuracy | Accuracy/F1 | Accuracy | Accuracy | Person/Spearman corr. | Accuracy |
+| bert_HF    | 81.67            | 78.85             | 56.53          | 83.91/84.10                  | 88.85/84.07 | 90.66    | 90.71/87.49 | 65.70    | 92.32    | 88.64/88.48           | 56.34    |
+| bert_paper | 79.60            | -                 | 52.10          | 84.60/83.40                  | 88.9        | 90.5     | 71.2        | 66.4     | 93.5     | 85.8                  | -        |
+| bert_700k  | 78.59            | 74.54             | 41.73          | 83.76/-                      | -/84.90 | 91.51    | 90.53/-    | 58.59    | 91.20    | 86.67/86.31           | 42.19    |
+| bert_100k  | 69.26            | 65.21             | 32.02          | 78.89/-                      | -/77.86 | 50.57    | 89.15/-    | 53.91    | 88.08    | 83.66/83.55           | 32.81    |
+
+</br>
+</br>
+
+Model description:
+* bert_HF: reported by HuggingFace, see https://github.com/huggingface/transformers/tree/master/examples/text-classification. No inner loop of hyperparameter optimization for each finetuning task. Pretrained for 1mi steps of batch size 256.
+* bert_paper: reported in BERT paper, see https://arxiv.org/abs/1810.04805. Hyperparameters for each task are chosen in a grid search with 18 different variations per task, and best results reported. Pretrained for 1mi steps of batch size 256.
+* bert_Nk: where N is the number of steps in pretraining. These refer to models trained by ourselves for less than or more than 1mi steps. They might be intermediate checkpoints of longer runs or a shorter run executed to completion. Batch size is 256 unless specified otherwise in the model name. No inner loop of hyperparameter optimization for each finetuning task, follow same finetuning hyperparameters defined by bert_HF.
+
+Known issues, to be investigated/fixed:
+* Currently we don't have results for mnli mismatched acc.
+* Missing f1 values for QQP and MRPC. Already available in code, require rerunning those specific tasks to get values or evaluating from final checkpoint.
+* We don't have 100% coverage of validation set. Some samples of the validation set are given the label "-100", most likely for the tokenizer not being able to process them. These samples are excluded for validation. That coverage varies from 95-100%, with most tasks being close to 100%, but cola and mnli specifically have ~95% coverage. Not clear whether the coverage for bert_paper and bert_hf is 100%.
+* Only GLUE tasks included in the table. GLUE covers sequence classification or other tasks such as Q&A or multiple choice reframed as sequence classification. BERT also reports results on SQuaD (question answering), SWAG (multiple choice) and CoNLL (named entity recognition).
+* To add to the table perplexity of the original pretrained models.
+
+> Finetuning is important to evaluate a language model effectiveness when being used for transfer learning in downstream tasks. However, it is not a reliable metric to use for optimization. These numbers will vary with a significant margin of error between two different runs. Use perplexity instead to guide hyperparameter search and development of language models.
+
 ## How to run - single node
 
 Local implementation using Huggingface. To run, create a new experiment dict under experiments and run using:
@@ -10,7 +39,7 @@ Other accepted ways are passing arguments directly in command line or through a 
 
 ## How to run - multiple nodes
 
-To run it in multiple nodes, you will require the run script from transformers-cli-utils (transformers-cli-utils is in a private repository; if you woud like to use it, feel free to drop me an email at lsouza at numenta dot com). Make sure to add transformers-cli-utils root folder to PATH after downloading.
+To run it in multiple nodes, you will require the run script from transformers-cli-utils (it can be found under ray folder in the infrastructure repository). Make sure to add transformers-cli-utils root folder to PATH after downloading.
 
 First define the location of your cluster yaml file in `RAY_CONFIG_FILE` and the location of your AWS certification file (.pem file) in `AWS_CERT_FILE`:
 
@@ -52,3 +81,15 @@ If required, you can reboot all instances by selecting all of them in EC2 consol
 There is also an option of running the multiple nodes scripts from a ray head node instead of local. In this case, the head node will play the part of local and only the worker nodes will run the commands. For this scenario it is advised to have a simple non-GPU head node, since it will only be used to issue commands to the workers.
 
 After accessing the head node via ssh or attaching a screen, run an experiment using the same command described above: `run.sh <experiment_name>`. See transformers-cli-utils readme for more information on how to use and what modifications are required to the yaml file.
+
+## Installing
+
+You will require the libraries `datasets` and `transformers`.
+* `datasets` can be installed using pip or from source
+* install `transformers` from source, by cloning and running `pip install -e .`
+
+The `requirement.txt` file contains a specific SHA if you want to reproduce a tested environment. We are using the latest features from these libraries and will incorporate others which are soon to be released, so for the moment those might change at a fast pace. Once we have the need to establish reproducible results we should consider more stable requirements.
+
+## Additional notes
+
+`transformers-cli-utils` is in a private repository. If you woud like to use it, feel free to drop me an email at lsouza at numenta dot com.

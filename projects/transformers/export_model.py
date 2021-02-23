@@ -22,6 +22,8 @@
 """
 Pretrained models need to be exported to be used for finetuning.
 Only required argument for this script is the checkpoint folder.
+
+Not tested for modified sparse models.
 """
 
 import argparse
@@ -35,6 +37,7 @@ def save_pretrained(checkpoint_folder, destination_folder, model_name):
         model_name = os.path.split(checkpoint_folder)[-1]
     model = AutoModelForMaskedLM.from_pretrained(checkpoint_folder)
     destination_file_path = os.path.join(destination_folder, model_name)
+    # TODO: customize this function for sparse models
     model.save_pretrained(destination_file_path)
     print(f"Model saved at {destination_file_path}")
 
