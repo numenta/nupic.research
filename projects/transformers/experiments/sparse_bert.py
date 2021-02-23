@@ -22,7 +22,6 @@
 Base Transformers Experiment configuration.
 """
 
-import os
 from copy import deepcopy
 
 from callbacks import SparsifyFCLayersCallback
@@ -33,7 +32,6 @@ from .bert_replication import bert_100k
 sparse_debug_bert = deepcopy(debug_bert)
 sparse_debug_bert.update(
 
-    run_name="debug_bert_sparsity=0.8",
     # Model Arguments
     trainer_callbacks=[SparsifyFCLayersCallback(sparsity=0.80)]
 
@@ -41,11 +39,10 @@ sparse_debug_bert.update(
 
 sparse_bert_100k = deepcopy(bert_100k)
 sparse_bert_100k.update(
-
+    # run_name is optional, gets name from experiment name when not defined
     run_name="bert-steps_100k-sparsity_0.8",
     # Model Arguments
     trainer_callbacks=[SparsifyFCLayersCallback(sparsity=0.80)],
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/bert-steps_100k-sparsity_0.8"),  # noqa: E501
     overwrite_output_dir=False,
 
 )
