@@ -32,13 +32,14 @@ from nupic.research.frameworks.pytorch.hooks import (
 from nupic.research.frameworks.pytorch.model_utils import filter_modules
 
 
-class PlotHiddenActivations(metaclass=abc.ABCMeta):
+class GradientMetrics(metaclass=abc.ABCMeta):
     """
-    Mixin for creating custom plots of a module's output/hidden activations.
+    Mixin for tracking and plotting module gradient metrics during training.
+
 
     :param config: a dict containing the following
 
-        - plot_hidden_activations_args: a dict containing the following
+        - gradient_metrics_args: a dict containing the following
 
             - include_modules: (optional) a list of module types to track
             - include_names: (optional) a list of module names to track e.g.
@@ -48,16 +49,17 @@ class PlotHiddenActivations(metaclass=abc.ABCMeta):
                                 can be included through "features.*"
             - plot_freq: (optional) how often to create the plot, measured in training
                          iterations; defaults to 1
-            - max_samples_to_plot: (optional) how many of samples to use for plotting;
-                                   only the newest will be used; defaults to 5000
+            - metric: one of "cosine", "dot", "pearson"
+            - max_samples_to_track: (optional) how many of samples to use for plotting;
+                                   only the newest will be used; defaults to 100
 
     Example config:
     ```
     config=dict(
-        plot_hidden_activations_args=dict(
+        gradient_metrics_args=dict(
             include_modules=[torch.nn.Linear, KWinners],
             plot_freq=1,
-            max_samples_to_plot=2000
+            max_samples_to_track=150
         )
     )
     ```
@@ -67,7 +69,7 @@ class PlotHiddenActivations(metaclass=abc.ABCMeta):
         super().setup_experiment(config)
 
         # Process config args
-        ha_args = config.get("plot_hidden_activations_args", {})
+        gradient_metrics_args = config.get("gradient_metrics_args", {})
         ha_plot_freq, filter_args, ha_max_samples = self.process_ha_args(ha_args)
 
         self.ha_plot_freq = ha_plot_freq
@@ -88,14 +90,14 @@ class PlotHiddenActivations(metaclass=abc.ABCMeta):
         # to the tensors being collected by the hooks.
         self.ha_targets = torch.tensor([]).long()
 
-    def process_ha_args(self, ha_args):
+    def process_gradient_metric_args(self, gradient_metric_args):
 
-        ha_args = deepcopy(ha_args)
+        gradient_metric_args = deepcopy(gradient_metric_args)
 
         # Collect information about which modules to apply hooks to
-        include_names = ha_args.pop("include_names", [])
-        include_modules = ha_args.pop("include_modules", [])
-        include_patterns = ha_args.pop("include_patterns", [])
+        include_names = gradient_metric_args.pop("include_names", [])
+        include_modules = gradient_metric_args.pop("include_modules", [])
+        include_patterns = gradient_metric_args.pop("include_patterns", [])
         filter_args = dict(
             include_names=include_names,
             include_modules=include_modules,
@@ -103,8 +105,8 @@ class PlotHiddenActivations(metaclass=abc.ABCMeta):
         )
 
         # Others args
-        plot_freq = ha_args.get("plot_freq", 1)
-        max_samples = ha_args.get("max_samples_to_plot", 1000)
+        plot_freq = gradient_metric_args.get("plot_freq", 1)
+        max_samples = gradient_metric_args.get("max_samples_to_track", 100)
 
         assert isinstance(plot_freq, int)
         assert isinstance(max_samples, int)
