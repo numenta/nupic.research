@@ -20,11 +20,16 @@
 # ----------------------------------------------------------------------
 
 import unittest
+from copy import deepcopy
+
+import torch
+from numpy.random import randint
 
 from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
-from nupic.research.frameworks.dendrites.routing import get_gating_context_weights
-from nupic.research.frameworks.dendrites.routing.hardcoded import (
-    run_hardcoded_routing_test,
+from nupic.research.frameworks.dendrites.routing import (
+    RoutingFunction,
+    generate_context_vectors,
+    get_gating_context_weights,
 )
 
 
@@ -55,18 +60,39 @@ class HardcodedErrorTest(unittest.TestCase):
         dim_context = 100
         batch_size = 100
 
-        result = run_hardcoded_routing_test(
-            dim_in=dim_in,
-            dim_out=dim_out,
-            k=num_contexts,
-            dim_context=dim_context,
-            dendrite_module=AbsoluteMaxGatingDendriticLayer,
-            context_weights_fn=get_gating_context_weights,
-            batch_size=batch_size
+        r = RoutingFunction(dim_in=dim_in, dim_out=dim_out, k=num_contexts,
+                            sparsity=0.7)
+
+        context_vectors = generate_context_vectors(num_contexts=num_contexts,
+                                                   n_dim=dim_context,
+                                                   percent_on=0.2)
+
+        module = AbsoluteMaxGatingDendriticLayer(module=r.sparse_weights.module,
+                                                 num_segments=num_contexts,
+                                                 dim_context=dim_context,
+                                                 module_sparsity=0.7,
+                                                 dendrite_sparsity=0.0)
+
+        module.register_buffer("zero_mask",
+                               deepcopy(r.sparse_weights.zero_mask.half()))
+
+        hardcoded_weights = get_gating_context_weights(output_masks=r.output_masks,
+                                                       context_vectors=context_vectors,
+                                                       num_dendrites=num_contexts)
+        module.segments.weights.data = hardcoded_weights
+
+        x_test = 4.0 * torch.rand((batch_size, dim_in)) - 2.0  # sampled from U(-2, 2)
+        context_inds_test = randint(low=0, high=num_contexts, size=batch_size).tolist()
+        context_test = torch.stack(
+            [context_vectors[j, :] for j in context_inds_test],
+            dim=0
         )
 
-        mean_abs_error = result["mean_abs_error"]
-        self.assertLess(mean_abs_error, epsilon)
+        target = r(context_inds_test, x_test)
+        actual = module(x_test, context_test)
+
+        result = torch.abs(target - actual).mean().item()  # Mean absolute error
+        self.assertLess(result, epsilon)
 
 
 if __name__ == "__main__":
