@@ -174,5 +174,7 @@ def parse_results(config_filename, experiments):
 
 
 if __name__ == "__main__":
+    # Example usage. In general, you would pass in a list of all the experiments you
+    # want to include in the final CSV/PKL file.
     parse_results(config_filename="dense_scaling_baselines.cfg",
                   experiments=["Dense_Baselines"])
