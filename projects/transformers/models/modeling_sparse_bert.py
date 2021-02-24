@@ -19,18 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from dataclasses import dataclass
+
 import torch
-from torch import nn
-from transformers import (
-    BertForMaskedLM,
-    BertForSequenceClassification,
-    BertPreTrainedModel,
-    BertModel,
-)
+from transformers import BertModel, BertPreTrainedModel
 from transformers.models.bert.modeling_bert import (
     BertEmbeddings,
     BertEncoder,
-    BertOnlyMLMHead,
     BertPooler,
 )
 from transformers.utils import logging
@@ -41,10 +36,23 @@ from nupic.research.frameworks.pytorch.model_utils import (
 )
 from nupic.torch.modules import SparseWeights
 
+from .register_bert_model import register_bert_model
+
 logger = logging.get_logger(__name__)
 
 
+@register_bert_model
 class SparseBertModel(BertModel):
+    """
+    Sparse Version of Bert that applies static sparsity to all linear layers (included
+    attention) in the encoder network.
+    """
+
+    @dataclass
+    class ConfigKWargs:
+        """Keyword arguments to configure sparsity."""
+        sparsity: float = 0.9
+
     def __init__(self, config, add_pooling_layer=True):
         # Call the init one parent class up. Otherwise, the model will be defined twice.
         BertPreTrainedModel.__init__(self, config)
@@ -74,46 +82,3 @@ class SparseBertModel(BertModel):
         for name, module in linear_modules.items():
             sparse_module = SparseWeights(module, sparsity=sparsity).to(device)
             set_module_attr(self.encoder, name, sparse_module)
-
-
-class SparseBertForMaskedLM(BertForMaskedLM):
-    """
-    Bert Model with a `language modeling` head on top.
-
-    Calls SparseBert in forward.
-    """
-    def __init__(self, config):
-
-        # Call the init one parent class up. Otherwise, the model will be defined twice.
-        BertPreTrainedModel.__init__(self, config)
-
-        if config.is_decoder:
-            logger.warning(
-                # This warning was included with the original BertForMaskedLM.
-                "If you want to use `BertForMaskedLM` make sure `config.is_decoder=False` for "
-                "bi-directional self-attention."
-            )
-
-        self.bert = SparseBertModel(config, add_pooling_layer=False)
-        self.cls = BertOnlyMLMHead(config)
-
-        self.init_weights()
-
-
-class SparseBertForSequenceClassification(BertForSequenceClassification):
-    """
-    Bert Model transformer with a sequence classification/regression head on top (a linear layer on top of the pooled
-    output) e.g. for GLUE tasks.
-
-    Calls SparseBert in forward.
-    """,
-    def __init__(self, config):
-        BertPreTrainedModel.__init__(self, config)
-        self.num_labels = config.num_labels
-
-        # Replace `BertModel` with SparseBertModel.
-        self.bert = SparseBertModel(config)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
-        self.init_weights()

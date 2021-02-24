@@ -25,36 +25,4 @@ Bert models. This way, they may be automatically loaded via AutoModelForMaskedLM
 related utilities.
 """
 
-from transformers import (
-    CONFIG_MAPPING,
-    MODEL_FOR_MASKED_LM_MAPPING,
-    MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING,
-    TOKENIZER_MAPPING,
-    BertTokenizer,
-    BertTokenizerFast,
-)
-
-from .configuration_sparse_bert import SparseBertConfig
-from .modeling_sparse_bert import (
-    SparseBertForMaskedLM,
-    SparseBertForSequenceClassification,
-)
-
-CONFIG_MAPPING.update(
-    sparse_bert=SparseBertConfig
-)
-
-
-TOKENIZER_MAPPING.update({
-    SparseBertConfig: (BertTokenizer, BertTokenizerFast),
-})
-
-
-MODEL_FOR_MASKED_LM_MAPPING.update({
-    SparseBertConfig: SparseBertForMaskedLM,
-})
-
-
-MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING.update({
-    SparseBertConfig: SparseBertForSequenceClassification
-})
+from .modeling_sparse_bert import SparseBertModel
