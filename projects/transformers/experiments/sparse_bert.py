@@ -24,7 +24,7 @@ Base Transformers Experiment configuration.
 
 from copy import deepcopy
 
-from callbacks import SparsifyFCLayersCallback
+from callbacks import SparsifyFCLayersCallback, RezeroWeightsCallback
 
 from .base import debug_bert
 from .bert_replication import bert_100k
@@ -48,8 +48,22 @@ sparse_bert_100k.update(
 )
 
 
+# Sparse Bert of only two layers and one attention head.
+mini_sparse_bert_debug = deepcopy(debug_bert)
+mini_sparse_bert_debug.update(
+    model_type="sparse_bert",
+    config_kwargs=dict(
+        num_hidden_layers=2,
+        num_attention_heads=1,
+        sparsity=0.9,
+    ),
+    trainer_callbacks=[RezeroWeightsCallback()]
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     sparse_debug_bert=sparse_debug_bert,
-    sparse_bert_100k=sparse_bert_100k
+    sparse_bert_100k=sparse_bert_100k,
+    mini_sparse_bert_debug=mini_sparse_bert_debug,
 )

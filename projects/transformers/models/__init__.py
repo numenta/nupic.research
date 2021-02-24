@@ -19,23 +19,42 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-# Automatically import models. This will update Transformer's model mappings so that
-# `sparse_bert` (and possibly other custom models) can be chosen as the `model_type`.
-import models
-
-from .base import CONFIGS as BASE
-from .bert_replication import CONFIGS as BERT_REPLICATION
-from .sparse_bert import CONFIGS as SPARSE_BERT
-from .finetuning import CONFIGS as FINETUNING
-
 """
-Import and collect all experiment configurations into one CONFIG
+This __init__ updates the transformer model and config mappings to include custom sparse
+Bert models. This way, they may be automatically loaded via AutoModelForMaskedLM and
+related utilities.
 """
-__all__ = ["CONFIGS"]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(BASE)
-CONFIGS.update(BERT_REPLICATION)
-CONFIGS.update(SPARSE_BERT)
-CONFIGS.update(FINETUNING)
+from transformers import (
+    CONFIG_MAPPING,
+    MODEL_FOR_MASKED_LM_MAPPING,
+    MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING,
+    TOKENIZER_MAPPING,
+    BertTokenizer,
+    BertTokenizerFast,
+)
+
+from .configuration_sparse_bert import SparseBertConfig
+from .modeling_sparse_bert import (
+    SparseBertForMaskedLM,
+    SparseBertForSequenceClassification,
+)
+
+CONFIG_MAPPING.update(
+    sparse_bert=SparseBertConfig
+)
+
+
+TOKENIZER_MAPPING.update({
+    SparseBertConfig: (BertTokenizer, BertTokenizerFast),
+})
+
+
+MODEL_FOR_MASKED_LM_MAPPING.update({
+    SparseBertConfig: SparseBertForMaskedLM,
+})
+
+
+MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING.update({
+    SparseBertConfig: SparseBertForSequenceClassification
+})

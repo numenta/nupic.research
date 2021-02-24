@@ -76,6 +76,12 @@ class ModelArguments:
             "help": "Pretrained config name or path if not the same as model_name"
         }
     )
+    config_kwargs: Dict = field(
+        default_factory=dict,
+        metadata={
+            "help": "Keyword arguments to pass to model config constructor."
+        }
+    )
     tokenizer_name: Optional[str] = field(
         default="bert-base-cased",
         metadata={

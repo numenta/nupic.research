@@ -593,13 +593,13 @@ def init_config(model_args, extra_config_kwargs=None):
             model_args.model_name_or_path, **config_kwargs
         )
     else:
-        config = CONFIG_MAPPING[model_args.model_type]()
+        config = CONFIG_MAPPING[model_args.model_type](**model_args.config_kwargs)
         logging.warning("You are instantiating a new config instance from scratch.")
 
     return config
 
 
-def init_tokenizer(model_args):
+def init_tokenizer(model_args, config=None):
     """
     Distributed training:
     The .from_pretrained methods guarantee that only one local process can
@@ -610,6 +610,7 @@ def init_tokenizer(model_args):
         use_fast=model_args.use_fast_tokenizer,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
+        config=config,
     )
     if model_args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(
@@ -665,6 +666,7 @@ def init_model(model_args, config, tokenizer, finetuning=False):
             model = AutoModelForMaskedLM.from_config(config)
             model.resize_token_embeddings(len(tokenizer))
 
+    logging.info(f"Initialized model: {model}")
     return model
 
 

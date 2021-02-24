@@ -36,6 +36,7 @@ import pickle
 import random
 import sys
 from copy import deepcopy
+from pprint import pformat
 
 import torch.distributed
 import transformers
@@ -87,6 +88,7 @@ def main():
         exp_parser = HfArgumentParser(
             (ModelArguments, DataTrainingArguments, CustomTrainingArguments)
         )
+        logging.info(f"Running with config:\n{pformat(config_dict, indent=4)}")
         model_args, data_args, training_args = exp_parser.parse_dict(config_dict)
 
         # Overrides default behavior of TrainingArguments of setting run name
@@ -170,7 +172,7 @@ def run_pretraining(
     datasets, tokenized_datasets, dataset_path = init_datasets_mlm(data_args)
 
     config = init_config(model_args, extra_config_kwargs=None)
-    tokenizer = init_tokenizer(model_args)
+    tokenizer = init_tokenizer(model_args, config=config)
     model = init_model(model_args, config, tokenizer, finetuning=False)
 
     if tokenized_datasets is None:
@@ -238,7 +240,7 @@ def run_finetuning_single_task(
         finetuning_task=data_args.task_name,
     )
     config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
-    tokenizer = init_tokenizer(model_args)
+    tokenizer = init_tokenizer(model_args, config=config)
     model = init_model(model_args, config, tokenizer, finetuning=True)
 
     # Tokenizing and preprocessing the datasets for downstream tasks
