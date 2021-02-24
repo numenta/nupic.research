@@ -251,7 +251,7 @@ class SparseSpeechExperiment(object):
             "total_samples": len(test_loader.sampler),
             "non_zero_parameters": count_nonzero_params(self.model)[1],
             "learning_rate": self.learning_rate if self.lr_scheduler is None
-                               else self.lr_scheduler.get_last_lr(),
+            else self.lr_scheduler.get_last_lr(),
         })
 
         return ret
@@ -311,7 +311,7 @@ class SparseSpeechExperiment(object):
 
         self.train_loader = DataLoader(
             train_dataset, batch_size=self.batch_size, shuffle=True,
-            num_workers = num_workers
+            num_workers=num_workers
         )
 
         self.validation_loader = DataLoader(

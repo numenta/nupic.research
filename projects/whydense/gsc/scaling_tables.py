@@ -90,8 +90,8 @@ def parse_one_experiment(exp, states, df):
 
                     # Do we have any activation sparsity
                     activation_sparsity = 0
-                    if ((net_params["cnn_percent_on"][1] < 1.0) or
-                        (net_params["linear_percent_on"][0] < 1.0)):
+                    if ((net_params["cnn_percent_on"][1] < 1.0)
+                       or (net_params["linear_percent_on"][0] < 1.0)):
                         activation_sparsity = 1
 
                     for iteration, r in enumerate(results):
