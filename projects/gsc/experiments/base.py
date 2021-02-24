@@ -159,7 +159,6 @@ DEFAULT_BASE = dict(
     verbose=1,
 )
 
-
 # This config is based off the example from `nupic.torch\examples\gsc\run_gsc_model.py`
 # That example model achieves an average of 96.003% acc while the config below
 # achieves 96.191% (both averaged over three trials) - so they are comparable.

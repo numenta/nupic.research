@@ -21,6 +21,7 @@
 
 import math
 
+import numpy as np
 import torch
 
 
@@ -50,10 +51,10 @@ def percent_active_dendrites(winning_mask, targets):
         percent_active = percent_active.to(device)
 
         for t in range(num_categories):
-            inds_t = torch.nonzero(1.0 * (targets == t)).flatten()
-            num_examples_t = len(inds_t)
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
+            num_examples_t = len(inds_t[0])
 
-            percent_active_t = winning_mask[inds_t, :, :].sum(dim=0, dtype=torch.float)
+            percent_active_t = winning_mask[inds_t].sum(dim=0, dtype=torch.float)
             percent_active_t = percent_active_t / num_examples_t
 
             percent_active_t = percent_active_t.unsqueeze(2)
@@ -92,19 +93,110 @@ def mean_selected_activations(dendrite_activations, winning_mask, targets):
         msa = msa.to(device)
 
         for t in range(num_categories):
-            inds_t = torch.nonzero(1.0 * (targets == t)).flatten()
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
 
-            num_selected_per_segment = winning_mask[inds_t, :, :].sum(dim=0)
+            num_selected_per_segment = winning_mask[inds_t].sum(dim=0)
             num_selected_per_segment[num_selected_per_segment == 0.0] = 1.0
 
             msa_t = dendrite_activations * winning_mask
-            msa_t = msa_t[inds_t, :, :].sum(dim=0, dtype=torch.float)
+            msa_t = msa_t[inds_t].sum(dim=0, dtype=torch.float)
             msa_t = msa_t / num_selected_per_segment
 
             msa_t = msa_t.unsqueeze(2)
             msa = torch.cat((msa, msa_t), dim=2)
 
         return msa
+
+
+def dendrite_activations_by_unit(dendrite_activations, winning_mask, targets):
+    """
+    Returns a 2D torch tensor with shape (num_categories, num_units) where cell c, i
+    gives the mean value (post-sigmoid) of the selected dendrite activation for unit i
+    over all given examples from category c.
+
+    :param dendrite_activations: 3D torch tensor with shape (batch_size, num_units,
+                                 num_segments) in which entry b, i, j gives the
+                                 activation of the ith unit's jth dendrite segment for
+                                 example b
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    with torch.no_grad():
+
+        device = dendrite_activations.device
+
+        # Assume the following:
+        # - target values are zero-based
+        # - the largest target value in the batch is that amongst all data
+        num_categories = 1 + targets.max().item()
+        _, num_units, _ = dendrite_activations.size()
+
+        raw_winners = dendrite_activations * winning_mask
+
+        selected_activations = torch.zeros((0, num_units))
+        selected_activations = selected_activations.to(device)
+
+        for t in range(num_categories):
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
+
+            # 'Select' dendrite activation for each example and each unit by summing
+            # out segments; the sum on axis 2 only includes one non-zero entry
+            selected_activations_t = raw_winners[inds_t]
+            selected_activations_t = selected_activations_t.sum(dim=2)
+
+            # Apply sigmoid and average across all examples
+            selected_activations_t = torch.sigmoid(selected_activations_t)
+            selected_activations_t = selected_activations_t.mean(dim=0)
+
+            selected_activations_t = selected_activations_t.unsqueeze(0)
+            selected_activations = torch.cat((selected_activations,
+                                              selected_activations_t))
+
+        return selected_activations
+
+
+def hidden_activations_by_unit(activations, targets):
+    """
+    Returns a 2D torch tensor with shape (num_categories, num_units) where cell c, i
+    gives the mean value of hidden activations for unit i over all given examples from
+    category c.
+
+    NOTE: This function is not specific to dendrites, and can be used with modules that
+    both include and don't include dendrite segments.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    with torch.no_grad():
+
+        device = activations.device
+
+        # Assume the following:
+        # - target values are zero-based
+        # - the largest target value in the batch is that amongst all data
+        num_categories = 1 + targets.max().item()
+        _, num_units = activations.size()
+
+        # 'habu' is an abbreviation for 'hidden activations by unit'
+        habu = torch.zeros((0, num_units))
+        habu = habu.to(device)
+
+        for t in range(num_categories):
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
+            habu_t = activations[inds_t]
+
+            # Average activations across all examples with the same label
+            habu_t = habu_t.mean(dim=0)
+
+            habu_t = habu_t.unsqueeze(0)
+            habu = torch.cat((habu, habu_t))
+
+        return habu
 
 
 def dendrite_overlap_matrix(winning_mask, targets):
@@ -188,6 +280,21 @@ def dendrite_duty_cycle(winning_mask):
         return winning_mask.sum(dim=0, dtype=torch.float) / num_examples
 
 
+def winning_segment_indices(winning_mask, units=None):
+    """
+    Returns the indices of the winning segments for the given units.
+
+    :param winning_mask: 3D torch tensor with shape (batch_size, num_units,
+                         num_segments) in which entry b, i, j is 1 iff the ith unit's
+                         jth dendrite segment won for example b, 0 otherwise
+    :param units: (optional) a list of units; winning indices will only be returned
+                  for these units; default to all units.
+    """
+    units = units or ...  # the ellipses is equivalent to all units
+    winning_indices = winning_mask.max(dim=2).indices  # shape batch_size x num_units
+    return winning_indices[:, units]
+
+
 def entropy(x):
     """
     Returns a tuple of scalars (entropy value, maximum possible entropy value) which
@@ -207,3 +314,126 @@ def entropy(x):
     _max_entropy = math.log(num_segments)
 
     return _entropy, _max_entropy
+
+
+def representation_overlap_matrix(activations, targets):
+    """
+    Returns a 2D torch tensor with shape (num_categories, num_categories) where cell
+    c1, c2 gives the mean value of pairwise representation overlap across all pairs of
+    examples between classes c1 and c2. Each individual pairwise representation overlap
+    is simply the fraction of hidden units that are active in both examples.
+
+    NOTE: This function is not specific to dendrites, and can be used with modules that
+    both include and don't include dendrite segments.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    with torch.no_grad():
+
+        overlap_values = representation_overlap_stats(activations, targets)
+
+        # Assume the following:
+        # - target values are zero-based
+        # - the largest target value in the batch is that amongst all data
+        num_categories = 1 + targets.max().item()
+
+        overlap_matrix = torch.zeros((num_categories, num_categories))
+
+        # For each pair of categories, compute the mean value of pairwise
+        # representation overlaps using all pairs of the form (x1, x2) where x1 belongs
+        # to category c1, and x2 belongs to category c2
+        for t1 in range(num_categories):
+            for t2 in range(1 + t1):
+
+                mean_overlap_val = np.mean(overlap_values[t1][t2])
+                overlap_matrix[t1, t2] = mean_overlap_val
+
+        return overlap_matrix
+
+
+def representation_overlap_values(activations, targets):
+    """
+    Returns (list of floats, list of floats) where the first list gives representation
+    overlap values between all pairs of samples in different classes, and the second
+    list gives representation overlaps values between all pairs of samples in the same
+    class.
+
+    NOTE: This function is not specific to dendrites, and can be used with modules that
+    both include and don't include dendrite segments.
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+    overlap_values = representation_overlap_stats(activations, targets)
+
+    # Assume the following:
+    # - target values are zero-based
+    # - the largest target value in the batch is that amongst all data
+    num_categories = 1 + targets.max().item()
+
+    inter_class_overlaps = []
+    intra_class_overlaps = []
+
+    for t1 in range(num_categories):
+        for t2 in range(1 + t1):
+
+            if t1 == t2:
+                intra_class_overlaps.extend(overlap_values[t1][t2])
+            else:
+                inter_class_overlaps.extend(overlap_values[t1][t2])
+
+    return inter_class_overlaps, intra_class_overlaps
+
+
+def representation_overlap_stats(activations, targets):
+    """
+    Returns `overlap_values`: a dict of dicts, where
+    overlap_values[class_id_1][class_id_2] is list of representation overlap values
+    between all pairs in class_id_1 and class_id_2; self-paired examples are excluded
+    in the case where the two classes are the same.
+    """
+    with torch.no_grad():
+
+        num_categories = 1 + targets.max().item()
+        _, num_units = activations.size()
+
+        overlap_values = {}
+
+        for t1 in range(num_categories):
+
+            overlap_values[t1] = {}
+
+            for t2 in range(1 + t1):
+
+                inds_1 = torch.nonzero((targets == t1).float(), as_tuple=True)
+                activations_1 = activations[inds_1]
+                activations_1 = (activations_1 != 0.0).float()
+
+                inds_2 = torch.nonzero((targets == t2).float(), as_tuple=True)
+                activations_2 = activations[inds_2]
+                activations_2 = (activations_2 != 0.0).float()
+
+                overlap_vals = torch.matmul(activations_1, activations_2.T)
+                overlap_vals /= num_units
+
+                # If `overlap_vals` gives intra-class representation overlaps, only
+                # consider elements below the main diagonal to ignore duplicates and
+                # identical pairs
+                if t1 == t2:
+                    num_examples, _ = overlap_vals.size()
+
+                    overlap_vals = overlap_vals.tolist()
+                    overlap_vals = [overlap_vals[x1][x2] for x1 in range(num_examples)
+                                    for x2 in range(x1)]
+
+                else:
+                    overlap_vals = overlap_vals.flatten().tolist()
+
+                overlap_values[t1][t2] = overlap_vals
+
+        return overlap_values

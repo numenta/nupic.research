@@ -28,6 +28,11 @@ from nupic.torch.modules import SparseWeights
 
 from .utils import generate_random_binary_vectors
 
+__all__ = [
+    "RoutingDataset",
+    "RoutingFunction",
+]
+
 
 class RoutingDataset(Dataset):
     """

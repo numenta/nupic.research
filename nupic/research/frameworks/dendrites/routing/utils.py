@@ -22,6 +22,20 @@
 import torch
 
 from nupic.research.frameworks.pytorch import l1_regularization_step
+from nupic.torch.modules.sparse_weights import rezero_weights
+
+__all__ = [
+    "evaluate_dendrite_model",
+    "generate_context_integers",
+    "generate_context_vectors",
+    "generate_random_binary_vectors",
+    "get_gating_context_weights",
+    "train_dendrite_model",
+]
+
+
+def generate_context_integers(num_contexts):
+    return torch.arange(num_contexts, dtype=torch.float32).reshape(num_contexts, 1)
 
 
 def generate_context_vectors(num_contexts, n_dim, percent_on=0.2):
@@ -113,6 +127,7 @@ def train_dendrite_model(
     optimizer,
     device,
     criterion,
+    context_model=None,
     concat=False,
     l1_weight_decay=0.0
 ):
@@ -127,6 +142,10 @@ def train_dendrite_model(
     :param optimizer: optimizer object used to train the model
     :param device: device to use ('cpu' or 'cuda')
     :param criterion: loss function to minimize
+    :param context_model: a torch.nn.Module subclass which generates context vectors.
+                          If the context vector should be learned, then the contexts in
+                          the dataset are integers from which a context will be
+                          generated.
     :param concat: if True, assumes input and context vectors are concatenated together
                    and model takes just a single input to its `forward`, otherwise
                    assumes input and context vectors are separate and model's `forward`
@@ -151,6 +170,9 @@ def train_dendrite_model(
 
             data = data.to(device)
             context = context.to(device)
+            if context_model:
+                # context model generates a context model from the context input
+                context = context_model(context)
             target = target.to(device)
 
             output = model(data, context)
@@ -159,6 +181,8 @@ def train_dendrite_model(
 
         loss.backward()
         optimizer.step()
+
+        model.apply(rezero_weights)
 
         # Perform L1 weight decay
         if l1_weight_decay > 0.0:
@@ -169,10 +193,17 @@ def train_dendrite_model(
             )
 
 
-def evaluate_dendrite_model(model, loader, device, criterion, concat=False):
+def evaluate_dendrite_model(
+    model,
+    loader,
+    device,
+    criterion,
+    context_model=None,
+    concat=False
+):
     """
     Evaluates a model on a specified criterion by iterating through all batches in the
-    given dataloader, and returns a dict of metrics that give evaluation performance
+    given dataloader, and returns a dict of metrics that give evaluation performance.
 
     :param model: a torch.nn.Module subclass that implements a dendrite module in
                   addition to a linear feed-forward module, and takes both feedforward
@@ -180,6 +211,7 @@ def evaluate_dendrite_model(model, loader, device, criterion, concat=False):
     :param loader: a torch dataloader that iterates over all train and test batches
     :param device: device to use ('cpu' or 'cuda')
     :param criterion: loss function to minimize
+    :param context_model: if not None, a torch.nn.Module which produces context vectors.
     :param concat: if True, assumes input and context vectors are concatenated together
                    and model takes just a single input to its `forward`, otherwise
                    assumes input and context vectors are separate and model's `forward`
@@ -207,6 +239,8 @@ def evaluate_dendrite_model(model, loader, device, criterion, concat=False):
 
                 data = data.to(device)
                 context = context.to(device)
+                if context_model:
+                    context = context_model(context)
                 target = target.to(device)
 
                 output = model(data, context)
@@ -217,9 +251,8 @@ def evaluate_dendrite_model(model, loader, device, criterion, concat=False):
             abs_err = torch.abs(output - target)
             mean_abs_err += torch.mean(abs_err)
 
-    loss = loss.item()
     mean_abs_err = mean_abs_err.item() / len(loader)
     return {
-        "loss": loss,
+        "loss": loss.item(),
         "mean_abs_err": mean_abs_err
     }
