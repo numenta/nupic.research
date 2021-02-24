@@ -164,4 +164,4 @@ if __name__ == "__main__":
 
     # Results over 100 examples with 10 random contexts
     # > Mean absolute error between R(j, x) and output from dendritic network:
-    # >      0.0006185245583765209
+    # >      1.564644386276015e-10

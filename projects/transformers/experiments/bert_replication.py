@@ -22,7 +22,6 @@
 Base Transformers Experiment configuration.
 """
 
-import os
 from copy import deepcopy
 
 from .base import transformers_base
@@ -92,9 +91,6 @@ bert_100k.update(
     data_collator="DataCollatorForWholeWordMask",
 
     # Training Arguments
-    run_name="bert_100k",
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/bert_100k"),
-    overwrite_output_dir=False,
     per_device_train_batch_size=8,
     per_device_eval_batch_size=8,
     learning_rate=1e-4,
@@ -106,11 +102,26 @@ bert_100k.update(
     max_steps=100000,
     lr_scheduler_type="linear",
 
+    # Training Arguments - checkpointing
+    logging_steps=500,
+    logging_first_step=True,
+    save_steps=5000,
+    save_total_limit=5,
+    overwrite_output_dir=False,
+
+    # speeding up
+    # fp16=True,
+    dataloader_num_workers=4,
 
 )
 
+bert_1mi = deepcopy(bert_100k)
+bert_1mi.update(
+    max_steps=1000000,
+)
 
 # Export configurations in this file
 CONFIGS = dict(
     bert_100k=bert_100k,
+    bert_1mi=bert_1mi
 )

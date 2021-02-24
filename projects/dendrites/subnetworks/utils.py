@@ -264,7 +264,7 @@ class StandardMLP(nn.Module):
 
 class DendriticMLP(nn.Module):
     """
-    Based on ANMLDendriticNetwork, using dendritic output as [0,1] gates
+    Based on MimicANMLDendriticNetwork, using dendritic output as [0,1] gates
     Added some modifications to inspect output and make it easier to debug
     and manipulate.
     """

@@ -24,22 +24,33 @@ Run a GSC experiment using SparseLeNet with SampledKWinners.
 
 from copy import deepcopy
 
-from .sampled_kwinners.sampled_le_sparse_net import SampledLeSparseNet
-from .sampled_kwinners.update_kwinner_temperature import UpdateKWinnerTemperature
-from .base import DEFAULT_SPARSE_CNN
-
 from nupic.research.frameworks.vernon import experiments, mixins
 
+from .base import DEFAULT_SPARSE_CNN
+from .sampled_kwinners.sampled_kwinner_gsc_cnn import SampledKWinnerGSCSparseCNN
+from .sampled_kwinners.sampled_kwinner_le_sparse_net import SampledKWinnerLeSparseNet
+from .sampled_kwinners.update_kwinner_temperature import UpdateKWinnerTemperature
 
-class SampledKWinnersGSCExperiment(mixins.VaryBatchSize, mixins.RezeroWeights, UpdateKWinnerTemperature,
+
+class SampledKWinnersGSCExperiment(mixins.VaryBatchSize,
+                                   mixins.RezeroWeights,
+                                   UpdateKWinnerTemperature,
                                    mixins.LoadPreprocessedData,
                                    experiments.SupervisedExperiment):
     pass
 
+
 SPARSE_CNN_SAMPLED_KWINNER = deepcopy(DEFAULT_SPARSE_CNN)
 SPARSE_CNN_SAMPLED_KWINNER.update(
     experiment_class=SampledKWinnersGSCExperiment,
-    model_class=SampledLeSparseNet,
+    model_class=SampledKWinnerGSCSparseCNN,
+    epochs_to_validate=range(30),
+)
+
+SPARSE_LENET_SAMPLED_KWINNER = deepcopy(DEFAULT_SPARSE_CNN)
+SPARSE_LENET_SAMPLED_KWINNER.update(
+    experiment_class=SampledKWinnersGSCExperiment,
+    model_class=SampledKWinnerLeSparseNet,
     model_args=dict(
         input_shape=(1, 32, 32),
         cnn_out_channels=(64, 64),
@@ -50,7 +61,7 @@ SPARSE_CNN_SAMPLED_KWINNER.update(
         linear_weight_percent_on=(0.1,),
         temperature=10.0,
         eval_temperature=1.0,
-        temperature_decay_rate=0.01,
+        temperature_decay_rate=0.99,
         use_batch_norm=True,
         dropout=0.0,
         num_classes=12,
@@ -64,4 +75,5 @@ SPARSE_CNN_SAMPLED_KWINNER.update(
 
 CONFIGS = dict(
     sparse_cnn_sampled_kwinner=SPARSE_CNN_SAMPLED_KWINNER,
+    sparse_lenet_sampled_kwinner=SPARSE_LENET_SAMPLED_KWINNER,
 )

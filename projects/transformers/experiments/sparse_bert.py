@@ -27,17 +27,29 @@ from copy import deepcopy
 from callbacks import SparsifyFCLayersCallback
 
 from .base import debug_bert
+from .bert_replication import bert_100k
 
 sparse_debug_bert = deepcopy(debug_bert)
 sparse_debug_bert.update(
 
-    run_name="sparsity=0.2_debug_bert",
     # Model Arguments
     trainer_callbacks=[SparsifyFCLayersCallback(sparsity=0.80)]
 
 )
 
+sparse_bert_100k = deepcopy(bert_100k)
+sparse_bert_100k.update(
+    # run_name is optional, gets name from experiment name when not defined
+    run_name="bert-steps_100k-sparsity_0.8",
+    # Model Arguments
+    trainer_callbacks=[SparsifyFCLayersCallback(sparsity=0.80)],
+    overwrite_output_dir=False,
+
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     sparse_debug_bert=sparse_debug_bert,
+    sparse_bert_100k=sparse_bert_100k
 )

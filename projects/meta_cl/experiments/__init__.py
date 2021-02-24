@@ -25,6 +25,7 @@ from .metacl_track_stats import CONFIGS as METACL_TRACK_STATS
 from .anml_replicate import CONFIGS as ANML_REPLICATE
 from .anml_variants import CONFIGS as ANML_VARIANTS
 from .dendrites import CONFIGS as DENDRITES
+from .dendrite_variants import CONFIGS as DENDRITE_VARIANTS
 from .oml_replicate import CONFIGS as OML_REPLICATE
 from .oml_variants import CONFIGS as OML_VARIANTS
 from .oml_regression_test import CONFIGS as OML_REGRESSION_TEST
@@ -42,6 +43,7 @@ CONFIGS.update(METACL_SIGOPT)
 CONFIGS.update(ANML_REPLICATE)
 CONFIGS.update(ANML_VARIANTS)
 CONFIGS.update(DENDRITES)
+CONFIGS.update(DENDRITE_VARIANTS)
 CONFIGS.update(OML_REPLICATE)
 CONFIGS.update(OML_VARIANTS)
 CONFIGS.update(OML_REGRESSION_TEST)

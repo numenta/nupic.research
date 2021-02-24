@@ -23,8 +23,9 @@ import abc
 import numpy as np
 import torch.nn as nn
 
-from .kwinner_functions import sampled_kwinners, sampled_kwinners2d
 from nupic.torch.duty_cycle_metrics import max_entropy
+
+from .sampled_kwinner_functions import sampled_kwinners, sampled_kwinners2d
 
 
 def update_temperature(m):
@@ -41,11 +42,13 @@ def update_temperature(m):
 
 
 class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
-    """Base SampledKWinners class.
+    """Base SampledKWinners class. Instead of deterministically choosing the top-k
+        units, the k units are chosen by sampling (with replacement) from the
+        softmax distribution over the output units.
 
     :param percent_on:
       k = percent_on * number of input units will be sampled, with replacement, from
-      categorial softmax distribution over the layer activations
+      categorical softmax distribution over the layer activations
     :type percent_on: float
 
     :param k_inference_factor:
@@ -73,7 +76,7 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         percent_on,
         k_inference_factor=1.0,
         temperature=10.0,
-        temperature_decay_rate=0.01,
+        temperature_decay_rate=0.99,
         eval_temperature=1.0,
     ):
         super(SampledKWinnersBase, self).__init__()
@@ -91,19 +94,23 @@ class SampledKWinnersBase(nn.Module, metaclass=abc.ABCMeta):
         self.k = 0
         self.k_inference = 0
 
-    def _load_from_state_dict(self, *args, **kwargs):
-        super()._load_from_state_dict(*args, **kwargs)
-
     def extra_repr(self):
         return (
-            "n={0}, percent_on={1}, temperature={2}, tempreature_decay_rate={3}, eval_temperature={4}".format(
-                self.n, self.percent_on, self.temperature, self.temperature_decay_rate, self.eval_temperature
+            "n={0},"
+            " percent_on={1},"
+            " temperature={2},"
+            " tempreature_decay_rate={3},"
+            " eval_temperature={4}".format(
+                self.n,
+                self.percent_on,
+                self.temperature,
+                self.temperature_decay_rate,
+                self.eval_temperature
             )
         )
 
     def update_temperature(self):
-        new_temp = self.temperature - self.temperature_decay_rate
-        self.temperature = max(1.0, new_temp)
+        self.temperature *= self.temperature_decay_rate
 
     def entropy(self):
         """Returns the current total entropy of this layer."""
@@ -159,7 +166,8 @@ class SampledKWinners(SampledKWinnersBase):
         if self.training:
             x = sampled_kwinners(x, self.k, self.temperature, relu=self.relu)
         else:
-            x = sampled_kwinners(x, self.k_inference, self.eval_temperature, relu=self.relu)
+            x = sampled_kwinners(x, self.k_inference, self.eval_temperature,
+                                 relu=self.relu)
         return x
 
     def extra_repr(self):
@@ -207,7 +215,6 @@ class SampledKWinners2d(SampledKWinnersBase):
         self.inplace = inplace
         self.relu = relu
 
-
     def forward(self, x):
         if self.n == 0:
             self.n = np.prod(x.shape[1:])
@@ -215,9 +222,17 @@ class SampledKWinners2d(SampledKWinnersBase):
             self.k_inference = int(round(self.n * self.percent_on_inference))
 
         if self.training:
-            x = sampled_kwinners2d(x, self.k, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
+            x = sampled_kwinners2d(x,
+                                   self.k,
+                                   temperature=self.temperature,
+                                   relu=self.relu,
+                                   inplace=self.inplace)
         else:
-            x = sampled_kwinners2d(x, self.k_inference, temperature=self.temperature, relu=self.relu, inplace=self.inplace)
+            x = sampled_kwinners2d(x,
+                                   self.k_inference,
+                                   temperature=self.temperature,
+                                   relu=self.relu,
+                                   inplace=self.inplace)
         return x
 
     def extra_repr(self):

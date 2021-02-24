@@ -19,12 +19,27 @@
 #
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Dict, List, Optional
 
-from transformers import MODEL_FOR_MASKED_LM_MAPPING
+from transformers import MODEL_FOR_MASKED_LM_MAPPING, TrainingArguments
+
+from run_utils import TASK_TO_KEYS
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+
+
+@dataclass
+class CustomTrainingArguments(TrainingArguments):
+    """
+    Additional arguments to HF TrainingArguments
+    """
+    num_runs: int = field(
+        default=1,
+        metadata={
+            "help": "How many runs per task. Currently only used for finetuning."
+        },
+    )
 
 
 @dataclass
@@ -33,12 +48,19 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune,
     or train from scratch.
     """
-
+    finetuning: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to finetune the model for downstream tasks. If false, "
+                    "will attempt to pretrain a masked language model instead."
+        },
+    )
     model_name_or_path: Optional[str] = field(
         default=None,
         metadata={
             "help": "The model checkpoint for weights initialization."
             "Don't set if you want to train a model from scratch."
+            "Config and tokenizers will also be determined from the model_name_or_path."
         },
     )
     model_type: Optional[str] = field(
@@ -86,6 +108,19 @@ class ModelArguments:
             "help": "Will use the token generated when running "
                     "`transformers-cli login` (necessary to use this script "
                     "with private models)."
+        },
+    )
+    task_hyperparams: Dict = field(
+        default_factory=dict,
+        metadata={
+            "help": "Allow user to define custom training arguments per task."
+        },
+    )
+    trainer_callbacks: Dict = field(
+        default_factory=dict,
+        metadata={
+            "help": "Whether to create a new results file. If set to False, will only"
+                    "attempt to update existing entries"
         },
     )
 
@@ -189,13 +224,62 @@ class DataTrainingArguments:
             "help": "Which data collator to use, define how masking is applied."
         },
     )
+    task_names: List[str] = field(
+        default_factory=list,
+        metadata={
+            "help": "Allows running several tasks at once. "
+                    f"Available tasks: {', '.join(TASK_TO_KEYS.keys())}"
+        },
+    )
+    task_name: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The name of the task to train on."
+                    "Option available for backwards compatibility with HF run script."
+                    f"Available tasks: {', '.join(TASK_TO_KEYS.keys())}"
+        },
+    )
+    override_finetuning_results: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to create a new results file. If set to False, will only"
+                    "attempt to update existing entries"
+        },
+    )
 
     def __post_init__(self):
-        if (self.dataset_name is None and self.train_file is None
-           and self.validation_file is None):
+        """Input validation"""
+
+        # Handle string tasks, backwards compatibility and GLUE
+        if self.task_name and self.task_names:
             raise ValueError(
-                "Need either a dataset name or a training/validation file."
+                "Define either a single task_name or multiple tasks using task_names"
             )
+        if self.task_name:
+            if self.task_name.lower() == "glue":
+                self.task_names = list(TASK_TO_KEYS.keys())
+            else:
+                self.task_names = [self.task_name]
+            self.task_name = None
+
+        # For finetuning, has to define one or more tasks among available tasks
+        if self.task_names:
+            # Validates that all tasks exists
+            self.task_names = [t.lower() for t in self.task_names]
+            for task_name in self.task_names:
+                # Checks if it is a valid task
+                if task_name not in TASK_TO_KEYS.keys():
+                    raise ValueError(f"Unknown task {task_name}, you should pick one in"
+                                     ": " + ",".join(TASK_TO_KEYS.keys()))
+
+        # If no task is set, validates if a dataset is given
+        elif (self.dataset_name is None and self.train_file is None
+              and self.validation_file is None):
+            raise ValueError(
+                "Need either a GLUE task, a dataset name or a training/validation file."
+            )
+
+        # If a train file is given, verify if extensions are compatible
         else:
             if self.train_file is not None:
                 extension = self.train_file.split(".")[-1]
