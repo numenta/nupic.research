@@ -88,11 +88,18 @@ def parse_one_experiment(exp, states, df):
                     l2d = l1c * 25  # Each L2 kernel is 5x5
                     l3d = l2c * 25  # The last CNN layer after maxpool is 5x5
 
+                    # Do we have any activation sparsity
+                    activation_sparsity = 0
+                    if ((net_params["cnn_percent_on"][1] < 1.0) or
+                        (net_params["linear_percent_on"][0] < 1.0)):
+                        activation_sparsity = 1
+
                     for iteration, r in enumerate(results):
                         df_entries.append([
                             exp,
                             l1c, l2c, l3n,
                             l1w, l2w, l3w,
+                            activation_sparsity,
                             r["non_zero_parameters"], r["mean_accuracy"],
                             iteration, best_result["mean_accuracy"],
                             l2d, l3d, results[0]["config"]["seed"],
@@ -127,6 +134,7 @@ def parse_results(config_filename, experiments):
     # The results table
     columns = ["Experiment name", "L1 channels", "L2 channels", "L3 N",
                "L1 Wt sparsity", "L2 Wt sparsity", "L3 Wt sparsity",
+               "Activation sparsity",
                "Non-zero params", "Accuracy", "Iteration", "Best accuracy",
                "L2 dimensionality", "L3 dimensionality", "Seed", "ID"
                ]
