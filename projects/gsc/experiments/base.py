@@ -26,6 +26,8 @@ import os
 import sys
 from copy import deepcopy
 
+import numpy as np
+import ray.tune as tune
 import torch
 
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
@@ -52,16 +54,16 @@ DEFAULT_BASE = dict(
     # Dataset
     dataset_class=preprocessed_gsc,
     dataset_args=dict(
-        root="~/nta/datasets/gsc_preprocessed",
+        root="~/nta/data/gsc_preprocessed",
         download=True,
     ),
 
     # Seed
-    seed=20,
+    seed=tune.sample_from(lambda spec: np.random.randint(1, 10000)),
 
     # Number of times to sample from the hyperparameter space. If `grid_search` is
     # provided the grid will be repeated `num_samples` of times.
-    num_samples=1,
+    num_samples=8,
 
     # Training batch size
     batch_size=BATCH_SIZE,
@@ -76,6 +78,7 @@ DEFAULT_BASE = dict(
 
     # Number of epochs
     epochs=30,
+    epochs_to_validate=range(0, 30),
 
     # Which epochs to run and report inference over the validation dataset.
     # epochs_to_validate=range(-1, 30),  # defaults to the last 3 epochs
@@ -128,11 +131,12 @@ DEFAULT_BASE = dict(
     ),
 
     # Loss function. See "torch.nn.functional"
-    loss_function=torch.nn.functional.cross_entropy,
+    loss_function=torch.nn.functional.nll_loss,
 
     # How often to checkpoint (epochs)
     checkpoint_freq=0,
     keep_checkpoints_num=1,
+    checkpoint_at_end=True,
     checkpoint_score_attr="training_iteration",
 
     # How many times to try to recover before stopping the trial
@@ -177,11 +181,53 @@ DEFAULT_SPARSE_CNN.update(
     batch_sizes=[4, 16],  # 4 for the first epoch and 16 for the remaining
     val_batch_size=1000,
     batches_in_epoch=sys.maxsize,
+)
+
+DEFAULT_DENSE_CNN = deepcopy(DEFAULT_BASE)
+DEFAULT_DENSE_CNN.update(
+
+    # Model
+    model_args=dict(
+        input_shape=(1, 32, 32),
+        cnn_out_channels=(64, 64),
+        cnn_activity_percent_on=(1.0, 1.0),
+        cnn_weight_percent_on=(1.0, 1.0),
+        linear_n=(1000,),
+        linear_activity_percent_on=(1.0,),
+        linear_weight_percent_on=(1.0,),
+        boost_strength=1.5,
+        boost_strength_factor=0.9,
+        use_batch_norm=True,
+        dropout=0.0,
+        num_classes=12,
+        k_inference_factor=1.0,
+        activation_fct_before_max_pool=True,
+        consolidated_sparse_weights=False,
+        use_kwinners_local=False,
+    ),
+
+    # Batch size
+    batch_size=64,
+    val_batch_size=1000,
+    batches_in_epoch=sys.maxsize,
     epochs_to_validate=range(0, 30),
+
+    # Optimizer class class arguments passed to the constructor
+    optimizer_args=dict(
+        lr=0.01,
+        weight_decay=0.01,
+        momentum=0.9,
+    ),
+    # Learning rate scheduler class class arguments passed to the constructor
+    lr_scheduler_args=dict(
+        gamma=0.8,
+        step_size=1,
+    ),
 )
 
 # Export configurations in this file
 CONFIGS = dict(
     default_base=DEFAULT_BASE,
     default_sparse_cnn=DEFAULT_SPARSE_CNN,
+    default_dense_cnn=DEFAULT_DENSE_CNN,
 )
