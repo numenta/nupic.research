@@ -34,9 +34,9 @@ from transformers import (
 
 sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers")) # noqa
 from models import (
-    SparseBertConfig,
-    SparseBertForMaskedLM,
-    SparseBertForSequenceClassification,
+    StaticSparseEncoderBertConfig,
+    StaticSparseEncoderBertForMaskedLM,
+    StaticSparseEncoderBertForSequenceClassification,
 )
 from nupic.torch.modules import SparseWeights
 # noqa
@@ -44,28 +44,30 @@ from nupic.torch.modules import SparseWeights
 
 class SparseBertModelTest(unittest.TestCase):
     """
-    Test the ability to load and save SparseBert models and associated SparseBertConfig.
+    Test the ability to load and save StaticSparseEncoderBert models and associated
+    StaticSparseEncoderBertConfig.
     """
 
     def setUp(self):
-        self.config = CONFIG_MAPPING["sparse_bert"](
+        self.config = CONFIG_MAPPING["static_sparse_encoder_bert"](
             sparsity=0.9,
             num_attention_heads=1,
             num_hidden_layers=2,
         )
 
     def test_model_mappings(self):
-        self.assertTrue(SparseBertConfig in MODEL_FOR_MASKED_LM_MAPPING)
-        self.assertTrue(SparseBertConfig in MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING)
+        config_cls = StaticSparseEncoderBertConfig
+        self.assertTrue(config_cls in MODEL_FOR_MASKED_LM_MAPPING)
+        self.assertTrue(config_cls in MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING)
 
     def test_sparse_bert_config(self):
-        self.assertIsInstance(self.config, SparseBertConfig)
+        self.assertIsInstance(self.config, StaticSparseEncoderBertConfig)
         self.assertEqual(self.config.sparsity, 0.9)
 
     def test_auto_model_for_mask_lm(self):
 
         model = AutoModelForMaskedLM.from_config(self.config)
-        self.assertIsInstance(model, SparseBertForMaskedLM)
+        self.assertIsInstance(model, StaticSparseEncoderBertForMaskedLM)
 
         # The are two layers with six linear layers and only one head.
         # There should be a total of 12 linear layers.
@@ -78,7 +80,10 @@ class SparseBertModelTest(unittest.TestCase):
     def test_auto_model_for_sequence_classification(self):
 
         model_seq_cls = AutoModelForSequenceClassification.from_config(self.config)
-        self.assertIsInstance(model_seq_cls, SparseBertForSequenceClassification)
+        self.assertIsInstance(
+            model_seq_cls,
+            StaticSparseEncoderBertForSequenceClassification
+        )
 
         # The are two layers with six linear layers and only one head.
         # There should be a total of 12 linear layers.
@@ -104,8 +109,8 @@ class SparseBertModelTest(unittest.TestCase):
         model = AutoModelForMaskedLM.from_pretrained(model_path)
         config = model.config
 
-        self.assertIsInstance(config, SparseBertConfig)
-        self.assertIsInstance(model, SparseBertForMaskedLM)
+        self.assertIsInstance(config, StaticSparseEncoderBertConfig)
+        self.assertIsInstance(model, StaticSparseEncoderBertForMaskedLM)
         self.assertEqual(config.sparsity, 0.9)
 
         # The are two layers with six linear layers and only one head.

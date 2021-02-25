@@ -55,6 +55,38 @@ def register_bert_model(bert_cls):
 
     This last step ensures that the resulting config and models may be used by
     AutoConfig, AutoModelForMaskedLM, and AutoModelForMaskedLM.
+
+    Assumptions are made to auto-name these classes and the corresponding model type.
+    For instance, SparseBertModel will have model_type="sparse_bert" and associated
+    classes like SparseBertConfig.
+
+    To customize the the inputs to the model's config, include the dataclass
+    `bert_cls.ConfigKWargs`. This is, in fact, required. Upon initialization of the
+    config, the fields of that dataclass will be used to extract extra keyword arguments
+    and assign them as attributes to the config.
+
+    Example
+    ```
+    @register_bert_model
+    class SparseBertModel(BertModel):
+
+        @dataclass
+        class ConfigKWargs:
+            # Keyword arguments to configure sparsity.
+            sparsity: float = 0.9
+
+        # Define __init__, ect.
+        ...
+
+    # Model is ready to auto load.
+    config = AutoConfig.for_model("sparse_bert", sparsity=0.5)
+    model = AutoModelForMaskedLM.from_config(model)
+
+    config.sparsity
+    >>> 0.5
+
+    type(model)
+    >>> SparseBertModelForMaskedLM
     """
 
     assert bert_cls.__name__.endswith("BertModel")

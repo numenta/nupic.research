@@ -41,8 +41,14 @@ from .register_bert_model import register_bert_model
 logger = logging.get_logger(__name__)
 
 
+__all__ = [
+    "StaticSparseEncoderBertModel",
+    "StaticSparseNonAttentionBertModel",
+]
+
+
 @register_bert_model
-class SparseBertModel(BertModel):
+class StaticSparseEncoderBertModel(BertModel):
     """
     Sparse Version of Bert that applies static sparsity to all linear layers (included
     attention) in the encoder network.
@@ -82,3 +88,51 @@ class SparseBertModel(BertModel):
         for name, module in linear_modules.items():
             sparse_module = SparseWeights(module, sparsity=sparsity).to(device)
             set_module_attr(self.encoder, name, sparse_module)
+
+
+@register_bert_model
+class StaticSparseNonAttentionBertModel(BertModel):
+    """
+    Sparse Version of Bert that applies static sparsity to all non-attention linear
+    layers in the encoder network.
+    """
+
+    @dataclass
+    class ConfigKWargs:
+        """Keyword arguments to configure sparsity."""
+        sparsity: float = 0.5
+        num_sparse_layers: int = 12
+
+    def __init__(self, config, add_pooling_layer=True):
+        # Call the init one parent class up. Otherwise, the model will be defined twice.
+        BertPreTrainedModel.__init__(self, config)
+        self.config = config
+
+        self.embeddings = BertEmbeddings(config)
+        self.encoder = BertEncoder(config)
+
+        self.pooler = BertPooler(config) if add_pooling_layer else None
+
+        # Sparsify linear modules.
+        self.sparsify_model()
+
+        self.init_weights()
+
+    def sparsify_model(self):
+        """
+        Sparsify all non-attention linear layers in encoder.
+        """
+
+        encoder = self.encoder
+        num_sparse_layers = self.config.num_sparse_layers
+        sparsity = self.config.sparsity
+        device = self.device
+
+        for idx in range(num_sparse_layers):
+            intermediate_layer = encoder.layer[idx].intermediate.dense
+            encoder.layer[idx].intermediate.dense = \
+                SparseWeights(intermediate_layer, sparsity=sparsity).to(device)
+
+            output_layer = encoder.layer[idx].output.dense
+            encoder.layer[idx].output.dense = \
+                SparseWeights(output_layer, sparsity=sparsity).to(device)

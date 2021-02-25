@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 # Automatically import models. This will update Transformer's model mappings so that
-# `sparse_bert` (and possibly other custom models) can be chosen as the `model_type`.
+# custom models can be loaded via AutoModelForMaskedLM and related auto-constructors.
 import models
 
 from .base import CONFIGS as BASE
