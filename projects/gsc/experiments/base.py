@@ -68,7 +68,7 @@ DEFAULT_BASE = dict(
     # Training batch size
     batch_size=BATCH_SIZE,
     # Validation batch size
-    val_batch_size=sys.maxsize,
+    val_batch_size=10000,
     # Number of batches per epoch. Useful for debugging
     batches_in_epoch=sys.maxsize,
 
