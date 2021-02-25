@@ -68,7 +68,7 @@ DEFAULT_BASE = dict(
     # Training batch size
     batch_size=BATCH_SIZE,
     # Validation batch size
-    val_batch_size=BATCH_SIZE,
+    val_batch_size=sys.maxsize,
     # Number of batches per epoch. Useful for debugging
     batches_in_epoch=sys.maxsize,
 
@@ -115,11 +115,6 @@ DEFAULT_BASE = dict(
         weight_decay=0.01,
         momentum=0.0,
     ),
-
-    # Whether or not to apply weight decay to batch norm modules parameters
-    # If False, remove 'weight_decay' from batch norm parameters
-    # See https://arxiv.org/abs/1807.11205
-    batch_norm_weight_decay=False,
 
     # Learning rate scheduler class. Must inherit from "_LRScheduler"
     lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
