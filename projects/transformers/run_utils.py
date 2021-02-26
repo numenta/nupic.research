@@ -405,7 +405,7 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
 
         # Map labels to IDs (not necessary for GLUE tasks)
         if label_to_id is not None and "label" in examples:
-            result["label"] = [label_to_id[l] for l in examples["label"]]
+            result["label"] = [label_to_id[label] for label in examples["label"]]
         return result
 
     tokenized_datasets = datasets.map(

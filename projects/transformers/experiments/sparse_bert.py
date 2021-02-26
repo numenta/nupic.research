@@ -24,7 +24,7 @@ Base Transformers Experiment configuration.
 
 from copy import deepcopy
 
-from callbacks import SparsifyFCLayersCallback, RezeroWeightsCallback
+from callbacks import RezeroWeightsCallback, SparsifyFCLayersCallback
 
 from .base import debug_bert
 from .bert_replication import bert_100k
