@@ -29,24 +29,17 @@ class TrackGradientsHook(TrackStatsHookBase):
     Backward hook class for tracking gradients
     """
 
-    def __init__(self, name, max_samples_to_track, metric="cosine"):
+    def __init__(self, name, max_samples_to_track):
         super().__init__(name=name)
 
         self.num_samples = max_samples_to_track
 
-        # `_gradients` keeps all hidden activations in memory, and grows linearly in
+        # `_gradients` keeps all gradients in memory, and grows linearly in
         # space with the number of samples
-        # self._activations = None
         self._gradients = torch.tensor([])
-        self.metric = metric
 
     def get_statistics(self):
-        if self.metric == "cosine":
-            return [torch.cosine_similarity(x, y) for x in self._gradients for y in
-                    self._gradients]
-        elif self.metric == "dot":
-            return [x.dot(y) for x in self._gradients for y in self._gradients]
-        return None
+        return [self._gradients]
 
     def __call__(self, module, grad_in, grad_out):
         """
@@ -58,9 +51,8 @@ class TrackGradientsHook(TrackStatsHookBase):
         """
         if not self._tracking:
             return
-
-        self._gradients = self._gradients.to(grad_out.device)
-        self._gradients = torch.cat((grad_out, self._gradients), dim=0)
+        self._gradients = self._gradients.to(grad_in[1].device)
+        self._gradients = torch.cat((grad_in[1], self._gradients), dim=0)
 
         # Keep only the last 'num_samples'
         self._gradients = self._gradients[:self.num_samples, ...]
