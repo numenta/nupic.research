@@ -54,7 +54,7 @@ def register_bert_model(bert_cls):
         4. Registers these classes with Transformers model mappings
 
     This last step ensures that the resulting config and models may be used by
-    AutoConfig, AutoModelForMaskedLM, and AutoModelForMaskedLM.
+    AutoConfig, AutoModelForMaskedLM, and AutoModelForSequenceClassification.
 
     Assumptions are made to auto-name these classes and the corresponding model type.
     For instance, SparseBertModel will have model_type="sparse_bert" and associated
