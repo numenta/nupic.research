@@ -157,6 +157,14 @@ finetuning_bert1mi_single_task.update(
 )
 
 
+finetuning_sparse_bert_100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_sparse_bert_100k_glue.update(
+    # Model arguments
+    model_type="static_sparse_non_attention_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/static_sparse_non_attention_bert_100k",  # noqa: E501
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     debug_finetuning=debug_finetuning,
@@ -168,4 +176,5 @@ CONFIGS = dict(
     finetuning_bert700k_single_task=finetuning_bert700k_single_task,
     finetuning_bert1mi_glue=finetuning_bert1mi_glue,
     finetuning_bert1mi_single_task=finetuning_bert1mi_single_task,
+    finetuning_sparse_bert_100k_glue=finetuning_sparse_bert_100k_glue,
 )

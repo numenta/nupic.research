@@ -64,6 +64,8 @@ class SparsifyFCLayersCallback(TrainerCallback):
 class RezeroWeightsCallback(TrainerCallback):
 
     def on_init_end(self, args, state, control, model, **kwargs):
+        """Log sparsity of the model and the sparsity of just the encoder."""
+
         model.apply(rezero_weights)
 
         num_tol, num_nonzero = count_nonzero_params(model)

@@ -88,7 +88,6 @@ def main():
         exp_parser = HfArgumentParser(
             (ModelArguments, DataTrainingArguments, CustomTrainingArguments)
         )
-        logging.info(f"Running with config:\n{pformat(config_dict, indent=4)}")
         model_args, data_args, training_args = exp_parser.parse_dict(config_dict)
 
         # Overrides default behavior of TrainingArguments of setting run name
@@ -127,6 +126,9 @@ def main():
             level=(logging.INFO if is_main_process(training_args.local_rank)
                    else logging.WARN)
         )
+
+        # Log config.
+        logging.info(f"Running with config:\n{pformat(config_dict, indent=4)}")
 
         # Log on each process the small summary:
         logging.warning(
