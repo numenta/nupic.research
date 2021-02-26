@@ -18,8 +18,8 @@ In progress, current results:
 <br/><br/>
 
 **Legend**
-* *sparse_v1:* Static sparse encoder with only the non-attention linear layers sparsified
-* *sparse_v2:* Static sparse encoder with all linear layers sparsified, including attention
+* *sparse_v1:* Static sparse encoder with only the non-attention linear layers sparsified (`model_type=static_sparse_non_attention_bert`)
+* *sparse_v2:* Static sparse encoder with all linear layers sparsified, including attention (`model_type=static_sparse_encoder_bert`)
 
 
 </br>

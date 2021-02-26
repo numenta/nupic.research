@@ -25,4 +25,4 @@ Bert models. This way, they may be automatically loaded via AutoModelForMaskedLM
 related utilities.
 """
 
-from .modeling_sparse_bert import *
+from .static_sparse_bert import *
