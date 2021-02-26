@@ -55,4 +55,4 @@ class TrackGradientsHook(TrackStatsHookBase):
         self._gradients = torch.cat((grad_in[1], self._gradients), dim=0)
 
         # Keep only the last 'num_samples'
-        self._gradients = self._gradients[:self.num_samples, ...]
+        self._gradients = self._gradients[: self.num_samples, ...]

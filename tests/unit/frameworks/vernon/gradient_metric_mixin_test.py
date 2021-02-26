@@ -27,16 +27,11 @@ from torch import nn
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
-from nupic.research.frameworks.vernon import (
-    MetaContinualLearningExperiment,
-    SupervisedExperiment,
-    mixins,
-)
-from nupic.torch.modules import KWinners, SparseWeights
-import matplotlib.pyplot as plt
+from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
+from nupic.torch.modules import SparseWeights
 
-class TrackStatsSupervisedExperiment(mixins.GradientMetrics,
-                                     SupervisedExperiment):
+
+class TrackStatsSupervisedExperiment(mixins.GradientMetrics, SupervisedExperiment):
     pass
 
 
@@ -46,8 +41,7 @@ class SimpleMLP(nn.Module):
         in_features = np.prod(input_shape)
         self.flatten = torch.nn.Flatten()
         self.classifier = SparseWeights(
-            nn.Linear(in_features, num_classes, bias=False),
-            sparsity=0.5,
+            nn.Linear(in_features, num_classes, bias=False), sparsity=0.5
         )
 
     def forward(self, x):
@@ -70,10 +64,7 @@ simple_supervised_config = dict(
     # Model class. Must inherit from "torch.nn.Module"
     model_class=SimpleMLP,
     # model model class arguments passed to the constructor
-    model_args=dict(
-        num_classes=10,
-        input_shape=(1, 4, 4),
-    ),
+    model_args=dict(num_classes=10, input_shape=(1, 4, 4)),
     gradient_metrics_args=dict(
         include_modules=[nn.Linear],
         plot_freq=2,
@@ -84,7 +75,7 @@ simple_supervised_config = dict(
     # Optimizer class class arguments passed to the constructor
     optimizer_args=dict(lr=0.1),
     # Suppress logging.
-    log_level="NOTSET"
+    log_level="NOTSET",
 )
 
 
@@ -114,6 +105,7 @@ class GradientMetricsTest(unittest.TestCase):
                 self.assertTrue("classifier.module/cosine" in ret)
                 self.assertTrue("classifier.module/pearson" in ret)
                 self.assertTrue("classifier.module/dot" in ret)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

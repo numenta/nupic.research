@@ -23,15 +23,13 @@ import abc
 from copy import deepcopy
 from pprint import pformat
 
-import torch
-import numpy as np
-
-from nupic.research.frameworks.pytorch.hooks import (
-    ModelHookManager,
-    TrackGradientsHook,
-)
-from nupic.research.frameworks.pytorch.model_utils import filter_modules
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
+
+from nupic.research.frameworks.pytorch.hooks import ModelHookManager, TrackGradientsHook
+from nupic.research.frameworks.pytorch.model_utils import filter_modules
+
 
 class GradientMetrics(metaclass=abc.ABCMeta):
     """
@@ -80,17 +78,16 @@ class GradientMetrics(metaclass=abc.ABCMeta):
         # Process config args
         gradient_metrics_args = config.get("gradient_metrics_args", {})
         self.gradient_metrics_plot_freq, self.gradient_metrics_filter_args, \
-        self.gradient_metrics_max_samples, self.gradient_metrics, \
-        self.gradient_values\
-            = self.process_gradient_metrics_args(gradient_metrics_args)
+            self.gradient_metrics_max_samples, self.gradient_metrics, \
+            self.gradient_values = self.process_gradient_metrics_args(
+                gradient_metrics_args)
 
         # Register hook for tracking hidden activations
         named_modules = filter_modules(self.model, **self.gradient_metrics_filter_args)
         hook_args = dict(max_samples_to_track=self.gradient_metrics_max_samples)
-        self.gradient_metric_hooks = ModelHookManager(named_modules,
-                                        TrackGradientsHook,
-                                        hook_type="backward",
-                                        hook_args=hook_args)
+        self.gradient_metric_hooks = ModelHookManager(
+            named_modules, TrackGradientsHook, hook_type="backward", hook_args=hook_args
+        )
 
         # Log the names of the modules being tracked
         tracked_names = pformat(list(named_modules.keys()))
@@ -153,11 +150,12 @@ class GradientMetrics(metaclass=abc.ABCMeta):
         if iteration % self.gradient_metrics_plot_freq == 0:
             gradient_stats = self.gradient_metric_hooks.get_statistics()
             gradient_metrics_stats = self.calculate_gradient_metrics_stats(
-                gradient_stats)
+                gradient_stats
+            )
             gradient_metric_heatmaps = self.plot_gradient_metric_heatmaps(
-                                                                gradient_metrics_stats,
-                                                                )
-            for (name, module, metric, stats, figure) in gradient_metric_heatmaps:
+                gradient_metrics_stats
+            )
+            for (name, _, metric, _, figure) in gradient_metric_heatmaps:
                 results.update({f"{name}/{metric}": figure})
         return results
 
@@ -170,21 +168,24 @@ class GradientMetrics(metaclass=abc.ABCMeta):
                 gradients = torch.abs(torch.sign(gradients))
             for metric in self.gradient_metrics:
                 if metric == "cosine":
-                    stats = [torch.cosine_similarity(x, y, dim=0)
-                             for x in gradients for y in gradients]
+                    stats = [
+                        torch.cosine_similarity(x, y, dim=0)
+                        for x in gradients
+                        for y in gradients
+                    ]
                 elif metric == "dot":
-                    stats =  [x.dot(y)
-                              for x in gradients for y in gradients]
+                    stats = [x.dot(y) for x in gradients for y in gradients]
                 elif metric == "pearson":
-                    stats = [torch.cosine_similarity(x-x.mean(), y-y.mean(), dim=0)
-                            for x in gradients for y in gradients]
+                    stats = [
+                        torch.cosine_similarity(x - x.mean(), y - y.mean(), dim=0)
+                        for x in gradients
+                        for y in gradients
+                    ]
                 stats = torch.tensor(stats)
-                #symmetric (metric[i, j] == metric[j, i]), only here to make plotting nicer
                 gradient_dim = len(gradients)
                 stats = stats.view(gradient_dim, gradient_dim)
                 all_stats.append((name, module, metric, stats))
         return all_stats
-
 
     def plot_gradient_metric_heatmaps(self, gradient_metrics_stats):
         order_by_class = torch.argsort(self.gradient_metric_targets)
@@ -194,8 +195,8 @@ class GradientMetrics(metaclass=abc.ABCMeta):
             plt.cla()
             fig, ax = plt.subplots()
             max_val = np.abs(stats).max()
-            #change to red/blue colormap
-            #after finishing, screenshot a demo and put into PR
+            # change to red/blue colormap
+            # after finishing, screenshot a demo and put into PR
             ax.imshow(stats, cmap="bwr", vmin=-max_val, vmax=max_val)
             ax.set_xlabel("class")
             ax.set_ylabel("class")
@@ -216,11 +217,16 @@ class GradientMetrics(metaclass=abc.ABCMeta):
 
             # Targets were initialized on the cpu which could differ from the
             # targets collected during the forward pass.
-            self.gradient_metric_targets = self.gradient_metric_targets.to(target.device)
+            self.gradient_metric_targets = self.gradient_metric_targets.to(
+                target.device
+            )
 
             # Concatenate and discard the older targets.
-            self.gradient_metric_targets = torch.cat([target, self.gradient_metric_targets], dim=0)
+            self.gradient_metric_targets = torch.cat(
+                [target, self.gradient_metric_targets], dim=0
+            )
             self.gradient_metric_targets = self.gradient_metric_targets[
-                                           :self.gradient_metrics_max_samples]
+                : self.gradient_metrics_max_samples
+            ]
 
         return loss
