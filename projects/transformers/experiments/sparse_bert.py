@@ -69,7 +69,6 @@ mini_sparse_bert_debug.update(
 
 # Export configurations in this file
 CONFIGS = dict(
-    sparse_debug_bert=sparse_debug_bert,
     sparse_bert_100k=sparse_bert_100k,
     mini_sparse_bert_debug=mini_sparse_bert_debug,
     static_sparse_encoder_bert_100k=static_sparse_encoder_bert_100k,
