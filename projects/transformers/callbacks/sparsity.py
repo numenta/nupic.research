@@ -24,41 +24,13 @@ from transformers import TrainerCallback
 from transformers.utils import logging
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
-from nupic.torch.modules import SparseWeights, rezero_weights
+from nupic.torch.modules import rezero_weights
 
 logger = logging.get_logger(__name__)
 
 __all__ = [
     "RezeroWeightsCallback",
-    "SparsifyFCLayersCallback",
 ]
-
-
-class SparsifyFCLayersCallback(TrainerCallback):
-    """
-    Sparsifies the hidden and output fully connected layer for a
-    BERT HuggingFace model
-    """
-
-    def __init__(self, sparsity: float = 0.5, num_sparse_layers: int = 12):
-        self.sparsity = sparsity
-        self.num_sparse_layers = num_sparse_layers
-
-    def on_init_end(self, args, state, control, model, **kwargs):
-        """Replace linear layers with sparse layers"""
-        device = model.device
-        for idx in range(self.num_sparse_layers):
-            intermediate_layer = model.bert.encoder.layer[idx].intermediate.dense
-            model.bert.encoder.layer[idx].intermediate.dense = \
-                SparseWeights(intermediate_layer, sparsity=self.sparsity).to(device)
-
-            output_layer = model.bert.encoder.layer[idx].output.dense
-            model.bert.encoder.layer[idx].output.dense = \
-                SparseWeights(output_layer, sparsity=self.sparsity).to(device)
-
-    def on_step_end(self, args, state, control, model, **kwargs):
-        """Rezero weights"""
-        model.apply(rezero_weights)
 
 
 class RezeroWeightsCallback(TrainerCallback):
