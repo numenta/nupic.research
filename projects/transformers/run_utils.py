@@ -405,7 +405,7 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
 
         # Map labels to IDs (not necessary for GLUE tasks)
         if label_to_id is not None and "label" in examples:
-            result["label"] = [label_to_id[l] for l in examples["label"]]
+            result["label"] = [label_to_id[label] for label in examples["label"]]
         return result
 
     tokenized_datasets = datasets.map(
@@ -593,7 +593,7 @@ def init_config(model_args, extra_config_kwargs=None):
             model_args.model_name_or_path, **config_kwargs
         )
     else:
-        config = CONFIG_MAPPING[model_args.model_type]()
+        config = CONFIG_MAPPING[model_args.model_type](**model_args.config_kwargs)
         logging.warning("You are instantiating a new config instance from scratch.")
 
     return config
@@ -665,6 +665,7 @@ def init_model(model_args, config, tokenizer, finetuning=False):
             model = AutoModelForMaskedLM.from_config(config)
             model.resize_token_embeddings(len(tokenizer))
 
+    logging.info(f"Initialized model: {model}")
     return model
 
 

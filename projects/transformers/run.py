@@ -36,6 +36,7 @@ import pickle
 import random
 import sys
 from copy import deepcopy
+from pprint import pformat
 
 import torch.distributed
 import transformers
@@ -125,6 +126,9 @@ def main():
             level=(logging.INFO if is_main_process(training_args.local_rank)
                    else logging.WARN)
         )
+
+        # Log config.
+        logging.info(f"Running with config:\n{pformat(config_dict, indent=4)}")
 
         # Log on each process the small summary:
         logging.warning(
