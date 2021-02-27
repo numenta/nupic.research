@@ -53,6 +53,8 @@ class SparseBertModelTest(unittest.TestCase):
             sparsity=0.9,
             num_attention_heads=1,
             num_hidden_layers=2,
+            hidden_size=64,
+            intermediate_size=64 * 4,
         )
 
     def test_model_mappings(self):

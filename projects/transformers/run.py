@@ -174,7 +174,7 @@ def run_pretraining(
     datasets, tokenized_datasets, dataset_path = init_datasets_mlm(data_args)
 
     config = init_config(model_args, extra_config_kwargs=None)
-    tokenizer = init_tokenizer(model_args, config=config)
+    tokenizer = init_tokenizer(model_args)
     model = init_model(model_args, config, tokenizer, finetuning=False)
 
     if tokenized_datasets is None:
@@ -242,7 +242,7 @@ def run_finetuning_single_task(
         finetuning_task=data_args.task_name,
     )
     config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
-    tokenizer = init_tokenizer(model_args, config=config)
+    tokenizer = init_tokenizer(model_args)
     model = init_model(model_args, config, tokenizer, finetuning=True)
 
     # Tokenizing and preprocessing the datasets for downstream tasks

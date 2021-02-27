@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import logging
 import re
 
 from torch import nn
@@ -35,14 +36,11 @@ from transformers import (
     BertTokenizerFast,
 )
 from transformers.models.bert.modeling_bert import BertOnlyMLMHead
-from transformers.utils import logging
 
 # This is the dict of the `models` module. Anything imported from `models`
 # must be contained in this dict. Hence, it will be updated to include
 # the new modules made below so they may be imported.
 from . import __dict__ as __models_dict__
-
-logger = logging.get_logger(__name__)
 
 
 def register_bert_model(bert_cls):
@@ -220,7 +218,7 @@ def create_masked_lm_class(bert_cls, name_prefix):
             BertPreTrainedModel.__init__(self, config)
 
             if config.is_decoder:
-                logger.warning(
+                logging.warning(
                     # This warning was included with the original BertForMaskedLM.
                     f"If you want to use `{name_prefix}BertForMaskedLM` make sure "
                     " `config.is_decoder=False` for bi-directional self-attention."

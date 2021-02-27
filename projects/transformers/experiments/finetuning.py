@@ -165,6 +165,13 @@ finetuning_sparse_bert_100k_glue.update(
 )
 
 
+finetuning_mini_sparse_bert_debug = deepcopy(finetuning_bert700k_glue)
+finetuning_mini_sparse_bert_debug.update(
+    model_type="static_sparse_encoder_bert",
+    model_name_or_path="/home/ec2-user/nta/results/experiments/transformers/mini_sparse_bert_debug",  # noqa: E501
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     debug_finetuning=debug_finetuning,
@@ -177,4 +184,5 @@ CONFIGS = dict(
     finetuning_bert1mi_glue=finetuning_bert1mi_glue,
     finetuning_bert1mi_single_task=finetuning_bert1mi_single_task,
     finetuning_sparse_bert_100k_glue=finetuning_sparse_bert_100k_glue,
+    finetuning_mini_sparse_bert_debug=finetuning_mini_sparse_bert_debug,
 )

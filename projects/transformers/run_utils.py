@@ -599,7 +599,7 @@ def init_config(model_args, extra_config_kwargs=None):
     return config
 
 
-def init_tokenizer(model_args, config=None):
+def init_tokenizer(model_args):
     """
     Distributed training:
     The .from_pretrained methods guarantee that only one local process can
@@ -610,7 +610,6 @@ def init_tokenizer(model_args, config=None):
         use_fast=model_args.use_fast_tokenizer,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
-        config=config,
     )
     if model_args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(

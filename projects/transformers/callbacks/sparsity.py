@@ -19,14 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import logging
+
 import wandb
 from transformers import TrainerCallback
-from transformers.utils import logging
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules import rezero_weights
-
-logger = logging.get_logger(__name__)
 
 __all__ = [
     "RezeroWeightsCallback",
@@ -42,12 +41,12 @@ class RezeroWeightsCallback(TrainerCallback):
 
         num_total, num_nonzero = count_nonzero_params(model)
         model_sparsity = 1 - (num_nonzero / num_total)
-        logger.info(f"Non-zero Params / Total Params, {num_nonzero:,} / {num_total:,}")
-        logger.info(f"   Model Sparsity={model_sparsity:.4f}")
+        logging.info(f"Non-zero Params / Total Params, {num_nonzero:,} / {num_total:,}")
+        logging.info(f"   Model Sparsity={model_sparsity:.4f}")
 
         num_total, num_nonzero = count_nonzero_params(model.bert.encoder)
         encoder_sparsity = 1 - (num_nonzero / num_total)
-        logger.info(f"   Encoder Sparsity={encoder_sparsity:0.4f}")
+        logging.info(f"   Encoder Sparsity={encoder_sparsity:0.4f}")
 
     def on_step_end(self, args, state, control, model, **kwargs):
         """Rezero weights and log sparsity."""

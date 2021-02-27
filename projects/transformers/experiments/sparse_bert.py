@@ -62,6 +62,8 @@ mini_sparse_bert_debug.update(
         num_hidden_layers=2,
         num_attention_heads=1,
         sparsity=0.9,
+        hidden_size=64,
+        intermediate_size=64 * 4,
     ),
     trainer_callbacks=[RezeroWeightsCallback()]
 )
