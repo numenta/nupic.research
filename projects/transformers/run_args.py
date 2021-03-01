@@ -21,12 +21,25 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from transformers import MODEL_FOR_MASKED_LM_MAPPING
+from transformers import MODEL_FOR_MASKED_LM_MAPPING, TrainingArguments
 
 from run_utils import TASK_TO_KEYS
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+
+
+@dataclass
+class CustomTrainingArguments(TrainingArguments):
+    """
+    Additional arguments to HF TrainingArguments
+    """
+    num_runs: int = field(
+        default=1,
+        metadata={
+            "help": "How many runs per task. Currently only used for finetuning."
+        },
+    )
 
 
 @dataclass
@@ -61,6 +74,12 @@ class ModelArguments:
         default=None,
         metadata={
             "help": "Pretrained config name or path if not the same as model_name"
+        }
+    )
+    config_kwargs: Dict = field(
+        default_factory=dict,
+        metadata={
+            "help": "Keyword arguments to pass to model config constructor."
         }
     )
     tokenizer_name: Optional[str] = field(
@@ -101,6 +120,13 @@ class ModelArguments:
         default_factory=dict,
         metadata={
             "help": "Allow user to define custom training arguments per task."
+        },
+    )
+    trainer_callbacks: Dict = field(
+        default_factory=dict,
+        metadata={
+            "help": "Whether to create a new results file. If set to False, will only"
+                    "attempt to update existing entries"
         },
     )
 
@@ -217,6 +243,13 @@ class DataTrainingArguments:
             "help": "The name of the task to train on."
                     "Option available for backwards compatibility with HF run script."
                     f"Available tasks: {', '.join(TASK_TO_KEYS.keys())}"
+        },
+    )
+    override_finetuning_results: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to create a new results file. If set to False, will only"
+                    "attempt to update existing entries"
         },
     )
 

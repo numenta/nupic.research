@@ -31,13 +31,16 @@ import os
 
 from transformers import AutoModelForMaskedLM
 
+# Import models. This will update Transformer's model mappings so that custom models can
+# be loaded via AutoModelForMaskedLM.
+import models # noqa F401
+
 
 def save_pretrained(checkpoint_folder, destination_folder, model_name):
     if not model_name:
         model_name = os.path.split(checkpoint_folder)[-1]
     model = AutoModelForMaskedLM.from_pretrained(checkpoint_folder)
     destination_file_path = os.path.join(destination_folder, model_name)
-    # TODO: customize this function for sparse models
     model.save_pretrained(destination_file_path)
     print(f"Model saved at {destination_file_path}")
 

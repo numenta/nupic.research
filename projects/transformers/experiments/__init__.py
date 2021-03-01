@@ -19,6 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+# Automatically import models. This will update Transformer's model mappings so that
+# custom models can be loaded via AutoModelForMaskedLM and related auto-constructors.
+import models
+
 from .base import CONFIGS as BASE
 from .bert_replication import CONFIGS as BERT_REPLICATION
 from .sparse_bert import CONFIGS as SPARSE_BERT

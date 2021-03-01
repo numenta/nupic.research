@@ -4,13 +4,23 @@
 
 In progress, current results:
 
-|            | average_bert     | average_glue      | cola           | mnli                         | mrpc        | qnli     | qqp         | rte      | sst2     | stsb                  | wnli     |
-|:-----------|:-----------------|:------------------|:---------------|:-----------------------------|:------------|:---------|:------------|:---------|:---------|:----------------------|:---------|
-|            | Average w/o wnli | Average all tasks | Matthew's corr | Matched acc./Mismatched acc. | F1/Accuracy | Accuracy | Accuracy/F1 | Accuracy | Accuracy | Person/Spearman corr. | Accuracy |
-| bert_HF    | 81.67            | 78.85             | 56.53          | 83.91/84.10                  | 88.85/84.07 | 90.66    | 90.71/87.49 | 65.70    | 92.32    | 88.64/88.48           | 56.34    |
-| bert_paper | 79.60            | -                 | 52.10          | 84.60/83.40                  | 88.9        | 90.5     | 71.2        | 66.4     | 93.5     | 85.8                  | -        |
-| bert_700k  | 78.59            | 74.54             | 41.73          | 83.76/-                      | -/84.90 | 91.51    | 90.53/-    | 58.59    | 91.20    | 86.67/86.31           | 42.19    |
-| bert_100k  | 69.26            | 65.21             | 32.02          | 78.89/-                      | -/77.86 | 50.57    | 89.15/-    | 53.91    | 88.08    | 83.66/83.55           | 32.81    |
+|            | average_bert     | average_glue      | cola           | mnli                         | mrpc        | qnli     | qqp         | rte      | sst2     | stsb                  | wnli     | perplexity |
+|:-----------|:-----------------|:------------------|:---------------|:-----------------------------|:------------|:---------|:------------|:---------|:---------|:----------------------|:---------|:-----------|
+|            | Average w/o wnli | Average all tasks | Matthew's corr | Matched acc./Mismatched acc. | F1/Accuracy | Accuracy | Accuracy/F1 | Accuracy | Accuracy | Person/Spearman corr. | Accuracy |            |
+| bert_HF    | 81.67            | 78.85             | 56.53          | 83.91/84.10                  | 88.85/84.07 | 90.66    | 90.71/87.49 | 65.70    | 92.32    | 88.64/88.48           | 56.34    |            |
+| bert_paper|          79.60 |             -  |  52.10 | 84.60/83.40          | 88.90/- | 90.50     | 71.20/-     | 66.40     | 93.50     | 85.80        |      - | 3.99 (RoBERTa) |
+| bert_1mi |          80.76 |          76.82 |  48.87 | 84.08/84.57 | 89.76/85.68 |  91.19 | 90.58/87.17 | 66.02 |  91.44 | 87.67/87.54 |  45.31 | 5.013 |
+| bert_700k |          79.77 |          75.25 |  47.73 | 83.91/84.22 | 88.27/83.59 |  91.51 | 90.37/86.90 | 62.11 |  91.44 | 86.88/86.70 |  39.06 |  |
+| bert_100k |          75.71 |          72.51 |  40.98 | 78.26/78.65 | 84.05/77.86 |  87.74 | 89.12/85.25 |  58.2 |  88.31 | 83.90/83.80 |  46.88 | 8.619 |
+| sparse_v1_100k |          72.67 |          67.91 |  22.43 | 77.25/77.96 | 85.37/78.82 |  84.65 | 88.23/84.32 | 58.32 |  87.27 | 82.79/82.65 |  29.84 | 10.461 |
+| sparse_v2_100k |  |  |  |  |  |  |  |  |  |  |  |  |
+
+<br/><br/>
+
+**Legend**
+* *sparse_v1:* Static sparse encoder with only the non-attention linear layers sparsified (`model_type=static_sparse_non_attention_bert`)
+* *sparse_v2:* Static sparse encoder with all linear layers sparsified, including attention (`model_type=static_sparse_encoder_bert`)
+
 
 </br>
 </br>
@@ -18,11 +28,10 @@ In progress, current results:
 Model description:
 * bert_HF: reported by HuggingFace, see https://github.com/huggingface/transformers/tree/master/examples/text-classification. No inner loop of hyperparameter optimization for each finetuning task. Pretrained for 1mi steps of batch size 256.
 * bert_paper: reported in BERT paper, see https://arxiv.org/abs/1810.04805. Hyperparameters for each task are chosen in a grid search with 18 different variations per task, and best results reported. Pretrained for 1mi steps of batch size 256.
-* bert_Nk: where N is the number of steps in pretraining. These refer to models trained by ourselves for less than or more than 1mi steps. They might be intermediate checkpoints of longer runs or a shorter run executed to completion. Batch size is 256 unless specified otherwise in the model name. No inner loop of hyperparameter optimization for each finetuning task, follow same finetuning hyperparameters defined by bert_HF.
+* bert_Nk: where N is the number of steps in pretraining. These refer to models trained by ourselves for less than or more than 1mi steps. They might be intermediate checkpoints of longer runs or a shorter run executed to completion. Batch size is 256 unless specified otherwise in the model name. No inner loop of hyperparameter optimization for each finetuning task, follows same finetuning hyperparameters defined by bert_HF. Results for {cola, rte, wnli} are a max over 10 runs, {sstb, mrpc} are a max over 3 runs, and the remaining tasks are single runs.
 
 Known issues, to be investigated/fixed:
-* Currently we don't have results for mnli mismatched acc.
-* Missing f1 values for QQP and MRPC. Already available in code, require rerunning those specific tasks to get values or evaluating from final checkpoint.
+* A lot of variance in finetuning, specially in small datasets, like rte and wnli, and highly unbalanced datasets such as cola. In cola for example, same model will output results from 14 to 47 using exact similar finetuning regimes. Maxing over several runs helps in stabilizing finetuning results, making it easier to compare across different models.
 * We don't have 100% coverage of validation set. Some samples of the validation set are given the label "-100", most likely for the tokenizer not being able to process them. These samples are excluded for validation. That coverage varies from 95-100%, with most tasks being close to 100%, but cola and mnli specifically have ~95% coverage. Not clear whether the coverage for bert_paper and bert_hf is 100%.
 * Only GLUE tasks included in the table. GLUE covers sequence classification or other tasks such as Q&A or multiple choice reframed as sequence classification. BERT also reports results on SQuaD (question answering), SWAG (multiple choice) and CoNLL (named entity recognition).
 * To add to the table perplexity of the original pretrained models.
@@ -33,9 +42,11 @@ Known issues, to be investigated/fixed:
 
 Local implementation using Huggingface. To run, create a new experiment dict under experiments and run using:
 
-`python run.py -e <experiment_name>`
+`python run.py <experiment_name>`
 
-Other accepted ways are passing arguments directly in command line or through a json file. See run.py for more details.
+You can also run multiple experiments in sequence:
+
+`python run.py <experiment_name_A>  <experiment_name_B>`
 
 ## How to run - multiple nodes
 
@@ -58,6 +69,10 @@ Then initialize your cluster:
 After the head and worker nodes are initialized, run using the bash script provided in transformers-cli-utils:
 
 `run.sh <experiment_name>`
+
+As in single node, you can run multiple experiments in sequence. When using the script with multiple experiments, wrap the experiment names in quotes so it is read as a single argument:
+
+`run.sh "<experiment_name_A> <experiment_name_B>"`
 
 Wait a few minutes and the output of all instances will be redirected to your local terminal.
 You can follow up the experiments in the wandb link shown when training starts.

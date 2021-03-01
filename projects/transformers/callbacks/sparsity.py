@@ -19,33 +19,51 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import logging
+
+import wandb
 from transformers import TrainerCallback
 
-from nupic.torch.modules import SparseWeights, rezero_weights
+from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
+from nupic.torch.modules import rezero_weights
+
+__all__ = [
+    "RezeroWeightsCallback",
+]
 
 
-class SparsifyFCLayersCallback(TrainerCallback):
-    """
-    Sparsifies the hidden and output fully connected layer for a
-    BERT HuggingFace model
-    """
-
-    def __init__(self, sparsity: float = 0.5, num_sparse_layers: int = 12):
-        self.sparsity = sparsity
-        self.num_sparse_layers = num_sparse_layers
+class RezeroWeightsCallback(TrainerCallback):
 
     def on_init_end(self, args, state, control, model, **kwargs):
-        """Replace linear layers with sparse layers"""
-        device = model.device
-        for idx in range(self.num_sparse_layers):
-            intermediate_layer = model.bert.encoder.layer[idx].intermediate.dense
-            model.bert.encoder.layer[idx].intermediate.dense = \
-                SparseWeights(intermediate_layer, sparsity=self.sparsity).to(device)
+        """Log sparsity of the model and the sparsity of just the encoder."""
 
-            output_layer = model.bert.encoder.layer[idx].output.dense
-            model.bert.encoder.layer[idx].output.dense = \
-                SparseWeights(output_layer, sparsity=self.sparsity).to(device)
+        model.apply(rezero_weights)
+
+        num_total, num_nonzero = count_nonzero_params(model)
+        model_sparsity = 1 - (num_nonzero / num_total)
+        logging.info(f"Non-zero Params / Total Params, {num_nonzero:,} / {num_total:,}")
+        logging.info(f"   Model Sparsity={model_sparsity:.4f}")
+
+        num_total, num_nonzero = count_nonzero_params(model.bert.encoder)
+        encoder_sparsity = 1 - (num_nonzero / num_total)
+        logging.info(f"   Encoder Sparsity={encoder_sparsity:0.4f}")
 
     def on_step_end(self, args, state, control, model, **kwargs):
-        """Rezero weights"""
+        """Rezero weights and log sparsity."""
+
         model.apply(rezero_weights)
+
+        # Log sparsity to wandb
+        if wandb.run is not None:
+            num_total, num_nonzero = count_nonzero_params(model)
+            model_sparsity = 1 - (num_nonzero / num_total)
+
+            num_total, num_nonzero = count_nonzero_params(model.bert.encoder)
+            encoder_sparsity = 1 - (num_nonzero / num_total)
+
+            logs = dict(
+                model_sparsity=model_sparsity,
+                encoder_sparsity=encoder_sparsity
+            )
+
+            wandb.log(logs, step=state.global_step)

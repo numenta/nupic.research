@@ -97,7 +97,7 @@ def load_ray_tune_experiment(
         if load_results:
             # Load results
             result_file = os.path.join(logpath, "result.json")
-            if not result_file:
+            if not os.path.exists(result_file):
                 print("No results for experiment:", experiment["experiment_tag"])
                 continue
 
