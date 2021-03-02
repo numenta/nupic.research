@@ -104,6 +104,8 @@ def initialize():
                 + DATASET + "_labels_SDR_classifiers_training.npy"))
 
     np.save("python2_htm_docker/docker_dir/training_and_testing_data/" + DATASET
+            + "_images_base_net_training", training_sources)
+    np.save("python2_htm_docker/docker_dir/training_and_testing_data/" + DATASET
             + "_images_SDR_classifiers_training", testing_decoder_sources)
     np.save("python2_htm_docker/docker_dir/training_and_testing_data/" + DATASET
             + "_images_SDR_classifiers_testing", testing_sdrc_classifiers_dataset)
