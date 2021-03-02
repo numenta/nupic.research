@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -20,9 +20,9 @@
 # ----------------------------------------------------------------------
 
 
-class TrackMaxAccuracy:
+class ReportMaxAccuracy:
     """
-    Track the maximum accuracy and its corresponding epoch during training.
+    Reports the maximum accuracy and its corresponding epoch during training.
     """
     def setup_experiment(self, config):
         super().setup_experiment(config)
@@ -31,9 +31,9 @@ class TrackMaxAccuracy:
 
     def validate(self):
         ret = super().validate()
-        curr_accuracy = ret["mean_accuracy"]
-        if curr_accuracy > self.max_accuracy:
-            self.max_accuracy = curr_accuracy
+        current_accuracy = ret["mean_accuracy"]
+        if current_accuracy > self.max_accuracy:
+            self.max_accuracy = current_accuracy
             self.max_accuracy_epoch = self.current_epoch
         ret.update(max_accuracy=self.max_accuracy)
         ret.update(max_accuracy_epoch=self.max_accuracy_epoch)
@@ -42,6 +42,6 @@ class TrackMaxAccuracy:
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].append("TrackMaxAccuracy: initialization")
-        eo["validate"].append("TrackMaxAccuracy: store running max accuracy")
+        eo["setup_experiment"].append("ReportMaxAccuracy: initialization")
+        eo["validate"].append("ReportMaxAccuracy: store running max accuracy")
         return eo
