@@ -30,7 +30,7 @@ from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
 
 
 class ReportMaxAccuracySupervisedExperiment(mixins.ReportMaxAccuracy,
-                                           SupervisedExperiment):
+                                            SupervisedExperiment):
     pass
 
 
@@ -93,11 +93,11 @@ class ReportMaxAccuracyUnitTest(unittest.TestCase):
         exp.setup_experiment(simple_supervised_config)
 
         # Loop through some pseudo epochs
-        curr_max = 0
+        current_max = 0
         for _ in range(5):
             ret = exp.run_epoch()
             self.assertTrue("max_accuracy" in ret)
-            self.assertTrue(ret["max_accuracy"] >= curr_max)
+            self.assertTrue(ret["max_accuracy"] >= current_max)
             current_max = ret["max_accuracy"]
 
 
