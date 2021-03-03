@@ -514,7 +514,7 @@ class SigOptTrainableMixin:
                 # check that all metrics are present
                 for name in self.metric_names:
                     if result[name] is not None:
-                        self.logger.info("Updating observation with value=",
+                        self.logger.info(f"Updating observation {name} with value=",
                                          result[name])
                     else:
                         self.logger.warning(f"No value: {name}")
