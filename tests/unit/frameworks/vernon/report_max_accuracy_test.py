@@ -29,8 +29,8 @@ from torchvision.transforms import ToTensor
 from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
 
 
-class TrackMaxAccuracySupervisedExperiment(mixins.TrackMaxAccuracy,
-                                           SupervisedExperiment):
+class ReportMaxAccuracySupervisedExperiment(mixins.ReportMaxAccuracy,
+                                            SupervisedExperiment):
     pass
 
 
@@ -51,7 +51,7 @@ def fake_data(size=100, image_size=(1, 4, 4), train=False):
 
 
 simple_supervised_config = dict(
-    experiment_class=TrackMaxAccuracySupervisedExperiment,
+    experiment_class=ReportMaxAccuracySupervisedExperiment,
     num_classes=10,
 
     # Dataset
@@ -78,14 +78,14 @@ simple_supervised_config = dict(
 )
 
 
-class TrackMaxAccuracyUnitTest(unittest.TestCase):
+class ReportMaxAccuracyUnitTest(unittest.TestCase):
     """
-    This is a test class for the `TrackMaxAccuracy` mixin.
+    This is a test class for the `ReportMaxAccuracy` mixin.
     """
 
-    def test_track_max_accuracy_supervised_experiment(self):
+    def test_report_max_accuracy_supervised_experiment(self):
         """
-        Test whether TrackMaxAccuracy works in the supervised setting.
+        Test whether ReportMaxAccuracy works in the supervised setting.
         """
 
         # Setup experiment and initialize model.
@@ -93,12 +93,12 @@ class TrackMaxAccuracyUnitTest(unittest.TestCase):
         exp.setup_experiment(simple_supervised_config)
 
         # Loop through some pseudo epochs
-        curr_max = 0
+        current_max = 0
         for _ in range(5):
             ret = exp.run_epoch()
             self.assertTrue("max_accuracy" in ret)
-            self.assertTrue(ret["max_accuracy"] >= curr_max)
-            curr_max = ret["max_accuracy"]
+            self.assertTrue(ret["max_accuracy"] >= current_max)
+            current_max = ret["max_accuracy"]
 
 
 if __name__ == "__main__":
