@@ -24,7 +24,6 @@ import copy
 from torch.optim.lr_scheduler import OneCycleLR
 
 from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
-import logging
 
 class MultiCycleLR:
     """
@@ -42,16 +41,17 @@ class MultiCycleLR:
         config = copy.deepcopy(config)
 
         ignored_class = config.pop("lr_scheduler_class", None)
-        if ignored_class is not None and ignored_class != OneCycleLR:
-            logging.warning("Ignoring lr_scheduler_class, using OneCycleLR")
         ignored_args = config.pop("lr_scheduler_args", None)
-        if ignored_args is not None and len(ignored_args) > 0:
-            logging.warning("Ignoring lr_scheduler_args, using "
-                                "multi_cycle_lr_args")
 
         config["lr_scheduler_step_every_batch"] = True
 
         super().setup_experiment(config)
+
+        if ignored_class is not None and ignored_class != OneCycleLR:
+            self.logger.warning("Ignoring lr_scheduler_class, using OneCycleLR")
+        if ignored_args is not None and len(ignored_args) > 0:
+            self.logger.warning("Ignoring lr_scheduler_args, using "
+                                "multi_cycle_lr_args")
 
         # Insert epoch counts and div_factors
         improved_args = {}

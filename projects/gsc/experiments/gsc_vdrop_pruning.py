@@ -31,6 +31,7 @@ from nupic.research.frameworks.backprop_structure.networks import (
     VDropLeNet,
     gsc_lenet_vdrop_sparse,
     gsc_lenet_vdrop_super_sparse,
+    gsc_lenet_vdrop_sparse_scaling,
 )
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
@@ -115,6 +116,7 @@ class SNRPruningGSCVDrop(
     mixins.LogBackpropStructure,
     mixins.LogEveryLearningRate,
     mixins.ExtraValidationsPerEpoch,
+    mixins.ReportMaxAccuracy,
     mixins.RegularizeLoss,
     mixins.ConstrainParameters,
     mixins.MultiCycleLR,
@@ -417,12 +419,61 @@ SIGOPT_GSC_VDROP_SNR_PRUNING.update(
         project="gsc_snr_pruning",
     ),
     sigopt_experiment_id=374528,
-    api_key = os.environ['SIGOPT_KEY']
+    api_key = os.environ.get("SIGOPT_KEY", None),
 )
+
+SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY = deepcopy(SIGOPT_GSC_VDROP_SNR_PRUNING)
+SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY.update(
+    name="SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING",
+    wandb_args=dict(
+        project="gsc-snr-pruning-scaling",
+        name="scaling_study",
+    ),
+    model_class=gsc_lenet_vdrop_sparse_scaling,
+    sigopt_experiment_class=SNRPruningGSCVDropSIGOPT,
+    sigopt_config=dict(
+        name="sigopt_vdrop_gsc_snr_pruning_scaling",
+        parameters=[
+            dict(name="num_pruning_iterations", type="int", bounds=dict(min=3, max=10)),
+            dict(
+                name="epochs_per_pruning_cycle", type="int", bounds=dict(min=2, max=8)
+            ),
+            dict(
+                name="max_lr",
+                type="double",
+                bounds=dict(min=0.001, max=0.3),
+                transformation="log",
+            ),
+            dict(
+                name="reg_scalar_max_value",
+                type="double",
+                bounds=dict(min=0.01, max=1.0),
+                transformation="log",
+            ),
+            dict(
+                name="reg_scalar_final_value",
+                type="double",
+                bounds=dict(min=0.0001, max=0.005),
+                transformation="log",
+            ),
+            dict(
+                name="momentum_max_value", type="double", bounds=dict(min=0.6, max=0.9)
+            ),
+        ],
+        metrics=[dict(name="max_accuracy", objective="maximize")],
+        parallel_bandwidth=1,
+        observation_budget=120,
+        project="gsc_snr_pruning",
+    ),
+    sigopt_experiment_id=376134,
+    api_key = os.environ.get("SIGOPT_KEY", None),
+)
+
 
 CONFIGS = dict(
     gsc_vdrop=GSC_VDROP,
     gsc_vdrop_snr_pruning=GSC_VDROP_SNR_PRUNING,
     gsc_vdrop_snr_pruning_super_sparse=GSC_VDROP_SNR_PRUNING_SUPER_SPARSE,
     sigopt_gsc_vdrop_snr_pruning=SIGOPT_GSC_VDROP_SNR_PRUNING,
+    sigopt_gsc_vdrop_snr_pruning_scaling_2 = SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY,
 )

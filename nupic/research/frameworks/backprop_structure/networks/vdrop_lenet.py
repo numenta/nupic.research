@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -40,7 +40,7 @@ from nupic.research.frameworks.backprop_structure.modules.vdrop_layers import (
 )
 
 
-class VDropLeNet(nn.Module):
+class VDropLeNet(nn.Sequential):
     def __init__(
         self,
         input_shape=(1, 32, 32),
@@ -60,7 +60,6 @@ class VDropLeNet(nn.Module):
             ((input_shape[1] - kernel_size + 1) / maxpool_stride) - kernel_size + 1
         ) / maxpool_stride
         vdrop_data = vdrop_data_class(z_logvar_init=z_logvar_init)
-        super().__init__()
         assert feature_map_sidelength == int(feature_map_sidelength)
         feature_map_sidelength = int(feature_map_sidelength)
 
@@ -166,13 +165,13 @@ class VDropLeNet(nn.Module):
                 ),
             ),
         ]
-        self.classifier = nn.Sequential(OrderedDict(modules))
+        super().__init__(OrderedDict(modules))
         vdrop_data.finalize()
         self.vdrop_data = vdrop_data
 
     def forward(self, *args, **kwargs):
         self.vdrop_data.compute_forward_data()
-        ret = self.classifier.forward(*args, **kwargs)
+        ret = super().forward(*args, **kwargs)
         self.vdrop_data.clear_forward_data()
         return ret
 
@@ -200,4 +199,15 @@ gsc_lenet_vdrop_super_sparse = partial(
     num_classes=12,
     linear_target_density=(0.01, 0.01),
     conv_target_density=(0.01, 0.01),
+)
+
+
+gsc_lenet_vdrop_sparse_scaling = partial(
+    VDropLeNet,
+    vdrop_data_class=MaskedVDropCentralData,
+    num_classes=12,
+    linear_units = 2000,
+    conv_target_density=(1.0, 0.2),
+    linear_target_density=(0.01, 1.0),
+    cnn_out_channels=(64, 64),
 )

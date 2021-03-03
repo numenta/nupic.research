@@ -107,10 +107,10 @@ class PruneLowSNR:
         vdrop_data = self.model.module.vdrop_data
         total_prunable_parameters = vdrop_data.z_mask.size(0)
         remaining_nonzero_parameters = vdrop_data.z_mask.double().sum().item()
-        model_sparsity = remaining_nonzero_parameters/total_prunable_parameters
+        model_density = remaining_nonzero_parameters/total_prunable_parameters
         results["total_prunable_parameters"] = total_prunable_parameters
         results["remaining_nonzero_parameters"] = remaining_nonzero_parameters
-        results["model_sparsity"] = model_sparsity
+        results["model_density"] = model_density
         return results
 
     @classmethod
