@@ -467,6 +467,7 @@ SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY.update(
     ),
     sigopt_experiment_id=376134,
     api_key = os.environ.get("SIGOPT_KEY", None),
+    num_samples=1,
 )
 
 
