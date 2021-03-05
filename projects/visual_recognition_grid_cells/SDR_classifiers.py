@@ -36,11 +36,11 @@ np.random.seed(18)
 
 DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note "fashion_mnist" not
 # fully supported in the current implementation
-SAMPLES_PER_CLASS_LIST = [5]  # How many samples per class to use in training the
+SAMPLES_PER_CLASS_LIST = [20]  # How many samples per class to use in training the
 # classifier; can be provided as a single-value list (e.g. [5]), or multi-valued list,
 # in which case a classifier will be trained for each number of sample classes
-CLASSIFIER_TYPE = "knn"  # Options are "rnn" and "knn"
-LOCATION_DATA_BOOL = False  # Concatenates the location of a feature (0:24) to the
+CLASSIFIER_TYPE = "rnn"  # Options are "rnn" and "knn"
+LOCATION_DATA_BOOL = True  # Concatenates the location of a feature (0:24) to the
 # features themselves, and provides this expanded feature to the classifier;
 # recommended for RNN comparison models
 ARBITRARY_SDR_ORDER_BOOL = False  # Option to shuffle the order of the SDRs for each
@@ -48,12 +48,16 @@ ARBITRARY_SDR_ORDER_BOOL = False  # Option to shuffle the order of the SDRs for 
 # inputs of arbitrary order
 USE_RASTER_BOOL = False  # Follow a fixed rastor sequence if True and
 # arbitrary order set to False
+BIASED_SAMPLING_REGION = False
+BLOCKED_TRAINING_EXAMPLES_BOOL = True # If True, block training examples together (e.g. 50
+# epochs of training on 0's, followed by 50 epochs on 1's, etc, with no interleving)
+# Used to evaluate robustness to continual learning
 
 # Hyperparameters for RNN
-EPOCHS = 1
+EPOCHS = 50
 WEIGHT_DECAY = 0.001  # Recommend 0.001
 BATCH_SIZE = 128  # Recommend 128
-LR_LIST = [0.002, 0.005, 0.01, 0.02]  # Learning rates to try for the RNN; can specify
+LR_LIST = [0.005]  # Learning rates to try for the RNN; can specify
 # just a single-value list if desired
 
 # Hyperparameters for k-NN
@@ -61,8 +65,9 @@ KNN_PROGRESSIVE_SENSATIONS_BOOL = False  # Whether to evaluate the k-NN classifi
 # where progressively more input points are given (from just 1 up to the maximum of 25)
 # This provides an indication of how many sensations are needed before classification
 # is robust
-N_NEIGHBOURS_LIST = list(range(1, 2))  # Number of neighbours to try for the k-NN, e.g.
+N_NEIGHBOURS_LIST = [1]  # Number of neighbours to try for the k-NN, e.g.
 # list(range(1, 11))
+TEST_EXAMPLES_PER_CLASS = 100
 
 
 class RNNModel(torch.nn.Module):
@@ -120,6 +125,33 @@ def sub_sample_classes(input_data, labels, samples_per_class, sanity_check=None)
 
     return input_data_samples, label_samples
 
+def biased_sequence_generator():
+
+    # Generate a sequence of sensations, biasing the
+    # early sensations to be from a particular region
+
+    # Randomly sample integers from a uniform distribution
+    # until the sequence is complete, but if a particular 
+    # digit is on the 'negative bias' list, re-sample with some
+    # probability
+
+    biased_sequence = []
+
+    negative_bias = [5, 10, 15, 20, 21, 22, 23, 24]
+    bias_prob = 0.1
+
+    while len(biased_sequence) < 25:
+
+        new_sample = np.random.randint(0,25)
+
+        if new_sample not in biased_sequence:
+            biased_sequence.append(new_sample)
+
+    print(biased_sequence)
+    exit()
+
+    return biased_sequence
+
 
 def shuffle_sdr_order(input_data_samples, random_indices):
     """
@@ -135,6 +167,10 @@ def shuffle_sdr_order(input_data_samples, random_indices):
 
             np.random.shuffle(random_indices)  # Re-shuffle the SDRs for each image
             # Otherwise the same fixed sequence is used to re-order them
+
+        elif BIASED_SAMPLING_REGION is True:
+
+            random_indices = biased_sequence_generator()
 
         temp_sdr_array = np.reshape(input_data_samples[image_iter], (128, 5 * 5))
 
@@ -229,6 +265,7 @@ def knn_progressive_senations(n_neighbors, training_data, training_labels,
 def train(net, training_data, training_labels, optimizer, criterion, epoch):
     net.train()
 
+    # Default is to shuffle training examples on each epoch
     shuffle_indices = torch.randperm(len(training_labels))
     training_data = training_data[shuffle_indices, :]
     training_labels = training_labels[shuffle_indices]
@@ -338,8 +375,7 @@ def train_net(net, training_data, training_labels,
     return testing_acc
 
 
-def run_classifier(samples_per_class):
-
+def generic_setup(samples_per_class):
     # Note the same fixed, random sampling of the input is used across all examples
     # in both training and testing, unless ARBITRARY_SDR_ORDER_BOOL==True
     random_indices = np.arange(25)
@@ -347,17 +383,86 @@ def run_classifier(samples_per_class):
     if USE_RASTER_BOOL is False:
         np.random.shuffle(random_indices)
 
-    training_data, training_labels = load_data(data_section="SDR_classifiers_training",
+    training_data, training_labels = load_data(data_section="base_net_training",
                                                random_indices=random_indices,
                                                samples_per_class=samples_per_class,
                                                sanity_check=None)
 
     # Note unless specified otherwise, the full test-dataset is not used for
     # evaluation, as this would take too long for GridCellNet
-    testing_data, testing_labels = load_data(data_section="SDR_classifiers_testing",
+    testing_data, testing_labels = load_data(data_section="SDR_classifiers_training",
                                              random_indices=random_indices,
-                                             samples_per_class=100,
+                                             samples_per_class=TEST_EXAMPLES_PER_CLASS,
                                              sanity_check=None)
+
+    return random_indices, training_data, training_labels, testing_data, testing_labels
+
+def blocked_training(random_indices, training_data, training_labels, testing_data, testing_labels, samples_per_class):
+
+    # NB that the sub_sample_classes method already, by default, blocks class examples together,
+    # which is undone by shuffling example order on each epoch in typical training
+
+    net = RNNModel()
+    lr = 0.005
+    criterion = torch.nn.CrossEntropyLoss()  # TODO refactor where this is defined
+
+    (testing_data_torch, testing_labels_torch) = (torch.FloatTensor(testing_data),
+                                         torch.LongTensor(testing_labels))
+
+    testing_acc_most_recent_class = []
+    testing_acc_cumm_classes = []
+    testing_acc_across_all_classes = []
+
+    for class_iter in range(10):
+
+        training_data_class_section = training_data[class_iter*samples_per_class:(class_iter+1)*samples_per_class]
+        training_labels_class_section = training_labels[class_iter*samples_per_class:(class_iter+1)*samples_per_class]
+
+        # NB accuracy is only evaluated on objects that have actually been learned
+        testing_data_class_section = testing_data[class_iter*TEST_EXAMPLES_PER_CLASS:(class_iter+1)*TEST_EXAMPLES_PER_CLASS]
+        testing_labels_class_section = testing_labels[class_iter*TEST_EXAMPLES_PER_CLASS:(class_iter+1)*TEST_EXAMPLES_PER_CLASS]
+
+        train_net(net, training_data_class_section, training_labels_class_section,
+                 testing_data_class_section, testing_labels_class_section, lr,
+                 samples_per_class)
+
+        print("\n\nEvaluating network on the class just seen:")
+        (testing_data_recent_torch, testing_labels_recent_torch) = (torch.FloatTensor(testing_data[class_iter*TEST_EXAMPLES_PER_CLASS:(class_iter+1)*TEST_EXAMPLES_PER_CLASS]),
+                                         torch.LongTensor(testing_labels[class_iter*TEST_EXAMPLES_PER_CLASS:(class_iter+1)*TEST_EXAMPLES_PER_CLASS]))
+        testing_recent_acc, testing_recent_loss = evaluate(
+            net, testing_data_recent_torch, testing_labels_recent_torch, criterion)
+        testing_acc_most_recent_class.append(testing_recent_acc)
+
+
+        print("\n\nEvaluating network on cummulatively seen classes:")
+        (testing_data_cumm_torch, testing_labels_cumm_torch) = (torch.FloatTensor(testing_data[:(class_iter+1)*TEST_EXAMPLES_PER_CLASS]),
+                                         torch.LongTensor(testing_labels[:(class_iter+1)*TEST_EXAMPLES_PER_CLASS]))
+        testing_cumm_acc, testing_cumm_loss = evaluate(
+            net, testing_data_cumm_torch, testing_labels_cumm_torch, criterion)
+        testing_acc_cumm_classes.append(testing_cumm_acc)
+
+
+        print("\n\nEvaluating network on all classes:")
+        testing_acc, testing_loss = evaluate(
+            net, testing_data_torch, testing_labels_torch, criterion)
+        testing_acc_across_all_classes.append(testing_acc)
+
+        # print("\n Class iter:" + str(class_iter))
+        # print("Testing accuracy is " + str(testing_acc))
+        # print("Testing loss is " + str(testing_loss))
+
+    print("\n\nFinal result across training on blocked class examples:")
+    print("Accuracy evaluated on most recent class seen:")
+    print(testing_acc_most_recent_class)
+    print("Accuracy evaluated across cumulative classes seen:")
+    print(testing_acc_cumm_classes)
+    print("Accuracy evluated across all possible classes:")
+    print(testing_acc_across_all_classes)
+
+    return None
+
+
+def run_over_hyperparameters(random_indices, training_data, training_labels, testing_data, testing_labels):
 
     acc_dic = {}
 
@@ -410,6 +515,18 @@ if __name__ == "__main__":
 
     print("\nUsing a " + CLASSIFIER_TYPE + " classifier")
 
-    for samples_per_class in SAMPLES_PER_CLASS_LIST:
+    if BLOCKED_TRAINING_EXAMPLES_BOOL is True:
 
-        run_classifier(samples_per_class)
+        samples_per_class = 20
+
+        random_indices, training_data, training_labels, testing_data, testing_labels = generic_setup(samples_per_class)
+
+        blocked_training(random_indices, training_data, training_labels, testing_data, testing_labels, samples_per_class)
+
+    else:
+
+        for samples_per_class in SAMPLES_PER_CLASS_LIST:
+
+            random_indices, training_data, training_labels, testing_data, testing_labels = generic_setup(samples_per_class)
+
+            run_over_hyperparameters(random_indices, training_data, training_labels, testing_data, testing_labels)

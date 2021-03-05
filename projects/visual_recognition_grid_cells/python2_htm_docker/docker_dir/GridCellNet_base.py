@@ -254,29 +254,29 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
 
                 # Track all the grid cells active over learning
                 all_locations.extend(locationRepresentation)
-                print("All locations")
-                print(np.shape(all_locations))
+                # print("All locations")
+                # print(np.shape(all_locations))
 
                 self.representationSet.add(tuple(locationRepresentation))
 
             # Update the weights associating location reps with class labels
             unique_locations = list(set(all_locations))
-            print("\nActual max location cell:" + str(np.max(unique_locations)))
-            print("Theoretical max location cell:" + str(np.shape(self.class_weights)[0]))
-            #print(unique_locations)
-            print("\nUnique locations:")
-            print(np.shape(unique_locations))
-            print(np.shape(np.array(unique_locations)))
+            # print("\nActual max location cell:" + str(np.max(unique_locations)))
+            # print("Theoretical max location cell:" + str(np.shape(self.class_weights)[0]))
+            # #print(unique_locations)
+            # print("\nUnique locations:")
+            # print(np.shape(unique_locations))
+            # print(np.shape(np.array(unique_locations)))
 
-            print("\nClass weights")
-            print(np.shape(self.class_weights))
-            print(np.shape(self.class_weights[unique_locations, int(objectDescription["name"][0])]))
+            # print("\nClass weights")
+            # print(np.shape(self.class_weights))
+            # print(np.shape(self.class_weights[unique_locations, int(objectDescription["name"][0])]))
 
             #print(self.class_weights)
             # Index by active grid-cells and the true class (i.e. supervised signal)
             self.class_weights[unique_locations, int(objectDescription["name"][0])] += 1
-            print("Num non-zero values")
-            print(np.sum(self.class_weights))
+            # print("Num non-zero values")
+            # print(np.sum(self.class_weights))
 
             #int(objectDescription["name"][0])
 
@@ -440,23 +440,23 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
                     if (len(set(representation)) > 0) and (currentStep >= 5):
 
                         # vector to store 1 where a location has been active
-                        print("\n\n")
+                        # print("\n\n")
                         active_loc_vector = np.zeros(np.shape(self.class_weights)[0])
-                        print(np.shape(active_loc_vector))
-                        print("\n Current representations:")
-                        print(np.shape(representation))
-                        print(np.shape(list(set(representation))))
-                        print("Max value:")
-                        print(np.max(representation))
+                        # print(np.shape(active_loc_vector))
+                        # print("\n Current representations:")
+                        # print(np.shape(representation))
+                        # print(np.shape(list(set(representation))))
+                        # print("Max value:")
+                        # print(np.max(representation))
                         
                         active_loc_vector[representation] = 1
 
-                        print("\nOutput:")
+                        # print("\nOutput:")
                         class_node_activations = np.matmul(active_loc_vector, self.class_weights)
-                        print(np.shape(class_node_activations))
-                        print(class_node_activations)
-                        print("\nCurrent node-based classifiction is:" + str(np.argmax(class_node_activations)))
-                        print("Ground truth: " + objectDescription["name"][0])
+                        # print(np.shape(class_node_activations))
+                        # print(class_node_activations)
+                        # print("\nCurrent node-based classifiction is:" + str(np.argmax(class_node_activations)))
+                        # print("Ground truth: " + objectDescription["name"][0])
 
 
                         # Track the proportion by which the winning node is active, as well as whether it's the correct node
@@ -528,7 +528,7 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
 
                     if inferred:
                         if np.argmax(class_node_activations) == int(objectDescription["name"][0]):
-                            print("Correctly classified")
+                            print("\nCorrectly classified")
                             inferredStep = currentStep  # noqa: N806
                             # plt.imsave("correctly_classified/trial_" + str(trial_iter)
                             #            + "_" + objectDescription["name"]
@@ -536,7 +536,7 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
                             incorrect = {"never_converged": 0, "false_convergence": 0}
 
                         else:
-                            print("Incorrectly classified")
+                            print("\nIncorrectly classified")
                             incorrect = {"never_converged": 0, "false_convergence": 1}
                             # plt.imsave("misclassified/trial_" + str(trial_iter)
                             #            + "_example_" + objectDescription["name"]

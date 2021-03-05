@@ -42,15 +42,15 @@ from GridCellNet_base import (
 from pre_process_SDRs import generate_image_objects
 
 # Core parameters for model urnning
-THRESHOLD_LIST = [0.7]  # The different dendritic thresholds to try using for the
+THRESHOLD_LIST = [0.8]  # The different dendritic thresholds to try using for the
 # GridCellNet classifier. Note this determines the threshold for the connections
 # from feature columns to grid cells. Adjusting the dendritic threshold for grid cells
 # to feature columns appears less important for performance on generalization
 # Recommend values in the range of 0.6-0.8 for learning with 5 examples per class
-NUM_SAMPLES_PER_CLASS_LIST = [5]  # The number of examples per class to give during
+NUM_SAMPLES_PER_CLASS_LIST = [20]  # The number of examples per class to give during
 # training, e.g. [1, 5, 10, 20], with each one run as a separate model. Note using
 # number of examples per class of 100+ requires hours of training time
-CLASS_THRESHOLDS_LIST = [0.4,0.5,0.6,0.7,0.8,0.9]
+CLASS_THRESHOLDS_LIST = [0.3]
 NUM_TEST_OBJECTS_PER_CLASS = 100  # The number of test objects per class to use during
 # evaluation
 NUM_TRIALS = 1  # The number of network duplicates to run for estimating performance
@@ -59,6 +59,9 @@ DATASET = "mnist"  # Options are "mnist" or "fashion_mnist", although functional
 # for fashion-mnist may be incomplete
 SEED1 = 1
 SEED2 = 2
+BLOCKED_TRAINING_BOOL = False  # True by default; if False, shuffle the order of the
+# example objects provided during training, providing the interleved training 
+# preferred by e.g. RNNs with back-propagation
 
 # Setting up special conditions for model learning and evaluation
 FIXED_TOUCH_SEQUENCE = None  # Use a random but fixed sequence when performing
@@ -182,15 +185,23 @@ def object_learning_and_inference(
 
     currentLocsUnique = True  # noqa: N806
 
+    training_order_list = range(num_samples_per_class*10)
+
+    if BLOCKED_TRAINING_BOOL is False:
+
+        print("\n Using a non-blocked (i.e. interleved) ordering of training examples during learning")
+        random.shuffle(training_order_list)
+
     print("\nLearning objects")
-    for objectDescription in train_objects:  # noqa: N806
-        print("Learning " + objectDescription["name"])
+    for learning_object_iter in training_order_list:  # noqa: N806
+        print("Learning " + train_objects[learning_object_iter]["name"])
         start_learn = time.time()
 
-        objLocsUnique = ColumnPlusNet.learnObject(objectDescription)  # noqa: N806
+        objLocsUnique = ColumnPlusNet.learnObject(train_objects[learning_object_iter])  # noqa: N806
         currentLocsUnique = currentLocsUnique and objLocsUnique  # noqa: N806
 
         print("Time to learn object : " + str(time.time() - start_learn))
+
 
     numFailures = 0  # noqa: N806 # General failures on classificaiton, including
     # either converged to an incorrect label, or never converged
