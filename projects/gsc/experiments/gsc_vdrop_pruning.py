@@ -103,6 +103,7 @@ GSC_VDROP.update(
     lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
     lr_scheduler_args=dict(step_size=1, gamma=1.0),
     optimizer_args=dict(lr=LR),
+    loss_function=torch.nn.functional.cross_entropy,
     num_epochs=100,
     epochs_to_validate=range(100),
     model_class=VDropLeNet,
@@ -146,7 +147,7 @@ def make_reg_schedule(
 
 
 SUBSEQUENT_LR_SCHED_ARGS = dict(
-    max_lr=6.0,
+    max_lr=1.5,
     pct_start=0.0625,
     anneal_strategy="linear",
     base_momentum=0.6,
@@ -157,14 +158,13 @@ SUBSEQUENT_LR_SCHED_ARGS = dict(
 
 NUM_EPOCHS = 120
 
-
 # 94% accuracy, ~170k params = 10% sparsity
 GSC_VDROP_SNR_PRUNING = deepcopy(GSC_VDROP)
 GSC_VDROP_SNR_PRUNING.update(
     dict(
         name="GSC_VDROP_INITIAL_MULTICYCLE",
         experiment_class=SNRPruningGSCVDrop,
-        epochs_to_validate=range(1, NUM_EPOCHS),
+        epochs_to_validate=range(NUM_EPOCHS),
         epochs=NUM_EPOCHS,
         wandb_args=dict(
             project="gsc-snr-pruning",
@@ -173,12 +173,12 @@ GSC_VDROP_SNR_PRUNING.update(
         ),
         log_timestep_freq=5,
         validate_on_prune=True,
-        model_class=gsc_lenet_vdrop_sparse,
+        model_class=gsc_lenet_vdrop_sparse_scaling,
         multi_cycle_lr_args=(
             (
                 0,
                 dict(
-                    max_lr=6.0,
+                    max_lr=1.5,
                     pct_start=0.2,
                     anneal_strategy="linear",
                     base_momentum=0.6,
@@ -230,7 +230,7 @@ GSC_VDROP_SNR_PRUNING_SUPER_SPARSE.update(
             (
                 0,
                 dict(
-                    max_lr=6.0,
+                    max_lr=0.3,
                     pct_start=0.2,
                     anneal_strategy="linear",
                     base_momentum=0.6,
@@ -325,7 +325,7 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
                 (
                     0,
                     dict(
-                        max_lr=6.0,
+                        max_lr=1.0,
                         pct_start=0.2,
                         anneal_strategy="linear",
                         base_momentum=0.6,
