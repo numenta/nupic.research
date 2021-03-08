@@ -43,7 +43,7 @@ class TrackGradientsHook(TrackStatsHookBase):
 
     def __call__(self, module, grad_in, grad_out):
         """
-        Forward hook on torch.nn.Module.
+        Backward hook on torch.nn.Module.
 
         :param module: module
         :param grad_in: gradient of model output wrt. layer output from forward pass
