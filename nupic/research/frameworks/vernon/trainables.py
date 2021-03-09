@@ -497,8 +497,8 @@ class SigOptTrainableMixin:
             self.metric_names = [
                 metric["name"] for metric in config["sigopt_config"]["metrics"]
             ]
-            assert "mean_accuracy" in self.metric_names, \
-                "For now, we only update the observation if `mean_accuracy` is present."
+            assert len(self.metric_names) > 0, \
+                "For now, we only update the observation if a metric is present."
 
     def _process_result(self, result):
         """
@@ -511,17 +511,22 @@ class SigOptTrainableMixin:
             result["early_stop"] = result.get("early_stop", 0.0)
             if self.iteration >= self.epochs - 1:
                 result["early_stop"] = 1.0
-                if result["mean_accuracy"] > 0.0:
-                    print("Updating observation with value=", result["mean_accuracy"])
+                # check that all metrics are present
+                for name in self.metric_names:
+                    if result[name] is not None:
+                        self.logger.info(f"Updating observation {name} with value=",
+                                         result[name])
+                    else:
+                        self.logger.warning(f"No value: {name}")
 
-                    # Collect and report relevant metrics.
-                    values = [
-                        dict(name=name, value=result[name])
-                        for name in self.metric_names
-                    ]
-                    self.sigopt.update_observation(self.suggestion, values=values)
-                    print("Full results: ")
-                    pprint(result)
+                # Collect and report relevant metrics.
+                values = [
+                    dict(name=name, value=result[name])
+                    for name in self.metric_names
+                ]
+                self.sigopt.update_observation(self.suggestion, values=values)
+                print("Full results: ")
+                pprint(result)
 
 
 class SigOptRemoteProcessTrainable(SigOptTrainableMixin, RemoteProcessTrainable):
