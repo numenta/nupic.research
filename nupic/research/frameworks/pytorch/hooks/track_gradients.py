@@ -52,7 +52,7 @@ class TrackGradientsHook(TrackStatsHookBase):
         if not self._tracking:
             return
         self._gradients = self._gradients.to(grad_in[1].device)
-        self._gradients = torch.cat((grad_in[1], self._gradients), dim=0)
-
+        self._gradients = torch.cat((grad_in[1].reshape(1, -1), self._gradients),
+                                      dim=0)
         # Keep only the last 'num_samples'
         self._gradients = self._gradients[: self.num_samples, ...]

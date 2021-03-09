@@ -41,7 +41,7 @@ class SimpleMLP(nn.Module):
         in_features = np.prod(input_shape)
         self.flatten = torch.nn.Flatten()
         self.classifier = SparseWeights(
-            nn.Linear(in_features, num_classes, bias=False), sparsity=0.5
+            nn.Linear(in_features, num_classes, bias=False), sparsity=0.9
         )
 
     def forward(self, x):
@@ -60,13 +60,13 @@ simple_supervised_config = dict(
     dataset_class=fake_data,
     # Number of epochs
     epochs=1,
-    batch_size=5,
+    batch_size=1,
     # Model class. Must inherit from "torch.nn.Module"
     model_class=SimpleMLP,
     # model model class arguments passed to the constructor
     model_args=dict(num_classes=10, input_shape=(1, 4, 4)),
     gradient_metrics_args=dict(
-        include_modules=[nn.Linear],
+        include_modules=[SparseWeights],
         plot_freq=2,
         metrics=["cosine", "pearson", "dot"],
         gradient_values="real",
@@ -102,9 +102,27 @@ class GradientMetricsTest(unittest.TestCase):
 
             # The plot frequency is 1 and should be logged every 2 epochs.
             if i % 2 == 0:
-                self.assertTrue("classifier.module/cosine" in ret)
-                self.assertTrue("classifier.module/pearson" in ret)
-                self.assertTrue("classifier.module/dot" in ret)
+                self.assertTrue("cosine/classifier" in ret)
+                self.assertTrue("pearson/classifier" in ret)
+                self.assertTrue("dot/classifier" in ret)
+
+    def test_gradient_sparsity_greater_than_weight_sparsity(self):
+        """
+        Test whether the TrackGradientsHook is tracking the gradients correctly. If
+        so, the gradients should be as sparse or more sparse than the weights.
+        """
+        # Setup experiment and initialize model.
+        exp = simple_supervised_config["experiment_class"]()
+        exp.setup_experiment(simple_supervised_config)
+        # Only one module should be tracked.
+        self.assertTrue(len(exp.gradient_metric_hooks.hooks) == 1)
+        track_gradients_hook = exp.gradient_metric_hooks.hooks[0]
+        ret = exp.run_epoch()
+        gradients = track_gradients_hook._gradients
+        weights = exp.gradient_metric_hooks.tracked_modules["classifier"].weight
+        gradient_sparsity = (gradients == 0).float().mean()
+        weight_sparsity = (weights == 0).float().mean()
+        self.assertTrue(gradient_sparsity >= weight_sparsity)
 
 
 if __name__ == "__main__":

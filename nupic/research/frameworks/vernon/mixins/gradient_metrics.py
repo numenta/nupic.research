@@ -29,6 +29,7 @@ import torch
 
 from nupic.research.frameworks.pytorch.hooks import ModelHookManager, TrackGradientsHook
 from nupic.research.frameworks.pytorch.model_utils import filter_modules
+from nupic.research.frameworks.wandb import ray_wandb
 
 
 class GradientMetrics(metaclass=abc.ABCMeta):
@@ -39,7 +40,6 @@ class GradientMetrics(metaclass=abc.ABCMeta):
     :param config: a dict containing the following
 
         - gradient_metrics_args: a dict containing the following
-
             - include_modules: (optional) a list of module types to track
             - include_names: (optional) a list of module names to track e.g.
                              "features.stem"
@@ -48,15 +48,17 @@ class GradientMetrics(metaclass=abc.ABCMeta):
                                 can be included through "features.*"
             - plot_freq: (optional) how often to create the plot, measured in training
                          iterations; defaults to 1
-            - metrics: a list of metrics options from ["cosine", "dot",
-            "pearson"]; defaults to ["cosine",]
-            - gradient_transformation: (optional) can be one of "real", "sign",
-            "mask". "real" corresponds to the real values of the gradients,
-            "sign" corresponds to collecting the sign of the gradients, and "mask"
-            results in a binary mask corresponding to nonzero gradients; defaults to
-            "real"
+            - metrics: a list of metrics options from ["cosine", "dot", "pearson"];
+                       defaults to ["cosine",]
+            - gradient_values: (optional) one of "real", "sign", "mask".
+                "real" corresponds to the real values of the gradients,
+                "sign" corresponds to collecting the sign of the gradients,
+                "mask" results in a binary mask corresponding to nonzero gradients;
+                 defaults to "real"
             - max_samples_to_track: (optional) how many of samples to use for plotting;
                                    only the newest will be used; defaults to 100
+            - prep_plots_for_wandb: Set to True if logging plots on wandb, defaults
+                                    to False
 
     Example config:
     ```
@@ -79,7 +81,8 @@ class GradientMetrics(metaclass=abc.ABCMeta):
         gradient_metrics_args = config.get("gradient_metrics_args", {})
         self.gradient_metrics_plot_freq, self.gradient_metrics_filter_args, \
             self.gradient_metrics_max_samples, self.gradient_metrics, \
-            self.gradient_values = self.process_gradient_metrics_args(
+            self.gradient_values, self.prep_plots_for_wandb = \
+            process_gradient_metrics_args(
                 gradient_metrics_args)
 
         # Register hook for tracking hidden activations
@@ -97,46 +100,11 @@ class GradientMetrics(metaclass=abc.ABCMeta):
         # to the tensors being collected by the hooks.
         self.gradient_metric_targets = torch.tensor([]).long()
 
-    def process_gradient_metrics_args(self, gradient_metric_args):
-
-        gradient_metrics_args = deepcopy(gradient_metric_args)
-
-        # Collect information about which modules to apply hooks to
-        include_names = gradient_metrics_args.pop("include_names", [])
-        include_modules = gradient_metrics_args.pop("include_modules", [])
-        include_patterns = gradient_metrics_args.pop("include_patterns", [])
-        filter_args = dict(
-            include_names=include_names,
-            include_modules=include_modules,
-            include_patterns=include_patterns,
-        )
-
-        # Others args
-        plot_freq = gradient_metrics_args.get("plot_freq", 1)
-        max_samples = gradient_metrics_args.get("max_samples_to_track", 100)
-        metrics = gradient_metrics_args.get("metrics", ["cosine"])
-        gradient_values = gradient_metrics_args.get("gradient_values", "real")
-
-        available_metrics_options = ["cosine", "pearson", "dot"]
-        available_gradient_values_options = ["real", "sign", "mask"]
-
-        assert isinstance(plot_freq, int)
-        assert isinstance(max_samples, int)
-        assert isinstance(metrics, list)
-        assert len(metrics) > 0
-        assert all([metric in available_metrics_options for metric in metrics])
-        assert plot_freq > 0
-        assert max_samples > 0
-        assert isinstance(gradient_values, str)
-        assert gradient_values in available_gradient_values_options
-
-        return plot_freq, filter_args, max_samples, metrics, gradient_values
-
     def run_epoch(self):
         """
-        This runs the epoch with the hooks in tracking mode. The resulting hidden
-        activations collected by the `TrackHiddenActivationsHook` object is plotted by
-        calling a plotting function.
+        This runs the epoch with the hooks in tracking mode. The resulting gradients
+        collected by the `TrackGradientsHook` object are plotted by calling a
+        plotting function.
         """
 
         # Run the epoch with tracking enabled.
@@ -156,7 +124,7 @@ class GradientMetrics(metaclass=abc.ABCMeta):
                 gradient_metrics_stats
             )
             for (name, _, metric, _, figure) in gradient_metric_heatmaps:
-                results.update({f"{name}/{metric}": figure})
+                results.update({f"{metric}/{name}": figure})
         return results
 
     def calculate_gradient_metrics_stats(self, gradients_stats):
@@ -189,20 +157,36 @@ class GradientMetrics(metaclass=abc.ABCMeta):
 
     def plot_gradient_metric_heatmaps(self, gradient_metrics_stats):
         order_by_class = torch.argsort(self.gradient_metric_targets)
+        sorted_gradient_metric_targets = self.gradient_metric_targets[order_by_class]
+        class_change_indices = \
+            (sorted_gradient_metric_targets - sorted_gradient_metric_targets.roll(
+                1)).nonzero(as_tuple=True)[0]
+        class_labels = [int(_x) for _x in
+                        sorted_gradient_metric_targets.unique()]
+        class_change_indices_right = class_change_indices.roll(-1)
+        class_change_indices_right[-1] = len(sorted_gradient_metric_targets)
+        tick_locations = (class_change_indices + class_change_indices_right) / 2.0 - 0.5
+
         stats_and_figures = []
         for (name, module, metric, stats) in gradient_metrics_stats:
             stats = stats[order_by_class, :][:, order_by_class]
-            plt.cla()
-            fig, ax = plt.subplots()
+            ax = plt.gca()
             max_val = np.abs(stats).max()
-            # change to red/blue colormap
-            # after finishing, screenshot a demo and put into PR
             ax.imshow(stats, cmap="bwr", vmin=-max_val, vmax=max_val)
             ax.set_xlabel("class")
             ax.set_ylabel("class")
-            ax.set_title(f"{name}:{metric}")
+            for idx in class_change_indices:
+                ax.axvline(idx - 0.5, color="black")
+                ax.axhline(idx - 0.5, color="black")
+            ax.set_xticks(tick_locations)
+            ax.set_yticks(tick_locations)
+            ax.set_xticklabels(class_labels)
+            ax.set_yticklabels(class_labels)
+            ax.set_title(f"{metric}:{name}")
             plt.tight_layout()
             figure = plt.gcf()
+            if self.prep_plots_for_wandb:
+                figure = ray_wandb.prep_plot_for_wandb(figure)
             stats_and_figures.append((name, module, metric, stats, figure))
         return stats_and_figures
 
@@ -230,3 +214,41 @@ class GradientMetrics(metaclass=abc.ABCMeta):
             ]
 
         return loss
+
+def process_gradient_metrics_args(gradient_metric_args):
+
+    gradient_metrics_args = deepcopy(gradient_metric_args)
+
+    # Collect information about which modules to apply hooks to
+    include_names = gradient_metrics_args.pop("include_names", [])
+    include_modules = gradient_metrics_args.pop("include_modules", [])
+    include_patterns = gradient_metrics_args.pop("include_patterns", [])
+    filter_args = dict(
+        include_names=include_names,
+        include_modules=include_modules,
+        include_patterns=include_patterns,
+    )
+
+    # Others args
+    plot_freq = gradient_metrics_args.get("plot_freq", 1)
+    max_samples = gradient_metrics_args.get("max_samples_to_track", 100)
+    metrics = gradient_metrics_args.get("metrics", ["cosine"])
+    gradient_values = gradient_metrics_args.get("gradient_values", "real")
+    prep_plots_for_wandb = gradient_metrics_args.get("prep_plots_for_wandb", False)
+
+    available_metrics_options = ["cosine", "pearson", "dot"]
+    available_gradient_values_options = ["real", "sign", "mask"]
+
+    assert isinstance(plot_freq, int)
+    assert isinstance(max_samples, int)
+    assert isinstance(metrics, list)
+    assert len(metrics) > 0
+    assert all([metric in available_metrics_options for metric in metrics])
+    assert plot_freq > 0
+    assert max_samples > 0
+    assert isinstance(gradient_values, str)
+    assert gradient_values in available_gradient_values_options
+    assert isinstance(prep_plots_for_wandb, bool)
+
+    return plot_freq, filter_args, max_samples, metrics, gradient_values, \
+           prep_plots_for_wandb
