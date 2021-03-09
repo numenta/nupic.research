@@ -117,7 +117,7 @@ class GradientMetricsTest(unittest.TestCase):
         # Only one module should be tracked.
         self.assertTrue(len(exp.gradient_metric_hooks.hooks) == 1)
         track_gradients_hook = exp.gradient_metric_hooks.hooks[0]
-        ret = exp.run_epoch()
+        exp.run_epoch()
         gradients = track_gradients_hook._gradients
         weights = exp.gradient_metric_hooks.tracked_modules["classifier"].weight
         gradient_sparsity = (gradients == 0).float().mean()

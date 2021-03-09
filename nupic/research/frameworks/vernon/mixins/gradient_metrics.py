@@ -215,6 +215,7 @@ class GradientMetrics(metaclass=abc.ABCMeta):
 
         return loss
 
+
 def process_gradient_metrics_args(gradient_metric_args):
 
     gradient_metrics_args = deepcopy(gradient_metric_args)
@@ -251,4 +252,4 @@ def process_gradient_metrics_args(gradient_metric_args):
     assert isinstance(prep_plots_for_wandb, bool)
 
     return plot_freq, filter_args, max_samples, metrics, gradient_values, \
-           prep_plots_for_wandb
+        prep_plots_for_wandb
