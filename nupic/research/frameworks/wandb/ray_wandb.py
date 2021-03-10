@@ -226,6 +226,34 @@ class WandbLogger(tune.logger.Logger):
         wandb.join()
 
 
+class PrepPlotForWandb:
+    """
+    This mixin ensures all plots can be logged to wandb without error. Ray typically
+    tries to deepcopy the results dict which throws an error since this is not
+    implemented for plots by matplotlib. This is avoided by first wrapping the plots
+    with wandb.Image before sending them to Ray which logs them through the WandbLogger.
+    """
+
+    def run_epoch(self):
+        """Wrap plots with wandb.Image"""
+        results = super().run_epoch()
+
+        wandb_plots = {}
+        for name, value in results.items():
+            if is_matplotlib_plot(value):
+                wandb_plots[name] = wandb.Image(value)
+
+        results.update(wandb_plots)
+        return results
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["run_epoch"].append(
+            "PrepPlotForWandb: Wrap plots with wandb.Image")
+        return eo
+
+
 class WorkerLogger(object):
     """
     This class serves an optional mixin for the ImagenetExperiment Class.
