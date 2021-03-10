@@ -172,7 +172,7 @@ def process_args(args, config):
             wandb_args["id"] = wandb_id
 
         # Enable logging on workers.
-        insert_experiment_mixin(config, ray_wandb.WorkerLogger, prepend_name=False)
+        insert_experiment_mixin(config, ray_wandb.PrepPlotForWandb, prepend_name=False)
 
     if "create_sigopt" in args:
 
