@@ -28,7 +28,7 @@ from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
 from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
-from nupic.torch.modules import SparseWeights, KWinners
+from nupic.torch.modules import KWinners, SparseWeights
 
 
 class TrackStatsSupervisedExperiment(mixins.GradientMetrics,

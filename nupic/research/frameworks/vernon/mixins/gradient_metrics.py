@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import abc
 from copy import deepcopy
 from pprint import pformat
 
@@ -156,12 +155,12 @@ class GradientMetrics(object):
         all_stats = []
         for (name, module, gradients) in gradients_stats:
             for gradient_metric, gradient_value in self.gradient_metrics:
-                #apply gradient value transformation if necessary
+                # apply gradient value transformation if necessary
                 if gradient_value == "sign":
                     gradients = torch.sign(gradients)
                 elif gradient_value == "mask":
                     gradients = torch.abs(torch.sign(gradients))
-                #calculate metric function on transformed gradients
+                # calculate metric function on transformed gradients
                 if gradient_metric == "cosine":
                     stats = [
                         torch.cosine_similarity(x, y, dim=0)
@@ -245,16 +244,6 @@ class GradientMetrics(object):
 
         return loss
 
-    # @classmethod
-    # def get_execution_order(cls):
-    #     eo = super().get_execution_order()
-    #     eo["setup_experiment"].append("Gradient Metrics initialization")
-    #     eo["error_loss"].insert(0, "If not training: {")
-    #     eo["error_loss"].append(
-    #         "} else: { Gradient Metrics track targets }"
-    #     )
-    #     eo["run_epoch"].append("Gradient Metrics calculate and plot statistics")
-    #     return eo
 
 def process_gradient_metrics_args(gradient_metric_args):
 
@@ -284,8 +273,8 @@ def process_gradient_metrics_args(gradient_metric_args):
     assert isinstance(max_samples, int)
     assert isinstance(metrics, list)
     assert len(metrics) > 0
-    assert all([metric in available_metrics_options and
-                gradient_value in available_gradient_values_options
+    assert all([metric in available_metrics_options
+                and gradient_value in available_gradient_values_options
                 for metric, gradient_value in metrics])
     assert plot_freq > 0
     assert max_samples > 0
