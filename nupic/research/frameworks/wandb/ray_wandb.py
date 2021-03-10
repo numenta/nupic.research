@@ -25,7 +25,6 @@ import numbers
 import os
 import warnings
 from copy import deepcopy
-from pprint import pformat
 
 import wandb
 from ray import tune
@@ -34,7 +33,6 @@ from ray.tune.utils import flatten_dict
 __all__ = [
     "log",
     "WandbLogger",
-    "WorkerLogger",
     "prep_plot_for_wandb",
 ]
 
@@ -49,34 +47,6 @@ CONFIG_NAME = "ray_wandb_config.json"
 def log(log_dict, commit=False, step=None, sync=True, *args, **kwargs):
     """
     This logs its arguments to wandb only if a run has been initialized.
-
-    It's intended for use in conjunction with the `WorkerLogger` mixin which initializes
-    wandb on a specified set of workers. Generally, the ray based logger, `WandbLogger`,
-    is intended to log results on the head node, while this function (and the helper
-    mixin) serve to log other values on the worker nodes - for instance, grad norms of
-    pytroch modules.
-
-    Example:
-    ```
-    plt = plot(...)
-    log({"accuracy": 0.9, "epoch": 5, "my_plot": plt})
-    ```
-
-    See `wandb.log` usage for details:
-        - https://docs.wandb.com/library/log
-        - https://docs.wandb.com/library/log#incremental-logging
-
-    Note: `commit` defaults to False here instead of True. This means the call to
-          `wandb.log` will not advance the step count. See the link on incremental
-          logging.
-
-    :param row: A dict of serializable python objects i.e str: ints, floats, Tensors,
-                dicts, or wandb.data_types
-    :param commit: Persist a set of metrics, if false just update the existing dict
-                   (defaults to true if step is not specified)
-    :param step: The global step in processing. This persists any non-committed earlier
-                 steps but defaults to not committing the specified step
-    :param sync: If set to False, process calls to log in a separate thread
     """
 
     if wandb.run:
@@ -251,58 +221,6 @@ class PrepPlotForWandb:
         eo = super().get_execution_order()
         eo["run_epoch"].append(
             "PrepPlotForWandb: Wrap plots with wandb.Image")
-        return eo
-
-
-class WorkerLogger(object):
-    """
-    This class serves an optional mixin for the ImagenetExperiment Class.
-    It's purpose is simply to initialize wandb on the worker nodes. This allows
-    logging to be done outside of this class by direct calls to wandb. Note that
-    the `log` function of this python module is designed with that purpose in mind.
-
-    To keep all logs managed under the same run across the head and worker nodes, try
-    using `wandb.util.generate_id()` to get a unique run-id that can be passed to both
-    this mixin and the ray based `WandbLogger`.
-    """
-
-    def setup_experiment(self, config):
-        """
-        Init wandb from worker processes if desired. This is useful for debugging
-        purposes, such as logging directly from pytorch modules.
-
-        :param config:
-            - wandb_args: dict to pass to wandb.init
-                - name: name of run
-                - project: name of project
-                - id: (optional) can generate via wandb.util.generate_id()
-                - group: name of group; it's recommended to use this or `id`
-                         to keep results together
-            - wandb_for_worker_ranks: list of integers denoting the ranks of
-                                      processes to init wandb
-        """
-        super().setup_experiment(config)
-        for rank in config.get("wandb_for_worker_ranks", []):
-
-            wandb_args = config.get("wandb_args", {})
-            self.logger.info(f"Setting up wandb on rank {rank}")
-            self.logger.info(f"wandb_agrs:\n{pformat(wandb_args)}")
-            if self.rank == rank:
-                wandb.init(**wandb_args)
-
-    def stop_experiment(self):
-        """Finalize wandb logging."""
-        super().stop_experiment()
-        if wandb.run:
-            wandb.join()
-
-    @classmethod
-    def get_execution_order(cls):
-        eo = super().get_execution_order()
-        eo["setup_experiment"].append(
-            "WorkerLogger: setup wandb logging for specified workers")
-        eo["stop_experiment"].append(
-            "WorkerLogger: finalize wandb logging on worker nodes")
         return eo
 
 
