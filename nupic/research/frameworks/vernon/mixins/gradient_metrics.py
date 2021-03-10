@@ -28,7 +28,6 @@ import torch
 
 from nupic.research.frameworks.pytorch.hooks import ModelHookManager, TrackGradientsHook
 from nupic.research.frameworks.pytorch.model_utils import filter_modules
-from nupic.research.frameworks.wandb import ray_wandb
 
 
 class GradientMetrics(object):
@@ -56,8 +55,6 @@ class GradientMetrics(object):
                  defaults to "real"
             - max_samples_to_track: (optional) how many of samples to use for plotting;
                                    only the newest will be used; defaults to 100
-            - prep_plots_for_wandb: Set to True if logging plots on wandb, defaults
-                                    to False
 
     Example config:
     ```
@@ -82,8 +79,7 @@ class GradientMetrics(object):
         # Process config args
         gradient_metrics_args = config.get("gradient_metrics_args", {})
         self.gradient_metrics_plot_freq, self.gradient_metrics_filter_args, \
-            self.gradient_metrics_max_samples, self.gradient_metrics, \
-            self.prep_plots_for_wandb = \
+            self.gradient_metrics_max_samples, self.gradient_metrics = \
             process_gradient_metrics_args(
                 gradient_metrics_args)
 
@@ -213,8 +209,6 @@ class GradientMetrics(object):
             ax.set_title(f"{gradient_metric}:{gradient_value}:{name}")
             plt.tight_layout()
             figure = plt.gcf()
-            if self.prep_plots_for_wandb:
-                figure = ray_wandb.prep_plot_for_wandb(figure)
             stats_and_figures.append((name, module, gradient_metric,
                                       gradient_value, stats, figure))
         return stats_and_figures
@@ -264,7 +258,6 @@ def process_gradient_metrics_args(gradient_metric_args):
     max_samples = gradient_metrics_args.get("max_samples_to_track", 100)
     metrics = gradient_metrics_args.get("metrics", [("cosine", "mask"),
                                                     ("cosine", "real")])
-    prep_plots_for_wandb = gradient_metrics_args.get("prep_plots_for_wandb", False)
 
     available_metrics_options = ["cosine", "pearson", "dot"]
     available_gradient_values_options = ["real", "sign", "mask"]
@@ -278,7 +271,5 @@ def process_gradient_metrics_args(gradient_metric_args):
                 for metric, gradient_value in metrics])
     assert plot_freq > 0
     assert max_samples > 0
-    assert isinstance(prep_plots_for_wandb, bool)
 
-    return plot_freq, filter_args, max_samples, metrics, \
-        prep_plots_for_wandb
+    return plot_freq, filter_args, max_samples, metrics
