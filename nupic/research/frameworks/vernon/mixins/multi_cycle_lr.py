@@ -25,6 +25,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 
 from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
 
+
 class MultiCycleLR:
     """
     Composes a sequence of OneCycleLR regimes, allowing different configurations

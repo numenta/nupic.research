@@ -35,8 +35,6 @@ from nupic.research.frameworks.backprop_structure.modules.common_layers import (
 from nupic.research.frameworks.backprop_structure.modules.vdrop_layers import (
     MaskedVDropCentralData,
     VDropCentralData,
-    VDropConv2d,
-    VDropLinear,
 )
 
 
@@ -206,7 +204,7 @@ gsc_lenet_vdrop_sparse_scaling = partial(
     VDropLeNet,
     vdrop_data_class=MaskedVDropCentralData,
     num_classes=12,
-    linear_units = 2000,
+    linear_units=2000,
     conv_target_density=(1.0, 0.2),
     linear_target_density=(0.01, 1.0),
     cnn_out_channels=(64, 64),

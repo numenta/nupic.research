@@ -297,9 +297,6 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
         assert "multi_cycle_lr_args" in config
         assert "reg_scalar" in config
 
-        multi_cycle_lr_args = config["multi_cycle_lr_args"]
-        prune_schedule = config["prune_schedule"]
-        reg_scalar = config["reg_scalar"]
         num_epochs = config["num_epochs"]
 
         # Optimizer args
@@ -319,7 +316,7 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
             cycle_momentum=True,
             final_div_factor=1000.0,
         )
-        multi_cycle_lr_args = (
+        config["multi_cycle_lr_args"] = (
             (
                 (
                     0,
@@ -345,7 +342,7 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
                 (30 + num_pruning_iterations * epochs_per_pruning_cycle, cycle_lr_args)
             )
         )
-        reg_scalar = make_reg_schedule(
+        config["reg_scalar"] = make_reg_schedule(
             epochs=NUM_EPOCHS,
             pct_ramp_start=10 / num_epochs,
             pct_ramp_end=30 / num_epochs,
@@ -355,7 +352,7 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
             final_value=reg_scalar_final_value,
         )
 
-        prune_schedule = tuple(
+        config["prune_schedule"] = tuple(
             [
                 (
                     30 + prune_iteration * epochs_per_pruning_cycle,
