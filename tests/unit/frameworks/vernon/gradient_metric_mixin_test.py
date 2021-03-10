@@ -28,10 +28,12 @@ from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
 from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
-from nupic.torch.modules import SparseWeights
+from nupic.torch.modules import SparseWeights, KWinners
 
 
-class TrackStatsSupervisedExperiment(mixins.GradientMetrics, SupervisedExperiment):
+class TrackStatsSupervisedExperiment(mixins.GradientMetrics,
+                                     mixins.RezeroWeights,
+                                     SupervisedExperiment):
     pass
 
 
@@ -40,13 +42,15 @@ class SimpleMLP(nn.Module):
         super().__init__()
         in_features = np.prod(input_shape)
         self.flatten = torch.nn.Flatten()
+        self.kwinners = KWinners(in_features, percent_on=0.1)
         self.classifier = SparseWeights(
             nn.Linear(in_features, num_classes, bias=False), sparsity=0.9
         )
 
     def forward(self, x):
-        y = self.flatten(x)
-        return self.classifier(y)
+        x = self.flatten(x)
+        x = self.kwinners(x)
+        return self.classifier(x)
 
 
 def fake_data(size=100, image_size=(1, 4, 4), train=False):
@@ -68,8 +72,7 @@ simple_supervised_config = dict(
     gradient_metrics_args=dict(
         include_modules=[SparseWeights],
         plot_freq=2,
-        metrics=["cosine", "pearson", "dot"],
-        gradient_values="real",
+        metrics=[("cosine", "real"), ("pearson", "mask"), ("cosine", "mask")],
         max_samples_to_track=50,
     ),
     # Optimizer class class arguments passed to the constructor
@@ -102,11 +105,11 @@ class GradientMetricsTest(unittest.TestCase):
 
             # The plot frequency is 1 and should be logged every 2 epochs.
             if i % 2 == 0:
-                self.assertTrue("cosine/classifier" in ret)
-                self.assertTrue("pearson/classifier" in ret)
-                self.assertTrue("dot/classifier" in ret)
+                self.assertTrue("cosine/real/classifier" in ret)
+                self.assertTrue("pearson/mask/classifier" in ret)
+                self.assertTrue("cosine/mask/classifier" in ret)
 
-    def test_gradient_sparsity_greater_than_weight_sparsity(self):
+    def test_gradient_sparsity_versus_activation_sparsity(self):
         """
         Test whether the TrackGradientsHook is tracking the gradients correctly. If
         so, the gradients should be as sparse or more sparse than the weights.
@@ -119,10 +122,9 @@ class GradientMetricsTest(unittest.TestCase):
         track_gradients_hook = exp.gradient_metric_hooks.hooks[0]
         exp.run_epoch()
         gradients = track_gradients_hook._gradients
-        weights = exp.gradient_metric_hooks.tracked_modules["classifier"].weight
         gradient_sparsity = (gradients == 0).float().mean()
-        weight_sparsity = (weights == 0).float().mean()
-        self.assertTrue(gradient_sparsity >= weight_sparsity)
+        activation_sparsity = 1 - (exp.model.kwinners.k / exp.model.kwinners.n)
+        self.assertTrue(gradient_sparsity >= activation_sparsity)
 
 
 if __name__ == "__main__":

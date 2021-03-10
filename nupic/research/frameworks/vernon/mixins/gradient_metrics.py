@@ -32,7 +32,7 @@ from nupic.research.frameworks.pytorch.model_utils import filter_modules
 from nupic.research.frameworks.wandb import ray_wandb
 
 
-class GradientMetrics(metaclass=abc.ABCMeta):
+class GradientMetrics(object):
     """
     Mixin for tracking and plotting module gradient metrics during training.
 
@@ -68,7 +68,10 @@ class GradientMetrics(metaclass=abc.ABCMeta):
             plot_freq=1,
             max_samples_to_track=150,
             metrics=["dot", "pearson"],
-            gradient_values="mask"
+            gradient_values="mask",
+
+            metric1 = "mask/dot"
+            metric2 = "sign/pearson"
         )
     )
     ```
@@ -81,7 +84,7 @@ class GradientMetrics(metaclass=abc.ABCMeta):
         gradient_metrics_args = config.get("gradient_metrics_args", {})
         self.gradient_metrics_plot_freq, self.gradient_metrics_filter_args, \
             self.gradient_metrics_max_samples, self.gradient_metrics, \
-            self.gradient_values, self.prep_plots_for_wandb = \
+            self.prep_plots_for_wandb = \
             process_gradient_metrics_args(
                 gradient_metrics_args)
 
@@ -123,27 +126,51 @@ class GradientMetrics(metaclass=abc.ABCMeta):
             gradient_metric_heatmaps = self.plot_gradient_metric_heatmaps(
                 gradient_metrics_stats
             )
-            for (name, _, metric, _, figure) in gradient_metric_heatmaps:
-                results.update({f"{metric}/{name}": figure})
+            for (name, _, gradient_metric, gradient_value, _, figure) in \
+                    gradient_metric_heatmaps:
+                results.update({f"{gradient_metric}/{gradient_value}/{name}": figure})
         return results
 
     def calculate_gradient_metrics_stats(self, gradients_stats):
+        """
+        This function calculates statistics given the gradients_stats which are being
+        tracked by the TrackGradients backwards hook.
+
+        This function accesses self.metrics, which is alsa a list of tuples. Each
+        tuple is the combination of a metric function ("cosine", "dot", "pearson)
+        and a gradient transformation ("real", "sign", "mask"). By default,
+        the statistics that are calculated are ("cosine", "mask") and ("cosine",
+        "real"). ("cosine", "mask") corresponds to the overlap between two different
+        gradients, and ("cosine", "real") corresponds to the standard cosine
+        similarity between two gradients.
+
+        Args:
+            gradients_stats: A list of tuples, each of which contains a named module
+            and its gradients
+
+        Returns:
+            A list of tuples, each of which contains a named module, the statistics
+            calculated from its gradients, and the metric function/transformation
+            used on the gradients
+        """
         all_stats = []
         for (name, module, gradients) in gradients_stats:
-            if self.gradient_values == "sign":
-                gradients = torch.sign(gradients)
-            elif self.gradient_values == "mask":
-                gradients = torch.abs(torch.sign(gradients))
-            for metric in self.gradient_metrics:
-                if metric == "cosine":
+            for gradient_metric, gradient_value in self.gradient_metrics:
+                #apply gradient value transformation if necessary
+                if gradient_value == "sign":
+                    gradients = torch.sign(gradients)
+                elif gradient_value == "mask":
+                    gradients = torch.abs(torch.sign(gradients))
+                #calculate metric function on transformed gradients
+                if gradient_metric == "cosine":
                     stats = [
                         torch.cosine_similarity(x, y, dim=0)
                         for x in gradients
                         for y in gradients
                     ]
-                elif metric == "dot":
+                elif gradient_metric == "dot":
                     stats = [x.dot(y) for x in gradients for y in gradients]
-                elif metric == "pearson":
+                elif gradient_metric == "pearson":
                     stats = [
                         torch.cosine_similarity(x - x.mean(), y - y.mean(), dim=0)
                         for x in gradients
@@ -152,7 +179,7 @@ class GradientMetrics(metaclass=abc.ABCMeta):
                 stats = torch.tensor(stats)
                 gradient_dim = len(gradients)
                 stats = stats.view(gradient_dim, gradient_dim)
-                all_stats.append((name, module, metric, stats))
+                all_stats.append((name, module, gradient_metric, gradient_value, stats))
         return all_stats
 
     def plot_gradient_metric_heatmaps(self, gradient_metrics_stats):
@@ -160,15 +187,17 @@ class GradientMetrics(metaclass=abc.ABCMeta):
         sorted_gradient_metric_targets = self.gradient_metric_targets[order_by_class]
         class_change_indices = \
             (sorted_gradient_metric_targets - sorted_gradient_metric_targets.roll(
-                1)).nonzero(as_tuple=True)[0]
+                1)).nonzero(as_tuple=True)[0].cpu()
         class_labels = [int(_x) for _x in
                         sorted_gradient_metric_targets.unique()]
-        class_change_indices_right = class_change_indices.roll(-1)
+        class_change_indices_right = class_change_indices.roll(-1).cpu()
         class_change_indices_right[-1] = len(sorted_gradient_metric_targets)
         tick_locations = (class_change_indices + class_change_indices_right) / 2.0 - 0.5
+        tick_locations = tick_locations.cpu()
 
         stats_and_figures = []
-        for (name, module, metric, stats) in gradient_metrics_stats:
+        for (name, module, gradient_metric, gradient_value, stats) in \
+                gradient_metrics_stats:
             stats = stats[order_by_class, :][:, order_by_class]
             ax = plt.gca()
             max_val = np.abs(stats).max()
@@ -182,12 +211,13 @@ class GradientMetrics(metaclass=abc.ABCMeta):
             ax.set_yticks(tick_locations)
             ax.set_xticklabels(class_labels)
             ax.set_yticklabels(class_labels)
-            ax.set_title(f"{metric}:{name}")
+            ax.set_title(f"{gradient_metric}:{gradient_value}:{name}")
             plt.tight_layout()
             figure = plt.gcf()
             if self.prep_plots_for_wandb:
                 figure = ray_wandb.prep_plot_for_wandb(figure)
-            stats_and_figures.append((name, module, metric, stats, figure))
+            stats_and_figures.append((name, module, gradient_metric,
+                                      gradient_value, stats, figure))
         return stats_and_figures
 
     def error_loss(self, output, target, reduction="mean"):
@@ -215,6 +245,16 @@ class GradientMetrics(metaclass=abc.ABCMeta):
 
         return loss
 
+    # @classmethod
+    # def get_execution_order(cls):
+    #     eo = super().get_execution_order()
+    #     eo["setup_experiment"].append("Gradient Metrics initialization")
+    #     eo["error_loss"].insert(0, "If not training: {")
+    #     eo["error_loss"].append(
+    #         "} else: { Gradient Metrics track targets }"
+    #     )
+    #     eo["run_epoch"].append("Gradient Metrics calculate and plot statistics")
+    #     return eo
 
 def process_gradient_metrics_args(gradient_metric_args):
 
@@ -233,8 +273,8 @@ def process_gradient_metrics_args(gradient_metric_args):
     # Others args
     plot_freq = gradient_metrics_args.get("plot_freq", 1)
     max_samples = gradient_metrics_args.get("max_samples_to_track", 100)
-    metrics = gradient_metrics_args.get("metrics", ["cosine"])
-    gradient_values = gradient_metrics_args.get("gradient_values", "real")
+    metrics = gradient_metrics_args.get("metrics", [("cosine", "mask"),
+                                                    ("cosine", "real")])
     prep_plots_for_wandb = gradient_metrics_args.get("prep_plots_for_wandb", False)
 
     available_metrics_options = ["cosine", "pearson", "dot"]
@@ -244,12 +284,12 @@ def process_gradient_metrics_args(gradient_metric_args):
     assert isinstance(max_samples, int)
     assert isinstance(metrics, list)
     assert len(metrics) > 0
-    assert all([metric in available_metrics_options for metric in metrics])
+    assert all([metric in available_metrics_options and
+                gradient_value in available_gradient_values_options
+                for metric, gradient_value in metrics])
     assert plot_freq > 0
     assert max_samples > 0
-    assert isinstance(gradient_values, str)
-    assert gradient_values in available_gradient_values_options
     assert isinstance(prep_plots_for_wandb, bool)
 
-    return plot_freq, filter_args, max_samples, metrics, gradient_values, \
+    return plot_freq, filter_args, max_samples, metrics, \
         prep_plots_for_wandb
