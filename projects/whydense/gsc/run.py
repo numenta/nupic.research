@@ -179,15 +179,18 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
         ray.init(num_cpus=num_cpus, num_gpus=num_gpus, local_mode=num_cpus == 1)
 
     # Run experiments
-    gpu_percent = 0
-    if num_gpus > 0:
-        gpu_percent = configs.get("gpu_percentage", 0.5)
-    resources_per_trial = {"cpu": 1, "gpu": gpu_percent}
-    print("resources_per_trial =", resources_per_trial)
     for exp in configs:
         print("experiment =", exp)
         config = configs[exp]
         config["name"] = exp
+
+        gpu_percent = 0
+        if num_gpus > 0:
+            gpu_percent = config.get("gpu_percentage", 0.5)
+        resources_per_trial = {
+            "cpu": 1,
+            "gpu": gpu_percent}
+        print("resources_per_trial =", resources_per_trial)
 
         # Stop criteria. Default to total number of iterations/epochs
         stop_criteria = {"training_iteration": config.get("iterations")}
@@ -211,7 +214,6 @@ def train(config, experiments, num_cpus, num_gpus, redis_address, show_list):
             num_samples=config.get("repetitions", 1),
             local_dir=config.get("path", None),
             upload_dir=config.get("upload_dir", None),
-            sync_to_driver=config.get("sync_function", None),
             checkpoint_freq=config.get("checkpoint_freq", 0),
             checkpoint_at_end=config.get("checkpoint_at_end", False),
             export_formats=config.get("", None),

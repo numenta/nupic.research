@@ -24,11 +24,15 @@ Auxiliary functions to run.py file
 import logging
 import math
 import os
+from collections import Counter, defaultdict
+from functools import partial
 from hashlib import blake2b
 
 import numpy as np
-from datasets import concatenate_datasets, load_dataset, load_from_disk, load_metric
+from datasets import concatenate_datasets, load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics import f1_score, matthews_corrcoef
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -43,8 +47,6 @@ from transformers import (
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
-logger = logging.getLogger(__name__)
-
 __all__ = [
     "evaluate_language_model",
     "evaluate_tasks",
@@ -57,150 +59,132 @@ __all__ = [
     "init_trainer",
     "preprocess_datasets_mlm",
     "preprocess_datasets_task",
+    "test_tasks",
     "train",
 ]
 
+"""
+GLUE:
+- SentencePair: (entailment, question answering)
+    - 2 classes: QQP (question pairing), QNLI (adapted q&A), MRPC (paraphrase),
+      RTE (adapted entailment from 3 to 2), WNLI (adapted multiple choice)
+    - 3 classes: MNLI (entailment, neutral or contradiction)
+    - 1 variable regresssion: STS-B  (similarity, from 0 to 5)
+- Single Sentence, 2 classes: SST-2 (sentiment), COLA (grammatically correct)
+"""
+
+# Tasks ordered by training time
 TASK_TO_KEYS = {
-    "cola": ("sentence", None),
-    "mnli": ("premise", "hypothesis"),
+    "wnli": ("sentence1", "sentence2"),
+    "rte": ("sentence1", "sentence2"),
+    "stsb": ("sentence1", "sentence2"),
     "mrpc": ("sentence1", "sentence2"),
+    "cola": ("sentence", None),
+    "sst2": ("sentence", None),
     "qnli": ("question", "sentence"),
     "qqp": ("question1", "question2"),
-    "rte": ("sentence1", "sentence2"),
-    "sst2": ("sentence", None),
-    "stsb": ("sentence1", "sentence2"),
-    "wnli": ("sentence1", "sentence2"),
+    "mnli": ("premise", "hypothesis"),  # includes matched and mismatched
 }
 
 
-def train(trainer, training_args, model_args, last_checkpoint):
+def train(trainer, output_dir, last_checkpoint=None):
     """Trainig function applicable to pretraining language models and finetuning."""
 
-    logger.info("Before training: total params: {:,} non zero params: {:,}".format(
+    logging.info("Before training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
 
-    # This here is all the same - can separate into a separate function?
-    # Training
-    if training_args.do_train:
-        if last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        elif (model_args.model_name_or_path is not None
-              and os.path.isdir(model_args.model_name_or_path)):
-            checkpoint = model_args.model_name_or_path
-        else:
-            checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+    train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
+    trainer.save_model()  # Saves the tokenizer too for easy upload
 
-        output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
-        if trainer.is_world_process_zero():
-            with open(output_train_file, "w") as writer:
-                logger.info("***** Train results *****")
-                for key, value in sorted(train_result.metrics.items()):
-                    logger.info(f"  {key} = {value}")
-                    writer.write(f"{key} = {value}\n")
+    output_train_file = os.path.join(output_dir, "train_results.txt")
+    if trainer.is_world_process_zero():
+        with open(output_train_file, "w") as writer:
+            logging.info("***** Train results *****")
+            for key, value in sorted(train_result.metrics.items()):
+                logging.info(f"  {key} = {value}")
+                writer.write(f"{key} = {value}\n")
 
-            # Need to save the state, since Trainer.save_model saves only the tokenizer
-            # with the model
-            trainer.state.save_to_json(
-                os.path.join(training_args.output_dir, "trainer_state.json")
-            )
+        # Need to save the state, since Trainer.save_model saves only the tokenizer
+        # with the model
+        trainer.state.save_to_json(
+            os.path.join(output_dir, "trainer_state.json")
+        )
 
-    logger.info("After training: total params: {:,} non zero params: {:,}".format(
+    logging.info("After training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
 
 
-def evaluate_tasks(trainer, training_args, data_args, datasets,
-                   eval_dataset, test_dataset, is_regression, label_list):
+def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     """
     Evaluate tasks after finetuning.
     Returns evaluation dict with results.
     """
-    # Evaluation
     eval_results = {}
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-
-        # Loop to handle MNLI double evaluation (matched, mis-matched)
-        tasks = [data_args.task_name]
-        eval_datasets = [eval_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            eval_datasets.append(datasets["validation_mismatched"])
-
-        for eval_dataset, task in zip(eval_datasets, tasks):
-            eval_result = trainer.evaluate(eval_dataset=eval_dataset)
-
-            output_eval_file = os.path.join(
-                training_args.output_dir, f"eval_results_{task}.txt"
-            )
-            if trainer.is_world_process_zero():
-                with open(output_eval_file, "w") as writer:
-                    logger.info(f"***** Eval results {task} *****")
-                    for key, value in sorted(eval_result.items()):
-                        logger.info(f"  {key} = {value}")
-                        writer.write(f"{key} = {value}\n")
-
-            eval_results.update(eval_result)
-
-    if training_args.do_predict:
-        logger.info("*** Test ***")
-
-        # Loop to handle MNLI double evaluation (matched, mis-matched)
-        tasks = [data_args.task_name]
-        test_datasets = [test_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            test_datasets.append(datasets["test_mismatched"])
-
-        for test_dataset, task in zip(test_datasets, tasks):
-            # Removing the `label` columns because it contains -1
-            # and Trainer won't like that.
-            test_dataset.remove_columns_("label")
-            predictions = trainer.predict(test_dataset=test_dataset).predictions
-            predictions = (np.squeeze(predictions) if is_regression
-                           else np.argmax(predictions, axis=1))
-
-            output_test_file = os.path.join(
-                training_args.output_dir, f"test_results_{task}.txt"
-            )
-            if trainer.is_world_process_zero():
-                with open(output_test_file, "w") as writer:
-                    logger.info(f"***** Test results {task} *****")
-                    writer.write("index\tprediction\n")
-                    for index, item in enumerate(predictions):
-                        if is_regression:
-                            writer.write(f"{index}\t{item:3.3f}\n")
-                        else:
-                            item = label_list[item]
-                            writer.write(f"{index}\t{item}\n")
-    return eval_results
-
-
-def evaluate_language_model(trainer, training_args):
-    """Evaluate language model. Returns dict with results on perplexity metric. """
-    results = {}
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-
-        eval_output = trainer.evaluate()
-
-        perplexity = math.exp(eval_output["eval_loss"])
-        results["perplexity"] = perplexity
+    for eval_dataset, task in zip(eval_datasets, tasks):
+        eval_result = trainer.evaluate(eval_dataset=eval_dataset)
+        if task == "mnli-mm":
+            eval_result = {f"mm_{k}": v for k, v in eval_result.items()}
+        eval_results.update(eval_result)
 
         output_eval_file = os.path.join(
-            training_args.output_dir, "eval_results_mlm.txt"
+            output_dir, f"eval_results_{task}.txt"
         )
         if trainer.is_world_process_zero():
             with open(output_eval_file, "w") as writer:
-                logger.info("***** Eval results *****")
-                for key, value in sorted(results.items()):
-                    logger.info(f"  {key} = {value}")
+                logging.info(f"***** Eval results {task} *****")
+                for key, value in sorted(eval_result.items()):
+                    logging.info(f"  {key} = {value}")
                     writer.write(f"{key} = {value}\n")
 
-        return results
+    return eval_results
+
+
+def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_list):
+    """
+    Test tasks after finetuning.
+    """
+    for test_dataset, task in zip(test_datasets, tasks):
+        # Removing the `label` columns because it contains -1
+        # and Trainer won't like that.
+        test_dataset.remove_columns_("label")
+        predictions = trainer.predict(test_dataset=test_dataset).predictions
+        predictions = (np.squeeze(predictions) if is_regression
+                       else np.argmax(predictions, axis=1))
+
+        output_test_file = os.path.join(
+            output_dir, f"test_results_{task}.txt"
+        )
+        if trainer.is_world_process_zero():
+            with open(output_test_file, "w") as writer:
+                logging.info(f"***** Test results {task} *****")
+                writer.write("index\tprediction\n")
+                for index, item in enumerate(predictions):
+                    if is_regression:
+                        writer.write(f"{index}\t{item:3.3f}\n")
+                    else:
+                        item = label_list[item]
+                        writer.write(f"{index}\t{item}\n")
+
+
+def evaluate_language_model(trainer, output_dir):
+    """Evaluate language model. Returns dict with results on perplexity metric. """
+    results = {}
+    eval_output = trainer.evaluate()
+
+    perplexity = math.exp(eval_output["eval_loss"])
+    results["perplexity"] = perplexity
+
+    output_eval_file = os.path.join(output_dir, "eval_results_mlm.txt")
+    if trainer.is_world_process_zero():
+        with open(output_eval_file, "w") as writer:
+            logging.info("***** Eval results *****")
+            for key, value in sorted(results.items()):
+                logging.info(f"  {key} = {value}")
+                writer.write(f"{key} = {value}\n")
+
+    return results
 
 
 def load_and_concatenate_datasets(data_args):
@@ -299,7 +283,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
         if data_args.max_seq_length is None:
             max_seq_length = tokenizer.model_max_length
             if max_seq_length > 1024:
-                logger.warning(
+                logging.warning(
                     f"The tokenizer picked seems to have a very large "
                     f"`model_max_length` ({tokenizer.model_max_length}). "
                     f"Picking 1024 instead. You can change that default value by "
@@ -308,7 +292,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
                 max_seq_length = 1024
         else:
             if data_args.max_seq_length > tokenizer.model_max_length:
-                logger.warning(
+                logging.warning(
                     f"The max_seq_length passed ({data_args.max_seq_length}) is larger "
                     f"than the maximum length for the model "
                     f"({tokenizer.model_max_length}). "
@@ -391,21 +375,20 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
                 i: label_name_to_id[label_list[i]] for i in range(num_labels)
             }
         else:
-            logger.warn(
+            logging.warn(
                 "Your model seems to have been trained with labels, but they don't "
-                "match the dataset: ",
+                "match the dataset. ",
                 f"model labels: {list(sorted(label_name_to_id.keys()))}, " ,
-                "dataset labels: {list(sorted(label_list))}.",
+                f"dataset labels: {list(sorted(label_list))}.",
                 "\nIgnoring the model labels as a result.",
             )
     elif data_args.task_name is None and not is_regression:
         label_to_id = {v: i for i, v in enumerate(label_list)}
 
     if data_args.max_seq_length > tokenizer.model_max_length:
-        logger.warn(
+        logging.warn(
             f"The max_seq_length passed ({data_args.max_seq_length}) is larger than ",
-            "the maximum length for the ",
-            f"model ({tokenizer.model_max_length}). ",
+            f"the maximum length for the model ({tokenizer.model_max_length}). ",
             f"Using max_seq_length={tokenizer.model_max_length}."
         )
     max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
@@ -422,7 +405,7 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
 
         # Map labels to IDs (not necessary for GLUE tasks)
         if label_to_id is not None and "label" in examples:
-            result["label"] = [label_to_id[l] for l in examples["label"]]
+            result["label"] = [label_to_id[label] for label in examples["label"]]
         return result
 
     tokenized_datasets = datasets.map(
@@ -479,10 +462,10 @@ def init_datasets_mlm(data_args):
             os.path.abspath(data_args.tokenized_data_cache_dir),
             str(dataset_folder)
         )
-        logger.info(f"Tokenized dataset cache folder: {dataset_path}")
+        logging.info(f"Tokenized dataset cache folder: {dataset_path}")
 
         if os.path.exists(dataset_path) and data_args.reuse_tokenized_data:
-            logger.info(f"Loading cached tokenized data ...")
+            logging.info(f"Loading cached tokenized data ...")
             tokenized_datasets = load_from_disk(dataset_path)
         else:
             datasets = load_and_concatenate_datasets(data_args)
@@ -553,7 +536,7 @@ def init_datasets_task(data_args, training_args):
                 )
 
         for key in data_files.keys():
-            logger.info(f"load a local file for {key}: {data_files[key]}")
+            logging.info(f"load a local file for {key}: {data_files[key]}")
 
         if data_args.train_file.endswith(".csv"):
             # Loading a dataset from local csv files
@@ -566,6 +549,7 @@ def init_datasets_task(data_args, training_args):
 
 
 def get_labels(datasets, data_args):
+    label_list = None
     if data_args.task_name is not None:
         is_regression = data_args.task_name == "stsb"
         if not is_regression:
@@ -609,8 +593,8 @@ def init_config(model_args, extra_config_kwargs=None):
             model_args.model_name_or_path, **config_kwargs
         )
     else:
-        config = CONFIG_MAPPING[model_args.model_type]()
-        logger.warning("You are instantiating a new config instance from scratch.")
+        config = CONFIG_MAPPING[model_args.model_type](**model_args.config_kwargs)
+        logging.warning("You are instantiating a new config instance from scratch.")
 
     return config
 
@@ -661,12 +645,12 @@ def init_model(model_args, config, tokenizer, finetuning=False):
             use_auth_token=True if model_args.use_auth_token else None,
         )
         if finetuning:
-            logger.info("Loading a pretrained model from HF for finetuning")
+            logging.info("Loading a pretrained model for finetuning")
             model = AutoModelForSequenceClassification.from_pretrained(
                 model_args.model_name_or_path, **model_kwargs
             )
         else:
-            logger.info("Loading a pretrained model from HF to continue pretraining")
+            logging.info("Loading a pretrained model to continue pretraining")
             model = AutoModelForMaskedLM.from_pretrained(
                 model_args.model_name_or_path, **model_kwargs
             )
@@ -677,10 +661,11 @@ def init_model(model_args, config, tokenizer, finetuning=False):
                 "Finetuning models must be loaded from pretrained models."
             )
         else:
-            logger.info("Pretraining new model from scratch")
+            logging.info("Pretraining new model from scratch")
             model = AutoModelForMaskedLM.from_config(config)
             model.resize_token_embeddings(len(tokenizer))
 
+    logging.info(f"Initialized model: {model}")
     return model
 
 
@@ -703,71 +688,141 @@ def init_trainer(model, tokenizer, data_collator, training_args,
         callbacks=trainer_callbacks,
     )
 
+    # Add specific metrics for finetuning task
     if finetuning:
-        # Get the metric function and add compute_metrics to trainer_kwargs
-        # If there is no task name, metric is not required
-        if task_name is not None:
-            metric = load_metric("glue", task_name)
-
-            # Compute metrics includes extra if clause that uses metrics
-            def compute_metrics(eval_prediction: EvalPrediction):
-                """
-                You can define your custom compute_metrics function. It takes an
-                `EvalPrediction` object (a namedtuple with a predictions and label_ids
-                field) and has to return a dictionary string to float.
-
-                Requires is_regression, data_args and metric in outer scope
-                TODO: remove dependency on outer scope variables
-                """
-                preds = (eval_prediction.predictions[0]
-                         if isinstance(eval_prediction.predictions, tuple)
-                         else eval_prediction.predictions)
-                preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
-                if task_name is not None:
-                    result = metric.compute(
-                        predictions=preds, references=eval_prediction.label_ids
-                    )
-                    if len(result) > 1:
-                        result["combined_score"] = np.mean(list(result.values())).item()
-                    return result
-                elif is_regression:
-                    return {
-                        "mse": ((preds - eval_prediction.label_ids) ** 2).mean().item()
-                    }
-                else:
-                    return {
-                        "accuracy": (preds == eval_prediction.label_ids).
-                        astype(np.float32).mean().item()
-                    }
-        else:
-            # Compute metrics doesn't include extra if clause if task name is not given
-            def compute_metrics(eval_prediction: EvalPrediction):
-                """
-                You can define your custom compute_metrics function. It takes an
-                `EvalPrediction` object (a namedtuple with a predictions and label_ids
-                field) and has to return a dictionary string to float.
-
-                Requires is_regression in outer scope
-                TODO: remove dependency on outer scope variables
-                """
-                preds = (eval_prediction.predictions[0]
-                         if isinstance(eval_prediction.predictions, tuple)
-                         else eval_prediction.predictions)
-                preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
-                if is_regression:
-                    return {
-                        "mse": ((preds - eval_prediction.label_ids) ** 2).mean().item()
-                    }
-                else:
-                    return {
-                        "accuracy": (preds == eval_prediction.label_ids).
-                        astype(np.float32).mean().item()
-                    }
-
-        trainer_kwargs.update(
-            compute_metrics=compute_metrics,
+        compute_metrics = partial(
+            compute_metrics_task, task_name=task_name, is_regression=is_regression,
         )
+        trainer_kwargs.update(compute_metrics=compute_metrics)
 
     trainer = Trainer(**trainer_kwargs)
 
     return trainer
+
+
+def compute_metrics_task(ep: EvalPrediction, metric=None,
+                         task_name=None, is_regression=None):
+    """
+    You can define your custom compute_metrics function. It takes an
+    `EvalPrediction` object (a namedtuple with a predictions and label_ids
+    field) and has to return a dictionary string to float.
+    """
+    preds = (ep.predictions[0] if isinstance(ep.predictions, tuple) else ep.predictions)
+    preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
+
+    if not is_regression:
+        logging.info(f"Label distribution for {task_name} before cleaning")
+        logging.info(f"Predictions: {Counter(preds).most_common()}")
+        logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
+
+    # Ignore the -100 labels - not able to tokenize?
+    # TODO: investigate why a few labels are -100 in all tasks
+    label_ids = ep.label_ids[np.where(ep.label_ids != -100)]
+    preds = preds[np.where(ep.label_ids != -100)]
+    logging.info(f"Removing {1-(len(label_ids) / len(ep.label_ids)):.2%} samples "
+                 "from evaluation set where label == -100")
+
+    if not is_regression:
+        logging.info(f"Label distribution for {task_name} after cleaning")
+        logging.info(f"Predictions: {Counter(preds).most_common()}")
+        logging.info(f"Labels: {Counter(label_ids).most_common()}")
+
+    if task_name is not None:
+        if task_name == "cola":
+            result = {"matthews_correlation": matthews_corrcoef(label_ids, preds)}
+        elif task_name == "stsb":
+            result = pearson_and_spearman(preds, label_ids)
+        elif task_name in ["mrpc", "qqp"]:
+            result = acc_and_f1(preds, label_ids)
+        elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
+                           "qnli", "rte", "wnli", "hans"]:
+            result = {"accuracy": simple_accuracy(preds, label_ids)}
+        # Consolidate if more than one metric
+        if len(result) > 1:
+            result["combined_score"] = np.mean(list(result.values())).item()
+        return result
+    elif is_regression:
+        return {"mse": ((preds - label_ids) ** 2).mean().item()}
+    else:
+        return {"accuracy": (preds == label_ids).astype(np.float32).mean().item()}
+
+
+def simple_accuracy(preds, labels):
+    return (preds == labels).mean()
+
+
+def acc_and_f1(preds, labels):
+    acc = simple_accuracy(preds, labels)
+    f1 = f1_score(y_true=labels, y_pred=preds)
+    return {
+        "accuracy": acc,
+        "f1": f1,
+    }
+
+
+def pearson_and_spearman(preds, labels):
+    pearson_corr = pearsonr(preds, labels)[0]
+    spearman_corr = spearmanr(preds, labels)[0]
+    return {
+        "pearson": pearson_corr,
+        "spearmanr": spearman_corr,
+    }
+
+
+class TaskResults():
+    """
+    Collects and reports results for each finetuning task
+    """
+
+    reporting_metrics_per_task = {
+        "cola": ["eval_matthews_correlation"],
+        "mnli": ["eval_accuracy", "mm_eval_accuracy"],
+        "mrpc": ["eval_f1", "eval_accuracy"],
+        "qnli": ["eval_accuracy"],
+        "qqp": ["eval_accuracy", "eval_f1"],
+        "rte": ["eval_accuracy"],
+        "sst2": ["eval_accuracy"],
+        "stsb": ["eval_pearson", "eval_spearmanr"],
+        "wnli": ["eval_accuracy"]
+    }
+
+    def __init__(self, task_name, training_args=None):
+        self.task_name = task_name
+        self.reporting_metrics = self.reporting_metrics_per_task[task_name]
+        self.all_results = []
+        self._results = None
+        self.training_args = training_args
+
+    def append(self, results):
+        self.all_results.append(results)
+
+    def reduce_metrics(self, reduction="mean"):
+        aggregated_results = defaultdict(list)
+        for results in self.all_results:
+            for metric, value in results.items():
+                aggregated_results[metric].append(value)
+
+        if reduction == "mean":
+            self._results = {k: np.average(v) for k, v in aggregated_results.items()}
+
+        elif reduction == "max":
+            argmax_idx = np.argmax(aggregated_results[self.reporting_metrics[0]])
+            self._results = self.all_results[argmax_idx]
+
+    @property
+    def results(self):
+        if self._results is not None:
+            return self._results
+        elif len(self.all_results) > 0:
+            return self.all_results[0]
+        else:
+            raise AttributeError(f"Results not available for {self.task_name}")
+
+    def consolidate(self):
+        return np.average([self.results[m] for m in self.reporting_metrics])
+
+    def to_string(self):
+        results_to_string = [
+            f"{self.results[m]*100:.2f}" for m in self.reporting_metrics
+        ]
+        return "/".join(results_to_string)

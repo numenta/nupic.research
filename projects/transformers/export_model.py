@@ -22,12 +22,18 @@
 """
 Pretrained models need to be exported to be used for finetuning.
 Only required argument for this script is the checkpoint folder.
+
+Not tested for modified sparse models.
 """
 
 import argparse
 import os
 
 from transformers import AutoModelForMaskedLM
+
+# Import models. This will update Transformer's model mappings so that custom models can
+# be loaded via AutoModelForMaskedLM.
+import models # noqa F401
 
 
 def save_pretrained(checkpoint_folder, destination_folder, model_name):

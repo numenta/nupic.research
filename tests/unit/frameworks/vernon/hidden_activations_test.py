@@ -100,7 +100,7 @@ class PlotHiddenActivationsTest(unittest.TestCase):
 
     def test_hidden_activations_tracking_supervised_experiment(self):
         """
-        Test whether the mixin track hidden activations in the supervised setting.
+        Test whether the mixin tracks hidden activations in the supervised setting.
         """
 
         # Setup experiment and initialize model.
@@ -134,7 +134,7 @@ class PlotHiddenActivationsTest(unittest.TestCase):
 
     def test_no_tracking_args_given_supervised_experiment(self):
         """
-        Test the edge case where where hidden activations are not tracked in the
+        Test the edge case where hidden activations are not tracked in the
         supervised setting.
         """
 

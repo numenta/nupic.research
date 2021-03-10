@@ -19,4 +19,4 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .sparsity import SparsifyFCLayersCallback
+from .sparsity import *
