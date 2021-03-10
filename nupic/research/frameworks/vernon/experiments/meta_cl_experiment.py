@@ -165,6 +165,7 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         self.class_indices = inds  # used short hand for line length
 
         # All loaders share tasks and dataset, but different indices and batch sizes.
+        # The indices will be determined through `partition_class_indices`.
         fast_loader = self.create_train_dataloader(config, data, deepcopy(inds))
         slow_loader = self.create_slow_train_dataloader(config, data, deepcopy(inds))
         replay_loader = self.create_replay_dataloader(config, data, deepcopy(inds))
