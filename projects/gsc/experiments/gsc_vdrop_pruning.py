@@ -22,23 +22,22 @@
 Run a simple GSC experiment using variational dropout modules.
 """
 
+import os
 from copy import deepcopy
 
 import numpy as np
 import torch
 
 from nupic.research.frameworks.backprop_structure.networks import (
+    LeSparseNet,
     VDropLeNet,
-    gsc_lenet_vdrop_sparse,
-    gsc_lenet_vdrop_super_sparse,
     gsc_lenet_vdrop_sparse_scaling,
+    gsc_lenet_vdrop_super_sparse,
 )
-from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
 
 from .base import DEFAULT_BASE
-import os
 
 
 class GSCVDropExperiment(
@@ -311,7 +310,7 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
         reg_scalar_final_value = assignments.get("reg_scalar_final_value", 0.001)
         momentum_max_value = assignments.get("momentum_max_value", 0.75)
 
-        CYCLE_LR_ARGS = dict(
+        cycle_lr_args = dict(
             max_lr=max_lr,
             pct_start=0.0625,
             anneal_strategy="linear",
@@ -338,12 +337,12 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
             )
             + tuple(
                 [
-                    (30 + prune_iteration * epochs_per_pruning_cycle, CYCLE_LR_ARGS)
+                    (30 + prune_iteration * epochs_per_pruning_cycle, cycle_lr_args)
                     for prune_iteration in range(num_pruning_iterations)
                 ]
             )
             + tuple(
-                (30 + num_pruning_iterations * epochs_per_pruning_cycle, CYCLE_LR_ARGS)
+                (30 + num_pruning_iterations * epochs_per_pruning_cycle, cycle_lr_args)
             )
         )
         reg_scalar = make_reg_schedule(
@@ -379,8 +378,6 @@ class SNRPruningGSCVDropSIGOPT(SigOptExperiment):
 # how many pruning iterations, and how long is each iteration (num epochs/pruning cycle)
 # how should the learning rate and momentum change? (how high LR should go)
 # how high should the regularization warmup go?
-
-
 
 SIGOPT_GSC_VDROP_SNR_PRUNING = deepcopy(GSC_VDROP_SNR_PRUNING)
 SIGOPT_GSC_VDROP_SNR_PRUNING.update(
@@ -419,8 +416,7 @@ SIGOPT_GSC_VDROP_SNR_PRUNING.update(
         project="gsc_snr_pruning",
     ),
     sigopt_experiment_id=374528,
-    api_key = os.environ.get("SIGOPT_KEY", None),
-)
+    api_key=os.environ.get("SIGOPT_KEY", None),)
 
 SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY = deepcopy(SIGOPT_GSC_VDROP_SNR_PRUNING)
 SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY.update(
@@ -466,15 +462,55 @@ SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY.update(
         project="gsc_snr_pruning",
     ),
     sigopt_experiment_id=376134,
-    api_key = os.environ.get("SIGOPT_KEY", None),
-    num_samples=1,
-)
+    api_key=os.environ.get("SIGOPT_KEY", None),
+    num_samples=1,)
 
+
+class ScalingSparseBaselineExperiment(
+    mixins.LogEveryLoss,
+    mixins.LogEveryLearningRate,
+    mixins.ExtraValidationsPerEpoch,
+    mixins.ReportMaxAccuracy,
+    experiments.SupervisedExperiment,
+):
+    pass
+
+
+GSC_SPARSE_SCALING_BASELINE = deepcopy(DEFAULT_BASE)
+GSC_SPARSE_SCALING_BASELINE.update(
+    experiment_class=ScalingSparseBaselineExperiment,
+    # Training batch size
+    batch_size=32,
+    # Validation batch size
+    val_batch_size=32,
+
+    wandb_args=dict(
+        name="gsc_sparse_scaling_baseline",
+        project="gsc_vdrop_experiments",
+        notes="Baseline to compare variational pruning",
+    ),
+    num_samples=1,
+    epochs=100,
+    epochs_to_validate=range(100),
+    model_class=LeSparseNet,
+    model_args=dict(input_shape=(1, 32, 32),
+                    cnn_out_channels=(64, 64),
+                    cnn_activity_percent_on=(1.0, 1.0),
+                    cnn_weight_percent_on=(1.0, 0.2),
+                    linear_n=(2000,),
+                    linear_activity_percent_on=(1.0,),
+                    linear_weight_percent_on=(0.01,),
+                    use_softmax=False,
+                    num_classes=12,
+                    ),
+    loss_function=torch.nn.functional.cross_entropy,
+)
 
 CONFIGS = dict(
     gsc_vdrop=GSC_VDROP,
     gsc_vdrop_snr_pruning=GSC_VDROP_SNR_PRUNING,
     gsc_vdrop_snr_pruning_super_sparse=GSC_VDROP_SNR_PRUNING_SUPER_SPARSE,
     sigopt_gsc_vdrop_snr_pruning=SIGOPT_GSC_VDROP_SNR_PRUNING,
-    sigopt_gsc_vdrop_snr_pruning_scaling_2 = SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY,
+    sigopt_gsc_vdrop_snr_pruning_scaling_2=SIGOPT_GSC_VDROP_SNR_PRUNING_SCALING_STUDY,
+    gsc_scaling_lesparsenet_baseline=GSC_SPARSE_SCALING_BASELINE,
 )
