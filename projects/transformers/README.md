@@ -18,10 +18,18 @@ In progress, current results:
 
 <br/><br/>
 
+|Bert Sparsity ||
+|:-----------|:-------|
+| sparse_v1  | 42.14% |
+| sparse_v2  | 63.15% |
+| sparse_v3  | 79.68% |
+
+<br/><br/>
+
 **Legend**
 * *sparse_v1:* Static sparse encoder with only the non-attention linear layers sparsified (`model_type=static_sparse_non_attention_bert`)
 * *sparse_v2:* Static sparse encoder with all linear layers sparsified, including attention (`model_type=static_sparse_encoder_bert`)
-* *sparse_v2:* Static sparse encoder (as with v2) as well as static sparse token embeddings (`model_type=fully_static_sparse_bert`)
+* *sparse_v3:* Static sparse encoder (as with v2) as well as static sparse token embeddings (`model_type=fully_static_sparse_bert`)
 
 
 </br>
