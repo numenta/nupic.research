@@ -42,21 +42,34 @@ See ../notebooks/create_little_text_dataset.ipynb
 """
 
 #
-# Table of results: (reported using a one p3.2xlarge)
+# Params and Results:
 #
-# |------------------------------------------------------------------------------------|
-# | model           | num params | loss  | perplexity | training time | samples/second |
-# |-----------------|:----------:|:-----:|:----------:|:-------------:|:--------------:|
-# | small_bert_100k | 27,523,072 | 2.951 | 14.532     | ~8 hrs        | 3.48           |
-# | small_bert_50k  | 27,523,072 | 3.373 | 21.386     | ~2 hrs 40 min | 3.778          |
-# | mini_bert_100k  | 10,615,808 | 3.669 | 27.342     | ~6 hrs        | 6.686          |
-# | mini_bert_50k   | 10,615,808 | 4.464 | 56.309     | ~2 hrs        | 6.676          |
-# | tiny_bert_100k  |  4,124,928 | 4.566 | 55.79276   | ~2 hrs 20 min | 12.066         |
-# | tiny_bert_50k   |  4,124,928 | 5.990 | 330.234    | ~1 hrs        | 12.213         |
-# |------------------------------------------------------------------------------------|
+# |--------------------------------------------------------------------------|
+# | model           | num params | train loss  | eval loss      | perplexity |
+# |-----------------|:----------:|:-----------:|:--------------:|:----------:|
+# | small_bert_100k | 27,523,072 | 2.951       | 3.861          | 14.532     |
+# | small_bert_50k  | 27,523,072 | 3.373       | 4.417          | 21.386     |
+# | mini_bert_100k  | 10,615,808 | 3.669       | 4.773          | 27.342     |
+# | mini_bert_50k   | 10,615,808 | 4.464       | 5.815          | 56.309     |
+# | tiny_bert_100k  |  4,124,928 | 4.566       | 5.802          | 55.79276   |
+# | tiny_bert_50k   |  4,124,928 | 5.990       | 8.367          | 330.234    |
+# |--------------------------------------------------------------------------|
+#
+#
+# Training Times:
+#
+# |---------------------------------|
+# | model           | training time |
+# |-----------------|:-------------:|
+# | small_bert_100k | ~8 hrs        |
+# | mini_bert_100k  | ~6 hrs        |
+# | tiny_bert_100k  | ~2 hrs 20 min |
+# |---------------------------------|
+# (reported using a one p3.2xlarge)
+#
 
 
-# samples/second = 2.536 p3.2xlarge
+# samples/second = 2.536 (on one p3.2xlarge)
 small_bert_debug = deepcopy(debug_bert)
 small_bert_debug.update(
     # Model Arguments
@@ -74,7 +87,7 @@ small_bert_debug.update(
 )
 
 
-# samples/second = 3.989 p3.2xlarge
+# samples/second = 3.989 (on one p3.2xlarge)
 mini_bert_debug = deepcopy(debug_bert)
 mini_bert_debug.update(
     # Model Arguments
@@ -92,7 +105,7 @@ mini_bert_debug.update(
 )
 
 
-# samples/second = 5.428 p3.2xlarge
+# samples/second = 5.428 (on one p3.2xlarge)
 tiny_bert_debug = deepcopy(debug_bert)
 tiny_bert_debug.update(
     # Model Arguments
@@ -110,6 +123,7 @@ tiny_bert_debug.update(
 )
 
 
+# samples/second = 3.48 (on one p3.2xlarge)
 small_bert_100k = deepcopy(bert_100k)
 small_bert_100k.update(
     # Model Arguments
@@ -130,12 +144,14 @@ small_bert_100k.update(
     dataset_config_name=None,
 )
 
+# samples/second = 3.778 (on one p3.2xlarge)
 small_bert_50k = deepcopy(small_bert_100k)
 small_bert_50k.update(
     max_steps=50000,
 )
 
 
+# samples/second = 6.686 (on one p3.2xlarge)
 mini_bert_100k = deepcopy(bert_100k)
 mini_bert_100k.update(
     # Model Arguments
@@ -156,12 +172,14 @@ mini_bert_100k.update(
     dataset_config_name=None,
 )
 
+# samples/second = 6.676 (on one p3.2xlarge)
 mini_bert_50k = deepcopy(mini_bert_100k)
 mini_bert_50k.update(
     max_steps=50000,
 )
 
 
+# samples/second = 12.066 (on one p3.2xlarge)
 tiny_bert_100k = deepcopy(bert_100k)
 tiny_bert_100k.update(
     # Model Arguments
@@ -182,6 +200,7 @@ tiny_bert_100k.update(
     dataset_config_name=None,
 )
 
+# samples/second = 12.213 (on one p3.2xlarge)
 tiny_bert_50k = deepcopy(tiny_bert_100k)
 tiny_bert_50k.update(
     max_steps=50000,
