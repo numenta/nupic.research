@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 import warnings
+from pprint import pformat
 
 import torch
 
@@ -30,6 +31,27 @@ class ConfigureOptimizerParamGroups:
     """
     This mixin enables configurable optimizer arguments for user specified param groups.
     """
+
+    def setup_experiment(self, config):
+        """
+        Log param groups after creating optimizer.
+        """
+        super().setup_experiment(config)
+
+        # The last group is the default group, so it won't be included.
+        param_groups = self.optimizer.param_groups[:-1]
+
+        # Print the param names and optimizer arguments belonging to each group.
+        for g, param_group in enumerate(param_groups):
+
+            # The `_name` attribute was set in `create_optimizer`.
+            params = param_group["params"]
+            names = [param._name for param in params if hasattr(param, "_name")]
+            args = {key: val for key, val in param_group.items() if key != "params"}
+
+            self.logger.info(f"\nParam group {g}:"
+                             f"\n   Params in group: \n{pformat(names, indent=6)}"
+                             f"\n   Group optim args: \n{pformat(args, indent=6)}")
 
     @classmethod
     def create_optimizer(cls, config, model):
@@ -98,6 +120,11 @@ class ConfigureOptimizerParamGroups:
                                          include_names=include_names,
                                          include_patterns=include_patterns)
 
+            # Set the `_name` of parameters. This is a new attribute, and will be
+            # accessed in `setup_experiment` for logging purposes.
+            for name, param in named_params.items():
+                param._name = name
+
             params = list(named_params.values())
             used_params.extend([p.data_ptr() for p in params])
 
@@ -127,5 +154,6 @@ class ConfigureOptimizerParamGroups:
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["create_optimizer"].append("Configure optimizer param groups.")
+        eo["setup_experiment"].append("Log param groups.")
+        eo["create_optimizer"] = ["Configure optimizer param groups."]
         return eo
