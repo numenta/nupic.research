@@ -165,6 +165,22 @@ finetuning_sparse_bert_100k_glue.update(
 )
 
 
+finetuning_sparse_encoder_bert_100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_sparse_encoder_bert_100k_glue.update(
+    # Model arguments
+    model_type="static_sparse_encoder_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/sparse_v2_100k",  # noqa: E501
+)
+
+
+finetuning_fully_sparse_bert_100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_fully_sparse_bert_100k_glue.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/sparse_v3_100k",  # noqa: E501
+)
+
+
 finetuning_mini_sparse_bert_debug = deepcopy(finetuning_bert700k_glue)
 finetuning_mini_sparse_bert_debug.update(
     model_type="static_sparse_encoder_bert",
@@ -184,5 +200,7 @@ CONFIGS = dict(
     finetuning_bert1mi_glue=finetuning_bert1mi_glue,
     finetuning_bert1mi_single_task=finetuning_bert1mi_single_task,
     finetuning_sparse_bert_100k_glue=finetuning_sparse_bert_100k_glue,
+    finetuning_sparse_encoder_bert_100k_glue=finetuning_sparse_encoder_bert_100k_glue,
     finetuning_mini_sparse_bert_debug=finetuning_mini_sparse_bert_debug,
+    finetuning_fully_sparse_bert_100k_glue=finetuning_fully_sparse_bert_100k_glue,
 )
