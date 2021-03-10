@@ -13,13 +13,23 @@ In progress, current results:
 | bert_700k |          79.77 |          75.25 |  47.73 | 83.91/84.22 | 88.27/83.59 |  91.51 | 90.37/86.90 | 62.11 |  91.44 | 86.88/86.70 |  39.06 |  |
 | bert_100k |          75.71 |          72.51 |  40.98 | 78.26/78.65 | 84.05/77.86 |  87.74 | 89.12/85.25 |  58.2 |  88.31 | 83.90/83.80 |  46.88 | 8.619 |
 | sparse_v1_100k |          72.67 |          67.91 |  22.43 | 77.25/77.96 | 85.37/78.82 |  84.65 | 88.23/84.32 | 58.32 |  87.27 | 82.79/82.65 |  29.84 | 10.461 |
-| sparse_v2_100k |  |  |  |  |  |  |  |  |  |  |  |  |
+| sparse_v2_100k |          68.41 |          67.06 |  15.96 | 72.25/73.11 | 80.50/71.35 |  81.23 | 85.78/81.01 | 58.98 |  82.64 | 76.53/76.40 |  56.25 | 16.696 |
+| sparse_v3_100k |          68.25 |          66.92 |  16.35 | 72.00/72.32 | 80.42/70.83 |  80.31 | 85.04/80.49 | 58.98 |  82.52 | 76.96/77.60 |  56.25 | 22.81 |
+
+<br/><br/>
+
+|Bert Sparsity ||
+|:-----------|:-------|
+| sparse_v1  | 42.14% |
+| sparse_v2  | 63.15% |
+| sparse_v3  | 79.68% |
 
 <br/><br/>
 
 **Legend**
 * *sparse_v1:* Static sparse encoder with only the non-attention linear layers sparsified (`model_type=static_sparse_non_attention_bert`)
 * *sparse_v2:* Static sparse encoder with all linear layers sparsified, including attention (`model_type=static_sparse_encoder_bert`)
+* *sparse_v3:* Static sparse encoder (as with v2) as well as static sparse token embeddings (`model_type=fully_static_sparse_bert`)
 
 
 </br>

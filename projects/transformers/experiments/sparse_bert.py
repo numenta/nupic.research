@@ -54,6 +54,19 @@ static_sparse_encoder_bert_100k.update(
     trainer_callbacks=[RezeroWeightsCallback()]
 )
 
+
+fully_static_sparse_bert_100k = deepcopy(bert_100k)
+fully_static_sparse_bert_100k.update(
+    # Model Arguments
+    overwrite_output_dir=False,
+    model_type="fully_static_sparse_bert",
+    config_kwargs=dict(
+        sparsity=0.8,
+    ),
+    trainer_callbacks=[RezeroWeightsCallback()]
+)
+
+
 # Sparse Bert of only two layers and one attention head.
 mini_sparse_bert_debug = deepcopy(debug_bert)
 mini_sparse_bert_debug.update(
@@ -65,7 +78,7 @@ mini_sparse_bert_debug.update(
         hidden_size=64,
         intermediate_size=64 * 4,
     ),
-    trainer_callbacks=[RezeroWeightsCallback()]
+    trainer_callbacks=[RezeroWeightsCallback()],
 )
 
 
@@ -74,4 +87,5 @@ CONFIGS = dict(
     sparse_bert_100k=sparse_bert_100k,
     mini_sparse_bert_debug=mini_sparse_bert_debug,
     static_sparse_encoder_bert_100k=static_sparse_encoder_bert_100k,
+    fully_static_sparse_bert_100k=fully_static_sparse_bert_100k,
 )

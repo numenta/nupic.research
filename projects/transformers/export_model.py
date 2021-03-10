@@ -40,6 +40,7 @@ def save_pretrained(checkpoint_folder, destination_folder, model_name):
     if not model_name:
         model_name = os.path.split(checkpoint_folder)[-1]
     model = AutoModelForMaskedLM.from_pretrained(checkpoint_folder)
+    print("Saving with model type:", model.__class__.__name__)
     destination_file_path = os.path.join(destination_folder, model_name)
     model.save_pretrained(destination_file_path)
     print(f"Model saved at {destination_file_path}")
