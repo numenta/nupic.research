@@ -59,9 +59,9 @@ DATASET = "mnist"  # Options are "mnist" or "fashion_mnist", although functional
 # for fashion-mnist may be incomplete
 SEED1 = 1
 SEED2 = 2
-BLOCKED_TRAINING_BOOL = False  # True by default; if False, shuffle the order of the
+BLOCKED_TRAINING_BOOL = True  # True by default; if False, shuffle the order of the
 # example objects provided during training, providing the interleved training 
-# preferred by e.g. RNNs with back-propagation
+# preferred by e.g. RNNs that use back-propagation
 
 # Setting up special conditions for model learning and evaluation
 FIXED_TOUCH_SEQUENCE = None  # Use a random but fixed sequence when performing
@@ -185,7 +185,7 @@ def object_learning_and_inference(
 
     currentLocsUnique = True  # noqa: N806
 
-    training_order_list = range(num_samples_per_class*10)
+    training_order_list = range(len(train_objects))
 
     if BLOCKED_TRAINING_BOOL is False:
 
@@ -212,14 +212,6 @@ def object_learning_and_inference(
     # Over-write the features dictionary with those that are being used for evaluation
     ColumnPlusNet.features = test_features_dic
 
-    print("\nGetting class and non-class targets")
-    all_class_targets = []
-
-    for class_iter in range(10):
-        print("Targets of " + str(class_iter))
-        all_class_targets.append(ColumnPlusNet.getClassFeatures(
-            objectClass=str(class_iter), featuresPerObject=featuresPerObject))
-
     object_iter = 0
     object_prediction_sequences = []
 
@@ -227,32 +219,23 @@ def object_learning_and_inference(
 
         start_infer = time.time()
         (numSensationsToInference, incorrect, prediction_sequence,  # noqa: N806
-            touch_sequence, progression) = ColumnPlusNet.inferObjectWithRandomMovements(
+            touch_sequence, classification_visualization) = ColumnPlusNet.inferObjectWithRandomMovements(
                 objectDescription,
                 objectImage=object_images[object_iter],
-                all_class_targets=all_class_targets,
                 cellsPerColumn=cellsPerColumn,
                 trial_iter=ii,
                 class_threshold=class_threshold,
                 fixed_touch_sequence=FIXED_TOUCH_SEQUENCE)
 
-        print(progression)
-
-        true_mask = (np.nonzero(progression['classified']))
+        
+        # Visualise how classification progressed
+        # Useful for hyperparameter tuning
+        true_mask = (np.nonzero(classification_visualization['classified']))
         false_mask = np.invert(true_mask)
-        # print(progression['classified'])
-        # print(progression['step'])
-        # print(progression['proportion'])
-        # print(true_mask)
-        # print(false_mask)
-        # print(progression['step'][true_mask])
-        # print(progression['proportion'][true_mask])
-        # exit() 
-        plt.scatter(np.array(progression['step'])[false_mask], np.array(progression['proportion'])[false_mask], alpha=0.5, label='Incorrect', color='crimson')
-        plt.scatter(np.array(progression['step'])[true_mask], np.array(progression['proportion'])[true_mask], alpha=0.5, label='Correct', color='dodgerblue')
+        plt.scatter(np.array(classification_visualization['step'])[false_mask], np.array(classification_visualization['proportion'])[false_mask], alpha=0.5, label='Incorrect', color='crimson')
+        plt.scatter(np.array(classification_visualization['step'])[true_mask], np.array(classification_visualization['proportion'])[true_mask], alpha=0.5, label='Correct', color='dodgerblue')
         plt.ylim(0,1)
         plt.xlim(0,25)
-        # plt.clf()
 
         # object_prediction_sequences is used by downstream programs to e.g. visualise
         # the predictions of the network
@@ -385,7 +368,7 @@ if __name__ == "__main__":
                     print("Trial results:")
                     print(all_results)
 
-                    plt.savefig('results/progression_plot__samples_per_class_' + str(num_samples_per_class) + "__dendritic_threshold_" + str(f_to_g_threshold) + "__class_threshold_" + 
+                    plt.savefig('results/classification_visualization_plot__samples_per_class_' + str(num_samples_per_class) + "__dendritic_threshold_" + str(f_to_g_threshold) + "__class_threshold_" + 
                         str(class_threshold) + '.png')
                     plt.clf()
 

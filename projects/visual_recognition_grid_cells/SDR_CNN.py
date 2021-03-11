@@ -29,7 +29,6 @@ nupic.torch/examples
 
 import os
 
-import antialiased_cnns
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -44,7 +43,7 @@ torch.manual_seed(18)
 np.random.seed(18)
 
 # Parameters
-TRAIN_NEW_NET = False  # To generate all the SDRs needed for down-stream use in other
+TRAIN_NEW_NET = True  # To generate all the SDRs needed for down-stream use in other
 # programs, train a network and run this again with TRAIN_NEW_NET=False
 
 # k-WTA parameters
@@ -93,7 +92,7 @@ def train(model, loader, optimizer, criterion, post_batch_callback=None):
             post_batch_callback(model)
 
 
-def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None, shift_image=False):
+def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
     """
     Evaluate pre-trained model using given dataset loader.
     Called on every epoch.
@@ -119,17 +118,6 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None, shi
 
     with torch.no_grad():
         for data, target in loader:
-
-            if shift_image == True:
-
-                # print(np.shape(data[0][0]))
-                # for ii in range(30):
-                #     plt.imsave("pre_roll" + str(ii) + ".png", data[ii][0])
-                data = [np.roll(x, 2, axis=2) for x in data] # Shift all images to the right 
-                data = torch.FloatTensor([np.roll(x, -2, axis=1) for x in data]) # Shift all images up
-                # for ii in range(30):
-                #     plt.imsave("post_roll" + str(ii) + ".png", data[ii][0])
-                # exit()
 
             data, target = data.to(device), target.to(device)
             output = model(data)
@@ -247,60 +235,6 @@ class SDRCNNBase(nn.Module):
         return x
 
 
-class SDRCNNAntiAlias(nn.Module):
-    """
-    Classifier that uses k-WTA to create a sparse representation after the
-    second pooling operation.
-    This sparse operation can subsequently be binarized and output so as to
-    generate SDR-like representaitons given an input image.
-    """
-    def __init__(self, percent_on, boost_strength):
-        super(SDRCNNAntiAlias, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5,
-                               padding=2)
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=1)
-        self.blur1 = antialiased_cnns.BlurPool(64, stride=2)
-
-        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5,
-                               padding=0)
-        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=1)
-        self.blur2 = antialiased_cnns.BlurPool(128, stride=2)
-
-        self.k_winner = KWinners2d(channels=128, percent_on=percent_on,
-                                   boost_strength=boost_strength, local=True)
-        self.dense1 = nn.Linear(in_features=128 * 5 * 5, out_features=256)
-        self.dense2 = nn.Linear(in_features=256, out_features=128)
-        self.output = nn.Linear(in_features=128, out_features=10)
-        self.softmax = nn.LogSoftmax(dim=1)
-
-        print("Using a network with an anti-aliased CNN architecture")
-
-    def until_kwta(self, inputs):
-        x = F.relu(self.conv1(inputs))
-        x = self.blur1(self.pool1(x))
-        x = F.relu(self.conv2(x))
-        x = self.blur2(self.pool2(x))
-        x = self.k_winner(x)
-        x = x.view(-1, 128 * 5 * 5)
-
-        return x
-
-    def forward(self, inputs):
-        x = self.until_kwta(inputs)
-        x = F.relu(self.dense1(x))
-        x = F.relu(self.dense2(x))
-        x = self.softmax(self.output(x))
-
-        return x
-
-    def output_sdr(self, inputs):
-        """Returns a binarized SDR-like output from the CNN"s
-        mid-level representations"""
-        x = self.until_kwta(inputs)
-        x = (x > 0).float()
-
-        return x
-
 def data_setup():
     """
     Note there are three data-sets used in all of the experiments; the training
@@ -368,7 +302,7 @@ if __name__ == "__main__":
     (first_loader, train_loader, test_cnn_loader, test_sdrc_loader, training_len,
         testing_cnn_len, testing_sdr_classifier_len) = data_setup()
 
-    sdr_cnn = SDRCNNAntiAlias(percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
+    sdr_cnn = SDRCNNBase(percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
 
     sdr_cnn.to(device)
 
@@ -425,18 +359,18 @@ if __name__ == "__main__":
           "base_net_training, and are used later to train the decoder")
     results = test(model=sdr_cnn, loader=train_loader, test_size=training_len,
                    epoch="final_train", criterion=F.nll_loss,
-                   sdr_output_subset="base_net_training", shift_image=False)
+                   sdr_output_subset="base_net_training")
     print(results)
     print("\nResults from data-set for evaluating CNN/decoder. The output SDRs are "
           "saved as SDR_classifiers_training")
     results = test(model=sdr_cnn, loader=test_cnn_loader, test_size=testing_cnn_len,
                    epoch="test_CNN", criterion=F.nll_loss,
-                   sdr_output_subset="SDR_classifiers_training", shift_image=True)
+                   sdr_output_subset="SDR_classifiers_training")
     print(results)
-    # print("\nResults from data-set for evaluating later SDR-based classifiers. The "
-    #       "output SDRs are saved as SDR_classifiers_testing")
-    # results = test(model=sdr_cnn, loader=test_sdrc_loader,
-    #                test_size=testing_sdr_classifier_len,
-    #                epoch="test_SDRs", criterion=F.nll_loss,
-    #                sdr_output_subset="SDR_classifiers_testing", shift_image=True)
-    # print(results)
+    print("\nResults from data-set for evaluating later SDR-based classifiers. The "
+          "output SDRs are saved as SDR_classifiers_testing")
+    results = test(model=sdr_cnn, loader=test_sdrc_loader,
+                   test_size=testing_sdr_classifier_len,
+                   epoch="test_SDRs", criterion=F.nll_loss,
+                   sdr_output_subset="SDR_classifiers_testing")
+    print(results)
