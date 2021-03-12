@@ -34,7 +34,8 @@ class GaussianDataset(Dataset):
     A dataset class where samples from each category (i.e., class) are drawn i.i.d.
     from a multivariate normal distribution. The mean of each distribution is randomly
     chosen, and its covariance matrix is simply the identity matrix scaled by a random
-    scalar value.
+    scalar value. Each task is also associated with a binary sparse context vector,
+    hence the dataset exists in (data, context, target) triplets.
     """
 
     # Distributions should be the same whether and instance of this class is

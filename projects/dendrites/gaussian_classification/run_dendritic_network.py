@@ -85,7 +85,7 @@ class DendriticMLP(nn.Module):
     """
 
     def __init__(self, input_size, output_size, hidden_size, num_segments, dim_context,
-                 weight_init, dendrite_init, kw, duty_cycle_period=15000,
+                 weight_init, dendrite_init, kw,
                  dendritic_layer_class=AbsoluteMaxGatingDendriticLayer):
 
         # Forward weight initialization must of one of "kaiming" or "modified" (i.e.,
@@ -128,11 +128,9 @@ class DendriticMLP(nn.Module):
 
             print(f"Using k-Winners: 0.05 'on'")
             self.kw1 = KWinners(n=hidden_size, percent_on=0.05, k_inference_factor=1.0,
-                                boost_strength=0.0, boost_strength_factor=0.0,
-                                duty_cycle_period=duty_cycle_period)
+                                boost_strength=0.0, boost_strength_factor=0.0)
             self.kw2 = KWinners(n=hidden_size, percent_on=0.05, k_inference_factor=1.0,
-                                boost_strength=0.0, boost_strength_factor=0.0,
-                                duty_cycle_period=duty_cycle_period)
+                                boost_strength=0.0, boost_strength_factor=0.0)
 
         if weight_init == "modified":
 
@@ -302,15 +300,12 @@ if __name__ == "__main__":
 
     for task_id in range(-1, num_tasks):
 
-        if task_id >= 0:
+        # Train model on current task
+        exp.train_loader.sampler.set_active_tasks(task_id)
+        for _ in range(num_epochs):
+            train_model(exp)
 
-            # Train model on current task
-            exp.train_loader.sampler.set_active_tasks(task_id)
-            for _ in range(num_epochs):
-                train_model(exp)
-
-        title = f"AFTER TASK {task_id}" if task_id >= 0 else "  initial   "
-        print(f"=== {title} ===")
+        print(f"=== AFTER TASK {task_id} ===")
         print("")
 
         # Evaluate model accuracy on each task separately
