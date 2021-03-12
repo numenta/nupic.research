@@ -6,7 +6,7 @@ In progress, current results:
 
 |            | average_bert     | average_glue      | cola           | mnli                         | mrpc        | qnli     | qqp         | rte      | sst2     | stsb                  | wnli     | perplexity | eval loss |
 |:-----------|:-----------------|:------------------|:---------------|:-----------------------------|:------------|:---------|:------------|:---------|:---------|:----------------------|:---------|:-----------|:----------|
-|            | Average w/o wnli | Average all tasks | Matthew's corr | Matched acc./Mismatched acc. | F1/Accuracy | Accuracy | Accuracy/F1 | Accuracy | Accuracy | Person/Spearman corr. | Accuracy |            | log(perplexoty) |
+|            | Average w/o wnli | Average all tasks | Matthew's corr | Matched acc./Mismatched acc. | F1/Accuracy | Accuracy | Accuracy/F1 | Accuracy | Accuracy | Person/Spearman corr. | Accuracy |            | log(perplexity) |
 | bert_HF    | 81.67            | 78.85             | 56.53          | 83.91/84.10                  | 88.85/84.07 | 90.66    | 90.71/87.49 | 65.70    | 92.32    | 88.64/88.48           | 56.34    |            | |
 | bert_paper|          79.60 |             -  |  52.10 | 84.60/83.40          | 88.90/- | 90.50     | 71.20/-     | 66.40     | 93.50     | 85.80        |      - | 3.99 (RoBERTa) | 1.996 |
 | bert_1mi |          80.76 |          76.82 |  48.87 | 84.08/84.57 | 89.76/85.68 |  91.19 | 90.58/87.17 | 66.02 |  91.44 | 87.67/87.54 |  45.31 | 5.013 | 2.326 |
