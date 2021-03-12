@@ -22,7 +22,6 @@
 Base Transformers Experiment configuration.
 """
 
-import os
 from copy import deepcopy
 
 from .base import transformers_base
@@ -104,12 +103,10 @@ bert_100k.update(
     lr_scheduler_type="linear",
 
     # Training Arguments - checkpointing
-    run_name="bert_100k",
     logging_steps=500,
     logging_first_step=True,
     save_steps=5000,
     save_total_limit=5,
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/bert_100k"),
     overwrite_output_dir=False,
 
     # speeding up
@@ -120,9 +117,7 @@ bert_100k.update(
 
 bert_1mi = deepcopy(bert_100k)
 bert_1mi.update(
-    run_name="bert_1mi",
     max_steps=1000000,
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/bert_1mi"),
 )
 
 # Export configurations in this file

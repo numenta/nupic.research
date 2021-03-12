@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from collections import defaultdict
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -157,52 +158,63 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
     def create_loaders(self, config):
         """Create train and val dataloaders."""
 
-        main_set = self.load_dataset(config, train=True)
+        data = self.load_dataset(config, train=True)
+
+        # Compute the class indices now so they can be reused in creating the samplers.
+        inds = self.compute_class_indices(config, data)
+        self.class_indices = inds  # used short hand for line length
 
         # All loaders share tasks and dataset, but different indices and batch sizes.
-        self.train_fast_loader = self.create_train_dataloader(config, main_set)
-        self.train_slow_loader = self.create_slow_train_dataloader(config, main_set)
-        self.train_replay_loader = self.create_replay_dataloader(config, main_set)
-        self.val_fast_loader = self.create_validation_dataloader(config, main_set)
+        # The indices will be determined through `partition_class_indices`.
+        fast_loader = self.create_train_dataloader(config, data, deepcopy(inds))
+        slow_loader = self.create_slow_train_dataloader(config, data, deepcopy(inds))
+        replay_loader = self.create_replay_dataloader(config, data, deepcopy(inds))
+        val_fast_loader = self.create_validation_dataloader(config, data,
+                                                            deepcopy(inds))
+
+        self.train_fast_loader = fast_loader
+        self.train_slow_loader = slow_loader
+        self.train_replay_loader = replay_loader
+        self.val_fast_loader = val_fast_loader
 
         # For pre/post epoch and batch processing slow loader is equiv to train loader
         self.train_loader = self.train_slow_loader
 
     @classmethod
-    def create_train_sampler(cls, config, dataset):
+    def create_train_sampler(cls, config, dataset, class_indices):
         """Sampler for meta-train training."""
         sample_size = config.get("train_train_sample_size", 5)
-        class_indices = cls.compute_class_indices(config, dataset,
-                                                  mode="train",
-                                                  sample_size=sample_size)
+        class_indices = cls.partition_class_indices(class_indices,
+                                                    mode="train",
+                                                    sample_size=sample_size)
         return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def create_train_slow_sampler(cls, config, dataset):
+    def create_train_slow_sampler(cls, config, dataset, class_indices):
         """Sampler for meta-train testing. Uses same images as for train-training."""
         sample_size = config.get("train_train_sample_size", 5)
-        class_indices = cls.compute_class_indices(config, dataset,
-                                                  mode="train",
-                                                  sample_size=sample_size)
+        class_indices = cls.partition_class_indices(class_indices,
+                                                    mode="train",
+                                                    sample_size=sample_size)
         return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def create_replay_sampler(cls, config, dataset):
+    def create_replay_sampler(cls, config, dataset, class_indices):
         """Sampler used to augment meta-train testing; "replays" previous classes."""
-        class_indices = cls.compute_class_indices(config, dataset, mode="all")
+        class_indices = cls.partition_class_indices(class_indices, mode="all")
         return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def create_validation_sampler(cls, config, dataset):
+    def create_validation_sampler(cls, config, dataset, class_indices):
         """Sampler used to validate meta-training phase."""
         sample_size = config.get("train_train_sample_size", 5)
-        class_indices = cls.compute_class_indices(config, dataset,
-                                                  mode="test",
-                                                  sample_size=sample_size)
+        class_indices = cls.partition_class_indices(class_indices,
+                                                    mode="test",
+                                                    sample_size=sample_size)
         return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def compute_class_indices(cls, config, dataset, mode="all", sample_size=None):
+    def compute_class_indices(cls, config, dataset):
         class_indices = defaultdict(list)
         for idx, (_, target) in enumerate(dataset):
             if isinstance(target, torch.Tensor):
@@ -212,16 +224,30 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
             assert isinstance(target, int)
             class_indices[target].append(idx)
 
+        return class_indices
+
+    @classmethod
+    def partition_class_indices(cls, class_indices, mode="all", sample_size=None):
+        """
+        Partition the class indices depending on the mode and sample size.
+        """
+        # Training mode: the last 'sample_size' number of samples
         if mode == "train":
             assert isinstance(sample_size, int)
             for c in class_indices:
                 class_indices[c] = class_indices[c][:sample_size]
+
+        # Testing mode: the last 'sample_size' number of samples
         elif mode == "test":
             assert isinstance(sample_size, int)
             for c in class_indices:
                 class_indices[c] = class_indices[c][sample_size:]
+
+        # All mode: use all samples
         elif mode == "all":
             pass
+
+        # Mode must be in ["train", "test", "all"]
         else:
             raise ValueError(f"Received unexpected mode: {mode}")
 
@@ -235,8 +261,23 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         return TaskRandomSampler(class_indices)
 
     @classmethod
-    def create_slow_train_dataloader(cls, config, dataset):
-        sampler = cls.create_train_slow_sampler(config, dataset)
+    def create_train_dataloader(cls, config, dataset, class_indices):
+        sampler = cls.create_train_sampler(config, dataset,
+                                           class_indices=class_indices)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("batch_size", 1),
+            shuffle=sampler is None,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+            drop_last=config.get("train_loader_drop_last", True),
+        )
+
+    @classmethod
+    def create_slow_train_dataloader(cls, config, dataset, class_indices):
+        sampler = cls.create_train_slow_sampler(config, dataset,
+                                                class_indices=class_indices)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("slow_batch_size", 64),
@@ -247,11 +288,26 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         )
 
     @classmethod
-    def create_replay_dataloader(cls, config, dataset):
-        sampler = cls.create_replay_sampler(config, dataset)
+    def create_replay_dataloader(cls, config, dataset, class_indices):
+        sampler = cls.create_replay_sampler(config, dataset,
+                                            class_indices=class_indices)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("replay_batch_size", 64),
+            shuffle=False,
+            num_workers=config.get("workers", 0),
+            sampler=sampler,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    @classmethod
+    def create_validation_dataloader(cls, config, dataset, class_indices):
+        sampler = cls.create_validation_sampler(config, dataset,
+                                                class_indices=class_indices)
+        return DataLoader(
+            dataset=dataset,
+            batch_size=config.get("val_batch_size",
+                                  config.get("batch_size", 1)),
             shuffle=False,
             num_workers=config.get("workers", 0),
             sampler=sampler,
@@ -441,13 +497,15 @@ class MetaContinualLearningExperiment(SupervisedExperiment):
         eo = super().get_execution_order()
         exp = "MetaContinualLearningExperiment"
         eo["create_loaders"] = [exp + ".create_loaders"]
-        eo["create_fast_slow_loaders"] = [exp + ".create_fast_slow_loaders"]
         eo["create_sampler"] = [exp + ".create_sampler"]
         eo["create_train_sampler"] = [exp + ".create_train_sampler"]
         eo["create_validation_sampler"] = [exp + ".create_validation_sampler"]
         eo["create_replay_sampler"] = [exp + ".create_replay_sampler"]
         eo["create_task_sampler"] = [exp + ".create_task_sampler"]
+        eo["create_train_dataloader"] = [exp + ".create_train_dataloader"]
         eo["create_slow_train_dataloader"] = [exp + ".create_slow_train_dataloader"]
+        eo["create_replay_dataloader"] = [exp + ".create_replay_dataloader"]
+        eo["create_validation_dataloader"] = [exp + ".create_validation_dataloader"]
         eo["sample_slow_data"] = [exp + ".sample_slow_data"]
         eo["run_epoch"] = [exp + ".run_epoch"]
         eo["pre_task"] = [exp + ".pre_task"]

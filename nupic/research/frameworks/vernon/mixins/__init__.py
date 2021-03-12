@@ -55,3 +55,4 @@ from .track_representation_sparsity import *
 from .update_boost_strength import UpdateBoostStrength
 from .update_dendrite_boost_strength import UpdateDendriteBoostStrength
 from .vary_batch_size import VaryBatchSize
+from .report_max_accuracy import ReportMaxAccuracy
