@@ -19,25 +19,36 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-# Automatically import models. This will update Transformer's model mappings so that
-# custom models can be loaded via AutoModelForMaskedLM and related auto-constructors.
-import models
+import math
 
-from .base import CONFIGS as BASE
-from .bert_replication import CONFIGS as BERT_REPLICATION
-from .bertitos import CONFIGS as BERTITOS
-from .finetuning import CONFIGS as FINETUNING
-from .sparse_bert import CONFIGS as SPARSE_BERT
+import wandb
+from transformers.integrations import INTEGRATION_TO_CALLBACK, WandbCallback
+
 
 """
-Import and collect all experiment configurations into one CONFIG
+This file serves to extend the functionalities of automated integrations such as those
+for wandb.
 """
-__all__ = ["CONFIGS"]
 
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(BASE)
-CONFIGS.update(BERT_REPLICATION)
-CONFIGS.update(BERTITOS)
-CONFIGS.update(FINETUNING)
-CONFIGS.update(SPARSE_BERT)
+
+class CustomWandbCallback(WandbCallback):
+    """
+    Log perplexity to wandb following evaluation.
+    """
+
+    def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+        super().on_evaluate(args, state, control, metrics=None, **kwargs)
+
+        if metrics is None:
+            return
+
+        perplexity = math.exp(metrics["eval_loss"])
+        print("CustomWandbCallback: Logging perplexity to wandb run summary.")
+        if wandb.run is not None:
+            wandb.run.summary["eval/perplexity"] = perplexity
+
+
+# Update the integrations. These will be used automatically.
+INTEGRATION_TO_CALLBACK.update({
+    "wandb": CustomWandbCallback,
+})
