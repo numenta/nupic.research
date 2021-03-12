@@ -320,7 +320,7 @@ if __name__ == "__main__":
 
     # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
 
-    for task_id in range(-1, num_tasks):
+    for task_id in range(num_tasks):
 
         # Train model on current task
         exp.train_loader.sampler.set_active_tasks(task_id)
