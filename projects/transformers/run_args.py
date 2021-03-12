@@ -19,9 +19,9 @@
 #
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
 
-from transformers import MODEL_FOR_MASKED_LM_MAPPING, TrainingArguments
+from transformers import MODEL_FOR_MASKED_LM_MAPPING, TrainingArguments, Trainer
 
 from run_utils import TASK_TO_KEYS
 
@@ -129,6 +129,27 @@ class ModelArguments:
                     "attempt to update existing entries"
         },
     )
+    trainer_class: Callable = field(
+        default=Trainer,
+        metadata={
+            "help": "Trainer class"
+        }
+    )
+    teacher_models_name_or_path: List[str] = field(
+        default_factory=list,
+        metadata={
+            "help": "List of models name or path for the teaachers. If argument is "
+                    "provided, assumes distillation is being used"
+        }
+    )
+    trainer_extra_kwargs: Dict = field(
+        default_factory=dict,
+        metadata={
+            "help": "Extra keyword arguments to be passed to Trainer. Can be passed "
+                    "to pass extra arguments when trainer mixins are used."
+        }
+    )
+
 
 
 @dataclass
