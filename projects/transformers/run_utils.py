@@ -207,7 +207,7 @@ def load_and_concatenate_datasets(data_args):
             train_ds = dataset["train"]
 
         # Some specific preprocessing to align fields on known datasets
-        # extraneous fields not used in language modelling are also removed
+        # extraneous fields not used in language modeling are also removed
         # after preprocessing
         if name == "wikipedia":
             train_ds.remove_columns_("title")
@@ -453,11 +453,7 @@ def init_datasets_mlm(data_args):
              "dataset_config_name must match")
 
         # Verifies if dataset is already saved
-        dataset_folder = "-".join([
-            f"{name}_{config}" for name, config in
-            zip(data_args.dataset_name, data_args.dataset_config_name)
-        ])
-        dataset_folder = blake2b(dataset_folder.encode(), digest_size=20).hexdigest()
+        dataset_folder = hash_dataset_folder_name(data_args)
         dataset_path = os.path.join(
             os.path.abspath(data_args.tokenized_data_cache_dir),
             str(dataset_folder)
@@ -838,3 +834,31 @@ class TaskResults():
             f"{self.results[m]*100:.2f}" for m in self.reporting_metrics
         ]
         return "/".join(results_to_string)
+
+
+def hash_dataset_folder_name(data_args):
+    """
+    Creates a hashed name for the dataset folder comprised of the dataset_name and
+    dataset_name_config. As well, the following data_args are included unless their
+    default values are used.
+        - max_seq_length (default None)
+
+    More arguments can be added to the hashed name as needed.
+    """
+    defaults = dict(
+        max_seq_length=None,
+    )
+
+    dataset_folder = "-".join([
+        f"{name}_{config}" for name, config in
+        zip(data_args.dataset_name, data_args.dataset_config_name)
+    ])
+
+    for arg, default in defaults.items():
+        if getattr(data_args, arg) != default:
+            non_default = getattr(data_args, arg)
+            dataset_folder += f" ({arg}={non_default})"
+
+    hashed_folder_name = blake2b(dataset_folder.encode(), digest_size=20).hexdigest()
+    print(f"Hashing dataset folder name '{dataset_folder}' to '{hashed_folder_name}'")
+    return hashed_folder_name

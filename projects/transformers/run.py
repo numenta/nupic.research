@@ -51,6 +51,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
+import integrations # noqa F401
 from experiments import CONFIGS
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
