@@ -22,37 +22,70 @@
 Base Transformers Experiment configuration.
 """
 
-import os
 from copy import deepcopy
 
-from callbacks import SparsifyFCLayersCallback
+from callbacks import RezeroWeightsCallback
 
 from .base import debug_bert
 from .bert_replication import bert_100k
 
-sparse_debug_bert = deepcopy(debug_bert)
-sparse_debug_bert.update(
-
-    run_name="debug_bert_sparsity=0.8",
-    # Model Arguments
-    trainer_callbacks=[SparsifyFCLayersCallback(sparsity=0.80)]
-
-)
-
 sparse_bert_100k = deepcopy(bert_100k)
 sparse_bert_100k.update(
-
+    # run_name is optional, gets name from experiment name when not defined
     run_name="bert-steps_100k-sparsity_0.8",
     # Model Arguments
-    trainer_callbacks=[SparsifyFCLayersCallback(sparsity=0.80)],
-    output_dir=os.path.expanduser("~/nta/results/experiments/transformers/bert-steps_100k-sparsity_0.8"),  # noqa: E501
+    model_type="static_sparse_non_attention_bert",
+    config_kwargs=dict(
+        sparsity=0.8,
+    ),
+    trainer_callbacks=[RezeroWeightsCallback()],
     overwrite_output_dir=False,
+)
 
+
+static_sparse_encoder_bert_100k = deepcopy(bert_100k)
+static_sparse_encoder_bert_100k.update(
+    # Model Arguments
+    overwrite_output_dir=False,
+    model_type="static_sparse_encoder_bert",
+    config_kwargs=dict(
+        sparsity=0.8,
+    ),
+    trainer_callbacks=[RezeroWeightsCallback()]
+)
+
+
+fully_static_sparse_bert_100k = deepcopy(bert_100k)
+fully_static_sparse_bert_100k.update(
+    # Model Arguments
+    overwrite_output_dir=False,
+    model_type="fully_static_sparse_bert",
+    config_kwargs=dict(
+        sparsity=0.8,
+    ),
+    trainer_callbacks=[RezeroWeightsCallback()]
+)
+
+
+# Sparse Bert of only two layers and one attention head.
+mini_sparse_bert_debug = deepcopy(debug_bert)
+mini_sparse_bert_debug.update(
+    model_type="static_sparse_encoder_bert",
+    config_kwargs=dict(
+        num_hidden_layers=2,
+        num_attention_heads=1,
+        sparsity=0.9,
+        hidden_size=64,
+        intermediate_size=64 * 4,
+    ),
+    trainer_callbacks=[RezeroWeightsCallback()],
 )
 
 
 # Export configurations in this file
 CONFIGS = dict(
-    sparse_debug_bert=sparse_debug_bert,
-    sparse_bert_100k=sparse_bert_100k
+    sparse_bert_100k=sparse_bert_100k,
+    mini_sparse_bert_debug=mini_sparse_bert_debug,
+    static_sparse_encoder_bert_100k=static_sparse_encoder_bert_100k,
+    fully_static_sparse_bert_100k=fully_static_sparse_bert_100k,
 )

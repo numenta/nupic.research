@@ -32,7 +32,8 @@ from nupic.research.frameworks.wandb import ray_wandb
 from .dendrites import metacl_anml_dendrites_adjust_lr
 
 
-class TrackBoostedDendritesExperiment(mixins.TrackRepresentationSparsity,
+class TrackBoostedDendritesExperiment(mixins.ConfigureOptimizerParamGroups,
+                                      mixins.TrackRepresentationSparsity,
                                       mixins.PlotDendriteMetrics,
                                       BoostedDendritesExperiment):
     pass
@@ -177,8 +178,35 @@ anml_dendrites_segments_boosted_09998.update(
 )
 
 
+boosted_dendrites_modulation_lr_1en4 = deepcopy(anml_dendrites_segments_boosted_09998)  # noqa
+boosted_dendrites_modulation_lr_1en4.update(
+
+    optimizer_class=torch.optim.Adam,
+    optimizer_args=dict(lr=1e-3),
+
+    # Reduce lr for modulation network.
+    optim_args_groups=[
+        # Param Group 0: modulation and segment weights
+        dict(
+            group_args=dict(lr=1e-4),
+            include_patterns=["modulation.*", "segments.*"],
+        ),
+    ],
+
+    # Use fewer test classes to make the run quicker.
+    num_meta_test_classes=[10, 50, 100, 200],
+
+    # Wandb logging.
+    wandb_args=dict(
+        name="boosted_dendrites_modulation_lr_1en4",
+        project="metacl",
+    ),
+)
+
+
 CONFIGS = dict(
     anml_dendrites_multi_segments=anml_dendrites_multi_segments,
     anml_dendrites_multi_segments_boosted=anml_dendrites_multi_segments_boosted,
     anml_dendrites_segments_boosted_09998=anml_dendrites_segments_boosted_09998,
+    boosted_dendrites_modulation_lr_1en4=boosted_dendrites_modulation_lr_1en4,
 )

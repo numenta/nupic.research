@@ -61,8 +61,8 @@ from nupic.research.support import load_ray_tune_experiments, parse_config
 def main(config, experiments, tablefmt):
 
     # The table we use in the paper
-    test_scores_table = [["Network", "Test Score", "Noise Score",
-                          "Params"]]
+    test_scores_table = [["Network", "Test Score",
+                          "Params", "Num Trials", "Session"]]
 
     # A more detailed table
     test_scores_table_long = [["Network", "Test Score", "Noise Score", "Noise Accuracy",
@@ -104,7 +104,7 @@ def main(config, experiments, tablefmt):
             )
 
         except RuntimeError:
-            # print("Could not locate experiment state for " + exp + " ...skipping")
+            print("Could not locate experiment state for " + exp + " ...skipping")
             continue
 
         for experiment_state in states:
@@ -138,7 +138,9 @@ def main(config, experiments, tablefmt):
                         best_result = max(results, key=lambda x: x["mean_accuracy"])
                         test_scores[i] = best_result["mean_accuracy"]
                         entropies[i] = best_result["entropy"]
-                        # print("best result:", best_result)
+                        nonzero_params[i] = max(
+                            results, key=lambda x: x["non_zero_parameters"])[
+                                "non_zero_parameters"]
 
                         # Load noise score
                         logdir = os.path.join(
@@ -160,8 +162,6 @@ def main(config, experiments, tablefmt):
 
                         noise_accuracies[i] = (
                             float(100.0 * noise_scores[i]) / noise_samples[i])
-                        nonzero_params[i] = max(x["non_zero_parameters"]
-                                                for x in list(noise.values()))
                 except Exception:
                     print("Problem with checkpoint group" + tag + " in " + exp
                           + " ...skipping")
@@ -181,8 +181,8 @@ def main(config, experiments, tablefmt):
                 )
                 nonzero = "{0:,.0f}".format(nonzero_params.mean())
                 test_scores_table.append(
-                    ["{} {}".format(exp, tag), test_score, noise_accuracy,
-                     nonzero]
+                    ["{} {}".format(exp, tag), test_score, nonzero, num_exps,
+                     experiment_state["runner_data"]["_session_str"]]
                 )
                 test_scores_table_long.append(
                     ["{} {}".format(exp, tag), test_score, noise_score, noise_accuracy,
