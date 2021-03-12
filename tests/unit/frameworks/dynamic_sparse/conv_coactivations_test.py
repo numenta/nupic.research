@@ -22,7 +22,7 @@ import unittest
 
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.networks import DSConv2d
+from nupic.research.archive.dynamic_sparse.networks import DSConv2d
 
 # ------------------------------------------
 # Helper functions for brute force method.

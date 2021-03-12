@@ -20,8 +20,8 @@
 
 import unittest
 
-from nupic.research.frameworks.dynamic_sparse.models import BaseModel
-from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb
+from nupic.research.archive.dynamic_sparse.models import BaseModel
+from nupic.research.archive.dynamic_sparse.networks import MLPHeb
 
 
 class BaseModelTest(unittest.TestCase):

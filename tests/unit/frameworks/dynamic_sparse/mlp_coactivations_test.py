@@ -24,7 +24,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb
+from nupic.research.archive.dynamic_sparse.networks import MLPHeb
 from nupic.torch.modules import KWinners
 
 

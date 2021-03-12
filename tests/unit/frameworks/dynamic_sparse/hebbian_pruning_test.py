@@ -23,13 +23,13 @@ from itertools import product
 
 import torch
 
-# from nupic.research.frameworks.dynamic_sparse.common import *
-from nupic.research.frameworks.dynamic_sparse.models import (
+# from nupic.research.archive.dynamic_sparse.common import *
+from nupic.research.archive.dynamic_sparse.models import (
     DSNNMixedHeb,
     DSNNWeightedMag,
     SparseModule,
 )
-from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb
+from nupic.research.archive.dynamic_sparse.networks import MLPHeb
 
 
 def allclose_boolean(t1, t2):

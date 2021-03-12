@@ -23,12 +23,12 @@ import unittest
 import torch
 from torch import nn
 
-from nupic.research.frameworks.dynamic_sparse.networks import (
+from nupic.research.archive.dynamic_sparse.networks import (
     DSConv2d,
     DSLinear,
     init_coactivation_tracking,
 )
-from nupic.research.frameworks.dynamic_sparse.networks.utils import (
+from nupic.research.archive.dynamic_sparse.networks.utils import (
     make_dsnn,
     replace_sparse_weights,
     squash_layers,

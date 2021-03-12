@@ -20,8 +20,8 @@
 
 import unittest
 
-from nupic.research.frameworks.dynamic_sparse.models import SparseModel
-from nupic.research.frameworks.dynamic_sparse.networks import MLPHeb, gsc_sparse_dsnn
+from nupic.research.archive.dynamic_sparse.models import SparseModel
+from nupic.research.archive.dynamic_sparse.networks import MLPHeb, gsc_sparse_dsnn
 
 
 def has_params(layer):
