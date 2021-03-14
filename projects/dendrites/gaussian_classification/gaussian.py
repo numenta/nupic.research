@@ -70,8 +70,8 @@ class GaussianDataset(Dataset):
         # Sample i.i.d. from each distribution
         self.data = {}
         for class_id in range(self.num_classes):
-            self.data[class_id] = torch.stack([self.distributions[class_id].sample()
-                                               for n in range(examples_per_class)])
+            self.data[class_id] = self.distributions[class_id].sample(
+                sample_shape=torch.Size([examples_per_class]))
         self.data = torch.cat([self.data[class_id] for class_id in
                                range(self.num_classes)], dim=0)
 
