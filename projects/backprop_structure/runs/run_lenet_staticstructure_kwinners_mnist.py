@@ -31,7 +31,7 @@ import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
 import nupic.research.frameworks.backprop_structure.networks as networks
-from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
+from nupic.research.archive.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
 

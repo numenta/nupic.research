@@ -23,7 +23,7 @@ import os
 
 import numpy as np
 
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
+from nupic.research.archive.dynamic_sparse.common.utils import run_ray
 
 exp_config = dict(
     device="cuda",
