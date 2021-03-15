@@ -33,6 +33,8 @@ initialization, and k-Winners usage, respectively.
 """
 
 import math
+import pprint
+import time
 from collections import defaultdict
 
 import numpy as np
@@ -274,7 +276,8 @@ if __name__ == "__main__":
         dataset_args=dict(
             num_classes=2 * num_tasks,
             num_tasks=num_tasks,
-            examples_per_class=2500,
+            training_examples_per_class=2500,
+            validation_examples_per_class=250,
             dim_x=2048,
             dim_context=2048,
         ),
@@ -304,6 +307,9 @@ if __name__ == "__main__":
         optimizer_args=dict(lr=2e-1),
     )
 
+    print("Experiment config: ")
+    pprint.pprint(config)
+    print("")
     exp_class = config["experiment_class"]
     exp = exp_class()
     exp.setup_experiment(config)
@@ -320,25 +326,30 @@ if __name__ == "__main__":
 
     # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
 
+    # Evaluation can be slow. Only run evaluation when training task_id is in this list
+    eval_tasks = [num_tasks - 2, num_tasks - 1]
     for task_id in range(num_tasks):
 
         # Train model on current task
+        t1 = time.time()
         exp.train_loader.sampler.set_active_tasks(task_id)
         for _ in range(num_epochs):
             train_model(exp)
-
-        print(f"=== AFTER TASK {task_id} ===")
-        print("")
+        t2 = time.time()
 
         # Evaluate model accuracy on each task separately
-        for eval_task_id in range(task_id + 1):
+        if task_id in eval_tasks:
+            for eval_task_id in range(task_id + 1):
 
-            exp.val_loader.sampler.set_active_tasks(eval_task_id)
-            acc_task = evaluate_model(exp)
-            if isinstance(acc_task, tuple):
-                acc_task = acc_task[0]
+                exp.val_loader.sampler.set_active_tasks(eval_task_id)
+                acc_task = evaluate_model(exp)
+                if isinstance(acc_task, tuple):
+                    acc_task = acc_task[0]
 
-            print(f"task {eval_task_id} accuracy: {acc_task}")
+                print(f"task {eval_task_id} accuracy: {acc_task}")
+
+        t3 = time.time()
+        print(f"=== AFTER TASK {task_id} === TRAIN TIME: {t2-t1}, EVAL TIME: {t3-t2}")
         print("")
 
     # ------------------------------------------------------------------------------- #
