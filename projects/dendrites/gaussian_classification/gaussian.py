@@ -44,11 +44,16 @@ class GaussianDataset(Dataset):
     covs = None
     _contexts = None
 
-    def __init__(self, num_classes, num_tasks, examples_per_class, dim_x, dim_context,
+    def __init__(self, num_classes, num_tasks, training_examples_per_class,
+                 validation_examples_per_class, dim_x, dim_context,
                  root=None, dataset_name=None, train=True):
 
         self.num_classes = num_classes
         self.num_tasks = num_tasks
+        if train:
+            examples_per_class = training_examples_per_class
+        else:
+            examples_per_class = validation_examples_per_class
 
         # Initialize disitributions only if `GaussianDataset` object does not exist in
         # memory
