@@ -25,10 +25,10 @@ import os
 import numpy as np
 from ray import tune
 
-from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
+from nupic.research.archive.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
+from nupic.research.archive.dynamic_sparse.common.utils import run_ray
 
 # define a small convolutional network
 # in line with the

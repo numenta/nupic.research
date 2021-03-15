@@ -36,8 +36,8 @@ from torch import nn, utils
 from torchvision import datasets, models, transforms
 
 # load the model
-from nupic.research.frameworks.dynamic_sparse.common.datasets import CustomDataset
-from nupic.research.frameworks.dynamic_sparse.models import BaseModel
+from nupic.research.archive.dynamic_sparse.common.datasets import CustomDataset
+from nupic.research.archive.dynamic_sparse.models import BaseModel
 
 SMALL_IMAGENET = False
 
