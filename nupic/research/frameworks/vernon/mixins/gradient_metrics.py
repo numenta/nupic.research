@@ -160,14 +160,18 @@ class GradientMetrics(object):
                 if gradient_metric == "cosine":
                     stats = [
                         torch.cosine_similarity(x, y, dim=0)
+                        if not torch.equal(x, y) else 0
                         for x in gradients
                         for y in gradients
                     ]
                 elif gradient_metric == "dot":
-                    stats = [x.dot(y) for x in gradients for y in gradients]
+                    stats = [x.dot(y) if not torch.equal(x, y) else 0
+                             for x in gradients
+                             for y in gradients]
                 elif gradient_metric == "pearson":
                     stats = [
                         torch.cosine_similarity(x - x.mean(), y - y.mean(), dim=0)
+                        if not torch.equal(x, y) else 0
                         for x in gradients
                         for y in gradients
                     ]
@@ -196,7 +200,7 @@ class GradientMetrics(object):
             stats = stats[order_by_class, :][:, order_by_class]
             ax = plt.gca()
             max_val = np.abs(stats).max()
-            ax.imshow(stats, cmap="bwr", vmin=-max_val, vmax=max_val)
+            img = ax.imshow(stats, cmap="bwr", vmin=-max_val, vmax=max_val)
             ax.set_xlabel("class")
             ax.set_ylabel("class")
             for idx in class_change_indices:
@@ -207,6 +211,7 @@ class GradientMetrics(object):
             ax.set_xticklabels(class_labels)
             ax.set_yticklabels(class_labels)
             ax.set_title(f"{gradient_metric}:{gradient_value}:{name}")
+            plt.colorbar(img, ax=ax)
             plt.tight_layout()
             figure = plt.gcf()
             stats_and_figures.append((name, module, gradient_metric,
