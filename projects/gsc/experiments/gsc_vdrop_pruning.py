@@ -468,6 +468,8 @@ class ScalingSparseBaselineExperiment(
     mixins.LogEveryLearningRate,
     mixins.ExtraValidationsPerEpoch,
     mixins.ReportMaxAccuracy,
+    mixins.RezeroWeights,
+    mixins.UpdateBoostStrength,
     experiments.SupervisedExperiment,
 ):
     pass
@@ -475,6 +477,9 @@ class ScalingSparseBaselineExperiment(
 
 GSC_SPARSE_SCALING_BASELINE = deepcopy(DEFAULT_BASE)
 GSC_SPARSE_SCALING_BASELINE.update(
+    verbose=2,
+    num_classes=12,
+    iterations=30,             # Number of training epochs
     experiment_class=ScalingSparseBaselineExperiment,
     # Training batch size
     batch_size=32,
@@ -487,7 +492,7 @@ GSC_SPARSE_SCALING_BASELINE.update(
         notes="Baseline to compare variational pruning",
     ),
     num_samples=1,
-    epochs=100,
+    epochs=30,
     epochs_to_validate=range(100),
     model_class=LeSparseNet,
     model_args=dict(input_shape=(1, 32, 32),
@@ -497,10 +502,15 @@ GSC_SPARSE_SCALING_BASELINE.update(
                     linear_n=(2000,),
                     linear_activity_percent_on=(1.0,),
                     linear_weight_percent_on=(0.01,),
-                    use_softmax=False,
+                    use_softmax=True,
                     num_classes=12,
+                    k_inference_factor=1.0,
+                    activation_fct_before_max_pool=True,
+                    dropout=0.0,
+                    use_batch_norm=True,
+                    boost_strength=1.5,
+                    boost_strength_factor=0.9,
                     ),
-    loss_function=torch.nn.functional.cross_entropy,
 )
 
 CONFIGS = dict(
