@@ -24,8 +24,8 @@ This module runs a dendritic network in continual learning setting where each ta
 consists of learning to classify samples drawn from one of two multivariate normal
 distributions.
 
-Dendritic weights can either be hardcoded or learned. All output heads are used for
-both training and inference.
+Dendritic weights can either be hardcoded (to induce overlapping or non-overlapping
+subnetworks) or learned. All output heads are used for both training and inference.
 
 Usage: adjust the config parameters `weight_init`, `dendrite_init`, and `kw` (all in
 `model_args`) to control the type of forward weight initialization, dendritic weight
@@ -49,26 +49,64 @@ from nupic.torch.modules import KWinners, SparseWeights, rezero_weights
 from projects.dendrites.gaussian_classification.gaussian import GaussianDataset
 
 
-def hardcode_dendritic_weights(dendrite_segments, context_vectors):
-    """
-    We hardcode the weights of dendrites such that each unit recognizes a single random
-    context vector. The first dendritic segment is initialized to contain positive
-    weights from that context vector. The other segment(s) ensure that the unit is
-    turned off for any other context - they contain negative weights for all other
-    weights.
-    """
+def hardcode_dendritic_weights(dendrite_segments, context_vectors, init):
     num_units, num_segments, dim_context = dendrite_segments.weights.size()
     num_contexts, _ = context_vectors.size()
-    fixed_segment_weights = torch.zeros((num_units, num_segments, dim_context))
 
-    for i in range(num_units):
-        context_perm = context_vectors[torch.randperm(num_contexts), :]
-        fixed_segment_weights[i, :, :] = 1.0 * (context_perm[0, :] > 0)
-        fixed_segment_weights[i, 1:, :] = -1
-        fixed_segment_weights[i, 1:, :] += fixed_segment_weights[i, 0, :]
-        del context_perm
+    if init == "overlapping":
+        # We hardcode the weights of dendrites such that each context selects 5% of
+        # hidden units to become active and form a subnetwork. Hidden units are sampled
+        # with replacement, hence subnetworks can overlap. Any context/task which does
+        # not use a particular hidden unit will cause it to turn off, as the unit's
+        # other segment(s) have -1 in all entries and will yield an extremely small
+        # dendritic activation.
 
-    dendrite_segments.weights.data = fixed_segment_weights
+        new_dendritic_weights = -0.95 * torch.ones((num_units, num_segments,
+                                                    dim_context))
+
+        # The number of units to allocate to each context (with replacement)
+        k = int(0.05 * num_units)
+
+        # Keep track of the number of contexts for which each segment has already been
+        # chosen; this is to not overwrite a previously hardcoded segment
+        num_contexts_chosen = {i: 0 for i in range(num_units)}
+
+        for c in range(num_contexts):
+
+            # Pick k random units to be activated by the cth context
+            selected_units = torch.randperm(num_units)[:k]
+            for i in selected_units:
+                i = i.item()
+
+                # If num_segments other contexts have already selected unit i to become
+                # active, skip
+                segment_id = num_contexts_chosen[i]
+                if segment_id == num_segments:
+                    continue
+
+                new_dendritic_weights[i, segment_id, :] = context_vectors[c, :]
+                num_contexts_chosen[i] += 1
+
+    elif init == "non_overlapping":
+        # We hardcode the weights of dendrites such that each unit recognizes a single
+        # random context vector. The first dendritic segment is initialized to contain
+        # positive weights from that context vector. The other segment(s) ensure that
+        # the unit is turned off for any other context - they contain negative weights
+        # for all other weights.
+
+        new_dendritic_weights = torch.zeros((num_units, num_segments, dim_context))
+
+        for i in range(num_units):
+            context_perm = context_vectors[torch.randperm(num_contexts), :]
+            new_dendritic_weights[i, :, :] = 1.0 * (context_perm[0, :] > 0)
+            new_dendritic_weights[i, 1:, :] = -1
+            new_dendritic_weights[i, 1:, :] += new_dendritic_weights[i, 0, :]
+            del context_perm
+
+    else:
+        raise Exception("Invalid dendritic weight hardcode choice")
+
+    dendrite_segments.weights.data = new_dendritic_weights
 
 
 # ------ Experiment class
@@ -235,7 +273,7 @@ def train_model(exp):
         output = exp.model(data, context)
 
         # Outputs are placed through a log softmax since `error_loss` is `F.nll_loss`,
-        # and assumes itwill received 'logged' values
+        # which assumes it will receive 'logged' values
         output = F.log_softmax(output)
         error_loss = exp.error_loss(output, target)
         error_loss.backward()
@@ -295,12 +333,13 @@ if __name__ == "__main__":
             input_size=2048,
             output_size=2 * num_tasks,
             hidden_size=2048,
-            num_segments=2,
+            num_segments=num_tasks,
             dim_context=2048,
             weight_init="modified",  # Must be one of {"kaiming", "modified"}
             dendrite_init="hardcoded",  # Must be one of {"kaiming", "modified",
                                         # "hardcoded"}
-            kw=False  # Turning on k-Winners results in 5% winners
+            kw=True  # Turning on k-Winners when hardcoding dendrites to induce
+                     # non-overlapping subnetworks results in 5% winners
         ),
 
         batch_size=64,
@@ -326,9 +365,11 @@ if __name__ == "__main__":
 
         # Manually set dendritic weights to invoke subnetworks
         hardcode_dendritic_weights(dendrite_segments=exp.model.dend1.segments,
-                                   context_vectors=exp.train_loader.dataset._contexts)
+                                   context_vectors=exp.train_loader.dataset._contexts,
+                                   init="overlapping")
         hardcode_dendritic_weights(dendrite_segments=exp.model.dend2.segments,
-                                   context_vectors=exp.train_loader.dataset._contexts)
+                                   context_vectors=exp.train_loader.dataset._contexts,
+                                   init="overlapping")
 
     exp.model = exp.model.to(exp.device)
 
@@ -345,10 +386,14 @@ if __name__ == "__main__":
         for _ in range(num_epochs):
             train_model(exp)
         t2 = time.time()
-        print(f"=== AFTER TASK {task_id} === TRAIN TIME: {t2 - t1}")
+
+        print(f"train time [task {task_id}]: {t2 - t1}")
 
         # Evaluate model accuracy on each task separately
         if task_id in eval_tasks:
+
+            print(f"\n=== AFTER TASK {task_id} ===\n")
+
             for eval_task_id in range(task_id + 1):
 
                 exp.val_loader.sampler.set_active_tasks(eval_task_id)
@@ -358,9 +403,9 @@ if __name__ == "__main__":
 
                 print(f"task {eval_task_id} accuracy: {acc_task}")
 
-        t3 = time.time()
-        print(f"=== AFTER EVALUATION, EVAL TIME: {t3 - t2}")
-        print("")
+            t3 = time.time()
+            print(f"\nevaluation time: {t3 - t2}")
+            print(f"====================\n")
 
     # ------------------------------------------------------------------------------- #
 
