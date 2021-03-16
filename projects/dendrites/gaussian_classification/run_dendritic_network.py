@@ -50,14 +50,22 @@ from projects.dendrites.gaussian_classification.gaussian import GaussianDataset
 
 
 def hardcode_dendritic_weights(dendrite_segments, context_vectors):
+    """
+    We hardcode the weights of dendrites such that each unit recognizes a single random
+    context vector. The first dendritic segment is initialized to contain positive
+    weights from that context vector. The other segment(s) ensure that the unit is
+    turned off for any other context - they contain negative weights for all other
+    weights.
+    """
     num_units, num_segments, dim_context = dendrite_segments.weights.size()
     num_contexts, _ = context_vectors.size()
     fixed_segment_weights = torch.zeros((num_units, num_segments, dim_context))
 
     for i in range(num_units):
         context_perm = context_vectors[torch.randperm(num_contexts), :]
-        fixed_segment_weights[i, :, :] = 1.0 * (context_perm[:, :] > 0)
-        fixed_segment_weights[i, 1:, :] = -1.0 * fixed_segment_weights[i, 1:, :]
+        fixed_segment_weights[i, :, :] = 1.0 * (context_perm[0, :] > 0)
+        fixed_segment_weights[i, 1:, :] = -1
+        fixed_segment_weights[i, 1:, :] += fixed_segment_weights[i, 0, :]
         del context_perm
 
     dendrite_segments.weights.data = fixed_segment_weights
@@ -277,7 +285,7 @@ if __name__ == "__main__":
             num_classes=2 * num_tasks,
             num_tasks=num_tasks,
             training_examples_per_class=2500,
-            validation_examples_per_class=250,
+            validation_examples_per_class=500,
             dim_x=2048,
             dim_context=2048,
         ),
@@ -287,7 +295,7 @@ if __name__ == "__main__":
             input_size=2048,
             output_size=2 * num_tasks,
             hidden_size=2048,
-            num_segments=num_tasks,
+            num_segments=2,
             dim_context=2048,
             weight_init="modified",  # Must be one of {"kaiming", "modified"}
             dendrite_init="hardcoded",  # Must be one of {"kaiming", "modified",
@@ -327,7 +335,8 @@ if __name__ == "__main__":
     # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
 
     # Evaluation can be slow. Only run evaluation when training task_id is in this list
-    eval_tasks = [num_tasks - 2, num_tasks - 1]
+    eval_tasks = [0, 3, 6, 10, 20, num_tasks - 1]
+    # eval_tasks = range(num_tasks)
     for task_id in range(num_tasks):
 
         # Train model on current task
