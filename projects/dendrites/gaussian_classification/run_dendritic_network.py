@@ -387,10 +387,12 @@ if __name__ == "__main__":
             train_model(exp)
         t2 = time.time()
 
+        print(f"train time [task {task_id}]: {t2 - t1}")
+
         # Evaluate model accuracy on each task separately
         if task_id in eval_tasks:
 
-            print(f"=== AFTER TASK {task_id} === TRAIN TIME: {t2 - t1}")
+            print(f"\n=== AFTER TASK {task_id} ===\n")
 
             for eval_task_id in range(task_id + 1):
 
@@ -402,8 +404,8 @@ if __name__ == "__main__":
                 print(f"task {eval_task_id} accuracy: {acc_task}")
 
             t3 = time.time()
-            print(f"=== AFTER EVALUATION, EVAL TIME: {t3 - t2}")
-            print("")
+            print(f"\nevaluation time: {t3 - t2}")
+            print(f"====================\n")
 
     # ------------------------------------------------------------------------------- #
 
