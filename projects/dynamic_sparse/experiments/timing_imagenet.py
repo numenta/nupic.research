@@ -35,8 +35,8 @@ from torch import utils
 from torchvision import transforms
 
 # load the model
-from nupic.research.frameworks.dynamic_sparse.common.datasets import CustomDataset
-from nupic.research.frameworks.dynamic_sparse.models import BaseModel
+from nupic.research.archive.dynamic_sparse.common.datasets import CustomDataset
+from nupic.research.archive.dynamic_sparse.models import BaseModel
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 

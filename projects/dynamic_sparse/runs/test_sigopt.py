@@ -24,7 +24,7 @@ import os
 import numpy as np
 from ray import tune
 
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
+from nupic.research.archive.dynamic_sparse.common.utils import run_ray
 
 # create sigopt params space
 # set observation budget -> not available in SigOpt-Ray integration

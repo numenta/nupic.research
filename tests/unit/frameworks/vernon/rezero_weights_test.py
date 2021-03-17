@@ -151,8 +151,11 @@ class RezeroWeightTest(unittest.TestCase):
         # the experiment will only sample from what's been randomly generated.
         metacl_experiment.pop("num_classes")
         dataset = exp.load_dataset(metacl_experiment, train=True)
-        fast_and_slow_sampler = exp.create_train_sampler(metacl_experiment, dataset)
-        replay_sampler = exp.create_replay_sampler(metacl_experiment, dataset)
+        class_indices = exp.compute_class_indices(metacl_experiment, dataset)
+        fast_and_slow_sampler = exp.create_train_sampler(metacl_experiment, dataset,
+                                                         class_indices=class_indices)
+        replay_sampler = exp.create_replay_sampler(metacl_experiment, dataset,
+                                                   class_indices=class_indices)
         metacl_experiment.update(
             fast_and_slow_classes=list(fast_and_slow_sampler.task_indices.keys()),
             replay_classes=list(replay_sampler.task_indices.keys()),
