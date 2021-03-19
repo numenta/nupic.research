@@ -49,8 +49,8 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-import integrations # noqa F401
 from experiments import CONFIGS
+from integrations import CustomWandbCallback
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
@@ -84,7 +84,9 @@ def main():
 
     for experiment in cmd_args.experiments:
         config_dict = CONFIGS[experiment]
-        config_dict["local_rank"] = int(cmd_args.local_rank or -1)
+        local_rank = int(cmd_args.local_rank or -1)
+        config_dict["local_rank"] = local_rank
+
         # See all possible arguments in transformers/training_args.py and ./run_args.py
         exp_parser = HfArgumentParser(
             (ModelArguments, DataTrainingArguments, CustomTrainingArguments)
@@ -99,6 +101,11 @@ def main():
         training_args.output_dir = os.path.join(
             training_args.output_dir, training_args.run_name
         )
+
+        # Initialize wandb now to include the logs that follow.
+        # For running and logging with multiple experiment, this is skipped for now.
+        if len(cmd_args.experiments):
+            CustomWandbCallback.early_init(training_args, local_rank)
 
         # Detecting last checkpoint.
         last_checkpoint = None
