@@ -28,6 +28,7 @@ from .dendrite_metrics import *
 from .ewc import ElasticWeightConsolidation
 from .export_model import ExportModel
 from .extra_validations_per_epoch import *
+from .gradient_metrics import GradientMetrics
 from .hidden_activations import *
 from .knowledge_distillation import KnowledgeDistillation, KnowledgeDistillationCL
 from .legacy_imagenet_config import LegacyImagenetConfig
