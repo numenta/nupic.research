@@ -130,7 +130,6 @@ class DistillationTrainerMixin:
             kd_temperature_init=kd_temperature_init,
             kd_temperature_end=kd_temperature_end,
         )
-        self.activate_distillation()
 
     def activate_distillation(self):
         self.kd_active = True
@@ -138,12 +137,26 @@ class DistillationTrainerMixin:
     def deactivate_distillation(self):
         self.kd_active = False
 
+    def train(self, *args, **kwargs):
+        self.activate_distillation()
+        return super().train(*args, **kwargs)
+
+    def evaluate(self, *args, **kwargs):
+        self.deactivate_distillation()
+        return super().evaluate(*args, **kwargs)
+
+    def predict(self, *args, **kwargs):
+        self.deactivate_distillation()
+        return super().predict(*args, **kwargs)
+
     def compute_loss(self, model, inputs, return_outputs=False):
         """
-        Override original compute_loss. Places kd_loss in place of label_smoother
+        Override original compute_loss.
+        KDLoss is used as a label smoother.
+        Defaults to standard loss calculation if kd_active is False
 
-        How the loss is computed by Trainer. By default, all models return the loss in
-        the first element.
+        Original: how the loss is computed by Trainer. By default, all models return
+        the loss in the first element.
         """
         if self.kd_active and "labels" in inputs:
             labels = inputs.pop("labels")
@@ -158,7 +171,7 @@ class DistillationTrainerMixin:
         if self.args.past_index >= 0:
             self._past = outputs[self.args.past_index]
 
-        if labels is not None:
+        if self.kd_active and labels is not None:
             # distillation outputs
             with torch.no_grad():
                 teacher_outputs = [teacher(**inputs) for teacher in self.teacher_models]
