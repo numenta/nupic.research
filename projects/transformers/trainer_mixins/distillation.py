@@ -227,6 +227,7 @@ class KDLoss:
         self.kd_temperature_init = kd_temperature_init
         self.kd_temperature_end = kd_temperature_end
         self.verbose = verbose
+        self.loss_fn = masked_soft_cross_entropy
 
     def compute_kd_factor(self, trainer_state):
         """Calculates kd factor based on a linear decay"""
@@ -322,6 +323,24 @@ def soft_cross_entropy(output, target, reduction="mean"):
         return torch.sum(torch.sum(-target * F.log_softmax(output, dim=1), dim=1))
     else:
         raise ValueError(f"Unknown reduction: {reduction}")
+
+
+def masked_soft_cross_entropy(output, target, padding_mask):
+    """
+    Soft cross entropy which accepts a padding mask. Loss is scaled to take into
+    account the actual number of elements used to calculate the loss.
+
+    Args:
+    :param output: predictions for neural network
+    :param targets: targets, can be soft
+    :param padding_mask: mask used to pad loss functions for tokens which are not
+                         part of the label for that batch
+    """
+    loss_vec = -target * F.log_softmax(output, dim=-1)
+    loss_vec.masked_fill_(padding_mask, 0.0)
+    loss = loss_vec.sum()
+    num_active_elements = padding_mask.numel() - padding_mask.sum()
+    return loss / num_active_elements
 
 
 def calculate_linear_decay(
