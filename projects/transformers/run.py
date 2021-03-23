@@ -103,8 +103,8 @@ def main():
         )
 
         # Initialize wandb now to include the logs that follow.
-        # For running and logging with multiple experiment, this is skipped for now.
-        if len(cmd_args.experiments):
+        # For now, only support early wandb logging when running one experiment.
+        if len(cmd_args.experiments) == 1:
             CustomWandbCallback.early_init(training_args, local_rank)
 
         # Detecting last checkpoint.
