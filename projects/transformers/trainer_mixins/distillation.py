@@ -228,6 +228,7 @@ class KDLoss:
         self.kd_temperature_end = kd_temperature_end
         self.verbose = verbose
         self.loss_fn = masked_soft_cross_entropy
+        self.ignore_index = -100
 
     def compute_kd_factor(self, trainer_state):
         """Calculates kd factor based on a linear decay"""
@@ -273,19 +274,24 @@ class KDLoss:
         def get_logits(output):
             return output["logits"] if isinstance(output, dict) else output[0]
 
-        model_logits = get_logits(model_output)
+        student_logits = get_logits(model_output)
 
         with torch.no_grad():
             # If ensemble, linearly combine outputs of softmax
-            softmax_output_teacher = torch.zeros_like(model_logits)
+            softmax_output_teacher = None
             for w_factor, t_output in zip(self.kd_ensemble_weights, teacher_outputs):
                 teacher_logits = get_logits(t_output)
-                softmax_output_teacher += (
-                    F.softmax(teacher_logits / kd_temperature) * w_factor
-                )
+                if softmax_output_teacher is None:
+                    softmax_output_teacher = \
+                        F.softmax(teacher_logits / kd_temperature, dim=-1) * w_factor
+                else:
+                    softmax_output_teacher += (
+                        F.softmax(teacher_logits / kd_temperature, dim=-1) * w_factor
+                    )
 
             # Replace labels according to kd_factor
             # if conditional avoids unnecessary computation when kd_factor is 1
+            # TODO: fix bug in output combination
             if kd_factor < 1:
                 # target is linear combination of teacher and target softmaxes
                 ohe_target = F.one_hot(labels, num_classes=self.num_classes)
@@ -295,7 +301,18 @@ class KDLoss:
             else:
                 kd_target = softmax_output_teacher
 
-        return soft_cross_entropy(model_logits, kd_target)
+        # calculate padding mask
+        if labels.dim() == kd_target.dim() - 1:
+            labels = labels.unsqueeze(-1)
+        padding_mask = labels.eq(self.ignore_index)
+
+        loss = self.loss_fn(
+            output=student_logits,
+            target=kd_target,
+            padding_mask=padding_mask
+        )
+
+        return loss
 
 
 def soft_cross_entropy(output, target, reduction="mean"):
