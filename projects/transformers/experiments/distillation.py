@@ -65,7 +65,10 @@ debug_bert_kd.update(
 
 )
 
-# samples/second (without kd)= 12.066 (on one p3.2xlarge)
+# expected ppl: 55.79276
+# results: 90.8664 (distillation from bert base cased from HF library)
+# train loss: 4.4652 (distillation loss), eval loss: 4.5094
+# 2.25 steps/sec
 tiny_bert_100k_kd = deepcopy(bert_100k)
 tiny_bert_100k_kd.update(
     # Model Arguments
@@ -86,22 +89,50 @@ tiny_bert_100k_kd.update(
     dataset_config_name=None,
 
     # Distillation Arguments
-    # trainer_class=DistillationTrainer,
-    # teacher_models_name_or_path=[
-    #     "bert-large-cased",
-    #     # "roberta-large"
-    # ],
-    # trainer_extra_kwargs=dict(
-    #     # kd_ensemble_weights=None,
-    #     kd_factor_init=1.0,
-    #     kd_factor_end=1.0,
-    #     kd_temperature_init=1.0,
-    #     kd_temperature_end=1.0,
-    # )
+    trainer_class=DistillationTrainer,
+    teacher_models_name_or_path=[
+        "bert-base-cased"
+        # "prajjwal1/bert-tiny",
+        # "roberta-large"
+    ],
+    trainer_extra_kwargs=dict(
+        # kd_ensemble_weights=None,
+        kd_factor_init=1.0,
+        kd_factor_end=1.0,
+        kd_temperature_init=1.0,
+        kd_temperature_end=1.0,
+    ),
+    overwrite_output_dir=True,
+
 )
+
+# expected ppl: 330.234
+# results: 40.817084 (distillation from bert base cased from HF library)
+# train loss: 4.1824 (distillation loss), eval loss: 5.3511
+# 2.25 steps/sec
+tiny_bert_50k_kd = deepcopy(tiny_bert_100k_kd)
+tiny_bert_50k_kd.update(
+    teacher_models_name_or_path=[
+        "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
+    ],
+    overwrite_output_dir=True,
+
+    # Training Arguments
+    learning_rate=1e-2,  # increased from 1e-4 to 1e-2
+    # min_lr_ratio not an argument to TrainingArguments
+    adam_beta1=0.9,  # default
+    adam_beta2=0.999,  # default
+    adam_epsilon=1e-8,  # default
+    weight_decay=1e-7,  # lowered from 1e-2 to 1e-7
+    warmup_steps=1000,
+    max_steps=50000,
+    lr_scheduler_type="linear",
+)
+
 
 # Export configurations in this file
 CONFIGS = dict(
     debug_bert_kd=debug_bert_kd,
-    tiny_bert_100k_kd=tiny_bert_100k_kd
+    tiny_bert_100k_kd=tiny_bert_100k_kd,
+    tiny_bert_50k_kd=tiny_bert_50k_kd,
 )
