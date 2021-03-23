@@ -23,3 +23,4 @@ from .base import TrackStatsHookBase
 from .hook_manager import ModelHookManager
 from .track_hidden_activations import TrackHiddenActivationsHook
 from .track_sparsity import TrackSparsityHook
+from .track_gradients import TrackGradientsHook

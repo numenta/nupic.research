@@ -44,11 +44,16 @@ class GaussianDataset(Dataset):
     covs = None
     _contexts = None
 
-    def __init__(self, num_classes, num_tasks, examples_per_class, dim_x, dim_context,
+    def __init__(self, num_classes, num_tasks, training_examples_per_class,
+                 validation_examples_per_class, dim_x, dim_context,
                  root=None, dataset_name=None, train=True):
 
         self.num_classes = num_classes
         self.num_tasks = num_tasks
+        if train:
+            examples_per_class = training_examples_per_class
+        else:
+            examples_per_class = validation_examples_per_class
 
         # Initialize disitributions only if `GaussianDataset` object does not exist in
         # memory
@@ -70,8 +75,9 @@ class GaussianDataset(Dataset):
         # Sample i.i.d. from each distribution
         self.data = {}
         for class_id in range(self.num_classes):
-            self.data[class_id] = torch.stack([self.distributions[class_id].sample()
-                                               for n in range(examples_per_class)])
+            self.data[class_id] = self.distributions[class_id].sample(
+                sample_shape=torch.Size([examples_per_class])
+            )
         self.data = torch.cat([self.data[class_id] for class_id in
                                range(self.num_classes)], dim=0)
 

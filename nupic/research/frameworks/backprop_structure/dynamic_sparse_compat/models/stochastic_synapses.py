@@ -22,7 +22,7 @@
 import torch
 from tqdm import tqdm
 
-from nupic.research.frameworks.dynamic_sparse.models import BaseModel
+from nupic.research.archive.dynamic_sparse.models import BaseModel
 from nupic.research.frameworks.stochastic_connections.binary_layers import (
     BinaryGatedConv2d,
     BinaryGatedLinear,

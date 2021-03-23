@@ -31,10 +31,10 @@ import re
 import numpy as np
 import ray
 
-import nupic.research.frameworks.dynamic_sparse.models as models
-import nupic.research.frameworks.dynamic_sparse.networks as networks
-from nupic.research.frameworks.dynamic_sparse.common import browser
-from nupic.research.frameworks.dynamic_sparse.common.datasets import Dataset
+import nupic.research.archive.dynamic_sparse.models as models
+import nupic.research.archive.dynamic_sparse.networks as networks
+from nupic.research.archive.dynamic_sparse.common import browser
+from nupic.research.archive.dynamic_sparse.common.datasets import Dataset
 
 
 @ray.remote(num_gpus=0.10)
