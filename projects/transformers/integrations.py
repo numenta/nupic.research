@@ -55,7 +55,8 @@ class CustomWandbCallback(WandbCallback):
     @classmethod
     def early_init(cls, trainer_args, local_rank):
         has_wandb = is_wandb_available()
-        assert has_wandb, "WandbCallback requires wandb to be installed. Run `pip install wandb`."
+        assert has_wandb, \
+            "WandbCallback requires wandb to be installed. Run `pip install wandb`."
 
         logger.info("Initializing wandb on rank", local_rank)
         if local_rank not in [-1, 0]:
