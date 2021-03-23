@@ -36,9 +36,8 @@ import pickle
 import random
 import sys
 from copy import deepcopy
-from pprint import pformat
-
 from dataclasses import replace
+from pprint import pformat
 
 import torch.distributed
 import transformers
@@ -51,7 +50,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-import integrations # noqa F401
+import integrations  # noqa F401
 from experiments import CONFIGS
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (

@@ -19,9 +19,9 @@
 #
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Callable
+from typing import Callable, Dict, List, Optional
 
-from transformers import MODEL_FOR_MASKED_LM_MAPPING, TrainingArguments, Trainer
+from transformers import MODEL_FOR_MASKED_LM_MAPPING, Trainer, TrainingArguments
 
 from run_utils import TASK_TO_KEYS
 
@@ -149,7 +149,6 @@ class ModelArguments:
                     "to pass extra arguments when trainer mixins are used."
         }
     )
-
 
 
 @dataclass

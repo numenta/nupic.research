@@ -19,8 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import logging
 import functools
+import logging
 
 import torch
 import torch.nn.functional as F

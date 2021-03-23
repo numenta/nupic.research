@@ -628,7 +628,6 @@ def init_tokenizer(model_args):
 def init_model(model_args, config, tokenizer, finetuning=False):
     """"
     Initialize a model for pretraining or finetuning
-    # TODO: investigate why resize_token_embeddings are not required in finetuning
     """
 
     # Load model
