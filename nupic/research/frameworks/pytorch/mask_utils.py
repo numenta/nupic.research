@@ -53,3 +53,43 @@ def indices_to_mask(indices, shape, dim):
     # Every location within 'indices' will give a one to the 'mask'.
     mask.scatter_(dim=dim, index=indices.unsqueeze(dim), src=ones)
     return mask
+
+
+def get_topk_submask(k, values, mask, largest=True):
+    """
+    The function finds the top values within the `mask` and returns a new sub-mask
+    indicating the positions of these top values.
+
+    :param k:
+        int indicating the number of values to select
+    :param values:
+        torch.Tensor of sortable values
+    :param mask:
+        torch.BoolTensor indicating which subset of `values` to chose from
+    :param largest:
+        bool - whether to select the largest or smallest values
+               this parameter is passed to torch.topk and thus has a similar meaning
+
+    :return:
+        torch.BoolTensor mask indicating the positions of the `percentage` values
+    """
+
+    assert values.shape == mask.shape
+
+    # Focus on the magnitude of the values which are on.
+    on_indices = mask.nonzero(as_tuple=True)
+    on_values = values[on_indices]
+
+    # Find the top values which are on.
+    _, top_on_sub_indices = on_values.topk(k, largest=largest)
+
+    # Convert those indices into those for the larger `values` matrix.
+    top_all_indices = [
+        on_idxs[top_on_sub_indices].cpu().numpy() for on_idxs in on_indices
+    ]
+
+    # Construct a mask of the top positive values.
+    top_values_mask = torch.zeros_like(values, dtype=torch.bool)
+    top_values_mask[top_all_indices] = 1
+
+    return top_values_mask
