@@ -293,7 +293,7 @@ def linear_decay(first_epoch_value, last_epoch_value, current_epoch, total_epoch
     Calculates value for a current epoch in a linear decay.
 
     :param first_epoch_value: Value at first epoch (before training).
-    :param last_epoch_value: Value at last epoch (before training).
+    :param last_epoch_value: Value at last epoch (after training).
     :param current_epoch: Current epoch. Assumes first epoch is 0.
     :param total_epochs: Total number of epochs in training.
     """

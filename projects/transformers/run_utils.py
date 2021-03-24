@@ -628,7 +628,6 @@ def init_tokenizer(model_args):
 def init_model(model_args, config, tokenizer, finetuning=False):
     """"
     Initialize a model for pretraining or finetuning
-    # TODO: investigate why resize_token_embeddings are not required in finetuning
     """
 
     # Load model
@@ -665,9 +664,20 @@ def init_model(model_args, config, tokenizer, finetuning=False):
     return model
 
 
-def init_trainer(model, tokenizer, data_collator, training_args,
-                 train_dataset, eval_dataset, trainer_callbacks,
-                 finetuning=False, task_name=None, is_regression=False):
+def init_trainer(
+    model,
+    tokenizer,
+    data_collator,
+    training_args,
+    train_dataset,
+    eval_dataset,
+    trainer_callbacks=None,
+    finetuning=False,
+    task_name=None,
+    is_regression=False,
+    trainer_class=Trainer,
+    trainer_extra_kwargs=None,
+):
     """Initialize Trainer, main class that controls the experiment"""
     if trainer_callbacks is not None:
         for cb in trainer_callbacks:
@@ -683,6 +693,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
         data_collator=data_collator,
         callbacks=trainer_callbacks,
     )
+    trainer_kwargs.update(trainer_extra_kwargs)
 
     # Add specific metrics for finetuning task
     if finetuning:
@@ -691,7 +702,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
         )
         trainer_kwargs.update(compute_metrics=compute_metrics)
 
-    trainer = Trainer(**trainer_kwargs)
+    trainer = trainer_class(**trainer_kwargs)
 
     return trainer
 
