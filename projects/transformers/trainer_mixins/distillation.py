@@ -19,11 +19,15 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import functools
 import logging
 
 import torch
 import torch.nn.functional as F
+
+from nupic.research.frameworks.pytorch.model_utils import (
+    filter_modules,
+    set_module_attr,
+)
 
 
 class DistillationTrainerMixin:
@@ -397,27 +401,16 @@ def resize_position_embeddings(model, new_seq_length):
     :param :new_seq_length Tokenizer sequence length.
     """
 
-    # Functions to recursively get and set attributes. Source:
-    # https://stackoverflow.com/questions/31174295/getattr-and-setattr-on-nested-subobjects-chained-properties  # noqa: E501
-    def rsetattr(obj, attr, val):
-        pre, _, post = attr.rpartition(".")
-        return setattr(rgetattr(obj, pre) if pre else obj, post, val)
-
-    def rgetattr(obj, attr, *args):
-        def _getattr(obj, attr):
-            return getattr(obj, attr, *args)
-        return functools.reduce(_getattr, [obj] + attr.split("."))
-
-    # Find and replace all position embeddings if the size of position embedding
-    # doesn't match new sequence length
-    for module_name, module in model.named_modules():
-        if "position_embeddings" in module_name:
-            original_embed_data = module.weight.data
-            max_position_embeddings, embed_hidden_size = original_embed_data.size()
-            if max_position_embeddings != new_seq_length:
-                new_embed = torch.nn.Embedding(new_seq_length, embed_hidden_size)
-                new_embed.weight.data[:, :] = original_embed_data[:new_seq_length, :]
-                rsetattr(model, module_name, new_embed)
+    position_embeddings = filter_modules(
+        model, include_patterns=[".*position_embeddings.*"]
+    )
+    for module_name, module in position_embeddings.items():
+        original_embed_data = module.weight.data
+        max_position_embeddings, embed_hidden_size = original_embed_data.size()
+        if max_position_embeddings != new_seq_length:
+            new_embed = torch.nn.Embedding(new_seq_length, embed_hidden_size)
+            new_embed.weight.data[:, :] = original_embed_data[:new_seq_length, :]
+            set_module_attr(model, module_name, new_embed)
 
     return model
 
