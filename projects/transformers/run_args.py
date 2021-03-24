@@ -138,7 +138,7 @@ class ModelArguments:
     teacher_models_name_or_path: List[str] = field(
         default_factory=list,
         metadata={
-            "help": "List of models name or path for the teaachers. If argument is "
+            "help": "List of models names or paths for the teachers. If argument is "
                     "provided, assumes distillation is being used"
         }
     )

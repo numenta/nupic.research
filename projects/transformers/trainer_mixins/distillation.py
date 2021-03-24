@@ -398,7 +398,7 @@ def resize_position_embeddings(model, new_seq_length):
     doesn't match new sequence length.
     (size of position embedding equals size of the attention window)
 
-    :param :new_seq_length Tokenizer sequence length.
+    :param new_seq_length: Tokenizer sequence length.
     """
 
     position_embeddings = filter_modules(
