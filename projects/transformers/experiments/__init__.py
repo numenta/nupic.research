@@ -27,8 +27,8 @@ from .base import CONFIGS as BASE
 from .bert_replication import CONFIGS as BERT_REPLICATION
 from .bertitos import CONFIGS as BERTITOS
 from .finetuning import CONFIGS as FINETUNING
+from .rigl_bert import CONFIGS as RIGL_BERT
 from .sparse_bert import CONFIGS as SPARSE_BERT
-from .finetuning import CONFIGS as FINETUNING
 from .distillation import CONFIGS as DISTILLATION
 
 """
@@ -42,6 +42,7 @@ CONFIGS.update(BASE)
 CONFIGS.update(BERT_REPLICATION)
 CONFIGS.update(BERTITOS)
 CONFIGS.update(FINETUNING)
+CONFIGS.update(RIGL_BERT)
 CONFIGS.update(SPARSE_BERT)
 CONFIGS.update(FINETUNING)
 CONFIGS.update(DISTILLATION)
