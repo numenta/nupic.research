@@ -142,11 +142,17 @@ class CustomWandbCallback(WandbCallback):
         perplexity = math.exp(eval_loss)
         run = wandb.run
         if run is not None:
-            run.summary["eval/perplexity"] = perplexity
-            run.summary["eval/loss"] = eval_loss
+            summary = run.summary
+            eval_results = {
+                "eval/perplexity": perplexity,
+                "eval/loss": eval_loss,
+            }
+            run.summary.update(eval_results)
+            wandb.log(eval_results, step=state.global_step)
 
-            runtime = run.summary["train/train_runtime"]
-            run.summary["train/train_runtime (hrs)"] = runtime / 3600
+            if "train/train_runtime" in summary.keys():
+                runtime = summary["train/train_runtime"]
+                summary["train/train_runtime (hrs)"] = runtime / 3600
 
 
 # Update the integrations. By updating this dict, any custom integration
