@@ -168,10 +168,10 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
                         writer.write(f"{index}\t{item}\n")
 
 
-def evaluate_language_model(trainer, output_dir):
+def evaluate_language_model(trainer, eval_dataset, output_dir):
     """Evaluate language model. Returns dict with results on perplexity metric. """
     results = {}
-    eval_output = trainer.evaluate()
+    eval_output = trainer.evaluate(eval_dataset)
 
     perplexity = math.exp(eval_output["eval_loss"])
     results["perplexity"] = perplexity
@@ -665,12 +665,12 @@ def init_model(model_args, config, tokenizer, finetuning=False):
 
 
 def init_trainer(
-    model,
     tokenizer,
     data_collator,
     training_args,
     train_dataset,
     eval_dataset,
+    model=None,
     trainer_callbacks=None,
     finetuning=False,
     task_name=None,
@@ -688,8 +688,8 @@ def init_trainer(
         model=model,
         args=training_args,
         tokenizer=tokenizer,
-        train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         data_collator=data_collator,
         callbacks=trainer_callbacks,
     )
@@ -861,3 +861,7 @@ def hash_dataset_folder_name(data_args):
     hashed_folder_name = blake2b(dataset_folder.encode(), digest_size=20).hexdigest()
     print(f"Hashing dataset folder name '{dataset_folder}' to '{hashed_folder_name}'")
     return hashed_folder_name
+
+
+def compute_objective_eval_loss(metrics):
+    return metrics["eval_loss"]
