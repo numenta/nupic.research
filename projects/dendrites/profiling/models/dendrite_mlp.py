@@ -19,7 +19,7 @@
 #  http://numenta.org/licenses/
 #
 # ------------------------------------------------------------------------------
-from .multiheaded_dendrite_mlp import MultiHeadedDendriticMLP
+from projects.dendrites.profiling.models.multiheaded_dendrite_mlp import MultiHeadedDendriticMLP
 from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 
 

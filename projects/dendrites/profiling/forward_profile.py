@@ -1,5 +1,4 @@
-from .dendrite_mlp import DendriticMLP
-from .sparse_mlp import SparseMLP
+from models import SparseMLP, DendriticMLP
 from nupic.research.frameworks.pytorch.models.common_models import StandardMLP
 import torch
 import time
