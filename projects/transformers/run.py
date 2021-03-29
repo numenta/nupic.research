@@ -102,10 +102,6 @@ def main():
             training_args.output_dir, training_args.run_name
         )
 
-        # Initialize wandb now to include the logs that follow.
-        # For now, only support early wandb logging when running one experiment.
-            CustomWandbCallback.early_init(training_args, local_rank)
-
         # Detecting last checkpoint.
         last_checkpoint = None
         if (os.path.isdir(training_args.output_dir) and training_args.do_train
