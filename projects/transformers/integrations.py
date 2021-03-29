@@ -26,7 +26,6 @@ import wandb
 from transformers.integrations import (
     INTEGRATION_TO_CALLBACK,
     WandbCallback,
-    is_torch_tpu_available,
     is_wandb_available,
     logger,
 )
