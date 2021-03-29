@@ -26,3 +26,5 @@ git+git:https://github.com/huggingface/transformers@master#egg=transformers
 datasets>=1.5.0
 torch>=1.8.1
 wandb>=0.10.23
+ray>=1.2.0
+pickle5>=0.0.11
