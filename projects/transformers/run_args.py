@@ -48,6 +48,13 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune,
     or train from scratch.
     """
+    use_custom_wandbcallback: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether or not to use custom wandback callbacks defined in "
+                    "./integrations."
+        },
+    )
     finetuning: bool = field(
         default=False,
         metadata={
