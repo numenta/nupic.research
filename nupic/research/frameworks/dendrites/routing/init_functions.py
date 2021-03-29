@@ -69,6 +69,7 @@ def init_test_scenario(mode, dim_in, dim_out, num_contexts, dim_context,
                    the context model should be onehot encoded.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # Initialize routing function that this task will try to hardcode, and set
     # `requires_grad=False` since the routing function is static
     r = RoutingFunction(

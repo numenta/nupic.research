@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 import torch
+
 from nupic.research.frameworks.pytorch import l1_regularization_step
 from nupic.torch.modules.sparse_weights import rezero_weights
 
@@ -31,10 +32,6 @@ __all__ = [
     "get_gating_context_weights",
     "train_dendrite_model",
 ]
-
-
-def generate_context_integers(num_contexts):
-    return torch.arange(num_contexts, dtype=torch.float32).reshape(num_contexts, 1)
 
 
 def generate_context_integers(num_contexts):

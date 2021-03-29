@@ -20,7 +20,6 @@
 
 import numpy as np
 import torch.nn as nn
-from nupic.research.frameworks.pytorch.models.le_sparse_net import add_sparse_linear_layer
 
 from nupic.research.frameworks.pytorch.models.le_sparse_net import (
     add_sparse_linear_layer,

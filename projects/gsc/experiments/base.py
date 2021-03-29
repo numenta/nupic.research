@@ -29,6 +29,7 @@ from copy import deepcopy
 import numpy as np
 import ray.tune as tune
 import torch
+
 from nupic.research.frameworks.pytorch.datasets import preprocessed_gsc
 from nupic.research.frameworks.pytorch.models.le_sparse_net import LeSparseNet
 from nupic.research.frameworks.vernon import (
