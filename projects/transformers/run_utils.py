@@ -207,7 +207,7 @@ def load_and_concatenate_datasets(data_args):
             train_ds = dataset["train"]
 
         # Some specific preprocessing to align fields on known datasets
-        # extraneous fields not used in language modelling are also removed
+        # extraneous fields not used in language modeling are also removed
         # after preprocessing
         if name == "wikipedia":
             train_ds.remove_columns_("title")
@@ -405,7 +405,7 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
 
         # Map labels to IDs (not necessary for GLUE tasks)
         if label_to_id is not None and "label" in examples:
-            result["label"] = [label_to_id[l] for l in examples["label"]]
+            result["label"] = [label_to_id[label] for label in examples["label"]]
         return result
 
     tokenized_datasets = datasets.map(
@@ -453,11 +453,7 @@ def init_datasets_mlm(data_args):
              "dataset_config_name must match")
 
         # Verifies if dataset is already saved
-        dataset_folder = "-".join([
-            f"{name}_{config}" for name, config in
-            zip(data_args.dataset_name, data_args.dataset_config_name)
-        ])
-        dataset_folder = blake2b(dataset_folder.encode(), digest_size=20).hexdigest()
+        dataset_folder = hash_dataset_folder_name(data_args)
         dataset_path = os.path.join(
             os.path.abspath(data_args.tokenized_data_cache_dir),
             str(dataset_folder)
@@ -593,7 +589,7 @@ def init_config(model_args, extra_config_kwargs=None):
             model_args.model_name_or_path, **config_kwargs
         )
     else:
-        config = CONFIG_MAPPING[model_args.model_type]()
+        config = CONFIG_MAPPING[model_args.model_type](**model_args.config_kwargs)
         logging.warning("You are instantiating a new config instance from scratch.")
 
     return config
@@ -632,7 +628,6 @@ def init_tokenizer(model_args):
 def init_model(model_args, config, tokenizer, finetuning=False):
     """"
     Initialize a model for pretraining or finetuning
-    # TODO: investigate why resize_token_embeddings are not required in finetuning
     """
 
     # Load model
@@ -665,12 +660,24 @@ def init_model(model_args, config, tokenizer, finetuning=False):
             model = AutoModelForMaskedLM.from_config(config)
             model.resize_token_embeddings(len(tokenizer))
 
+    logging.info(f"Initialized model: {model}")
     return model
 
 
-def init_trainer(model, tokenizer, data_collator, training_args,
-                 train_dataset, eval_dataset, trainer_callbacks,
-                 finetuning=False, task_name=None, is_regression=False):
+def init_trainer(
+    model,
+    tokenizer,
+    data_collator,
+    training_args,
+    train_dataset,
+    eval_dataset,
+    trainer_callbacks=None,
+    finetuning=False,
+    task_name=None,
+    is_regression=False,
+    trainer_class=Trainer,
+    trainer_extra_kwargs=None,
+):
     """Initialize Trainer, main class that controls the experiment"""
     if trainer_callbacks is not None:
         for cb in trainer_callbacks:
@@ -686,6 +693,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
         data_collator=data_collator,
         callbacks=trainer_callbacks,
     )
+    trainer_kwargs.update(trainer_extra_kwargs)
 
     # Add specific metrics for finetuning task
     if finetuning:
@@ -694,7 +702,7 @@ def init_trainer(model, tokenizer, data_collator, training_args,
         )
         trainer_kwargs.update(compute_metrics=compute_metrics)
 
-    trainer = Trainer(**trainer_kwargs)
+    trainer = trainer_class(**trainer_kwargs)
 
     return trainer
 
@@ -825,3 +833,31 @@ class TaskResults():
             f"{self.results[m]*100:.2f}" for m in self.reporting_metrics
         ]
         return "/".join(results_to_string)
+
+
+def hash_dataset_folder_name(data_args):
+    """
+    Creates a hashed name for the dataset folder comprised of the dataset_name and
+    dataset_name_config. As well, the following data_args are included unless their
+    default values are used.
+        - max_seq_length (default None)
+
+    More arguments can be added to the hashed name as needed.
+    """
+    defaults = dict(
+        max_seq_length=None,
+    )
+
+    dataset_folder = "-".join([
+        f"{name}_{config}" for name, config in
+        zip(data_args.dataset_name, data_args.dataset_config_name)
+    ])
+
+    for arg, default in defaults.items():
+        if getattr(data_args, arg) != default:
+            non_default = getattr(data_args, arg)
+            dataset_folder += f" ({arg}={non_default})"
+
+    hashed_folder_name = blake2b(dataset_folder.encode(), digest_size=20).hexdigest()
+    print(f"Hashing dataset folder name '{dataset_folder}' to '{hashed_folder_name}'")
+    return hashed_folder_name

@@ -30,13 +30,13 @@ import ray
 import torch
 from ray import tune
 
+from nupic.research.archive.dynamic_sparse.common.ray_custom_loggers import (
+    DEFAULT_LOGGERS,
+)
 from nupic.research.frameworks.backprop_structure.ray_ax.ray_ax_utils import (
     AxSearch,
     ax_client_with_explicit_strategy,
     get_ray_trials,
-)
-from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
-    DEFAULT_LOGGERS,
 )
 
 

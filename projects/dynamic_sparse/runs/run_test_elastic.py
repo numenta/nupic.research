@@ -24,7 +24,7 @@ import os
 from dotenv import load_dotenv
 from ray.tune.logger import DEFAULT_LOGGERS
 
-from nupic.research.frameworks.dynamic_sparse.common.utils import run_ray
+from nupic.research.archive.dynamic_sparse.common.utils import run_ray
 from nupic.research.support.elastic_logger import ElasticsearchLogger
 
 load_dotenv()

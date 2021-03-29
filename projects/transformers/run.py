@@ -36,6 +36,8 @@ import pickle
 import random
 import sys
 from copy import deepcopy
+from dataclasses import replace
+from pprint import pformat
 
 import torch.distributed
 import transformers
@@ -49,6 +51,7 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
+from integrations import CustomWandbCallback
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
@@ -82,7 +85,9 @@ def main():
 
     for experiment in cmd_args.experiments:
         config_dict = CONFIGS[experiment]
-        config_dict["local_rank"] = int(cmd_args.local_rank or -1)
+        local_rank = int(cmd_args.local_rank or -1)
+        config_dict["local_rank"] = local_rank
+
         # See all possible arguments in transformers/training_args.py and ./run_args.py
         exp_parser = HfArgumentParser(
             (ModelArguments, DataTrainingArguments, CustomTrainingArguments)
@@ -97,6 +102,11 @@ def main():
         training_args.output_dir = os.path.join(
             training_args.output_dir, training_args.run_name
         )
+
+        # Initialize wandb now to include the logs that follow.
+        # For now, only support early wandb logging when running one experiment.
+        if len(cmd_args.experiments) == 1:
+            CustomWandbCallback.early_init(training_args, local_rank)
 
         # Detecting last checkpoint.
         last_checkpoint = None
@@ -125,6 +135,9 @@ def main():
             level=(logging.INFO if is_main_process(training_args.local_rank)
                    else logging.WARN)
         )
+
+        # Log config.
+        logging.info(f"Running with config:\n{pformat(config_dict, indent=4)}")
 
         # Log on each process the small summary:
         logging.warning(
@@ -169,9 +182,20 @@ def run_pretraining(
 
     datasets, tokenized_datasets, dataset_path = init_datasets_mlm(data_args)
 
-    config = init_config(model_args, extra_config_kwargs=None)
+    config = init_config(model_args)
     tokenizer = init_tokenizer(model_args)
-    model = init_model(model_args, config, tokenizer, finetuning=False)
+    model = init_model(model_args, config, tokenizer)
+
+    # Initialize distillation models
+    if model_args.teacher_models_name_or_path:
+        teacher_models = []
+        for model_name_or_path in model_args.teacher_models_name_or_path:
+            teacher_args = replace(model_args, model_name_or_path=model_name_or_path)
+            teacher_config = init_config(teacher_args)
+            teacher_models.append(init_model(teacher_args, teacher_config, tokenizer))
+
+        model_args.trainer_extra_kwargs["teacher_models"] = teacher_models
+        logging.info(f"{len(teacher_models)} teacher models initialized.")
 
     if tokenized_datasets is None:
         # Tokenizing and preprocessing the datasets for language modeling
@@ -212,9 +236,10 @@ def run_pretraining(
     trainer = init_trainer(
         model, tokenizer, data_collator, training_args,
         train_dataset, eval_dataset,
-        trainer_callbacks=model_args.trainer_callbacks or None
+        trainer_class=model_args.trainer_class,
+        trainer_extra_kwargs=model_args.trainer_extra_kwargs,
+        trainer_callbacks=model_args.trainer_callbacks or None,
     )
-
     if training_args.do_train:
         train(trainer, training_args.output_dir, last_checkpoint)
 

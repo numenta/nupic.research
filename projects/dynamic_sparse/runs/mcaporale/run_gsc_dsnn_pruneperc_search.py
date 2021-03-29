@@ -25,8 +25,8 @@ import numpy as np
 import ray
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
-from nupic.research.frameworks.dynamic_sparse.common.utils import (
+from nupic.research.archive.dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from nupic.research.archive.dynamic_sparse.common.utils import (
     Trainable,
     new_experiment,
     run_experiment,

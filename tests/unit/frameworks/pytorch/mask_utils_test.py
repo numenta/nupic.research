@@ -23,10 +23,13 @@ import unittest
 
 import torch
 
-from nupic.research.frameworks.pytorch.mask_utils import indices_to_mask
+from nupic.research.frameworks.pytorch.mask_utils import (
+    get_topk_submask,
+    indices_to_mask,
+)
 
 
-class InidicesToMaskTest(unittest.TestCase):
+class TestMaskUtils(unittest.TestCase):
 
     def setUp(self):
         self.tensor = torch.tensor([
@@ -91,6 +94,75 @@ class InidicesToMaskTest(unittest.TestCase):
         self.assertTrue(actual_mask.dtype == torch.bool)
 
         all_equal = (actual_mask == expected_mask).all()
+        self.assertTrue(all_equal)
+
+    def test_topk_submask_structure(self):
+
+        values = torch.rand(5, 6, 7)
+        k = 5
+        mask = torch.rand_like(values) < 0.5
+        submask = get_topk_submask(k, values, mask, largest=True)
+
+        # Validate that the submask's on-positions are a subset of the original.
+        is_subset = (submask <= mask).all()
+        self.assertTrue(is_subset)
+
+        # Validate only k positions have been chosen.
+        self.assertEqual(submask.sum(), k)
+
+    def test_get_topk_submask(self):
+        k = 3
+        values = torch.tensor([
+            [0.5086, 0.5467, 0.2095],
+            [0.9721, 0.2540, 0.2837],
+            [0.4696, 0.9867, 0.6543]
+        ])
+        mask = torch.tensor([
+            [True, True, False],
+            [True, True, False],
+            [True, False, True]
+        ])
+        submask = get_topk_submask(k, values, mask, largest=True)
+        expected_submask = torch.tensor([
+            [False, True, False],
+            [True, False, False],
+            [False, False, True]
+        ])
+
+        # Validate that the submask's on-positions are a subset of the original.
+        is_subset = (submask <= mask).all()
+        self.assertTrue(is_subset)
+
+        # Validate calculated submask.
+        all_equal = (submask == expected_submask).all()
+        self.assertTrue(all_equal)
+
+    def test_get_bottomk_submask(self):
+        k = 3
+        values = torch.tensor([
+            [0.5184, 0.1562, 0.3428],
+            [0.7742, 0.8507, 0.0986],
+            [0.3525, 0.8384, 0.4315]])
+
+        mask = torch.tensor([
+            [True, False, True],
+            [True, True, False],
+            [True, False, False]
+        ])
+        submask = get_topk_submask(k, values, mask, largest=False)
+
+        expected_submask = torch.tensor([
+            [True, False, True],
+            [False, False, False],
+            [True, False, False]
+        ])
+
+        # Validate that the submask's on-positions are a subset of the original.
+        is_subset = (submask <= mask).all()
+        self.assertTrue(is_subset)
+
+        # Validate calculated submask.
+        all_equal = (submask == expected_submask).all()
         self.assertTrue(all_equal)
 
 
