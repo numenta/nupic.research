@@ -30,6 +30,7 @@ from .finetuning import CONFIGS as FINETUNING
 from .sparse_bert import CONFIGS as SPARSE_BERT
 from .finetuning import CONFIGS as FINETUNING
 from .distillation import CONFIGS as DISTILLATION
+from .hpsearch import CONFIGS as HPSEARCH
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -45,3 +46,4 @@ CONFIGS.update(FINETUNING)
 CONFIGS.update(SPARSE_BERT)
 CONFIGS.update(FINETUNING)
 CONFIGS.update(DISTILLATION)
+CONFIGS.update(HPSEARCH)
