@@ -20,6 +20,9 @@
 #
 # ------------------------------------------------------------------------------
 # Run pip install -r requirements.txt to reproduce the currently tested environment
-# Last update: 2/17/2021
--e git+https://github.com/huggingface/transformers@e94d63f6cbf5efe288e41d9840a96a5857090617#egg=transformers
--e git+https://github.com/huggingface/datasets@58555b2734b8a18d70b5a2418129f26fedd96a39#egg=datasets
+# Last update: 3/29/2021
+
+git+git:https://github.com/huggingface/transformers@master#egg=transformers
+datasets>=1.5.0
+torch>=1.8.1
+wandb>=0.10.23
