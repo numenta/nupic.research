@@ -48,6 +48,7 @@ from transformers import (
     default_data_collator,
     set_seed,
 )
+from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
@@ -105,7 +106,7 @@ def main():
 
         # Initialize wandb now to include the logs that follow.
         # For now, only support early wandb logging when running one experiment.
-        if len(cmd_args.experiments) == 1:
+        if is_wandb_available() and len(cmd_args.experiments) == 1:
             CustomWandbCallback.early_init(training_args, local_rank)
 
         # Detecting last checkpoint.
