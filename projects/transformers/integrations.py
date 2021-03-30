@@ -26,7 +26,6 @@ import wandb
 from transformers.integrations import (
     INTEGRATION_TO_CALLBACK,
     WandbCallback,
-    is_torch_tpu_available,
     is_wandb_available,
     logger,
 )
@@ -78,52 +77,6 @@ class CustomWandbCallback(WandbCallback):
         )
 
         return wandb.run.id
-
-    def setup(self, args, state, model, reinit, **kwargs):
-        """
-        Setup the optional Weights & Biases (`wandb`) integration.
-        """
-        if self._wandb is None:
-            return
-
-        self._initialized = True
-        if state.is_world_process_zero:
-            logger.info(
-                "Automatic Weights & Biases logging enabled, "
-                "to disable set os.environ['WANDB_DISABLED'] = 'true'"
-            )
-            combined_dict = {**args.to_sanitized_dict()}
-
-            if hasattr(model, "config") and model.config is not None:
-                model_config = model.config.to_dict()
-                combined_dict = {**model_config, **combined_dict}
-
-            trial_name = state.trial_name
-            init_args = {}
-            if trial_name is not None:
-                run_name = trial_name
-                init_args["group"] = args.run_name
-            else:
-                run_name = args.run_name
-
-            if reinit or wandb.run is None:
-                self._wandb.init(
-                    project=os.getenv("WANDB_PROJECT", "huggingface"),
-                    config=combined_dict,
-                    name=run_name,
-                    reinit=reinit,
-                    **init_args,
-                )
-            else:
-                wandb.config.update(combined_dict)
-
-            # keep track of model topology and gradients, unsupported on TPU
-            if not is_torch_tpu_available() and os.getenv("WANDB_WATCH") != "false":
-                self._wandb.watch(
-                    model,
-                    log=os.getenv("WANDB_WATCH", "gradients"),
-                    log_freq=max(100, args.logging_steps)
-                )
 
     def on_evaluate(self, args, state, control, metrics=None, **kwargs):
         """
