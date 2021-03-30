@@ -163,13 +163,13 @@ class ModelArguments:
     hp_validation_dataset_pct: float = field(
         default=0.05,
         metadata={
-            "help": "Percentage of the validation dataset to use durying hp search"
+            "help": "Percentage of the validation dataset to be used in hp search"
         }
     )
     hp_compute_objective: Callable = field(
         default=compute_objective_eval_loss,
         metadata={
-            "help": "Function that objective to be used in hyperparameter search "
+            "help": "Defines the objective function be used in hyperparameter search"
         }
     )
     hp_extra_kwargs: Dict = field(

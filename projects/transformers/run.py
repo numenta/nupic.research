@@ -36,8 +36,6 @@ import pickle
 import random
 import sys
 from copy import deepcopy
-from dataclasses import replace
-from functools import partial
 from pprint import pformat
 
 import torch.distributed
@@ -64,10 +62,12 @@ from run_utils import (
     init_datasets_mlm,
     init_datasets_task,
     init_model,
+    init_teacher_models,
     init_tokenizer,
     init_trainer,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
+    run_hyperparameter_search,
     test_tasks,
     train,
 )
@@ -224,18 +224,22 @@ def run_pretraining(
 
     # Initialize distillation models
     if model_args.teacher_models_name_or_path:
-        teacher_models = []
-        for model_name_or_path in model_args.teacher_models_name_or_path:
-            teacher_args = replace(model_args, model_name_or_path=model_name_or_path)
-            teacher_config = init_config(teacher_args)
-            teacher_models.append(init_model(teacher_args, teacher_config, tokenizer))
+        model_args.trainer_extra_kwargs["teacher_models"] = init_teacher_models(
+            model_args, tokenizer
+        )
 
-        model_args.trainer_extra_kwargs["teacher_models"] = teacher_models
-        logging.info(f"{len(teacher_models)} teacher models initialized.")
-
-    # Regular training run: init model, trainer, and call train
-    if model_args.hp_num_trials <= 1:
-
+    # Run hp search or regular training
+    if model_args.hp_num_trials >= 1:
+        run_hyperparameter_search(
+            model_args=model_args,
+            config=config,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            training_args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+        )
+    else:
         trainer = init_trainer(
             tokenizer=tokenizer,
             data_collator=data_collator,
@@ -247,73 +251,8 @@ def run_pretraining(
             trainer_extra_kwargs=model_args.trainer_extra_kwargs,
             trainer_callbacks=model_args.trainer_callbacks or None,
         )
-
         if training_args.do_train:
             train(trainer, training_args.output_dir, last_checkpoint)
-
-    # Alternative: using hp search
-    else:
-        # Extra trainer configurations required for hpsearch
-        model_args.trainer_extra_kwargs.update(
-            model_init=partial(init_model, model_args, config, tokenizer, False)
-        )
-        training_args.load_best_model_at_end = True
-        training_args.disable_tqdm = True
-        # TODO: sync metric_for_best_model with compute_objective, should be same metric
-        # and accept custom metrics defined by user
-        training_args.metric_for_best_model = "eval_loss"
-        # TODO: load best model and proceed to evaluation normally after hp search
-        training_args.do_eval = False
-        training_args.do_predict = False
-
-        # Get fraction of the validation dataset to use in hp search
-        hp_eval_dataset = eval_dataset.shard(
-            index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
-        )
-
-        trainer = init_trainer(
-            tokenizer=tokenizer,
-            data_collator=data_collator,
-            training_args=training_args,
-            train_dataset=train_dataset,
-            eval_dataset=hp_eval_dataset,
-            trainer_class=model_args.trainer_class,
-            trainer_extra_kwargs=model_args.trainer_extra_kwargs,
-            trainer_callbacks=model_args.trainer_callbacks or None,
-        )
-
-        hp_search_kwargs = dict(
-            direction="maximize",
-            backend="ray",
-            n_trials=model_args.hp_num_trials,
-            hp_space=model_args.hp_space,
-            compute_objective=model_args.hp_compute_objective,
-            local_dir=training_args.output_dir,
-            resources_per_trial=dict(
-                cpu=os.cpu_count() / torch.cuda.device_count() - 1,
-                gpu=1
-            ),
-            checkpoint_freq=0,
-            keep_checkpoints_num=0,
-            checkpoint_at_end=False,
-        )
-        # Update any extra kwargs defined in config
-        hp_search_kwargs.update(**model_args.hp_extra_kwargs)
-
-        # Run hp search and save results
-        best_run = trainer.hyperparameter_search(**hp_search_kwargs)
-        logging.info(f"Best run: {best_run}")
-
-        hp_res_file = os.path.join(training_args.output_dir, "hp_search_results.txt")
-        if trainer.is_world_process_zero():
-            with open(hp_res_file, "w") as writer:
-                writer.write("Hyperparameter search best run:\n")
-                writer.write(f"run_id = {best_run.run_id}\n")
-                writer.write(f"{training_args.metric_for_best_model}")
-                writer.write(f"= {best_run.objective}\n")
-                writer.write(f"\nHyperparameters:\n")
-                for key, value in sorted(best_run.hyperparameters.items()):
-                    writer.write(f"{key} = {value}\n")
 
     # Evaluate in full eval dataset.
     # if using hp search, load best model before running evaluate
