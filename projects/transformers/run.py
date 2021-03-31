@@ -36,7 +36,6 @@ import pickle
 import random
 import sys
 from copy import deepcopy
-from dataclasses import replace
 from pprint import pformat
 
 import torch.distributed
@@ -63,10 +62,12 @@ from run_utils import (
     init_datasets_mlm,
     init_datasets_task,
     init_model,
+    init_teacher_models,
     init_tokenizer,
     init_trainer,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
+    run_hyperparameter_search,
     test_tasks,
     train,
 )
@@ -185,18 +186,6 @@ def run_pretraining(
 
     config = init_config(model_args)
     tokenizer = init_tokenizer(model_args)
-    model = init_model(model_args, config, tokenizer)
-
-    # Initialize distillation models
-    if model_args.teacher_models_name_or_path:
-        teacher_models = []
-        for model_name_or_path in model_args.teacher_models_name_or_path:
-            teacher_args = replace(model_args, model_name_or_path=model_name_or_path)
-            teacher_config = init_config(teacher_args)
-            teacher_models.append(init_model(teacher_args, teacher_config, tokenizer))
-
-        model_args.trainer_extra_kwargs["teacher_models"] = teacher_models
-        logging.info(f"{len(teacher_models)} teacher models initialized.")
 
     if tokenized_datasets is None:
         # Tokenizing and preprocessing the datasets for language modeling
@@ -233,20 +222,43 @@ def run_pretraining(
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
-    # Train and evaluate
-    trainer = init_trainer(
-        model, tokenizer, data_collator, training_args,
-        train_dataset, eval_dataset,
-        trainer_class=model_args.trainer_class,
-        trainer_extra_kwargs=model_args.trainer_extra_kwargs,
-        trainer_callbacks=model_args.trainer_callbacks or None,
-    )
-    if training_args.do_train:
-        train(trainer, training_args.output_dir, last_checkpoint)
+    # Initialize distillation models
+    if model_args.teacher_models_name_or_path:
+        model_args.trainer_extra_kwargs["teacher_models"] = init_teacher_models(
+            model_args, tokenizer
+        )
 
+    # Run hp search or regular training
+    if model_args.hp_num_trials >= 1:
+        run_hyperparameter_search(
+            model_args=model_args,
+            config=config,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            training_args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+        )
+    else:
+        trainer = init_trainer(
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            training_args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            model=init_model(model_args, config, tokenizer),
+            trainer_class=model_args.trainer_class,
+            trainer_extra_kwargs=model_args.trainer_extra_kwargs,
+            trainer_callbacks=model_args.trainer_callbacks or None,
+        )
+        if training_args.do_train:
+            train(trainer, training_args.output_dir, last_checkpoint)
+
+    # Evaluate in full eval dataset.
+    # if using hp search, load best model before running evaluate
     if training_args.do_eval:
         logging.info("*** Evaluate ***")
-        evaluate_language_model(trainer, training_args.output_dir)
+        evaluate_language_model(trainer, eval_dataset, training_args.output_dir)
 
 
 def run_finetuning_single_task(
@@ -301,8 +313,12 @@ def run_finetuning_single_task(
 
     # Train
     trainer = init_trainer(
-        model, tokenizer, data_collator, training_args,
-        train_dataset, eval_dataset,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        training_args=training_args,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
+        model=init_model(model_args, config, tokenizer),
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
