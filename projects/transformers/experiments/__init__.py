@@ -26,10 +26,11 @@ import models
 from .base import CONFIGS as BASE
 from .bert_replication import CONFIGS as BERT_REPLICATION
 from .bertitos import CONFIGS as BERTITOS
+from .distillation import CONFIGS as DISTILLATION
 from .finetuning import CONFIGS as FINETUNING
+from .one_cycle_lr import CONFIGS as ONE_CYCLE_LR
 from .rigl_bert import CONFIGS as RIGL_BERT
 from .sparse_bert import CONFIGS as SPARSE_BERT
-from .distillation import CONFIGS as DISTILLATION
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -41,8 +42,8 @@ CONFIGS = dict()
 CONFIGS.update(BASE)
 CONFIGS.update(BERT_REPLICATION)
 CONFIGS.update(BERTITOS)
+CONFIGS.update(DISTILLATION)
 CONFIGS.update(FINETUNING)
+CONFIGS.update(ONE_CYCLE_LR)
 CONFIGS.update(RIGL_BERT)
 CONFIGS.update(SPARSE_BERT)
-CONFIGS.update(FINETUNING)
-CONFIGS.update(DISTILLATION)
