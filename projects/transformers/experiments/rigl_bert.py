@@ -23,7 +23,16 @@ from copy import deepcopy
 
 from callbacks import PlotDensitiesCallback, RezeroWeightsCallback, RigLCallback
 
-from .bertitos import tiny_bert_100k, tiny_bert_debug
+from .bertitos import small_bert_100k, tiny_bert_100k, tiny_bert_debug
+
+# Results:
+# |--------------------------------------------------------------------------|
+# | model                        | train loss  | eval loss      | perplexity |
+# |------------------------------|:-----------:|:--------------:|:----------:|
+# | tiny_bert_static_sparse_300k | 4.537       | 3.997          | 54.432     |
+# | tiny_bert_rigl_sparse_300k   | 5.963       | 5.774          | 321.95     |
+# |--------------------------------------------------------------------------|
+#
 
 # Just a debug config.
 tiny_bert_rigl_debug = deepcopy(tiny_bert_debug)
@@ -73,9 +82,9 @@ tiny_bert_static_full_sparse_100k["config_kwargs"].update(
 )
 
 
-tiny_bert_static_full_sparse_200k = deepcopy(tiny_bert_static_full_sparse_100k)
-tiny_bert_static_full_sparse_200k.update(
-    max_steps=200000,
+tiny_bert_static_full_sparse_300k = deepcopy(tiny_bert_static_full_sparse_100k)
+tiny_bert_static_full_sparse_300k.update(
+    max_steps=300000,
     evaluation_strategy="steps",
     eval_steps=100000,
 )
@@ -98,21 +107,49 @@ tiny_bert_full_sparse_rigl_100k["config_kwargs"].update(
 
 
 # This config replicates the RigL paper more closely.
-tiny_bert_full_sparse_rigl_200k_prune_perc_30 = deepcopy(tiny_bert_100k)
-tiny_bert_full_sparse_rigl_200k_prune_perc_30.update(
+tiny_bert_full_sparse_rigl_300k_prune_perc_30 = deepcopy(tiny_bert_100k)
+tiny_bert_full_sparse_rigl_300k_prune_perc_30.update(
+    max_steps=300000,
     model_type="fully_static_sparse_bert",
     trainer_callbacks=[
         RezeroWeightsCallback(),
         RigLCallback(prune_fraction=0.3, prune_freq=100),
-        PlotDensitiesCallback(plot_freq=100),
+        PlotDensitiesCallback(plot_freq=1000),
     ],
     fp16=True,
     overwrite_output_dir=True,
     evaluation_strategy="steps",
     eval_steps=100000,
 )
-tiny_bert_full_sparse_rigl_200k_prune_perc_30["config_kwargs"].update(
+tiny_bert_full_sparse_rigl_300k_prune_perc_30["config_kwargs"].update(
     sparsity=0.8,
+)
+
+
+# ----------
+# Small BERT
+# ----------
+
+small_bert_sparse_100k = deepcopy(small_bert_100k)
+small_bert_sparse_100k.update(
+    model_type="fully_static_sparse_bert",
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+    ],
+    fp16=True,
+    overwrite_output_dir=True,
+)
+
+small_bert_rigl_100k = deepcopy(small_bert_100k)
+small_bert_rigl_100k.update(
+    model_type="fully_static_sparse_bert",
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        RigLCallback(prune_fraction=0.3, prune_freq=100),
+        PlotDensitiesCallback(plot_freq=1000),
+    ],
+    fp16=True,
+    overwrite_output_dir=True,
 )
 
 
@@ -120,7 +157,10 @@ CONFIGS = dict(
     tiny_bert_rigl_debug=tiny_bert_rigl_debug,
     tiny_bert_rigl_100k=tiny_bert_rigl_100k,
     tiny_bert_static_full_sparse_100k=tiny_bert_static_full_sparse_100k,
-    tiny_bert_static_full_sparse_200k=tiny_bert_static_full_sparse_200k,
+    tiny_bert_static_full_sparse_300k=tiny_bert_static_full_sparse_300k,
     tiny_bert_full_sparse_rigl_100k=tiny_bert_full_sparse_rigl_100k,
-    tiny_bert_full_sparse_rigl_200k_prune_perc_30=tiny_bert_full_sparse_rigl_200k_prune_perc_30,  # noqa E501
+    tiny_bert_full_sparse_rigl_300k_prune_perc_30=tiny_bert_full_sparse_rigl_300k_prune_perc_30,  # noqa E501
+
+    small_bert_sparse_100k=small_bert_sparse_100k,
+    small_bert_rigl_100k=small_bert_rigl_100k,
 )
