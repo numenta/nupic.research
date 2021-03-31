@@ -199,6 +199,48 @@ def hidden_activations_by_unit(activations, targets):
         return habu
 
 
+def contexts_by_class(contexts, targets):
+    """
+    Returns a 2D torch tensor with shape (num_categories, dim_context) where cell c, k
+    gives the fraction of instances of category c for which feature/dimension k of the
+    context signal generated for an input of said class was non-zero. All values are in
+    the range [0, 1].
+
+    :param activations: 2D torch tensor with shape (batch_size, num_units) where entry
+                        b, i gives the activation of unit i for example b
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    """
+
+    with torch.no_grad():
+
+        device = contexts.device
+
+        # Assume the following:
+        # - target values are zero-based
+        # - the largest target value in the batch is that amongst all data
+        num_categories = 1 + targets.max().item()
+        _, dim_context = contexts.size()
+
+        _contexts_by_class = torch.zeros((0, dim_context))
+        _contexts_by_class = _contexts_by_class.to(device)
+
+        for t in range(num_categories):
+            inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
+            contexts_t = contexts[inds_t]
+
+            # Determine which bits are ON and which are OFF
+            contexts_t = (contexts_t != 0).float()
+
+            # Average activations across all examples with the same label
+            contexts_t = contexts_t.mean(dim=0)
+            contexts_t = contexts_t.unsqueeze(0)
+
+            _contexts_by_class = torch.cat((_contexts_by_class, contexts_t))
+
+        return _contexts_by_class
+
+
 def dendrite_overlap_matrix(winning_mask, targets):
     """ Returns a 3D torch tensor with shape (num_units, num_categories,
     num_categories) which represents num_units overlap matrices (one per unit) """
