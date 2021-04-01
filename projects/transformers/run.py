@@ -47,9 +47,11 @@ from transformers import (
     default_data_collator,
     set_seed,
 )
+from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
+from integrations import CustomWandbCallback
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
@@ -60,10 +62,12 @@ from run_utils import (
     init_datasets_mlm,
     init_datasets_task,
     init_model,
+    init_teacher_models,
     init_tokenizer,
     init_trainer,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
+    run_hyperparameter_search,
     test_tasks,
     train,
 )
@@ -83,7 +87,9 @@ def main():
 
     for experiment in cmd_args.experiments:
         config_dict = CONFIGS[experiment]
-        config_dict["local_rank"] = int(cmd_args.local_rank or -1)
+        local_rank = int(cmd_args.local_rank or -1)
+        config_dict["local_rank"] = local_rank
+
         # See all possible arguments in transformers/training_args.py and ./run_args.py
         exp_parser = HfArgumentParser(
             (ModelArguments, DataTrainingArguments, CustomTrainingArguments)
@@ -98,6 +104,11 @@ def main():
         training_args.output_dir = os.path.join(
             training_args.output_dir, training_args.run_name
         )
+
+        # Initialize wandb now to include the logs that follow.
+        # For now, only support early wandb logging when running one experiment.
+        if is_wandb_available() and len(cmd_args.experiments) == 1:
+            CustomWandbCallback.early_init(training_args, local_rank)
 
         # Detecting last checkpoint.
         last_checkpoint = None
@@ -173,9 +184,8 @@ def run_pretraining(
 
     datasets, tokenized_datasets, dataset_path = init_datasets_mlm(data_args)
 
-    config = init_config(model_args, extra_config_kwargs=None)
+    config = init_config(model_args)
     tokenizer = init_tokenizer(model_args)
-    model = init_model(model_args, config, tokenizer, finetuning=False)
 
     if tokenized_datasets is None:
         # Tokenizing and preprocessing the datasets for language modeling
@@ -212,19 +222,43 @@ def run_pretraining(
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
-    # Train and evaluate
-    trainer = init_trainer(
-        model, tokenizer, data_collator, training_args,
-        train_dataset, eval_dataset,
-        trainer_callbacks=model_args.trainer_callbacks or None
-    )
+    # Initialize distillation models
+    if model_args.teacher_models_name_or_path:
+        model_args.trainer_extra_kwargs["teacher_models"] = init_teacher_models(
+            model_args, tokenizer
+        )
 
-    if training_args.do_train:
-        train(trainer, training_args.output_dir, last_checkpoint)
+    # Run hp search or regular training
+    if model_args.hp_num_trials >= 1:
+        run_hyperparameter_search(
+            model_args=model_args,
+            config=config,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            training_args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+        )
+    else:
+        trainer = init_trainer(
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            training_args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            model=init_model(model_args, config, tokenizer),
+            trainer_class=model_args.trainer_class,
+            trainer_extra_kwargs=model_args.trainer_extra_kwargs,
+            trainer_callbacks=model_args.trainer_callbacks or None,
+        )
+        if training_args.do_train:
+            train(trainer, training_args.output_dir, last_checkpoint)
 
+    # Evaluate in full eval dataset.
+    # if using hp search, load best model before running evaluate
     if training_args.do_eval:
         logging.info("*** Evaluate ***")
-        evaluate_language_model(trainer, training_args.output_dir)
+        evaluate_language_model(trainer, eval_dataset, training_args.output_dir)
 
 
 def run_finetuning_single_task(
@@ -279,8 +313,12 @@ def run_finetuning_single_task(
 
     # Train
     trainer = init_trainer(
-        model, tokenizer, data_collator, training_args,
-        train_dataset, eval_dataset,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        training_args=training_args,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
+        model=init_model(model_args, config, tokenizer),
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )

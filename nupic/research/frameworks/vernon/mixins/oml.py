@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 import os
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -111,12 +112,19 @@ class OnlineMetaLearning(object):
     def create_loaders(self, config):
         super().create_loaders(config)
 
-        eval_set = self.load_dataset(config, train=False)
+        # Load eval set.
+        data = self.load_dataset(config, train=False)
+        inds = self.compute_class_indices(config, data)
+        self.test_class_indices = inds  # used short hand for line length
 
-        self.test_train_loader = self.create_test_train_dataloader(config, eval_set)
-        self.test_test_loader = self.create_test_test_dataloader(config, eval_set)
-        self.test_train_eval_loader = self.create_test_train_eval_dataloader(config,
-                                                                             eval_set)
+        train_loader = self.create_test_train_dataloader(config, data, deepcopy(inds))
+        test_loader = self.create_test_test_dataloader(config, data, deepcopy(inds))
+        train_eval_loader = self.create_test_train_eval_dataloader(config, data,
+                                                                   deepcopy(inds))
+
+        self.test_train_loader = train_loader
+        self.test_test_loader = test_loader
+        self.test_train_eval_loader = train_eval_loader
 
         self.num_classes_eval = min(
             config.get("num_classes_eval", 50),
@@ -124,26 +132,26 @@ class OnlineMetaLearning(object):
         )
 
     @classmethod
-    def create_test_train_sampler(cls, config, dataset):
+    def create_test_train_sampler(cls, config, dataset, class_indices):
         """Sampler for meta-test training."""
         sample_size = config.get("test_train_sample_size", 15)
-        class_indices = cls.compute_class_indices(config, dataset,
-                                                  mode="train",
-                                                  sample_size=sample_size)
+        class_indices = cls.partition_class_indices(class_indices,
+                                                    mode="train",
+                                                    sample_size=sample_size)
         return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def create_test_test_sampler(cls, config, dataset):
+    def create_test_test_sampler(cls, config, dataset, class_indices):
         """Sampler for meta-test testing."""
         sample_size = config.get("test_train_sample_size", 15)
-        class_indices = cls.compute_class_indices(config, dataset,
-                                                  mode="test",
-                                                  sample_size=sample_size)
+        class_indices = cls.partition_class_indices(class_indices,
+                                                    mode="test",
+                                                    sample_size=sample_size)
         return cls.create_sampler(config, dataset, class_indices)
 
     @classmethod
-    def create_test_train_dataloader(cls, config, dataset):
-        sampler = cls.create_test_train_sampler(config, dataset)
+    def create_test_train_dataloader(cls, config, dataset, class_indices):
+        sampler = cls.create_test_train_sampler(config, dataset, class_indices)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("test_train_batch_size", 1),
@@ -154,12 +162,12 @@ class OnlineMetaLearning(object):
         )
 
     @classmethod
-    def create_test_train_eval_dataloader(cls, config, dataset):
+    def create_test_train_eval_dataloader(cls, config, dataset, class_indices):
         """
         Exactly the same as the test-train loader, but with a potentially
         larger batch size for evaluation.
         """
-        sampler = cls.create_test_train_sampler(config, dataset)
+        sampler = cls.create_test_train_sampler(config, dataset, class_indices)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("test_train_eval_batch_size",
@@ -171,8 +179,8 @@ class OnlineMetaLearning(object):
         )
 
     @classmethod
-    def create_test_test_dataloader(cls, config, dataset):
-        sampler = cls.create_test_test_sampler(config, dataset)
+    def create_test_test_dataloader(cls, config, dataset, class_indices):
+        sampler = cls.create_test_test_sampler(config, dataset, class_indices)
         return DataLoader(
             dataset=dataset,
             batch_size=config.get("test_test_batch_size", 1),

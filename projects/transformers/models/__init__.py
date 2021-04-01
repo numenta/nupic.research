@@ -26,3 +26,4 @@ related utilities.
 """
 
 from .static_sparse_bert import *
+from .sparse_embedding import *
