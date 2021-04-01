@@ -173,7 +173,7 @@ class RigLCallback(TrainerCallback):
 
         # Log pruning stats.
         actual_pruned = param_sparsity1 - param_sparsity0
-        actual_pruned_on_params = actual_pruned / mask_sparsity0
+        actual_pruned_on_params = actual_pruned / (1 - mask_sparsity0)
 
         logging.info(f"RigLCallback:")
         logging.info(f"Target: remove {prune_fraction} frac of on params")
@@ -182,9 +182,9 @@ class RigLCallback(TrainerCallback):
         # For now, the logs are very robust to ensure pruning occurs as expected.
         logs = dict({
             "rigl/target_pruned_on_params": prune_fraction,
-            "rigl/actual_pruned_on_params": actual_pruned / mask_sparsity0,
-            "rigl/target_pruned_total_params": prune_fraction * mask_sparsity0,
-            "rigl/actual_pruned_total_params": actual_pruned,
+            "rigl/actual_pruned_on_params": actual_pruned_on_params,
+            "rigl/target_pruned_all_params": prune_fraction * mask_sparsity0,
+            "rigl/actual_pruned_all_params": actual_pruned,
             "rigl/pre_prune_param_sparsity": param_sparsity0,
             "rigl/pre_prune_mask_sparsity": mask_sparsity0,
             "rigl/post_prune_param_sparsity": param_sparsity1,
