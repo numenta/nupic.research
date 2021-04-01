@@ -41,7 +41,7 @@ from torch.nn.parameter import Parameter
 from nupic.research.frameworks.pytorch.modules import MaskedConv2d
 
 
-class VDropCentralData(nn.Module):
+class VDropCentralData(nn.Identity):
     """
     Stores data for a set of variational dropout (VDrop) modules in large
     central tensors. The VDrop modules access the data using views. This makes
@@ -59,6 +59,10 @@ class VDropCentralData(nn.Module):
     The parameters are stored in terms of z_mu and z_var rather than w_mu and
     w_var to support group variational dropout (e.g. to allow for pruning entire
     channels.)
+
+    This module inherits from nn.Identity instead of nn.Module so that it can be
+    used in nn.Sequential models. It simply passes its input to the next layer
+    unchanged.
     """
     def __init__(self, z_logvar_init=-10):
         super().__init__()
