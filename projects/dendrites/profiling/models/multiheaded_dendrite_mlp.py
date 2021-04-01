@@ -24,8 +24,8 @@ import torch.nn as nn
 # from garage.torch import NonLinearity
 from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
-    GatingDendriticLayer,
     BiasingDendriticLayer,
+    GatingDendriticLayer,
 )
 from nupic.torch.modules import KWinners
 
@@ -119,7 +119,7 @@ class MultiHeadedDendriticMLP(nn.Module):
                 output_layer.add_module("non_linearity",
                                         None)
             self._output_layers.append(output_layer)
-    # @profile
+
     def forward(self, x, context):
         for layer, activation in zip(self._layers, self._activations):
             # print(layer(x, context))
