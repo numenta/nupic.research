@@ -24,10 +24,10 @@ import os
 import ray
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.common.ray_custom_loggers import (
+from nupic.research.archive.dynamic_sparse.common.ray_custom_loggers import (
     DEFAULT_LOGGERS,
 )
-from nupic.research.frameworks.dynamic_sparse.common.utils import (
+from nupic.research.archive.dynamic_sparse.common.utils import (
     Trainable,
     download_dataset,
     new_experiment,

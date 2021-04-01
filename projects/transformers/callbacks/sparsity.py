@@ -44,6 +44,10 @@ class RezeroWeightsCallback(TrainerCallback):
         logging.info(f"Non-zero Params / Total Params, {num_nonzero:,} / {num_total:,}")
         logging.info(f"   Model Sparsity={model_sparsity:.4f}")
 
+        num_total, num_nonzero = count_nonzero_params(model.bert)
+        bert_sparsity = 1 - (num_nonzero / num_total)
+        logging.info(f"   Bert Sparsity={bert_sparsity:0.4f}")
+
         num_total, num_nonzero = count_nonzero_params(model.bert.encoder)
         encoder_sparsity = 1 - (num_nonzero / num_total)
         logging.info(f"   Encoder Sparsity={encoder_sparsity:0.4f}")
@@ -58,11 +62,15 @@ class RezeroWeightsCallback(TrainerCallback):
             num_total, num_nonzero = count_nonzero_params(model)
             model_sparsity = 1 - (num_nonzero / num_total)
 
+            num_total, num_nonzero = count_nonzero_params(model.bert)
+            bert_sparsity = 1 - (num_nonzero / num_total)
+
             num_total, num_nonzero = count_nonzero_params(model.bert.encoder)
             encoder_sparsity = 1 - (num_nonzero / num_total)
 
             logs = dict(
                 model_sparsity=model_sparsity,
+                bert_sparsity=bert_sparsity,
                 encoder_sparsity=encoder_sparsity
             )
 

@@ -34,6 +34,7 @@ from transformers import (
 
 sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers")) # noqa
 from models import (
+    SparseEmbeddings,
     StaticSparseEncoderBertConfig,
     StaticSparseEncoderBertForMaskedLM,
     StaticSparseEncoderBertForSequenceClassification,
@@ -49,8 +50,19 @@ class SparseBertModelTest(unittest.TestCase):
     """
 
     def setUp(self):
+
+        # Config for model with sparse encoder.
         self.config = CONFIG_MAPPING["static_sparse_encoder_bert"](
-            sparsity=0.9,
+            sparsity=0.90,
+            num_attention_heads=1,
+            num_hidden_layers=2,
+            hidden_size=64,
+            intermediate_size=64 * 4,
+        )
+
+        # Config for model with sparse encoder and sparse embedding layer.
+        self.fully_sparse_config = CONFIG_MAPPING["fully_static_sparse_bert"](
+            sparsity=0.75,
             num_attention_heads=1,
             num_hidden_layers=2,
             hidden_size=64,
@@ -125,6 +137,32 @@ class SparseBertModelTest(unittest.TestCase):
 
         # Cleanup saved model and config.
         tempdir.cleanup()
+
+    def test_model_with_sparse_embedding(self):
+        # Init model type of fully_static_sparse_bert.
+        model = AutoModelForMaskedLM.from_config(self.fully_sparse_config)
+
+        # Call resize on token embeddings. This required overriding
+        # _get_resized_sparse_embeddings to work with a SparseEmbeddings layer.
+        model.resize_token_embeddings(30000)
+
+        # Validate the word embeddings are sparse.
+        word_embeddings = model.bert.embeddings.word_embeddings
+        self.assertIsInstance(word_embeddings, SparseEmbeddings)
+        word_embeddings.rezero_weights()
+
+        num_zero = (word_embeddings.weight == 0).sum()
+        self.assertTrue(num_zero >= 1440000)
+
+        # Make the on weights all one in case there are random zeros.
+        word_embeddings.weight.data[:] = 1
+        word_embeddings.rezero_weights()
+
+        # Validate sparsity per embedding. Should be 64 * 0.75
+        num_embeddings = word_embeddings.module.num_embeddings
+        for n in range(num_embeddings):
+            num_zero = (word_embeddings.weight[n, :] == 0).sum()
+            self.assertEqual(num_zero, 48)
 
 
 if __name__ == "__main__":
