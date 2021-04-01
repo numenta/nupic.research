@@ -24,6 +24,7 @@ Base Transformers Experiment configuration.
 
 from copy import deepcopy
 
+from ray import tune
 from transformers import Trainer
 
 from trainer_mixins import DistillationTrainerMixin
@@ -130,9 +131,29 @@ tiny_bert_50k_kd.update(
 )
 
 
+def hp_space_lr_search_loguniform(trial):
+    return dict(
+        learning_rate=tune.grid_search([3, 1, 3e-1, 1e-1, 3e-2, 1e-2, 3e-3, 1e-3])
+    )
+
+
+tiny_bert_50k_kd_lrsearch = deepcopy(tiny_bert_50k_kd)
+tiny_bert_50k_kd_lrsearch.update(
+    learning_rate=1e-2,
+
+    # hyperparameter search
+    hp_space=hp_space_lr_search_loguniform,  # required
+    hp_num_trials=1,
+    hp_validation_dataset_pct=0.1,  # default
+    hp_extra_kwargs=dict()  # default
+
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     debug_bert_kd=debug_bert_kd,
     tiny_bert_100k_kd=tiny_bert_100k_kd,
     tiny_bert_50k_kd=tiny_bert_50k_kd,
+    tiny_bert_50k_kd_lrsearch=tiny_bert_50k_kd_lrsearch,
 )
