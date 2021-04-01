@@ -222,8 +222,9 @@ def contexts_by_class(contexts, targets):
         num_categories = 1 + targets.max().item()
         _, dim_context = contexts.size()
 
-        _contexts_by_class = torch.zeros((0, dim_context))
-        _contexts_by_class = _contexts_by_class.to(device)
+        # 'cbc' is an abbreviation for 'contexts by class'
+        cbc = torch.zeros((0, dim_context))
+        cbc = cbc.to(device)
 
         for t in range(num_categories):
             inds_t = torch.nonzero((targets == t).float(), as_tuple=True)
@@ -236,9 +237,9 @@ def contexts_by_class(contexts, targets):
             contexts_t = contexts_t.mean(dim=0)
             contexts_t = contexts_t.unsqueeze(0)
 
-            _contexts_by_class = torch.cat((_contexts_by_class, contexts_t))
+            cbc = torch.cat((cbc, contexts_t))
 
-        return _contexts_by_class
+        return cbc
 
 
 def dendrite_overlap_matrix(winning_mask, targets):
