@@ -24,68 +24,94 @@ import torch
 import torch.autograd.profiler as profiler
 
 from models import DendriticMLP, SparseMLP
+from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.pytorch.models.common_models import StandardMLP
 
 
-def func(model, device, dendrite=False):
+def func(model, device, input_size, dendrite=False):
+    batch_size = 4096
     use_cuda = device.type == "cuda"
+    dummy_tensor = torch.rand((batch_size, input_size), device=device)
     if dendrite:
-        dummy_tensor = torch.rand(1024, 11, device=device)
-        dummy_context = torch.rand(1024, 10, device=device)
+        dummy_context = torch.rand((batch_size, model.dim_context), device=device)
 
         s = time.time()
         with profiler.profile(record_shapes=True, use_cuda=use_cuda) as prof:
             with profiler.record_function("model_inference"):
                 res = model(dummy_tensor, dummy_context)
-        print(res)
-        print(time.time() - s)
     else:
-        dummy_tensor = torch.rand(1024, 21, device=device)
         s = time.time()
         with profiler.profile(record_shapes=True, use_cuda=use_cuda) as prof:
             with profiler.record_function("model_inference"):
                 res = model(dummy_tensor)
-        print(res)
-        print(time.time() - s)
-    print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+
+    wall_clock = time.time() - s
+    print("Wall clock:", wall_clock)
+    if device.type == "cuda":
+        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+    else:
+        print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+
+    dense_params, sparse_params = count_nonzero_params(model)
+    print(f"Total params:{dense_params}, non-zero params:{sparse_params}")
+
+    if res.sum() == 0:  # Just to make Python think we need res
+        print(res.sum())
+
+    return wall_clock
 
 
 if __name__ == "__main__":
-    dendrite_net = DendriticMLP(
-        hidden_sizes=(2048, 2048, 2048),
-        input_size=11,
-        output_dim=7,
-        k_winners=False,
-        relu=True,
-        k_winner_percent_on=0.1,
-        dim_context=10,
-        num_segments=(10, 10, 10),
-        sparsity=0.5,
-        # dendritic_layer_class=GatingDendriticLayer
-    )
-
-    dense_net = StandardMLP(
-        input_size=21,
-        num_classes=7,
-        hidden_sizes=(2048, 2048, 2048)
-    )
-
-    sparse_net = SparseMLP(
-        input_size=21,
-        output_dim=7,
-        hidden_sizes=(2048, 2048, 2048),
-        linear_activity_percent_on=(0.1, 0.1, 0.1),
-        linear_weight_percent_on=(0.5, 0.5, 0.5),
-    )
     if torch.cuda.is_available():
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
 
-    dendrite_net.to(device)
-    dense_net.to(device)
-    sparse_net.to(device)
+    dim_context = 10
+    dendritic_net_ff_input_dim = 11
+    non_dendritic_net_input_dim = dendritic_net_ff_input_dim + dim_context
+    output_dim = 10
+    dendrite_net = DendriticMLP(
+        hidden_sizes=(2048, 2048, 2048),
+        input_size=dendritic_net_ff_input_dim,
+        output_dim=output_dim,
+        k_winners=False,
+        relu=True,
+        k_winner_percent_on=0.1,
+        dim_context=dim_context,
+        num_segments=(10, 10, 10),
+        sparsity=0.5,
+    ).to(device)
 
-    # func(dense_net, device=device)
-    # func(sparse_net, device=device)
-    func(dendrite_net, device=device, dendrite=True)
+    dense_net = StandardMLP(
+        input_size=non_dendritic_net_input_dim,
+        num_classes=output_dim,
+        hidden_sizes=(2048, 2048, 2048),
+    ).to(device)
+
+    sparse_net = SparseMLP(
+        input_size=non_dendritic_net_input_dim,
+        output_dim=output_dim,
+        hidden_sizes=(2048, 2048, 2048),
+        linear_activity_percent_on=(0.1, 0.1, 0.1),
+        linear_weight_percent_on=(0.5, 0.5, 0.5),
+        k_inference_factor=1.0,
+        use_batch_norm=False,
+    ).to(device)
+
+    print("=================== DENSE NETWORK =====================")
+    print(dense_net)
+    dense_time = func(dense_net, input_size=non_dendritic_net_input_dim, device=device)
+
+    print("\n\n=================== SPARSE NETWORK =====================")
+    print(sparse_net)
+    sparse_time = func(sparse_net, input_size=non_dendritic_net_input_dim,
+                       device=device)
+
+    print("\n\n=================== SPARSE DENDRITIC NETWORK =====================")
+    print(dendrite_net)
+    dendrite_time = func(dendrite_net, input_size=dendritic_net_ff_input_dim,
+                         device=device, dendrite=True)
+
+    print(f"Ratio of sparse to dense: {sparse_time/dense_time}")
+    print(f"Ratio of dendritic to dense: {dendrite_time/dense_time}")
