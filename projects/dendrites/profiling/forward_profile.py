@@ -93,7 +93,6 @@ if __name__ == "__main__":
         linear_weight_percent_on=(0.5, 0.5, 0.5),
         use_batch_norm=False,
     ).to(device)
-    print(sparse_net)
 
     print("=================== DENSE NETWORK =====================")
     func(dense_net, input_size=input_size, device=device)
