@@ -99,8 +99,8 @@ class MultiHeadedDendriticMLP(nn.Module):
                 curr_activation = KWinners(n=hidden_sizes[i],
                                            percent_on=k_winners_percent_on,
                                            k_inference_factor=1.0,
-                                           boost_strength=0.0,
-                                           boost_strength_factor=0.0)
+                                           boost_strength=1.67,
+                                           boost_strength_factor=0.9)
             else:
                 curr_activation = nn.ReLU()
 
