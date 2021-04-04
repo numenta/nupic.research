@@ -65,10 +65,6 @@ class MultiHeadedDendriticMLP(nn.Module):
                  output_nonlinearities=(None, None, ),
                  dendritic_layer_class=AbsoluteMaxGatingDendriticLayer):
 
-        assert dendritic_layer_class in {AbsoluteMaxGatingDendriticLayer,
-                                         GatingDendriticLayer,
-                                         BiasingDendriticLayer}
-
         # The nonlinearity can either be k-Winners or ReLU, but not both
         assert not (k_winners and relu)
         assert num_heads == len(output_dims)
