@@ -22,11 +22,7 @@
 import torch.nn as nn
 
 # from garage.torch import NonLinearity
-from nupic.research.frameworks.dendrites import (
-    AbsoluteMaxGatingDendriticLayer,
-    BiasingDendriticLayer,
-    GatingDendriticLayer,
-)
+from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 from nupic.torch.modules import KWinners
 
 
