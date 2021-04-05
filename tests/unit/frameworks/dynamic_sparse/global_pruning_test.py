@@ -26,8 +26,8 @@ import torch
 from torch.nn.utils import parameters_to_vector
 
 from nupic.research.frameworks.dynamic_sparse import (
-    global_add_by_grad,
-    global_prune_by_weight,
+    global_add_by_abs_grad,
+    global_prune_by_abs_weight,
 )
 from nupic.torch.modules import SparseWeights, rezero_weights
 
@@ -141,7 +141,7 @@ class GlobalPruningTest(unittest.TestCase):
         # ----------
 
         sparse_modules = [self.model.lin1, self.model.lin2, self.model.lin3]
-        global_prune_by_weight(sparse_modules, prune_fraction=0.5)
+        global_prune_by_abs_weight(sparse_modules, prune_fraction=0.5)
         self.model.apply(rezero_weights)
 
         # Validate pruned weights
@@ -200,7 +200,7 @@ class GlobalPruningTest(unittest.TestCase):
         self.model(x).sum().backward()
 
         # Regrow weights per the largest abs gradients.
-        global_add_by_grad(sparse_modules, num_add=12)
+        global_add_by_abs_grad(sparse_modules, num_add=12)
         self.model.apply(rezero_weights)
 
         # Validate regrown weights

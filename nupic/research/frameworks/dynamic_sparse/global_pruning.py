@@ -24,12 +24,12 @@ from torch.nn.utils import parameters_to_vector
 from nupic.research.frameworks.pytorch.mask_utils import get_topk_submask
 
 __all__ = [
-    "global_prune_by_weight",
-    "global_add_by_grad",
+    "global_prune_by_abs_weight",
+    "global_add_by_abs_grad",
 ]
 
 
-def global_prune_by_weight(sparse_modules, prune_fraction):
+def global_prune_by_abs_weight(sparse_modules, prune_fraction):
     """
     Globally prune 'num_remove' weights from a list of sparse modules by ranking and
     selecting the top absolute weights. Modules are pruned adjusting their `zero_masks`;
@@ -71,7 +71,7 @@ def global_prune_by_weight(sparse_modules, prune_fraction):
     return num_remove
 
 
-def global_add_by_grad(sparse_modules, num_add):
+def global_add_by_abs_grad(sparse_modules, num_add):
     """
     Adds weights globally (among all given sparse modules) by ranking and selecting the
     top absolute gradients. Weights are added by adjusting the `zero_masks` of their

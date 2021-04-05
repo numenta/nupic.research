@@ -28,8 +28,8 @@ import torch
 from transformers import CONFIG_MAPPING, AdamW, AutoModelForMaskedLM
 
 from nupic.research.frameworks.dynamic_sparse import (
-    global_add_by_grad,
-    global_prune_by_weight,
+    global_add_by_abs_grad,
+    global_prune_by_abs_weight,
 )
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
@@ -115,7 +115,7 @@ class GlobalPruningTest(unittest.TestCase):
         # Prune weights
         # --------------
 
-        num_removed = global_prune_by_weight(sparse_modules, prune_fraction=1 / 3)
+        num_removed = global_prune_by_abs_weight(sparse_modules, prune_fraction=1 / 3)
 
         self.model.apply(rezero_weights)
         total_off_mask = np.sum([m.zero_mask.bool().sum() for m in sparse_modules])
@@ -146,7 +146,7 @@ class GlobalPruningTest(unittest.TestCase):
         loss.backward()
 
         # Add weights according to the largest gradients of the model.
-        global_add_by_grad(sparse_modules, num_add=num_removed)
+        global_add_by_abs_grad(sparse_modules, num_add=num_removed)
 
         # The new weights are initialized to zero.
         self.model.apply(rezero_weights)

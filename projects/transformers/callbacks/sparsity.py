@@ -30,8 +30,8 @@ from transformers import TrainerCallback
 
 from nupic.research.frameworks.dynamic_sparse import (
     CosineDecayPruneScheduler,
-    global_add_by_grad,
-    global_prune_by_weight,
+    global_add_by_abs_grad,
+    global_prune_by_abs_weight,
 )
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
@@ -150,7 +150,7 @@ class RigLCallback(TrainerCallback):
         # Prune weights.
         model.apply(rezero_weights)
         prune_fraction = self.prune_scheduler.get_prune_fraction()
-        num_removed = global_prune_by_weight(self.sparse_modules, prune_fraction)
+        num_removed = global_prune_by_abs_weight(self.sparse_modules, prune_fraction)
         model.apply(rezero_weights)
 
         # Post-prune sparsities.
@@ -165,7 +165,7 @@ class RigLCallback(TrainerCallback):
 
         # Regrow weights
         num_add = self.prune_scheduler.get_num_add(num_removed)
-        global_add_by_grad(self.sparse_modules, num_add)
+        global_add_by_abs_grad(self.sparse_modules, num_add)
         self.prune_scheduler.step()
 
         # Post-grow sparsities.
