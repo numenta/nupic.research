@@ -217,7 +217,8 @@ class PlotDensitiesCallback(TrainerCallback):
         """
         self.sparse_modules = filter_modules(model, include_modules=[SparseWeightsBase])
         for name, module in self.sparse_modules.items():
-            self.initial_on_params[name] = (module.zero_mask.bool() == 0).sum().item()
+            zero_mask = module.zero_mask.bool()
+            self.initial_on_params[name] = zero_mask.numel() - torch.count_nonzero(zero_mask)
         initial_sparsity = getattr(args, "config_kwargs", {}).get("sparsity", 0)
         self.initial_density = 1 - initial_sparsity
 
@@ -298,8 +299,9 @@ def inputs_to_device(inputs, device):
 
 def calc_sparsity(tensor):
     """Calculate the sparsity of a given tensor."""
-    num_zero = (tensor == 0).sum().item()
-    return num_zero / tensor.numel()
+    num_total = tensor.numel()
+    num_zero = num_total - torch.count_nonzero(tensor)
+    return num_zero / num_total
 
 
 def calc_model_sparsity(model):
@@ -318,8 +320,8 @@ def calc_cumulative_sparsity(sparse_modules):
     total_zero = 0
     total_params = 0
     for m in sparse_modules:
-        total_off += (m.zero_mask != 0).sum().item()
-        total_zero += (m.weight == 0).sum().item()
+        total_off += torch.count_nonzero(m.zero_mask)
+        total_zero += m.weight.numel() - torch.count_nonzero(m.weight)
         total_params += m.weight.numel()
 
     mask_sparsity = total_off / total_params
@@ -355,7 +357,8 @@ def get_delta_on_params(sparse_modules, initial_on_params):
         subname = ".".join(n.split(".")[3:])
         layer_name = f"{subname} {tuple(m.weight.shape)}"
 
-        on_params = (m.zero_mask.bool() == 0).sum().item()
+        zero_mask = m.zero_mask.bool()
+        on_params = zero_mask.numel() - torch.count_nonzero(zero_mask)
         delta = on_params - initial_on_params[n]
         df.loc[len(df.index)] = (layer_name, delta)
 
