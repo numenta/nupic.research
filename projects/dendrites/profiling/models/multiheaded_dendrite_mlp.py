@@ -22,11 +22,7 @@
 import torch.nn as nn
 
 # from garage.torch import NonLinearity
-from nupic.research.frameworks.dendrites import (
-    AbsoluteMaxGatingDendriticLayer,
-    BiasingDendriticLayer,
-    GatingDendriticLayer,
-)
+from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
 from nupic.torch.modules import KWinners
 
 
@@ -64,10 +60,6 @@ class MultiHeadedDendriticMLP(nn.Module):
                  k_winners_percent_on=0.1,
                  output_nonlinearities=(None, None, ),
                  dendritic_layer_class=AbsoluteMaxGatingDendriticLayer):
-
-        assert dendritic_layer_class in {AbsoluteMaxGatingDendriticLayer,
-                                         GatingDendriticLayer,
-                                         BiasingDendriticLayer}
 
         # The nonlinearity can either be k-Winners or ReLU, but not both
         assert not (k_winners and relu)
