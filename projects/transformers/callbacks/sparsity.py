@@ -180,6 +180,7 @@ class RigLCallback(TrainerCallback):
         logging.info(f"Actual: removed {actual_pruned_on_params} fraction of on params")
 
         # For now, the logs are very robust to ensure pruning occurs as expected.
+        # TODO: Remove non-essential logging.
         logs = dict({
             "rigl/target_pruned_on_params": prune_fraction,
             "rigl/actual_pruned_on_params": actual_pruned_on_params,
@@ -192,8 +193,8 @@ class RigLCallback(TrainerCallback):
             "rigl/pre_grow_param_sparsity": param_sparsity2,
             "rigl/post_grow_mask_sparsity": mask_sparsity2,
         })
-
-        wandb.log(logs, step=state.global_step)
+        if wandb.run is not None:
+            wandb.log(logs, step=state.global_step)
 
 
 class PlotDensitiesCallback(TrainerCallback):
@@ -226,6 +227,9 @@ class PlotDensitiesCallback(TrainerCallback):
         """
 
         if state.global_step % self.plot_freq != 0:
+            return
+
+        if wandb.run is None:
             return
 
         # Plot densities for each layer.
