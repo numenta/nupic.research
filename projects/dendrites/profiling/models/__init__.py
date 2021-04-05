@@ -1,5 +1,6 @@
+# ------------------------------------------------------------------------------
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions apply:
 #
@@ -17,12 +18,8 @@
 #
 #  http://numenta.org/licenses/
 #
-
-from .alexnet import *
-from .alexnet_binaryactivation import *
-from .alexnet_binaryactivation_kwinners import *
-from .lenet_backpropstructure import *
-from .lesparsenet import *
-from .lenet_vdrop import *
-from .vdrop_resnet import *
-from .vdrop_lenet import *
+# ------------------------------------------------------------------------------
+from .multiheaded_sparse_mlp import MultiHeadedSparseMLP
+from .multiheaded_dendrite_mlp import MultiHeadedDendriticMLP
+from .dendrite_mlp import DendriticMLP
+from .sparse_mlp import SparseMLP
