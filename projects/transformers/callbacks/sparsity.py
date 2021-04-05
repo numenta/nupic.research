@@ -156,7 +156,7 @@ class RigLCallback(TrainerCallback):
         # Post-prune sparsities.
         param_sparsity1, mask_sparsity1 = calc_cumulative_sparsity(self.sparse_modules)
 
-        # Train for one step.
+        # Accumulate gradients over one batch.
         optimizer.zero_grad()
         train_batch = next(iter(train_dataloader))
         inputs_to_device(train_batch, device=args.device)

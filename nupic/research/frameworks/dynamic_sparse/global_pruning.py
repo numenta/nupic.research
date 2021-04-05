@@ -41,7 +41,7 @@ def global_prune_by_abs_weight(sparse_modules, prune_fraction):
     """
     assert 0 <= prune_fraction <= 1
 
-    # Flatten parameters to compare them all at once for global pruningn.
+    # Flatten parameters to compare them all at once for global pruning.
     flattened_params = parameters_to_vector([m.weight for m in sparse_modules])
     flattened_off_mask = parameters_to_vector([m.zero_mask for m in sparse_modules])
     flattened_on_mask = ~flattened_off_mask.bool()
