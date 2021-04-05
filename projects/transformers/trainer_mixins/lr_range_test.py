@@ -28,14 +28,15 @@ class LRRangeTestMixin:
     Neural Network Hyper-Parameters"
         - https://arxiv.org/pdf/1803.09820.pdf
 
-    Herein, a min_lr and max_lr are set, and training proceeds for a small number of
-    epochs (1-3) while the learning rate is linearly or exponentially increased.
-    Generally, the point at which the training loss begins to curve upwards, is
-    considered to be a reasonable choice for your max_lr in a cyclical lr-schedule. For
-    an exponential ramp-up, the ideal max_lr is roughly one order of magnitude below the
-    point in which the loss begins to increase. The same author recommends using 10-20
-    times lower this amount for your min_lr. Of course, in practice these heuristics may
-    vary.
+    To use this mixin, define min_lr and max_lr through the config and then run a small
+    number of steps of training (e.g. 100 steps). Throughout training the lr will be
+    gradually increased either linearly or exponentially. Next, review the plotted
+    training loss. This mixin won't calculate the max_lr you should use for training
+    with a OneCycle schedule. You must inspect the loss yourself and observe when the
+    loss begins to increase. This inflection point is where you should set your max_lr.
+    Note, sometimes the ideal max_lr turns out an order of magnitude lower; you know
+    this is the case if your training loss increases at all during training. For your
+    min_lr, the author recommends using 10-20 times lower than the max_lr.
 
     :param min_lr: starting lr
     :param max_lr: ending lr; presumed to be larger than min_lr
