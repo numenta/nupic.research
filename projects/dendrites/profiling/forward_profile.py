@@ -23,30 +23,33 @@ import time
 import torch
 import torch.autograd.profiler as profiler
 
+from dendritic_speed_experiments import OneSegmentDendriticLayer
 from models import DendriticMLP, SparseMLP
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.pytorch.models.common_models import StandardMLP
 
 
-def func(model, device, input_size, dendrite=False):
+def func(model, device, input_size, epochs=100, dendrite=False):
     batch_size = 4096
     use_cuda = device.type == "cuda"
     dummy_tensor = torch.rand((batch_size, input_size), device=device)
-    if dendrite:
-        dummy_context = torch.rand((batch_size, model.dim_context), device=device)
+    wall_clock = 0.0
+    for _ in range(epochs):
+        if dendrite:
+            dummy_context = torch.rand((batch_size, model.dim_context), device=device)
 
-        s = time.time()
-        with profiler.profile(record_shapes=True, use_cuda=use_cuda) as prof:
-            with profiler.record_function("model_inference"):
-                res = model(dummy_tensor, dummy_context)
-    else:
-        s = time.time()
-        with profiler.profile(record_shapes=True, use_cuda=use_cuda) as prof:
-            with profiler.record_function("model_inference"):
-                res = model(dummy_tensor)
+            s = time.time()
+            with profiler.profile(record_shapes=True, use_cuda=use_cuda) as prof:
+                with profiler.record_function("model_inference"):
+                    res = model(dummy_tensor, dummy_context)
+        else:
+            s = time.time()
+            with profiler.profile(record_shapes=True, use_cuda=use_cuda) as prof:
+                with profiler.record_function("model_inference"):
+                    res = model(dummy_tensor)
 
-    wall_clock = time.time() - s
-    print("Wall clock:", wall_clock)
+        wall_clock += time.time() - s
+    print("Wall clock:", wall_clock / epochs)
     if device.type == "cuda":
         print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
     else:
@@ -58,7 +61,7 @@ def func(model, device, input_size, dendrite=False):
     if res.sum() == 0:  # Just to make Python think we need res
         print(res.sum())
 
-    return wall_clock
+    return wall_clock / epochs
 
 
 if __name__ == "__main__":
@@ -75,12 +78,13 @@ if __name__ == "__main__":
         hidden_sizes=(2048, 2048, 2048),
         input_size=dendritic_net_ff_input_dim,
         output_dim=output_dim,
-        k_winners=False,
-        relu=True,
+        k_winners=True,
+        relu=False,
         k_winner_percent_on=0.1,
         dim_context=dim_context,
-        num_segments=(10, 10, 10),
+        num_segments=(1, 1, 1),
         sparsity=0.5,
+        dendritic_layer_class=OneSegmentDendriticLayer
     ).to(device)
 
     dense_net = StandardMLP(

@@ -29,4 +29,5 @@ from .dendritic_layers import (
     GatingDendriticLayer,
     GatingDendriticLayer2d,
     DendriticLayerBase,
+    OneSegmentDendriticLayer
 )
