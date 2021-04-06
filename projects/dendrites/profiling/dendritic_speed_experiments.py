@@ -45,7 +45,7 @@ class FlatAbsoluteMaxLayer(DendriticLayerBase):
         dendrite_activations = torch.gather(dendrite_activations, dim=2,
                                             index=unsqueezed)
         winning_activations = dendrite_activations.squeeze(dim=2)
-        return y * winning_activations
+        return y * torch.sigmoid(winning_activations)
 
 
 class FlatOneSegmentLayer(DendriticLayerBase):
