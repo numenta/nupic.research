@@ -65,7 +65,7 @@ tiny_bert_one_cycle_lr_debug.update(
     logging_steps=1,
     logging_first_step=True,
 
-    trainer_extra_kwargs=dict(
+    mixin_args=dict(
         max_lr=1.0,
         pct_start=0.3,
         anneal_strategy="linear",
@@ -88,7 +88,7 @@ tiny_bert_one_cycle_lr_50k = deepcopy(tiny_bert_50k)
 tiny_bert_one_cycle_lr_50k.update(
 
     trainer_class=OneCycleLRTrainer,
-    trainer_extra_kwargs=dict(
+    mixin_args=dict(
         max_lr=0.01,
         pct_start=0.3,
         anneal_strategy="linear",
@@ -116,7 +116,7 @@ tiny_bert_linear_lr_range_test.update(
     overwrite_output_dir=True,
     do_eval=False,
     trainer_class=LRRangeTestTrainer,
-    trainer_extra_kwargs=dict(
+    mixin_args=dict(
         min_lr=1e-5,
         max_lr=0.5,
         test_mode="linear"
@@ -126,7 +126,7 @@ tiny_bert_linear_lr_range_test.update(
 
 # lr range test with exponential ramp up
 tiny_bert_exponential_lr_range_test = deepcopy(tiny_bert_linear_lr_range_test)
-tiny_bert_exponential_lr_range_test["trainer_extra_kwargs"].update(
+tiny_bert_exponential_lr_range_test["mixin_args"].update(
     test_mode="exponential"
 )
 

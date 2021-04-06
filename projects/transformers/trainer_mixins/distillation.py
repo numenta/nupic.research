@@ -23,6 +23,7 @@ import logging
 
 import torch
 import torch.nn.functional as F
+from transformers import AutoModelForMaskedLM
 
 from nupic.research.frameworks.pytorch.model_utils import (
     filter_modules,
@@ -41,22 +42,14 @@ class DistillationTrainerMixin:
     fall back to regular loss computation.
     """
 
-    def __init__(
-        self,
-        teacher_models=None,
-        kd_ensemble_weights=None,
-        kd_factor_init=1.0,
-        kd_factor_end=1.0,
-        kd_temperature_init=1.0,
-        kd_temperature_end=1.0,
-        **kwargs,
-    ):
+    def __init__(self, *args, **kwargs):
         """
-        Add following variables to Trainer
+        Add following variables under 'mixin_args' through the training arguments.
 
-        :param teacher_models:  Pretrained models to be used as teacher
-                                in knowledge distillation. Can be one or list of
-                                models for knowledge distillation with ensemble.
+        :param teacher_model_names_or_paths: List of pretrained model names or paths to
+                                             use as teachers in knowledge distillation.
+        :param teacher_model_cache_dir: (optional) directory to load and save
+                                        pre-trained teacher models
         :param kd_ensemble_weights: List of weights to apply to each teacher model
                                 during distillation.
                                 If the total is > 1 the loss will be scaled out
@@ -86,16 +79,34 @@ class DistillationTrainerMixin:
                                 If None, no decay is applied. Defaults to None.
         """
 
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
+
+        mixin_args = self.args.mixin_args
+
+        teacher_names_or_paths = mixin_args.get("teacher_model_names_or_paths", None)
+        teacher_model_cache_dir = mixin_args.get("teacher_model_cache_dir", None)
+        kd_ensemble_weights = mixin_args.get("kd_ensemble_weights", None)
+        kd_factor_init = mixin_args.get("kd_factor_init", 1.0)
+        kd_factor_end = mixin_args.get("kd_factor_end", 1.0)
+        kd_temperature_init = mixin_args.get("kd_temperature_init", 1.0)
+        kd_temperature_end = mixin_args.get("kd_temperature_end", 1.0)
 
         # Validate teacher models
         assert (
-            teacher_models is not None
-        ), "When using KD mixin, teacher_models must be defined"
+            isinstance(teacher_names_or_paths, list) and len(teacher_names_or_paths) > 0
+        ), "When using KD mixin, teacher_models_name_or_path must be defined"
 
-        if type(teacher_models) != list:
+        teacher_models = []
+        for model_name_or_path in teacher_names_or_paths:
+            teacher_model = AutoModelForMaskedLM.from_pretrained(
+                model_name_or_path,
+                cache_dir=teacher_model_cache_dir
+            )
+            teacher_model.resize_token_embeddings(len(self.tokenizer))
+            teacher_models.append(teacher_model)
+
+        if len(teacher_models) == 1:
             logging.info(f"KD single teacher class: {teacher_models.__class__}")
-            teacher_models = [teacher_models]
         else:
             logging.info(f"KD teacher is ensemble of {len(teacher_models)} models")
 

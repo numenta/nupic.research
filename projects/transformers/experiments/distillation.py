@@ -52,12 +52,11 @@ debug_bert_kd.update(
 
     # Distillation Arguments
     trainer_class=DistillationTrainer,
-    teacher_models_name_or_path=[
-        "bert-large-cased",
-        # "roberta-large"
-    ],
-    trainer_extra_kwargs=dict(
+
+    mixin_args=dict(
         # kd_ensemble_weights=None,
+        teacher_model_names_or_paths=["bert-large-cased"],
+        teacher_model_cache_dir="/mnt/efs/results/pretrained-models/huggingface",
         kd_factor_init=1.0,
         kd_factor_end=1.0,
         kd_temperature_init=1.0,
@@ -91,13 +90,14 @@ tiny_bert_100k_kd.update(
 
     # Distillation Arguments
     trainer_class=DistillationTrainer,
-    teacher_models_name_or_path=[
-        "bert-base-cased"
-        # "prajjwal1/bert-tiny",
-        # "roberta-large"
-    ],
-    trainer_extra_kwargs=dict(
+    mixin_args=dict(
         # kd_ensemble_weights=None,
+        teacher_model_names_or_paths=[
+            "bert-base-cased"
+            # "prajjwal1/bert-tiny",
+            # "roberta-large"
+        ],
+        teacher_model_cache_dir="/mnt/efs/results/pretrained-models/huggingface",
         kd_factor_init=1.0,
         kd_factor_end=1.0,
         kd_temperature_init=1.0,
