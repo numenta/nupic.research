@@ -97,6 +97,11 @@ def register_bert_model(bert_cls):
     masked_lm_cls = create_masked_lm_class(bert_cls, name_prefix)
     seq_classification_cls = create_sequence_classification_class(bert_cls, name_prefix)
 
+    # Specify the correct config class
+    bert_cls.config_class = config_cls
+    masked_lm_cls.config_class = config_cls
+    seq_classification_cls.config_class = config_cls
+
     # Update Transformers mappings to auto-load these new models.
     CONFIG_MAPPING.update({
         config_cls.model_type: config_cls

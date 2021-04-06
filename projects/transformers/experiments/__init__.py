@@ -29,6 +29,8 @@ from .bertitos import CONFIGS as BERTITOS
 from .distillation import CONFIGS as DISTILLATION
 from .finetuning import CONFIGS as FINETUNING
 from .hpsearch import CONFIGS as HPSEARCH
+from .one_cycle_lr import CONFIGS as ONE_CYCLE_LR
+from .rigl_bert import CONFIGS as RIGL_BERT
 from .sparse_bert import CONFIGS as SPARSE_BERT
 
 """
@@ -44,4 +46,6 @@ CONFIGS.update(BERTITOS)
 CONFIGS.update(DISTILLATION)
 CONFIGS.update(FINETUNING)
 CONFIGS.update(HPSEARCH)
+CONFIGS.update(ONE_CYCLE_LR)
+CONFIGS.update(RIGL_BERT)
 CONFIGS.update(SPARSE_BERT)
