@@ -21,9 +21,17 @@
 
 from copy import deepcopy
 
-from callbacks import PlotDensitiesCallback, RezeroWeightsCallback, RigLCallback
+from transformers import Trainer
+
+from callbacks import PlotDensitiesCallback, RezeroWeightsCallback
+from trainer_mixins import RigLMixin
 
 from .bertitos import small_bert_100k, tiny_bert_100k, tiny_bert_debug
+
+
+class RigLTrainer(RigLMixin, Trainer):
+    pass
+
 
 # Results:
 # |--------------------------------------------------------------------------|
@@ -44,9 +52,12 @@ tiny_bert_rigl_debug.update(
     model_type="fully_static_sparse_bert",
     trainer_callbacks=[
         RezeroWeightsCallback(),
-        # RigLCallback(prune_freq=5),
         PlotDensitiesCallback(plot_freq=5),
     ],
+    trainer_class=RigLTrainer,
+    mixin_args=dict(
+        prune_freq=5,
+    ),
 )
 tiny_bert_rigl_debug["config_kwargs"].update(
     sparsity=0.8,
@@ -59,8 +70,12 @@ tiny_bert_rigl_100k.update(
     model_type="static_sparse_encoder_bert",
     trainer_callbacks=[
         RezeroWeightsCallback(),
-        RigLCallback(prune_fraction=0.2, prune_freq=1000)
     ],
+    trainer_class=RigLTrainer,
+    mixin_args=dict(
+        prune_fraction=0.2,
+        prune_freq=1000,
+    ),
 )
 tiny_bert_rigl_100k["config_kwargs"].update(
     sparsity=0.5,
@@ -96,9 +111,13 @@ tiny_bert_full_sparse_rigl_100k.update(
     model_type="fully_static_sparse_bert",
     trainer_callbacks=[
         RezeroWeightsCallback(),
-        RigLCallback(prune_fraction=0.2, prune_freq=1000),
         PlotDensitiesCallback(plot_freq=1000),
     ],
+    trainer_class=RigLTrainer,
+    mixin_args=dict(
+        prune_fraction=0.2,
+        prune_freq=1000,
+    ),
     fp16=True,
 )
 tiny_bert_full_sparse_rigl_100k["config_kwargs"].update(
@@ -113,9 +132,13 @@ tiny_bert_full_sparse_rigl_300k_prune_perc_30.update(
     model_type="fully_static_sparse_bert",
     trainer_callbacks=[
         RezeroWeightsCallback(),
-        RigLCallback(prune_fraction=0.3, prune_freq=100),
         PlotDensitiesCallback(plot_freq=1000),
     ],
+    trainer_class=RigLTrainer,
+    mixin_args=dict(
+        prune_fraction=0.3,
+        prune_freq=100,
+    ),
     fp16=True,
     overwrite_output_dir=True,
     evaluation_strategy="steps",
@@ -145,9 +168,13 @@ small_bert_rigl_100k.update(
     model_type="fully_static_sparse_bert",
     trainer_callbacks=[
         RezeroWeightsCallback(),
-        RigLCallback(prune_fraction=0.3, prune_freq=100),
         PlotDensitiesCallback(plot_freq=1000),
     ],
+    trainer_class=RigLTrainer,
+    mixin_args=dict(
+        prune_fraction=0.3,
+        prune_freq=100,
+    ),
     fp16=True,
     overwrite_output_dir=True,
 )
