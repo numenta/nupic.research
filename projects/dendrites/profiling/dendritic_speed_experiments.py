@@ -26,8 +26,8 @@ import torch.autograd.profiler as profiler
 from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
     DendriticLayerBase,
+    OneSegmentDendriticLayer,
 )
-from nupic.torch.modules.sparse_weights import SparseWeights
 
 
 class FlatAbsoluteMaxLayer(DendriticLayerBase):
@@ -45,7 +45,7 @@ class FlatAbsoluteMaxLayer(DendriticLayerBase):
         dendrite_activations = torch.gather(dendrite_activations, dim=2,
                                             index=unsqueezed)
         winning_activations = dendrite_activations.squeeze(dim=2)
-        return y * winning_activations
+        return y * torch.sigmoid(winning_activations)
 
 
 class FlatOneSegmentLayer(DendriticLayerBase):
@@ -63,54 +63,6 @@ class FlatOneSegmentLayer(DendriticLayerBase):
         """Apply dendrites as a gating mechanism."""
         winning_activations = dendrite_activations.squeeze(dim=2)
         return y * torch.sigmoid(winning_activations)
-
-
-class OneSegmentDendriticLayer(SparseWeights):
-    """
-    Class for a layer of units with exactly one sparse dendritic segment per unit. With
-    this assumption the segments are just a straightforward linear SparseWeights layer.
-    It seems to be 3-6 times faster than other implementations depending on settings.
-    """
-
-    def __init__(
-        self, module, dim_context, module_sparsity, dendrite_sparsity,
-        num_segments=1, dendrite_bias=False
-    ):
-        """
-        :param module: linear module from in-units to out-units
-        :param dim_context: length of the context vector;
-                            the same context will be applied to each segment
-        :param module_sparsity: sparsity applied over linear module;
-        :param dendrite_sparsity: sparsity applied transformation per unit per segment
-        :param num_segments: number of dendrite segments per out-unit. Must be 1.
-        :param dendrite_bias: bool indicating whether or not dendrite activations have
-               an additive bias
-        """
-        assert(num_segments == 1)
-
-        self.segments = None
-        super().__init__(module, sparsity=module_sparsity)
-
-        self.segments = SparseWeights(
-            torch.nn.Linear(dim_context,
-                            module.weight.shape[0],
-                            bias=dendrite_bias),
-            dendrite_sparsity)
-
-        self.rezero_weights()
-
-    def rezero_weights(self):
-        """Set the previously selected weights to zero."""
-        super().rezero_weights()
-        if self.segments is not None:  # only none at beginning of init
-            self.segments.rezero_weights()
-
-    def forward(self, x, context):
-        """Compute of linear layer and apply output of dendrite segments."""
-        y = super().forward(x)
-        dendrite_activations = self.segments(context)
-        r = y * torch.sigmoid(dendrite_activations)
-        return r
 
 
 def profile_model(device,
