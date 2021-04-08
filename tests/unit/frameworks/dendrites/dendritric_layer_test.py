@@ -31,6 +31,7 @@ from nupic.research.frameworks.dendrites import (
     GatingDendriticLayer,
     GatingDendriticLayer2d,
 )
+from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 
 class DendriteSegmentsTests(unittest.TestCase):
@@ -374,6 +375,22 @@ class AbsoluteMaxGatingDendriticLayerTests(unittest.TestCase):
 
         out = dendrite_layer(x, context)
         self.assertEqual(out.shape, (8, 10))
+
+    def test_segment_sparsity(self):
+        """Test sparsity of dendritic segments."""
+        linear = torch.nn.Linear(10, 11)
+        dendrite_layer = AbsoluteMaxGatingDendriticLayer(
+            module=linear,
+            num_segments=10,
+            dim_context=100,
+            module_sparsity=0.7,
+            dendrite_sparsity=0.9,
+            dendrite_bias=False,
+        )
+
+        params, nonzero_params = count_nonzero_params(dendrite_layer.segments)
+        self.assertAlmostEqual(0.1, nonzero_params / params)
+        self.assertEqual(1100, nonzero_params)
 
     def test_apply_gating_dendrites(self):
         """

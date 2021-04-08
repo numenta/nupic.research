@@ -50,7 +50,7 @@ class OneSegmentDendriticLayerTests(unittest.TestCase):
         self.assertEqual(out.shape, (batch_size, num_units))
 
     def test_segment_sparsity(self):
-        """Validate shape of forward output."""
+        """Test sparsity of dendritic segments."""
         linear = torch.nn.Linear(10, 11)
         dendrite_layer = OneSegmentDendriticLayer(
             module=linear,
