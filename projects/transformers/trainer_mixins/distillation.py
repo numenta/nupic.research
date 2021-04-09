@@ -44,7 +44,8 @@ class DistillationTrainerMixin:
 
     def __init__(self, *args, **kwargs):
         """
-        Add following variables under 'mixin_args' through the training arguments.
+        Add following variables under 'trainer_mixin_args' through the training
+        arguments.
 
         :param teacher_model_names_or_paths: List of pretrained model names or paths to
                                              use as teachers in knowledge distillation.
@@ -81,7 +82,7 @@ class DistillationTrainerMixin:
 
         super().__init__(*args, **kwargs)
 
-        mixin_args = self.args.mixin_args
+        mixin_args = self.args.trainer_mixin_args
 
         teacher_names_or_paths = mixin_args.get("teacher_model_names_or_paths", None)
         teacher_models_cache_dir = mixin_args.get("teacher_models_cache_dir", None)
