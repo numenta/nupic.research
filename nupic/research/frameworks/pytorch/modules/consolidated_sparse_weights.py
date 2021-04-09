@@ -91,7 +91,7 @@ class ConsolidatedSparseWeights(SparseWeights):
         """
         super(ConsolidatedSparseWeights, self).__init__(
             module,
-            sparsity=weight_sparsity
+            sparsity=1 - weight_sparsity
         )
         assert isinstance(module, nn.Linear)
 
