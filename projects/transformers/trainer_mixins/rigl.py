@@ -43,6 +43,7 @@ class RigLMixin:
 
     .. _RigL: https://arxiv.org/abs/1911.11134
 
+    Params to add to 'trainer_mixin_args':
     :param prune_fraction: initial fraction of weights to prune
     :param prune_freq: how often, in iterations, to prune and regrow weights
     :param warmup_steps: defaults to prune_freq; e.g. prune_freq of 100 will allow 100
@@ -52,7 +53,7 @@ class RigLMixin:
     def __init__(self, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
-        mixin_args = self.args.mixin_args
+        mixin_args = self.args.trainer_mixin_args
 
         self.prune_fraction = mixin_args.get("prune_fraction", 0.3)
         self.prune_freq = mixin_args.get("prune_freq", 100)
@@ -138,6 +139,7 @@ class RigLMixin:
 # -------------
 # Utilities
 # -------------
+
 
 def inputs_to_device(inputs, device):
     """

@@ -55,7 +55,7 @@ tiny_bert_rigl_debug.update(
         PlotDensitiesCallback(plot_freq=5),
     ],
     trainer_class=RigLTrainer,
-    mixin_args=dict(
+    trainer_mixin_args=dict(
         prune_freq=5,
     ),
 )
@@ -72,7 +72,7 @@ tiny_bert_rigl_100k.update(
         RezeroWeightsCallback(),
     ],
     trainer_class=RigLTrainer,
-    mixin_args=dict(
+    trainer_mixin_args=dict(
         prune_fraction=0.2,
         prune_freq=1000,
     ),
@@ -114,7 +114,7 @@ tiny_bert_full_sparse_rigl_100k.update(
         PlotDensitiesCallback(plot_freq=1000),
     ],
     trainer_class=RigLTrainer,
-    mixin_args=dict(
+    trainer_mixin_args=dict(
         prune_fraction=0.2,
         prune_freq=1000,
     ),
@@ -135,7 +135,7 @@ tiny_bert_full_sparse_rigl_300k_prune_perc_30.update(
         PlotDensitiesCallback(plot_freq=1000),
     ],
     trainer_class=RigLTrainer,
-    mixin_args=dict(
+    trainer_mixin_args=dict(
         prune_fraction=0.3,
         prune_freq=100,
     ),
@@ -171,7 +171,7 @@ small_bert_rigl_100k.update(
         PlotDensitiesCallback(plot_freq=1000),
     ],
     trainer_class=RigLTrainer,
-    mixin_args=dict(
+    trainer_mixin_args=dict(
         prune_fraction=0.3,
         prune_freq=100,
     ),
