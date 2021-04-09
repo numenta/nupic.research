@@ -163,7 +163,7 @@ class OneSegmentDendriticLayer(SparseWeights):
             torch.nn.Linear(dim_context,
                             module.weight.shape[0],
                             bias=dendrite_bias),
-            dendrite_sparsity)
+            sparsity=dendrite_sparsity)
 
         self.rezero_weights()
 
@@ -177,8 +177,11 @@ class OneSegmentDendriticLayer(SparseWeights):
         """Compute of linear layer and apply output of dendrite segments."""
         y = super().forward(x)
         dendrite_activations = self.segments(context)
-        r = y * torch.sigmoid(dendrite_activations)
-        return r
+        return self.apply_dendrites(y, dendrite_activations)
+
+    def apply_dendrites(self, y, dendrite_activations):
+        """Apply dendrites as a sigmoidal gating mechanism."""
+        return y * torch.sigmoid(dendrite_activations)
 
 
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
