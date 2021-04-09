@@ -894,7 +894,26 @@ def run_hyperparameter_search(
     )
 
     # Specify how to re-init model each training run.
-    model_init = partial(init_model, model_args, config, tokenizer, False)
+    def model_init():
+
+        # Our custom model mapping made for sparse models must be imported here
+        # as ray uses an independently imported version of transformers which
+        # doesn't have access to this updated mapping.
+        from models import MODEL_FOR_MASKED_LM_MAPPING as CUSTOM_MASKED_LM_MAPPING
+        from models import CONFIG_MAPPING as CUSTOM_CONFIG_MAPPING
+
+        # For now, we'll only load new models from scratch.
+        assert model_args.model_name_or_path is None, \
+            "HP search with saved models not supported."
+        logging.info("Pretraining new model from scratch")
+
+        # Instantiate model; possibly one of our custom sparse models.
+        config_cls = CUSTOM_CONFIG_MAPPING[config.model_type]
+        model_for_lm_cls = CUSTOM_MASKED_LM_MAPPING[config_cls]
+        model = model_for_lm_cls(config)
+        model.resize_token_embeddings(len(tokenizer))
+        return model
+
     trainer = init_trainer(
         tokenizer=tokenizer,
         data_collator=data_collator,
