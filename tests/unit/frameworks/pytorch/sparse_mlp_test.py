@@ -27,7 +27,7 @@ from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.pytorch.models.common_models import SparseMLP
 
 
-class OneSegmentDendriticLayerTests(unittest.TestCase):
+class SparseMLPTests(unittest.TestCase):
     def test_forward_output_shape(self):
         """Validate shape of forward output."""
         input_dim = 10
@@ -48,7 +48,7 @@ class OneSegmentDendriticLayerTests(unittest.TestCase):
         sparse_mlp = SparseMLP(input_dim,
                                11,
                                hidden_sizes=(hidden_dim,),
-                               weight_sparsity=(0.9,)
+                               weight_sparsity=(0.1,)
                                )
 
         params, nonzero_params = count_nonzero_params(sparse_mlp.linear1)
