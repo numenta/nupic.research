@@ -40,7 +40,7 @@ class CustomTrainingArguments(TrainingArguments):
             "help": "How many runs per task. Currently only used for finetuning."
         },
     )
-    mixin_args: Dict = field(
+    trainer_mixin_args: Dict = field(
         default_factory=dict,
         metadata={
             "help": "Extra arguments to be passed to Trainer. Can be accessed "

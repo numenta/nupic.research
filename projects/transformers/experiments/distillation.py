@@ -53,7 +53,7 @@ debug_bert_kd.update(
     # Distillation Arguments
     trainer_class=DistillationTrainer,
 
-    mixin_args=dict(
+    trainer_mixin_args=dict(
         # kd_ensemble_weights=None,
         teacher_model_names_or_paths=["bert-large-cased"],
         teacher_model_cache_dir="/mnt/efs/results/pretrained-models/huggingface",
@@ -90,7 +90,7 @@ tiny_bert_100k_kd.update(
 
     # Distillation Arguments
     trainer_class=DistillationTrainer,
-    mixin_args=dict(
+    trainer_mixin_args=dict(
         # kd_ensemble_weights=None,
         teacher_model_names_or_paths=[
             "bert-base-cased"
@@ -113,9 +113,6 @@ tiny_bert_100k_kd.update(
 # 2.25 steps/sec
 tiny_bert_50k_kd = deepcopy(tiny_bert_100k_kd)
 tiny_bert_50k_kd.update(
-    teacher_models_name_or_path=[
-        "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
-    ],
     overwrite_output_dir=True,
 
     # Training Arguments
@@ -128,6 +125,16 @@ tiny_bert_50k_kd.update(
     warmup_steps=1000,
     max_steps=50000,
     lr_scheduler_type="linear",
+
+    trainer_mixin_args=dict(
+        teacher_model_names_or_paths=[
+            "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi"
+        ],
+        kd_factor_init=1.0,
+        kd_factor_end=1.0,
+        kd_temperature_init=1.0,
+        kd_temperature_end=1.0,
+    ),
 )
 
 

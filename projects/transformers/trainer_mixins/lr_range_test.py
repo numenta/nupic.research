@@ -38,7 +38,7 @@ class LRRangeTestMixin:
     this is the case if your training loss increases at all during training. For your
     min_lr, the author recommends using 10-20 times lower than the max_lr.
 
-    Params to add to 'mixin_args':
+    Params to add to 'trainer_mixin_args':
     :param min_lr: starting lr
     :param max_lr: ending lr; presumed to be larger than min_lr
     :param test_mode: either linear or exponential
@@ -56,9 +56,9 @@ class LRRangeTestMixin:
 
         super().__init__(*args, **kwargs)
 
-        self.min_lr = self.args.mixin_args.get("min_lr", None)
-        self.max_lr = self.args.mixin_args.get("max_lr", None)
-        self.test_mode = self.args.mixin_args.get("test_mode", "linear")
+        self.min_lr = self.args.trainer_mixin_args.get("min_lr", None)
+        self.max_lr = self.args.trainer_mixin_args.get("max_lr", None)
+        self.test_mode = self.args.trainer_mixin_args.get("test_mode", "linear")
 
         assert isinstance(self.min_lr, float)
         assert isinstance(self.max_lr, float)
