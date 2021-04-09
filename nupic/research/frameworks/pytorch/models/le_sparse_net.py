@@ -153,7 +153,11 @@ def add_sparse_linear_layer(
             )
         else:
             network.add_module(
-                "linear{}".format(suffix), SparseWeights(linear, weight_sparsity)
+                "linear{}".format(suffix),
+                SparseWeights(
+                    linear,
+                    sparsity=weight_sparsity
+                )
             )
     else:
         network.add_module("linear{}_linear".format(suffix), linear)
