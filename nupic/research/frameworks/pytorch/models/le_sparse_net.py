@@ -156,7 +156,7 @@ def add_sparse_linear_layer(
                 "linear{}".format(suffix),
                 SparseWeights(
                     linear,
-                    sparsity=weight_sparsity
+                    sparsity=1 - weight_sparsity
                 )
             )
     else:
