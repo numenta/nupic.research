@@ -24,9 +24,10 @@ from copy import deepcopy
 from transformers import Trainer
 
 from callbacks import PlotDensitiesCallback, RezeroWeightsCallback
-from trainer_mixins import RigLMixin
+from trainer_mixins import DistillationTrainerMixin, OneCycleLRMixin, RigLMixin
 
 from .bertitos import small_bert_100k, tiny_bert_100k, tiny_bert_debug
+from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
 
 
 class RigLTrainer(RigLMixin, Trainer):
@@ -82,22 +83,7 @@ tiny_bert_rigl_100k["config_kwargs"].update(
 )
 
 
-# Fully static sparse bert (sparse encoding and sparse embeddings).
-tiny_bert_static_full_sparse_100k = deepcopy(tiny_bert_100k)
-tiny_bert_static_full_sparse_100k.update(
-    model_type="fully_static_sparse_bert",
-    trainer_callbacks=[
-        RezeroWeightsCallback(),
-    ],
-    fp16=True,
-    overwrite_output_dir=True,
-)
-tiny_bert_static_full_sparse_100k["config_kwargs"].update(
-    sparsity=0.8,
-)
-
-
-tiny_bert_static_full_sparse_300k = deepcopy(tiny_bert_static_full_sparse_100k)
+tiny_bert_static_full_sparse_300k = deepcopy(tiny_bert_sparse_100k)
 tiny_bert_static_full_sparse_300k.update(
     max_steps=300000,
     evaluation_strategy="steps",
@@ -153,17 +139,7 @@ tiny_bert_full_sparse_rigl_300k_prune_perc_30["config_kwargs"].update(
 # Small BERT
 # ----------
 
-small_bert_sparse_100k = deepcopy(small_bert_100k)
-small_bert_sparse_100k.update(
-    model_type="fully_static_sparse_bert",
-    trainer_callbacks=[
-        RezeroWeightsCallback(),
-    ],
-    fp16=True,
-    overwrite_output_dir=True,
-)
-
-small_bert_rigl_100k = deepcopy(small_bert_100k)
+small_bert_rigl_100k = deepcopy(small_bert_sparse_100k)
 small_bert_rigl_100k.update(
     model_type="fully_static_sparse_bert",
     trainer_callbacks=[
@@ -183,11 +159,9 @@ small_bert_rigl_100k.update(
 CONFIGS = dict(
     tiny_bert_rigl_debug=tiny_bert_rigl_debug,
     tiny_bert_rigl_100k=tiny_bert_rigl_100k,
-    tiny_bert_static_full_sparse_100k=tiny_bert_static_full_sparse_100k,
     tiny_bert_static_full_sparse_300k=tiny_bert_static_full_sparse_300k,
     tiny_bert_full_sparse_rigl_100k=tiny_bert_full_sparse_rigl_100k,
     tiny_bert_full_sparse_rigl_300k_prune_perc_30=tiny_bert_full_sparse_rigl_300k_prune_perc_30,  # noqa E501
 
-    small_bert_sparse_100k=small_bert_sparse_100k,
     small_bert_rigl_100k=small_bert_rigl_100k,
 )
