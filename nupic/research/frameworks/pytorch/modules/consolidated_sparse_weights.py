@@ -89,7 +89,10 @@ class ConsolidatedSparseWeights(SparseWeights):
         :param weight_sparsity:
           Pct of weights that are allowed to be non-zero in the layer.
         """
-        super(ConsolidatedSparseWeights, self).__init__(module, weight_sparsity)
+        super(ConsolidatedSparseWeights, self).__init__(
+            module,
+            sparsity=1 - weight_sparsity
+        )
         assert isinstance(module, nn.Linear)
 
     def compute_indices(self):
