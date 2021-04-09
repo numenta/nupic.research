@@ -62,7 +62,6 @@ from run_utils import (
     init_datasets_mlm,
     init_datasets_task,
     init_model,
-    init_teacher_models,
     init_tokenizer,
     init_trainer,
     preprocess_datasets_mlm,
@@ -222,12 +221,6 @@ def run_pretraining(
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
-    # Initialize distillation models
-    if model_args.teacher_models_name_or_path:
-        model_args.trainer_extra_kwargs["teacher_models"] = init_teacher_models(
-            model_args, tokenizer
-        )
-
     # Run hp search or regular training
     if model_args.hp_num_trials >= 1:
         run_hyperparameter_search(
@@ -248,7 +241,6 @@ def run_pretraining(
             eval_dataset=eval_dataset if training_args.do_eval else None,
             model=init_model(model_args, config, tokenizer),
             trainer_class=model_args.trainer_class,
-            trainer_extra_kwargs=model_args.trainer_extra_kwargs,
             trainer_callbacks=model_args.trainer_callbacks or None,
         )
         if training_args.do_train:

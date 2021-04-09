@@ -38,17 +38,12 @@ class LRRangeTestMixin:
     this is the case if your training loss increases at all during training. For your
     min_lr, the author recommends using 10-20 times lower than the max_lr.
 
+    Params to add to 'trainer_mixin_args':
     :param min_lr: starting lr
     :param max_lr: ending lr; presumed to be larger than min_lr
     :param test_mode: either linear or exponential
     """
-    def __init__(
-        self,
-        min_lr=None,
-        max_lr=None,
-        test_mode="linear",
-        **kwargs,
-    ):
+    def __init__(self, *args, **kwargs):
 
         # The LambdaLR will multiply this base lr of 1 times the one at the given step.
         kwargs["args"].learning_rate = 1
@@ -59,13 +54,15 @@ class LRRangeTestMixin:
         # Turn off eval since it's satisfactory to just look at the training loss.
         kwargs["args"].do_eval = False
 
-        super().__init__(**kwargs)
-        assert isinstance(min_lr, float)
-        assert isinstance(max_lr, float)
-        assert test_mode in ["linear", "exponential"]
-        self.min_lr = min_lr
-        self.max_lr = max_lr
-        self.test_mode = test_mode
+        super().__init__(*args, **kwargs)
+
+        self.min_lr = self.args.trainer_mixin_args.get("min_lr", None)
+        self.max_lr = self.args.trainer_mixin_args.get("max_lr", None)
+        self.test_mode = self.args.trainer_mixin_args.get("test_mode", "linear")
+
+        assert isinstance(self.min_lr, float)
+        assert isinstance(self.max_lr, float)
+        assert self.test_mode in ["linear", "exponential"]
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """

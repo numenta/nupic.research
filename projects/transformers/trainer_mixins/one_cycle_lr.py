@@ -25,36 +25,28 @@ from torch.optim.lr_scheduler import OneCycleLR
 class OneCycleLRMixin:
     """
     Mixin to HF Trainer for using the `OneCycleLR`_. See documentation for argument
-    details.
+    details. Arguments for the one-cycle lr schedule must be passed though
+    'trainer_mixin_args'.
 
     .. _OneCycleLR:
         https://pytorch.org/docs/stable/optim.html#torch.optim.lr_scheduler.OneCycleLR
     """
 
-    def __init__(
-        self,
-        max_lr=1e-2,
-        pct_start=0.3,
-        anneal_strategy="linear",
-        cycle_momentum=True,
-        base_momentum=0.85,
-        max_momentum=0.95,
-        div_factor=25,
-        final_div_factor=1e4,
-        last_epoch=-1,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
 
-        self.max_lr = max_lr
-        self.pct_start = pct_start
-        self.anneal_strategy = anneal_strategy
-        self.cycle_momentum = cycle_momentum
-        self.base_momentum = base_momentum
-        self.max_momentum = max_momentum
-        self.div_factor = div_factor
-        self.final_div_factor = final_div_factor
-        self.last_epoch = last_epoch
+        super().__init__(*args, **kwargs)
+
+        mixin_args = self.args.trainer_mixin_args
+
+        self.max_lr = mixin_args.get("max_lr", 1e-2)
+        self.pct_start = mixin_args.get("pct_start", 0.3)
+        self.anneal_strategy = mixin_args.get("anneal_strategy", "linear")
+        self.cycle_momentum = mixin_args.get("cycle_momentum", True)
+        self.base_momentum = mixin_args.get("base_momentum", 0.85)
+        self.max_momentum = mixin_args.get("max_momentum", 0.95)
+        self.div_factor = mixin_args.get("div_factor", 25)
+        self.final_div_factor = mixin_args.get("final_div_factor", 1e4)
+        self.last_epoch = mixin_args.get("last_epoch", -1)
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """
