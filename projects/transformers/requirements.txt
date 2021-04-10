@@ -22,7 +22,7 @@
 # Run pip install -r requirements.txt to reproduce the currently tested environment
 # Last update: 3/29/2021
 
-transformers>=4.4.2,<=4.5.0
+transformers>=4.4.2,<4.5.0
 datasets>=1.5.0,<=1.6.0
 torch>=1.8.1
 wandb>=0.10.23
