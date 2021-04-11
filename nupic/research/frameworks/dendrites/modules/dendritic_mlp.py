@@ -111,7 +111,6 @@ class DendriticMLP(nn.Module):
             self._init_sparse_dendrites(self.dend2, 0.95)
 
         elif dendrite_init == "hardcoded":
-
             # Dendritic weights will not be updated during backward pass
             for name, param in self.named_parameters():
                 if "segments" in name:
@@ -128,7 +127,8 @@ class DendriticMLP(nn.Module):
         return output
 
     # ------ Weight initialization functions
-    def _init_sparse_weights(self, m, input_sparsity):
+    @staticmethod
+    def _init_sparse_weights(m, input_sparsity):
         """
         Modified Kaiming weight initialization that considers input sparsity and weight
         sparsity.
@@ -140,7 +140,8 @@ class DendriticMLP(nn.Module):
         nn.init.uniform_(m.module.weight, -bound, bound)
         m.apply(rezero_weights)
 
-    def _init_sparse_dendrites(self, m, input_sparsity):
+    @staticmethod
+    def _init_sparse_dendrites(m, input_sparsity):
         """
         Modified Kaiming initialization for dendrites segments that consider input
         sparsity and dendritic weight sparsity.
@@ -178,7 +179,8 @@ class DendriticMLP(nn.Module):
         self._hardcode_dendritic_weights(self.dend1.segments, context_vectors, init)
         self._hardcode_dendritic_weights(self.dend2.segments, context_vectors, init)
 
-    def _hardcode_dendritic_weights(self, dendrite_segments, context_vectors, init):
+    @staticmethod
+    def _hardcode_dendritic_weights(dendrite_segments, context_vectors, init):
         num_units, num_segments, dim_context = dendrite_segments.weights.size()
         num_contexts, _ = context_vectors.size()
 
