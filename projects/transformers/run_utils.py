@@ -25,7 +25,6 @@ import logging
 import math
 import os
 from collections import Counter, defaultdict
-from dataclasses import replace
 from functools import partial
 from hashlib import blake2b
 
@@ -57,7 +56,6 @@ __all__ = [
     "init_datasets_mlm",
     "init_datasets_task",
     "init_model",
-    "init_teacher_models",
     "init_tokenizer",
     "init_trainer",
     "preprocess_datasets_mlm",
@@ -680,7 +678,7 @@ def init_trainer(
     task_name=None,
     is_regression=False,
     trainer_class=Trainer,
-    trainer_extra_kwargs=None,
+    model_init=None,
 ):
     """Initialize Trainer, main class that controls the experiment"""
     if trainer_callbacks is not None:
@@ -696,8 +694,8 @@ def init_trainer(
         eval_dataset=eval_dataset,
         data_collator=data_collator,
         callbacks=trainer_callbacks,
+        model_init=model_init,
     )
-    trainer_kwargs.update(trainer_extra_kwargs)
 
     # Add specific metrics for finetuning task
     if finetuning:
@@ -867,20 +865,6 @@ def hash_dataset_folder_name(data_args):
     return hashed_folder_name
 
 
-def init_teacher_models(model_args, tokenizer):
-    """Initialize and return list of teacher models"""
-
-    teacher_models = []
-    for model_name_or_path in model_args.teacher_models_name_or_path:
-        teacher_args = replace(model_args, model_name_or_path=model_name_or_path)
-        teacher_config = init_config(teacher_args)
-        teacher_models.append(init_model(teacher_args, teacher_config, tokenizer))
-
-    logging.info(f"{len(teacher_models)} teacher models initialized.")
-
-    return teacher_models
-
-
 def run_hyperparameter_search(
     model_args,
     config,
@@ -895,9 +879,6 @@ def run_hyperparameter_search(
     Not tested when using multiple instances with torch.distributed.launch
     """
 
-    model_args.trainer_extra_kwargs.update(
-        model_init=partial(init_model, model_args, config, tokenizer, False)
-    )
     training_args.load_best_model_at_end = True
     training_args.disable_tqdm = True
     # TODO: sync metric_for_best_model with compute_objective, should be same metric
@@ -912,6 +893,8 @@ def run_hyperparameter_search(
         index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
     )
 
+    # Specify how to re-init model each training run.
+    model_init = partial(init_model, model_args, config, tokenizer, False)
     trainer = init_trainer(
         tokenizer=tokenizer,
         data_collator=data_collator,
@@ -919,8 +902,8 @@ def run_hyperparameter_search(
         train_dataset=train_dataset,
         eval_dataset=hp_eval_dataset,
         trainer_class=model_args.trainer_class,
-        trainer_extra_kwargs=model_args.trainer_extra_kwargs,
         trainer_callbacks=model_args.trainer_callbacks or None,
+        model_init=model_init,
     )
 
     hp_search_kwargs = dict(
