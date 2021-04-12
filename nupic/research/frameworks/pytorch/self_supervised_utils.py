@@ -44,7 +44,6 @@ def train_model_unsupervised(
     batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
     post_batch_callback=None,
-    pre_model_transform=None,
     transform_to_device_fn=None,
     progress_bar=None,
 ):
@@ -73,18 +72,6 @@ def train_model_unsupervised(
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters: model, batch_idx
     :type post_batch_callback: function
-    :param pre_model_transform: An optional function which can be used to transform
-                                the data before passing into the model. For
-                                self-supervised tasks, this would be something like
-                                taking an image and turning it into many overlapping
-                                patches
-    :type pre_model_transform: function
-    :param post_model_transform: An optional function which can be used to transform
-                                 the output of the model. For self-supervised tasks,
-                                 this would be something like taking the final
-                                 patch-level representations and aggregating by an
-                                 adaptive average pool operation
-    :type post_model_transform: function
     :param transform_to_device_fn: Function for sending data and labels to the
                                    device. This provides an extensibility point
                                    for performing any final transformations on
@@ -134,11 +121,13 @@ def train_model_unsupervised(
         if pre_batch_callback is not None:
             pre_batch_callback(model=model, batch_idx=batch_idx)
 
-        if pre_model_transform is not None:
-            data = pre_model_transform(data)
-
         optimizer.zero_grad()
-        output = model(data)
+
+        #check if this is what Lucas was talking about
+        if hasattr(model, "forward_unsupervised"):
+            output = model.forward_unsupervised(data)
+        else:
+            output = model(data)
 
         error_loss = criterion(output)
 
@@ -201,8 +190,6 @@ def train_model_supervised(
     active_classes=None,
     pre_batch_callback=None,
     post_batch_callback=None,
-    pre_model_transform=None,
-    post_model_transform=None,
     transform_to_device_fn=None,
     progress_bar=None,
 ):
@@ -251,9 +238,7 @@ def train_model_supervised(
 
     # Freeze the original model
     model.eval()
-    for param in model.parameters():
-        param.requires_grad = False
-
+    classifier.train()
     # Use asynchronous GPU copies when the memory is pinned
     # See https://pytorch.org/docs/master/notes/cuda.html
     async_gpu = loader.pin_memory
@@ -291,13 +276,9 @@ def train_model_supervised(
         if pre_batch_callback is not None:
             pre_batch_callback(model=model, batch_idx=batch_idx)
 
-        if pre_model_transform is not None:
-            data = pre_model_transform(data)
         #we don't want to calculate gradients during supervised training step
         with torch.no_grad():
             output = model(data)
-            if post_model_transform is not None:
-                output = post_model_transform(output)
 
 
         optimizer.zero_grad()

@@ -28,6 +28,7 @@ import torch
 from torch.backends import cudnn
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 
@@ -81,22 +82,14 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
     def __init__(self):
         super(SelfSupervisedExperiment, self).__init__()
-        self.unsupervised_loader = None
         self.supervised_loader = None
         self.supervised_training_epochs_per_validation = 3
 
         #params for self supervised training
         """
-        unsupervised_batch_size
-        supervised_batch_size
-        val_batch_size
-        
-        pre_model_transformation_func (patchify)
-        post_model_transformation_func (aggregate, like an adaptive average pool)
-        
+
         classifier_class
         classifier_args
-        init_batch_norm_classifier
         checkpoint_file_classifier
         load_checkpoint_args_classifier
         reset_classifier_on_validate
@@ -113,6 +106,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             - progress: Show progress during training
             - train_dir: Dataset training data relative path
             - batch_size: Training batch size
+            - supervised_dir: Dataset supervised data relative path
+            - supervised_batch_size: Supervised training batch size
             - val_dir: Dataset validation data relative path
             - val_batch_size: Validation batch size
             - workers: how many data loading processes to use
@@ -133,22 +128,18 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                                  passed to the constructor
             - lr_scheduler_step_every_batch: Whether to step the lr-scheduler
                                              after every batch (e.g. for OneCycleLR)
-            - unsupervised_loss_function: Loss function for unsupervised training.
+            - loss_function: Loss function for unsupervised training.
             Can be a
             - epochs: Number of epochs to train
             - batches_in_epoch: Number of batches per epoch.
                                 Useful for debugging
+            - batches_in_epoch_supervised: Number of batches per epoch in supervised
+                                           training
             - batches_in_epoch_val: Number of batches per epoch in validation.
                                    Useful for debugging
             - mixed_precision: Whether or not to enable apex mixed precision
             - mixed_precision_args: apex mixed precision arguments.
                                     See "amp.initialize"
-            - sample_transform: Transform acting on the training samples. To be used
-                                additively after default transform or auto-augment.
-            - target_transform: Transform acting on the training targets.
-            - replicas_per_sample: Number of replicas to create per sample in the batch.
-                                   (each replica is transformed independently)
-                                   Used in maxup.
             - train_model_func: Optional user defined function to train the model,
                                 expected to behave similarly to `train_model`
                                 in terms of input parameters and return values
@@ -159,6 +150,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                                must have the same model_args and model_class as the
                                current experiment.
             - load_checkpoint_args: args to be passed to `load_state_from_checkpoint`
+            - checkpoint_file
             - epochs_to_validate: list of epochs to run validate(). A -1 asks
                                   to run validate before any training occurs.
                                   Default: last three epochs.
@@ -167,118 +159,29 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                            Default: time.time() in this setup_experiment().
         """
 
-        self.launch_time = config.get("launch_time", time.time())
         super().setup_experiment(config)
-        self.logger.info("Execution order: %s",
-                         pformat(self.get_execution_order()))
 
-        # Configure model
-        self.device = config.get("device", self.device)
-        self.model = self.create_model(config, self.device)
         self.classifier = self.create_classifier(config, self.device)
-        self.transform_model()
-
-        self.logger.debug(self.model)
         self.logger.debug(self.classifier)
-
-        # Validate mixed precision requirements
-        self.mixed_precision = config.get("mixed_precision", False)
-        if self.mixed_precision and amp is None:
-            self.mixed_precision = False
-            self.logger.error(
-                "Mixed precision requires NVIDA APEX."
-                "Please install apex from https://www.github.com/nvidia/apex"
-                "Disabling mixed precision training.")
-
-        # Configure mixed precision training
-        if self.mixed_precision:
-            amp_args = config.get("mixed_precision_args", {})
-            self.model, self.optimizer = amp.initialize(
-                self.model, self.optimizer, **amp_args)
-            self.logger.info("Using mixed precision")
-
-        self._loss_function_unsupervised = config.get(
-            "loss_function", torch.nn.functional.cross_entropy
-        )
-        self._loss_function_args = config.get(
-            "loss_function_args", dict()
-        )
-        if isinstance(self._loss_function_unsupervised, torch.nn.Module):
-            self._loss_function_unsupervised_class = self._loss_function_unsupervised
-            self._loss_function_unsupervised = \
-                self._loss_function_unsupervised_class(**self._loss_function_args)
-            self._loss_function_unsupervised.to(self.device)
-            self.optimizer = self.create_optimizer(config,
-                [self.model.parameters(),self._loss_function_unsupervised.parameters()])
-        else:
-            # Configure and create optimizer
-            self.optimizer = self.create_optimizer(config, self.model.parameters())
 
         self._loss_function_supervised = config.get(
             "loss_function_supervised", torch.nn.functional.cross_entropy
         )
-        self.optimizer_supervised = self.create_optimizer(config,
-                                                          self.classifier.parameters())
+        self.optimizer_supervised = self.create_optimizer(config, self.classifier)
 
-        self.num_classes = config.get("num_classes", 1000)
-        self.epochs = config.get("epochs", 1)
-        self.batches_in_epoch = config.get("batches_in_epoch", sys.maxsize)
         self.batches_in_epoch_supervised = config.get("batches_in_epoch_supervised",
                                                       sys.maxsize)
-        self.batches_in_epoch_val = config.get("batches_in_epoch_val", sys.maxsize)
-        self.current_epoch = 0
         self.reset_classifier_on_validate = config.get(
             "reset_classifier_on_validate", False)
 
-        # Configure data loaders
-        self.create_loaders(config)
-        self.total_batches = len(self.train_loader, )
-
-        self.epochs_to_validate = config.get("epochs_to_validate",
-                                             range(self.epochs - 3,
-                                                   self.epochs + 1))
-
-        # Configure learning rate scheduler
-        self.lr_scheduler = self.create_lr_scheduler(
-            config, self.optimizer, self.total_batches)
-        if self.lr_scheduler is not None:
-            lr_scheduler_class = self.lr_scheduler.__class__.__name__
-            lr_scheduler_args = config.get("lr_scheduler_args", {})
-            self.logger.info("LR Scheduler class: " + lr_scheduler_class)
-            self.logger.info("LR Scheduler args:")
-            self.logger.info(pformat(lr_scheduler_args))
-            self.logger.info("steps_per_epoch=%s", self.total_batches)
-
-        self.step_lr_every_batch = config.get("lr_scheduler_step_every_batch", False)
-        if isinstance(self.lr_scheduler, (OneCycleLR, ComposedLRScheduler)):
-            self.step_lr_every_batch = True
-
         # Set train and validate methods.
-        self.train_model_unsupervised = config.get("train_model_unsupervised_func",
-                                            train_model_unsupervised)
+        self.train_model = config.get("train_model_func", train_model_unsupervised)
         self.train_model_supervised = config.get("train_model_supervised_func",
                                                  train_model_supervised)
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
-        self.progress = config.get("progress", False)
-        if self.logger.disabled:
-            self.progress = False
         self.supervised_training_epochs_per_validation = config.get(
             "supervised_training_epochs_per_validation", 3)
-
-    @classmethod
-    def create_optimizer(cls, config, parameter_list):
-        """
-        Create optimizer from an experiment config. Override here is to provide
-        parameters lists (so that loss module parameters can be included)
-
-        :param optimizer_class: Callable or class to instantiate optimizer. Must return
-                                object inherited from "torch.optim.Optimizer"
-        :param optimizer_args: Arguments to pass to the optimizer.
-        """
-        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-        optimizer_args = config.get("optimizer_args", {})
-        return optimizer_class(parameter_list, **optimizer_args)
 
 
     def create_loaders(self, config):
@@ -354,7 +257,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             drop_last=config.get("validation_loader_drop_last", True),
         )
 
-
+    #TODO: Ask Lucas about how to pass in datasets
     @classmethod
     def load_dataset(cls, config, split="unsupervised"):
         dataset_class = config.get("dataset_class", None)
@@ -398,7 +301,17 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         )
 
     def train_epoch(self):
-        self.train_model_unsupervised
+        self.train_model(self.model,
+                                      self.train_loader,
+                                      self.optimizer,
+                                      self.device,
+                                      criterion=F.mse_loss,
+                                      complexity_loss_fn=None,
+                                      batches_in_epoch=sys.maxsize,
+                                      pre_batch_callback=None,
+                                      post_batch_callback=None,
+                                      transform_to_device_fn=None,
+                                      progress_bar=None,)
 
     def validate(self):
         if self.reset_classifier_on_validate:
@@ -407,14 +320,14 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                     layer.reset_parameters()
 
         for _ in range(self.supervised_training_epochs_per_validation):
-            self.train_model_supervised(
+            self.train_model(
                 self.model,
                 self.classifier,
                 self.supervised_loader,
                 self.optimizer,
                 self.device,
                 criterion=self.error_loss,
-                batches_in_supervised_epoch=self.batches_in_supervised_epoch,
+                batches_in_supervised_epoch=self.batches_in_epoch_supervised,
             )
 
         return self.train_model_unsupervised(
