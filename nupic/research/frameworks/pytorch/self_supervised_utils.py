@@ -21,6 +21,7 @@
 
 import torch
 
+
 class EncoderClassifier(torch.nn.Module):
     def __init__(self, encoder, classifier):
         super(EncoderClassifier, self).__init__()
