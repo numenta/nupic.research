@@ -37,10 +37,9 @@ class AutoEncoder(torch.nn.Module):
         self.fc2 = nn.Linear(hidden_dim, input_dim)
 
     def forward(self, x):
-        x = x.flatten(start_dim=1)
-        encoded = self.fc1(x)
-        decoded = self.fc2(encoded)
-        return decoded.view(-1, 1, 28, 28)
+        encoded = self.encode(x)
+        decoded = self.fc2(encoded).view(-1, 1, 28, 28)
+        return decoded
 
     def encode(self, x):
         x = x.flatten(start_dim=1)
