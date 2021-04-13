@@ -25,7 +25,7 @@ import unittest
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
-from torchvision.datasets import MNIST
+from torchvision.datasets.fakedata import FakeData
 
 from nupic.research.frameworks.vernon import SelfSupervisedExperiment
 
@@ -57,23 +57,26 @@ class LinearClassifier(torch.nn.Module):
         out = self.fc(x)
         return out
 
+# # MNIST
+# MEAN = 0.13062755
+# STDEV = 0.30810780
+# transform = transforms.Compose(
+#     [transforms.ToTensor(), transforms.Normalize(MEAN, STDEV)]
+# )
 
-MEAN = 0.13062755
-STDEV = 0.30810780
-transform = transforms.Compose(
-    [transforms.ToTensor(), transforms.Normalize(MEAN, STDEV)]
-)
 
+fake_data_args = dict(size=1000, image_size=(1, 28, 28), num_classes=10,
+                      transform=transforms.ToTensor())
 
 self_supervised_config = dict(
     experiment_class=SelfSupervisedExperiment,
     num_classes=10,
     # Dataset
-    dataset_class=MNIST,
+    dataset_class=FakeData,
     dataset_args=dict(
-        unsupervised=dict(root="~/nta/data/MNIST", train=True, transform=transform),
-        supervised=dict(root="~/nta/data/MNIST", train=True, transform=transform),
-        validation=dict(root="~/nta/data/MNIST", train=False, transform=transform),
+        unsupervised=fake_data_args,
+        supervised=fake_data_args,
+        validation=fake_data_args,
     ),
     # Number of epochs
     epochs=5,
