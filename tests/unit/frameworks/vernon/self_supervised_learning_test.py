@@ -101,14 +101,10 @@ self_supervised_config = dict(
 
 class SelfSupervisedLearningTest(unittest.TestCase):
     """
-    This is a test class for the `GradientMetrics` mixin.
+    This is a test class for the `SelfSupervisedExperiment` class.
     """
 
-    def test_gradient_metrics_supervised_experiment(self):
-        """
-        Test whether GradientMetrics tracking and plotting works in the supervised
-        setting.
-        """
+    def test_self_supervised_experiment(self):
         # Setup experiment and initialize model.
         exp = self_supervised_config["experiment_class"]()
         exp.setup_experiment(self_supervised_config)
