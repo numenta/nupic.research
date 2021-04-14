@@ -23,11 +23,11 @@ import numpy as np
 import torch
 from torch import nn
 
+from nupic.research.frameworks.dendrites.modules.dendritic_layers import (
+    AbsoluteMaxGatingDendriticLayer,
+    OneSegmentDendriticLayer,
+)
 from nupic.torch.modules import KWinners, SparseWeights, rezero_weights
-
-from nupic.research.frameworks.dendrites.modules.dendritic_layers import\
-    AbsoluteMaxGatingDendriticLayer, \
-    OneSegmentDendriticLayer
 
 
 class DendriticMLP(nn.Module):
@@ -72,10 +72,12 @@ class DendriticMLP(nn.Module):
                     input
     """
 
-    def __init__(self, input_size, output_size, hidden_sizes, num_segments, dim_context,
-                 kw, kw_percent_on=0.05, context_percent_on=1.0, weight_sparsity=0.95, weight_init="modified",
-                 dendrite_init="modified", freeze_dendrites=False,
-                 dendritic_layer_class=AbsoluteMaxGatingDendriticLayer, output_nonlinearity=None):
+    def __init__(
+        self, input_size, output_size, hidden_sizes, num_segments, dim_context,
+        kw, kw_percent_on=0.05, context_percent_on=1.0, weight_sparsity=0.95,
+        weight_init="modified", dendrite_init="modified", freeze_dendrites=False,
+        dendritic_layer_class=AbsoluteMaxGatingDendriticLayer, output_nonlinearity=None
+    ):
 
         # Forward & dendritic weight initialization must be either "kaiming" or
         # "modified"
@@ -88,7 +90,7 @@ class DendriticMLP(nn.Module):
 
         if num_segments == 1:
             # use optimized 1 segment class
-            dendritic_layer_class=OneSegmentDendriticLayer
+            dendritic_layer_class = OneSegmentDendriticLayer
 
         self.num_segments = num_segments
         self.input_size = input_size
@@ -110,7 +112,7 @@ class DendriticMLP(nn.Module):
                 num_segments=num_segments,
                 dim_context=dim_context,
                 module_sparsity=self.weight_sparsity,
-                dendrite_sparsity=0.0 if self.hardcode_dendrites else self.weight_sparsity,
+                dendrite_sparsity=0.0 if self.hardcode_dendrites else weight_sparsity,
             )
 
             if weight_init == "modified":
@@ -120,7 +122,10 @@ class DendriticMLP(nn.Module):
                     # first hidden layer can't have kw input
                     self._init_sparse_weights(curr_dend, 0.0)
                 else:
-                    self._init_sparse_weights(curr_dend, 1 - kw_percent_on if kw else 0.0)
+                    self._init_sparse_weights(
+                        curr_dend,
+                        1 - kw_percent_on if kw else 0.0
+                    )
 
             if dendrite_init == "modified":
                 self._init_sparse_dendrites(curr_dend, 1 - context_percent_on)
@@ -273,12 +278,3 @@ class DendriticMLP(nn.Module):
             # dendrite weights doesn't point to the dendrite weights tensor,
             # so expicitly assign the new values
             original_weights.data = dendrite_weights
-
-
-
-
-if __name__ == '__main__':
-    d = DendriticMLP(10, 5, (32, 32), num_segments=1, dim_context=10, context_percent_on=1.0, kw=True)
-    contexts = torch.eye(10)
-    d.hardcode_dendritic_weights(contexts, init="overlapping")
-    d(torch.rand(1, 10), torch.rand(1, 10))
