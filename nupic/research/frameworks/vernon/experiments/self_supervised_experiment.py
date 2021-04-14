@@ -25,7 +25,7 @@ import torch
 import torch.nn.functional as F
 from torch.backends import cudnn
 from torch.optim.lr_scheduler import OneCycleLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, RandomSampler
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
@@ -166,7 +166,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             - loss_function_supervised: Loss function for supervised training.
             - batches_in_epoch_supervised: Number of batches per epoch in supervised
                                            training
-            - train_loader_drop_last: Whether to skip last batch if it is
+            - supervised_loader_drop_last: Whether to skip last batch if it is
                                       smaller than the batch size
             - reset_classifier_on_validate: optionally reset the parameters of the
                                             classifier during each validation
@@ -174,6 +174,10 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             - supervised_training_epochs_per_validation: number of epochs to train
                                                          the classifier for each
                                                          validation loop
+            - reuse_unsupervised_dataset: if True, will reuse the unsupervised
+                                          dataset during supervised training
+            - num_unsupervised_samples: optionally select a random subset from the
+                                        unsupervised dataset for faster training
         """
 
         super().setup_experiment(config)
@@ -285,18 +289,10 @@ class SelfSupervisedExperiment(SupervisedExperiment):
     def create_loaders(self, config):
 
         unsupervised_data = self.load_dataset(config, dataset_type="unsupervised")
-
-        # check if the supervised dataset is the same as the unsupervised dataset to
-        # avoid wasting memory
-        supervised_data_class = config.get("dataset_class", None)
-        if isinstance(supervised_data_class, dict):
-            supervised_data_class = supervised_data_class.get("supervised", None)
-
-        if supervised_data_class is type(unsupervised_data):
+        if config.get("reuse_unsupervised_dataset", False):
             supervised_data = unsupervised_data
         else:
             supervised_data = self.load_dataset(config, dataset_type="supervised")
-
         val_data = self.load_dataset(config, dataset_type="validation")
 
         self.unsupervised_loader = (
@@ -374,6 +370,9 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
     @classmethod
     def create_unsupervised_sampler(cls, config, dataset):
+        num_samples = config.get("num_unsupervised_samples", -1)
+        if num_samples > 0:
+            return RandomSampler(dataset, num_samples=num_samples)
         return None
 
     @classmethod
