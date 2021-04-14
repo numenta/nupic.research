@@ -63,8 +63,10 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
         :param dendrite_sparsity: sparsity applied transformation per unit per segment
         :param dendrite_bias: whether or not dendrite activations have an additive bias
         """
+        self.dim_context = dim_context
         self.segments = None
-        super().__init__(module, sparsity=module_sparsity)
+        allow_extremes = module_sparsity == 0.0 or module_sparsity == 1.0
+        super().__init__(module, sparsity=module_sparsity, allow_extremes=allow_extremes)
 
         self.segments = DendriteSegments(
             num_units=module.weight.shape[0],
@@ -93,6 +95,9 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
         dendrite_activations = self.segments(context)  # num_units x num_segments
         return self.apply_dendrites(y, dendrite_activations)
 
+    @property
+    def weights(self):
+        return self.segments.weights
 
 class BiasingDendriticLayer(DendriticLayerBase):
 
@@ -156,14 +161,18 @@ class OneSegmentDendriticLayer(SparseWeights):
         """
         assert(num_segments == 1)
 
+        self.dim_context = dim_context
         self.segments = None
         super().__init__(module, sparsity=module_sparsity)
 
+        allow_extremes = dendrite_sparsity==1.0 or dendrite_sparsity==0.0
         self.segments = SparseWeights(
             torch.nn.Linear(dim_context,
                             module.weight.shape[0],
                             bias=dendrite_bias),
-            sparsity=dendrite_sparsity)
+            sparsity=dendrite_sparsity,
+            allow_extremes=allow_extremes
+        )
 
         self.rezero_weights()
 
@@ -182,6 +191,10 @@ class OneSegmentDendriticLayer(SparseWeights):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a sigmoidal gating mechanism."""
         return y * torch.sigmoid(dendrite_activations)
+
+    @property
+    def weights(self):
+        return self.segments.module.weight
 
 
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
