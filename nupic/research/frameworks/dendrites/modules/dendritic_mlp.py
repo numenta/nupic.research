@@ -35,6 +35,23 @@ class DendriticMLP(nn.Module):
     input.  The class is used to experiment with different dendritic weight
     initializations and learning parameters
 
+    :param input_size: size of the input to the network
+    :param output_size: the number of units in the output layer
+    :param hidden_size: the number of units in each of the two hidden layers
+    :param num_segments: the number of dendritic segments that each hidden unit has
+    :param dim_context: the size of the context input to the network
+    :param kw: whether to apply k-Winners (with 5% winners) to the outputs of each
+               hidden layer
+    :param dendrite_sparsity: the sparsity level of dendritic weights (default 0.95)
+    :param weight_init: the initialization applied to feed-forward weights; must be
+                        either "kaiming" (for Kaiming Uniform) of "modified" (for
+                        sparse Kaiming Uniform)
+    :param dendrite_init: the initialization applied to dendritic weights; similar to
+                          `weight_init`
+    :param freeze_dendrites: whether to set `requires_grad=False` for all dendritic
+                             weights so they don't train
+    :param dendritic_layer_class: dendritic layer class to use for each hidden layer
+
                     _____
                    |_____|    # classifier layer, no dendrite input
                       ^
@@ -51,16 +68,14 @@ class DendriticMLP(nn.Module):
     """
 
     def __init__(self, input_size, output_size, hidden_size, num_segments, dim_context,
-                 weight_init, dendrite_init, kw,
+                 kw=True, dendrite_sparsity=0.95, weight_init="modified",
+                 dendrite_init="modified", freeze_dendrites=False,
                  dendritic_layer_class=AbsoluteMaxGatingDendriticLayer):
 
-        # Forward weight initialization must of one of "kaiming" or "modified" (i.e.,
-        # modified sparse Kaiming initialization)
+        # Forward & dendritic weight initialization must be either "kaiming" or
+        # "modified"
         assert weight_init in ("kaiming", "modified")
-
-        # Forward weight initialization must of one of "kaiming" or "modified",
-        # "hardcoded"
-        assert dendrite_init in ("kaiming", "modified", "hardcoded")
+        assert dendrite_init in ("kaiming", "modified")
 
         super().__init__()
 
@@ -70,7 +85,8 @@ class DendriticMLP(nn.Module):
         self.output_size = output_size
         self.dim_context = dim_context
         self.kw = kw
-        self.hardcode_dendrites = (dendrite_init == "hardcoded")
+        self.dendrite_sparsity = dendrite_sparsity
+        self.freeze_dendrites = freeze_dendrites
 
         # Forward layers & k-winners
         self.dend1 = dendritic_layer_class(
@@ -78,14 +94,14 @@ class DendriticMLP(nn.Module):
             num_segments=num_segments,
             dim_context=dim_context,
             module_sparsity=0.95,
-            dendrite_sparsity=0.0 if self.hardcode_dendrites else 0.95,
+            dendrite_sparsity=dendrite_sparsity,
         )
         self.dend2 = dendritic_layer_class(
             module=nn.Linear(hidden_size, hidden_size, bias=True),
             num_segments=num_segments,
             dim_context=dim_context,
             module_sparsity=0.95,
-            dendrite_sparsity=0.0 if self.hardcode_dendrites else 0.95,
+            dendrite_sparsity=dendrite_sparsity,
         )
         self.classifier = SparseWeights(module=nn.Linear(hidden_size, output_size),
                                         sparsity=0.95)
@@ -110,7 +126,8 @@ class DendriticMLP(nn.Module):
             self._init_sparse_dendrites(self.dend1, 0.95)
             self._init_sparse_dendrites(self.dend2, 0.95)
 
-        elif dendrite_init == "hardcoded":
+        if freeze_dendrites:
+
             # Dendritic weights will not be updated during backward pass
             for name, param in self.named_parameters():
                 if "segments" in name:

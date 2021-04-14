@@ -27,9 +27,8 @@ distributions.
 Dendritic weights can either be hardcoded (to induce overlapping or non-overlapping
 subnetworks) or learned. All output heads are used for both training and inference.
 
-Usage: adjust the config parameters `weight_init`, `dendrite_init`, and `kw` (all in
-`model_args`) to control the type of forward weight initialization, dendritic weight
-initialization, and k-Winners usage, respectively.
+Usage: adjust the config parameters `kw`, `dendrite_sparsity`, `weight_init`,
+`dendrite_init`, and `freeze_dendrites` (all in `model_args`).
 """
 
 import math
@@ -53,10 +52,13 @@ class DendritesExperiment(mixins.RezeroWeights,
     def setup_experiment(self, config):
         super().setup_experiment(config)
 
-        # Manually set dendritic weights to invoke subnetworks
-        if self.model.hardcode_dendrites:
+        # Manually set dendritic weights to invoke subnetworks; if the user sets
+        # `freeze_dendrites=True`, we assume dendritic weights are intended to be
+        # hardcoded
+        if self.model.freeze_dendrites:
             self.model.hardcode_dendritic_weights(
-                context_vectors=self.train_loader.dataset._contexts, init="overlapping")
+                context_vectors=self.train_loader.dataset._contexts, init="overlapping"
+            )
 
     @classmethod
     def compute_task_indices(cls, config, dataset):
@@ -210,11 +212,12 @@ if __name__ == "__main__":
             hidden_size=2048,
             num_segments=num_tasks,
             dim_context=2048,
+            kw=True,  # Turning on k-Winners when hardcoding dendrites to induce
+                      # non-overlapping subnetworks results in 5% winners
+            dendrite_sparsity=0.0,  # Irrelevant if `freeze_dendrites=True`
             weight_init="modified",  # Must be one of {"kaiming", "modified"}
-            dendrite_init="hardcoded",  # Must be one of {"kaiming", "modified",
-                                        # "hardcoded"}
-            kw=True  # Turning on k-Winners when hardcoding dendrites to induce
-                     # non-overlapping subnetworks results in 5% winners
+            dendrite_init="modified",  # Irrelevant if `freeze_dendrites=True`
+            freeze_dendrites=True
         ),
 
         batch_size=64,
