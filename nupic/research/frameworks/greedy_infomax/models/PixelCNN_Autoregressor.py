@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 
 from .PixelCNN import PixelCNNGatedLayer, PixelCNNGatedStack
-from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import InfoNCE_Loss
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
 
 
@@ -27,9 +26,6 @@ class PixelCNN_Autoregressor(torch.nn.Module):
         self.stack = PixelCNNGatedStack(*layer_objs)
         self.stack_out = nn.Conv2d(in_channels, in_channels, 1)
 
-        self.loss = InfoNCE_Loss(
-            in_channels=in_channels, out_channels=in_channels
-        )
 
         if weight_init:
             self.initialize()

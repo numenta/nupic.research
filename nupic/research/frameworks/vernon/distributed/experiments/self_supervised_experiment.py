@@ -19,9 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.vernon.distributed import (
-    SupervisedExperiment as DistributedSupervisedExperiment,
-)
+from nupic.research.frameworks.vernon.distributed.experiments.supervised_experiment \
+    import SupervisedExperiment as DistributedSupervisedExperiment
 from nupic.research.frameworks.vernon.experiments import (
     SelfSupervisedExperiment as SelfSupervisedExperimentBase,
 )

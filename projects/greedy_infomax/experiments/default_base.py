@@ -30,7 +30,7 @@ from torchvision.datasets import STL10, FakeData
 from torchvision import transforms
 from ray import tune
 import sys
-from nupic.research.frameworks.greedy_infomax.models.FullModel import FullVisionModel
+from nupic.research.frameworks.greedy_infomax.models import FullVisionModel
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import \
     multiple_cross_entropy
 
@@ -76,9 +76,8 @@ aug = {
     "bw_mean": [0.4120],
     "bw_std": [0.2570],
 }
-transform_unsupervised = transform_supervised = get_transforms(eval=False, aug=aug[
-    "stl10"])
-transform_valid = trans = get_transforms(eval=True, aug=aug["stl10"])
+transform_unsupervised = transform_supervised = get_transforms(eval=False, aug=aug)
+transform_valid = trans = get_transforms(eval=True, aug=aug)
 
 
 base_dataset_args=dict(
@@ -113,8 +112,10 @@ DEFAULT_BASE = dict(
     dataset_args=dict(unsupervised=unsupervised_dataset_args,
                       supervised=supervised_dataset_args,
                       validation=validation_dataset_args),
-    workers=1,
 
+    num_unsupervised_samples = 1000,
+    workers=1,
+    reuse_actors = True,
     # Seed
     seed=tune.sample_from(lambda spec: np.random.randint(1, 10000)),
 
@@ -145,7 +146,9 @@ DEFAULT_BASE = dict(
     model_args = dict(negative_samples=10,
                       k_predictions=5,
                       resnet_50=False,
-                      grayscale=True,),
+                      grayscale=True,
+                      patch_size=16,
+                      overlap=2),
 
     classifier_model_class = torch.nn.Linear,
     classifier_model_args = dict(in_features=100,
@@ -162,9 +165,16 @@ DEFAULT_BASE = dict(
         lr=1.5e-4,
     ),
 
+    # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
+    classifier_optimizer_class=torch.optim.Adam,
+    # Optimizer class class arguments passed to the constructor
+    classifier_optimizer_args=dict(
+        lr=1.5e-4,
+    ),
 
-    # Learning rate scheduler class. Must inherit from "_LRScheduler"
-    lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+
+    # # Learning rate scheduler class. Must inherit from "_LRScheduler"
+    # lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
 
     # How often to checkpoint (epochs)
     checkpoint_freq=0,

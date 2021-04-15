@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from nupic.research.frameworks.greedy_infomax.models import \
-    ResNet_Encoder, PreActBlockNoBN, PreActBottleneckNoBN, PixelCNN_Autoregressor
+    ResNet_Encoder, PreActBlockNoBN, PreActBottleneckNoBN
 
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
 
@@ -12,11 +12,15 @@ class FullVisionModel(torch.nn.Module):
                  k_predictions=5,
                  resnet_50=True,
                  grayscale=True,
+                 patch_size = 16,
+                 overlap = 2,
                  ):
         super().__init__()
         self.negative_samples = negative_samples
         self.k_predictions = k_predictions
-        print("Contrasting against ", self.contrastive_samples, " negative samples")
+        self.patch_size = patch_size
+        self.overlap = overlap
+        print("Contrasting against ", self.negative_samples, " negative samples")
 
         block_dims = [3, 4, 6]
         num_channels = [64, 128, 256]

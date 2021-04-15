@@ -30,7 +30,7 @@ class BilinearInfo(nn.Module):
                     makeDeltaOrthogonal(
                         m.weight,
                         nn.init.calculate_gain(
-                            "Sigmoid"
+                            "sigmoid"
                         ),
                     )
 
