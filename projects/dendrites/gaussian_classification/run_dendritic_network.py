@@ -31,10 +31,8 @@ Usage: adjust the config parameters `kw`, `dendrite_sparsity`, `weight_init`,
 `dendrite_init`, and `freeze_dendrites` (all in `model_args`).
 """
 
-import math
 import pprint
 import time
-from collections import defaultdict
 
 import torch
 import torch.nn.functional as F
@@ -59,25 +57,6 @@ class DendritesExperiment(mixins.RezeroWeights,
             self.model.hardcode_dendritic_weights(
                 context_vectors=self.train_loader.dataset._contexts, init="overlapping"
             )
-
-    @classmethod
-    def compute_task_indices(cls, config, dataset):
-        # Assume dataloaders are already created
-        class_indices = defaultdict(list)
-        for idx, (_, _, target) in enumerate(dataset):
-            class_indices[target].append(idx)
-
-        # Defines how many classes should exist per task
-        num_tasks = config.get("num_tasks", 1)
-        num_classes = config.get("num_classes", None)
-        assert num_classes is not None, "num_classes should be defined"
-        num_classes_per_task = math.floor(num_classes / num_tasks)
-
-        task_indices = defaultdict(list)
-        for i in range(num_tasks):
-            for j in range(num_classes_per_task):
-                task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
-        return task_indices
 
 
 # ------ Training & evaluation function
