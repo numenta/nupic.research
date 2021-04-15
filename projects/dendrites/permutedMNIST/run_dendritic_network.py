@@ -45,13 +45,6 @@ from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 class PermutedMNISTExperiment(mixins.RezeroWeights,
                               ContinualLearningExperiment):
 
-    def setup_experiment(self, config):
-        # Store optimizer args, since optimizer is reset at the beginning of each task
-        self.optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-        self.optimizer_args = config.get("optimizer_args", {})
-
-        super().setup_experiment(config)
-
     @classmethod
     def compute_task_indices(cls, config, dataset):
         # Assume dataloaders are already created
@@ -71,21 +64,13 @@ class PermutedMNISTExperiment(mixins.RezeroWeights,
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
         return task_indices
 
-    def run_iteration(self):
-        # Reset optimizer before training on a new task, just as context-dependent
-        # gating does
-        del self.optimizer
-
-        self.optimizer = self.optimizer_class(self.model.parameters(),
-                                              **self.optimizer_args)
-        return super().run_iteration()
-
 
 # ------ Training & evaluation functions
 def train_model(exp):
     # Assume `loader` yields 3-item tuples of the form (data, context, target)
     exp.model.train()
     for data, context, target in exp.train_loader:
+        data = data.flatten(start_dim=1)
 
         # Since there's only one output head, target values should be modified to be in
         # the range [0, 1, ..., 9]
@@ -118,6 +103,7 @@ def evaluate_model(exp):
     with torch.no_grad():
 
         for data, context, target in exp.val_loader:
+            data = data.flatten(start_dim=1)
 
             # Since there's only one output head, target values should be modified to
             # be in the range [0, 1, ..., 9]
@@ -145,6 +131,11 @@ def run_experiment(config):
     exp.setup_experiment(config)
 
     exp.model = exp.model.to(exp.device)
+
+    # Read optimizer class and args from config as it will be used to reinitialize the
+    # model's optimizer
+    optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+    optimizer_args = config.get("optimizer_args", {})
 
     # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
 
@@ -174,6 +165,10 @@ def run_experiment(config):
 
         else:
             print(f"--Completed task {task_id}--")
+
+        # Reset optimizer before starting new task
+        del exp.optimizer
+        exp.optimizer = optimizer_class(exp.model.parameters(), **optimizer_args)
 
     # ------------------------------------------------------------------------------- #
 

@@ -75,7 +75,7 @@ class PermutedMNIST(MNIST):
         img, target = super().__getitem__(index % len(self.data))
 
         # Determine which task `index` corresponds to
-        task_id = index // len(self.data)
+        task_id = self.get_task_id(index)
 
         # Apply permutation to `img`
         img = permute(img, self.permutations[task_id])
@@ -83,9 +83,7 @@ class PermutedMNIST(MNIST):
         # Since target values are not shared between tasks, `target` should be in the
         # range [0 + 10 * task_id, 9 + 10 * task_id]
         target += 10 * task_id
-
-        # Since image size is not relevant for an MLP, `img` can be flattened
-        return img.flatten(), target
+        return img, target
 
     def __len__(self):
         return self.num_tasks * len(self.data)
@@ -93,6 +91,9 @@ class PermutedMNIST(MNIST):
     @property
     def processed_folder(self):
         return os.path.join(self.root, "MNIST", "processed")
+
+    def get_task_id(self, index):
+        return index // len(self.data)
 
 
 class ContextDependentPermutedMNIST(PermutedMNIST):
@@ -124,7 +125,7 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         Returns an (image, context, target) triplet.
         """
         img, target = super().__getitem__(index)
-        task_id = index // len(self.data)
+        task_id = self.get_task_id(index)
         return img, self.contexts[task_id, :], target
 
 
