@@ -278,3 +278,11 @@ class DendriticMLP(nn.Module):
             # dendrite weights doesn't point to the dendrite weights tensor,
             # so expicitly assign the new values
             original_weights.data = dendrite_weights
+
+
+
+if __name__ == '__main__':
+    d = DendriticMLP(10, 5, (32, 32), num_segments=1, dim_context=10, context_percent_on=1.0, kw=True)
+    contexts = torch.eye(10)
+    d.hardcode_dendritic_weights(contexts, init="non_overlapping")
+    d(torch.rand(1, 10), torch.rand(1, 10))
