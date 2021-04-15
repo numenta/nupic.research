@@ -33,12 +33,6 @@ from nupic.research.frameworks.vernon.experiment_utils import create_lr_schedule
 from nupic.research.frameworks.vernon.experiments import SupervisedExperiment
 from nupic.research.frameworks.vernon.network_utils import create_model
 
-try:
-    from apex import amp
-except ImportError:
-    amp = None
-
-
 __all__ = ["SelfSupervisedExperiment"]
 
 
@@ -91,56 +85,6 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         """
         Configure the experiment for training.
         :param config: Dictionary containing the configuration parameters
-
-            ********* Params from the parent class, SupervisedExperiment ***************
-
-            - progress: Show progress during training
-            - batch_size: Training batch size
-            - val_batch_size: Validation batch size
-            - workers: how many data loading processes to use
-            - train_loader_drop_last: Whether to skip last batch if it is
-                                      smaller than the batch size
-            - num_classes: Limit the dataset size to the given number of classes
-            - model_class: Model class. Must inherit from "torch.nn.Module"
-            - model_args: model model class arguments passed to the constructor
-            - init_batch_norm: Whether or not to Initialize running batch norm
-                               mean to 0.
-            - optimizer_class: Optimizer class.
-                               Must inherit from "torch.optim.Optimizer"
-            - optimizer_args: Optimizer class class arguments passed to the
-                              constructor
-            - lr_scheduler_class: Learning rate scheduler class.
-                                 Must inherit from "_LRScheduler"
-            - lr_scheduler_args: Learning rate scheduler class class arguments
-                                 passed to the constructor
-            - lr_scheduler_step_every_batch: Whether to step the lr-scheduler
-                                             after every batch (e.g. for OneCycleLR)
-            - loss_function: Loss function for unsupervised training.
-            - epochs: Number of epochs to train
-            - batches_in_epoch: Number of batches per epoch.
-                                Useful for debugging
-            - batches_in_epoch_val: Number of batches per epoch in validation.
-                                   Useful for debugging
-            - mixed_precision: Whether or not to enable apex mixed precision
-            - mixed_precision_args: apex mixed precision arguments.
-                                    See "amp.initialize"
-            - train_model_func: Optional user defined function to train the model,
-                                expected to behave similarly to `train_model`
-                                in terms of input parameters and return values
-            - evaluate_model_func: Optional user defined function to validate the model
-                                   expected to behave similarly to `evaluate_model`
-                                   in terms of input parameters and return values
-            - checkpoint_file: if not None, will start from this model. The model
-                               must have the same model_args and model_class as the
-                               current experiment.
-            - load_checkpoint_args: args to be passed to `load_state_from_checkpoint`
-            - epochs_to_validate: list of epochs to run validate(). A -1 asks
-                                  to run validate before any training occurs.
-                                  Default: last three epochs.
-            - launch_time: time the config was created (via time.time). Used to report
-                           wall clock time until the first batch is done.
-                           Default: time.time() in this setup_experiment().
-            ********* Params unique to this class, SelfSupervisedExperiment ************
             - supervised_batch_size: Supervised training batch size
             - classifier_model_class: Classifier model class. Must inherit from
                                       "torch.nn.Module"
@@ -377,10 +321,20 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
     @classmethod
     def create_supervised_sampler(cls, config, dataset):
+        num_samples = config.get("num_supervised_samples", -1)
+        if num_samples > 0:
+            return RandomSampler(dataset, num_samples=num_samples)
         return None
 
     @classmethod
-    def load_dataset(cls, config, dataset_type="unsupervised"):
+    def create_validation_sampler(cls, config, dataset):
+        num_samples = config.get("num_validation_samples", -1)
+        if num_samples > 0:
+            return RandomSampler(dataset, num_samples=num_samples)
+        return None
+
+    @classmethod
+    def load_dataset(cls, config, train=True, dataset_type="unsupervised"):
         """
         Loads one of three types of datasets: unsupervised, supervised, and validation
 
