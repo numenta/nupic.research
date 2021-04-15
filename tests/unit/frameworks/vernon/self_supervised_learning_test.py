@@ -27,6 +27,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torchvision.datasets.fakedata import FakeData
 
+from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
 from nupic.research.frameworks.vernon import SelfSupervisedExperiment
 
 
@@ -56,6 +57,7 @@ class LinearClassifier(torch.nn.Module):
         out = self.fc(x)
         return out
 
+
 # # MNIST
 # MEAN = 0.13062755
 # STDEV = 0.30810780
@@ -64,8 +66,9 @@ class LinearClassifier(torch.nn.Module):
 # )
 
 
-fake_data_args = dict(size=1000, image_size=(1, 28, 28), num_classes=10,
-                      transform=transforms.ToTensor())
+fake_data_args = dict(
+    size=1000, image_size=(1, 28, 28), num_classes=10, transform=transforms.ToTensor()
+)
 
 self_supervised_config = dict(
     experiment_class=SelfSupervisedExperiment,
@@ -108,6 +111,9 @@ class SelfSupervisedLearningTest(unittest.TestCase):
         # Setup experiment and initialize model.
         exp = self_supervised_config["experiment_class"]()
         exp.setup_experiment(self_supervised_config)
+        assert isinstance(exp.model, EncoderClassifier)
+        assert hasattr(exp.model, "classifier")
+        assert hasattr(exp.model, "encoder")
         # Loop through some pseudo epochs.
         for _ in range(5):
             ret = exp.run_epoch()
