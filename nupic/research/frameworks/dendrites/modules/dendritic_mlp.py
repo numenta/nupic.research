@@ -73,16 +73,19 @@ class DendriticMLP(nn.Module):
     """
 
     def __init__(
-        self, input_size, output_size, hidden_sizes, num_segments, dim_context,
-        kw, kw_percent_on=0.05, context_percent_on=1.0, weight_sparsity=0.95,
-        weight_init="modified", dendrite_init="modified", freeze_dendrites=False,
-        dendritic_layer_class=AbsoluteMaxGatingDendriticLayer, output_nonlinearity=None
+            self, input_size, output_size, hidden_sizes, num_segments, dim_context,
+            kw, kw_percent_on=0.05, context_percent_on=1.0, weight_sparsity=0.95,
+            weight_init="modified", dendrite_init="modified", freeze_dendrites=False,
+            dendritic_layer_class=AbsoluteMaxGatingDendriticLayer, output_nonlinearity=None,
+            preprocess_module_type=None, preprocess_output_dim=128,
+            preprocess_kw_percent_on=0.1
     ):
 
         # Forward & dendritic weight initialization must be either "kaiming" or
         # "modified"
         assert weight_init in ("kaiming", "modified")
         assert dendrite_init in ("kaiming", "modified")
+        assert preprocess_module_type in (None, "relu", "kw")
         assert kw_percent_on >= 0.0
         assert context_percent_on >= 0.0
 
@@ -103,6 +106,12 @@ class DendriticMLP(nn.Module):
         self.output_nonlinearity = output_nonlinearity
         self.hardcode_dendrites = (dendrite_init == "hardcoded")
 
+        self.preprocess_module = self.create_preprocess_module(
+            preprocess_module_type,
+            preprocess_output_dim,
+            preprocess_kw_percent_on
+        )
+
         self._layers = nn.ModuleList()
         self._activations = nn.ModuleList()
 
@@ -110,7 +119,7 @@ class DendriticMLP(nn.Module):
             curr_dend = dendritic_layer_class(
                 module=nn.Linear(input_size, self.hidden_sizes[i], bias=True),
                 num_segments=num_segments,
-                dim_context=dim_context,
+                dim_context=self.dim_context,
                 module_sparsity=self.weight_sparsity,
                 dendrite_sparsity=0.0 if self.hardcode_dendrites else weight_sparsity,
             )
@@ -161,10 +170,42 @@ class DendriticMLP(nn.Module):
             self._output_layer.add_module("non_linearity", output_nonlinearity)
 
     def forward(self, x, context):
+        if self.preprocess_module is not None:
+            context = self.preprocess_module(torch.cat((x, context), dim=-1))
         for layer, activation in zip(self._layers, self._activations):
             x = activation(layer(x, context))
 
         return self._output_layer(x)
+
+    def create_preprocess_module(self, module_type, preprocess_output_dim, kw_percent_on):
+        if module_type is None:
+            return None
+
+        preprocess_module = nn.Sequential()
+        linear_layer = SparseWeights(
+            torch.nn.Linear(self.dim_context + self.input_size,
+                            preprocess_output_dim,
+                            bias=True),
+            sparsity=self.weight_sparsity,
+            allow_extremes=True
+        )
+        self._init_sparse_weights(linear_layer, 0.0)
+
+        if module_type == "relu":
+            nonlinearity = nn.ReLU()
+        else:
+            nonlinearity = KWinners(
+                n=preprocess_output_dim,
+                percent_on=kw_percent_on,
+                k_inference_factor=1.0,
+                boost_strength=0.0,
+                boost_strength_factor=0.0
+            )
+        preprocess_module.add_module("linear_layer", linear_layer)
+        preprocess_module.add_module("nonlinearity", nonlinearity)
+
+        self.dim_context = preprocess_output_dim
+        return preprocess_module
 
     # ------ Weight initialization functions ------
     @staticmethod
@@ -221,6 +262,7 @@ class DendriticMLP(nn.Module):
 
     @staticmethod
     def _hardcode_dendritic_weights(dendrite_weights, context_vectors, init):
+        assert self.preprocess_module is None
         squeeze = False
         if len(dendrite_weights.shape) == 2:
             # 1 segment dendrite, so add in a segment dimension
@@ -280,9 +322,8 @@ class DendriticMLP(nn.Module):
             original_weights.data = dendrite_weights
 
 
-
 if __name__ == '__main__':
-    d = DendriticMLP(10, 5, (32, 32), num_segments=1, dim_context=10, context_percent_on=1.0, kw=True)
-    contexts = torch.eye(10)
-    d.hardcode_dendritic_weights(contexts, init="non_overlapping")
+    d = DendriticMLP(10, 5, (32, 32), num_segments=1, dim_context=10, context_percent_on=1.0, kw=True, preprocess_module_type="relu")
+    # contexts = torch.eye(10)
+    # d.hardcode_dendritic_weights(contexts, init="non_overlapping")
     d(torch.rand(1, 10), torch.rand(1, 10))
