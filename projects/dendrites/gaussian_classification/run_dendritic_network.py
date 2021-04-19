@@ -37,82 +37,26 @@ import pprint
 import time
 from collections import defaultdict
 
-import numpy as np
 import torch
 import torch.nn.functional as F
-from torch import nn
 
-from nupic.research.frameworks.dendrites import AbsoluteMaxGatingDendriticLayer
+from nupic.research.frameworks.dendrites.modules import DendriticMLP
 from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 from nupic.torch.duty_cycle_metrics import max_entropy
-from nupic.torch.modules import KWinners, SparseWeights, rezero_weights
 from projects.dendrites.gaussian_classification.gaussian import GaussianDataset
-
-
-def hardcode_dendritic_weights(dendrite_segments, context_vectors, init):
-    num_units, num_segments, dim_context = dendrite_segments.weights.size()
-    num_contexts, _ = context_vectors.size()
-
-    if init == "overlapping":
-        # We hardcode the weights of dendrites such that each context selects 5% of
-        # hidden units to become active and form a subnetwork. Hidden units are sampled
-        # with replacement, hence subnetworks can overlap. Any context/task which does
-        # not use a particular hidden unit will cause it to turn off, as the unit's
-        # other segment(s) have -1 in all entries and will yield an extremely small
-        # dendritic activation.
-
-        new_dendritic_weights = -0.95 * torch.ones((num_units, num_segments,
-                                                    dim_context))
-
-        # The number of units to allocate to each context (with replacement)
-        k = int(0.05 * num_units)
-
-        # Keep track of the number of contexts for which each segment has already been
-        # chosen; this is to not overwrite a previously hardcoded segment
-        num_contexts_chosen = {i: 0 for i in range(num_units)}
-
-        for c in range(num_contexts):
-
-            # Pick k random units to be activated by the cth context
-            selected_units = torch.randperm(num_units)[:k]
-            for i in selected_units:
-                i = i.item()
-
-                # If num_segments other contexts have already selected unit i to become
-                # active, skip
-                segment_id = num_contexts_chosen[i]
-                if segment_id == num_segments:
-                    continue
-
-                new_dendritic_weights[i, segment_id, :] = context_vectors[c, :]
-                num_contexts_chosen[i] += 1
-
-    elif init == "non_overlapping":
-        # We hardcode the weights of dendrites such that each unit recognizes a single
-        # random context vector. The first dendritic segment is initialized to contain
-        # positive weights from that context vector. The other segment(s) ensure that
-        # the unit is turned off for any other context - they contain negative weights
-        # for all other weights.
-
-        new_dendritic_weights = torch.zeros((num_units, num_segments, dim_context))
-
-        for i in range(num_units):
-            context_perm = context_vectors[torch.randperm(num_contexts), :]
-            new_dendritic_weights[i, :, :] = 1.0 * (context_perm[0, :] > 0)
-            new_dendritic_weights[i, 1:, :] = -1
-            new_dendritic_weights[i, 1:, :] += new_dendritic_weights[i, 0, :]
-            del context_perm
-
-    else:
-        raise Exception("Invalid dendritic weight hardcode choice")
-
-    dendrite_segments.weights.data = new_dendritic_weights
 
 
 # ------ Experiment class
 class DendritesExperiment(mixins.RezeroWeights,
                           ContinualLearningExperiment):
-    pass
+
+    def setup_experiment(self, config):
+        super().setup_experiment(config)
+
+        # Manually set dendritic weights to invoke subnetworks
+        if self.model.hardcode_dendrites:
+            self.model.hardcode_dendritic_weights(
+                context_vectors=self.train_loader.dataset._contexts, init="overlapping")
 
     @classmethod
     def compute_task_indices(cls, config, dataset):
@@ -132,132 +76,6 @@ class DendritesExperiment(mixins.RezeroWeights,
             for j in range(num_classes_per_task):
                 task_indices[i].extend(class_indices[j + (i * num_classes_per_task)])
         return task_indices
-
-
-# ------ Network
-class DendriticMLP(nn.Module):
-    """
-    Dendrite segments receive context directly as input.
-
-                    _____
-                   |_____|    # classifier layer, no dendrite input
-                      ^
-                      |
-                  _________
-    context -->  |_________|  # second linear layer with dendrites
-                      ^
-                      |
-                  _________
-    context -->  |_________|  # first linear layer with dendrites
-                      ^
-                      |
-                    input
-    """
-
-    def __init__(self, input_size, output_size, hidden_size, num_segments, dim_context,
-                 weight_init, dendrite_init, kw,
-                 dendritic_layer_class=AbsoluteMaxGatingDendriticLayer):
-
-        # Forward weight initialization must of one of "kaiming" or "modified" (i.e.,
-        # modified sparse Kaiming initialization)
-        assert weight_init in ("kaiming", "modified")
-
-        # Forward weight initialization must of one of "kaiming" or "modified",
-        # "hardcoded"
-        assert dendrite_init in ("kaiming", "modified", "hardcoded")
-
-        super().__init__()
-
-        self.num_segments = num_segments
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-        self.dim_context = dim_context
-        self.kw = kw
-        self.hardcode_dendrites = (dendrite_init == "hardcoded")
-
-        # Forward layers & k-winners
-        self.dend1 = dendritic_layer_class(
-            module=nn.Linear(input_size, hidden_size, bias=True),
-            num_segments=num_segments,
-            dim_context=dim_context,
-            module_sparsity=0.95,
-            dendrite_sparsity=0.0 if self.hardcode_dendrites else 0.95,
-        )
-        self.dend2 = dendritic_layer_class(
-            module=nn.Linear(hidden_size, hidden_size, bias=True),
-            num_segments=num_segments,
-            dim_context=dim_context,
-            module_sparsity=0.95,
-            dendrite_sparsity=0.0 if self.hardcode_dendrites else 0.95,
-        )
-        self.classifier = SparseWeights(module=nn.Linear(hidden_size, output_size),
-                                        sparsity=0.95)
-
-        if kw:
-
-            print(f"Using k-Winners: 0.05 'on'")
-            self.kw1 = KWinners(n=hidden_size, percent_on=0.05, k_inference_factor=1.0,
-                                boost_strength=0.0, boost_strength_factor=0.0)
-            self.kw2 = KWinners(n=hidden_size, percent_on=0.05, k_inference_factor=1.0,
-                                boost_strength=0.0, boost_strength_factor=0.0)
-
-        if weight_init == "modified":
-
-            # Scale weights to be sampled from the new inititialization U(-h, h) where
-            # h = sqrt(1 / (weight_density * previous_layer_percent_on))
-            init_sparse_weights(self.dend1, 0.0)
-            init_sparse_weights(self.dend2, 0.95 if kw else 0.0)
-            init_sparse_weights(self.classifier, 0.95 if kw else 0.0)
-
-        if dendrite_init == "modified":
-            init_sparse_dendrites(self.dend1, 0.95)
-            init_sparse_dendrites(self.dend2, 0.95)
-
-        elif dendrite_init == "hardcoded":
-
-            # Dendritic weights will not be updated during backward pass
-            for name, param in self.named_parameters():
-                if "segments" in name:
-                    param.requires_grad = False
-
-    def forward(self, x, context):
-        output = self.dend1(x, context=context)
-        output = self.kw1(output) if self.kw else output
-
-        output = self.dend2(output, context=context)
-        output = self.kw2(output) if self.kw else output
-
-        output = self.classifier(output)
-        return output
-
-
-# ------ Weight initialization functions
-def init_sparse_weights(m, input_sparsity):
-    """
-    Modified Kaiming weight initialization that consider input sparsity and weight
-    sparsity.
-    """
-    input_density = 1.0 - input_sparsity
-    weight_density = 1.0 - m.sparsity
-    _, fan_in = m.module.weight.size()
-    bound = 1.0 / np.sqrt(input_density * weight_density * fan_in)
-    nn.init.uniform_(m.module.weight, -bound, bound)
-    m.apply(rezero_weights)
-
-
-def init_sparse_dendrites(m, input_sparsity):
-    """
-    Modified Kaiming initialization for dendrites segments that consider input sparsity
-    and dendritic weight sparsity.
-    """
-    # Assume `m` is an instance of `DendriticLayerBase`
-    input_density = 1.0 - input_sparsity
-    weight_density = 1.0 - m.segments.sparsity
-    fan_in = m.segments.dim_context
-    bound = 1.0 / np.sqrt(input_density * weight_density * fan_in)
-    nn.init.uniform_(m.segments.weights, -bound, bound)
-    m.apply(rezero_weights)
 
 
 # ------ Training & evaluation function
@@ -310,6 +128,63 @@ def evaluate_model(exp):
     return mean_acc
 
 
+def run_experiment(config):
+    exp_class = config["experiment_class"]
+    exp = exp_class()
+    exp.setup_experiment(config)
+
+    exp.model = exp.model.to(exp.device)
+
+    # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
+    for task_id in range(num_tasks):
+
+        # Train model on current task
+        t1 = time.time()
+        exp.train_loader.sampler.set_active_tasks(task_id)
+        for _ in range(num_epochs):
+            train_model(exp)
+        t2 = time.time()
+
+        print(f"train time [task {task_id}]: {t2 - t1}")
+
+        # Evaluate model accuracy on each task separately
+        if task_id in config["epochs_to_validate"]:
+
+            print(f"\n=== AFTER TASK {task_id} ===\n")
+
+            for eval_task_id in range(task_id + 1):
+
+                exp.val_loader.sampler.set_active_tasks(eval_task_id)
+                acc_task = evaluate_model(exp)
+                if isinstance(acc_task, tuple):
+                    acc_task = acc_task[0]
+
+                print(f"task {eval_task_id} accuracy: {acc_task}")
+
+            t3 = time.time()
+            print(f"\nevaluation time: {t3 - t2}")
+            print(f"====================\n")
+
+    # ------------------------------------------------------------------------------- #
+
+    # Report final aggregate accuracy
+    exp.val_loader.sampler.set_active_tasks(range(num_tasks))
+    acc_task = evaluate_model(exp)
+    if isinstance(acc_task, tuple):
+        acc_task = acc_task[0]
+
+    print(f"Total test accuracy: {acc_task}")
+
+    # Print entropy of layers
+    max_possible_entropy = max_entropy(exp.model.hidden_size,
+                                       int(0.05 * exp.model.hidden_size))
+    if exp.model.kw:
+        print(f"   KW1 entropy: {exp.model.kw1.entropy().item()}")
+        print(f"   KW2 entropy: {exp.model.kw2.entropy().item()}")
+        print(f"   max entropy: {max_possible_entropy}")
+    print("")
+
+
 if __name__ == "__main__":
 
     num_tasks = 50
@@ -345,7 +220,7 @@ if __name__ == "__main__":
         batch_size=64,
         val_batch_size=512,
         epochs=num_epochs,
-        epochs_to_validate=np.arange(num_epochs),
+        epochs_to_validate=[0, 3, 6, 10, 20, num_tasks - 1],
         num_tasks=num_tasks,
         num_classes=2 * num_tasks,
         distributed=False,
@@ -357,71 +232,5 @@ if __name__ == "__main__":
     print("Experiment config: ")
     pprint.pprint(config)
     print("")
-    exp_class = config["experiment_class"]
-    exp = exp_class()
-    exp.setup_experiment(config)
 
-    if exp.model.hardcode_dendrites:
-
-        # Manually set dendritic weights to invoke subnetworks
-        hardcode_dendritic_weights(dendrite_segments=exp.model.dend1.segments,
-                                   context_vectors=exp.train_loader.dataset._contexts,
-                                   init="overlapping")
-        hardcode_dendritic_weights(dendrite_segments=exp.model.dend2.segments,
-                                   context_vectors=exp.train_loader.dataset._contexts,
-                                   init="overlapping")
-
-    exp.model = exp.model.to(exp.device)
-
-    # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
-
-    # Evaluation can be slow. Only run evaluation when training task_id is in this list
-    eval_tasks = [0, 3, 6, 10, 20, num_tasks - 1]
-    # eval_tasks = range(num_tasks)
-    for task_id in range(num_tasks):
-
-        # Train model on current task
-        t1 = time.time()
-        exp.train_loader.sampler.set_active_tasks(task_id)
-        for _ in range(num_epochs):
-            train_model(exp)
-        t2 = time.time()
-
-        print(f"train time [task {task_id}]: {t2 - t1}")
-
-        # Evaluate model accuracy on each task separately
-        if task_id in eval_tasks:
-
-            print(f"\n=== AFTER TASK {task_id} ===\n")
-
-            for eval_task_id in range(task_id + 1):
-
-                exp.val_loader.sampler.set_active_tasks(eval_task_id)
-                acc_task = evaluate_model(exp)
-                if isinstance(acc_task, tuple):
-                    acc_task = acc_task[0]
-
-                print(f"task {eval_task_id} accuracy: {acc_task}")
-
-            t3 = time.time()
-            print(f"\nevaluation time: {t3 - t2}")
-            print(f"====================\n")
-
-    # ------------------------------------------------------------------------------- #
-
-    # Report final aggregate accuracy
-    exp.val_loader.sampler.set_active_tasks(range(num_tasks))
-    acc_task = evaluate_model(exp)
-    if isinstance(acc_task, tuple):
-        acc_task = acc_task[0]
-
-    print(f"Total test accuracy: {acc_task}")
-
-    # Print entropy of layers
-    max_possible_entropy = max_entropy(exp.model.hidden_size,
-                                       int(0.05 * exp.model.hidden_size))
-    if exp.model.kw:
-        print(f"   KW1 entropy: {exp.model.kw1.entropy().item()}")
-        print(f"   KW2 entropy: {exp.model.kw2.entropy().item()}")
-        print(f"   max entropy: {max_possible_entropy}")
-    print("")
+    run_experiment(config)

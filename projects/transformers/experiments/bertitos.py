@@ -47,13 +47,22 @@ See ../notebooks/create_little_text_dataset.ipynb
 # |--------------------------------------------------------------------------|
 # | model           | num params | train loss  | eval loss      | perplexity |
 # |-----------------|:----------:|:-----------:|:--------------:|:----------:|
-# | small_bert_100k | 27,523,072 | 2.951       | 3.861          | 14.532     |
-# | small_bert_50k  | 27,523,072 | 3.373       | 4.417          | 21.386     |
-# | mini_bert_100k  | 10,615,808 | 3.669       | 4.773          | 27.342     |
-# | mini_bert_50k   | 10,615,808 | 4.464       | 5.815          | 56.309     |
-# | tiny_bert_100k  |  4,124,928 | 4.566       | 5.802          | 55.79276   |
-# | tiny_bert_50k   |  4,124,928 | 5.990       | 8.367          | 330.234    |
+# | small_bert_100k | 27,523,072 | 2.951       | 2.676          | 14.532     |
+# | small_bert_50k  | 27,523,072 | 3.373       | 3.063          | 21.386     |
+# | mini_bert_100k  | 10,615,808 | 3.669       | 3.308          | 27.342     |
+# | mini_bert_50k   | 10,615,808 | 4.464       | 4.031          | 56.309     |
+# | tiny_bert_100k  |  4,124,928 | 4.566       | 4.021          | 55.793     |
+# | tiny_bert_50k   |  4,124,928 | 5.990       | 5.800          | 330.234    |
 # |--------------------------------------------------------------------------|
+#
+# Mixed precision training:
+#
+# |------------------------------------------------------------------|
+# | model                | train loss  | eval loss      | perplexity |
+# |----------------------|:-----------:|:--------------:|:----------:|
+# | small_bert_100k_fp16 | 2.964       | 2.698          | 14.844     |
+# | small_bert_50k_fp16  | 3.286       | 2.979          | 19.671     |
+# |------------------------------------------------------------------|
 #
 # Model Structure
 # |--------------------------------------------------------------------------------|
@@ -66,13 +75,14 @@ See ../notebooks/create_little_text_dataset.ipynb
 #
 # Training Times:
 #
-# |---------------------------------|
-# | model           | training time |
-# |-----------------|:-------------:|
-# | small_bert_100k | ~8 hrs        |
-# | mini_bert_100k  | ~6 hrs        |
-# | tiny_bert_100k  | ~2 hrs 20 min |
-# |---------------------------------|
+# |--------------------------------------|
+# | model                | training time |
+# |----------------------|:-------------:|
+# | small_bert_100k      | ~8 hrs        |
+# | small_bert_100k_fp16 | ~5 hrs 45 min |
+# | mini_bert_100k       | ~6 hrs        |
+# | tiny_bert_100k       | ~2 hrs 20 min |
+# |--------------------------------------|
 # (reported using a one p3.2xlarge)
 #
 
@@ -158,6 +168,8 @@ small_bert_50k.update(
     max_steps=50000,
 )
 
+small_bert_100k_fp16 = dict(**small_bert_100k, fp16=True)
+small_bert_50k_fp16 = dict(**small_bert_50k, fp16=True)
 
 # samples/second = 6.686 (on one p3.2xlarge)
 mini_bert_100k = deepcopy(bert_100k)
@@ -227,4 +239,7 @@ CONFIGS = dict(
     small_bert_50k=small_bert_50k,
     mini_bert_50k=mini_bert_50k,
     tiny_bert_50k=tiny_bert_50k,
+
+    small_bert_100k_fp16=small_bert_100k_fp16,
+    small_bert_50k_fp16=small_bert_50k_fp16,
 )

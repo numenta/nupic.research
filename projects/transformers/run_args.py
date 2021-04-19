@@ -19,11 +19,11 @@
 #
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
-from transformers import MODEL_FOR_MASKED_LM_MAPPING, TrainingArguments
+from transformers import MODEL_FOR_MASKED_LM_MAPPING, Trainer, TrainingArguments
 
-from run_utils import TASK_TO_KEYS
+from run_utils import TASK_TO_KEYS, compute_objective_eval_loss
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -39,6 +39,13 @@ class CustomTrainingArguments(TrainingArguments):
         metadata={
             "help": "How many runs per task. Currently only used for finetuning."
         },
+    )
+    trainer_mixin_args: Dict = field(
+        default_factory=dict,
+        metadata={
+            "help": "Extra arguments to be passed to Trainer. Can be accessed "
+                    "for addition arguments when trainer mixins are used."
+        }
     )
 
 
@@ -122,12 +129,48 @@ class ModelArguments:
             "help": "Allow user to define custom training arguments per task."
         },
     )
-    trainer_callbacks: Dict = field(
+    trainer_callbacks: List = field(
+        default_factory=list,
+        metadata={
+            "help": "List of callbacks to trainer"
+        },
+    )
+    trainer_class: Callable = field(
+        default=Trainer,
+        metadata={
+            "help": "Trainer class"
+        }
+    )
+    hp_space: Callable = field(
+        default=lambda: {},
+        metadata={
+            "help": "Hyperparameters to search for in the model"
+        }
+    )
+    hp_num_trials: int = field(
+        default=0,
+        metadata={
+            "help": "How many trials to run during hyperparameter search"
+        }
+    )
+    hp_validation_dataset_pct: float = field(
+        default=0.05,
+        metadata={
+            "help": "Percentage of the validation dataset to be used in hp search"
+        }
+    )
+    hp_compute_objective: Callable = field(
+        default=compute_objective_eval_loss,
+        metadata={
+            "help": "Defines the objective function be used in hyperparameter search"
+        }
+    )
+    hp_extra_kwargs: Dict = field(
         default_factory=dict,
         metadata={
-            "help": "Whether to create a new results file. If set to False, will only"
-                    "attempt to update existing entries"
-        },
+            "help": "Dictionary with extra parameters to be passed to "
+                    "`trainer.hyperparameter_search`. Includse arguments to `tune.run`"
+        }
     )
 
 

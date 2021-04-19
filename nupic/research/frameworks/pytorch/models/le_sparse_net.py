@@ -81,7 +81,8 @@ def add_sparse_cnn_layer(
         if consolidated_sparse_weights:
             sparse_cnn = ConsolidatedSparseWeights2D(cnn, weight_sparsity)
         else:
-            sparse_cnn = SparseWeights2d(cnn, weight_sparsity)
+            sparsity = 1.0 - weight_sparsity
+            sparse_cnn = SparseWeights2d(cnn, sparsity=sparsity)
         network.add_module("cnn{}_cnn".format(suffix), sparse_cnn)
     else:
         network.add_module("cnn{}_cnn".format(suffix), cnn)
@@ -152,7 +153,11 @@ def add_sparse_linear_layer(
             )
         else:
             network.add_module(
-                "linear{}".format(suffix), SparseWeights(linear, weight_sparsity)
+                "linear{}".format(suffix),
+                SparseWeights(
+                    linear,
+                    sparsity=1 - weight_sparsity
+                )
             )
     else:
         network.add_module("linear{}_linear".format(suffix), linear)

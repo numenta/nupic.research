@@ -22,6 +22,7 @@
 from .composite_loss import CompositeLoss
 from .configure_optimizer_param_groups import ConfigureOptimizerParamGroups
 from .constrain_parameters import ConstrainParameters
+from .context_signal import *
 from .cutmix import CutMix, CutMixKnowledgeDistillation
 from .delay_load_checkpoint import *
 from .dendrite_metrics import *
@@ -48,6 +49,7 @@ from .prune_low_snr import PruneLowSNR
 from .quantization_aware import QuantizationAware
 from .reduce_lr_after_task import ReduceLRAfterTask
 from .regularize_loss import RegularizeLoss
+from .report_max_accuracy import ReportMaxAccuracy
 from .representation_overlap import *
 from .rezero_weights import RezeroWeights
 from .save_final_checkpoint import SaveFinalCheckpoint
@@ -56,4 +58,3 @@ from .track_representation_sparsity import *
 from .update_boost_strength import UpdateBoostStrength
 from .update_dendrite_boost_strength import UpdateDendriteBoostStrength
 from .vary_batch_size import VaryBatchSize
-from .report_max_accuracy import ReportMaxAccuracy

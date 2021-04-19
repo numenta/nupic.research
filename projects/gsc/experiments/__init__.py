@@ -24,6 +24,8 @@ from .test_sigopt import CONFIGS as TEST_SIGOPT
 from .gsc_onecyclelr import CONFIGS as SPARSE_CNN_ONECYCLELR
 from .gsc_onecyclelr_sigopt import CONFIGS as SIGOPT_SPARSE_CNN_ONECYCLELR
 from .gsc_sampled_kwinner import CONFIGS as SAMPLED_K_WINNER
+from .gsc_vdrop_pruning import CONFIGS as VDROP_PRUNING
+
 
 """
 Import and collect all Imagenet experiment configurations into one CONFIG
@@ -37,3 +39,4 @@ CONFIGS.update(TEST_SIGOPT)
 CONFIGS.update(SPARSE_CNN_ONECYCLELR)
 CONFIGS.update(SIGOPT_SPARSE_CNN_ONECYCLELR)
 CONFIGS.update(SAMPLED_K_WINNER)
+CONFIGS.update(VDROP_PRUNING)
