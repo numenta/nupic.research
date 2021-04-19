@@ -23,8 +23,8 @@ Auxiliary functions to run.py file
 
 import logging
 import math
-import os
 import multiprocessing
+import os
 from collections import Counter, defaultdict
 from functools import partial
 from hashlib import blake2b
