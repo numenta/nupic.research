@@ -58,14 +58,6 @@ class LinearClassifier(torch.nn.Module):
         return out
 
 
-# # MNIST
-# MEAN = 0.13062755
-# STDEV = 0.30810780
-# transform = transforms.Compose(
-#     [transforms.ToTensor(), transforms.Normalize(MEAN, STDEV)]
-# )
-
-
 fake_data_args = dict(
     size=1000, image_size=(1, 28, 28), num_classes=10, transform=transforms.ToTensor()
 )
@@ -90,15 +82,16 @@ self_supervised_config = dict(
     model_class=AutoEncoder,
     # model model class arguments passed to the constructor
     model_args=dict(),
-    classifier_model_class=LinearClassifier,
-    classifier_model_args=dict(),
     optimizer_class=torch.optim.Adam,
-    # Optimizer class class arguments passed to the constructor
     optimizer_args=dict(lr=0.001),
-    classifier_optimizer_class=torch.optim.SGD,
-    classifier_optimizer_args=dict(lr=0.001),
+    classifier_config=dict(
+        model_class=LinearClassifier,
+        model_args=dict(),
+        optimizer_class=torch.optim.SGD,
+        optimizer_args=dict(lr=0.001),
+        loss_function=torch.nn.functional.cross_entropy,
+    ),
     loss_function=torch.nn.functional.mse_loss,
-    loss_function_supervised=torch.nn.functional.cross_entropy,
 )
 
 
@@ -111,13 +104,12 @@ class SelfSupervisedLearningTest(unittest.TestCase):
         # Setup experiment and initialize model.
         exp = self_supervised_config["experiment_class"]()
         exp.setup_experiment(self_supervised_config)
-        assert isinstance(exp.model, EncoderClassifier)
-        assert hasattr(exp.model, "classifier")
-        assert hasattr(exp.model, "encoder")
+        self.assertIsInstance(exp.model, EncoderClassifier)
+        self.assertTrue(hasattr(exp.model, "classifier"))
+        self.assertTrue(hasattr(exp.model, "encoder"))
         # Loop through some pseudo epochs.
         for _ in range(5):
-            ret = exp.run_epoch()
-            print(ret)
+            exp.run_epoch()
 
 
 if __name__ == "__main__":

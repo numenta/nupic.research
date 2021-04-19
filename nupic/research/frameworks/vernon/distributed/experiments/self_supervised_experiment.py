@@ -19,11 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from nupic.research.frameworks.vernon import (
+    SelfSupervisedExperiment as SelfSupervisedExperimentBase,
+)
 from nupic.research.frameworks.vernon.distributed import (
     SupervisedExperiment as DistributedSupervisedExperiment,
-)
-from nupic.research.frameworks.vernon.experiments import (
-    SelfSupervisedExperiment as SelfSupervisedExperimentBase,
 )
 
 __all__ = ["SelfSupervisedExperiment"]
@@ -49,7 +49,6 @@ class SelfSupervisedExperiment(
         eo = super().get_execution_order()
         exp = "DistributedSelfSupervisedExperiment"
 
-        # Extended methods
         eo.update(
             # Overwritten methods
             create_unsupervised_sampler=[exp + ": Create distributed sampler"],

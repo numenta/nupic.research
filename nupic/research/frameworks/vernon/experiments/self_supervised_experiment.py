@@ -23,21 +23,16 @@ import sys
 
 import torch
 import torch.nn.functional as F
-from torch.backends import cudnn
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, RandomSampler
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
-from nupic.research.frameworks.vernon.experiment_utils import create_lr_scheduler
-from nupic.research.frameworks.vernon.experiments import SupervisedExperiment
-from nupic.research.frameworks.vernon.network_utils import create_model
+from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
+    SupervisedExperiment,
+)
 
 __all__ = ["SelfSupervisedExperiment"]
-
-
-# Improves performance when using fixed size images (224) and CNN
-cudnn.benchmark = True
 
 
 class SelfSupervisedExperiment(SupervisedExperiment):
@@ -85,36 +80,37 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         """
         Configure the experiment for training.
         :param config: Dictionary containing the configuration parameters
+            - classifier_config: Dictionary containing parameters for the classifier
+                                 model
+                - model_class: Classifier model class. Must inherit from
+                                          "torch.nn.Module"
+                - model_args: model class arguments passed to the
+                                         constructor
+                - init_batch_norm: Whether or not to Initialize running batch
+                                              norm mean to 0.
+                - checkpoint_file: if not None, will start from this model. The
+                                              model must have the same model_args and
+                                              model_class as the current experiment.
+                - load_checkpoint_args_classifier: args to be passed to
+                                                   `load_state_from_checkpoint`
+                - optimizer_class: Optimizer class for the optimizer.
+                                              Must inherit from "torch.optim.Optimizer"
+                - optimizer_args: Optimizer class arguments passed to the
+                                             constructor for the classifier optimizer
+                - lr_scheduler_class: Learning rate scheduler class.
+                                     Must inherit from "_LRScheduler"
+                - lr_scheduler_args: Learning rate scheduler class class
+                                                arguments passed to the constructor
+                - lr_scheduler_step_every_batch: Whether to step the lr-scheduler
+                                                 after every batch (e.g. for OneCycleLR)
+                - loss_function: Loss function for supervised training.
+                - reset_on_validate: optionally reset the parameters of the
+                                     classifier during each validation training loop
             - supervised_batch_size: Supervised training batch size
-            - classifier_model_class: Classifier model class. Must inherit from
-                                      "torch.nn.Module"
-            - classifier_model_args: model model class arguments passed to the
-                                     constructor
-            - classifier_init_batch_norm: Whether or not to Initialize running batch
-                                          norm mean to 0.
-            - classifier_checkpoint_file: if not None, will start from this model. The
-                                          model must have the same model_args and
-                                          model_class as the current experiment.
-            - classifier_load_checkpoint_args_classifier: args to be passed to
-                                               `load_state_from_checkpoint`
-            - classifier_optimizer_class: Optimizer class for the optimizer.
-                                          Must inherit from "torch.optim.Optimizer"
-            - classifier_optimizer_args: Optimizer class arguments passed to the
-                                         constructor for the classifier optimizer
-            - classifier_lr_scheduler_class: Learning rate scheduler class.
-                                 Must inherit from "_LRScheduler"
-            - classifier_lr_scheduler_args: Learning rate scheduler class class
-                                            arguments passed to the constructor
-            - classifier_lr_scheduler_step_every_batch: Whether to step the lr-scheduler
-                                             after every batch (e.g. for OneCycleLR)
-            - loss_function_supervised: Loss function for supervised training.
             - batches_in_epoch_supervised: Number of batches per epoch in supervised
                                            training
             - supervised_loader_drop_last: Whether to skip last batch if it is
-                                      smaller than the batch size
-            - reset_classifier_on_validate: optionally reset the parameters of the
-                                            classifier during each validation
-                                            training loop
+                                           smaller than the batch size
             - supervised_training_epochs_per_validation: number of epochs to train
                                                          the classifier for each
                                                          validation loop
@@ -122,24 +118,32 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                                           dataset during supervised training
             - num_unsupervised_samples: optionally select a random subset from the
                                         unsupervised dataset for faster training
+            - num_supervised_samples: optionally select a random subset from the
+                                      supervised dataset for faster training
+            - num_validation_samples: optionally select a random subset from the
+                                      validation dataset for faster validation
         """
 
         super().setup_experiment(config)
+        classifier_config = config.get("classifier_config", None)
+        if classifier_config is None:
+            raise ValueError("Must provide 'classifier_config' in config")
 
         self.encoder = self.model
-        self.classifier = self.create_classifier(config, self.device)
+        self.classifier = self.create_model(classifier_config, self.device)
         self.model = EncoderClassifier(self.encoder, self.classifier)
 
         self.encoder_optimizer = self.optimizer
-        self.classifier_optimizer = self.create_classifier_optimizer(
-            config, self.classifier
+        self.classifier_optimizer = self.create_optimizer(
+            classifier_config, self.classifier
         )
 
         self._loss_function_unsupervised = self._loss_function = config.get(
             "loss_function_unsupervised", config.get("loss_function", F.mse_loss)
         )
-        self._loss_function_supervised = config.get(
-            "loss_function_supervised", torch.nn.functional.cross_entropy
+        self._loss_function_supervised = classifier_config.get(
+            "loss_function_supervised",
+            classifier_config.get("loss_function", F.cross_entropy),
         )
 
         self.total_batches_unsupervised = self.total_batches
@@ -148,87 +152,22 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             "batches_in_epoch_supervised", sys.maxsize
         )
 
-        self.lr_scheduler_classifier = self.create_lr_scheduler_classifier(
-            config, self.classifier_optimizer, self.total_batches_supervised
+        self.lr_scheduler_classifier = self.create_lr_scheduler(
+            classifier_config, self.classifier_optimizer, self.total_batches_supervised
         )
-        self.step_lr_every_batch_classifier = config.get(
-            "lr_scheduler_classifier_step_every_batch", False
+        self.step_lr_every_batch_classifier = classifier_config.get(
+            "lr_scheduler_step_every_batch", False
         )
         if isinstance(self.lr_scheduler_classifier, (OneCycleLR, ComposedLRScheduler)):
             self.step_lr_every_batch_classifier = True
 
-        self.reset_classifier_on_validate = config.get(
-            "reset_classifier_on_validate", False
+        self.reset_classifier_on_validate = classifier_config.get(
+            "reset_on_validate", False
         )
 
         self.supervised_training_epochs_per_validation = config.get(
             "supervised_training_epochs_per_validation", 3
         )
-
-    @classmethod
-    def create_classifier(cls, config, device):
-        """
-        Create `torch.nn.Module` model from an experiment config
-        :param config:
-            - classifier_model_class: Model class. Must inherit from "torch.nn.Module"
-            - classifier_model_args: model model class arguments passed to the
-                                     constructor
-            - classifier_init_batch_norm: Whether or not to Initialize running batch
-                                          norm mean to 0.
-            - classifier_checkpoint_file: if not None, will start from this model. The
-                                          model must have the same model_args and
-                                          model_class as the current experiment.
-            - classifier_load_checkpoint_args_classifier: args to be passed to
-                                               `load_state_from_checkpoint`
-        :param device:
-            Pytorch device
-        :return:
-                Model instance
-        """
-        return create_model(
-            model_class=config["classifier_model_class"],
-            model_args=config.get("classifier_model_args", {}),
-            init_batch_norm=config.get("classifier_init_batch_norm", False),
-            device=device,
-            checkpoint_file=config.get("classifier_checkpoint_file", None),
-            load_checkpoint_args=config.get(
-                "classifier_load_checkpoint_args_classifier", {}
-            ),
-        )
-
-    @classmethod
-    def create_classifier_optimizer(cls, config, model):
-        """
-        Create optimizer for the classifier from an experiment config.
-
-        :param optimizer_class_classifier: Callable or class to instantiate
-                                           optimizer. Must return object inherited
-                                           from "torch.optim.Optimizer"
-        :param optimizer_args_classifier: Arguments to pass to the classifier optimizer.
-        """
-        optimizer_class = config.get("classifier_optimizer_class", torch.optim.SGD)
-        optimizer_args = config.get("classifier_optimizer_args", {})
-        return optimizer_class(model.parameters(), **optimizer_args)
-
-    @classmethod
-    def create_lr_scheduler_classifier(cls, config, optimizer, total_batches):
-        """
-        Create lr scheduler from the experiment config
-        :param config:
-            - classifier_lr_scheduler_class: (optional) Class of lr-scheduler
-            - classifier_lr_scheduler_args: (optional) dict of args to pass to lr-class
-        :param optimizer: torch optimizer
-        :param total_batches: number of batches/steps in an epoch
-        """
-        lr_scheduler_class = config.get("classifier_lr_scheduler_class", None)
-        if lr_scheduler_class is not None:
-            lr_scheduler_args = config.get("classifier_lr_scheduler_args", {})
-            return create_lr_scheduler(
-                optimizer=optimizer,
-                lr_scheduler_class=lr_scheduler_class,
-                lr_scheduler_args=lr_scheduler_args,
-                steps_per_epoch=total_batches,
-            )
 
     def create_loaders(self, config):
 
@@ -349,8 +288,11 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         Similarly, the dataset_args argument in the config should be a dict of dicts
         with keys corresponding to the different dataset types as described above.
         """
+        if not train:
+            dataset_type = "validation"
+
         dataset_class = config.get("dataset_class", None)
-        dataset_args = dict(config.get("dataset_args", {}))
+        dataset_args = config.get("dataset_args", {})
 
         if isinstance(dataset_class, dict):
             dataset_class = dataset_class.get(dataset_type, None)
@@ -408,11 +350,17 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         return data, data
 
     def train_epoch(self):
+        """
+        Trains the encoder in a self-supervised fashion. Train epoch will call the
+        .forward() method on the encoder, and the optimizer being used here is also
+        specific to the encoder. The classifier will not be affected by this method.
+
+        """
         self.train_model(
-            self.encoder,
-            self.unsupervised_loader,
-            self.encoder_optimizer,
-            self.device,
+            model=self.encoder,
+            loader=self.unsupervised_loader,
+            optimizer=self.encoder_optimizer,
+            device=self.device,
             criterion=self.error_loss,
             complexity_loss_fn=self.encoder_complexity_loss,
             batches_in_epoch=self.batches_in_epoch,
@@ -422,6 +370,34 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         )
 
     def validate(self):
+        """
+        This method has three parts.
+
+        First, it optionally resets the classifier if specified in the config. This
+        can be used to ensure "fairness" between validation trials. Defaults to
+        false, which should not cause problems so long as
+        supervised_epcochs_per_validaiton is enough for the classifier to converge.
+
+        Second, this method trains the classifier in a supervised fashion for a
+        specified number of epochs. self.model refers to the entire
+        EncoderClassifier model, whose .forward() method is as follows:
+
+            def forward(self, x):
+                with torch.no_grad():
+                    encoded = self.encoder.encode(x)
+                out = self.classifier(encoded)
+                return out
+
+        The forward pass involves the encoder and classifier, but there are no
+        gradients computed for the encode() pass, and the optimizer being used here,
+        self.classifier_optimizer, only updates the parameters of the classifier.
+
+        Last, this method validates the whole model using evaluate_model(),
+        again calling forward on the EncoderClassifier model and evaludating on the
+        validation set.
+
+
+        """
         if self.reset_classifier_on_validate:
             for layer in self.classifier.children():
                 if hasattr(layer, "reset_parameters"):
@@ -429,10 +405,10 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
         for _ in range(self.supervised_training_epochs_per_validation):
             self.train_model(
-                self.model,
-                self.supervised_loader,
-                self.classifier_optimizer,
-                self.device,
+                model=self.model,
+                loader=self.supervised_loader,
+                optimizer=self.classifier_optimizer,
+                device=self.device,
                 criterion=self.supervised_loss,
                 complexity_loss_fn=self.complexity_loss,
                 batches_in_epoch=self.batches_in_epoch_supervised,
@@ -442,11 +418,44 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             )
 
         return self.evaluate_model(
-            self.model,
-            self.val_loader,
-            self.device,
+            model=self.model,
+            loader=self.val_loader,
+            device=self.device,
             criterion=self.supervised_loss,
             complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch_val,
             transform_to_device_fn=self.transform_data_to_device,
+        )
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        exp = "SelfSupervisedExperiment"
+        # Extended methods
+        eo["setup_experiment"].append(exp + ".setup_experiment")
+
+        eo.update(
+            # New methods
+            create_unsupervised_dataloader=[exp + ".create_unsupervised_dataloader"],
+            create_unsupervised_sampler=[exp + ".create_unsupervised_sampler"],
+            create_supervised_dataloader=[exp + ".create_supervised_dataloader"],
+            create_supervised_sampler=[exp + ".create_supervised_sampler"],
+            unsupervised_loss=[exp + ".unsupervised_loss"],
+            supervised_loss=[exp + ".supervised_loss"],
+            encoder_complexity_loss=[exp + ".encoder_complexity_loss"],
+            pre_batch_supervised=[exp + ".pre_batch_supervised"],
+            post_batch_supervised=[exp + ".post_batch_supervised"],
+            post_optimizer_step_supervised=[exp + ".post_optimizer_step_supervised"],
+            post_batch_wrapper_supervised=[exp + ".post_batch_wrapper_supervised"],
+            transform_data_to_device_unsupervised=[
+                exp + ".transform_data_to_device_unsupervised"
+            ],
+            # Overwritten methods
+            validate=[exp + ".validate"],
+            create_loaders=[exp + ".create_loaders"],
+            create_validation_dataloader=[exp + ".create_validation_dataloader"],
+            create_validation_sampler=[exp + ".create_validation_sampler"],
+            train_epoch=[exp + ".train_epoch"],
+            transform_data_to_device=[exp + ".transform_data_to_device"],
+            load_dataset=[exp + ".load_dataset"],
         )
