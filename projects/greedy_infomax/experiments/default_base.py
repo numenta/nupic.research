@@ -115,7 +115,6 @@ DEFAULT_BASE = dict(
     num_unsupervised_samples=32,
     num_supervised_samples=32,
     num_validation_samples=32,
-    workers=1,
     reuse_actors=True,
     # Seed
     seed=tune.sample_from(lambda spec: np.random.randint(1, 10000)),
@@ -132,7 +131,7 @@ DEFAULT_BASE = dict(
     stop=dict(),
     # Number of epochs
     epochs=10,
-    epochs_to_validate=[3],
+    epochs_to_validate=[-1],
     # Which epochs to run and report inference over the validation dataset.
     # epochs_to_validate=range(-1, 30),  # defaults to the last 3 epochs
     # Model class. Must inherit from "torch.nn.Module"
