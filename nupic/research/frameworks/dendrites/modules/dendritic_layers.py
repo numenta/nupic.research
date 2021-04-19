@@ -25,6 +25,8 @@ linear layer with the output from a set of dendritic segments.
 """
 import abc
 
+import torch
+
 from nupic.torch.modules.sparse_weights import SparseWeights, SparseWeights2d
 
 from .apply_dendrites import (
@@ -129,6 +131,57 @@ class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a gating mechanism."""
         return self.dendritic_absolute_max_gate(y, dendrite_activations).values
+
+
+class OneSegmentDendriticLayer(SparseWeights):
+    """
+    Class for a layer of units with exactly one sparse dendritic segment per unit. With
+    this assumption the segments are just a straightforward linear SparseWeights layer.
+    It seems to be 3-6 times faster than other implementations depending on settings.
+    """
+
+    def __init__(
+        self, module, dim_context, module_sparsity, dendrite_sparsity,
+        num_segments=1, dendrite_bias=False
+    ):
+        """
+        :param module: linear module from in-units to out-units
+        :param dim_context: length of the context vector;
+                            the same context will be applied to each segment
+        :param module_sparsity: sparsity applied over linear module;
+        :param dendrite_sparsity: sparsity applied transformation per unit per segment
+        :param num_segments: number of dendrite segments per out-unit. Must be 1.
+        :param dendrite_bias: bool indicating whether or not dendrite activations have
+               an additive bias
+        """
+        assert(num_segments == 1)
+
+        self.segments = None
+        super().__init__(module, sparsity=module_sparsity)
+
+        self.segments = SparseWeights(
+            torch.nn.Linear(dim_context,
+                            module.weight.shape[0],
+                            bias=dendrite_bias),
+            sparsity=dendrite_sparsity)
+
+        self.rezero_weights()
+
+    def rezero_weights(self):
+        """Set the previously selected weights to zero."""
+        super().rezero_weights()
+        if self.segments is not None:  # only none at beginning of init
+            self.segments.rezero_weights()
+
+    def forward(self, x, context):
+        """Compute of linear layer and apply output of dendrite segments."""
+        y = super().forward(x)
+        dendrite_activations = self.segments(context)
+        return self.apply_dendrites(y, dendrite_activations)
+
+    def apply_dendrites(self, y, dendrite_activations):
+        """Apply dendrites as a sigmoidal gating mechanism."""
+        return y * torch.sigmoid(dendrite_activations)
 
 
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):

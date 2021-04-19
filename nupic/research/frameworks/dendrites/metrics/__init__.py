@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .metrics import (
+    contexts_by_class,
     dendrite_activations_by_unit,
     dendrite_duty_cycle,
     dendrite_overlap,
@@ -34,6 +35,7 @@ from .metrics import (
     winning_segment_indices,
 )
 from .plotting import (
+    plot_contexts_by_class,
     plot_dendrite_activations,
     plot_dendrite_activations_by_unit,
     plot_dendrite_overlap_matrix,

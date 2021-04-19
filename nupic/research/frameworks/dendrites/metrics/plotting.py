@@ -25,6 +25,7 @@ import seaborn as sns
 import torch
 
 from .metrics import (
+    contexts_by_class,
     dendrite_activations_by_unit,
     dendrite_duty_cycle,
     dendrite_overlap,
@@ -300,6 +301,39 @@ def plot_hidden_activations_by_unit(activations, targets, category_names=None,
     ax.imshow(activations, cmap="PiYG", vmin=-max_val, vmax=max_val)
 
     ax.set_xlabel("hidden unit")
+    ax.set_ylabel("category")
+
+    plt.tight_layout()
+    figure = plt.gcf()
+    return figure
+
+
+def plot_contexts_by_class(contexts, targets, dims_to_plot=64):
+    """
+    Returns a heatmap with shape (num_categories, dim_context) where cell c, k gives
+    the fraction of instances of category c for which feature/dimension k of the
+    context signal generated for an input of said class was non-zero. All values are in
+    the range [0, 1].
+
+    :param contexts: 2D torch tensor with shape (batch_size, dim_context) where row b
+                     gives the context signal for the bth input
+    :param targets: 1D torch tensor with shape (batch_size,) where entry b gives the
+                    target label for example b
+    :param dims_to_plot: an integer which gives how many columns/features to show, for
+                         ease of visualization; only the first dims_to_plot units are
+                         shown
+    """
+    contexts = contexts_by_class(contexts, targets)
+
+    if dims_to_plot is not None:
+        contexts = contexts[:, :dims_to_plot]
+    contexts = contexts.detach().cpu().numpy()
+
+    plt.cla()
+    fig, ax = plt.subplots()
+    ax.imshow(contexts, cmap="binary", vmin=0)
+
+    ax.set_xlabel("context feature")
     ax.set_ylabel("category")
 
     plt.tight_layout()
