@@ -109,11 +109,11 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
 
     def __getitem__(self, index):
         """
-        Returns an (image, context, target) triplet.
+        Returns an ((image, context), target) tuple.
         """
         img, target = super().__getitem__(index)
         task_id = self.get_task_id(index)
-        return img, self.contexts[task_id, :], target
+        return (img, self.contexts[task_id, :]), target
 
     def init_contexts(self, seed):
         percent_on = 0.05

@@ -46,9 +46,8 @@ class PermutedMNISTExperiment(mixins.RezeroWeights,
 
 # ------ Training & evaluation functions
 def train_model(exp):
-    # Assume `loader` yields 3-item tuples of the form (data, context, target)
     exp.model.train()
-    for data, context, target in exp.train_loader:
+    for (data, context), target in exp.train_loader:
         data = data.flatten(start_dim=1)
 
         # Since there's only one output head, target values should be modified to be in
@@ -72,7 +71,6 @@ def train_model(exp):
 
 
 def evaluate_model(exp):
-    # Assume `loader` yields 3-item tuples of the form (data, context, target)
     exp.model.eval()
     total = 0
 
@@ -81,7 +79,7 @@ def evaluate_model(exp):
 
     with torch.no_grad():
 
-        for data, context, target in exp.val_loader:
+        for (data, context), target in exp.val_loader:
             data = data.flatten(start_dim=1)
 
             # Since there's only one output head, target values should be modified to

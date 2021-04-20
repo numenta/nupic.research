@@ -138,8 +138,7 @@ class ContinualLearningExperiment(
     def compute_task_indices(cls, config, dataset):
         # Assume dataloaders are already created
         class_indices = defaultdict(list)
-        for idx, batch_item in enumerate(dataset):
-            target = batch_item[-1]
+        for idx, (_, target) in enumerate(dataset):
             class_indices[target].append(idx)
 
         # Defines how many classes should exist per task
