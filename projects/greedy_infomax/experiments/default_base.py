@@ -32,14 +32,50 @@ from nupic.research.frameworks.greedy_infomax.models import FullVisionModel
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_cross_entropy,
 )
-from nupic.research.frameworks.vernon import experiments, mixins
-
+from nupic.research.frameworks.vernon.distributed import experiments, mixins
+from torch.utils.data.dataset import Subset
 
 class GreedyInfoMaxExperiment(
     mixins.LogEveryLoss,
     experiments.SelfSupervisedExperiment,
 ):
-    pass
+    def create_loaders(self, config):
+        unsupervised_data = self.load_dataset(config, dataset_type="unsupervised")
+        if config.get("reuse_unsupervised_dataset", False):
+            supervised_data = unsupervised_data
+        else:
+            supervised_data = self.load_dataset(config, dataset_type="supervised")
+        validation_data = self.load_dataset(config, dataset_type="validation")
+        num_unsupervised_samples = config.get("num_unsupervised_samples", -1)
+        if num_unsupervised_samples > 0:
+            unsupervised_indices = np.random.choice(len(unsupervised_data),
+                                                    num_unsupervised_samples,
+                                                    replace=False)
+            unsupervised_data = Subset(unsupervised_data, unsupervised_indices)
+
+        num_supervised_samples = config.get("num_supervised_samples", -1)
+        if num_supervised_samples > 0:
+            supervised_indices = np.random.choice(len(supervised_data),
+                                                    num_supervised_samples,
+                                                    replace=False)
+            supervised_data = Subset(supervised_data, supervised_indices)
+
+        num_validation_samples = config.get("num_validation_samples", -1)
+        if num_validation_samples > 0:
+            validation_indices = np.random.choice(len(validation_data),
+                                                    num_validation_samples,
+                                                    replace=False)
+            validation_data = Subset(validation_data, validation_indices)
+
+        self.unsupervised_loader = (
+            self.train_loader
+        ) = self.create_unsupervised_dataloader(config, unsupervised_data)
+
+        self.supervised_loader = self.create_supervised_dataloader(
+            config, supervised_data
+        )
+        self.val_loader = self.create_validation_dataloader(config, validation_data)
+
 
 
 # get transforms for the dataset
@@ -112,9 +148,13 @@ DEFAULT_BASE = dict(
         supervised=supervised_dataset_args,
         validation=validation_dataset_args,
     ),
-    num_unsupervised_samples=32,
-    num_supervised_samples=32,
-    num_validation_samples=32,
+    #               STL10:
+    # 500 training images (10 pre-defined folds)
+    # 8000 test images (800 test images per class)
+    # 100,000 unlabeled images
+    num_unsupervised_samples=10000,
+    #num_supervised_samples=500,
+    # num_validation_samples=32,
     reuse_actors=True,
     # Seed
     seed=42,
