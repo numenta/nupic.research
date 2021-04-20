@@ -117,13 +117,13 @@ DEFAULT_BASE = dict(
     num_validation_samples=32,
     reuse_actors=True,
     # Seed
-    seed=tune.sample_from(lambda spec: np.random.randint(1, 10000)),
+    seed=42,
     # Number of times to sample from the hyperparameter space. If `grid_search` is
     # provided the grid will be repeated `num_samples` of times.
     # Training batch size
-    batch_size=BATCH_SIZE,
+    batch_size=32,
     # Validation batch size
-    val_batch_size=10000,
+    val_batch_size=32,
     # Number of batches per epoch. Useful for debugging
     batches_in_epoch=sys.maxsize,
     # Update this to stop training when accuracy reaches the metric value
@@ -131,15 +131,15 @@ DEFAULT_BASE = dict(
     stop=dict(),
     # Number of epochs
     epochs=10,
-    epochs_to_validate=[-1],
+    epochs_to_validate=[-1, 0, 1, 2, 3],
     # Which epochs to run and report inference over the validation dataset.
     # epochs_to_validate=range(-1, 30),  # defaults to the last 3 epochs
     # Model class. Must inherit from "torch.nn.Module"
     model_class=FullVisionModel,
     # default model arguments
     model_args=dict(
-        negative_samples=10,
-        k_predictions=5,
+        negative_samples=6,
+        k_predictions=3,
         resnet_50=False,
         grayscale=True,
         patch_size=16,
@@ -147,13 +147,14 @@ DEFAULT_BASE = dict(
     ),
     classifier_config=dict(
         model_class=torch.nn.Linear,
-        model_args=dict(in_features=100, out_features=NUM_CLASSES),
+        model_args=dict(in_features=256, out_features=NUM_CLASSES),
         loss_function=torch.nn.functional.cross_entropy,
         # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
         optimizer_class=torch.optim.Adam,
         # Optimizer class class arguments passed to the constructor
         optimizer_args=dict(lr=1.5e-4),
     ),
+    supervised_training_epochs_per_validation=1,
     loss_function=multiple_cross_entropy,  # each GIM layer has a cross-entropy
     # Optimizer class. Must inherit from "torch.optim.Optimizer"
     optimizer_class=torch.optim.Adam,

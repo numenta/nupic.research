@@ -156,5 +156,5 @@ class ResNet_Encoder(nn.Module):
         out = F.adaptive_avg_pool2d(z, 1)
         out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
         out = out.permute(0, 3, 1, 2).contiguous()
-        representation = F.adaptive_avg_pool2d(z, 1).squeeze()
+        representation = F.adaptive_avg_pool2d(out, 1).reshape(out.shape[0], -1)
         return representation, z
