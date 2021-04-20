@@ -314,7 +314,7 @@ def run_finetuning_single_task(
         training_args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
-        model=init_model(model_args, config, tokenizer),
+        model=model,
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
