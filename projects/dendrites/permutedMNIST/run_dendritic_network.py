@@ -172,6 +172,7 @@ if __name__ == "__main__":
         dataset_args=dict(
             num_tasks=num_tasks,
             dim_context=1024,
+            seed=np.random.randint(0, 1000),
         ),
 
         model_class=DendriticMLP,
