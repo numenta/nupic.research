@@ -22,3 +22,4 @@
 from .distillation import DistillationTrainerMixin
 from .lr_range_test import LRRangeTestMixin
 from .one_cycle_lr import OneCycleLRMixin
+from .rigl import RigLMixin

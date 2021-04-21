@@ -42,6 +42,12 @@ from transformers.models.bert.modeling_bert import BertOnlyMLMHead
 # the new modules made below so they may be imported.
 from . import __dict__ as __models_dict__
 
+# Keep a copy of the mappings so they may be directly accessed.
+__models_dict__["CONFIG_MAPPING"] = CONFIG_MAPPING
+__models_dict__["MODEL_FOR_MASKED_LM_MAPPING"] = MODEL_FOR_MASKED_LM_MAPPING
+__models_dict__["MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING"] = MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING # noqa E501
+__models_dict__["TOKENIZER_MAPPING"] = TOKENIZER_MAPPING
+
 
 def register_bert_model(bert_cls):
     """
