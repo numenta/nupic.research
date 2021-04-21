@@ -23,7 +23,6 @@ import logging
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-import torch
 import wandb
 from pandas import DataFrame
 from torch import count_nonzero

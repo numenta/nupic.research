@@ -24,9 +24,9 @@ from copy import deepcopy
 from transformers import Trainer
 
 from callbacks import PlotDensitiesCallback, RezeroWeightsCallback
-from trainer_mixins import DistillationTrainerMixin, OneCycleLRMixin, RigLMixin
+from trainer_mixins import RigLMixin
 
-from .bertitos import small_bert_100k, tiny_bert_100k, tiny_bert_debug
+from .bertitos import tiny_bert_100k, tiny_bert_debug
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
 
 

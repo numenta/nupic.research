@@ -23,6 +23,7 @@ Auxiliary functions to run.py file
 
 import logging
 import math
+import multiprocessing
 import os
 from collections import Counter, defaultdict
 from functools import partial
@@ -237,6 +238,13 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
                             text_column_name):
     """Tokenize datasets and applies remaining preprocessing steps"""
 
+    # Letting the tokenizer handle multi-threading results in poor performance
+    # So if num_workers is not specified, critical to set it
+    if data_args.preprocessing_num_workers is None:
+        num_procs = multiprocessing.cpu_count()
+    else:
+        num_procs = data_args.preprocessing_num_workers
+
     if data_args.line_by_line:
         # When using line_by_line, we just tokenize each nonempty line.
         padding = "max_length" if data_args.pad_to_max_length else False
@@ -260,7 +268,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
         tokenized_datasets = datasets.map(
             tokenize_function,
             batched=True,
-            num_proc=data_args.preprocessing_num_workers,
+            num_proc=num_procs,
             remove_columns=[text_column_name],
             load_from_cache_file=not data_args.overwrite_cache,
         )
@@ -277,7 +285,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
         tokenized_datasets = datasets.map(
             tokenize_function,
             batched=True,
-            num_proc=data_args.preprocessing_num_workers,
+            num_proc=num_procs,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
         )
@@ -329,7 +337,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
         tokenized_datasets = tokenized_datasets.map(
             group_texts,
             batched=True,
-            num_proc=data_args.preprocessing_num_workers,
+            num_proc=num_procs,
             load_from_cache_file=not data_args.overwrite_cache,
         )
 
