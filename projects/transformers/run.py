@@ -29,6 +29,8 @@ github.com/huggingface/transformers/blob/master/examples/language-modeling/run_m
 github.com/huggingface/transformers/blob/master/examples/text-classification/run_glue.py
 """
 
+# FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
+from ray import tune # noqa F401
 import argparse
 import logging
 import os
@@ -106,8 +108,10 @@ def main():
 
         # Initialize wandb now to include the logs that follow.
         # For now, only support early wandb logging when running one experiment.
+        distributed_initialized = torch.distributed.is_initialized()
+        rank = -1 if not distributed_initialized else torch.distributed.get_rank()
         if is_wandb_available() and len(cmd_args.experiments) == 1:
-            CustomWandbCallback.early_init(training_args, local_rank)
+            CustomWandbCallback.early_init(training_args, rank)
 
         # Detecting last checkpoint.
         last_checkpoint = None

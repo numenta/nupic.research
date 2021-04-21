@@ -32,6 +32,7 @@ from .hpsearch import CONFIGS as HPSEARCH
 from .one_cycle_lr import CONFIGS as ONE_CYCLE_LR
 from .rigl_bert import CONFIGS as RIGL_BERT
 from .sparse_bert import CONFIGS as SPARSE_BERT
+from .sparse_bertitos import CONFIGS as SPARSE_BERTITOS
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -49,3 +50,4 @@ CONFIGS.update(HPSEARCH)
 CONFIGS.update(ONE_CYCLE_LR)
 CONFIGS.update(RIGL_BERT)
 CONFIGS.update(SPARSE_BERT)
+CONFIGS.update(SPARSE_BERTITOS)
