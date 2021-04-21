@@ -19,16 +19,17 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .apply_dendrites import *
-from .boosted_dendrites import *
-from .dendrite_segments import DendriteSegments
-from .dendritic_mlp import DendriticMLP
-from .dendritic_layers import (
-    AbsoluteMaxGatingDendriticLayer,
-    AbsoluteMaxGatingDendriticLayer2d,
-    BiasingDendriticLayer,
-    GatingDendriticLayer,
-    GatingDendriticLayer2d,
-    DendriticLayerBase,
-    OneSegmentDendriticLayer
-)
+import torch
+
+
+class EncoderClassifier(torch.nn.Module):
+    def __init__(self, encoder, classifier):
+        super(EncoderClassifier, self).__init__()
+        self.encoder = encoder
+        self.classifier = classifier
+
+    def forward(self, x):
+        with torch.no_grad():
+            encoded = self.encoder.encode(x)
+        out = self.classifier(encoded)
+        return out
