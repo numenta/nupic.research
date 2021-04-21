@@ -22,7 +22,7 @@ import copy
 
 import ray  # noqa: F401
 
-from projects.greedy_infomax.experiments import CONFIGS
+from experiments import CONFIGS
 from nupic.research.frameworks.vernon.parser_utils import (
     DEFAULT_PARSERS,
     process_args,

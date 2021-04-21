@@ -1,1 +1,1 @@
-from .default_base import *
+from .default_base import CONFIGS

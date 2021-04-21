@@ -34,6 +34,9 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
 )
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
 from torch.utils.data.dataset import Subset
+from torch.nn import DataParallel
+from torch.nn.parallel import DistributedDataParallel
+
 
 class GreedyInfoMaxExperiment(
     mixins.LogEveryLoss,
@@ -75,6 +78,18 @@ class GreedyInfoMaxExperiment(
             config, supervised_data
         )
         self.val_loader = self.create_validation_dataloader(config, validation_data)
+
+    def setup_experiment(self, config):
+        super().setup_experiment(config)
+        if self.distributed:
+            self.model = DistributedDataParallel(self.model,
+                                                 find_unused_parameters=True)
+            self.encoder = DistributedDataParallel(self.encoder,
+                                                   find_unused_parameters=True)
+            self.classifier = DistributedDataParallel(self.classifier,
+                                                      find_unused_parameters=True)
+        else:
+            self.model = DataParallel(self.model)
 
 
 
@@ -119,7 +134,7 @@ transform_unsupervised = transform_supervised = get_transforms(val=False, aug=au
 transform_validation = trans = get_transforms(val=True, aug=aug)
 
 
-base_dataset_args = dict(root="~/nta/data/STL10", download=False)
+base_dataset_args = dict(root="~/nta/data/STL10/stl10_binary", download=False)
 
 # #fake data class for debugging purposes
 # def fake_data(size=256, image_size=(3, 96, 96), num_classes = 10, train=True,
@@ -141,6 +156,13 @@ BATCH_SIZE = 32
 NUM_CLASSES = 10
 DEFAULT_BASE = dict(
     experiment_class=GreedyInfoMaxExperiment,
+
+    #wandb
+    wandb_args=dict(
+        project="greedy_infomax",
+        name="paper_replication-small-1",
+    ),
+
     # Dataset
     dataset_class=STL10,
     dataset_args=dict(
@@ -202,6 +224,9 @@ DEFAULT_BASE = dict(
     optimizer_args=dict(lr=1.5e-4),
     # # Learning rate scheduler class. Must inherit from "_LRScheduler"
     # lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+
+    distributed=True,
+
     # How often to checkpoint (epochs)
     checkpoint_freq=0,
     keep_checkpoints_num=1,
