@@ -20,5 +20,6 @@
 # ----------------------------------------------------------------------
 
 from .gsc_factory import download_gsc_data, preprocessed_gsc
-from .torchvision_factory import torchvisiondataset, omniglot
 from .imagenet_factory import imagenet
+from .permuted_mnist import ContextDependentPermutedMNIST, PermutedMNIST
+from .torchvision_factory import omniglot, torchvisiondataset
