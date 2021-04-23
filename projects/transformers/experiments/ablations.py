@@ -238,11 +238,12 @@ bert_sparse_100k_kd_lr_range_test.update(
 
 
 # This fine-tunes a pretrained model from `bert_sparse_100k_kd_oncycle_lr` above.
+# This took 6h 20m to run on a p3.2xlarge
 finetuning_bert_sparse_kd_oncycle_lr_100k_glue = deepcopy(finetuning_bert700k_glue)
 finetuning_bert_sparse_kd_oncycle_lr_100k_glue.update(
     # Model arguments
     model_type="fully_static_sparse_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_100k_kd_oncycle_lr",  # noqa: E501
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_kd_onecycle_lr_100k",  # noqa: E501
 )
 
 
