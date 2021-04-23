@@ -23,6 +23,7 @@ Auxiliary functions to run.py file
 
 import logging
 import math
+import multiprocessing
 import os
 from collections import Counter, defaultdict
 from functools import partial
@@ -237,6 +238,13 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
                             text_column_name):
     """Tokenize datasets and applies remaining preprocessing steps"""
 
+    # Letting the tokenizer handle multi-threading results in poor performance
+    # So if num_workers is not specified, critical to set it
+    if data_args.preprocessing_num_workers is None:
+        num_procs = multiprocessing.cpu_count()
+    else:
+        num_procs = data_args.preprocessing_num_workers
+
     if data_args.line_by_line:
         # When using line_by_line, we just tokenize each nonempty line.
         padding = "max_length" if data_args.pad_to_max_length else False
@@ -260,7 +268,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
         tokenized_datasets = datasets.map(
             tokenize_function,
             batched=True,
-            num_proc=data_args.preprocessing_num_workers,
+            num_proc=num_procs,
             remove_columns=[text_column_name],
             load_from_cache_file=not data_args.overwrite_cache,
         )
@@ -277,7 +285,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
         tokenized_datasets = datasets.map(
             tokenize_function,
             batched=True,
-            num_proc=data_args.preprocessing_num_workers,
+            num_proc=num_procs,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
         )
@@ -329,7 +337,7 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
         tokenized_datasets = tokenized_datasets.map(
             group_texts,
             batched=True,
-            num_proc=data_args.preprocessing_num_workers,
+            num_proc=num_procs,
             load_from_cache_file=not data_args.overwrite_cache,
         )
 
@@ -894,7 +902,26 @@ def run_hyperparameter_search(
     )
 
     # Specify how to re-init model each training run.
-    model_init = partial(init_model, model_args, config, tokenizer, False)
+    def model_init():
+
+        # Our custom model mapping made for sparse models must be imported here
+        # as ray uses an independently imported version of transformers which
+        # doesn't have access to this updated mapping.
+        from models import MODEL_FOR_MASKED_LM_MAPPING as CUSTOM_MASKED_LM_MAPPING
+        from models import CONFIG_MAPPING as CUSTOM_CONFIG_MAPPING
+
+        # For now, we'll only load new models from scratch.
+        assert model_args.model_name_or_path is None, \
+            "HP search with saved models not supported."
+        logging.info("Pretraining new model from scratch")
+
+        # Instantiate model; possibly one of our custom sparse models.
+        config_cls = CUSTOM_CONFIG_MAPPING[config.model_type]
+        model_for_lm_cls = CUSTOM_MASKED_LM_MAPPING[config_cls]
+        model = model_for_lm_cls(config)
+        model.resize_token_embeddings(len(tokenizer))
+        return model
+
     trainer = init_trainer(
         tokenizer=tokenizer,
         data_collator=data_collator,
