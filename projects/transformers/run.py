@@ -77,6 +77,16 @@ MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
 
+def bold(text):
+    """Bold inputed text for printing."""
+    return "\033[1m" + text + "\033[0m"
+
+
+def pdict(dictionary):
+    """Pretty print dictionary."""
+    return pformat(dictionary, indent=4)
+
+
 def main():
     cmd_parser = argparse.ArgumentParser()
     cmd_parser.add_argument("experiments", nargs="+", choices=list(CONFIGS.keys()),
@@ -142,7 +152,7 @@ def main():
         )
 
         # Log config.
-        logging.info(f"Running with config:\n{pformat(config_dict, indent=4)}")
+        logging.info(bold("\n\nRunning with experiment config:\n") + pdict(config_dict))
 
         # Log on each process the small summary:
         logging.warning(
@@ -156,9 +166,10 @@ def main():
             transformers.utils.logging.set_verbosity_info()
             transformers.utils.logging.enable_default_handler()
             transformers.utils.logging.enable_explicit_format()
-        logging.info("Training/evaluation parameters %s", training_args)
-        logging.info("Model parameters: %s", model_args)
-        logging.info("Data parameters: %s", data_args)
+
+        logging.info(bold("\n\nTraining parameters:\n") + pdict(training_args.__dict__))
+        logging.info(bold("\n\nModel parameters:\n") + pdict(model_args.__dict__))
+        logging.info(bold("\n\nData parameters:\n") + pdict(data_args.__dict__))
 
         # Set seed before initializing model.
         set_seed(training_args.seed)
