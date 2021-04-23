@@ -169,7 +169,9 @@ class OneSegmentDendriticLayer(SparseWeights):
         self.segments = None
 
         allow_extremes = module_sparsity == 1.0 or module_sparsity == 0.0
-        super().__init__(module, sparsity=module_sparsity, allow_extremes=allow_extremes)
+        super().__init__(module,
+                         sparsity=module_sparsity,
+                         allow_extremes=allow_extremes)
 
         allow_extremes = dendrite_sparsity == 1.0 or dendrite_sparsity == 0.0
         self.segments = SparseWeights(
