@@ -79,7 +79,7 @@ class DendriticMLP(nn.Module):
             dendritic_layer_class=AbsoluteMaxGatingDendriticLayer, output_nonlinearity=None,
             preprocess_module_type=None, preprocess_output_dim=128,
             preprocess_kw_percent_on=0.1, representation_module_type=None,
-            representation_module_dims=(128, 128)
+            representation_module_dims=(128, 128), return_dendrite_outs=False
     ):
 
         # Forward & dendritic weight initialization must be either "kaiming" or
@@ -125,9 +125,10 @@ class DendriticMLP(nn.Module):
         self._dendrite_layers = nn.ModuleList()
         self._dendrite_activations = nn.ModuleList()
 
+        input_size = self.representation_dim
         for i in range(len(self.hidden_sizes)):
             curr_dend = dendritic_layer_class(
-                module=nn.Linear(self.representation_dim, self.hidden_sizes[i], bias=True),
+                module=nn.Linear(input_size, self.hidden_sizes[i], bias=True),
                 num_segments=num_segments,
                 dim_context=self.context_representation_dim,
                 module_sparsity=self.weight_sparsity,
@@ -179,15 +180,27 @@ class DendriticMLP(nn.Module):
         if self.output_nonlinearity:
             self._output_layer.add_module("non_linearity", output_nonlinearity)
 
-    def forward(self, x, context):
+    def forward(self, x, context, return_sigmoid_values=False):
         if self.representation_module is not None:
             x = self.representation_module(x)
         if self.preprocess_module is not None:
             context = self.preprocess_module(torch.cat((x, context), dim=-1))
-        for layer, activation in zip(self._dendrite_layers, self._dendrite_activations):
-            x = activation(layer(x, context))
 
-        return self._output_layer(x)
+        if return_sigmoid_values:
+            dendrite_sigmoids = []
+
+        for layer, activation in zip(self._dendrite_layers, self._dendrite_activations):
+            if return_sigmoid_values:
+                x, dend_sig = layer(x, context, return_sigmoid_values=True)
+                x = activation(x)
+                dendrite_sigmoids.append(dend_sig)
+            else:
+                x = activation(layer(x, context))
+
+        if return_sigmoid_values:
+            return self._output_layer(x), torch.stack(dendrite_sigmoids)
+        else:
+            return self._output_layer(x)
 
     def _create_representation_module(self, module_type, dims):
         if module_type is None:
@@ -369,4 +382,5 @@ if __name__ == '__main__':
                      representation_module_type="relu", preprocess_module_type="relu")
     # contexts = torch.eye(10)
     # d.hardcode_dendritic_weights(contexts, init="non_overlapping")
-    d(torch.rand(1, 10), torch.rand(1, 10))
+    ret = d(torch.rand(32, 10), torch.rand(32, 10), return_sigmoid_values=True)
+    a = 2

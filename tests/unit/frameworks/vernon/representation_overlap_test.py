@@ -124,7 +124,7 @@ class PlotRepresentationOverlapTest(unittest.TestCase):
 
             # All the the tensors tracked should be of the same batch size.
             batch_size1 = exp.ro_targets.size(0)
-            batch_size2 = exp.ro_hook.hooks[0]._activations.shape[0]
+            batch_size2 = exp.ro_hook.hooks[0]._dendrite_activations.shape[0]
 
             if i == 0:
                 self.assertTrue(batch_size1 == batch_size2 == 200)

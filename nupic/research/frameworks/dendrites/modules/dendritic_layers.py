@@ -93,11 +93,11 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
         """Apply dendrites using function specified by subclass"""
         raise NotImplementedError
 
-    def forward(self, x, context):
+    def forward(self, x, context, return_sigmoid_values=False):
         """Compute of linear layer and apply output of dendrite segments."""
         y = super().forward(x)
         dendrite_activations = self.segments(context)  # num_units x num_segments
-        return self.apply_dendrites(y, dendrite_activations)
+        return self.apply_dendrites(y, dendrite_activations, return_sigmoid_values=return_sigmoid_values)
 
     @property
     def weights(self):
@@ -109,9 +109,12 @@ class BiasingDendriticLayer(DendriticLayerBase):
         super().__init__(*args, **kwargs)
         self.dendritic_bias = DendriticBias1d()
 
-    def apply_dendrites(self, y, dendrite_activations):
+    def apply_dendrites(self, y, dendrite_activations, return_sigmoid_values=False):
         """Apply dendrites as a bias."""
-        return self.dendritic_bias(y, dendrite_activations).values
+        if return_sigmoid_values:
+            raise NotImplementedError
+        else:
+            return self.dendritic_bias(y, dendrite_activations).values
 
 
 class GatingDendriticLayer(DendriticLayerBase):
@@ -120,9 +123,13 @@ class GatingDendriticLayer(DendriticLayerBase):
         super().__init__(*args, **kwargs)
         self.dendritic_gate = DendriticGate1d()
 
-    def apply_dendrites(self, y, dendrite_activations):
+    def apply_dendrites(self, y, dendrite_activations, return_sigmoid_values=False):
         """Apply dendrites as a gating mechanism."""
-        return self.dendritic_gate(y, dendrite_activations).values
+        if return_sigmoid_values:
+            result, sigmoid_values = self.dendritic_gate(y, dendrite_activations, return_sigmoid_values=True)
+            return result.values, sigmoid_values
+        else:
+            return self.dendritic_gate(y, dendrite_activations).values
 
 
 class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
@@ -137,9 +144,13 @@ class AbsoluteMaxGatingDendriticLayer(DendriticLayerBase):
         super().__init__(*args, **kwargs)
         self.dendritic_absolute_max_gate = DendriticAbsoluteMaxGate1d()
 
-    def apply_dendrites(self, y, dendrite_activations):
+    def apply_dendrites(self, y, dendrite_activations, return_sigmoid_values=False):
         """Apply dendrites as a gating mechanism."""
-        return self.dendritic_absolute_max_gate(y, dendrite_activations).values
+        if return_sigmoid_values:
+            result, sigmoid_values = self.dendritic_gate(y, dendrite_activations, return_sigmoid_values=True)
+            return result.values, sigmoid_values
+        else:
+            return self.dendritic_gate(y, dendrite_activations).values
 
 
 class OneSegmentDendriticLayer(SparseWeights):
@@ -188,15 +199,19 @@ class OneSegmentDendriticLayer(SparseWeights):
         if self.segments is not None:  # only none at beginning of init
             self.segments.rezero_weights()
 
-    def forward(self, x, context):
+    def forward(self, x, context, return_sigmoid_values=False):
         """Compute of linear layer and apply output of dendrite segments."""
         y = super().forward(x)
         dendrite_activations = self.segments(context)
-        return self.apply_dendrites(y, dendrite_activations)
+        return self.apply_dendrites(y, dendrite_activations, return_sigmoid_values=return_sigmoid_values)
 
-    def apply_dendrites(self, y, dendrite_activations):
+    def apply_dendrites(self, y, dendrite_activations, return_sigmoid_values=False):
         """Apply dendrites as a sigmoidal gating mechanism."""
-        return y * torch.sigmoid(dendrite_activations)
+        if return_sigmoid_values:
+            sig = torch.sigmoid(dendrite_activations)
+            return y * sig, sig
+        else:
+            return y * torch.sigmoid(dendrite_activations)
 
     @property
     def weights(self):
