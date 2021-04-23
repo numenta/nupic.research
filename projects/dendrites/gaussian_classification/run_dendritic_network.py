@@ -34,6 +34,7 @@ Usage: adjust the config parameters `kw`, `dendrite_sparsity`, `weight_init`,
 import pprint
 import time
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -63,7 +64,7 @@ class DendritesExperiment(mixins.RezeroWeights,
 def train_model(exp):
     # Assume `loader` yields 3-item tuples of the form (data, context, target)
     exp.model.train()
-    for data, context, target in exp.train_loader:
+    for (data, context), target in exp.train_loader:
         data = data.to(exp.device)
         context = context.to(exp.device)
         target = target.to(exp.device)
@@ -92,7 +93,7 @@ def evaluate_model(exp):
 
     with torch.no_grad():
 
-        for data, context, target in exp.val_loader:
+        for (data, context), target in exp.val_loader:
             data = data.to(exp.device)
             context = context.to(exp.device)
             target = target.to(exp.device)
@@ -122,7 +123,7 @@ def run_experiment(config):
         # Train model on current task
         t1 = time.time()
         exp.train_loader.sampler.set_active_tasks(task_id)
-        for _ in range(num_epochs):
+        for _epoch_id in range(num_epochs):
             train_model(exp)
         t2 = time.time()
 
@@ -154,7 +155,7 @@ def run_experiment(config):
     if isinstance(acc_task, tuple):
         acc_task = acc_task[0]
 
-    print(f"Total test accuracy: {acc_task}")
+    print(f"Final test accuracy: {acc_task}")
 
     # Print entropy of layers
     max_possible_entropy = max_entropy(exp.model.hidden_size,
@@ -182,6 +183,7 @@ if __name__ == "__main__":
             validation_examples_per_class=500,
             dim_x=2048,
             dim_context=2048,
+            seed=np.random.randint(0, 1000),
         ),
 
         model_class=DendriticMLP,
@@ -196,7 +198,7 @@ if __name__ == "__main__":
             dendrite_sparsity=0.0,  # Irrelevant if `freeze_dendrites=True`
             weight_init="modified",  # Must be one of {"kaiming", "modified"}
             dendrite_init="modified",  # Irrelevant if `freeze_dendrites=True`
-            freeze_dendrites=True
+            freeze_dendrites=False
         ),
 
         batch_size=64,
@@ -206,6 +208,7 @@ if __name__ == "__main__":
         num_tasks=num_tasks,
         num_classes=2 * num_tasks,
         distributed=False,
+        seed=np.random.randint(0, 10000),
 
         optimizer_class=torch.optim.SGD,
         optimizer_args=dict(lr=2e-1),

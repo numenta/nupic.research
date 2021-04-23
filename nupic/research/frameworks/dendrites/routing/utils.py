@@ -38,17 +38,23 @@ def generate_context_integers(num_contexts):
     return torch.arange(num_contexts, dtype=torch.float32).reshape(num_contexts, 1)
 
 
-def generate_context_vectors(num_contexts, n_dim, percent_on=0.2):
+def generate_context_vectors(num_contexts, n_dim, percent_on=0.2, seed=None):
     """
     Returns a binary Torch tensor of shape (num_vectors, n_dim) where each row
     represents a context vector with n_dim * percent_on non-zero values
+
     :param num_contexts: the number of context vectors
     :type num_contexts: int
     :param n_dim: the size of each binary vector
     :type n_dim: int
     :param percent_on: the fraction of non-zero
     :type percent_on: float
+    :param seed: (optional) a random seed
+    :type percent_on: int
     """
+    if seed is not None:
+        torch.manual_seed(seed)
+
     num_ones = int(percent_on * n_dim)
     num_zeros = n_dim - num_ones
 
