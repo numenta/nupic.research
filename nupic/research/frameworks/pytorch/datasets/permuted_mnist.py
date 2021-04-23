@@ -25,8 +25,6 @@ import torch
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from nupic.research.frameworks.dendrites.routing import generate_context_vectors
-
 
 class PermutedMNIST(MNIST):
     """
@@ -38,11 +36,7 @@ class PermutedMNIST(MNIST):
     permutation) that a continual learner will try to learn in sequence.
     """
 
-    # Permutations should be the same whether this class is instantiated for training
-    # or testing
-    permutations = None
-
-    def __init__(self, num_tasks, train, root=".", target_transform=None,
+    def __init__(self, num_tasks, seed, train, root=".", target_transform=None,
                  download=False):
 
         data_transform = transforms.Compose([
@@ -54,15 +48,16 @@ class PermutedMNIST(MNIST):
 
         self.num_tasks = num_tasks
 
-        # Generate num_tasks random permutations - the first one is the identity
-        # permutation (i.e., regular MNIST), represented below as `None`
-        if PermutedMNIST.permutations is None:
-            PermutedMNIST.permutations = [
-                torch.randperm(784) for task_id in range(1, num_tasks)
-            ]
-            PermutedMNIST.permutations.insert(0, None)
+        # Use a generator object to manually set the seed and generate the same
+        # num_tasks random permutations for both training and validation datasets; the
+        # first one is the identity permutation (i.e., regular MNIST), represented
+        # below as `None`
+        g = torch.manual_seed(seed)
 
-        self.permutations = PermutedMNIST.permutations
+        self.permutations = [
+            torch.randperm(784, generator=g) for task_id in range(1, num_tasks)
+        ]
+        self.permutations.insert(0, None)
 
     def __getitem__(self, index):
         """
@@ -75,7 +70,7 @@ class PermutedMNIST(MNIST):
         img, target = super().__getitem__(index % len(self.data))
 
         # Determine which task `index` corresponds to
-        task_id = index // len(self.data)
+        task_id = self.get_task_id(index)
 
         # Apply permutation to `img`
         img = permute(img, self.permutations[task_id])
@@ -83,9 +78,7 @@ class PermutedMNIST(MNIST):
         # Since target values are not shared between tasks, `target` should be in the
         # range [0 + 10 * task_id, 9 + 10 * task_id]
         target += 10 * task_id
-
-        # Since image size is not relevant for an MLP, `img` can be flattened
-        return img.flatten(), target
+        return img, target
 
     def __len__(self):
         return self.num_tasks * len(self.data)
@@ -93,6 +86,9 @@ class PermutedMNIST(MNIST):
     @property
     def processed_folder(self):
         return os.path.join(self.root, "MNIST", "processed")
+
+    def get_task_id(self, index):
+        return index // len(self.data)
 
 
 class ContextDependentPermutedMNIST(PermutedMNIST):
@@ -102,30 +98,42 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
     vector along with the data sample and target.
     """
 
-    # Context vectors should be the same whether this class is instantiated for
-    # training or testing
-    contexts = None
+    def __init__(self, num_tasks, dim_context, seed, train, root=".",
+                 target_transform=None, download=False):
 
-    def __init__(self, num_tasks, dim_context, train, root=".", target_transform=None,
-                 download=False):
+        super().__init__(num_tasks, seed, train, root, target_transform, download)
+        self.dim_context = dim_context
 
-        super().__init__(num_tasks, train, root, target_transform, download)
-
-        # Generate context vectors if `contexts` isn't already defined
-        if ContextDependentPermutedMNIST.contexts is None:
-            ContextDependentPermutedMNIST.contexts = generate_context_vectors(
-                num_contexts=num_tasks, n_dim=dim_context, percent_on=0.05
-            )
-
-        self.contexts = ContextDependentPermutedMNIST.contexts
+        # Initialize random binary sparse context vectors for each permutation
+        self.init_contexts(seed)
 
     def __getitem__(self, index):
         """
-        Returns an (image, context, target) triplet.
+        Returns an ((image, context), target) tuple.
         """
         img, target = super().__getitem__(index)
-        task_id = index // len(self.data)
-        return img, self.contexts[task_id, :], target
+        task_id = self.get_task_id(index)
+        return (img, self.contexts[task_id, :]), target
+
+    def init_contexts(self, seed):
+        percent_on = 0.05
+        num_contexts = self.num_tasks
+
+        num_ones = int(percent_on * self.dim_context)
+        num_zeros = self.dim_context - num_ones
+
+        self.contexts = torch.cat((
+            torch.zeros((num_contexts, num_zeros)),
+            torch.ones((num_contexts, num_ones))
+        ), dim=1)
+
+        # Shuffle each context vector i.i.d. to randomize it; use a fixed seed during
+        # shuffling so that train & validation contexts are identical
+        g = torch.manual_seed(seed)
+
+        for i in range(num_contexts):
+            self.contexts[i, :] = self.contexts[i, torch.randperm(self.dim_context,
+                                                                  generator=g)]
 
 
 def permute(x, permutation):

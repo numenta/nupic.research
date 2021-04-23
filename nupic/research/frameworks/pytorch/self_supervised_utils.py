@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,7 +19,17 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .distillation import DistillationTrainerMixin
-from .lr_range_test import LRRangeTestMixin
-from .one_cycle_lr import OneCycleLRMixin
-from .rigl import RigLMixin
+import torch
+
+
+class EncoderClassifier(torch.nn.Module):
+    def __init__(self, encoder, classifier):
+        super(EncoderClassifier, self).__init__()
+        self.encoder = encoder
+        self.classifier = classifier
+
+    def forward(self, x):
+        with torch.no_grad():
+            encoded = self.encoder.encode(x)
+        out = self.classifier(encoded)
+        return out

@@ -20,13 +20,12 @@
 # ----------------------------------------------------------------------
 
 """
-This module trains & evaluates a dendritic network in a continual learning setting on
-permutedMNIST for a specified number of tasks/permutations. A context vector is
-provided to the dendritic network, so task information need not be inferred.
+Use a prototype method for inferring context:
 
-This setup is very similar to that of context-dependent gating model from the paper
-'Alleviating catastrophic forgetting using contextdependent gating and synaptic
-stabilization' (Masse et al., 2018).
+During training, the prototype (or "centroid") of all training samples from a
+particular task are averaged in data space, and this resulting vector is used as the
+context. At inference, pick the prototype closest to each test example, and use that as
+context.
 """
 
 import numpy as np
@@ -34,20 +33,59 @@ import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
-from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
+from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
+from nupic.torch.modules import KWinners
 
 
 # ------ Experiment class
-class PermutedMNISTExperiment(mixins.RezeroWeights,
-                              ContinualLearningExperiment):
-    pass
+class CentroidExperiment(mixins.RezeroWeights,
+                         ContinualLearningExperiment):
+
+    def setup_experiment(self, config):
+        super().setup_experiment(config)
+
+        # Store batch size
+        self.batch_size = config.get("batch_size", 1)
+
+        # Tensor for accumulating each task's centroid vector
+        self.contexts = torch.zeros((0, self.model.input_size))
+        self.contexts = self.contexts.to(self.device)
+
+
+# ------ Network
+class CentroidDendriticMLP(DendriticMLP):
+    """
+    A slight variant of `DendriticMLP` which applies k-Winners to the context it
+    receives.
+    """
+
+    def __init__(self, input_size, output_size, hidden_size, num_segments, dim_context,
+                 kw=True, dendrite_sparsity=0.95):
+
+        super().__init__(input_size=input_size, output_size=output_size,
+                         hidden_size=hidden_size, num_segments=num_segments,
+                         dim_context=dim_context, kw=kw,
+                         dendrite_sparsity=dendrite_sparsity)
+
+        # k-Winners module to apply to context input
+        self.kw_context = KWinners(n=dim_context, percent_on=0.05,
+                                   k_inference_factor=1.0, boost_strength=0.0,
+                                   boost_strength_factor=1.0)
+
+    def forward(self, x, context):
+        context = self.kw_context(context)
+        return super().forward(x, context)
 
 
 # ------ Training & evaluation functions
-def train_model(exp):
+def train_model(exp, context):
     exp.model.train()
-    for (data, context), target in exp.train_loader:
+
+    # Tile context vector
+    context = context.repeat(exp.batch_size, 1)
+
+    for data, target in exp.train_loader:
         data = data.flatten(start_dim=1)
 
         # Since there's only one output head, target values should be modified to be in
@@ -55,7 +93,6 @@ def train_model(exp):
         target = target % exp.num_classes_per_task
 
         data = data.to(exp.device)
-        context = context.to(exp.device)
         target = target.to(exp.device)
 
         exp.optimizer.zero_grad()
@@ -79,7 +116,7 @@ def evaluate_model(exp):
 
     with torch.no_grad():
 
-        for (data, context), target in exp.val_loader:
+        for data, target in exp.val_loader:
             data = data.flatten(start_dim=1)
 
             # Since there's only one output head, target values should be modified to
@@ -87,9 +124,11 @@ def evaluate_model(exp):
             target = target % exp.num_classes_per_task
 
             data = data.to(exp.device)
-            context = context.to(exp.device)
             target = target.to(exp.device)
 
+            # Select the closest centroid to each test example based on Euclidean
+            # distance
+            context = infer_centroid(exp, data)
             output = exp.model(data, context)
 
             # All output units are used to compute loss / accuracy
@@ -102,26 +141,61 @@ def evaluate_model(exp):
     return mean_acc
 
 
+def centroid(exp):
+    """
+    Returns the centroid vector over all training examples of `exp`'s current active
+    task.
+    """
+    centroid_vector = torch.zeros((exp.model.input_size,))
+    for batch_item in exp.train_loader:
+        x = batch_item[0]
+        x = x.flatten(start_dim=1)
+
+        n_x = x.size(0)
+        n = centroid_vector.size(0)
+
+        centroid_vector = centroid_vector.to(x.device)
+
+        centroid_vector = n * centroid_vector + x.sum(dim=0)
+        centroid_vector = centroid_vector / (n + n_x)
+        n += n_x
+
+    return centroid_vector
+
+
+def infer_centroid(exp, data):
+    """
+    Returns a 2D array where row i gives the the centroid vector closest to test
+    example `data[i, :]`.
+    """
+    context = torch.cdist(exp.contexts, data)
+    context = context.argmin(dim=0)
+    context = context.cpu()
+    context = exp.contexts[context]
+    return context
+
+
 def run_experiment(config):
     exp_class = config["experiment_class"]
     exp = exp_class()
     exp.setup_experiment(config)
 
-    exp.model = exp.model.to(exp.device)
+    # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
 
-    # Read optimizer class and args from config as it will be used to reinitialize the
-    # model's optimizer
     optimizer_class = config.get("optimizer_class", torch.optim.SGD)
     optimizer_args = config.get("optimizer_args", {})
-
-    # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
 
     for task_id in range(num_tasks):
 
         # Train model on current task
         exp.train_loader.sampler.set_active_tasks(task_id)
+
+        # Construct a context vector by computing the centroid of all training examples
+        context = centroid(exp).to(exp.device)
+        exp.contexts = torch.cat((exp.contexts, context.unsqueeze(0)))
+
         for _epoch_id in range(exp.epochs):
-            train_model(exp)
+            train_model(exp, context)
 
         if task_id in config["epochs_to_validate"]:
 
@@ -164,23 +238,18 @@ if __name__ == "__main__":
     num_tasks = 50
 
     config = dict(
-        experiment_class=PermutedMNISTExperiment,
+        experiment_class=CentroidExperiment,
 
-        dataset_class=ContextDependentPermutedMNIST,
-        dataset_args=dict(
-            num_tasks=num_tasks,
-            dim_context=1024,
-            seed=np.random.randint(0, 1000),
-        ),
+        dataset_class=PermutedMNIST,
+        dataset_args=dict(num_tasks=num_tasks, seed=np.random.randint(0, 1000)),
 
-        model_class=DendriticMLP,
+        model_class=CentroidDendriticMLP,
         model_args=dict(
             input_size=784,
-            output_size=10,
+            output_size=10,  # Single output head shared by all tasks
             hidden_size=2048,
             num_segments=num_tasks,
-            dim_context=1024,  # Note: with the Gaussian dataset, `dim_context` was
-                               # 2048, but this shouldn't effect results
+            dim_context=784,
             kw=True,
             dendrite_sparsity=0.0,
         ),
@@ -188,17 +257,16 @@ if __name__ == "__main__":
         batch_size=256,
         val_batch_size=512,
         epochs=1,
-        epochs_to_validate=(4, 9, 24, 49),  # Note: `epochs_to_validate` is treated as
-                                            # the set of task ids after which to
-                                            # evaluate the model on all seen tasks
+        epochs_to_validate=(4, 9, 24, 49),
         num_tasks=num_tasks,
         num_classes=10 * num_tasks,
         distributed=False,
         seed=np.random.randint(0, 10000),
 
         loss_function=F.nll_loss,
-        optimizer_class=torch.optim.Adam,
-        optimizer_args=dict(lr=0.001),
+        optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
+                                           # SGD with default hyperparameter settings
+        optimizer_args=dict(lr=1e-3),
     )
 
     run_experiment(config)

@@ -19,8 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from random import uniform
-
 import torch
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.utils.data import Dataset
@@ -38,14 +36,8 @@ class GaussianDataset(Dataset):
     hence the dataset exists in (data, context, target) triplets.
     """
 
-    # Distributions should be the same whether and instance of this class is
-    # instantiated for training or testing
-    means = None
-    covs = None
-    _contexts = None
-
     def __init__(self, num_classes, num_tasks, training_examples_per_class,
-                 validation_examples_per_class, dim_x, dim_context,
+                 validation_examples_per_class, dim_x, dim_context, seed,
                  root=None, dataset_name=None, train=True):
 
         self.num_classes = num_classes
@@ -55,21 +47,17 @@ class GaussianDataset(Dataset):
         else:
             examples_per_class = validation_examples_per_class
 
-        # Initialize disitributions only if `GaussianDataset` object does not exist in
-        # memory
-        if GaussianDataset.means is None:
+        # Use a generator object to manually set the seed and generate the same means
+        # and covariances for both training and validation datasets
+        g = torch.manual_seed(seed)
 
-            assert GaussianDataset.covs is None
-            assert GaussianDataset._contexts is None
-
-            GaussianDataset.means = {class_id: torch.rand((dim_x,)) for class_id in
-                                     range(self.num_classes)}
-            GaussianDataset.covs = {class_id: uniform(0.1, 2.5) * torch.eye(dim_x) for
-                                    class_id in range(self.num_classes)}
+        self.means = {class_id: torch.rand((dim_x,), generator=g) for class_id in
+                      range(self.num_classes)}
+        self.covs = {class_id: (2.4 * torch.rand(1, generator=g) + 0.1)
+                     * torch.eye(dim_x) for class_id in range(self.num_classes)}
 
         self.distributions = {class_id: MultivariateNormal(
-            loc=GaussianDataset.means[class_id],
-            covariance_matrix=GaussianDataset.covs[class_id]
+            loc=self.means[class_id], covariance_matrix=self.covs[class_id]
         ) for class_id in range(self.num_classes)}
 
         # Sample i.i.d. from each distribution
@@ -86,17 +74,15 @@ class GaussianDataset(Dataset):
         self.targets = self.targets.flatten()
 
         # Context vectors
-        if GaussianDataset._contexts is None:
-            GaussianDataset._contexts = generate_context_vectors(num_contexts=num_tasks,
-                                                                 n_dim=dim_context,
-                                                                 percent_on=0.05)
-
+        self._contexts = generate_context_vectors(num_contexts=num_tasks,
+                                                  n_dim=dim_context, percent_on=0.05,
+                                                  seed=seed)
         num_repeats = int(num_classes * examples_per_class / num_tasks)
-        self.contexts = torch.repeat_interleave(GaussianDataset._contexts,
-                                                repeats=num_repeats, dim=0)
+        self.contexts = torch.repeat_interleave(self._contexts, repeats=num_repeats,
+                                                dim=0)
 
     def __getitem__(self, idx):
-        return self.data[idx, :], self.contexts[idx, :], self.targets[idx].item()
+        return (self.data[idx, :], self.contexts[idx, :]), self.targets[idx].item()
 
     def __len__(self):
         return self.data.size(0)
