@@ -50,10 +50,11 @@ def generate_context_vectors(num_contexts, n_dim, percent_on=0.2, seed=None):
     :param percent_on: the fraction of non-zero
     :type percent_on: float
     :param seed: (optional) a random seed
-    :type percent_on: int
+    :type seed: int
     """
+    g = None
     if seed is not None:
-        torch.manual_seed(seed)
+        g = torch.manual_seed(seed)
 
     num_ones = int(percent_on * n_dim)
     num_zeros = n_dim - num_ones
@@ -65,7 +66,7 @@ def generate_context_vectors(num_contexts, n_dim, percent_on=0.2, seed=None):
 
     # All rows in context_vectors are currently the same; they need to be shuffled
     for i in range(num_contexts):
-        context_vectors[i, :] = context_vectors[i, torch.randperm(n_dim)]
+        context_vectors[i, :] = context_vectors[i, torch.randperm(n_dim, generator=g)]
 
     return context_vectors
 
