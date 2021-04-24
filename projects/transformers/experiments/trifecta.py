@@ -237,10 +237,6 @@ finetuning_bert_sparse_trifecta_100k_glue.update(
     # Model arguments
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
-    task_name=None,
-    # task_names=["sst2", "qnli", "qqp", "mnli"],
-    task_names=["rte", "stsb", "mrpc", "cola"],
-    override_finetuning_results=False,
 )
 
 
