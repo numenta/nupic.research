@@ -42,7 +42,6 @@ from pprint import pformat
 
 import torch.distributed
 import transformers
-from integrations import CustomWandbCallback
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     DataCollatorWithPadding,
@@ -54,6 +53,7 @@ from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
+from integrations import CustomWandbCallback
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
