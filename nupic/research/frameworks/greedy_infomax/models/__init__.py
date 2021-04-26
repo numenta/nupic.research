@@ -1,5 +1,3 @@
-from .ClassificationModel import *
-from .PixelCNN_Autoregressor import *
-from .PixelCNN import *
-from .ResNetEncoder import *
+from .BilinearInfo import *
 from .FullModel import *
+from .ResNetEncoder import *

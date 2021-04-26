@@ -1,8 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import \
-    BilinearInfo
+from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import BilinearInfo
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
 
 
@@ -67,26 +66,32 @@ class PreActBottleneckNoBN(nn.Module):
         return out
 
 
-class ResNet_Encoder(nn.Module):
+class ResNetEncoder(nn.Module):
+    """
+    The main subcomponent of FullVisionModel. This encoder also implements both
+    .forward() and .encode() to support different outputs for unsupervised and
+    supervised training.
+    """
+
     def __init__(
         self,
         block,
         num_blocks,
-        filter,
+        filters,
         encoder_num,
-        negative_samples = 16,
-        k_predictions = 5,
+        negative_samples=16,
+        k_predictions=5,
         patch_size=16,
         input_dims=3,
-        weight_init = True,
+        weight_init=True,
     ):
-        super(ResNet_Encoder, self).__init__()
+        super(ResNetEncoder, self).__init__()
         self.encoder_num = encoder_num
 
         self.overlap = 2
 
         self.patch_size = patch_size
-        self.filter = filter
+        self.filters = filters
 
         self.model = nn.Sequential()
 
@@ -94,33 +99,33 @@ class ResNet_Encoder(nn.Module):
             self.model.add_module(
                 "Conv1",
                 nn.Conv2d(
-                    input_dims, self.filter[0], kernel_size=5, stride=1, padding=2
+                    input_dims, self.filters[0], kernel_size=5, stride=1, padding=2
                 ),
             )
-            self.in_planes = self.filter[0]
+            self.in_planes = self.filters[0]
             self.first_stride = 1
         elif encoder_num > 2:
-            self.in_planes = self.filter[0] * block.expansion
+            self.in_planes = self.filters[0] * block.expansion
             self.first_stride = 2
         else:
-            self.in_planes = (self.filter[0] // 2) * block.expansion
+            self.in_planes = (self.filters[0] // 2) * block.expansion
             self.first_stride = 2
 
         for idx in range(len(num_blocks)):
             self.model.add_module(
                 "layer {}".format((idx)),
                 self._make_layer(
-                    block, self.filter[idx], num_blocks[idx], stride=self.first_stride
+                    block, self.filters[idx], num_blocks[idx], stride=self.first_stride
                 ),
             )
             self.first_stride = 2
 
         self.bilinear_model = BilinearInfo(
-                in_channels=self.in_planes,
-                out_channels=self.in_planes,
-                negative_samples = negative_samples,
-                k_predictions = k_predictions,
-            )
+            in_channels=self.in_planes,
+            out_channels=self.in_planes,
+            negative_samples=negative_samples,
+            k_predictions=k_predictions,
+        )
 
         if weight_init:
             self.initialize()
@@ -142,19 +147,19 @@ class ResNet_Encoder(nn.Module):
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
+    def compute_output(self, x, n_patches_x, n_patches_y):
+        z = self.model(x)
+        out = F.adaptive_avg_pool2d(z, 1)
+        out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
+        out = out.permute(0, 3, 1, 2).contiguous()
+        return z, out
 
     def forward(self, x, n_patches_x, n_patches_y):
-        z = self.model(x)
-        out = F.adaptive_avg_pool2d(z, 1)
-        out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
-        out = out.permute(0, 3, 1, 2).contiguous()
-        log_fk, true_f = self.bilinear_model(out, out)
-        return log_fk, true_f, z
+        z, out = self.compute_output(x, n_patches_x, n_patches_y)
+        log_f_list, true_f_list = self.bilinear_model(out, out)
+        return log_f_list, true_f_list, z
 
     def encode(self, x, n_patches_x, n_patches_y):
-        z = self.model(x)
-        out = F.adaptive_avg_pool2d(z, 1)
-        out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
-        out = out.permute(0, 3, 1, 2).contiguous()
+        z, out = self.compute_output(x, n_patches_x, n_patches_y)
         representation = F.adaptive_avg_pool2d(out, 1).reshape(out.shape[0], -1)
         return representation, z
