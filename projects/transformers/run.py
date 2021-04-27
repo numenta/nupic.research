@@ -77,6 +77,16 @@ MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
 
+def bold(text):
+    """Bold inputed text for printing."""
+    return "\033[1m" + text + "\033[0m"
+
+
+def pdict(dictionary):
+    """Pretty print dictionary."""
+    return pformat(dictionary, indent=4)
+
+
 def main():
     cmd_parser = argparse.ArgumentParser()
     cmd_parser.add_argument("experiments", nargs="+", choices=list(CONFIGS.keys()),
@@ -109,8 +119,8 @@ def main():
         # Initialize wandb now to include the logs that follow.
         # For now, only support early wandb logging when running one experiment.
         distributed_initialized = torch.distributed.is_initialized()
-        rank = -1 if not distributed_initialized else torch.distributed.get_rank()
         if is_wandb_available() and len(cmd_args.experiments) == 1:
+            rank = -1 if not distributed_initialized else torch.distributed.get_rank()
             CustomWandbCallback.early_init(training_args, rank)
 
         # Detecting last checkpoint.
@@ -142,7 +152,7 @@ def main():
         )
 
         # Log config.
-        logging.info(f"Running with config:\n{pformat(config_dict, indent=4)}")
+        logging.info(bold("\n\nRunning with experiment config:\n") + pdict(config_dict))
 
         # Log on each process the small summary:
         logging.warning(
@@ -156,9 +166,10 @@ def main():
             transformers.utils.logging.set_verbosity_info()
             transformers.utils.logging.enable_default_handler()
             transformers.utils.logging.enable_explicit_format()
-        logging.info("Training/evaluation parameters %s", training_args)
-        logging.info("Model parameters: %s", model_args)
-        logging.info("Data parameters: %s", data_args)
+
+        logging.info(bold("\n\nTraining parameters:\n") + pdict(training_args.__dict__))
+        logging.info(bold("\n\nModel parameters:\n") + pdict(model_args.__dict__))
+        logging.info(bold("\n\nData parameters:\n") + pdict(data_args.__dict__))
 
         # Set seed before initializing model.
         set_seed(training_args.seed)
@@ -314,7 +325,7 @@ def run_finetuning_single_task(
         training_args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
-        model=init_model(model_args, config, tokenizer),
+        model=model,
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )

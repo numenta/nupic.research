@@ -27,6 +27,7 @@ from transformers import Trainer
 from trainer_mixins import LRRangeTestMixin, OneCycleLRMixin
 
 from .bertitos import tiny_bert_50k, tiny_bert_debug
+from .sparse_bertitos import tiny_bert_sparse_100k
 
 """
 Experiment to train BERT models with OneCycle LR.
@@ -103,6 +104,26 @@ tiny_bert_one_cycle_lr_50k.update(
 )
 
 
+# Train an 80% sparse Tiny Bert with OneCycle LR.
+tiny_bert_sparse_100k_onecycle_lr = deepcopy(tiny_bert_sparse_100k)
+tiny_bert_sparse_100k_onecycle_lr.update(
+
+    trainer_class=OneCycleLRTrainer,
+    trainer_mixin_args=dict(
+        max_lr=0.0075,
+        pct_start=0.3,
+        anneal_strategy="linear",
+        cycle_momentum=True,
+        base_momentum=0.85,
+        max_momentum=0.95,
+        div_factor=25,
+        final_div_factor=1e4,
+        last_epoch=-1,
+    ),
+    overwrite_output_dir=True,
+)
+
+
 # --------------
 # LR Range Test
 # --------------
@@ -134,6 +155,7 @@ tiny_bert_exponential_lr_range_test["trainer_mixin_args"].update(
 CONFIGS = dict(
     tiny_bert_one_cycle_lr_debug=tiny_bert_one_cycle_lr_debug,
     tiny_bert_one_cycle_lr_50k=tiny_bert_one_cycle_lr_50k,
+    tiny_bert_sparse_100k_onecycle_lr=tiny_bert_sparse_100k_onecycle_lr,
 
     # LR Range Tests
     tiny_bert_linear_lr_range_test=tiny_bert_linear_lr_range_test,

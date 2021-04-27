@@ -32,7 +32,11 @@ Achieved ~0.8896 acc, 11min training time on 4 GPUs.
 
 Effective batch size was 128 with 1/4 the number of steps, so results were expected to
 be lower than baseline.
+
+See a summary of the Static Sparse Baseline here:
+https://wandb.ai/numenta/huggingface/reports/Static-Sparse-Baselines--Vmlldzo1MTY1MTc
 """
+
 debug_finetuning = deepcopy(transformers_base)
 debug_finetuning.update(
     # Data arguments
@@ -169,7 +173,7 @@ finetuning_sparse_encoder_bert_100k_glue = deepcopy(finetuning_bert700k_glue)
 finetuning_sparse_encoder_bert_100k_glue.update(
     # Model arguments
     model_type="static_sparse_encoder_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/sparse_v2_100k",  # noqa: E501
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/static_sparse_encoder_bert_100k",  # noqa: E501
 )
 
 
@@ -177,7 +181,7 @@ finetuning_fully_sparse_bert_100k_glue = deepcopy(finetuning_bert700k_glue)
 finetuning_fully_sparse_bert_100k_glue.update(
     # Model arguments
     model_type="fully_static_sparse_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/sparse_v3_100k",  # noqa: E501
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_100k",  # noqa: E501
 )
 
 
