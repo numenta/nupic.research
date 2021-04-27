@@ -65,11 +65,10 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
         """
         self.dim_context = dim_context
         self.segments = None
-        allow_extremes = module_sparsity == 0.0 or module_sparsity == 1.0
         super().__init__(
             module,
             sparsity=module_sparsity,
-            allow_extremes=allow_extremes
+            allow_extremes=True
         )
 
         self.segments = DendriteSegments(
@@ -100,7 +99,7 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
         return self.apply_dendrites(y, dendrite_activations)
 
     @property
-    def weights(self):
+    def segment_weights(self):
         return self.segments.weights
 
 
@@ -168,18 +167,16 @@ class OneSegmentDendriticLayer(SparseWeights):
         self.dim_context = dim_context
         self.segments = None
 
-        allow_extremes = module_sparsity == 1.0 or module_sparsity == 0.0
         super().__init__(module,
                          sparsity=module_sparsity,
-                         allow_extremes=allow_extremes)
+                         allow_extremes=True)
 
-        allow_extremes = dendrite_sparsity == 1.0 or dendrite_sparsity == 0.0
         self.segments = SparseWeights(
             torch.nn.Linear(dim_context,
                             module.weight.shape[0],
                             bias=dendrite_bias),
             sparsity=dendrite_sparsity,
-            allow_extremes=allow_extremes
+            allow_extremes=True
         )
 
         self.rezero_weights()
@@ -201,7 +198,7 @@ class OneSegmentDendriticLayer(SparseWeights):
         return y * torch.sigmoid(dendrite_activations)
 
     @property
-    def weights(self):
+    def segment_weights(self):
         return self.segments.module.weight
 
 
