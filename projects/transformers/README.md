@@ -12,24 +12,12 @@ In progress, current results:
 | bert_1mi |          80.76 |          76.82 |  48.87 | 84.08/84.57 | 89.76/85.68 |  91.19 | 90.58/87.17 | 66.02 |  91.44 | 87.67/87.54 |  45.31 | 5.013 | 1.612 |
 | bert_700k |          79.77 |          75.25 |  47.73 | 83.91/84.22 | 88.27/83.59 |  91.51 | 90.37/86.90 | 62.11 |  91.44 | 86.88/86.70 |  39.06 |  | |
 | bert_100k |          75.71 |          72.51 |  40.98 | 78.26/78.65 | 84.05/77.86 |  87.74 | 89.12/85.25 |  58.2 |  88.31 | 83.90/83.80 |  46.88 | 8.619 | 2.154 |
-| sparse_v1_100k |          72.67 |          67.91 |  22.43 | 77.25/77.96 | 85.37/78.82 |  84.65 | 88.23/84.32 | 58.32 |  87.27 | 82.79/82.65 |  29.84 | 10.461 | 2.348 |
-| sparse_v2_100k |          68.41 |          67.06 |  15.96 | 72.25/73.11 | 80.50/71.35 |  81.23 | 85.78/81.01 | 58.98 |  82.64 | 76.53/76.40 |  56.25 | 16.696 | 2.815 |
-| sparse_v3_100k |          68.25 |          66.92 |  16.35 | 72.00/72.32 | 80.42/70.83 |  80.31 | 85.04/80.49 | 58.98 |  82.52 | 76.96/77.60 |  56.25 | 22.81 | 3.127 |
+| sparse_80%_kd_onecycle_lr_rigl |            75.3 |          72.83 |  38.29 | 79.72/80.88 | 87.31/82.81 |  87.65 | 89.19/85.25 |  54.3 |  88.89 | 80.74/80.59 |  53.12 | 8.482 | 2.138 |
+| sparse_80%_kd_onecycle_lr |       74.17 |          72.18 |   27.2 | 78.34/79.97 | 87.29/82.55 |  88.57 | 88.91/84.97 | 58.59 |  88.77 | 79.11/79.33 |  56.25 | 9.78  | 2.28 |
 
 <br/><br/>
 
-|Bert Sparsity ||
-|:-----------|:-------|
-| sparse_v1  | 42.14% |
-| sparse_v2  | 63.15% |
-| sparse_v3  | 79.68% |
-
-<br/><br/>
-
-**Legend**
-* *sparse_v1:* Static sparse encoder with only the non-attention linear layers sparsified (`model_type=static_sparse_non_attention_bert`)
-* *sparse_v2:* Static sparse encoder with all linear layers sparsified, including attention (`model_type=static_sparse_encoder_bert`)
-* *sparse_v3:* Static sparse encoder (as with v2) as well as static sparse token embeddings (`model_type=fully_static_sparse_bert`)
+**Note:** `sparse_80%_kd_onecycle_lr_rigl` is not actually 80% sparse. It's just under at 79.58%. This is because the token embeddings are fully dense. Future work will either sparsify these, or make the other layers more sparse to achieve the full 80%.
 
 
 </br>

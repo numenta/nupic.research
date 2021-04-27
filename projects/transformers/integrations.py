@@ -144,24 +144,29 @@ class CustomWandbCallback(WandbCallback):
 
         super().on_evaluate(args, state, control, metrics=None, **kwargs)
 
-        if metrics is None:
+        if metrics is None or wandb.run is None:
             return
 
-        eval_loss = metrics["eval_loss"]
-        perplexity = math.exp(eval_loss)
         run = wandb.run
-        if run is not None:
-            summary = run.summary
+        summary = run.summary
+
+        # Log eval loss and perplexity.
+        if "eval_loss" in metrics:
+
+            eval_loss = metrics["eval_loss"]
+            perplexity = math.exp(eval_loss)
+
             eval_results = {
                 "eval/perplexity": perplexity,
                 "eval/loss": eval_loss,
             }
-            run.summary.update(eval_results)
+            summary.update(eval_results)
             wandb.log(eval_results, step=state.global_step)
 
-            if "train/train_runtime" in summary.keys():
-                runtime = summary["train/train_runtime"]
-                summary["train/train_runtime (hrs)"] = runtime / 3600
+        # Log training runtime.
+        if "train/train_runtime" in summary.keys():
+            runtime = summary["train/train_runtime"]
+            summary["train/train_runtime (hrs)"] = runtime / 3600
 
 
 # Update the integrations. By updating this dict, any custom integration

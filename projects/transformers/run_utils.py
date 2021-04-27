@@ -869,7 +869,8 @@ def hash_dataset_folder_name(data_args):
             dataset_folder += f" ({arg}={non_default})"
 
     hashed_folder_name = blake2b(dataset_folder.encode(), digest_size=20).hexdigest()
-    print(f"Hashing dataset folder name '{dataset_folder}' to '{hashed_folder_name}'")
+    logging.info("Hashing dataset folder name "
+                 f"'{dataset_folder}' to '{hashed_folder_name}'")
     return hashed_folder_name
 
 
