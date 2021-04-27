@@ -29,8 +29,6 @@ github.com/huggingface/transformers/blob/master/examples/language-modeling/run_m
 github.com/huggingface/transformers/blob/master/examples/text-classification/run_glue.py
 """
 
-# FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
-import ray  # noqa: F401, I001
 import argparse
 import logging
 import os
@@ -40,6 +38,8 @@ import sys
 from copy import deepcopy
 from pprint import pformat
 
+# FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
+import ray  # noqa: F401, I001
 import torch.distributed
 import transformers
 from transformers import (
