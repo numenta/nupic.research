@@ -45,7 +45,8 @@ class DendriticMLP(nn.Module):
     :param kw: whether to apply k-Winners to the outputs of each hidden layer
     :param kw_percent_on: percent of hidden units activated by K-winners.
     :param context_percent_on: percent of non-zero units in the context input.
-    :param weight_sparsity: the sparsity level of dendritic weights (default 0.95)
+    :param dendrite_weight_sparsity: the sparsity level of dendritic weights.
+    :param ff_weight_sparsity: the sparsity level of feed-forward weights.
     :param weight_init: the initialization applied to feed-forward weights; must be
                         either "kaiming" (for Kaiming Uniform) of "modified" (for
                         sparse Kaiming Uniform)
@@ -54,9 +55,8 @@ class DendriticMLP(nn.Module):
     :param freeze_dendrites: whether to set `requires_grad=False` for all dendritic
                              weights so they don't train
     :param dendritic_layer_class: dendritic layer class to use for each hidden layer
-    :param output_nonlinearity: nonlinearity to apply to output. 'None' of no
-                                nonlinearity.
-
+    :param output_nonlinearity: nonlinearity to apply to final output layer.
+                                'None' of no nonlinearity.
                     _____
                    |_____|    # classifier layer, no dendrite input
                       ^
@@ -74,9 +74,10 @@ class DendriticMLP(nn.Module):
 
     def __init__(
         self, input_size, output_size, hidden_sizes, num_segments, dim_context,
-        kw, kw_percent_on=0.05, context_percent_on=1.0, weight_sparsity=0.95,
-        weight_init="modified", dendrite_init="modified", freeze_dendrites=False,
-        dendritic_layer_class=AbsoluteMaxGatingDendriticLayer, output_nonlinearity=None
+        kw, kw_percent_on=0.05, context_percent_on=1.0, dendrite_weight_sparsity=0.95,
+        ff_weight_sparsity=0.95, weight_init="modified", dendrite_init="modified",
+        freeze_dendrites=False, output_nonlinearity=None,
+        dendritic_layer_class=AbsoluteMaxGatingDendriticLayer,
     ):
 
         # Forward & dendritic weight initialization must be either "kaiming" or
@@ -99,20 +100,25 @@ class DendriticMLP(nn.Module):
         self.dim_context = dim_context
         self.kw = kw
         self.kw_percent_on = kw_percent_on
-        self.weight_sparsity = weight_sparsity
+        self.ff_weight_sparsity = ff_weight_sparsity
+        self.dendrite_weight_sparsity = dendrite_weight_sparsity
         self.output_nonlinearity = output_nonlinearity
         self.hardcode_dendrites = (dendrite_init == "hardcoded")
 
         self._layers = nn.ModuleList()
         self._activations = nn.ModuleList()
 
+        if self.hardcode_dendrites:
+            dendrite_sparsity = 0.0
+        else:
+            dendrite_sparsity = self.dendrite_weight_sparsity
         for i in range(len(self.hidden_sizes)):
             curr_dend = dendritic_layer_class(
                 module=nn.Linear(input_size, self.hidden_sizes[i], bias=True),
                 num_segments=num_segments,
                 dim_context=dim_context,
-                module_sparsity=self.weight_sparsity,
-                dendrite_sparsity=0.0 if self.hardcode_dendrites else weight_sparsity,
+                module_sparsity=self.ff_weight_sparsity,
+                dendrite_sparsity=dendrite_sparsity,
             )
 
             if weight_init == "modified":
@@ -152,12 +158,12 @@ class DendriticMLP(nn.Module):
 
         self._output_layer = nn.Sequential()
         output_linear = SparseWeights(module=nn.Linear(input_size, output_size),
-                                      sparsity=weight_sparsity, allow_extremes=True)
+                                      sparsity=ff_weight_sparsity, allow_extremes=True)
         if weight_init == "modified":
             self._init_sparse_weights(output_linear, 1 - kw_percent_on if kw else 0.0)
         self._output_layer.add_module("output_linear", output_linear)
 
-        if self.output_nonlinearity:
+        if self.output_nonlinearity is not None:
             self._output_layer.add_module("non_linearity", output_nonlinearity)
 
     def forward(self, x, context):
@@ -191,7 +197,7 @@ class DendriticMLP(nn.Module):
         weight_density = 1.0 - m.segments.sparsity
         fan_in = m.dim_context
         bound = 1.0 / np.sqrt(input_density * weight_density * fan_in)
-        nn.init.uniform_(m.weights, -bound, bound)
+        nn.init.uniform_(m.segment_weights, -bound, bound)
         m.apply(rezero_weights)
 
     def hardcode_dendritic_weights(self, context_vectors, init):
