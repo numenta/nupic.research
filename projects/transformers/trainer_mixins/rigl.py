@@ -65,7 +65,7 @@ class RigLMixin:
             warmup_steps=self.warmup_steps
         )
         self.sparse_modules = None
-        self.verbose_rigl_logging = mixin_args.get("verbose_rigl_logging", 0.3)
+        self.verbose_rigl_logging = mixin_args.get("verbose_rigl_logging", False)
 
     def training_step(self, model, inputs):
         """Prune and regrow weights every 'prune_freq' iterations."""
