@@ -22,6 +22,8 @@
 Base Experiment configuration.
 """
 
+from copy import deepcopy
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -77,8 +79,17 @@ DEFAULT_BASE = dict(
     optimizer_args=dict(lr=0.001),
 )
 
+# Temporary, just for testing
+BASE2 = deepcopy(DEFAULT_BASE)
+BASE2.update(
+    batch_size=64,
+    epochs=2,
+    optimizer_class=torch.optim.SGD,
+    optimizer_args=dict(lr=0.001),
+)
 
 # Export configurations in this file
 CONFIGS = dict(
     default_base=DEFAULT_BASE,
+    base2=BASE2,
 )

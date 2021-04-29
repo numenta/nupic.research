@@ -168,8 +168,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("-e", "--experiment", dest="name", default="default_base",
                         help="Experiment to run", choices=CONFIGS.keys())
-    parser.add_argument("--num-samples", type=int, default=1,
-                        help="Number of samples to run")
     args = parser.parse_args()
     if args.name is None:
         parser.print_help()
@@ -177,6 +175,9 @@ if __name__ == "__main__":
 
     # Get configuration values
     config = copy.deepcopy(CONFIGS[args.name])
+
+    # Merge configuration with command line arguments
+    config.update(vars(args))
 
     config = process_args(args, config)
     if config is None:
