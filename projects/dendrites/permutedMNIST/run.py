@@ -46,31 +46,32 @@ def train_dendrite_model(
     loader,
     optimizer,
     device,
-    criterion=F.nll_loss,
+    criterion=F.cross_entropy,
+    share_labels=False,
+    num_labels=None,
+    post_batch_callback=None,
     complexity_loss_fn=None,
-    batches_in_epoch=sys.maxsize,
+    batches_in_epoch=None,
     active_classes=None,
     pre_batch_callback=None,
-    post_batch_callback=None,
     transform_to_device_fn=None,
     progress_bar=None,
-    share_labels=False,
+    
 ):
     model.train()
     for batch_idx, (data, target) in enumerate(loader):
         # TODO: need to make this more generic to not require context
-        data = data[0]
-        context = data[1]
+        data, context = data
         data = data.flatten(start_dim=1)
 
         # Since there's only one output head, target values should be modified to be in
         # the range [0, 1, ..., 9]
         if share_labels:
-            target = target % exp.num_classes_per_task
+            target = target % num_labels
 
-        data = data.to(exp.device)
-        context = context.to(exp.device)
-        target = target.to(exp.device)
+        data = data.to(device)
+        context = context.to(device)
+        target = target.to(device)
 
         optimizer.zero_grad()
         output = model(data, context)
@@ -141,7 +142,10 @@ def run_experiment(config):
         # Train model on current task
         exp.train_loader.sampler.set_active_tasks(task_id)
         for _ in range(exp.epochs):
-            train_model(exp)
+            train_dendrite_model(model=exp.model, loader=exp.train_loader,
+                                 optimizer=exp.optimizer, device=exp.device,
+                                 criterion=F.cross_entropy, share_labels=True,
+                                 num_labels=10)
 
         if task_id in config["epochs_to_validate"]:
 
@@ -198,6 +202,7 @@ if __name__ == "__main__":
     config.update(vars(args))
 
     config = process_args(args, config)
+
     if config is None:
         pass
     else:

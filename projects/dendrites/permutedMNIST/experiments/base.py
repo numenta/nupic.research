@@ -47,7 +47,7 @@ DEFAULT_BASE = dict(
     dataset_args=dict(
         num_tasks=NUM_TASKS,
         dim_context=1024,
-        seed=np.random.randint(0, 1000),
+        seed=42,
         download=True,  # Change to True if running for the first time
     ),
 
@@ -72,7 +72,7 @@ DEFAULT_BASE = dict(
     num_tasks=NUM_TASKS,
     num_classes=10 * NUM_TASKS,
     distributed=False,
-    seed=np.random.randint(0, 10000),
+    seed=42,
 
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,

@@ -61,7 +61,6 @@ def train_model(exp):
         exp.optimizer.zero_grad()
         output = exp.model(data, context)
 
-        output = F.log_softmax(output)
         error_loss = exp.error_loss(output, target)
         error_loss.backward()
         exp.optimizer.step()
@@ -170,7 +169,7 @@ if __name__ == "__main__":
         dataset_args=dict(
             num_tasks=num_tasks,
             dim_context=1024,
-            seed=np.random.randint(0, 1000),
+            seed=42,
             download=True,
         ),
 
@@ -195,9 +194,9 @@ if __name__ == "__main__":
         num_tasks=num_tasks,
         num_classes=10 * num_tasks,
         distributed=False,
-        seed=np.random.randint(0, 10000),
+        seed=42,
 
-        loss_function=F.nll_loss,
+        loss_function=F.cross_entropy,
         optimizer_class=torch.optim.Adam,
         optimizer_args=dict(lr=0.001),
     )
