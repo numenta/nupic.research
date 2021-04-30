@@ -78,6 +78,7 @@ class ContinualLearningExperiment(
 
         # Set train and validate methods.
         self.train_model = config.get("train_model_func", train_model)
+        self.train_model_args = config.get("train_model_args", None)
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
         # Whitelist evaluation metrics
@@ -87,6 +88,9 @@ class ContinualLearningExperiment(
         for metric in self.evaluation_metrics:
             if not hasattr(self, metric):
                 raise ValueError(f"Metric {metric} not available.")
+
+        self.reset_optimizer_after_task = config.get(
+            "reset_optimizer_after_task", True)
 
     def run_iteration(self):
         return self.run_task()
@@ -122,6 +126,10 @@ class ContinualLearningExperiment(
         )
 
         self.current_task += 1
+
+        if reset_optimizer_after_task:
+            self.optimizer = self.create_optimizer(self.model)
+
         return ret
 
     @classmethod
@@ -183,6 +191,7 @@ class ContinualLearningExperiment(
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch_wrapper,
             transform_to_device_fn=self.transform_data_to_device,
+            **self.train_model_args,
         )
 
     def get_active_classes(self):

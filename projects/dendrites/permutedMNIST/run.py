@@ -36,32 +36,59 @@ import torch.nn.functional as F
 
 from experiments import CONFIGS
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
+from nupic.research.frameworks.vernon.run_with_raytune import run
 
+# TODO: there are mixins that assume create_optimizer is a class method
 
 # ------ Training & evaluation functions
-def train_model(exp):
-    exp.model.train()
-    for (data, context), target in exp.train_loader:
+def train_dendrite_model(
+    model,
+    loader,
+    optimizer,
+    device,
+    criterion=F.nll_loss,
+    complexity_loss_fn=None,
+    batches_in_epoch=sys.maxsize,
+    active_classes=None,
+    pre_batch_callback=None,
+    post_batch_callback=None,
+    transform_to_device_fn=None,
+    progress_bar=None,
+    share_labels=False,
+):
+    model.train()
+    for batch_idx, (data, target) in enumerate(loader):
+        # TODO: need to make this more generic to not require context
+        data = data[0]
+        context = data[1]
         data = data.flatten(start_dim=1)
 
         # Since there's only one output head, target values should be modified to be in
         # the range [0, 1, ..., 9]
-        target = target % exp.num_classes_per_task
+        if share_labels:
+            target = target % exp.num_classes_per_task
 
         data = data.to(exp.device)
         context = context.to(exp.device)
         target = target.to(exp.device)
 
-        exp.optimizer.zero_grad()
-        output = exp.model(data, context)
+        optimizer.zero_grad()
+        output = model(data, context)
 
-        output = F.log_softmax(output)
-        error_loss = exp.error_loss(output, target)
+        error_loss = criterion(output, target)
         error_loss.backward()
-        exp.optimizer.step()
+        optimizer.step()
 
         # Rezero weights if necessary
-        exp.post_optimizer_step(exp.model)
+        if post_batch_callback is not None:
+            post_batch_callback(model=model,
+                                error_loss=error_loss.detach(),
+                                complexity_loss=(complexity_loss.detach()
+                                                 if complexity_loss is not None
+                                                 else None),
+                                batch_idx=batch_idx,
+                                num_images=0,
+                                time_string="")
 
 
 def evaluate_model(exp):
@@ -101,8 +128,6 @@ def run_experiment(config):
     exp = exp_class()
     exp.setup_experiment(config)
 
-    exp.model = exp.model.to(exp.device)
-
     # Read optimizer class and args from config as it will be used to reinitialize the
     # model's optimizer
     optimizer_class = config.get("optimizer_class", torch.optim.SGD)
@@ -115,7 +140,7 @@ def run_experiment(config):
 
         # Train model on current task
         exp.train_loader.sampler.set_active_tasks(task_id)
-        for _epoch_id in range(exp.epochs):
+        for _ in range(exp.epochs):
             train_model(exp)
 
         if task_id in config["epochs_to_validate"]:

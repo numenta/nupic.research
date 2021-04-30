@@ -74,7 +74,7 @@ DEFAULT_BASE = dict(
     distributed=False,
     seed=np.random.randint(0, 10000),
 
-    loss_function=F.nll_loss,
+    loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,
     optimizer_args=dict(lr=0.001),
 )
