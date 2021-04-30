@@ -80,20 +80,11 @@ class LRRangeTestMixin:
         assert isinstance(self.max_lr, float)
         assert self.test_mode in ["linear", "exponential"]
 
-    def create_optimizer_and_scheduler(self, num_training_steps: int):
+    def create_scheduler(self, num_training_steps: int):
         """
-        Create a linearly or exponentially increasing lr schedule. This overrides super
-        in a way that just customizes the lr scheduler while the optimizer remains the
-        default.
+        Create a lr scheduler that ramps up either linearly or exponentially.
         """
 
-        # Set lr scheduler to dummy variable so it's not created in the call to super.
-        self.lr_scheduler = ...
-
-        # Create just the optimizer.
-        super().create_optimizer_and_scheduler(num_training_steps)
-
-        # Create a lr scheduler that ramps up either linearly or exponentially.
         total_steps = num_training_steps
         min_lr = self.min_lr
         max_lr = self.max_lr

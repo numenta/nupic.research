@@ -21,7 +21,7 @@
 
 from copy import deepcopy
 
-from trifecta import tiny_bert_trifecta_300k
+from .trifecta import tiny_bert_trifecta_300k
 
 """
 Regression tests configs: As the Transformers project is updated the results from
