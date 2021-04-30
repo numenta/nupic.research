@@ -161,7 +161,7 @@ def run_experiment(config):
 
 if __name__ == "__main__":
 
-    num_tasks = 50
+    num_tasks = 2
 
     config = dict(
         experiment_class=PermutedMNISTExperiment,
@@ -171,18 +171,19 @@ if __name__ == "__main__":
             num_tasks=num_tasks,
             dim_context=1024,
             seed=np.random.randint(0, 1000),
+            download=True,
         ),
 
         model_class=DendriticMLP,
         model_args=dict(
             input_size=784,
             output_size=10,
-            hidden_size=2048,
+            hidden_sizes=[64, 64],
             num_segments=num_tasks,
             dim_context=1024,  # Note: with the Gaussian dataset, `dim_context` was
                                # 2048, but this shouldn't effect results
             kw=True,
-            dendrite_sparsity=0.0,
+            # dendrite_sparsity=0.0,
         ),
 
         batch_size=256,
