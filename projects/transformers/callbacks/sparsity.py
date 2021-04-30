@@ -86,7 +86,7 @@ class RezeroWeightsCallback(TrainerCallback):
                 encoder_sparsity=encoder_sparsity
             )
 
-            wandb.log(logs, step=state.global_step)
+            wandb.log(logs, commit=False)
 
 
 class PlotDensitiesCallback(TrainerCallback):
@@ -147,7 +147,7 @@ class PlotDensitiesCallback(TrainerCallback):
             rotation_mode="anchor"
         )
         plot = wandb.Image(ax)
-        wandb.log({"density_per_layer": plot}, step=state.global_step)
+        wandb.log({"density_per_layer": plot}, commit=False)
 
         # Plot plot change in on params for each layer.
         df_delta_on_params = get_delta_on_params(
@@ -173,7 +173,7 @@ class PlotDensitiesCallback(TrainerCallback):
             rotation_mode="anchor",
         )
         plot = wandb.Image(ax)
-        wandb.log({"delta_on_params": plot}, step=state.global_step)
+        wandb.log({"delta_on_params": plot}, commit=False)
 
 
 # -------------
