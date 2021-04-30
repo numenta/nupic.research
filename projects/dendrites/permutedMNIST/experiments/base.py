@@ -23,6 +23,7 @@ Base Experiment configuration.
 """
 
 from copy import deepcopy
+import os
 
 import numpy as np
 import torch
@@ -43,9 +44,13 @@ NUM_TASKS = 2
 DEFAULT_BASE = dict(
     experiment_class=PermutedMNISTExperiment,
 
+    # Results path
+    local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
+
     dataset_class=ContextDependentPermutedMNIST,
     dataset_args=dict(
         num_tasks=NUM_TASKS,
+        root="~/nta/data/dendrites",
         dim_context=1024,
         seed=42,
         download=True,  # Change to True if running for the first time
