@@ -35,94 +35,11 @@ import torch
 import torch.nn.functional as F
 
 from experiments import CONFIGS
+from nupic.research.frameworks.dendrites import evaluate_dendrite_model, train_dendrite_model
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
 from nupic.research.frameworks.vernon.run_with_raytune import run
 
 # TODO: there are mixins that assume create_optimizer is a class method
-
-# ------ Training & evaluation functions
-def train_dendrite_model(
-    model,
-    loader,
-    optimizer,
-    device,
-    criterion=F.cross_entropy,
-    share_labels=False,
-    num_labels=None,
-    post_batch_callback=None,
-    complexity_loss_fn=None,
-    batches_in_epoch=None,
-    active_classes=None,
-    pre_batch_callback=None,
-    transform_to_device_fn=None,
-    progress_bar=None,
-    
-):
-    model.train()
-    for batch_idx, (data, target) in enumerate(loader):
-        # TODO: need to make this more generic to not require context
-        data, context = data
-        data = data.flatten(start_dim=1)
-
-        # Since there's only one output head, target values should be modified to be in
-        # the range [0, 1, ..., 9]
-        if share_labels:
-            target = target % num_labels
-
-        data = data.to(device)
-        context = context.to(device)
-        target = target.to(device)
-
-        optimizer.zero_grad()
-        output = model(data, context)
-
-        error_loss = criterion(output, target)
-        error_loss.backward()
-        optimizer.step()
-
-        # Rezero weights if necessary
-        if post_batch_callback is not None:
-            post_batch_callback(model=model,
-                                error_loss=error_loss.detach(),
-                                complexity_loss=(complexity_loss.detach()
-                                                 if complexity_loss is not None
-                                                 else None),
-                                batch_idx=batch_idx,
-                                num_images=0,
-                                time_string="")
-
-
-def evaluate_model(exp):
-    exp.model.eval()
-    total = 0
-
-    loss = torch.tensor(0., device=exp.device)
-    correct = torch.tensor(0, device=exp.device)
-
-    with torch.no_grad():
-
-        for (data, context), target in exp.val_loader:
-            data = data.flatten(start_dim=1)
-
-            # Since there's only one output head, target values should be modified to
-            # be in the range [0, 1, ..., 9]
-            target = target % exp.num_classes_per_task
-
-            data = data.to(exp.device)
-            context = context.to(exp.device)
-            target = target.to(exp.device)
-
-            output = exp.model(data, context)
-
-            # All output units are used to compute loss / accuracy
-            loss += exp.error_loss(output, target, reduction="sum")
-            pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum()
-            total += len(data)
-
-    mean_acc = torch.true_divide(correct, total).item() if total > 0 else 0,
-    return mean_acc
-
 
 def run_experiment(config):
     exp_class = config["experiment_class"]
@@ -144,8 +61,8 @@ def run_experiment(config):
         for _ in range(exp.epochs):
             train_dendrite_model(model=exp.model, loader=exp.train_loader,
                                  optimizer=exp.optimizer, device=exp.device,
-                                 criterion=F.cross_entropy, share_labels=True,
-                                 num_labels=10)
+                                 criterion=exp.error_loss, share_labels=True,
+                                 num_labels=10, post_batch_callback=exp.post_batch_wrapper)
 
         if task_id in config["epochs_to_validate"]:
 
@@ -157,7 +74,11 @@ def run_experiment(config):
             for eval_task_id in range(task_id + 1):
 
                 exp.val_loader.sampler.set_active_tasks(eval_task_id)
-                acc_task = evaluate_model(exp)
+                results = evaluate_dendrite_model(model=exp.model, loader=exp.val_loader,
+                                                  device=exp.device,
+                                                  criterion=exp.error_loss,
+                                                  share_labels=True, num_labels=10)
+                acc_task = results["mean_accuracy"]
                 if isinstance(acc_task, tuple):
                     acc_task = acc_task[0]
 
@@ -175,7 +96,10 @@ def run_experiment(config):
 
     # Report final aggregate accuracy
     exp.val_loader.sampler.set_active_tasks(range(num_tasks))
-    acc_task = evaluate_model(exp)
+    results = evaluate_dendrite_model(model=exp.model, loader=exp.val_loader,
+                                      device=exp.device, criterion=exp.error_loss,
+                                      share_labels=True, num_labels=10)
+    acc_task = results["mean_accuracy"]
     if isinstance(acc_task, tuple):
         acc_task = acc_task[0]
 
