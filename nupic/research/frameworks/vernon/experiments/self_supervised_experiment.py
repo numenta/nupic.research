@@ -132,6 +132,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         self.encoder = self.model
         self.classifier = self.create_model(classifier_config, self.device)
         self.model = EncoderClassifier(self.encoder, self.classifier)
+        self.model.to(self.device)
+
 
         self.encoder_optimizer = self.optimizer
         self.classifier_optimizer = self.create_optimizer(
@@ -376,7 +378,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         First, it optionally resets the classifier if specified in the config. This
         can be used to ensure "fairness" between validation trials. Defaults to
         false, which should not cause problems so long as
-        supervised_epcochs_per_validaiton is enough for the classifier to converge.
+        supervised_epochs_per_validation is enough for the classifier to converge.
 
         Second, this method trains the classifier in a supervised fashion for a
         specified number of epochs. self.model refers to the entire

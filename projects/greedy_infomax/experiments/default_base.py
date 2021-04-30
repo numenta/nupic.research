@@ -30,14 +30,15 @@ from torchvision.datasets import STL10
 from nupic.research.frameworks.greedy_infomax.models import FullVisionModel
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_cross_entropy,
+    multiple_log_softmax_nll_loss,
+    true_GIM_loss,
 )
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
-
+import time
 
 class GreedyInfoMaxExperiment(
     mixins.LogEveryLoss, experiments.SelfSupervisedExperiment
 ):
-    pass
     # def create_model(cls, config, device):
     #     model = super().create_model(config, device)
     #     use_synch_batchnorm = config.get("use_synch_batchnorm", True)
@@ -90,7 +91,7 @@ def get_transforms(val=False, aug=None):
     trans = []
 
     if aug["randcrop"]:
-        if val:
+        if not val:
             trans.append(transforms.RandomCrop(aug["randcrop"]))
         else:
             trans.append(transforms.CenterCrop(aug["randcrop"]))
@@ -123,7 +124,7 @@ aug = {
     "bw_std": [0.2570],
 }
 transform_unsupervised = transform_supervised = get_transforms(val=False, aug=aug)
-transform_validation = trans = get_transforms(val=True, aug=aug)
+transform_validation = get_transforms(val=True, aug=aug)
 
 
 base_dataset_args = dict(root="~/nta/data/STL10/stl10_binary", download=False)
@@ -139,18 +140,23 @@ unsupervised_dataset_args.update(
     dict(transform=transform_unsupervised, split="unlabeled")
 )
 supervised_dataset_args = deepcopy(base_dataset_args)
-supervised_dataset_args.update(dict(transform=transform_supervised, split="train"))
+supervised_dataset_args.update(
+    dict(transform=transform_supervised, split="train")
+)
 validation_dataset_args = deepcopy(base_dataset_args)
-validation_dataset_args.update(dict(transform=transform_validation, split="test"))
+validation_dataset_args.update(
+    dict(transform=transform_validation, split="test")
+)
 
 
 BATCH_SIZE = 32
 NUM_CLASSES = 10
-NUM_EPOCHS = 200
+NUM_EPOCHS = 60
 DEFAULT_BASE = dict(
     experiment_class=GreedyInfoMaxExperiment,
     # wandb
-    wandb_args=dict(project="greedy_infomax", name="paper-replication-small-baseline"),
+    wandb_args=dict(project="greedy_infomax",
+                    name="paper-replication-small-true-loss"),
     # Dataset
     dataset_class=STL10,
     dataset_args=dict(
@@ -185,15 +191,15 @@ DEFAULT_BASE = dict(
     stop=dict(),
     # Number of epochs
     epochs=NUM_EPOCHS,
-    epochs_to_validate=list(range(NUM_EPOCHS)),
+    epochs_to_validate=[5, 10, 20, 30, 40, 50, 59],
     # Which epochs to run and report inference over the validation dataset.
     # epochs_to_validate=range(-1, 30),  # defaults to the last 3 epochs
     # Model class. Must inherit from "torch.nn.Module"
     model_class=FullVisionModel,
     # default model arguments
     model_args=dict(
-        negative_samples=10,
-        k_predictions=3,
+        negative_samples=16,
+        k_predictions=5,
         resnet_50=False,
         grayscale=True,
         patch_size=16,
@@ -206,21 +212,21 @@ DEFAULT_BASE = dict(
         # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
         optimizer_class=torch.optim.Adam,
         # Optimizer class class arguments passed to the constructor
-        optimizer_args=dict(lr=1.5e-4),
+        optimizer_args=dict(lr=2e-3),
     ),
-    supervised_training_epochs_per_validation=1,
-    loss_function=multiple_cross_entropy,  # each GIM layer has a cross-entropy
+    supervised_training_epochs_per_validation=10,
+    loss_function=true_GIM_loss,  # each GIM layer has a cross-entropy
     # Optimizer class. Must inherit from "torch.optim.Optimizer"
     optimizer_class=torch.optim.Adam,
     # Optimizer class class arguments passed to the constructor
-    optimizer_args=dict(lr=1.5e-4),
+    optimizer_args=dict(lr=1.5e-3),
     # # Learning rate scheduler class. Must inherit from "_LRScheduler"
     # lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
     # Distributed parameters
     distributed=True,
     find_unused_parameters=True,
     # Number of dataloader workers (should be num_cpus)
-    workers=16,
+    workers=0,
     local_dir="~/nta/results/greedy_infomax/experiments",
     num_samples=1,
     # How often to checkpoint (epochs)
@@ -245,4 +251,47 @@ DEFAULT_BASE = dict(
 )
 
 
-CONFIGS = dict(default_base=DEFAULT_BASE)
+def load_batch_timer_func(
+        model,
+        loader,
+        optimizer,
+        device,
+        criterion=None,
+        complexity_loss_fn=None,
+        batches_in_epoch=5,
+        active_classes=None,
+        pre_batch_callback=None,
+        post_batch_callback=None,
+        transform_to_device_fn=None,
+        progress_bar=None,
+):
+    async_gpu = loader.pin_memory
+    # time batch loading
+    t0 = time.time()
+    for batch_idx, (data, target) in enumerate(loader):
+        t1 = time.time()
+        print("Batch " + str(batch_idx) + ": " + str(t1 - t0))
+        if batch_idx >= batches_in_epoch:
+            break
+        num_images = len(target)
+        if transform_to_device_fn is None:
+            data = data.to(device, non_blocking=async_gpu)
+            target = target.to(device, non_blocking=async_gpu)
+        else:
+            data, target = transform_to_device_fn(data, target, device,
+                                                  non_blocking=async_gpu)
+        t2 = time.time()
+        print("Batch " + str(batch_idx) + " Device Transform: " + str(t2 - t1))
+        t0 = t2
+    print("All batches loaded")
+LOAD_BATCH_TIMER = deepcopy(DEFAULT_BASE)
+LOAD_BATCH_TIMER.update(dict(
+    train_model_func=load_batch_timer_func,
+    epochs_to_validate=[],
+    batches_in_epoch=5,
+    num_unsupervised_samples=10000,
+    workers=0,
+))
+
+CONFIGS = dict(default_base=DEFAULT_BASE,
+               load_batch_timer=LOAD_BATCH_TIMER)

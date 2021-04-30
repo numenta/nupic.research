@@ -20,29 +20,15 @@
 # ----------------------------------------------------------------------
 
 
-import unittest
-
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
-from torchvision.datasets.fakedata import FakeData
-
-from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
-from experiments.default_base import CONFIGS
-from nupic.research.frameworks.vernon import experiments, mixins
-
-import unittest
-
 from copy import deepcopy
 
-import numpy as np
 import torch
-from ray import tune
 from torchvision import transforms
 from torchvision.datasets import STL10
-
+import time
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
-    multiple_cross_entropy, module_specific_cross_entropy
+    multiple_cross_entropy,
+    multiple_log_softmax_nll_loss,
 )
 from nupic.research.frameworks.greedy_infomax.models import FullVisionModel
 from nupic.research.frameworks.vernon import experiments, mixins
@@ -101,8 +87,12 @@ validation_dataset_args.update(dict(transform=transform_validation, split="test"
 
 BATCH_SIZE = 32
 NUM_CLASSES = 10
+NUM_EPOCHS=1
 self_supervised_config = dict(
-    experiment_class= experiments.SelfSupervisedExperiment,
+    experiment_class=experiments.SelfSupervisedExperiment,
+    # wandb
+    wandb_args=dict(project="greedy_infomax",
+                    name="paper-replication-small-baseline-2"),
     # Dataset
     dataset_class=STL10,
     dataset_args=dict(
@@ -114,7 +104,7 @@ self_supervised_config = dict(
     # 500 training images (10 pre-defined folds)
     # 8000 test images (800 test images per class)
     # 100,000 unlabeled images
-    num_unsupervised_samples=32,
+    num_unsupervised_samples=10000,
     # num_supervised_samples=500,
     # num_validation_samples=32,
     reuse_actors=True,
@@ -123,20 +113,20 @@ self_supervised_config = dict(
     # Number of times to sample from the hyperparameter space. If `grid_search` is
     # provided the grid will be repeated `num_samples` of times.
     # Training batch size
-    batch_size=32,
+    batch_size=1,
     # Supervised batch size
     batch_size_supervised=32,
     # Validation batch size
     val_batch_size=32,
     # Number of batches per epoch. Useful for debugging
-    batches_in_epoch=1,
-    batches_in_epoch_supervised=1,
-    batches_in_epoch_val=1,
+    batches_in_epoch=2,
+    # batches_in_epoch_supervised=1,
+    # batches_in_epoch_val=1,
     # Update this to stop training when accuracy reaches the metric value
     # For example, stop=dict(mean_accuracy=0.75),
     stop=dict(),
     # Number of epochs
-    epochs=2,
+    epochs=NUM_EPOCHS,
     epochs_to_validate=[],
     # Which epochs to run and report inference over the validation dataset.
     # epochs_to_validate=range(-1, 30),  # defaults to the last 3 epochs
@@ -144,8 +134,8 @@ self_supervised_config = dict(
     model_class=FullVisionModel,
     # default model arguments
     model_args=dict(
-        negative_samples=5,
-        k_predictions=3,
+        negative_samples=16,
+        k_predictions=5,
         resnet_50=False,
         grayscale=True,
         patch_size=16,
@@ -158,17 +148,22 @@ self_supervised_config = dict(
         # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
         optimizer_class=torch.optim.Adam,
         # Optimizer class class arguments passed to the constructor
-        optimizer_args=dict(lr=1.5e-4),
+        optimizer_args=dict(lr=2e-4),
     ),
     supervised_training_epochs_per_validation=1,
-    loss_function=multiple_cross_entropy,  # each GIM layer has a cross-entropy
+    loss_function=multiple_log_softmax_nll_loss,  # each GIM layer has a cross-entropy
     # Optimizer class. Must inherit from "torch.optim.Optimizer"
     optimizer_class=torch.optim.Adam,
     # Optimizer class class arguments passed to the constructor
-    optimizer_args=dict(lr=1.5e-4),
+    optimizer_args=dict(lr=2e-4),
     # # Learning rate scheduler class. Must inherit from "_LRScheduler"
     # lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
-
+    # Distributed parameters
+    distributed=False,
+    find_unused_parameters=True,
+    # Number of dataloader workers (should be num_cpus)
+    workers=0,
+    local_dir="~/nta/results/greedy_infomax/experiments",
     num_samples=1,
     # How often to checkpoint (epochs)
     checkpoint_freq=0,
@@ -195,7 +190,4 @@ self_supervised_config = dict(
 if __name__ == '__main__':
     exp = self_supervised_config["experiment_class"]()
     exp.setup_experiment(self_supervised_config)
-    data, target = next(iter(exp.unsupervised_loader))
-    output = exp.encoder(data)
-    error_loss = multiple_cross_entropy(output, target)
-    error_loss.backward()
+    exp.run_epoch()

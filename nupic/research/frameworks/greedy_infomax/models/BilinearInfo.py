@@ -4,6 +4,7 @@ import torch.nn as nn
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     makeDeltaOrthogonal,
 )
+from nupic.torch.modules import PrunableSparseWeights2d
 
 
 class BilinearInfo(nn.Module):
@@ -44,7 +45,7 @@ class BilinearInfo(nn.Module):
         out_channels,
         negative_samples=16,
         k_predictions=5,
-        weight_init=True,
+        weight_init=False,
     ):
         super().__init__()
         self.negative_samples = negative_samples
@@ -148,3 +149,20 @@ class BilinearInfo(nn.Module):
             true_f_list.append(true_fk)
 
         return log_f_list, true_f_list
+
+
+class SparseBilinearInfo(BilinearInfo):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        negative_samples=16,
+        k_predictions=5,
+        sparsity=0.2
+    ):
+        super(SparseBilinearInfo, self).__init__(in_channels, out_channels,
+                                            negative_samples, k_predictions)
+        for module in self.W_k:
+            module = PrunableSparseWeights2d(module, sparsity=sparsity)
+
+

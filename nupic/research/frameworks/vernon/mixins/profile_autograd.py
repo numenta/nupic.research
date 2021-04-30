@@ -41,7 +41,7 @@ class ProfileAutograd:
 
         if self.profile_autograd and prof is not None:
             self.logger.info(prof.key_averages().table(
-                sort_by="self_cpu_time_total"))
+                sort_by="cuda_time_total"))
 
             prof.export_chrome_trace(os.path.join(
                 self.logdir, f"autograd{self.current_epoch}.trace"))
