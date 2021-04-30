@@ -35,14 +35,7 @@ import torch
 import torch.nn.functional as F
 
 from experiments import CONFIGS
-from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
-
-
-# ------ Experiment class
-class PermutedMNISTExperiment(mixins.RezeroWeights,
-                              ContinualLearningExperiment):
-    pass
 
 
 # ------ Training & evaluation functions
