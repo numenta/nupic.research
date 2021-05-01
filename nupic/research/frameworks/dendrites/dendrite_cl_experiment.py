@@ -71,6 +71,7 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
         return ret
 
     def train_epoch(self):
+        # TODO: take out constants in the call below
         train_dendrite_model(
             model=self.model,
             loader=self.train_loader,
@@ -89,6 +90,7 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
         if loader is None:
             loader = self.val_loader
 
+        # TODO: take out constants in the call below
         return evaluate_dendrite_model(model=self.model,
                                        loader=loader,
                                        device=self.device,
