@@ -36,16 +36,41 @@ def train_dendrite_model(
     criterion=F.cross_entropy,
     share_labels=False,
     num_labels=None,
+    active_classes=None,
     post_batch_callback=None,
     complexity_loss_fn=None,
     batches_in_epoch=None,
-    active_classes=None,
     pre_batch_callback=None,
     transform_to_device_fn=None,
     progress_bar=None,
 ):
     """
-    TODO: add docstring
+    Train the given model by iterating through mini batches. An epoch ends
+    after one pass through the training set.
+
+    For unused parameters, see `nupic.research.frameworks.pytorch.model_utils`
+
+    :param model: Pytorch model to be trained
+    :param loader: Train dataset loader
+    :param optimizer: Optimizer object used to train the model. This function
+                      will train the model on every batch using this optimizer and the
+                      :func:`torch.nn.functional.nll_loss` function
+    :param device: Device to use ('cpu' or 'cuda')
+    :param criterion: Loss function to use
+    :param share_labels: Whether or not to share labels between tasks, which is
+                         accomplished by applying the modulo operator to target labels
+    :param num_labels: The number of unique labels; only required if
+                       `share_labels = True`
+    :param active_classes: List of indices of the heads that are active for a given
+                           task; only relevant if this function is being used in a
+                           continual learning scenario
+    :param post_batch_callback: Callback function to be called after every batch
+                                with the following parameters: model, batch_idx
+    :param complexity_loss_fn: Unused
+    :param batches_in_epoch: Unused
+    :param pre_batch_callback: Unused
+    :param transform_to_device_fn: Unused
+    :param progress_bar: Unused
     """
     model.train()
     for batch_idx, (data, target) in enumerate(loader):
@@ -53,8 +78,8 @@ def train_dendrite_model(
         data, context = data
         data = data.flatten(start_dim=1)
 
-        # Since there's only one output head, target values should be modified to be in
-        # the range [0, 1, ..., 9]
+        # Since labels are shared, target values should be in
+        # [0, 1, ..., num_labels - 1]
         if share_labels:
             target = target % num_labels
 
@@ -64,6 +89,8 @@ def train_dendrite_model(
 
         optimizer.zero_grad()
         output = model(data, context)
+        if active_classes is not None:
+            output = output[:, active_classes]
 
         error_loss = criterion(output, target)
         error_loss.backward()
@@ -83,15 +110,33 @@ def evaluate_dendrite_model(
     criterion=F.nll_loss,
     share_labels=False,
     num_labels=None,
+    active_classes=None,
     batches_in_epoch=None,
     complexity_loss_fn=None,
-    active_classes=None,
     progress=None,
     post_batch_callback=None,
     transform_to_device_fn=None,
 ):
     """
-    TODO docstring
+    Evaluate pre-trained model using given test dataset loader, and return a dict with
+    computed "mean_accuracy", "mean_loss", "total_correct", and "total_tested".
+
+    :param model: Pretrained pytorch model
+    :param loader: test dataset loader
+    :param device: device to use ('cpu' or 'cuda')
+    :param criterion: loss function to use
+    :param share_labels: Whether or not to share labels between tasks, which is
+                         accomplished by applying the modulo operator to target labels
+    :param num_labels: The number of unique labels; only required if
+                       `share_labels = True`
+    :param active_classes: List of indices of the heads that are active for a given
+                           task; only relevant if this function is being used in a
+                           continual learning scenario
+    :param batches_in_epoch: Max number of mini batches to test on
+    :param complexity_loss_fn: a regularization term for the loss function
+    :param progress: Unused
+    :param post_batch_callback: Unused
+    :param transform_to_device_fn: Unused
     """
     model.eval()
     total = 0
@@ -106,8 +151,8 @@ def evaluate_dendrite_model(
             data, context = data
             data = data.flatten(start_dim=1)
 
-            # Since there's only one output head, target values should be modified to
-            # be in the range [0, 1, ..., 9]
+            # Since labels are shared, target values should be in
+            # [0, 1, ..., num_labels - 1]
             if share_labels:
                 target = target % num_labels
 
@@ -116,6 +161,8 @@ def evaluate_dendrite_model(
             target = target.to(device)
 
             output = model(data, context)
+            if active_classes is not None:
+                output = output[:, active_classes]
 
             loss += criterion(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
