@@ -46,7 +46,8 @@ def train_dendrite_model(
 ):
     """
     Train the given model by iterating through mini batches. An epoch ends
-    after one pass through the training set.
+    after one pass through the training set. This function is compatible with models
+    and datasets that explicitly provide context, and ones that don't.
 
     For unused parameters, see `nupic.research.frameworks.pytorch.model_utils`.
 
@@ -73,9 +74,13 @@ def train_dendrite_model(
     :param progress_bar: Unused
     """
     model.train()
+    context = None
     for batch_idx, (data, target) in enumerate(loader):
-        # TODO: need to make this more generic to not require context
-        data, context = data
+
+        # `data` may be a 2-item list comprising the example data and context signal in
+        # case context is explicitly provided
+        if isinstance(data, list):
+            data, context = data
         data = data.flatten(start_dim=1)
 
         # Since labels are shared, target values should be in
@@ -84,11 +89,13 @@ def train_dendrite_model(
             target = target % num_labels
 
         data = data.to(device)
-        context = context.to(device)
         target = target.to(device)
+        if context is not None:
+            context = context.to(device)
 
         optimizer.zero_grad()
-        output = model(data, context)
+        forward_args = [data] if context is None else [data, context]
+        output = model(*forward_args)
         if active_classes is not None:
             output = output[:, active_classes]
 
@@ -119,7 +126,9 @@ def evaluate_dendrite_model(
 ):
     """
     Evaluate pre-trained model using given test dataset loader, and return a dict with
-    computed "mean_accuracy", "mean_loss", "total_correct", and "total_tested".
+    computed "mean_accuracy", "mean_loss", "total_correct", and "total_tested". This
+    function is compatible with models and datasets that explicitly provide context,
+    and ones that don't.
 
     For unused parameters, see `nupic.research.frameworks.pytorch.model_utils`.
 
@@ -146,11 +155,16 @@ def evaluate_dendrite_model(
     loss = torch.tensor(0., device=device)
     correct = torch.tensor(0, device=device)
 
+    context = None
+
     with torch.no_grad():
 
         for data, target in loader:
-            # TODO: need to make this more generic to not require context
-            data, context = data
+
+            # `data` may be a 2-item list comprising the example data and context
+            # signal in case context is explicitly provided
+            if isinstance(data, list):
+                data, context = data
             data = data.flatten(start_dim=1)
 
             # Since labels are shared, target values should be in
@@ -159,10 +173,12 @@ def evaluate_dendrite_model(
                 target = target % num_labels
 
             data = data.to(device)
-            context = context.to(device)
             target = target.to(device)
+            if context is not None:
+                context = context.to(device)
 
-            output = model(data, context)
+            forward_args = [data] if context is None else [data, context]
+            output = model(*forward_args)
             if active_classes is not None:
                 output = output[:, active_classes]
 
