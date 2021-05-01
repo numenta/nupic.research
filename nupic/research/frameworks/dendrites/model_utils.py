@@ -48,7 +48,7 @@ def train_dendrite_model(
     Train the given model by iterating through mini batches. An epoch ends
     after one pass through the training set.
 
-    For unused parameters, see `nupic.research.frameworks.pytorch.model_utils`
+    For unused parameters, see `nupic.research.frameworks.pytorch.model_utils`.
 
     :param model: Pytorch model to be trained
     :param loader: Train dataset loader
@@ -121,10 +121,12 @@ def evaluate_dendrite_model(
     Evaluate pre-trained model using given test dataset loader, and return a dict with
     computed "mean_accuracy", "mean_loss", "total_correct", and "total_tested".
 
+    For unused parameters, see `nupic.research.frameworks.pytorch.model_utils`.
+
     :param model: Pretrained pytorch model
-    :param loader: test dataset loader
-    :param device: device to use ('cpu' or 'cuda')
-    :param criterion: loss function to use
+    :param loader: Test dataset loader
+    :param device: Device to use ('cpu' or 'cuda')
+    :param criterion: Loss function to use
     :param share_labels: Whether or not to share labels between tasks, which is
                          accomplished by applying the modulo operator to target labels
     :param num_labels: The number of unique labels; only required if
@@ -132,8 +134,8 @@ def evaluate_dendrite_model(
     :param active_classes: List of indices of the heads that are active for a given
                            task; only relevant if this function is being used in a
                            continual learning scenario
-    :param batches_in_epoch: Max number of mini batches to test on
-    :param complexity_loss_fn: a regularization term for the loss function
+    :param batches_in_epoch: Unused
+    :param complexity_loss_fn: Unused
     :param progress: Unused
     :param post_batch_callback: Unused
     :param transform_to_device_fn: Unused
