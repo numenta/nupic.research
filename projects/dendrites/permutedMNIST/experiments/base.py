@@ -25,7 +25,7 @@ Base Experiment configuration.
 import os
 from copy import deepcopy
 
-    import torch
+import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
