@@ -131,6 +131,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
         self.encoder = self.model
         self.classifier = self.create_model(classifier_config, self.device)
+        self.logger.debug(self.classifier)
         self.model = EncoderClassifier(self.encoder, self.classifier)
         self.model.to(self.device)
 
@@ -255,23 +256,23 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
     @classmethod
     def create_unsupervised_sampler(cls, config, dataset):
-        num_samples = config.get("num_unsupervised_samples", -1)
-        if num_samples > 0:
-            return RandomSampler(dataset, replacement=True, num_samples=num_samples)
+        # num_samples = config.get("num_unsupervised_samples", -1)
+        # if num_samples > 0:
+        #     return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod
     def create_supervised_sampler(cls, config, dataset):
-        num_samples = config.get("num_supervised_samples", -1)
-        if num_samples > 0:
-            return RandomSampler(dataset, replacement=True, num_samples=num_samples)
+        # num_samples = config.get("num_supervised_samples", -1)
+        # if num_samples > 0:
+        #     return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
-        num_samples = config.get("num_validation_samples", -1)
-        if num_samples > 0:
-            return RandomSampler(dataset, replacement=True, num_samples=num_samples)
+        # num_samples = config.get("num_validation_samples", -1)
+        # if num_samples > 0:
+        #     return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod

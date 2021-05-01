@@ -1,3 +1,29 @@
+# ----------------------------------------------------------------------
+# Numenta Platform for Intelligent Computing (NuPIC)
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
+# with Numenta, Inc., for a separate license for this software code, the
+# following terms and conditions apply:
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero Public License version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Affero Public License for more details.
+#
+# You should have received a copy of the GNU Affero Public License
+# along with this program.  If not, see http://www.gnu.org/licenses.
+#
+# http://numenta.org/licenses/
+#
+# This work was based on the original Greedy InfoMax codebase from Sindy Lowe:
+# https://github.com/loeweX/Greedy_InfoMax
+# The Greedy InfoMax paper can be found here:
+# https://arxiv.org/abs/1905.11786
+# ----------------------------------------------------------------------
+
 import torch
 import torch.nn as nn
 
@@ -5,7 +31,7 @@ from nupic.research.frameworks.greedy_infomax.models import (
     PreActBlockNoBN,
     SparsePreActBlockNoBN,
     PreActBottleneckNoBN,
-
+    SparsePreActBottleneckNoBN,
     ResNetEncoder,
     SparseResNetEncoder,
 )
@@ -105,14 +131,14 @@ class FullVisionModel(torch.nn.Module):
         for module in self.encoder:
             # no need to detach between modules as .encode() will only be called
             # under a torch.no_grad() scope
-            representation, x = module.encode(x, n_patches_x, n_patches_y)
+            x, out = module.encode(x, n_patches_x, n_patches_y)
         # Return patch-level representation from the last block
-        return representation
+        return out
 
 
 class SparseFullVisionModel(FullVisionModel):
     """
-    A sparse version of the above FullVisionModel
+    A sparse weights version of the above FullVisionModel.
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.
                           For example, if k_predictions is 5 and skip_step is 1,
@@ -136,7 +162,7 @@ class SparseFullVisionModel(FullVisionModel):
         grayscale=True,
         patch_size=16,
         overlap=2,
-        sparsity=None
+        sparsity=None,
     ):
         super(SparseFullVisionModel, self).__init__(negative_samples=negative_samples,
                                                     k_predictions=k_predictions,
@@ -145,17 +171,17 @@ class SparseFullVisionModel(FullVisionModel):
                                                     patch_size=patch_size,
                                                     overlap=overlap,)
         if sparsity is None:
-            sparsity = [0.2, 0.2, 0.2]
+            sparsity = [0.5, 0.5, 0.5]
 
-        self.block_dims = [3, 4, 6]
-        self.num_channels = [64, 128, 256]
+        block_dims = [3, 4, 6]
+        num_channels = [64, 128, 256]
 
         self.encoder = nn.ModuleList([])
 
         if resnet_50:
-            self.block = PreActBottleneckNoBN
+            self.block = SparsePreActBottleneckNoBN
         else:
-            self.block = PreActBlockNoBN
+            self.block = SparsePreActBlockNoBN
 
         if grayscale:
             input_dims = 1
@@ -172,37 +198,6 @@ class SparseFullVisionModel(FullVisionModel):
                     input_dims=input_dims,
                     k_predictions=self.k_predictions,
                     negative_samples=self.negative_samples,
-                    sparsity=sparsity
+                    sparsity=sparsity[idx]
                 )
             )
-
-    def forward(self, x):
-        # Patchify inputs
-        x, n_patches_x, n_patches_y = model_utils.patchify_inputs(
-            x, self.patch_size, self.overlap
-        )
-        # Save positive/contrastive samples for each encoder block
-        log_f_module_list, true_f_module_list = [], []
-        for module in self.encoder:
-            # log_f_list and true_f_list each have k_predictions elements
-            log_f_list, true_f_list, z = module(x, n_patches_x, n_patches_y)
-            log_f_module_list.append(log_f_list)
-            true_f_module_list.append(true_f_list)
-            # Detach x to make sure no gradients are flowing in between modules
-            x = z.detach()
-        # Lists of lists: each list has num_modules internal lists, with each
-        # internal list containing k_predictions elements
-        return log_f_module_list, true_f_module_list
-
-    def encode(self, x):
-        # Patchify inputs
-        x, n_patches_x, n_patches_y = model_utils.patchify_inputs(
-            x, self.patch_size, self.overlap
-        )
-        # Compute encoded patch-level representation for each encoder block
-        for module in self.encoder:
-            # no need to detach between modules as .encode() will only be called
-            # under a torch.no_grad() scope
-            representation, x = module.encode(x, n_patches_x, n_patches_y)
-        # Return patch-level representation from the last block
-        return representation

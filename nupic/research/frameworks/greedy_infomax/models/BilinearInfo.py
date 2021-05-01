@@ -1,3 +1,29 @@
+# ----------------------------------------------------------------------
+# Numenta Platform for Intelligent Computing (NuPIC)
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
+# with Numenta, Inc., for a separate license for this software code, the
+# following terms and conditions apply:
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero Public License version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Affero Public License for more details.
+#
+# You should have received a copy of the GNU Affero Public License
+# along with this program.  If not, see http://www.gnu.org/licenses.
+#
+# http://numenta.org/licenses/
+#
+# This work was based on the original Greedy InfoMax codebase from Sindy Lowe:
+# https://github.com/loeweX/Greedy_InfoMax
+# The Greedy InfoMax paper can be found here:
+# https://arxiv.org/abs/1905.11786
+# ----------------------------------------------------------------------
+
 import torch
 import torch.nn as nn
 
@@ -162,7 +188,7 @@ class SparseBilinearInfo(BilinearInfo):
     ):
         super(SparseBilinearInfo, self).__init__(in_channels, out_channels,
                                             negative_samples, k_predictions)
-        for module in self.W_k:
-            module = PrunableSparseWeights2d(module, sparsity=sparsity)
+        for i in range(len(self.W_k)):
+            self.W_k[i] = PrunableSparseWeights2d(self.W_k[i], sparsity=sparsity)
 
 
