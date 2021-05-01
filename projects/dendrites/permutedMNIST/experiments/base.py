@@ -25,6 +25,7 @@ Base Experiment configuration.
 import os
 from copy import deepcopy
 
+import ray.tune as tune
 import torch
 import torch.nn.functional as F
 
@@ -88,10 +89,7 @@ DEFAULT_BASE = dict(
 # Temporary, just for testing
 BASE2 = deepcopy(DEFAULT_BASE)
 BASE2.update(
-    batch_size=64,
-    epochs=2,
-    optimizer_class=torch.optim.SGD,
-    optimizer_args=dict(lr=0.001),
+    epochs=tune.grid_search([1, 2, 3]),
 )
 
 # Export configurations in this file
