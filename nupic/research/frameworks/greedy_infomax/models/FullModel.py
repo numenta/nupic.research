@@ -29,10 +29,10 @@ import torch.nn as nn
 
 from nupic.research.frameworks.greedy_infomax.models import (
     PreActBlockNoBN,
-    SparsePreActBlockNoBN,
     PreActBottleneckNoBN,
-    SparsePreActBottleneckNoBN,
     ResNetEncoder,
+    SparsePreActBlockNoBN,
+    SparsePreActBottleneckNoBN,
     SparseResNetEncoder,
 )
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
@@ -164,12 +164,14 @@ class SparseFullVisionModel(FullVisionModel):
         overlap=2,
         sparsity=None,
     ):
-        super(SparseFullVisionModel, self).__init__(negative_samples=negative_samples,
-                                                    k_predictions=k_predictions,
-                                                    resnet_50=resnet_50,
-                                                    grayscale=grayscale,
-                                                    patch_size=patch_size,
-                                                    overlap=overlap,)
+        super(SparseFullVisionModel, self).__init__(
+            negative_samples=negative_samples,
+            k_predictions=k_predictions,
+            resnet_50=resnet_50,
+            grayscale=grayscale,
+            patch_size=patch_size,
+            overlap=overlap,
+        )
         if sparsity is None:
             sparsity = [0.5, 0.5, 0.5]
 
@@ -198,6 +200,6 @@ class SparseFullVisionModel(FullVisionModel):
                     input_dims=input_dims,
                     k_predictions=self.k_predictions,
                     negative_samples=self.negative_samples,
-                    sparsity=sparsity[idx]
+                    sparsity=sparsity[idx],
                 )
             )

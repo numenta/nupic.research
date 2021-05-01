@@ -28,7 +28,7 @@ import torch
 import torch.nn as nn
 
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
-    makeDeltaOrthogonal,
+    make_delta_orthogonal,
 )
 from nupic.torch.modules import PrunableSparseWeights2d
 
@@ -94,7 +94,7 @@ class BilinearInfo(nn.Module):
                     # nn.init.kaiming_normal_(
                     #     m.weight, mode="fan_in", nonlinearity="tanh"
                     # )
-                    makeDeltaOrthogonal(m.weight, nn.init.calculate_gain("sigmoid"))
+                    make_delta_orthogonal(m.weight, nn.init.calculate_gain("sigmoid"))
 
     def forward(self, z, c, skip_step=1):
         """
@@ -184,11 +184,10 @@ class SparseBilinearInfo(BilinearInfo):
         out_channels,
         negative_samples=16,
         k_predictions=5,
-        sparsity=0.2
+        sparsity=0.2,
     ):
-        super(SparseBilinearInfo, self).__init__(in_channels, out_channels,
-                                            negative_samples, k_predictions)
+        super(SparseBilinearInfo, self).__init__(
+            in_channels, out_channels, negative_samples, k_predictions
+        )
         for i in range(len(self.W_k)):
             self.W_k[i] = PrunableSparseWeights2d(self.W_k[i], sparsity=sparsity)
-
-

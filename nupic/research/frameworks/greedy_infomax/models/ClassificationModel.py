@@ -26,6 +26,7 @@
 
 import torch.nn as nn
 
+
 class ClassificationModel(nn.Module):
     def __init__(self, in_channels=256, num_classes=10, hidden_nodes=0):
         super().__init__()
@@ -35,7 +36,6 @@ class ClassificationModel(nn.Module):
         self.model.add_module(
             "layer1", nn.Linear(self.in_channels, num_classes, bias=True)
         )
-
 
     def forward(self, x):
         x = self.avg_pool(x).squeeze()

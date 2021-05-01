@@ -26,15 +26,19 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import \
-    BilinearInfo, SparseBilinearInfo
+from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import (
+    BilinearInfo,
+    SparseBilinearInfo,
+)
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
 from nupic.torch.modules import PrunableSparseWeights2d
 
 
 class PreActBlockNoBN(nn.Module):
     """Pre-activation version of the BasicBlock."""
+
     expansion = 1
+
     def __init__(self, in_planes, planes, stride=1):
         super(PreActBlockNoBN, self).__init__()
         self.conv1 = nn.Conv2d(
@@ -61,26 +65,22 @@ class PreActBlockNoBN(nn.Module):
 
 class SparsePreActBlockNoBN(PreActBlockNoBN):
     """Sparse version of the PreActBlockNoBN block."""
-    def __init__(self,
-                 in_planes,
-                 planes,
-                 stride=1,
-                 sparsity=0.2):
-        super(SparsePreActBlockNoBN, self).__init__(in_planes,
-                                                    planes,
-                                                    stride=stride)
-        self.conv1 = PrunableSparseWeights2d(self.conv1 ,sparsity=sparsity)
+
+    def __init__(self, in_planes, planes, stride=1, sparsity=0.2):
+        super(SparsePreActBlockNoBN, self).__init__(in_planes, planes, stride=stride)
+        self.conv1 = PrunableSparseWeights2d(self.conv1, sparsity=sparsity)
         self.conv2 = PrunableSparseWeights2d(self.conv2, sparsity=sparsity)
         if hasattr(self, "shortcut"):
             self.shortcut = nn.Sequential(
-                PrunableSparseWeights2d(self.shortcut._modules['0'], sparsity=sparsity)
+                PrunableSparseWeights2d(self.shortcut._modules["0"], sparsity=sparsity)
             )
-
 
 
 class PreActBottleneckNoBN(nn.Module):
     """Pre-activation version of the original Bottleneck module."""
+
     expansion = 4
+
     def __init__(self, in_planes, planes, stride=1):
         super(PreActBottleneckNoBN, self).__init__()
         # self.bn1 = nn.BatchNorm2d(in_planes)
@@ -105,23 +105,20 @@ class PreActBottleneckNoBN(nn.Module):
         out += shortcut
         return out
 
+
 class SparsePreActBottleneckNoBN(PreActBottleneckNoBN):
     """Pre-activation version of the original Bottleneck module."""
 
-    def __init__(self,
-                 in_planes,
-                 planes,
-                 stride=1,
-                 sparsity=0.2):
-        super(SparsePreActBottleneckNoBN, self).__init__(in_planes,
-                                                         planes,
-                                                         stride=stride)
+    def __init__(self, in_planes, planes, stride=1, sparsity=0.2):
+        super(SparsePreActBottleneckNoBN, self).__init__(
+            in_planes, planes, stride=stride
+        )
         self.conv1 = PrunableSparseWeights2d(self.conv1, sparsity=sparsity)
         self.conv2 = PrunableSparseWeights2d(self.conv2, sparsity=sparsity)
         self.conv3 = PrunableSparseWeights2d(self.conv3, sparsity=sparsity)
         if hasattr(self, "shortcut"):
             self.shortcut = nn.Sequential(
-                PrunableSparseWeights2d(self.shortcut._modules['0'], sparsity=sparsity)
+                PrunableSparseWeights2d(self.shortcut._modules["0"], sparsity=sparsity)
             )
 
 
@@ -192,7 +189,7 @@ class ResNetEncoder(nn.Module):
     def initialize(self):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d,)):
-                model_utils.makeDeltaOrthogonal(
+                model_utils.make_delta_orthogonal(
                     m.weight, nn.init.calculate_gain("relu")
                 )
             elif isinstance(m, (nn.BatchNorm3d, nn.BatchNorm2d)):
@@ -219,8 +216,6 @@ class ResNetEncoder(nn.Module):
         return log_f_list, true_f_list, z
 
 
-
-
 class SparseResNetEncoder(ResNetEncoder):
     """
     A sparse version of the above ResNetEncoder.
@@ -239,26 +234,28 @@ class SparseResNetEncoder(ResNetEncoder):
         sparsity=None,
         weight_init=False,
     ):
-        super(SparseResNetEncoder, self).__init__(block,
-                                                  num_blocks,
-                                                  filters,
-                                                  encoder_num,
-                                                  negative_samples,
-                                                  k_predictions=k_predictions,
-                                                  patch_size=patch_size,
-                                                  input_dims=input_dims,
-                                                  weight_init=weight_init)
+        super(SparseResNetEncoder, self).__init__(
+            block,
+            num_blocks,
+            filters,
+            encoder_num,
+            negative_samples,
+            k_predictions=k_predictions,
+            patch_size=patch_size,
+            input_dims=input_dims,
+            weight_init=weight_init,
+        )
 
         self.model = nn.Sequential()
         if encoder_num == 0:
             self.model.add_module(
                 "SparseConv1",
                 PrunableSparseWeights2d(
-                nn.Conv2d(
-                    input_dims, self.filters[0], kernel_size=5, stride=1, padding=2
+                    nn.Conv2d(
+                        input_dims, self.filters[0], kernel_size=5, stride=1, padding=2
+                    ),
+                    sparsity=sparsity,
                 ),
-                sparsity=sparsity
-                )
             )
             self.in_planes = self.filters[0]
             self.first_stride = 1
@@ -277,7 +274,7 @@ class SparseResNetEncoder(ResNetEncoder):
                     self.filters[idx],
                     num_blocks[idx],
                     stride=self.first_stride,
-                    sparsity=sparsity
+                    sparsity=sparsity,
                 ),
             )
             self.first_stride = 2
@@ -287,16 +284,15 @@ class SparseResNetEncoder(ResNetEncoder):
             out_channels=self.in_planes,
             negative_samples=negative_samples,
             k_predictions=k_predictions,
-            sparsity=sparsity
+            sparsity=sparsity,
         )
 
     def _make_layer_sparse(self, block, planes, num_blocks, stride=1, sparsity=0.1):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes,
-                                planes,
-                                stride=stride,
-                                sparsity=sparsity))
+            layers.append(
+                block(self.in_planes, planes, stride=stride, sparsity=sparsity)
+            )
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)

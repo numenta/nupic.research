@@ -18,16 +18,17 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-from torch.nn.modules import SyncBatchNorm
+import torch.nn as nn
+
 
 class SyncBatchNorm:
-    def create_model(cls, config, device):
+    def create_model(self, config, device):
         model = super().create_model(config, device)
         use_synch_batchnorm = config.get("use_synch_batchnorm", True)
         distributed = config.get("distributed", False)
         if use_synch_batchnorm and distributed and next(model.parameters()).is_cuda:
             # Convert batch norm to sync batch norms
-            model = SyncBatchNorm.convert_sync_batchnorm(module=model)
+            model = nn.modules.SyncBatchNorm.convert_sync_batchnorm(module=model)
         return model
 
     @classmethod

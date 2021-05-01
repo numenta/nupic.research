@@ -19,23 +19,21 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from copy import deepcopy
-
 import numpy as np
 import torch
 from torch.utils.data.dataset import Subset
-from torchvision import transforms
 from torchvision.datasets import STL10
 
-from nupic.research.frameworks.greedy_infomax.models import FullVisionModel, ClassificationModel
-from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
-    multiple_cross_entropy,
-    multiple_log_softmax_nll_loss,
-    true_GIM_loss,
+from nupic.research.frameworks.greedy_infomax.models import (
+    ClassificationModel,
+    FullVisionModel,
 )
 from nupic.research.frameworks.greedy_infomax.utils.data_utils import STL10_DATASET_ARGS
+from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
+    multiple_cross_entropy,
+)
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
-import time
+
 
 class GreedyInfoMaxExperiment(
     mixins.LogEveryLoss, experiments.SelfSupervisedExperiment
@@ -84,8 +82,9 @@ NUM_EPOCHS = 60
 DEFAULT_BASE = dict(
     experiment_class=GreedyInfoMaxExperiment,
     # wandb
-    wandb_args=dict(project="greedy_infomax",
-                    name="paper-replication-small-pooling-after"),
+    wandb_args=dict(
+        project="greedy_infomax", name="paper-replication-small-pooling-after"
+    ),
     # Dataset
     dataset_class=STL10,
     dataset_args=STL10_DATASET_ARGS,
@@ -176,4 +175,4 @@ DEFAULT_BASE = dict(
 )
 
 
-CONFIGS = dict(default_base=DEFAULT_BASE,)
+CONFIGS = dict(default_base=DEFAULT_BASE)
