@@ -22,20 +22,22 @@
 Base Experiment configuration.
 """
 
-from copy import deepcopy
 import os
+from copy import deepcopy
 
-import numpy as np
-import torch
+    import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
+from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
+    DendriteContinualLearningExperiment,
+)
 from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
-from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
+from nupic.research.frameworks.vernon import mixins
 
 
 class PermutedMNISTExperiment(mixins.RezeroWeights,
-                              ContinualLearningExperiment):
+                              DendriteContinualLearningExperiment):
     pass
 
 
@@ -71,9 +73,8 @@ DEFAULT_BASE = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=1,
-    epochs_to_validate=(4, 9, 24, 49),  # Note: `epochs_to_validate` is treated as
-    # the set of task ids after which to
-    # evaluate the model on all seen tasks
+    tasks_to_validate=(0, 1, 2),  # Tasks on which to run validate
+    epochs_to_validate=[],
     num_tasks=NUM_TASKS,
     num_classes=10 * NUM_TASKS,
     distributed=False,

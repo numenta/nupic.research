@@ -31,81 +31,12 @@ stabilization' (Masse et al., 2018).
 import argparse
 import copy
 
-import torch
-import torch.nn.functional as F
-
 from experiments import CONFIGS
-from nupic.research.frameworks.dendrites import evaluate_dendrite_model, train_dendrite_model
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
 from nupic.research.frameworks.vernon.run_with_raytune import run
 
-# TODO: there are mixins that assume create_optimizer is a class method
-
-def run_experiment(config):
-    exp_class = config["experiment_class"]
-    exp = exp_class()
-    exp.setup_experiment(config)
-
-    # Read optimizer class and args from config as it will be used to reinitialize the
-    # model's optimizer
-    optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-    optimizer_args = config.get("optimizer_args", {})
-    num_tasks = config.get("num_tasks", 2)
-
-    # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
-
-    for task_id in range(num_tasks):
-
-        # Train model on current task
-        exp.train_loader.sampler.set_active_tasks(task_id)
-        for _ in range(exp.epochs):
-            train_dendrite_model(model=exp.model, loader=exp.train_loader,
-                                 optimizer=exp.optimizer, device=exp.device,
-                                 criterion=exp.error_loss, share_labels=True,
-                                 num_labels=10, post_batch_callback=exp.post_batch_wrapper)
-
-        if task_id in config["epochs_to_validate"]:
-
-            print("")
-            print(f"=== AFTER TASK {task_id} ===")
-            print("")
-
-            # Evaluate model accuracy on each task separately
-            for eval_task_id in range(task_id + 1):
-
-                exp.val_loader.sampler.set_active_tasks(eval_task_id)
-                results = evaluate_dendrite_model(model=exp.model, loader=exp.val_loader,
-                                                  device=exp.device,
-                                                  criterion=exp.error_loss,
-                                                  share_labels=True, num_labels=10)
-                acc_task = results["mean_accuracy"]
-                if isinstance(acc_task, tuple):
-                    acc_task = acc_task[0]
-
-                print(f"task {eval_task_id} accuracy: {acc_task}")
-            print("")
-
-        else:
-            print(f"--Completed task {task_id}--")
-
-        # Reset optimizer before starting new task
-        del exp.optimizer
-        exp.optimizer = optimizer_class(exp.model.parameters(), **optimizer_args)
-
-    # ------------------------------------------------------------------------------- #
-
-    # Report final aggregate accuracy
-    exp.val_loader.sampler.set_active_tasks(range(num_tasks))
-    results = evaluate_dendrite_model(model=exp.model, loader=exp.val_loader,
-                                      device=exp.device, criterion=exp.error_loss,
-                                      share_labels=True, num_labels=10)
-    acc_task = results["mean_accuracy"]
-    if isinstance(acc_task, tuple):
-        acc_task = acc_task[0]
-
-    print(f"Final test accuracy: {acc_task}")
-    print("")
-
+# TODO: there are mixins that assume create_optimizer is a class method. We made it
+#       a normal method, so need to fix
 
 if __name__ == "__main__":
 
@@ -130,4 +61,4 @@ if __name__ == "__main__":
     if config is None:
         pass
     else:
-        run_experiment(config)
+        run(config)

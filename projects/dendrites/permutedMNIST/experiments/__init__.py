@@ -21,7 +21,6 @@
 
 from .base import CONFIGS as BASE
 
-
 """
 Import and collect all experiment configurations into one CONFIG
 """
