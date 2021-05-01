@@ -80,6 +80,9 @@ class ContinualLearningExperiment(
         self.train_model = config.get("train_model_func", train_model)
         self.train_model_args = config.get("train_model_args", None)
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
+        self.tasks_to_validate = config.get("tasks_to_validate",
+                                            range(self.num_tasks - 3,
+                                                  self.num_tasks))
 
         # Whitelist evaluation metrics
         self.evaluation_metrics = config.get(
@@ -127,7 +130,7 @@ class ContinualLearningExperiment(
 
         self.current_task += 1
 
-        if reset_optimizer_after_task:
+        if self.reset_optimizer_after_task:
             self.optimizer = self.create_optimizer(self.model)
 
         return ret
