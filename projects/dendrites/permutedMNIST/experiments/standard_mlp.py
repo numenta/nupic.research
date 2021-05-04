@@ -30,18 +30,10 @@ import torch
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 
-from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
-    DendriteContinualLearningExperiment,
-)
 from nupic.research.frameworks.pytorch.models import StandardMLP
-from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
+from nupic.research.frameworks.vernon import SupervisedExperiment
 
 """Regular MNIST """
-
-
-class PermutedMNISTExperiment(mixins.RezeroWeights,
-                              DendriteContinualLearningExperiment):
-    pass
 
 
 NUM_TASKS = 2
