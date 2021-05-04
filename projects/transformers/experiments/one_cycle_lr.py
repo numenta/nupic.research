@@ -135,7 +135,7 @@ tiny_bert_linear_lr_range_test.update(
 
     max_steps=100,
     overwrite_output_dir=True,
-    do_eval=False,
+    do_eval=True,
     trainer_class=LRRangeTestTrainer,
     trainer_mixin_args=dict(
         min_lr=1e-5,

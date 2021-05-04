@@ -32,7 +32,7 @@ class OneCycleLRMixin:
         https://pytorch.org/docs/stable/optim.html#torch.optim.lr_scheduler.OneCycleLR
     """
 
-    def create_optimizer_and_scheduler(self, num_training_steps: int):
+    def create_scheduler(self, num_training_steps: int):
         """
         Setup the optimizer and the learning rate scheduler. This overrides super
         in a way that just customizes the lr scheduler while the optimizer remains the
@@ -51,12 +51,6 @@ class OneCycleLRMixin:
         div_factor = mixin_args.get("div_factor", 25)
         final_div_factor = mixin_args.get("final_div_factor", 1e4)
         last_epoch = mixin_args.get("last_epoch", -1)
-
-        # Set lr scheduler to dummy variable so it's not created in the call to super.
-        self.lr_scheduler = ...
-
-        # Create just the optimizer.
-        super().create_optimizer_and_scheduler(num_training_steps)
 
         # Now define the lr scheduler, given the optimizer.
         self.lr_scheduler = OneCycleLR(
