@@ -23,18 +23,20 @@ Base Experiment configuration.
 """
 
 import os
-from copy import deepcopy
 
+import numpy as np
 import ray.tune as tune
 import torch
 import torch.nn.functional as F
+from torchvision import datasets, transforms
 
-from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.pytorch.models import StandardMLP
+from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
+
+"""Regular MNIST """
 
 
 class PermutedMNISTExperiment(mixins.RezeroWeights,
@@ -44,56 +46,54 @@ class PermutedMNISTExperiment(mixins.RezeroWeights,
 
 NUM_TASKS = 2
 
-DEFAULT_BASE = dict(
-    experiment_class=PermutedMNISTExperiment,
+# Gets about 98% accuracy
+DENSE_MLP = dict(
+    experiment_class=SupervisedExperiment,
 
     # Results path
     local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
 
-    dataset_class=ContextDependentPermutedMNIST,
+    dataset_class=datasets.MNIST,
     dataset_args=dict(
-        num_tasks=NUM_TASKS,
-        root="~/nta/data/dendrites",  # Consistent location outside of git repo
-        dim_context=1024,
-        seed=42,
+        root="~/nta/data/",  # Consistent location outside of git repo
         download=False,  # Change to True if running for the first time
+        transform=transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.13062755,), (0.30810780,)),
+        ])
     ),
 
-    model_class=DendriticMLP,
+    model_class=StandardMLP,
     model_args=dict(
         input_size=784,
-        output_size=10,
-        hidden_sizes=[64, 64],
-        num_segments=NUM_TASKS,
-        dim_context=1024,  # Note: with the Gaussian dataset, `dim_context` was
-        # 2048, but this shouldn't effect results
-        kw=True,
-        # dendrite_sparsity=0.0,
+        num_classes=10,
+        hidden_sizes=[2048, 2048],
     ),
 
-    batch_size=256,
+    batch_size=32,
     val_batch_size=512,
-    epochs=1,
-    tasks_to_validate=(0, 1, 2),  # Tasks on which to run validate
-    epochs_to_validate=[],
-    num_tasks=NUM_TASKS,
-    num_classes=10 * NUM_TASKS,
+    epochs=13,
+    epochs_to_validate=range(30),
+    num_classes=10,
     distributed=False,
-    seed=42,
+    seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
+    num_samples=1,  # Increase to run multiple experiments in parallel
 
     loss_function=F.cross_entropy,
-    optimizer_class=torch.optim.Adam,
-    optimizer_args=dict(lr=0.001),
-)
+    optimizer_class=torch.optim.SGD,
+    optimizer_args=dict(
+        lr=0.01,
+    ),
 
-# Temporary, just for testing
-BASE2 = deepcopy(DEFAULT_BASE)
-BASE2.update(
-    epochs=tune.grid_search([1, 2, 3]),
+    # Learning rate scheduler class and args. Must inherit from "_LRScheduler"
+    lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
+    lr_scheduler_args=dict(
+        gamma=0.1,
+        step_size=10,
+    ),
 )
 
 # Export configurations in this file
 CONFIGS = dict(
-    default_base=DEFAULT_BASE,
-    base2=BASE2,
+    dense_mlp=DENSE_MLP,
 )

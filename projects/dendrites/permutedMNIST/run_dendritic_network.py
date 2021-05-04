@@ -29,7 +29,6 @@ This setup is very similar to that of context-dependent gating model from the pa
 stabilization' (Masse et al., 2018).
 """
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 
