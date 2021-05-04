@@ -51,6 +51,9 @@ class ContinualLearningExperiment(
 
         self.current_task = 0
 
+        # TODO: General mechanism to handle all the cases and determine num_labels,
+        #       number of output units, error calculation, share labels, etc.
+
         # Defines how many classes should exist per task
         self.num_tasks = config.get("num_tasks", 1)
 
