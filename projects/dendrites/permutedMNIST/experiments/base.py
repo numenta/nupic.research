@@ -53,7 +53,8 @@ DEFAULT_BASE = dict(
     dataset_class=ContextDependentPermutedMNIST,
     dataset_args=dict(
         num_tasks=NUM_TASKS,
-        root="~/nta/data/dendrites",  # Consistent location outside of git repo
+        # Consistent location outside of git repo
+        root=os.path.expanduser("~/nta/results/data/"),
         dim_context=1024,
         seed=42,
         download=False,  # Change to True if running for the first time
