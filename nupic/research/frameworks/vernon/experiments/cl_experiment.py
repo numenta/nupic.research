@@ -22,6 +22,7 @@
 import math
 from collections import defaultdict
 
+import torch
 from torchvision import transforms
 
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
@@ -48,8 +49,10 @@ class ContinualLearningExperiment(
         super().setup_experiment(config)
         # Override epochs to validate to not validate within the inner loop over epochs
         self.epochs_to_validate = []
-
         self.current_task = 0
+
+        self.optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+        self.optimizer_args = config.get("optimizer_args", {})
 
         # TODO: General mechanism to handle all the cases and determine num_labels,
         #       number of output units, error calculation, share labels, etc.
@@ -134,9 +137,15 @@ class ContinualLearningExperiment(
         self.current_task += 1
 
         if self.reset_optimizer_after_task:
-            self.optimizer = self.create_optimizer(self.model)
+            self.optimizer = self.recreate_optimizer(self.model)
 
         return ret
+
+    def recreate_optimizer(self, model=None):
+        """
+        Recreate the optimizer.
+        """
+        return self.optimizer_class(model.parameters(), **self.optimizer_args)
 
     @classmethod
     def create_train_sampler(cls, config, dataset):

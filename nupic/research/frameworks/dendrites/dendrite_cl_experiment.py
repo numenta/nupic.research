@@ -65,13 +65,13 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
         self.current_task += 1
 
         if self.reset_optimizer_after_task:
-            self.optimizer = self.create_optimizer(self.model)
+            self.optimizer = self.recreate_optimizer(self.model)
 
         print("run_task ret: ", ret)
         return ret
 
     def train_epoch(self):
-        # TODO: take out constants in the call below
+        # TODO: take out constants in the call below. How do we determine num_labels?
         train_dendrite_model(
             model=self.model,
             loader=self.train_loader,

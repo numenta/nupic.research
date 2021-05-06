@@ -154,9 +154,7 @@ class SupervisedExperiment(ExperimentBase):
         self.logger.debug(self.model)
 
         # Configure and create optimizer
-        self.optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-        self.optimizer_args = config.get("optimizer_args", {})
-        self.optimizer = self.create_optimizer(self.model)
+        self.optimizer = self.create_optimizer(config, self.model)
 
         # Validate mixed precision requirements
         self.mixed_precision = config.get("mixed_precision", False)
@@ -242,11 +240,18 @@ class SupervisedExperiment(ExperimentBase):
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
         )
 
-    def create_optimizer(self, model):
+    @classmethod
+    def create_optimizer(cls, config, model):
         """
-        Create optimizer from our experiment config.
+        Create optimizer from an experiment config.
+
+        :param optimizer_class: Callable or class to instantiate optimizer. Must return
+                                object inherited from "torch.optim.Optimizer"
+        :param optimizer_args: Arguments to pass to the optimizer.
         """
-        return self.optimizer_class(model.parameters(), **self.optimizer_args)
+        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+        optimizer_args = config.get("optimizer_args", {})
+        return optimizer_class(model.parameters(), **optimizer_args)
 
     @classmethod
     def create_lr_scheduler(cls, config, optimizer, total_batches):
