@@ -22,19 +22,23 @@
 Base Experiment configuration.
 """
 
+import os
 from copy import deepcopy
 
-import numpy as np
+import ray.tune as tune
 import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
+from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
+    DendriteContinualLearningExperiment,
+)
 from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
-from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
+from nupic.research.frameworks.vernon import mixins
 
 
 class PermutedMNISTExperiment(mixins.RezeroWeights,
-                              ContinualLearningExperiment):
+                              DendriteContinualLearningExperiment):
     pass
 
 
@@ -43,12 +47,16 @@ NUM_TASKS = 2
 DEFAULT_BASE = dict(
     experiment_class=PermutedMNISTExperiment,
 
+    # Results path
+    local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
+
     dataset_class=ContextDependentPermutedMNIST,
     dataset_args=dict(
         num_tasks=NUM_TASKS,
+        root="~/nta/data/dendrites",  # Consistent location outside of git repo
         dim_context=1024,
-        seed=np.random.randint(0, 1000),
-        download=True,  # Change to True if running for the first time
+        seed=42,
+        download=False,  # Change to True if running for the first time
     ),
 
     model_class=DendriticMLP,
@@ -66,15 +74,14 @@ DEFAULT_BASE = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=1,
-    epochs_to_validate=(4, 9, 24, 49),  # Note: `epochs_to_validate` is treated as
-    # the set of task ids after which to
-    # evaluate the model on all seen tasks
+    tasks_to_validate=(0, 1, 2),  # Tasks on which to run validate
+    epochs_to_validate=[],
     num_tasks=NUM_TASKS,
     num_classes=10 * NUM_TASKS,
     distributed=False,
-    seed=np.random.randint(0, 10000),
+    seed=42,
 
-    loss_function=F.nll_loss,
+    loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,
     optimizer_args=dict(lr=0.001),
 )
@@ -82,10 +89,7 @@ DEFAULT_BASE = dict(
 # Temporary, just for testing
 BASE2 = deepcopy(DEFAULT_BASE)
 BASE2.update(
-    batch_size=64,
-    epochs=2,
-    optimizer_class=torch.optim.SGD,
-    optimizer_args=dict(lr=0.001),
+    epochs=tune.grid_search([1, 2, 3]),
 )
 
 # Export configurations in this file

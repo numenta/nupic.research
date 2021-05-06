@@ -29,7 +29,6 @@ This setup is very similar to that of context-dependent gating model from the pa
 stabilization' (Masse et al., 2018).
 """
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -61,7 +60,6 @@ def train_model(exp):
         exp.optimizer.zero_grad()
         output = exp.model(data, context)
 
-        output = F.log_softmax(output)
         error_loss = exp.error_loss(output, target)
         error_loss.backward()
         exp.optimizer.step()
@@ -161,7 +159,7 @@ def run_experiment(config):
 
 if __name__ == "__main__":
 
-    num_tasks = 50
+    num_tasks = 2
 
     config = dict(
         experiment_class=PermutedMNISTExperiment,
@@ -170,19 +168,20 @@ if __name__ == "__main__":
         dataset_args=dict(
             num_tasks=num_tasks,
             dim_context=1024,
-            seed=np.random.randint(0, 1000),
+            seed=42,
+            download=True,
         ),
 
         model_class=DendriticMLP,
         model_args=dict(
             input_size=784,
             output_size=10,
-            hidden_size=2048,
+            hidden_sizes=[64, 64],
             num_segments=num_tasks,
             dim_context=1024,  # Note: with the Gaussian dataset, `dim_context` was
                                # 2048, but this shouldn't effect results
             kw=True,
-            dendrite_sparsity=0.0,
+            # dendrite_sparsity=0.0,
         ),
 
         batch_size=256,
@@ -194,9 +193,9 @@ if __name__ == "__main__":
         num_tasks=num_tasks,
         num_classes=10 * num_tasks,
         distributed=False,
-        seed=np.random.randint(0, 10000),
+        seed=42,
 
-        loss_function=F.nll_loss,
+        loss_function=F.cross_entropy,
         optimizer_class=torch.optim.Adam,
         optimizer_args=dict(lr=0.001),
     )
