@@ -142,7 +142,7 @@ class RigLMixin:
             })
 
         if wandb.run is not None:
-            wandb.log(logs, step=self.state.global_step)
+            wandb.log(logs, commit=False)
 
         return train_loss
 
