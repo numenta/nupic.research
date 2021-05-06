@@ -47,7 +47,8 @@ DENSE_MLP = dict(
 
     dataset_class=datasets.MNIST,
     dataset_args=dict(
-        root="~/nta/data/",  # Consistent location outside of git repo
+        # Consistent location outside of git repo
+        root=os.path.expanduser("~/nta/results/data/"),
         download=False,  # Change to True if running for the first time
         transform=transforms.Compose([
             transforms.ToTensor(),

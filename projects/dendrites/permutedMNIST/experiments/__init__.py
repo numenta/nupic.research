@@ -21,6 +21,7 @@
 
 from .base import CONFIGS as BASE
 from .standard_mlp import CONFIGS as STANDARD
+from .sparse_mlp import CONFIGS as SPARSE
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -31,3 +32,4 @@ __all__ = ["CONFIGS"]
 CONFIGS = dict()
 CONFIGS.update(BASE)
 CONFIGS.update(STANDARD)
+CONFIGS.update(SPARSE)
