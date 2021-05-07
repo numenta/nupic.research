@@ -43,6 +43,7 @@ def train_dendrite_model(
     pre_batch_callback=None,
     transform_to_device_fn=None,
     progress_bar=None,
+    context_vector=None,
 ):
     """
     Train the given model by iterating through mini batches. An epoch ends
@@ -72,15 +73,23 @@ def train_dendrite_model(
     :param pre_batch_callback: Unused
     :param transform_to_device_fn: Unused
     :param progress_bar: Unused
+    :param context_vector: if not None, use this context vector in place of any that
+                            we get from the loader.
     """
     model.train()
     context = None
+    if context_vector is not None:
+        # Tile context vector
+        context = context_vector.repeat(loader.batch_size, 1)
+
     for batch_idx, (data, target) in enumerate(loader):
 
         # `data` may be a 2-item list comprising the example data and context signal in
         # case context is explicitly provided
         if isinstance(data, list):
-            data, context = data
+            data = data[0]
+            if context_vector is None:
+                context = data[1]
         data = data.flatten(start_dim=1)
 
         # Since labels are shared, target values should be in

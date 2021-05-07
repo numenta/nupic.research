@@ -112,6 +112,7 @@ def evaluate_model(exp):
 
     loss = torch.tensor(0., device=exp.device)
     correct = torch.tensor(0, device=exp.device)
+    infer_centroid_fn=infer_centroid(exp.contexts)
 
     with torch.no_grad():
 
@@ -127,7 +128,7 @@ def evaluate_model(exp):
 
             # Select the closest centroid to each test example based on Euclidean
             # distance
-            context = infer_centroid(exp, data)
+            context = infer_centroid_fn(data)
             output = exp.model(data, context)
 
             # All output units are used to compute loss / accuracy
@@ -162,16 +163,20 @@ def centroid(exp):
     return centroid_vector
 
 
-def infer_centroid(exp, data):
+def infer_centroid(contexts):
     """
     Returns a 2D array where row i gives the the centroid vector closest to test
     example `data[i, :]`.
     """
-    context = torch.cdist(exp.contexts, data)
-    context = context.argmin(dim=0)
-    context = context.cpu()
-    context = exp.contexts[context]
-    return context
+
+    def _infer_centroid(data):
+        context = torch.cdist(contexts, data)
+        context = context.argmin(dim=0)
+        context = context.cpu()
+        context = contexts[context]
+        return context
+
+    return _infer_centroid
 
 
 def run_experiment(config):
@@ -196,7 +201,7 @@ def run_experiment(config):
         for _epoch_id in range(exp.epochs):
             train_model(exp, context)
 
-        if task_id in config["epochs_to_validate"]:
+        if task_id in config["tasks_to_validate"]:
 
             print("")
             print(f"=== AFTER TASK {task_id} ===")
@@ -254,13 +259,14 @@ if __name__ == "__main__":
             num_segments=num_tasks,
             dim_context=784,
             kw=True,
+            context_percent_on=0.05,
             dendrite_weight_sparsity=0.0,
         ),
 
         batch_size=256,
         val_batch_size=512,
         epochs=1,
-        epochs_to_validate=(4, 9, 24, 49),
+        tasks_to_validate=(0, 1, 4, 9, 24, 49),
         num_tasks=num_tasks,
         num_classes=10 * num_tasks,
         distributed=False,

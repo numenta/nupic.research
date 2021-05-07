@@ -34,6 +34,7 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
 
     def setup_experiment(self, config):
         super().setup_experiment(config)
+        self.context_vector = None
 
     def run_task(self):
         """
@@ -46,7 +47,8 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
         # Run epochs, inner loop
         # TODO: return the results from run_epoch
         self.current_epoch = 0
-        for _ in range(self.epochs):
+        for e in range(self.epochs):
+            self.logger.info("Training task %d, epoch %d...", self.current_task, e)
             self.run_epoch()
 
         # TODO: put back evaluation_metrics from cl_experiment
@@ -80,7 +82,8 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
             criterion=self.error_loss,
             share_labels=True,
             num_labels=10,
-            post_batch_callback=self.post_batch_wrapper
+            post_batch_callback=self.post_batch_wrapper,
+            context_vector=self.context_vector,
         )
 
     def validate(self, loader=None):
