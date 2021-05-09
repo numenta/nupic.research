@@ -37,13 +37,13 @@ def train_dendrite_model(
     share_labels=False,
     num_labels=None,
     active_classes=None,
+    context_vector=None,
     post_batch_callback=None,
     complexity_loss_fn=None,
     batches_in_epoch=None,
     pre_batch_callback=None,
     transform_to_device_fn=None,
     progress_bar=None,
-    context_vector=None,
 ):
     """
     Train the given model by iterating through mini batches. An epoch ends
@@ -66,6 +66,8 @@ def train_dendrite_model(
     :param active_classes: List of indices of the heads that are active for a given
                            task; only relevant if this function is being used in a
                            continual learning scenario
+    :param context_vector: If not None, use this context vector in place of any that
+                           we get from the loader
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters: model, batch_idx
     :param complexity_loss_fn: Unused
@@ -73,8 +75,6 @@ def train_dendrite_model(
     :param pre_batch_callback: Unused
     :param transform_to_device_fn: Unused
     :param progress_bar: Unused
-    :param context_vector: if not None, use this context vector in place of any that
-                            we get from the loader.
     """
     model.train()
     context = None
@@ -124,10 +124,11 @@ def evaluate_dendrite_model(
     model,
     loader,
     device,
-    criterion=F.nll_loss,
+    criterion=F.cross_entropy,
     share_labels=False,
     num_labels=None,
     active_classes=None,
+    infer_context_fn=None,
     batches_in_epoch=None,
     complexity_loss_fn=None,
     progress=None,
@@ -153,6 +154,8 @@ def evaluate_dendrite_model(
     :param active_classes: List of indices of the heads that are active for a given
                            task; only relevant if this function is being used in a
                            continual learning scenario
+    :infer_context_fn: A function that computes the context vector to use given a batch
+                       of data samples
     :param batches_in_epoch: Unused
     :param complexity_loss_fn: Unused
     :param progress: Unused
@@ -165,6 +168,7 @@ def evaluate_dendrite_model(
     loss = torch.tensor(0., device=device)
     correct = torch.tensor(0, device=device)
 
+    infer_context = (infer_context_fn is not None)
     context = None
 
     with torch.no_grad():
@@ -184,6 +188,9 @@ def evaluate_dendrite_model(
 
             data = data.to(device)
             target = target.to(device)
+            if infer_context:
+                # Use `infer_context_fn` to retrieve the context vector
+                context = infer_context_fn(data)
             if context is not None:
                 context = context.to(device)
 
