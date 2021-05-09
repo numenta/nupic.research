@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .centroid_context import *
 from .composite_loss import CompositeLoss
 from .configure_optimizer_param_groups import ConfigureOptimizerParamGroups
 from .constrain_parameters import ConstrainParameters

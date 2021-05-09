@@ -34,25 +34,19 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from nupic.research.frameworks.dendrites import DendriticMLP
+from nupic.research.frameworks.dendrites import (
+    DendriticMLP,
+    evaluate_dendrite_model,
+    train_dendrite_model,
+)
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 from nupic.torch.modules import KWinners
 
 
-# ------ Experiment class
-class CentroidExperiment(mixins.RezeroWeights,
+class CentroidExperiment(mixins.CentroidContext,
                          ContinualLearningExperiment):
-
-    def setup_experiment(self, config):
-        super().setup_experiment(config)
-
-        # Store batch size
-        self.batch_size = config.get("batch_size", 1)
-
-        # Tensor for accumulating each task's centroid vector
-        self.contexts = torch.zeros((0, self.model.input_size))
-        self.contexts = self.contexts.to(self.device)
+    pass
 
 
 # ------ Network
@@ -78,107 +72,6 @@ class CentroidDendriticMLP(DendriticMLP):
         return super().forward(x, context)
 
 
-# ------ Training & evaluation functions
-def train_model(exp, context):
-    exp.model.train()
-
-    # Tile context vector
-    context = context.repeat(exp.batch_size, 1)
-
-    for data, target in exp.train_loader:
-        data = data.flatten(start_dim=1)
-
-        # Since there's only one output head, target values should be modified to be in
-        # the range [0, 1, ..., 9]
-        target = target % exp.num_classes_per_task
-
-        data = data.to(exp.device)
-        target = target.to(exp.device)
-
-        exp.optimizer.zero_grad()
-        output = exp.model(data, context)
-
-        error_loss = exp.error_loss(output, target)
-        error_loss.backward()
-        exp.optimizer.step()
-
-        # Rezero weights if necessary
-        exp.post_optimizer_step(exp.model)
-
-
-def evaluate_model(exp):
-    exp.model.eval()
-    total = 0
-
-    loss = torch.tensor(0., device=exp.device)
-    correct = torch.tensor(0, device=exp.device)
-    infer_centroid_fn=infer_centroid(exp.contexts)
-
-    with torch.no_grad():
-
-        for data, target in exp.val_loader:
-            data = data.flatten(start_dim=1)
-
-            # Since there's only one output head, target values should be modified to
-            # be in the range [0, 1, ..., 9]
-            target = target % exp.num_classes_per_task
-
-            data = data.to(exp.device)
-            target = target.to(exp.device)
-
-            # Select the closest centroid to each test example based on Euclidean
-            # distance
-            context = infer_centroid_fn(data)
-            output = exp.model(data, context)
-
-            # All output units are used to compute loss / accuracy
-            loss += exp.error_loss(output, target, reduction="sum")
-            pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum()
-            total += len(data)
-
-    mean_acc = torch.true_divide(correct, total).item() if total > 0 else 0,
-    return mean_acc
-
-
-def centroid(exp):
-    """
-    Returns the centroid vector over all training examples of `exp`'s current active
-    task.
-    """
-    centroid_vector = torch.zeros((exp.model.input_size,))
-    for batch_item in exp.train_loader:
-        x = batch_item[0]
-        x = x.flatten(start_dim=1)
-
-        n_x = x.size(0)
-        n = centroid_vector.size(0)
-
-        centroid_vector = centroid_vector.to(x.device)
-
-        centroid_vector = n * centroid_vector + x.sum(dim=0)
-        centroid_vector = centroid_vector / (n + n_x)
-        n += n_x
-
-    return centroid_vector
-
-
-def infer_centroid(contexts):
-    """
-    Returns a 2D array where row i gives the the centroid vector closest to test
-    example `data[i, :]`.
-    """
-
-    def _infer_centroid(data):
-        context = torch.cdist(contexts, data)
-        context = context.argmin(dim=0)
-        context = context.cpu()
-        context = contexts[context]
-        return context
-
-    return _infer_centroid
-
-
 def run_experiment(config):
     exp_class = config["experiment_class"]
     exp = exp_class()
@@ -195,11 +88,14 @@ def run_experiment(config):
         exp.train_loader.sampler.set_active_tasks(task_id)
 
         # Construct a context vector by computing the centroid of all training examples
-        context = centroid(exp).to(exp.device)
-        exp.contexts = torch.cat((exp.contexts, context.unsqueeze(0)))
+        context_vector = mixins.compute_centroid(exp.train_loader).to(exp.device)
+        exp.contexts = torch.cat((exp.contexts, context_vector.unsqueeze(0)))
 
         for _epoch_id in range(exp.epochs):
-            train_model(exp, context)
+            train_dendrite_model(model=exp.model, loader=exp.train_loader,
+                                 optimizer=exp.optimizer, device=exp.device,
+                                 criterion=exp.error_loss, share_labels=True,
+                                 num_labels=10, context_vector=context_vector)
 
         if task_id in config["tasks_to_validate"]:
 
@@ -211,9 +107,14 @@ def run_experiment(config):
             for eval_task_id in range(task_id + 1):
 
                 exp.val_loader.sampler.set_active_tasks(eval_task_id)
-                acc_task = evaluate_model(exp)
-                if isinstance(acc_task, tuple):
-                    acc_task = acc_task[0]
+                infer_centroid_fn = mixins.infer_centroid(exp.contexts)
+                acc_task = evaluate_dendrite_model(model=exp.model,
+                                                   loader=exp.val_loader,
+                                                   device=exp.device,
+                                                   criterion=exp.error_loss,
+                                                   share_labels=True, num_labels=10,
+                                                   infer_context_fn=infer_centroid_fn)
+                acc_task = acc_task["mean_accuracy"]
 
                 print(f"task {eval_task_id} accuracy: {acc_task}")
             print("")
@@ -229,9 +130,12 @@ def run_experiment(config):
 
     # Report final aggregate accuracy
     exp.val_loader.sampler.set_active_tasks(range(num_tasks))
-    acc_task = evaluate_model(exp)
-    if isinstance(acc_task, tuple):
-        acc_task = acc_task[0]
+    infer_centroid_fn = mixins.infer_centroid(exp.contexts)
+    acc_task = evaluate_dendrite_model(model=exp.model, loader=exp.val_loader,
+                                       device=exp.device, criterion=exp.error_loss,
+                                       share_labels=True, num_labels=10,
+                                       infer_context_fn=infer_centroid_fn)
+    acc_task = acc_task["mean_accuracy"]
 
     print(f"Final test accuracy: {acc_task}")
     print("")
