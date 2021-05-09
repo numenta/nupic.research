@@ -44,7 +44,8 @@ from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 from nupic.torch.modules import KWinners
 
 
-class CentroidExperiment(mixins.CentroidContext,
+class CentroidExperiment(mixins.RezeroWeights,
+                         mixins.CentroidContext,
                          ContinualLearningExperiment):
     pass
 
@@ -59,8 +60,7 @@ class CentroidDendriticMLP(DendriticMLP):
     def __init__(self, input_size, output_size, hidden_sizes, num_segments, dim_context,
                  kw, **kwargs):
         super().__init__(input_size, output_size, hidden_sizes, num_segments,
-                         dim_context,
-                         kw, **kwargs)
+                         dim_context, kw, **kwargs)
 
         # k-Winners module to apply to context input
         self.kw_context = KWinners(n=dim_context, percent_on=0.05,
@@ -95,7 +95,8 @@ def run_experiment(config):
             train_dendrite_model(model=exp.model, loader=exp.train_loader,
                                  optimizer=exp.optimizer, device=exp.device,
                                  criterion=exp.error_loss, share_labels=True,
-                                 num_labels=10, context_vector=context_vector)
+                                 num_labels=10, context_vector=context_vector,
+                                 post_batch_callback=exp.post_batch_wrapper)
 
         if task_id in config["tasks_to_validate"]:
 
