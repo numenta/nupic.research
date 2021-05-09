@@ -46,6 +46,7 @@ from nupic.torch.modules import KWinners
 
 class CentroidExperiment(mixins.RezeroWeights,
                          mixins.CentroidContext,
+                         mixins.PermutedMNISTTaskIndices,
                          ContinualLearningExperiment):
     pass
 
