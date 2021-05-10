@@ -31,128 +31,12 @@ stabilization' (Masse et al., 2018).
 import argparse
 import copy
 
-import torch
-import torch.nn.functional as F
-
 from experiments import CONFIGS
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
+from nupic.research.frameworks.vernon.run_with_raytune import run
 
-
-# ------ Training & evaluation functions
-def train_model(exp):
-    exp.model.train()
-    for (data, context), target in exp.train_loader:
-        data = data.flatten(start_dim=1)
-
-        # Since there's only one output head, target values should be modified to be in
-        # the range [0, 1, ..., 9]
-        target = target % exp.num_classes_per_task
-
-        data = data.to(exp.device)
-        context = context.to(exp.device)
-        target = target.to(exp.device)
-
-        exp.optimizer.zero_grad()
-        output = exp.model(data, context)
-
-        output = F.log_softmax(output)
-        error_loss = exp.error_loss(output, target)
-        error_loss.backward()
-        exp.optimizer.step()
-
-        # Rezero weights if necessary
-        exp.post_optimizer_step(exp.model)
-
-
-def evaluate_model(exp):
-    exp.model.eval()
-    total = 0
-
-    loss = torch.tensor(0., device=exp.device)
-    correct = torch.tensor(0, device=exp.device)
-
-    with torch.no_grad():
-
-        for (data, context), target in exp.val_loader:
-            data = data.flatten(start_dim=1)
-
-            # Since there's only one output head, target values should be modified to
-            # be in the range [0, 1, ..., 9]
-            target = target % exp.num_classes_per_task
-
-            data = data.to(exp.device)
-            context = context.to(exp.device)
-            target = target.to(exp.device)
-
-            output = exp.model(data, context)
-
-            # All output units are used to compute loss / accuracy
-            loss += exp.error_loss(output, target, reduction="sum")
-            pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum()
-            total += len(data)
-
-    mean_acc = torch.true_divide(correct, total).item() if total > 0 else 0,
-    return mean_acc
-
-
-def run_experiment(config):
-    exp_class = config["experiment_class"]
-    exp = exp_class()
-    exp.setup_experiment(config)
-
-    exp.model = exp.model.to(exp.device)
-
-    # Read optimizer class and args from config as it will be used to reinitialize the
-    # model's optimizer
-    optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-    optimizer_args = config.get("optimizer_args", {})
-    num_tasks = config.get("num_tasks", 2)
-
-    # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
-
-    for task_id in range(num_tasks):
-
-        # Train model on current task
-        exp.train_loader.sampler.set_active_tasks(task_id)
-        for _epoch_id in range(exp.epochs):
-            train_model(exp)
-
-        if task_id in config["epochs_to_validate"]:
-
-            print("")
-            print(f"=== AFTER TASK {task_id} ===")
-            print("")
-
-            # Evaluate model accuracy on each task separately
-            for eval_task_id in range(task_id + 1):
-
-                exp.val_loader.sampler.set_active_tasks(eval_task_id)
-                acc_task = evaluate_model(exp)
-                if isinstance(acc_task, tuple):
-                    acc_task = acc_task[0]
-
-                print(f"task {eval_task_id} accuracy: {acc_task}")
-            print("")
-
-        else:
-            print(f"--Completed task {task_id}--")
-
-        # Reset optimizer before starting new task
-        del exp.optimizer
-        exp.optimizer = optimizer_class(exp.model.parameters(), **optimizer_args)
-
-    # ------------------------------------------------------------------------------- #
-
-    # Report final aggregate accuracy
-    exp.val_loader.sampler.set_active_tasks(range(num_tasks))
-    acc_task = evaluate_model(exp)
-    if isinstance(acc_task, tuple):
-        acc_task = acc_task[0]
-
-    print(f"Final test accuracy: {acc_task}")
-    print("")
-
+# TODO: there are mixins that assume create_optimizer is a class method. We made it
+#       a normal method, so need to fix
 
 if __name__ == "__main__":
 
@@ -173,7 +57,8 @@ if __name__ == "__main__":
     config.update(vars(args))
 
     config = process_args(args, config)
+
     if config is None:
         pass
     else:
-        run_experiment(config)
+        run(config)
