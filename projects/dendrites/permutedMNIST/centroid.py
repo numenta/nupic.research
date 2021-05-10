@@ -31,6 +31,7 @@ context.
 import os
 
 import numpy as np
+import pprint
 import torch
 import torch.nn.functional as F
 
@@ -59,12 +60,12 @@ class CentroidDendriticMLP(DendriticMLP):
     """
 
     def __init__(self, input_size, output_size, hidden_sizes, num_segments, dim_context,
-                 kw, **kwargs):
+                 kw, kw_percent_on=0.05, context_percent_on=0.05, **kwargs):
         super().__init__(input_size, output_size, hidden_sizes, num_segments,
-                         dim_context, kw, **kwargs)
+                         dim_context, kw, kw_percent_on, context_percent_on, **kwargs)
 
         # k-Winners module to apply to context input
-        self.kw_context = KWinners(n=dim_context, percent_on=0.05,
+        self.kw_context = KWinners(n=dim_context, percent_on=context_percent_on,
                                    k_inference_factor=1.0, boost_strength=0.0,
                                    boost_strength_factor=1.0)
 
@@ -74,9 +75,11 @@ class CentroidDendriticMLP(DendriticMLP):
 
 
 def run_experiment(config):
+    pprint.pprint(config)
     exp_class = config["experiment_class"]
     exp = exp_class()
     exp.setup_experiment(config)
+    print(exp.model)
 
     # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
 
@@ -145,7 +148,7 @@ def run_experiment(config):
 
 if __name__ == "__main__":
 
-    num_tasks = 2
+    num_tasks = 50
 
     config = dict(
         experiment_class=CentroidExperiment,
@@ -157,7 +160,7 @@ if __name__ == "__main__":
             download=False,  # Change to True if running for the first time
             seed=np.random.randint(0, 1000)),
 
-        model_class=CentroidDendriticMLP,
+        model_class=DendriticMLP,  # CentroidDendriticMLP does not affect accuracy..??
         model_args=dict(
             input_size=784,
             output_size=10,  # Single output head shared by all tasks
@@ -165,14 +168,14 @@ if __name__ == "__main__":
             num_segments=num_tasks,
             dim_context=784,
             kw=True,
-            context_percent_on=0.05,
-            dendrite_weight_sparsity=0.0,
+            dendrite_weight_sparsity=0,
+            weight_sparsity=0.5,
         ),
 
         batch_size=256,
         val_batch_size=512,
-        epochs=1,
-        tasks_to_validate=(0, 1, 4, 9, 24, 49),
+        epochs=2,
+        tasks_to_validate=(0, 1, 9, 24, 49),
         num_tasks=num_tasks,
         num_classes=10 * num_tasks,
         distributed=False,
@@ -181,7 +184,7 @@ if __name__ == "__main__":
         loss_function=F.cross_entropy,
         optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                            # SGD with default hyperparameter settings
-        optimizer_args=dict(lr=1e-3),
+        optimizer_args=dict(lr=0.0005),
     )
 
     run_experiment(config)
