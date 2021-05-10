@@ -28,6 +28,8 @@ context. At inference, pick the prototype closest to each test example, and use 
 context.
 """
 
+import os
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -60,13 +62,11 @@ class CentroidDendriticMLP(DendriticMLP):
     receives.
     """
 
-    def __init__(self, input_size, output_size, hidden_size, num_segments, dim_context,
-                 kw=True, dendrite_sparsity=0.95):
-
-        super().__init__(input_size=input_size, output_size=output_size,
-                         hidden_size=hidden_size, num_segments=num_segments,
-                         dim_context=dim_context, kw=kw,
-                         dendrite_sparsity=dendrite_sparsity)
+    def __init__(self, input_size, output_size, hidden_sizes, num_segments, dim_context,
+                 kw, **kwargs):
+        super().__init__(input_size, output_size, hidden_sizes, num_segments,
+                         dim_context,
+                         kw, **kwargs)
 
         # k-Winners module to apply to context input
         self.kw_context = KWinners(n=dim_context, percent_on=0.05,
@@ -98,7 +98,6 @@ def train_model(exp, context):
         exp.optimizer.zero_grad()
         output = exp.model(data, context)
 
-        output = F.log_softmax(output)
         error_loss = exp.error_loss(output, target)
         error_loss.backward()
         exp.optimizer.step()
@@ -235,23 +234,27 @@ def run_experiment(config):
 
 if __name__ == "__main__":
 
-    num_tasks = 50
+    num_tasks = 2
 
     config = dict(
         experiment_class=CentroidExperiment,
 
         dataset_class=PermutedMNIST,
-        dataset_args=dict(num_tasks=num_tasks, seed=np.random.randint(0, 1000)),
+        dataset_args=dict(
+            num_tasks=num_tasks,
+            root=os.path.expanduser("~/nta/results/data/"),
+            download=False,  # Change to True if running for the first time
+            seed=np.random.randint(0, 1000)),
 
         model_class=CentroidDendriticMLP,
         model_args=dict(
             input_size=784,
             output_size=10,  # Single output head shared by all tasks
-            hidden_size=2048,
+            hidden_sizes=[2048, 2048],
             num_segments=num_tasks,
             dim_context=784,
             kw=True,
-            dendrite_sparsity=0.0,
+            dendrite_weight_sparsity=0.0,
         ),
 
         batch_size=256,
@@ -263,7 +266,7 @@ if __name__ == "__main__":
         distributed=False,
         seed=np.random.randint(0, 10000),
 
-        loss_function=F.nll_loss,
+        loss_function=F.cross_entropy,
         optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                            # SGD with default hyperparameter settings
         optimizer_args=dict(lr=1e-3),

@@ -139,7 +139,7 @@ def run_experiment(config):
 if __name__ == "__main__":
 
     # `model_type` must be one of "denseMLP", "sparseMLP", or "dendriticMLP"
-    model_type = "sparseMLP"
+    model_type = "dendriticMLP"
     assert model_type in ("denseMLP", "sparseMLP", "dendriticMLP"), "invalid model"
 
     model_class = dict(
@@ -153,9 +153,9 @@ if __name__ == "__main__":
                        weight_sparsity=(0.05, 0.05), boost_strength=0.0,
                        boost_strength_factor=0.0, k_inference_factor=1.0,
                        use_batch_norm=False, hidden_sizes=(2048, 2048)),
-        dendriticMLP=dict(input_size=784, output_size=784, hidden_size=2048,
+        dendriticMLP=dict(input_size=784, output_size=784, hidden_sizes=[2048, 2048],
                           num_segments=1, dim_context=1024, kw=True,
-                          dendrite_sparsity=0.95, freeze_dendrites=False)
+                          dendrite_weight_sparsity=0.95, freeze_dendrites=False)
     )
 
     mnist_transform = transforms.Compose([
