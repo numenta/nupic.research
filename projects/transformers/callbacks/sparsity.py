@@ -56,13 +56,31 @@ class RezeroWeightsCallback(TrainerCallback):
         logging.info(f"Non-zero Params / Total Params, {num_nonzero:,} / {num_total:,}")
         logging.info(f"   Model Sparsity={model_sparsity:.4f}")
 
+        num_total, num_nonzero = count_nonzero_params(model.bert.encoder)
+        encoder_sparsity = 1 - (num_nonzero / num_total)
+        logging.info(f"   Encoder Sparsity={encoder_sparsity:0.4f}")
+
         num_total, num_nonzero = count_nonzero_params(model.bert)
         bert_sparsity = 1 - (num_nonzero / num_total)
         logging.info(f"   Bert Sparsity={bert_sparsity:0.4f}")
 
-        num_total, num_nonzero = count_nonzero_params(model.bert.encoder)
-        encoder_sparsity = 1 - (num_nonzero / num_total)
-        logging.info(f"   Encoder Sparsity={encoder_sparsity:0.4f}")
+        if wandb.run is not None:
+            wandb.run.summary.update(dict(
+                bert_on_params_at_init=num_nonzero,
+                bert_sparsity_at_init=bert_sparsity,
+            ))
+
+    def on_train_end(self, args, state, control, model, **kwargs):
+
+        num_total, num_nonzero = count_nonzero_params(model.bert)
+        bert_sparsity = 1 - (num_nonzero / num_total)
+        logging.info(f"   Bert Sparsity={bert_sparsity:0.4f}")
+
+        if wandb.run is not None:
+            wandb.run.summary.update(dict(
+                bert_on_params_at_end=num_nonzero,
+                bert_sparsity_at_end=bert_sparsity,
+            ))
 
     def on_step_end(self, args, state, control, model, **kwargs):
         """Rezero weights and log sparsity."""
