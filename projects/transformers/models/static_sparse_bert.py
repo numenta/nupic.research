@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from dataclasses import dataclass
+from typing import Union
 
 import torch
 from transformers import BertModel, BertPreTrainedModel
@@ -152,8 +153,8 @@ class FullyStaticSparseBertModel(BertModel):
     @dataclass
     class ConfigKWargs:
         """Keyword arguments to configure sparsity."""
-        sparsity: float = 0.5
-        num_sparse_layers: int = 12
+        sparsity: Union[float, dict] = 0.5
+        sparsify_all_embeddings: bool = True
 
     def __init__(self, config, add_pooling_layer=True):
         # Call the init one parent class up. Otherwise, the model will be defined twice.
@@ -179,17 +180,38 @@ class FullyStaticSparseBertModel(BertModel):
         sparsity = self.config.sparsity
         device = self.device
 
+        # Use `getattr` here for backwards compatibility for configs without this param.
+        sparsify_all_embeddings = getattr(self.config, "sparsify_all_embeddings", True)
+
+        def get_sparsity(name):
+            if isinstance(sparsity, dict):
+                if name in sparsity:
+                    return sparsity[name]
+                else:
+                    raise KeyError(f"Layer {name} not included in sparsity dict.")
+            else:
+                return sparsity
+
         # Perform model surgery by replacing the linear layers with `SparseWeights`.
         linear_modules = filter_modules(encoder, include_modules=[torch.nn.Linear])
         for name, module in linear_modules.items():
-            sparse_module = SparseWeights(module, sparsity=sparsity).to(device)
-            set_module_attr(self.encoder, name, sparse_module)
+            layer_sparsity = get_sparsity("bert.encoder." + name)
+            sparse_module = SparseWeights(module, sparsity=layer_sparsity)
+            set_module_attr(self.encoder, name, sparse_module.to(device))
 
-        # Replace the embedding layer in a similar fashion.
-        dense_embeddings = self.embeddings.word_embeddings
-        sparse_embeddings = SparseEmbeddings(dense_embeddings, sparsity=sparsity)
-        self.embeddings.word_embeddings = sparse_embeddings
+        # Replace the embedding layers in a similar fashion.
+        if sparsify_all_embeddings:
+            embeddings = ["word_embeddings",
+                          "position_embeddings",
+                          "token_type_embeddings"]
+        else:
+            embeddings = ["word_embeddings"]
 
+        for embedding_name in embeddings:
+            dense_module = getattr(self.embeddings, embedding_name)
+            layer_sparsity = get_sparsity(f"bert.embeddings.{embedding_name}")
+            sparse_module = SparseEmbeddings(dense_module, sparsity=layer_sparsity)
+            setattr(self.embeddings, embedding_name, sparse_module.to(device))
 
 # Import new class to override embedding related functions. # noqa
 # This class was implicitly defined through register_bert_model # noqa
