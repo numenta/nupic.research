@@ -53,7 +53,7 @@ from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from experiments import CONFIGS
-from integrations import CustomWandbCallback
+from integrations import CustomWandbCallback  # noqa I001
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
