@@ -22,7 +22,7 @@ from copy import deepcopy
 
 from transformers import Trainer
 
-from callbacks import PlotDensitiesCallback, RezeroWeightsCallback
+from callbacks import RezeroWeightsCallback
 from trainer_mixins import (
     DistillationTrainerMixin,
     LRRangeTestMixin,
@@ -101,6 +101,15 @@ tiny_bert_trifecta_300k.update(
 tiny_bert_trifecta_100k = deepcopy(tiny_bert_trifecta_300k)
 tiny_bert_trifecta_100k.update(
     max_steps=100000,
+)
+
+
+# This fine-tunes a pretrained model from `tiny_bert_trifecta_100k`
+finetuning_tiny_bert_trifecta_100k = deepcopy(finetuning_bert700k_glue)
+finetuning_tiny_bert_trifecta_100k.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/tiny_bert_trifecta_100k",  # noqa: E501
 )
 
 
@@ -255,6 +264,7 @@ CONFIGS = dict(
     tiny_bert_trifecta_100k=tiny_bert_trifecta_100k,
     tiny_bert_trifecta_300k=tiny_bert_trifecta_300k,
     tiny_bert_trifecta_lr_range_test=tiny_bert_trifecta_lr_range_test,
+    finetuning_tiny_bert_trifecta_100k=finetuning_tiny_bert_trifecta_100k,
 
     # Small BERT
     small_bert_trifecta_100k=small_bert_trifecta_100k,
