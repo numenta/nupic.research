@@ -34,12 +34,22 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.pytorch.datasets import (
+    ContextDependentPermutedMNIST,
+    PermutedMNIST,
+)
+from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 
 
 class PermutedMNISTExperiment(mixins.RezeroWeights,
                               DendriteContinualLearningExperiment):
+    pass
+
+
+class CentroidExperiment(mixins.RezeroWeights,
+                         mixins.CentroidContext,
+                         mixins.PermutedMNISTTaskIndices,
+                         ContinualLearningExperiment):
     pass
 
 
@@ -56,7 +66,8 @@ DEFAULT_BASE = dict(
     dataset_args=dict(
         num_tasks=NUM_TASKS,
         # Consistent location outside of git repo
-        root=os.path.expanduser("~/nta/results/data/"),
+        # root=os.path.expanduser("~/nta/results/data/"),
+        root=os.path.expanduser("~/nta/nupic.research/"),
         dim_context=1024,
         seed=42,
         download=False,  # Change to True if running for the first time
@@ -196,6 +207,54 @@ BASE_50_SPARSITY_SEARCH.update(
     ),
 )
 
+CENTROID = dict(
+    experiment_class=CentroidExperiment,
+    num_samples=8,
+
+    # Results path
+    local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
+
+    dataset_class=PermutedMNIST,
+    dataset_args=dict(
+        num_tasks=NUM_TASKS,
+        root=os.path.expanduser("~/nta/results/data/"),
+        download=False,  # Change to True if running for the first time
+        seed=42,
+    ),
+
+    model_class=DendriticMLP,
+    model_args=dict(
+        input_size=784,
+        output_size=10,  # Single output head shared by all tasks
+        hidden_sizes=[2048, 2048],
+        num_segments=NUM_TASKS,
+        dim_context=784,
+        kw=True,
+        kw_percent_on=0.1,
+        dendrite_weight_sparsity=0.0,
+        weight_sparsity=tune.sample_from(
+            lambda spec: np.random.choice([0.95, 0.75, 0.5])
+        ),
+        context_percent_on=0.1,
+    ),
+
+    batch_size=256,
+    val_batch_size=512,
+    epochs=tune.sample_from(lambda spec: np.random.randint(1, 4)),
+    tasks_to_validate=(0, 1, 9, 24, 49),
+    num_tasks=NUM_TASKS,
+    num_classes=10 * NUM_TASKS,
+    distributed=False,
+    seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
+
+    loss_function=F.cross_entropy,
+    optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
+                                       # SGD with default hyperparameter settings
+    optimizer_args=dict(
+        lr=tune.sample_from(lambda spec: np.random.choice([0.001, 0.0005]))
+    ),
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     default_base=DEFAULT_BASE,
@@ -203,4 +262,5 @@ CONFIGS = dict(
     base_10_sparsity=BASE_10_SPARSITY_SEARCH,
     base_50_search=BASE_50_SPARSITY_SEARCH,
     base2=BASE2,
+    centroid=CENTROID
 )

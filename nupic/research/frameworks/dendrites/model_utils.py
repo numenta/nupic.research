@@ -205,9 +205,9 @@ def evaluate_dendrite_model(
             total += len(data)
 
     results = {
-        "total_correct": correct,
+        "total_correct": correct.item(),
         "total_tested": total,
-        "mean_loss": loss / total if total > 0 else 0,
+        "mean_loss": loss.item() / total if total > 0 else 0,
         "mean_accuracy": torch.true_divide(correct, total).item() if total > 0 else 0,
     }
     return results

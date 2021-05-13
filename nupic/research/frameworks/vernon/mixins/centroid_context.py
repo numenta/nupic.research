@@ -62,7 +62,7 @@ class CentroidContext(metaclass=abc.ABCMeta):
         self.context_vector = compute_centroid(self.train_loader).to(self.device)
         self.contexts = torch.cat((self.contexts, self.context_vector.unsqueeze(0)))
 
-        super().run_task()
+        return super().run_task()
 
     def train_epoch(self):
         # TODO: take out constants in the call below. How do we determine num_labels?
