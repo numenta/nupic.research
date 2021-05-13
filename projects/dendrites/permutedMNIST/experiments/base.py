@@ -66,8 +66,7 @@ DEFAULT_BASE = dict(
     dataset_args=dict(
         num_tasks=NUM_TASKS,
         # Consistent location outside of git repo
-        # root=os.path.expanduser("~/nta/results/data/"),
-        root=os.path.expanduser("~/nta/nupic.research/"),
+        root=os.path.expanduser("~/nta/results/data/"),
         dim_context=1024,
         seed=42,
         download=False,  # Change to True if running for the first time
