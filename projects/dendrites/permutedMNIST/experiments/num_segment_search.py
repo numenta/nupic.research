@@ -40,8 +40,9 @@ from nupic.research.frameworks.vernon import mixins, ContinualLearningExperiment
 
 
 class NbSegmentSearchExperiment(mixins.RezeroWeights,
-                          mixins.UpdateBoostStrength,
-                          DendriteContinualLearningExperiment):
+                                # mixins.CentroidContext,
+                                # mixins.PermutedMNISTTaskIndices,
+                                DendriteContinualLearningExperiment):
     pass
 
 NUM_TASKS = 10
@@ -58,7 +59,6 @@ NB_SEGMENT_SEARCH = dict(
         num_tasks=NUM_TASKS,
         # Consistent location outside of git repo
         root=os.path.expanduser("~/nta/results/data/"),
-        # dim_context=1024,
         seed=42,
         download=False,  # Change to True if running for the first time
     ),
@@ -69,26 +69,28 @@ NB_SEGMENT_SEARCH = dict(
         output_size=10,
         # hidden_sizes=[64, 64],
         hidden_sizes=[2048, 2048],
-        num_segments=tune.grid_search([1, 2, 3, 5, 10]),
-        dim_context=1024,  # Note: with the Gaussian dataset, `dim_context` was
-        # 2048, but this shouldn't effect results
+        # num_segments=tune.grid_search([2, 3, 5, 10]),
+        num_segments=tune.grid_search([2]),
+        dim_context=1024,
         kw=True,
-        kw_percent_on = tune.grid_search([0.1, 0.2, 0.3, 0.4, 0.5]),
+        # kw_percent_on = tune.grid_search([0.1, 0.2, 0.3, 0.4, 0.5]),
+        kw_percent_on = tune.grid_search([0.5]),
         dendrite_weight_sparsity=0.0,
-        weight_sparsity = tune.grid_search([0.1, 0.5, 0.7, 0.9, 0.95]),
-        context_percent_on=0.1,
+        # weight_sparsity = tune.grid_search([0.1, 0.5, 0.7, 0.9, 0.95]),
+        weight_sparsity = tune.grid_search([0.1]),
     ),
 
     batch_size=256,
     val_batch_size=512,
-    epochs=2,
-    tasks_to_validate=(0, 1, 5, 9),  # Tasks on which to run validate
+    epochs=1,
+    tasks_to_validate= range(NUM_TASKS),  # Tasks on which to run validate
     epochs_to_validate=[],
     num_tasks=NUM_TASKS,
     num_classes=10 * NUM_TASKS,
-    distributed=True,
+    distributed=False,
     seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
-    num_sample = 10,
+    num_sample = 1,
+
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,
     optimizer_args=dict(lr= 0.0005),
