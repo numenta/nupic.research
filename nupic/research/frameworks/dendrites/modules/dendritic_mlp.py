@@ -43,7 +43,7 @@ class DendriticMLP(nn.Module):
     :param num_segments: the number of dendritic segments that each hidden unit has
     :param dim_context: the size of the context input to the network
     :param kw: whether to apply k-Winners to the outputs of each hidden layer
-    :param kw_percent_on: percent of hidden units activated by K-winners.
+    :param kw_percent_on: percent of hidden units activated by K-winners. If 0, use ReLU
     :param context_percent_on: percent of non-zero units in the context input.
     :param dendrite_weight_sparsity: the sparsity level of dendritic weights.
     :param weight_sparsity: the sparsity level of feed-forward weights.
@@ -84,8 +84,11 @@ class DendriticMLP(nn.Module):
         # "modified"
         assert weight_init in ("kaiming", "modified")
         assert dendrite_init in ("kaiming", "modified")
-        assert kw_percent_on >= 0.0
+        assert kw_percent_on >= 0.0 and kw_percent_on < 1.0
         assert context_percent_on >= 0.0
+
+        if kw_percent_on == 0.0:
+            kw = False
 
         super().__init__()
 
