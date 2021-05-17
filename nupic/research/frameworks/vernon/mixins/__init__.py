@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .centroid_context import *
 from .composite_loss import CompositeLoss
 from .configure_optimizer_param_groups import ConfigureOptimizerParamGroups
 from .constrain_parameters import ConstrainParameters
@@ -42,6 +43,7 @@ from .lr_range_test import LRRangeTest, create_lr_test_experiment
 from .maxup import MaxupPerSample, MaxupStandard
 from .multi_cycle_lr import MultiCycleLR
 from .oml import OnlineMetaLearning
+from .permuted_mnist_task_indices import *
 from .profile import Profile
 from .profile_autograd import ProfileAutograd
 from .prune_low_magnitude import PruneLowMagnitude
