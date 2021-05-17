@@ -22,7 +22,7 @@
 from .base import CONFIGS as BASE
 from .standard_mlp import CONFIGS as STANDARD
 from .sparse_mlp import CONFIGS as SPARSE
-
+from .num_segment_search import CONFIGS as SEGSEARCH
 """
 Import and collect all experiment configurations into one CONFIG
 """
@@ -33,3 +33,4 @@ CONFIGS = dict()
 CONFIGS.update(BASE)
 CONFIGS.update(STANDARD)
 CONFIGS.update(SPARSE)
+CONFIGS.update(SEGSEARCH)
