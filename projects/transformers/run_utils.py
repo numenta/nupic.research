@@ -125,7 +125,22 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     Returns evaluation dict with results.
     """
     eval_results = {}
+
+    # trainer references args.dataloader_drop_last for both train and eval dataloaders.
+    # We want to be able to drop last for training, but not for eval, because
+    # dropping at eval leaves off examples, leading to innacurate performance measures
+    # This is a hack to toggle args.dataloader_drop_last
+    drop_last=False
+    if trainer.args.dataloader_drop_last:
+        drop_last=True
+        trainer.args.dataloader_drop_last=False
+        logging.info("Switched trainer.args.dataloader_drop_last to False for evaluation")
+
     for eval_dataset, task in zip(eval_datasets, tasks):
+        vals, cnts = np.unique(np.array(eval_dataset['label']), return_counts=True)
+        logging.info(f"Label distribution for {task} before calling trainer.evaluate")
+        for val in range(len(vals)):
+            logging.info(f"Label={vals[val]}: {cnts[val]} examples")
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
         if task == "mnli-mm":
             eval_result = {f"mm_{k}": v for k, v in eval_result.items()}
@@ -140,6 +155,11 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
                 for key, value in sorted(eval_result.items()):
                     logging.info(f"  {key} = {value}")
                     writer.write(f"{key} = {value}\n")
+
+    # if you want drop_last for training, this toggles it back on
+    if drop_last:
+        trainer.args.dataloader_drop_last=True
+        logging.info("Switched trainer.args.dataloader_drop_last to back on for further training")
 
     return eval_results
 
@@ -708,7 +728,10 @@ def init_trainer(
     # Add specific metrics for finetuning task
     if finetuning:
         compute_metrics = partial(
-            compute_metrics_task, task_name=task_name, is_regression=is_regression,
+            compute_metrics_task,
+            task_name=task_name,
+            is_regression=is_regression,
+            output_dir=training_args.output_dir
         )
         trainer_kwargs.update(compute_metrics=compute_metrics)
 
@@ -718,7 +741,8 @@ def init_trainer(
 
 
 def compute_metrics_task(ep: EvalPrediction, metric=None,
-                         task_name=None, is_regression=None):
+                         task_name=None, is_regression=None,
+                         output_dir=None):
     """
     You can define your custom compute_metrics function. It takes an
     `EvalPrediction` object (a namedtuple with a predictions and label_ids
@@ -727,41 +751,53 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
     preds = (ep.predictions[0] if isinstance(ep.predictions, tuple) else ep.predictions)
     preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
 
-    if not is_regression:
-        logging.info(f"Label distribution for {task_name} before cleaning")
-        logging.info(f"Predictions: {Counter(preds).most_common()}")
-        logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
+    assert -100 not in ep.label_ids, "unknown source of -100 labels"
+
+    # if not is_regression:
+    #     logging.info(f"Label distribution for {task_name} before cleaning")
+    #     logging.info(f"Predictions: {Counter(preds).most_common()}")
+    #     logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
 
     # Ignore the -100 labels - not able to tokenize?
     # TODO: investigate why a few labels are -100 in all tasks
-    label_ids = ep.label_ids[np.where(ep.label_ids != -100)]
-    preds = preds[np.where(ep.label_ids != -100)]
-    logging.info(f"Removing {1-(len(label_ids) / len(ep.label_ids)):.2%} samples "
-                 "from evaluation set where label == -100")
+
+    # # all cases -100
+    # bad_label_idx = np.where(ep.label_ids == -100)[0]
+    # bad_label_ids = ep.label_ids[bad_label_idx]
+
+    # # everything else
+    # label_idx = np.where(ep.label_ids != -100)
+    # label_ids = ep.label_ids[label_idx]
+    # preds = preds[label_idx]
+    # logging.info(f"Removing {len(bad_label_idx) / len(ep.label_ids):.2%} samples "
+    #              "from evaluation set where label == -100")
+
+    # cache the -100 labels for further investigation
+    # save_unk_labels(bad_label_ids, bad_label_idx, output_dir, task_name)
 
     if not is_regression:
-        logging.info(f"Label distribution for {task_name} after cleaning")
+        logging.info(f"Label distribution for {task_name}")
         logging.info(f"Predictions: {Counter(preds).most_common()}")
-        logging.info(f"Labels: {Counter(label_ids).most_common()}")
+        logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
 
     if task_name is not None:
         if task_name == "cola":
-            result = {"matthews_correlation": matthews_corrcoef(label_ids, preds)}
+            result = {"matthews_correlation": matthews_corrcoef(ep.label_ids, preds)}
         elif task_name == "stsb":
-            result = pearson_and_spearman(preds, label_ids)
+            result = pearson_and_spearman(preds, ep.label_ids)
         elif task_name in ["mrpc", "qqp"]:
-            result = acc_and_f1(preds, label_ids)
+            result = acc_and_f1(preds, ep.label_ids)
         elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
                            "qnli", "rte", "wnli", "hans"]:
-            result = {"accuracy": simple_accuracy(preds, label_ids)}
+            result = {"accuracy": simple_accuracy(preds, ep.label_ids)}
         # Consolidate if more than one metric
         if len(result) > 1:
             result["combined_score"] = np.mean(list(result.values())).item()
         return result
     elif is_regression:
-        return {"mse": ((preds - label_ids) ** 2).mean().item()}
+        return {"mse": ((preds - ep.label_ids) ** 2).mean().item()}
     else:
-        return {"accuracy": (preds == label_ids).astype(np.float32).mean().item()}
+        return {"accuracy": (preds == ep.label_ids).astype(np.float32).mean().item()}
 
 
 def simple_accuracy(preds, labels):
@@ -916,7 +952,7 @@ def run_hyperparameter_search(
             "HP search with saved models not supported."
         logging.info("Pretraining new model from scratch")
 
-        # Instantiate model; possibly one of our custom sparse models.
+    # Instantiate model; possibly one of our custom sparse models.
         config_cls = CUSTOM_CONFIG_MAPPING[config.model_type]
         model_for_lm_cls = CUSTOM_MASKED_LM_MAPPING[config_cls]
         model = model_for_lm_cls(config)

@@ -52,7 +52,7 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from experiments import CONFIGS
+from experiments import CONFIGS 
 from integrations import CustomWandbCallback
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
@@ -299,9 +299,10 @@ def run_finetuning_single_task(
     eval_dataset = tokenized_datasets[
         "validation_matched" if data_args.task_name == "mnli" else "validation"
     ]
+
     test_dataset = None
     if ((data_args.task_name is not None or data_args.test_file is not None)
-       and training_args.do_predict):
+    and training_args.do_predict):
         test_dataset = tokenized_datasets[
             "test_matched" if data_args.task_name == "mnli" else "test"
         ]
@@ -329,7 +330,9 @@ def run_finetuning_single_task(
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
+
     if training_args.do_train:
+        logging.info(f"trainer.args.dataloader_drop_last before training: {trainer.args.dataloader_drop_last}")
         train(trainer, training_args.output_dir, last_checkpoint)
 
     # Evaluate
@@ -400,6 +403,7 @@ def run_finetuning_multiple_tasks(
         training_args.output_dir = os.path.join(
             base_training_args.output_dir, task_name
         )
+
         # Update any custom training hyperparameter
         # TODO: allow hyperparameter search for each task
         if task_name in model_args.task_hyperparams:

@@ -144,6 +144,12 @@ finetuning_bert100k_single_task.update(
 )
 
 
+initial_finetuning_tiny_bert50k_glue = deepcopy(finetuning_bert700k_glue)
+initial_finetuning_tiny_bert50k_glue.update(
+    model_name_or_path="/home/ec2-user/nta/results/experiments/transformers/tiny_bert_50k"
+)
+
+
 finetuning_bert700k_single_task = deepcopy(finetuning_bert700k_glue)
 finetuning_bert700k_single_task.update(
     # logging
@@ -199,6 +205,7 @@ CONFIGS = dict(
     debug_finetuning_bert100k_ntasks=debug_finetuning_bert100k_ntasks,
     finetuning_bert100k_glue=finetuning_bert100k_glue,
     finetuning_bert100k_single_task=finetuning_bert100k_single_task,
+    initial_finetuning_tiny_bert50k_glue=initial_finetuning_tiny_bert50k_glue,  
     finetuning_bert700k_glue=finetuning_bert700k_glue,
     finetuning_bert700k_single_task=finetuning_bert700k_single_task,
     finetuning_bert1mi_glue=finetuning_bert1mi_glue,
