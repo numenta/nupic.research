@@ -119,7 +119,6 @@ def infer_centroid(contexts):
     def _infer_centroid(data):
         context = torch.cdist(contexts, data)
         context = context.argmin(dim=0)
-        # context = context.cpu()
         context = contexts[context]
         return context
 
