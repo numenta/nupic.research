@@ -753,28 +753,6 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
 
     assert -100 not in ep.label_ids, "unknown source of -100 labels"
 
-    # if not is_regression:
-    #     logging.info(f"Label distribution for {task_name} before cleaning")
-    #     logging.info(f"Predictions: {Counter(preds).most_common()}")
-    #     logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
-
-    # Ignore the -100 labels - not able to tokenize?
-    # TODO: investigate why a few labels are -100 in all tasks
-
-    # # all cases -100
-    # bad_label_idx = np.where(ep.label_ids == -100)[0]
-    # bad_label_ids = ep.label_ids[bad_label_idx]
-
-    # # everything else
-    # label_idx = np.where(ep.label_ids != -100)
-    # label_ids = ep.label_ids[label_idx]
-    # preds = preds[label_idx]
-    # logging.info(f"Removing {len(bad_label_idx) / len(ep.label_ids):.2%} samples "
-    #              "from evaluation set where label == -100")
-
-    # cache the -100 labels for further investigation
-    # save_unk_labels(bad_label_ids, bad_label_idx, output_dir, task_name)
-
     if not is_regression:
         logging.info(f"Label distribution for {task_name}")
         logging.info(f"Predictions: {Counter(preds).most_common()}")
