@@ -103,12 +103,10 @@ def compute_centroid(loader):
         x = x.flatten(start_dim=1)
         n_x = x.size(0)
 
-        centroid_vector = centroid_vector.to(x.device)
-
-        centroid_vector = n_centroid * centroid_vector + n_x * x.mean(dim=0)
-        centroid_vector = centroid_vector / (n_centroid + n_x)
+        centroid_vector = centroid_vector + x.sum(dim=0)
         n_centroid += n_x
 
+    centroid_vector /= n_centroid
     return centroid_vector
 
 
@@ -121,7 +119,7 @@ def infer_centroid(contexts):
     def _infer_centroid(data):
         context = torch.cdist(contexts, data)
         context = context.argmin(dim=0)
-        context = context.cpu()
+        # context = context.cpu()
         context = contexts[context]
         return context
 
