@@ -42,6 +42,15 @@ class CentroidContext(metaclass=abc.ABCMeta):
     """
 
     def setup_experiment(self, config):
+        # Since the centroid vector is an element-wise mean of individual data samples,
+        # it's necessarily the same dimension as the input
+        model_args = config.get("model_args")
+        dim_context = model_args.get("dim_context")
+        input_size = model_args.get("input_size")
+
+        assert dim_context == input_size, ("For centroid experiments `dim_context` "
+                                           "must match `input_size`")
+
         super().setup_experiment(config)
 
         # Store batch size
