@@ -21,7 +21,6 @@
 """
 Base Transformers Experiment configuration.
 """
-
 from copy import deepcopy
 
 from .base import transformers_base
@@ -115,6 +114,39 @@ bert_100k.update(
 
 )
 
+# Equivalent to bert 100k but trained with 2K batch size for 12.5K steps using
+# deepspeed on 4 x p3dn.24xlarge, for a total of 32 GPUs with 32Gb each GPU.
+# It takes 7h with the final eval_loss of 2.225.
+bert_100k_deepspeed_bsz_2k = deepcopy(bert_100k)
+bert_100k_deepspeed_bsz_2k.update(
+    # tokenized_data_cache_dir="/mnt/efs/results/preprocessed-datasets/text",
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+
+    # Training Arguments
+    gradient_accumulation_steps=2,
+    per_device_train_batch_size=32,  # Requires 26Gb GPU memory
+    per_device_eval_batch_size=32,
+    warmup_steps=500,
+    learning_rate=2e-4,
+    max_steps=12500,
+
+    # Training Arguments - checkpointing
+    logging_steps=100,
+    save_steps=500,
+
+    deepspeed={
+        "zero_optimization": {
+            "stage": 1,
+        },
+        "fp16": {
+            "enabled": True,
+        },
+        "gradient_clipping": 1.0,
+        "sparse_gradients": True,
+        "steps_per_print": 100,
+    },
+)
+
 bert_1mi = deepcopy(bert_100k)
 bert_1mi.update(
     max_steps=1000000,
@@ -122,6 +154,7 @@ bert_1mi.update(
 
 # Export configurations in this file
 CONFIGS = dict(
+    bert_100k_deepspeed_bsz_2k=bert_100k_deepspeed_bsz_2k,
     bert_100k=bert_100k,
     bert_1mi=bert_1mi
 )
