@@ -751,6 +751,8 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
     preds = (ep.predictions[0] if isinstance(ep.predictions, tuple) else ep.predictions)
     preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
 
+    # -100 labels can come up when drop_last batch setting gets set to true during
+    # evaluation. That is fixed, so any -100 labels should not pass silently.
     assert -100 not in ep.label_ids, "unknown source of -100 labels"
 
     if not is_regression:
