@@ -42,6 +42,15 @@ class CentroidContext(metaclass=abc.ABCMeta):
     """
 
     def setup_experiment(self, config):
+        # Since the centroid vector is an element-wise mean of individual data samples,
+        # it's necessarily the same dimension as the input
+        model_args = config.get("model_args")
+        dim_context = model_args.get("dim_context")
+        input_size = model_args.get("input_size")
+
+        assert dim_context == input_size, ("For centroid experiments `dim_context` "
+                                           "must match `input_size`")
+
         super().setup_experiment(config)
 
         # Store batch size
@@ -103,12 +112,10 @@ def compute_centroid(loader):
         x = x.flatten(start_dim=1)
         n_x = x.size(0)
 
-        centroid_vector = centroid_vector.to(x.device)
-
-        centroid_vector = n_centroid * centroid_vector + n_x * x.mean(dim=0)
-        centroid_vector = centroid_vector / (n_centroid + n_x)
+        centroid_vector = centroid_vector + x.sum(dim=0)
         n_centroid += n_x
 
+    centroid_vector /= n_centroid
     return centroid_vector
 
 
@@ -121,7 +128,6 @@ def infer_centroid(contexts):
     def _infer_centroid(data):
         context = torch.cdist(contexts, data)
         context = context.argmin(dim=0)
-        context = context.cpu()
         context = contexts[context]
         return context
 
