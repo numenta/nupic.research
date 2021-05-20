@@ -36,6 +36,21 @@ pre-training. Widening is simply done by setting adjusting the `hidden_size` and
 possible to keep the same number of on-params between the models.
 """
 
+# Results:
+# |--------------------------------------------------------|
+# |   Model    | width  | sparsity | on-params | eval loss |
+# |:----------:|:------ |:-------- |:---------:|:---------:|
+# | Tiny BERT  | 1.0x   | 80%      |  850,510  |   3.578   |
+# | Tiny BERT  | 1.25x  | 84.3%    |  842,474  |   3.514   |
+# | Tiny BERT  | 1.50x  | 88%      |  865,227  |   3.461   |
+# | Tiny BERT  | 2.0x   | 90.8%    |  876,872  |   3.43    |
+# | Tiny BERT  | 2.0x   | 90.83%   |  843,781  |   3.469   |
+# | Tiny BERT  | 4.875x | 97%      |  918,441  |   3.409   |
+# | Tiny BERT  | 4.875x | 97.2%    |  834,243  |   3.438   |
+# | Small BERT | 1.0 x  | 96.95%   |  924,208  |   3.317   |
+# |--------------------------------------------------------|
+#
+
 
 lr_range_test_args = dict(
     max_steps=100,
