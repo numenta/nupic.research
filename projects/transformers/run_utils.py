@@ -134,8 +134,6 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     if trainer.args.dataloader_drop_last:
         drop_last = True
         trainer.args.dataloader_drop_last = False
-        logging.info("Switched trainer.args.dataloader_drop_last"
-                     "to False for evaluation")
 
     for eval_dataset, task in zip(eval_datasets, tasks):
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
@@ -156,8 +154,6 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     # if you want drop_last for training, this toggles it back on
     if drop_last:
         trainer.args.dataloader_drop_last = True
-        logging.info("Switched trainer.args.dataloader_drop_last"
-                     "to back on for further training")
 
     return eval_results
 

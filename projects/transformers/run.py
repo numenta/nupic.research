@@ -332,8 +332,6 @@ def run_finetuning_single_task(
     )
 
     if training_args.do_train:
-        logging.info("trainer.args.dataloader_drop_last before training:"
-                     "f{trainer.args.dataloader_drop_last}")
         train(trainer, training_args.output_dir, last_checkpoint)
 
     # Evaluate
