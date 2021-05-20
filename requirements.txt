@@ -56,4 +56,4 @@ wandb>=0.9.4
 # of colorama or urllib3 compatible with awscli
 colorama==0.4.3
 urllib3==1.25.11
-pytorch-lightning
+pytorch-lightning==1.2.9

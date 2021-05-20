@@ -91,6 +91,8 @@ def load_ray_tune_experiment(
     for experiment in all_experiments:
         # Make logs relative to experiment path
         logdir = experiment["logdir"]
+        if logdir is None:
+            logdir = ""
         logpath = os.path.join(experiment_path, os.path.basename(logdir))
         experiment["results"] = None
 
