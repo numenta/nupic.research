@@ -52,7 +52,7 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from experiments import CONFIGS 
+from experiments import CONFIGS
 from integrations import CustomWandbCallback
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
@@ -301,11 +301,11 @@ def run_finetuning_single_task(
     ]
 
     test_dataset = None
-    if ((data_args.task_name is not None or data_args.test_file is not None)
-    and training_args.do_predict):
-        test_dataset = tokenized_datasets[
-            "test_matched" if data_args.task_name == "mnli" else "test"
-        ]
+    if (data_args.task_name is not None or data_args.test_file is not None):
+        if training_args.do_predict:
+            test_dataset = tokenized_datasets[
+                "test_matched" if data_args.task_name == "mnli" else "test"
+            ]
 
     # Log fingerprint used in HF smart caching
     logging.info(f"Dataset fingerprint: {train_dataset._fingerprint}")
@@ -332,7 +332,8 @@ def run_finetuning_single_task(
     )
 
     if training_args.do_train:
-        logging.info(f"trainer.args.dataloader_drop_last before training: {trainer.args.dataloader_drop_last}")
+        logging.info("trainer.args.dataloader_drop_last before training:"
+                     "f{trainer.args.dataloader_drop_last}")
         train(trainer, training_args.output_dir, last_checkpoint)
 
     # Evaluate

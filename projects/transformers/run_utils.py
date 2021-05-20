@@ -130,17 +130,14 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     # We want to be able to drop last for training, but not for eval, because
     # dropping at eval leaves off examples, leading to innacurate performance measures
     # This is a hack to toggle args.dataloader_drop_last
-    drop_last=False
+    drop_last = False
     if trainer.args.dataloader_drop_last:
-        drop_last=True
-        trainer.args.dataloader_drop_last=False
-        logging.info("Switched trainer.args.dataloader_drop_last to False for evaluation")
+        drop_last = True
+        trainer.args.dataloader_drop_last = False
+        logging.info("Switched trainer.args.dataloader_drop_last"
+                     "to False for evaluation")
 
     for eval_dataset, task in zip(eval_datasets, tasks):
-        vals, cnts = np.unique(np.array(eval_dataset['label']), return_counts=True)
-        logging.info(f"Label distribution for {task} before calling trainer.evaluate")
-        for val in range(len(vals)):
-            logging.info(f"Label={vals[val]}: {cnts[val]} examples")
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
         if task == "mnli-mm":
             eval_result = {f"mm_{k}": v for k, v in eval_result.items()}
@@ -158,8 +155,9 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
 
     # if you want drop_last for training, this toggles it back on
     if drop_last:
-        trainer.args.dataloader_drop_last=True
-        logging.info("Switched trainer.args.dataloader_drop_last to back on for further training")
+        trainer.args.dataloader_drop_last = True
+        logging.info("Switched trainer.args.dataloader_drop_last"
+                     "to back on for further training")
 
     return eval_results
 
@@ -753,7 +751,7 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
 
     # -100 labels can come up when drop_last batch setting gets set to true during
     # evaluation. That is fixed, so any -100 labels should not pass silently.
-    assert -100 not in ep.label_ids, "unknown source of -100 labels"
+    assert -100 not in ep.label_ids, "Unknown source of -100 labels"
 
     if not is_regression:
         logging.info(f"Label distribution for {task_name}")
@@ -932,7 +930,7 @@ def run_hyperparameter_search(
             "HP search with saved models not supported."
         logging.info("Pretraining new model from scratch")
 
-    # Instantiate model; possibly one of our custom sparse models.
+        # Instantiate model; possibly one of our custom sparse models.
         config_cls = CUSTOM_CONFIG_MAPPING[config.model_type]
         model_for_lm_cls = CUSTOM_MASKED_LM_MAPPING[config_cls]
         model = model_for_lm_cls(config)
