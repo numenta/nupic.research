@@ -54,6 +54,7 @@ tiny_bert_sparse_100k.update(
 )
 tiny_bert_sparse_100k["config_kwargs"].update(
     sparsity=0.8,
+    sparsify_all_embeddings=False,
 )
 
 
@@ -69,6 +70,7 @@ small_bert_sparse_100k.update(
 )
 small_bert_sparse_100k["config_kwargs"].update(
     sparsity=0.8,
+    sparsify_all_embeddings=False,
 )
 
 

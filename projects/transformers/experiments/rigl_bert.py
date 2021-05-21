@@ -62,6 +62,7 @@ tiny_bert_rigl_debug.update(
 )
 tiny_bert_rigl_debug["config_kwargs"].update(
     sparsity=0.8,
+    sparsify_all_embeddings=False,
 )
 
 
@@ -80,6 +81,7 @@ tiny_bert_rigl_100k.update(
 )
 tiny_bert_rigl_100k["config_kwargs"].update(
     sparsity=0.5,
+    sparsify_all_embeddings=False,
 )
 
 
@@ -108,6 +110,7 @@ tiny_bert_full_sparse_rigl_100k.update(
 )
 tiny_bert_full_sparse_rigl_100k["config_kwargs"].update(
     sparsity=0.8,
+    sparsify_all_embeddings=False,
 )
 
 
@@ -132,6 +135,7 @@ tiny_bert_full_sparse_rigl_300k_prune_perc_30.update(
 )
 tiny_bert_full_sparse_rigl_300k_prune_perc_30["config_kwargs"].update(
     sparsity=0.8,
+    sparsify_all_embeddings=False,
 )
 
 
