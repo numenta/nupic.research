@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .base import CONFIGS as BASE
+from .centroid import CONFIGS as CENTROID
 from .standard_mlp import CONFIGS as STANDARD
 from .sparse_mlp import CONFIGS as SPARSE
 
@@ -31,5 +32,6 @@ __all__ = ["CONFIGS"]
 # Collect all configurations
 CONFIGS = dict()
 CONFIGS.update(BASE)
+CONFIGS.update(CENTROID)
 CONFIGS.update(STANDARD)
 CONFIGS.update(SPARSE)

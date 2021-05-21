@@ -62,6 +62,7 @@ fully_static_sparse_bert_100k.update(
     model_type="fully_static_sparse_bert",
     config_kwargs=dict(
         sparsity=0.8,
+        sparsify_all_embeddings=False,
     ),
     trainer_callbacks=[RezeroWeightsCallback()]
 )
