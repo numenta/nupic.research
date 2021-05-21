@@ -8,8 +8,6 @@ import ptitprince as pt
 import matplotlib.gridspec as gridspec
 
 
-
-
 def cns_figure_1c():
     '''
     CNS 2021 abstract figure 1C.
@@ -63,10 +61,11 @@ def cns_figure_1c():
     ax2.set(yticklabels=[])
     ax2.set_xlabel('Activation sparsity (k-winner %)')
 
-
     if savefigs:
         plt.savefig('cns2021_figure1c.png', bbox_inches='tight',
                     dpi=1200)
+
+
 
 if __name__ == '__main__':
     cns_figure_1c()
