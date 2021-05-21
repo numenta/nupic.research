@@ -35,6 +35,9 @@ Known issues, to be investigated/fixed:
 
 > Finetuning is important to evaluate a language model effectiveness when being used for transfer learning in downstream tasks. However, it is not a reliable metric to use for optimization. These numbers will vary with a significant margin of error between two different runs. Use perplexity instead to guide hyperparameter search and development of language models.
 
+Known Bugs
+* Finetuning occasionally stalls and needs restarting. This may be related to [this](https://github.com/huggingface/transformers/issues/5486) documented issue. Although this deadlock doesn't happen every time, the only way found to entirely avoid this is to disable wandb logging.
+
 ## How to run - single node
 
 Local implementation using Huggingface. To run, create a new experiment dict under experiments and run using:
