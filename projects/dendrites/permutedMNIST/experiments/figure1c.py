@@ -52,15 +52,16 @@ def cns_figure_1c():
     pt.RainCloud(x = x2, y = y, data = df2, palette = pal, bw = sigma,
                      width_viol = .6, ax = ax2, orient = ort, move = .2,
                      pointplot = True, alpha = .65)
-    ax1.set_ylim([.68, .98])
+    ax1.set_ylim([.9, .96])
     ax1.set_ylabel('Mean accuracy', fontsize=16)
     ax1.set_xlabel('Number of dendritic segments', fontsize=16)
     ax1.set_xticklabels(['2', '3', '5', '7', '10', '14', '20'],fontsize=14)
-    ax1.set_yticklabels(['0.65', '0.70', '0.75', '0.80', '0.85', '0.90', '0.95'],fontsize=14)
-    ax2.set_ylim([.68, .98])
+    ax1.set_yticklabels(['0.90', '0.91', '0.92', '0.93', '0.94', '0.95', '0.96'],fontsize=14)
+    ax2.set_ylim([.60, 1])
     ax2.set_ylabel('')
     ax2.set_xticklabels(['0.99', '0.95', '0.9', '0.8', '0.6', '0.4', '0.2', '0.1'], fontsize=14)
-    ax2.set_yticklabels([''], fontsize=14)
+    ax2.set_yticklabels(['0.60', '0.65', '0.70', '0.75', '0.80', '0.85', '0.90',
+                         '0.95', '1.0'],fontsize=14)
     ax2.set_xlabel('Activation sparsity', fontsize=16)
 
     if savefigs:
