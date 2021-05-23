@@ -22,7 +22,7 @@
 from nupic.research.frameworks.vernon import (
     SelfSupervisedExperiment as SelfSupervisedExperimentBase,
 )
-from nupic.research.frameworks.vernon.distributed.experiments.supervised_experiment import (
+from nupic.research.frameworks.vernon.distributed.experiments import (
     SupervisedExperiment as DistributedSupervisedExperiment,
 )
 

@@ -21,6 +21,7 @@
 
 import math
 import os
+from collections import MutableMapping
 
 import wandb
 from transformers.integrations import (
@@ -78,6 +79,22 @@ class CustomWandbCallback(WandbCallback):
 
         return wandb.run.id
 
+    def setup(self, args, state, model, **kwargs):
+        """
+        Setup the optional Weights & Biases (`wandb`) integration.
+        """
+        super().setup(args, state, model, **kwargs)
+
+        if state.is_world_process_zero and self._wandb is not None:
+
+            # Log the mixin args to the wandb config.
+            if hasattr(args, "trainer_mixin_args"):
+                flattened_args = flatten_dict(
+                    args.trainer_mixin_args,
+                    parent_key="trainer_mixin_args"
+                )
+                wandb.config.update(flattened_args)
+
     def on_evaluate(self, args, state, control, metrics=None, **kwargs):
         """
         Add the following logs to the run summary
@@ -88,24 +105,24 @@ class CustomWandbCallback(WandbCallback):
 
         super().on_evaluate(args, state, control, metrics=None, **kwargs)
 
-        if metrics is None:
+        if metrics is None or wandb.run is None:
             return
 
-        eval_loss = metrics["eval_loss"]
-        perplexity = math.exp(eval_loss)
         run = wandb.run
-        if run is not None:
-            summary = run.summary
+        summary = run.summary
+
+        # Log eval loss and perplexity.
+        if "eval_loss" in metrics:
+
+            eval_loss = metrics["eval_loss"]
+            perplexity = math.exp(eval_loss)
+
             eval_results = {
                 "eval/perplexity": perplexity,
                 "eval/loss": eval_loss,
             }
-            run.summary.update(eval_results)
-            wandb.log(eval_results, step=state.global_step)
-
-            if "train/train_runtime" in summary.keys():
-                runtime = summary["train/train_runtime"]
-                summary["train/train_runtime (hrs)"] = runtime / 3600
+            summary.update(eval_results)
+            wandb.log(eval_results, commit=False)
 
 
 # Update the integrations. By updating this dict, any custom integration
@@ -113,3 +130,30 @@ class CustomWandbCallback(WandbCallback):
 INTEGRATION_TO_CALLBACK.update({
     "wandb": CustomWandbCallback,
 })
+
+
+# -----
+# Utils
+# -----
+
+
+def flatten_dict(d, parent_key="", seperator="."):
+    """
+    Flatten a (possibly) nested set of dictionaries.
+    """
+
+    # Collect the flattened items as a list of tuples.
+    items = []
+    for k, v in d.items():
+
+        # The parent key will be '' at the first level but non null for the rest.
+        new_key = parent_key + seperator + k if parent_key else k
+
+        # Recurse for dictionary like objects.
+        if isinstance(v, MutableMapping):
+            items.extend(flatten_dict(v, new_key, seperator=seperator).items())
+        # Otherwise append as is (e.g. for list and strings)
+        else:
+            items.append((new_key, v))
+
+    return dict(items)

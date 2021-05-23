@@ -22,6 +22,7 @@
 import math
 from collections import defaultdict
 
+import torch
 from torchvision import transforms
 
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
@@ -48,8 +49,13 @@ class ContinualLearningExperiment(
         super().setup_experiment(config)
         # Override epochs to validate to not validate within the inner loop over epochs
         self.epochs_to_validate = []
-
         self.current_task = 0
+
+        self.optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+        self.optimizer_args = config.get("optimizer_args", {})
+
+        # TODO: General mechanism to handle all the cases and determine num_labels,
+        #       number of output units, error calculation, share labels, etc.
 
         # Defines how many classes should exist per task
         self.num_tasks = config.get("num_tasks", 1)
@@ -78,7 +84,11 @@ class ContinualLearningExperiment(
 
         # Set train and validate methods.
         self.train_model = config.get("train_model_func", train_model)
+        self.train_model_args = config.get("train_model_args", {})
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
+        self.tasks_to_validate = config.get("tasks_to_validate",
+                                            range(self.num_tasks - 3,
+                                                  self.num_tasks))
 
         # Whitelist evaluation metrics
         self.evaluation_metrics = config.get(
@@ -87,6 +97,9 @@ class ContinualLearningExperiment(
         for metric in self.evaluation_metrics:
             if not hasattr(self, metric):
                 raise ValueError(f"Metric {metric} not available.")
+
+        self.reset_optimizer_after_task = config.get(
+            "reset_optimizer_after_task", True)
 
     def run_iteration(self):
         return self.run_task()
@@ -122,7 +135,17 @@ class ContinualLearningExperiment(
         )
 
         self.current_task += 1
+
+        if self.reset_optimizer_after_task:
+            self.optimizer = self.recreate_optimizer(self.model)
+
         return ret
+
+    def recreate_optimizer(self, model=None):
+        """
+        Recreate the optimizer.
+        """
+        return self.optimizer_class(model.parameters(), **self.optimizer_args)
 
     @classmethod
     def create_train_sampler(cls, config, dataset):
@@ -183,6 +206,7 @@ class ContinualLearningExperiment(
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch_wrapper,
             transform_to_device_fn=self.transform_data_to_device,
+            **self.train_model_args,
         )
 
     def get_active_classes(self):

@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,7 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .distillation import DistillationTrainerMixin
-from .lr_range_test import LRRangeTestMixin
-from .one_cycle_lr import OneCycleLRMixin
-from .rigl import RigLMixin
+from .base import CONFIGS as BASE
+from .centroid import CONFIGS as CENTROID
+from .standard_mlp import CONFIGS as STANDARD
+from .sparse_mlp import CONFIGS as SPARSE
+
+"""
+Import and collect all experiment configurations into one CONFIG
+"""
+__all__ = ["CONFIGS"]
+
+# Collect all configurations
+CONFIGS = dict()
+CONFIGS.update(BASE)
+CONFIGS.update(CENTROID)
+CONFIGS.update(STANDARD)
+CONFIGS.update(SPARSE)

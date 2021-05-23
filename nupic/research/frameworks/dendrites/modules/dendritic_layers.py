@@ -63,8 +63,13 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
         :param dendrite_sparsity: sparsity applied transformation per unit per segment
         :param dendrite_bias: whether or not dendrite activations have an additive bias
         """
+        self.dim_context = dim_context
         self.segments = None
-        super().__init__(module, sparsity=module_sparsity)
+        super().__init__(
+            module,
+            sparsity=module_sparsity,
+            allow_extremes=True
+        )
 
         self.segments = DendriteSegments(
             num_units=module.weight.shape[0],
@@ -93,9 +98,12 @@ class DendriticLayerBase(SparseWeights, metaclass=abc.ABCMeta):
         dendrite_activations = self.segments(context)  # num_units x num_segments
         return self.apply_dendrites(y, dendrite_activations)
 
+    @property
+    def segment_weights(self):
+        return self.segments.weights
+
 
 class BiasingDendriticLayer(DendriticLayerBase):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dendritic_bias = DendriticBias1d()
@@ -156,14 +164,20 @@ class OneSegmentDendriticLayer(SparseWeights):
         """
         assert(num_segments == 1)
 
+        self.dim_context = dim_context
         self.segments = None
-        super().__init__(module, sparsity=module_sparsity)
+
+        super().__init__(module,
+                         sparsity=module_sparsity,
+                         allow_extremes=True)
 
         self.segments = SparseWeights(
             torch.nn.Linear(dim_context,
                             module.weight.shape[0],
                             bias=dendrite_bias),
-            sparsity=dendrite_sparsity)
+            sparsity=dendrite_sparsity,
+            allow_extremes=True
+        )
 
         self.rezero_weights()
 
@@ -182,6 +196,10 @@ class OneSegmentDendriticLayer(SparseWeights):
     def apply_dendrites(self, y, dendrite_activations):
         """Apply dendrites as a sigmoidal gating mechanism."""
         return y * torch.sigmoid(dendrite_activations)
+
+    @property
+    def segment_weights(self):
+        return self.segments.module.weight
 
 
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):

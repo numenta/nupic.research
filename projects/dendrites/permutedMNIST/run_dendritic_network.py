@@ -20,51 +20,39 @@
 # ----------------------------------------------------------------------
 
 """
-This module runs a dendritic network in continual learning setting where each task
-consists of learning to classify samples drawn from one of two multivariate normal
-distributions.
+This module trains & evaluates a dendritic network in a continual learning setting on
+permutedMNIST for a specified number of tasks/permutations. A context vector is
+provided to the dendritic network, so task information need not be inferred.
 
-Dendritic weights can either be hardcoded (to induce overlapping or non-overlapping
-subnetworks) or learned. All output heads are used for both training and inference.
-
-Usage: adjust the config parameters `kw`, `dendrite_sparsity`, `weight_init`,
-`dendrite_init`, and `freeze_dendrites` (all in `model_args`).
+This setup is very similar to that of context-dependent gating model from the paper
+'Alleviating catastrophic forgetting using contextdependent gating and synaptic
+stabilization' (Masse et al., 2018).
 """
 
-import pprint
-import time
-
-import numpy as np
 import torch
 import torch.nn.functional as F
 
-from nupic.research.frameworks.dendrites.modules import DendriticMLP
+from nupic.research.frameworks.dendrites import DendriticMLP
+from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
 from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
-from nupic.torch.duty_cycle_metrics import max_entropy
-from projects.dendrites.gaussian_classification.gaussian import GaussianDataset
 
 
 # ------ Experiment class
-class DendritesExperiment(mixins.RezeroWeights,
-                          ContinualLearningExperiment):
-
-    def setup_experiment(self, config):
-        super().setup_experiment(config)
-
-        # Manually set dendritic weights to invoke subnetworks; if the user sets
-        # `freeze_dendrites=True`, we assume dendritic weights are intended to be
-        # hardcoded
-        if self.model.freeze_dendrites:
-            self.model.hardcode_dendritic_weights(
-                context_vectors=self.train_loader.dataset._contexts, init="overlapping"
-            )
+class PermutedMNISTExperiment(mixins.RezeroWeights,
+                              ContinualLearningExperiment):
+    pass
 
 
-# ------ Training & evaluation function
+# ------ Training & evaluation functions
 def train_model(exp):
-    # Assume `loader` yields 3-item tuples of the form (data, context, target)
     exp.model.train()
     for (data, context), target in exp.train_loader:
+        data = data.flatten(start_dim=1)
+
+        # Since there's only one output head, target values should be modified to be in
+        # the range [0, 1, ..., 9]
+        target = target % exp.num_classes_per_task
+
         data = data.to(exp.device)
         context = context.to(exp.device)
         target = target.to(exp.device)
@@ -72,9 +60,6 @@ def train_model(exp):
         exp.optimizer.zero_grad()
         output = exp.model(data, context)
 
-        # Outputs are placed through a log softmax since `error_loss` is `F.nll_loss`,
-        # which assumes it will receive 'logged' values
-        output = F.log_softmax(output)
         error_loss = exp.error_loss(output, target)
         error_loss.backward()
         exp.optimizer.step()
@@ -84,7 +69,6 @@ def train_model(exp):
 
 
 def evaluate_model(exp):
-    # Assume `loader` yields 3-item tuples of the form (data, context, target)
     exp.model.eval()
     total = 0
 
@@ -94,6 +78,12 @@ def evaluate_model(exp):
     with torch.no_grad():
 
         for (data, context), target in exp.val_loader:
+            data = data.flatten(start_dim=1)
+
+            # Since there's only one output head, target values should be modified to
+            # be in the range [0, 1, ..., 9]
+            target = target % exp.num_classes_per_task
+
             data = data.to(exp.device)
             context = context.to(exp.device)
             target = target.to(exp.device)
@@ -101,7 +91,7 @@ def evaluate_model(exp):
             output = exp.model(data, context)
 
             # All output units are used to compute loss / accuracy
-            loss += exp.error_loss(output, target)
+            loss += exp.error_loss(output, target, reduction="sum")
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
@@ -117,23 +107,27 @@ def run_experiment(config):
 
     exp.model = exp.model.to(exp.device)
 
+    # Read optimizer class and args from config as it will be used to reinitialize the
+    # model's optimizer
+    optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+    optimizer_args = config.get("optimizer_args", {})
+
     # --------------------------- CONTINUAL LEARNING PHASE -------------------------- #
+
     for task_id in range(num_tasks):
 
         # Train model on current task
-        t1 = time.time()
         exp.train_loader.sampler.set_active_tasks(task_id)
-        for _epoch_id in range(num_epochs):
+        for _epoch_id in range(exp.epochs):
             train_model(exp)
-        t2 = time.time()
 
-        print(f"train time [task {task_id}]: {t2 - t1}")
-
-        # Evaluate model accuracy on each task separately
         if task_id in config["epochs_to_validate"]:
 
-            print(f"\n=== AFTER TASK {task_id} ===\n")
+            print("")
+            print(f"=== AFTER TASK {task_id} ===")
+            print("")
 
+            # Evaluate model accuracy on each task separately
             for eval_task_id in range(task_id + 1):
 
                 exp.val_loader.sampler.set_active_tasks(eval_task_id)
@@ -142,10 +136,14 @@ def run_experiment(config):
                     acc_task = acc_task[0]
 
                 print(f"task {eval_task_id} accuracy: {acc_task}")
+            print("")
 
-            t3 = time.time()
-            print(f"\nevaluation time: {t3 - t2}")
-            print(f"====================\n")
+        else:
+            print(f"--Completed task {task_id}--")
+
+        # Reset optimizer before starting new task
+        del exp.optimizer
+        exp.optimizer = optimizer_class(exp.model.parameters(), **optimizer_args)
 
     # ------------------------------------------------------------------------------- #
 
@@ -156,66 +154,50 @@ def run_experiment(config):
         acc_task = acc_task[0]
 
     print(f"Final test accuracy: {acc_task}")
-
-    # Print entropy of layers
-    max_possible_entropy = max_entropy(exp.model.hidden_size,
-                                       int(0.05 * exp.model.hidden_size))
-    if exp.model.kw:
-        print(f"   KW1 entropy: {exp.model.kw1.entropy().item()}")
-        print(f"   KW2 entropy: {exp.model.kw2.entropy().item()}")
-        print(f"   max entropy: {max_possible_entropy}")
     print("")
 
 
 if __name__ == "__main__":
 
-    num_tasks = 50
-    num_epochs = 1  # Number of training epochs per task
+    num_tasks = 2
 
     config = dict(
-        experiment_class=DendritesExperiment,
+        experiment_class=PermutedMNISTExperiment,
 
-        dataset_class=GaussianDataset,
+        dataset_class=ContextDependentPermutedMNIST,
         dataset_args=dict(
-            num_classes=2 * num_tasks,
             num_tasks=num_tasks,
-            training_examples_per_class=2500,
-            validation_examples_per_class=500,
-            dim_x=2048,
-            dim_context=2048,
-            seed=np.random.randint(0, 1000),
+            dim_context=1024,
+            seed=42,
+            download=True,
         ),
 
         model_class=DendriticMLP,
         model_args=dict(
-            input_size=2048,
-            output_size=2 * num_tasks,
-            hidden_size=2048,
+            input_size=784,
+            output_size=10,
+            hidden_sizes=[64, 64],
             num_segments=num_tasks,
-            dim_context=2048,
-            kw=True,  # Turning on k-Winners when hardcoding dendrites to induce
-                      # non-overlapping subnetworks results in 5% winners
-            dendrite_sparsity=0.0,  # Irrelevant if `freeze_dendrites=True`
-            weight_init="modified",  # Must be one of {"kaiming", "modified"}
-            dendrite_init="modified",  # Irrelevant if `freeze_dendrites=True`
-            freeze_dendrites=False
+            dim_context=1024,  # Note: with the Gaussian dataset, `dim_context` was
+                               # 2048, but this shouldn't effect results
+            kw=True,
+            # dendrite_sparsity=0.0,
         ),
 
-        batch_size=64,
+        batch_size=256,
         val_batch_size=512,
-        epochs=num_epochs,
-        epochs_to_validate=[0, 3, 6, 10, 20, num_tasks - 1],
+        epochs=1,
+        epochs_to_validate=(4, 9, 24, 49),  # Note: `epochs_to_validate` is treated as
+                                            # the set of task ids after which to
+                                            # evaluate the model on all seen tasks
         num_tasks=num_tasks,
-        num_classes=2 * num_tasks,
+        num_classes=10 * num_tasks,
         distributed=False,
-        seed=np.random.randint(0, 10000),
+        seed=42,
 
-        optimizer_class=torch.optim.SGD,
-        optimizer_args=dict(lr=2e-1),
+        loss_function=F.cross_entropy,
+        optimizer_class=torch.optim.Adam,
+        optimizer_args=dict(lr=0.001),
     )
-
-    print("Experiment config: ")
-    pprint.pprint(config)
-    print("")
 
     run_experiment(config)

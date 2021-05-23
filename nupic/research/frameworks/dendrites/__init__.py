@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .model_utils import *
 from .modules import *
 from .metrics import *
 from .apply_dendrites_hook import *

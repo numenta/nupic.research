@@ -23,9 +23,11 @@ import numpy as np
 import torch
 from torch import nn
 
+from nupic.research.frameworks.dendrites.modules.dendritic_layers import (
+    AbsoluteMaxGatingDendriticLayer,
+    OneSegmentDendriticLayer,
+)
 from nupic.torch.modules import KWinners, SparseWeights, rezero_weights
-
-from .dendritic_layers import AbsoluteMaxGatingDendriticLayer
 
 
 class DendriticMLP(nn.Module):
@@ -35,6 +37,26 @@ class DendriticMLP(nn.Module):
     input.  The class is used to experiment with different dendritic weight
     initializations and learning parameters
 
+    :param input_size: size of the input to the network
+    :param output_size: the number of units in the output layer
+    :param hidden_sizes: the number of units in each hidden layer
+    :param num_segments: the number of dendritic segments that each hidden unit has
+    :param dim_context: the size of the context input to the network
+    :param kw: whether to apply k-Winners to the outputs of each hidden layer
+    :param kw_percent_on: percent of hidden units activated by K-winners. If 0, use ReLU
+    :param context_percent_on: percent of non-zero units in the context input.
+    :param dendrite_weight_sparsity: the sparsity level of dendritic weights.
+    :param weight_sparsity: the sparsity level of feed-forward weights.
+    :param weight_init: the initialization applied to feed-forward weights; must be
+                        either "kaiming" (for Kaiming Uniform) of "modified" (for
+                        sparse Kaiming Uniform)
+    :param dendrite_init: the initialization applied to dendritic weights; similar to
+                          `weight_init`
+    :param freeze_dendrites: whether to set `requires_grad=False` for all dendritic
+                             weights so they don't train
+    :param dendritic_layer_class: dendritic layer class to use for each hidden layer
+    :param output_nonlinearity: nonlinearity to apply to final output layer.
+                                'None' of no nonlinearity.
                     _____
                    |_____|    # classifier layer, no dendrite input
                       ^
@@ -50,83 +72,110 @@ class DendriticMLP(nn.Module):
                     input
     """
 
-    def __init__(self, input_size, output_size, hidden_size, num_segments, dim_context,
-                 weight_init, dendrite_init, kw,
-                 dendritic_layer_class=AbsoluteMaxGatingDendriticLayer):
+    def __init__(
+        self, input_size, output_size, hidden_sizes, num_segments, dim_context,
+        kw, kw_percent_on=0.05, context_percent_on=1.0, dendrite_weight_sparsity=0.95,
+        weight_sparsity=0.95, weight_init="modified", dendrite_init="modified",
+        freeze_dendrites=False, output_nonlinearity=None,
+        dendritic_layer_class=AbsoluteMaxGatingDendriticLayer,
+    ):
 
-        # Forward weight initialization must of one of "kaiming" or "modified" (i.e.,
-        # modified sparse Kaiming initialization)
+        # Forward & dendritic weight initialization must be either "kaiming" or
+        # "modified"
         assert weight_init in ("kaiming", "modified")
+        assert dendrite_init in ("kaiming", "modified")
+        assert kw_percent_on >= 0.0 and kw_percent_on < 1.0
+        assert context_percent_on >= 0.0
 
-        # Forward weight initialization must of one of "kaiming" or "modified",
-        # "hardcoded"
-        assert dendrite_init in ("kaiming", "modified", "hardcoded")
+        if kw_percent_on == 0.0:
+            kw = False
 
         super().__init__()
 
+        if num_segments == 1:
+            # use optimized 1 segment class
+            dendritic_layer_class = OneSegmentDendriticLayer
+
         self.num_segments = num_segments
         self.input_size = input_size
-        self.hidden_size = hidden_size
+        self.hidden_sizes = hidden_sizes
         self.output_size = output_size
         self.dim_context = dim_context
         self.kw = kw
+        self.kw_percent_on = kw_percent_on
+        self.weight_sparsity = weight_sparsity
+        self.dendrite_weight_sparsity = dendrite_weight_sparsity
+        self.output_nonlinearity = output_nonlinearity
         self.hardcode_dendrites = (dendrite_init == "hardcoded")
 
-        # Forward layers & k-winners
-        self.dend1 = dendritic_layer_class(
-            module=nn.Linear(input_size, hidden_size, bias=True),
-            num_segments=num_segments,
-            dim_context=dim_context,
-            module_sparsity=0.95,
-            dendrite_sparsity=0.0 if self.hardcode_dendrites else 0.95,
-        )
-        self.dend2 = dendritic_layer_class(
-            module=nn.Linear(hidden_size, hidden_size, bias=True),
-            num_segments=num_segments,
-            dim_context=dim_context,
-            module_sparsity=0.95,
-            dendrite_sparsity=0.0 if self.hardcode_dendrites else 0.95,
-        )
-        self.classifier = SparseWeights(module=nn.Linear(hidden_size, output_size),
-                                        sparsity=0.95)
+        self._layers = nn.ModuleList()
+        self._activations = nn.ModuleList()
 
-        if kw:
+        if self.hardcode_dendrites:
+            dendrite_sparsity = 0.0
+        else:
+            dendrite_sparsity = self.dendrite_weight_sparsity
+        for i in range(len(self.hidden_sizes)):
+            curr_dend = dendritic_layer_class(
+                module=nn.Linear(input_size, self.hidden_sizes[i], bias=True),
+                num_segments=num_segments,
+                dim_context=dim_context,
+                module_sparsity=self.weight_sparsity,
+                dendrite_sparsity=dendrite_sparsity,
+            )
 
-            print(f"Using k-Winners: 0.05 'on'")
-            self.kw1 = KWinners(n=hidden_size, percent_on=0.05, k_inference_factor=1.0,
-                                boost_strength=0.0, boost_strength_factor=0.0)
-            self.kw2 = KWinners(n=hidden_size, percent_on=0.05, k_inference_factor=1.0,
-                                boost_strength=0.0, boost_strength_factor=0.0)
+            if weight_init == "modified":
+                # Scale weights to be sampled from the new initialization U(-h, h) where
+                # h = sqrt(1 / (weight_density * previous_layer_percent_on))
+                if i == 0:
+                    # first hidden layer can't have kw input
+                    self._init_sparse_weights(curr_dend, 0.0)
+                else:
+                    self._init_sparse_weights(
+                        curr_dend,
+                        1 - kw_percent_on if kw else 0.0
+                    )
 
+            if dendrite_init == "modified":
+                self._init_sparse_dendrites(curr_dend, 1 - context_percent_on)
+
+            if freeze_dendrites:
+                # Dendritic weights will not be updated during backward pass
+                for name, param in curr_dend.named_parameters():
+                    if "segments" in name:
+                        param.requires_grad = False
+
+            if self.kw:
+                curr_activation = KWinners(n=hidden_sizes[i],
+                                           percent_on=kw_percent_on,
+                                           k_inference_factor=1.0,
+                                           boost_strength=0.0,
+                                           boost_strength_factor=0.0)
+            else:
+                curr_activation = nn.ReLU()
+
+            self._layers.append(curr_dend)
+            self._activations.append(curr_activation)
+
+            input_size = self.hidden_sizes[i]
+
+        self._output_layer = nn.Sequential()
+        output_linear = SparseWeights(module=nn.Linear(input_size, output_size),
+                                      sparsity=weight_sparsity, allow_extremes=True)
         if weight_init == "modified":
+            self._init_sparse_weights(output_linear, 1 - kw_percent_on if kw else 0.0)
+        self._output_layer.add_module("output_linear", output_linear)
 
-            # Scale weights to be sampled from the new inititialization U(-h, h) where
-            # h = sqrt(1 / (weight_density * previous_layer_percent_on))
-            self._init_sparse_weights(self.dend1, 0.0)
-            self._init_sparse_weights(self.dend2, 0.95 if kw else 0.0)
-            self._init_sparse_weights(self.classifier, 0.95 if kw else 0.0)
-
-        if dendrite_init == "modified":
-            self._init_sparse_dendrites(self.dend1, 0.95)
-            self._init_sparse_dendrites(self.dend2, 0.95)
-
-        elif dendrite_init == "hardcoded":
-            # Dendritic weights will not be updated during backward pass
-            for name, param in self.named_parameters():
-                if "segments" in name:
-                    param.requires_grad = False
+        if self.output_nonlinearity is not None:
+            self._output_layer.add_module("non_linearity", output_nonlinearity)
 
     def forward(self, x, context):
-        output = self.dend1(x, context=context)
-        output = self.kw1(output) if self.kw else output
+        for layer, activation in zip(self._layers, self._activations):
+            x = activation(layer(x, context))
 
-        output = self.dend2(output, context=context)
-        output = self.kw2(output) if self.kw else output
+        return self._output_layer(x)
 
-        output = self.classifier(output)
-        return output
-
-    # ------ Weight initialization functions
+    # ------ Weight initialization functions ------
     @staticmethod
     def _init_sparse_weights(m, input_sparsity):
         """
@@ -149,9 +198,9 @@ class DendriticMLP(nn.Module):
         # Assume `m` is an instance of `DendriticLayerBase`
         input_density = 1.0 - input_sparsity
         weight_density = 1.0 - m.segments.sparsity
-        fan_in = m.segments.dim_context
+        fan_in = m.dim_context
         bound = 1.0 / np.sqrt(input_density * weight_density * fan_in)
-        nn.init.uniform_(m.segments.weights, -bound, bound)
+        nn.init.uniform_(m.segment_weights, -bound, bound)
         m.apply(rezero_weights)
 
     def hardcode_dendritic_weights(self, context_vectors, init):
@@ -176,12 +225,19 @@ class DendriticMLP(nn.Module):
         :param context_vectors:
         :param init: a string "overlapping" or "non_overlapping"
         """
-        self._hardcode_dendritic_weights(self.dend1.segments, context_vectors, init)
-        self._hardcode_dendritic_weights(self.dend2.segments, context_vectors, init)
+        for dendrite in self._layers:
+            self._hardcode_dendritic_weights(dendrite.weights, context_vectors, init)
 
     @staticmethod
-    def _hardcode_dendritic_weights(dendrite_segments, context_vectors, init):
-        num_units, num_segments, dim_context = dendrite_segments.weights.size()
+    def _hardcode_dendritic_weights(dendrite_weights, context_vectors, init):
+        squeeze = False
+        if len(dendrite_weights.shape) == 2:
+            # 1 segment dendrite, so add in a segment dimension
+            squeeze = True
+            original_weights = dendrite_weights
+            dendrite_weights = dendrite_weights.unsqueeze(dim=1)
+
+        num_units, num_segments, dim_context = dendrite_weights.size()
         num_contexts, _ = context_vectors.size()
 
         if init == "overlapping":
@@ -224,4 +280,10 @@ class DendriticMLP(nn.Module):
         else:
             raise Exception("Invalid dendritic weight hardcode choice")
 
-        dendrite_segments.weights.data = new_dendritic_weights
+        dendrite_weights.data = new_dendritic_weights
+
+        if squeeze:
+            dendrite_weights = dendrite_weights.squeeze(dim=1)
+            # dendrite weights doesn't point to the dendrite weights tensor,
+            # so expicitly assign the new values
+            original_weights.data = dendrite_weights

@@ -62,8 +62,14 @@ fully_static_sparse_bert_100k.update(
     model_type="fully_static_sparse_bert",
     config_kwargs=dict(
         sparsity=0.8,
+        sparsify_all_embeddings=False,
     ),
     trainer_callbacks=[RezeroWeightsCallback()]
+)
+
+fully_static_sparse_bert_100k_fp16 = deepcopy(fully_static_sparse_bert_100k)
+fully_static_sparse_bert_100k_fp16.update(
+    fp16=True,
 )
 
 
@@ -88,4 +94,5 @@ CONFIGS = dict(
     mini_sparse_bert_debug=mini_sparse_bert_debug,
     static_sparse_encoder_bert_100k=static_sparse_encoder_bert_100k,
     fully_static_sparse_bert_100k=fully_static_sparse_bert_100k,
+    fully_static_sparse_bert_100k_fp16=fully_static_sparse_bert_100k_fp16,
 )
