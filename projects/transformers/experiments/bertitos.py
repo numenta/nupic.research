@@ -182,6 +182,16 @@ small_bert_100k.update(
     dataset_config_name=None,
 )
 
+
+small_bert_300k = deepcopy(small_bert_100k)
+small_bert_300k.update(
+    max_steps=300000,
+
+    # Using batch_size of 16 instead of 128 since we're training on 8 GPUs.
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+)
+
 # samples/second = 3.778 (on one p3.2xlarge)
 small_bert_50k = deepcopy(small_bert_100k)
 small_bert_50k.update(
@@ -253,6 +263,8 @@ CONFIGS = dict(
     small_bert_debug=small_bert_debug,
     mini_bert_debug=mini_bert_debug,
     tiny_bert_debug=tiny_bert_debug,
+
+    small_bert_300k=small_bert_300k,
 
     small_bert_100k=small_bert_100k,
     mini_bert_100k=mini_bert_100k,
