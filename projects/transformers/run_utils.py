@@ -118,33 +118,33 @@ def train(trainer, output_dir, last_checkpoint=None):
         *count_nonzero_params(trainer.model)
     ))
 
+
 def toggle_drop_last(trainer, should_drop_last):
     """
     Turn trainer.args.dataloader_drop_last on or off depending on use case
-    If drop_last is left on, then you can get skewed results anytime 
+    If drop_last is left on, then you can get skewed results anytime
     trainer.evaluate or trainer.predict is called, since drop_last will set
     the last batch with incomplete number of samples to be labeled -100
     You'll want to use this if you want drop_last on for training, but off
     for testing
-
     Example usage at evaluation time
         drop_last = toggle_drop_last(trainer, False)
         trainer.evaluate(...)
         _ = toggle_drop_last(trainer, drop_last)
     """
-
     if should_drop_last:
         return False
     else:
         trainer.args.dataloader_drop_last = False
         return True
 
+
 def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     """
     Evaluate tasks after finetuning.
     Returns evaluation dict with results.
     """
-    drop_last = toggle_drop_last(trainer, False) # should_drop_last=False
+    drop_last = toggle_drop_last(trainer, False)  # should_drop_last=False
     eval_results = {}
 
     for eval_dataset, task in zip(eval_datasets, tasks):
