@@ -1,5 +1,5 @@
 # Purpose of the Code
-This code is intended to run simulations to evaluate the properties of sparsely distributed representations (SDRs) with an emphasis on using SDRs for machine learning tasks. The figures generated are automatically saved as PDF files. The properties of SDRs were discussed in the paper "How Can We Be So Dense? The Benefits of Using Highly Sparse Representations" availalbe at: https://arxiv.org/abs/1903.11257.
+This code is intended to run simulations to evaluate the properties of sparse distributed representations (SDRs) with an emphasis on using SDRs for machine learning tasks. The figures generated are automatically saved as PDF files. The properties of SDRs were discussed in the paper "How Can We Be So Dense? The Benefits of Using Highly Sparse Representations" available at https://arxiv.org/abs/1903.11257 and "How do neurons operate on sparse distributed representations? A mathematical theory of sparsity, neurons and active dendrites" available at https://arxiv.org/abs/1601.00720.
 
 # The Code
 The following scripts can ben run in any order, but running plot_numerical_results.py may provide some intuition that will make scalar_sdrs.py easier to understand. 
