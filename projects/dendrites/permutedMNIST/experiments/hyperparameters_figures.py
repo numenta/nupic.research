@@ -6,7 +6,7 @@ sns.set(style="whitegrid",font_scale=1)
 import matplotlib.collections as clt
 import ptitprince as pt
 import matplotlib.gridspec as gridspec
-
+plt.rcParams.update({'font.size': 16})
 
 
 def first_iteration():
@@ -291,10 +291,14 @@ def third_iteration():
     pt.RainCloud(x = x3, y = y, data = df3, palette = pal, bw = sigma,
                      width_viol = .6, ax = ax3, orient = ort, move = .2,
                      pointplot = True, alpha = .65)
-    ax2.set_ylabel('')
-    # ax2.set(yticklabels=[])
-    ax3.set_ylabel('')
-    # ax3.set(yticklabels=[])
+    ax1.set(xlabel = 'Number of dendritic segments')
+    ax2.set(ylabel = '')
+    ax2.set(xticklabels = ['0.99', '0.95', '0.9', '0.8', '0.6', '0.4', '0.2',
+                        '0.1'])
+    ax3.set(ylabel = '')
+    ax3.set(xticklabels = ['0.99', '0.95', '0.9', '0.5', '0.3', '0.1', '0.05',
+                        '0.01'])
+
 
     if savefigs:
         plt.savefig(f'{figs_dir}/third_iteration_figure1.png', bbox_inches='tight')
