@@ -51,7 +51,7 @@ NB_SEGMENT_SEARCH = dict(
     experiment_class=NbSegmentSearchExperiment,
 
     # Results path
-    local_dir=os.path.expanduser("~/nta/results/experiments/dendrites/weights_sparsity_search2"),
+    local_dir=os.path.expanduser("~/nta/results/experiments/dendrites/nb_segment_search4"),
 
     # dataset_class=ContextDependentPermutedMNIST,
     dataset_class=PermutedMNIST,
@@ -106,6 +106,12 @@ NB_SEGMENT_SEARCH_3['model_args'].update(
     num_segments = tune.grid_search([14, 20])
 )
 
+# adding 100 segments for 10 tasks
+NB_SEGMENT_SEARCH_4 = deepcopy(NB_SEGMENT_SEARCH_2)
+NB_SEGMENT_SEARCH_4['model_args'].update(
+    num_segments = 100
+)
+
 # varying only kw sparsity
 KW_SPARSITY_SEARCH = deepcopy(NB_SEGMENT_SEARCH)
 KW_SPARSITY_SEARCH['model_args'].update(
@@ -120,7 +126,7 @@ W_SPARSITY_SEARCH['model_args'].update(
     kw_percent_on = 0.1
 )
 
-# adding a couple of parameter
+# adding a couple of parameters
 W_SPARSITY_SEARCH2 = deepcopy(W_SPARSITY_SEARCH)
 W_SPARSITY_SEARCH2['model_args'].update(
     weight_sparsity = tune.grid_search([0.05, 0.01])
@@ -131,6 +137,7 @@ CONFIGS = dict(
     nb_segment_search = NB_SEGMENT_SEARCH,
     nb_segment_search2 = NB_SEGMENT_SEARCH_2,
     nb_segment_search3 = NB_SEGMENT_SEARCH_3,
+    nb_segment_search4 = NB_SEGMENT_SEARCH_4,
     kw_sparsity_search = KW_SPARSITY_SEARCH, #old name is sparsity_search
     weights_sparsity_search = W_SPARSITY_SEARCH,
     weights_sparsity_search2 = W_SPARSITY_SEARCH2
