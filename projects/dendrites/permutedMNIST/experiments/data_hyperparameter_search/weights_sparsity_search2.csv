@@ -1,0 +1,21 @@
+,Experiment name,Activation sparsity,FF weight sparsity,Dendrite weight sparsity,Num segments,Dim context,Epochs,Num tasks,LR,Momentum,Seed,Accuracy,ID
+0,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,9333,0.9483399987220764,weights_sparsity_search2 weight_sparsity=0.01
+1,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,2674,0.9450599551200867,weights_sparsity_search2 weight_sparsity=0.01
+2,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,3902,0.9477699995040894,weights_sparsity_search2 weight_sparsity=0.01
+3,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,8895,0.9534399509429932,weights_sparsity_search2 weight_sparsity=0.01
+4,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,8613,0.9559800028800964,weights_sparsity_search2 weight_sparsity=0.01
+5,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,6959,0.9350199699401855,weights_sparsity_search2 weight_sparsity=0.01
+6,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,9235,0.9472799897193909,weights_sparsity_search2 weight_sparsity=0.01
+7,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,4299,0.9475199580192566,weights_sparsity_search2 weight_sparsity=0.01
+8,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,144,0.9492999911308289,weights_sparsity_search2 weight_sparsity=0.01
+9,weights_sparsity_search2,0.1,0.01,0.0,10,784,3,10,0.0005,0.0,9607,0.9418999552726746,weights_sparsity_search2 weight_sparsity=0.01
+10,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,5693,0.9484699964523315,weights_sparsity_search2 weight_sparsity=0.05
+11,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,1193,0.9514999985694885,weights_sparsity_search2 weight_sparsity=0.05
+12,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,9278,0.9445099830627441,weights_sparsity_search2 weight_sparsity=0.05
+13,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,714,0.9458400011062622,weights_sparsity_search2 weight_sparsity=0.05
+14,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,4587,0.9524700045585632,weights_sparsity_search2 weight_sparsity=0.05
+15,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,7753,0.9427099823951721,weights_sparsity_search2 weight_sparsity=0.05
+16,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,7866,0.9501799941062927,weights_sparsity_search2 weight_sparsity=0.05
+17,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,1217,0.943120002746582,weights_sparsity_search2 weight_sparsity=0.05
+18,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,8153,0.9511999487876892,weights_sparsity_search2 weight_sparsity=0.05
+19,weights_sparsity_search2,0.1,0.05,0.0,10,784,3,10,0.0005,0.0,7362,0.9489099979400635,weights_sparsity_search2 weight_sparsity=0.05
