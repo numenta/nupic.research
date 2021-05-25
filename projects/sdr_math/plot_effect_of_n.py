@@ -26,8 +26,8 @@
 import os
 
 import plotly.graph_objs as go
-# import plotly.plotly as py
-import chart_studio.plotly as py
+import plotly.plotly as py
+
 plotly_user = os.environ["PLOTLY_USERNAME"]
 plotly_api_key = os.environ["PLOTLY_API_KEY"]
 
