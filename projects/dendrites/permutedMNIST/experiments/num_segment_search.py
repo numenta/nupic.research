@@ -132,6 +132,26 @@ W_SPARSITY_SEARCH2['model_args'].update(
     weight_sparsity = tune.grid_search([0.05, 0.01])
 )
 
+# Idem on 50 tasks
+# Segment search
+NB_SEGMENT_SEARCH_50 = deepcopy(NB_SEGMENT_SEARCH_2)
+NB_SEGMENT_SEARCH_50['dataset_args'].update(num_tasks = 50)
+NB_SEGMENT_SEARCH_50['model_args'].update(
+    num_segments = tune.grid_search([2, 3, 5, 7, 10, 20, 30, 50, 100])
+)
+
+# kw sparsity search
+KW_SPARSITY_SEARCH_50 = deepcopy(KW_SPARSITY_SEARCH)
+KW_SPARSITY_SEARCH_50['dataset_args'].update(num_tasks = 50)
+
+# weight sparsity search
+W_SPARSITY_SEARCH_50 = deepcopy(W_SPARSITY_SEARCH)
+W_SPARSITY_SEARCH_50['dataset_args'].update(num_tasks = 50)
+W_SPARSITY_SEARCH_50['model_args'].update(
+    weight_sparsity = tune.grid_search([0.01, 0.05, 0.1, 0.5, 0.7, 0.9, 0.95, 0.99])
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     nb_segment_search = NB_SEGMENT_SEARCH,
@@ -140,5 +160,9 @@ CONFIGS = dict(
     nb_segment_search4 = NB_SEGMENT_SEARCH_4,
     kw_sparsity_search = KW_SPARSITY_SEARCH, #old name is sparsity_search
     weights_sparsity_search = W_SPARSITY_SEARCH,
-    weights_sparsity_search2 = W_SPARSITY_SEARCH2
+    weights_sparsity_search2 = W_SPARSITY_SEARCH2,
+
+    nb_segment_search_50 = NB_SEGMENT_SEARCH_50,
+    kw_sparsity_search_50 = KW_SPARSITY_SEARCH_50,
+    weights_sparsity_search_50 = W_SPARSITY_SEARCH_50
 )
