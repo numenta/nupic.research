@@ -213,9 +213,10 @@ def third_iteration():
     Third experimental runs. Technically this is 3 separate runs as I only ran some
     of the hyperparameters, variying only one at the time and using Karan's
     CENTROID method ones for the others.
-    Refer to configs:
+    Refers to configs:
         nb_segment_search2 = NB_SEGMENT_SEARCH_2,
         nb_segment_search3 = NB_SEGMENT_SEARCH_3,
+        nb_segment_search4 = NB_SEGMENT_SEARCH_4 (pending),
         kw_sparsity_search = KW_SPARSITY_SEARCH,
         weights_sparsity_search = W_SPARSITY_SEARCH,
         weights_sparsity_search2 = W_SPARSITY_SEARCH2
@@ -227,28 +228,36 @@ def third_iteration():
         if not os.path.isdir(f'{figs_dir}'):
             os.makedirs(f'{figs_dir}')
 
-    experiment_folder1 = '~/nta/results/experiments/dendrites/nb_segment_search2/'
-    df_path1 = f'{experiment_folder1}temp.csv'
+    experiment_folder = '~/nta/nupic.research/projects/dendrites/permutedMNIST/experiments/data_hyperparameter_search/'
+
+    # experiment_folder1 = '~/nta/results/experiments/dendrites/nb_segment_search2/'
+    # df_path1 = f'{experiment_folder1}temp.csv'
+    df_path1 = f'{experiment_folder}nb_segment_search2.csv'
     df1 = pd.read_csv(df_path1)
 
-    experiment_folder1bis = '~/nta/results/experiments/dendrites/nb_segment_search3/'
-    df_path1bis = f'{experiment_folder1bis}temp.csv'
+    # experiment_folder1bis = '~/nta/results/experiments/dendrites/nb_segment_search3/'
+    # df_path1bis = f'{experiment_folder1bis}temp.csv'
+    df_path1bis = f'{experiment_folder}nb_segment_search3.csv'
     df1bis = pd.read_csv(df_path1bis)
 
     # experiment_folder1bis2 = '~/nta/results/experiments/dendrites/nb_segment_search4/'
     # df_path1bis2 = f'{experiment_folder1bis2}temp.csv'
+    # df_path1bis2 = f'{experiment_folder}nb_segment_search4.csv'
     # df1bis2 = pd.read_csv(df_path1bis2)
 
-    experiment_folder2 = '~/nta/results/experiments/dendrites/kw_sparsity_search/'
-    df_path2 = f'{experiment_folder2}temp.csv'
+    # experiment_folder2 = '~/nta/results/experiments/dendrites/kw_sparsity_search/'
+    # df_path2 = f'{experiment_folder2}temp.csv'
+    df_path2 = f'{experiment_folder}kw_sparsity_search.csv'
     df2 = pd.read_csv(df_path2)
 
-    experiment_folder3 = '~/nta/results/experiments/dendrites/weights_sparsity_search/'
-    df_path3 = f'{experiment_folder3}temp.csv'
+    # experiment_folder3 = '~/nta/results/experiments/dendrites/weights_sparsity_search/'
+    # df_path3 = f'{experiment_folder3}temp.csv'
+    df_path3 = f'{experiment_folder}weights_sparsity_search.csv'
     df3 = pd.read_csv(df_path3)
 
-    experiment_folder3bis = '~/nta/results/experiments/dendrites/weights_sparsity_search2/'
-    df_path3bis = f'{experiment_folder3bis}temp.csv'
+    # experiment_folder3bis = '~/nta/results/experiments/dendrites/weights_sparsity_search2/'
+    # df_path3bis = f'{experiment_folder3bis}temp.csv'
+    df_path3bis = f'{experiment_folder}weights_sparsity_search2.csv'
     df3bis = pd.read_csv(df_path3bis)
 
     df1 = df1[['Activation sparsity', 'FF weight sparsity', 'Num segments', 'Accuracy']]
