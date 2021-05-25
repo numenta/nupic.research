@@ -6,8 +6,6 @@ sns.set(style="whitegrid",font_scale=1)
 import matplotlib.collections as clt
 import ptitprince as pt
 import matplotlib.gridspec as gridspec
-plt.rcParams.update({'font.size': 16})
-
 
 def first_iteration():
     '''
@@ -288,8 +286,8 @@ def third_iteration():
     ort = "v"
     pal = "Set2"
     sigma = .2
-    fig.suptitle('Impact of the different hyperparameters on performance - \n \
-                 full cross product of hyperparameters ', fontsize=12)
+    fig.suptitle('Impact of the different hyperparameters on performance',
+                 fontsize=12)
 
     pt.RainCloud(x = x1, y = y, data = df1, palette = pal, bw = sigma,
                      width_viol = .6, ax = ax1, orient = ort, move = .2,
