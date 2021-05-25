@@ -297,7 +297,7 @@ def third_iteration():
     # ax3.set(yticklabels=[])
 
     if savefigs:
-        plt.savefig(f'{figs_dir}/third_teration_figure1.png', bbox_inches='tight')
+        plt.savefig(f'{figs_dir}/third_iteration_figure1.png', bbox_inches='tight')
 
 def cns_figure_1c():
     '''
