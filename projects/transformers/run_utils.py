@@ -119,12 +119,34 @@ def train(trainer, output_dir, last_checkpoint=None):
     ))
 
 
+def toggle_drop_last(trainer, should_drop_last):
+    """
+    Turn trainer.args.dataloader_drop_last on or off depending on use case
+    If drop_last is left on, then you can get skewed results anytime
+    trainer.evaluate or trainer.predict is called, since drop_last will set
+    the last batch with incomplete number of samples to be labeled -100
+    You'll want to use this if you want drop_last on for training, but off
+    for testing
+    Example usage at evaluation time
+        drop_last = toggle_drop_last(trainer, False)
+        trainer.evaluate(...)
+        _ = toggle_drop_last(trainer, drop_last)
+    """
+    if should_drop_last:
+        return False
+    else:
+        trainer.args.dataloader_drop_last = False
+        return True
+
+
 def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     """
     Evaluate tasks after finetuning.
     Returns evaluation dict with results.
     """
+    drop_last = toggle_drop_last(trainer, False)  # should_drop_last=False
     eval_results = {}
+
     for eval_dataset, task in zip(eval_datasets, tasks):
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
         if task == "mnli-mm":
@@ -141,6 +163,9 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
                     logging.info(f"  {key} = {value}")
                     writer.write(f"{key} = {value}\n")
 
+    # if you want drop_last for training, this toggles it back on
+    _ = toggle_drop_last(trainer, drop_last)
+
     return eval_results
 
 
@@ -148,6 +173,9 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
     """
     Test tasks after finetuning.
     """
+
+    drop_last = toggle_drop_last(trainer, False)
+
     for test_dataset, task in zip(test_datasets, tasks):
         # Removing the `label` columns because it contains -1
         # and Trainer won't like that.
@@ -170,9 +198,13 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
                         item = label_list[item]
                         writer.write(f"{index}\t{item}\n")
 
+    _ = toggle_drop_last(trainer, drop_last)
+
 
 def evaluate_language_model(trainer, eval_dataset, output_dir):
     """Evaluate language model. Returns dict with results on perplexity metric. """
+    drop_last = toggle_drop_last(trainer, False)
+
     results = {}
     eval_output = trainer.evaluate(eval_dataset)
 
@@ -186,6 +218,8 @@ def evaluate_language_model(trainer, eval_dataset, output_dir):
             for key, value in sorted(results.items()):
                 logging.info(f"  {key} = {value}")
                 writer.write(f"{key} = {value}\n")
+
+    _ = toggle_drop_last(trainer, drop_last)
 
     return results
 
@@ -708,7 +742,10 @@ def init_trainer(
     # Add specific metrics for finetuning task
     if finetuning:
         compute_metrics = partial(
-            compute_metrics_task, task_name=task_name, is_regression=is_regression,
+            compute_metrics_task,
+            task_name=task_name,
+            is_regression=is_regression,
+            output_dir=training_args.output_dir
         )
         trainer_kwargs.update(compute_metrics=compute_metrics)
 
@@ -718,7 +755,8 @@ def init_trainer(
 
 
 def compute_metrics_task(ep: EvalPrediction, metric=None,
-                         task_name=None, is_regression=None):
+                         task_name=None, is_regression=None,
+                         output_dir=None):
     """
     You can define your custom compute_metrics function. It takes an
     `EvalPrediction` object (a namedtuple with a predictions and label_ids
@@ -727,41 +765,33 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
     preds = (ep.predictions[0] if isinstance(ep.predictions, tuple) else ep.predictions)
     preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
 
+    # -100 labels can come up when drop_last batch setting gets set to true during
+    # evaluation. That is fixed, so any -100 labels should not pass silently.
+    assert -100 not in ep.label_ids, "Unknown source of -100 labels"
+
     if not is_regression:
-        logging.info(f"Label distribution for {task_name} before cleaning")
+        logging.info(f"Label distribution for {task_name}")
         logging.info(f"Predictions: {Counter(preds).most_common()}")
         logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
 
-    # Ignore the -100 labels - not able to tokenize?
-    # TODO: investigate why a few labels are -100 in all tasks
-    label_ids = ep.label_ids[np.where(ep.label_ids != -100)]
-    preds = preds[np.where(ep.label_ids != -100)]
-    logging.info(f"Removing {1-(len(label_ids) / len(ep.label_ids)):.2%} samples "
-                 "from evaluation set where label == -100")
-
-    if not is_regression:
-        logging.info(f"Label distribution for {task_name} after cleaning")
-        logging.info(f"Predictions: {Counter(preds).most_common()}")
-        logging.info(f"Labels: {Counter(label_ids).most_common()}")
-
     if task_name is not None:
         if task_name == "cola":
-            result = {"matthews_correlation": matthews_corrcoef(label_ids, preds)}
+            result = {"matthews_correlation": matthews_corrcoef(ep.label_ids, preds)}
         elif task_name == "stsb":
-            result = pearson_and_spearman(preds, label_ids)
+            result = pearson_and_spearman(preds, ep.label_ids)
         elif task_name in ["mrpc", "qqp"]:
-            result = acc_and_f1(preds, label_ids)
+            result = acc_and_f1(preds, ep.label_ids)
         elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
                            "qnli", "rte", "wnli", "hans"]:
-            result = {"accuracy": simple_accuracy(preds, label_ids)}
+            result = {"accuracy": simple_accuracy(preds, ep.label_ids)}
         # Consolidate if more than one metric
         if len(result) > 1:
             result["combined_score"] = np.mean(list(result.values())).item()
         return result
     elif is_regression:
-        return {"mse": ((preds - label_ids) ** 2).mean().item()}
+        return {"mse": ((preds - ep.label_ids) ** 2).mean().item()}
     else:
-        return {"accuracy": (preds == label_ids).astype(np.float32).mean().item()}
+        return {"accuracy": (preds == ep.label_ids).astype(np.float32).mean().item()}
 
 
 def simple_accuracy(preds, labels):
