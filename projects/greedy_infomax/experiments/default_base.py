@@ -176,9 +176,15 @@ DEFAULT_BASE = dict(
 
 VALIDATE_ONLY = deepcopy(DEFAULT_BASE)
 VALIDATE_ONLY.update(dict(
-    epochs=0,
-    epochs_to_validate=[0],
-    supervised_training_epochs_per_validation=25,
+    wandb_args=dict(
+        project="greedy_infomax", name="validation-paper-replication"
+    ),
+    epochs=61,
+    epochs_to_validate=[60, 61],
+    supervised_training_epochs_per_validation=20,
+    num_unsupervised_samples=32,
+    # num_supervised_samples=500,
+    # num_validation_samples=32,
 ))
 
 

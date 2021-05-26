@@ -31,7 +31,7 @@ from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import (
     SparseBilinearInfo,
 )
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
-from nupic.torch.modules import PrunableSparseWeights2d
+from nupic.torch.modules import PrunableSparseWeights2d, KWinners2d
 
 
 class PreActBlockNoBN(nn.Module):
@@ -231,8 +231,11 @@ class SparseResNetEncoder(ResNetEncoder):
         k_predictions=5,
         patch_size=16,
         input_dims=3,
-        sparsity=None,
+        weight_sparsity=None,
         weight_init=False,
+        activation_sparsity=0.5,
+
+
     ):
         super(SparseResNetEncoder, self).__init__(
             block,
@@ -254,8 +257,23 @@ class SparseResNetEncoder(ResNetEncoder):
                     nn.Conv2d(
                         input_dims, self.filters[0], kernel_size=5, stride=1, padding=2
                     ),
-                    sparsity=sparsity,
+                    sparsity=weight_sparsity,
                 ),
+            )
+            self.model.add_module(
+                "Kwinners2d1",
+                KWinners2d(
+                    self.filters[0],
+                    percent_on=0.1,
+                    k_inference_factor=1.5,
+                    boost_strength=1.0,
+                    boost_strength_factor=0.9,
+                    duty_cycle_period=1000,
+                    local=False,
+                    break_ties=False,
+                    relu=False,
+                    inplace=False,
+                )
             )
             self.in_planes = self.filters[0]
             self.first_stride = 1

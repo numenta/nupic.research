@@ -59,8 +59,8 @@ aug = {"randcrop": 64,
 transform_unsupervised = get_transforms(val=False, aug=aug)
 transform_validation = transform_supervised = get_transforms(val=True, aug=aug)
 
-# base_dataset_args = dict(root="~/nta/data/STL10/", download=False)
-base_dataset_args = dict(root="~/nta/data/STL10/stl10_binary", download=False)
+base_dataset_args = dict(root="~/nta/data/STL10/", download=False)
+# base_dataset_args = dict(root="~/nta/data/STL10/stl10_binary", download=False)
 unsupervised_dataset_args = deepcopy(base_dataset_args)
 unsupervised_dataset_args.update(
     dict(transform=transform_unsupervised, split="unlabeled")

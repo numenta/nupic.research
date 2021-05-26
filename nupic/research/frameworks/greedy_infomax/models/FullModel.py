@@ -162,7 +162,8 @@ class SparseFullVisionModel(FullVisionModel):
         grayscale=True,
         patch_size=16,
         overlap=2,
-        sparsity=None,
+        weight_sparsity=None,
+        activation_sparsity=None,
     ):
         super(SparseFullVisionModel, self).__init__(
             negative_samples=negative_samples,
@@ -172,8 +173,10 @@ class SparseFullVisionModel(FullVisionModel):
             patch_size=patch_size,
             overlap=overlap,
         )
-        if sparsity is None:
-            sparsity = [0.5, 0.5, 0.5]
+        if weight_sparsity is None:
+            weight_sparsity = [0.5, 0.5, 0.5]
+        if activation_sparsity is None:
+            activation_sparsity = [0.5, 0.5, 0.5]
 
         block_dims = [3, 4, 6]
         num_channels = [64, 128, 256]
@@ -200,6 +203,7 @@ class SparseFullVisionModel(FullVisionModel):
                     input_dims=input_dims,
                     k_predictions=self.k_predictions,
                     negative_samples=self.negative_samples,
-                    sparsity=sparsity[idx],
+                    weight_sparsity=weight_sparsity[idx],
+                    activation_sparsity=activation_sparsity[idx]
                 )
             )
