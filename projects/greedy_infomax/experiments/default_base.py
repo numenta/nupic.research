@@ -33,7 +33,7 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_cross_entropy,
 )
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
-
+from copy import deepcopy
 
 class GreedyInfoMaxExperiment(
     mixins.LogEveryLoss, experiments.SelfSupervisedExperiment
@@ -174,5 +174,13 @@ DEFAULT_BASE = dict(
     verbose=1,
 )
 
+VALIDATE_ONLY = deepcopy(DEFAULT_BASE)
+VALIDATE_ONLY.update(dict(
+    epochs=0,
+    epochs_to_validate=[0],
+    supervised_training_epochs_per_validation=25,
+))
 
-CONFIGS = dict(default_base=DEFAULT_BASE)
+
+CONFIGS = dict(default_base=DEFAULT_BASE,
+               validate_only=VALIDATE_ONLY)

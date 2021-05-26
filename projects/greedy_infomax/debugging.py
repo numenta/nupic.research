@@ -19,30 +19,28 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-
-from copy import deepcopy
-
 import torch
-from torchvision import transforms
 from torchvision.datasets import STL10
-import time
-from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
-    multiple_cross_entropy,
-    multiple_log_softmax_nll_loss,
+
+from nupic.research.frameworks.greedy_infomax.models import (
+    ClassificationModel,
+    SparseFullVisionModel,
 )
 from nupic.research.frameworks.greedy_infomax.utils.data_utils import STL10_DATASET_ARGS
-from nupic.research.frameworks.greedy_infomax.models import SparseFullVisionModel, \
-    ClassificationModel
-from nupic.research.frameworks.vernon import experiments, mixins
+from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
+    multiple_log_softmax_nll_loss,
+)
+from nupic.research.frameworks.vernon import experiments
 
 BATCH_SIZE = 32
 NUM_CLASSES = 10
-NUM_EPOCHS=1
+NUM_EPOCHS = 1
 self_supervised_config = dict(
     experiment_class=experiments.SelfSupervisedExperiment,
     # wandb
-    wandb_args=dict(project="greedy_infomax",
-                    name="paper-replication-small-baseline-2"),
+    wandb_args=dict(
+        project="greedy_infomax", name="paper-replication-small-baseline-2"
+    ),
     # Dataset
     dataset_class=STL10,
     dataset_args=STL10_DATASET_ARGS,
@@ -86,7 +84,7 @@ self_supervised_config = dict(
         grayscale=True,
         patch_size=16,
         overlap=2,
-        sparsity=[0.5, 0.5, 0.5]
+        sparsity=[0.5, 0.5, 0.5],
     ),
     classifier_config=dict(
         model_class=ClassificationModel,
@@ -134,7 +132,7 @@ self_supervised_config = dict(
 )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     exp = self_supervised_config["experiment_class"]()
     exp.setup_experiment(self_supervised_config)
     exp.run_epoch()

@@ -24,7 +24,7 @@ import sys
 import torch
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import OneCycleLR
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
@@ -134,7 +134,6 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         self.logger.debug(self.classifier)
         self.model = EncoderClassifier(self.encoder, self.classifier)
         self.model.to(self.device)
-
 
         self.encoder_optimizer = self.optimizer
         self.classifier_optimizer = self.create_optimizer(
