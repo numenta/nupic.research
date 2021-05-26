@@ -52,7 +52,10 @@ def get_transforms(val=False, aug=None):
 
 
 # labeled train set: mean [0.4469, 0.4400, 0.4069], std [0.2603, 0.2566, 0.2713]
-aug = {"randcrop": 64, "flip": True, "bw_mean": [0.4120], "bw_std": [0.2570]}
+aug = {"randcrop": 64,
+       "flip": True,
+       "bw_mean": [0.4120],
+       "bw_std": [0.2570]}
 transform_unsupervised = get_transforms(val=False, aug=aug)
 transform_validation = transform_supervised = get_transforms(val=True, aug=aug)
 

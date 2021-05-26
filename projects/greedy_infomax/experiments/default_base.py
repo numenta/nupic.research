@@ -92,7 +92,7 @@ DEFAULT_BASE = dict(
     # 500 training images (10 pre-defined folds)
     # 8000 test images (800 test images per class)
     # 100,000 unlabeled images
-    num_unsupervised_samples=10000,
+    # num_unsupervised_samples=10000,
     # num_supervised_samples=500,
     # num_validation_samples=32,
     reuse_actors=True,
