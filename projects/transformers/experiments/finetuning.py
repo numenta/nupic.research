@@ -129,6 +129,38 @@ finetuning_bert100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
 )
 
+# the name 'simple' is in reference to the paper
+# "On the stability of finetuning BERT"
+# where they propose a "simple but hard to beat" approach
+# https://openreview.net/pdf?id=nzpLWnVAyah
+# num_train_epochs rationale:
+# they say rte for 20 is good ~ 50k iterations
+# train for 50k iterations unless 1 epoch > 50k samples
+# then set to 3 epochs for medium sized like sst2 (67k)
+# or set to 1 epoch for large datasets like qqp
+finetuning_bert100k_glue_simple = deepcopy(finetuning_bert100k_glue)
+finetuning_bert100k_glue_simple.update(
+    warmup_ratio=0.1,
+    task_hyperparams=dict(
+        cola=dict(num_train_epochs=6, num_runs=5),  # 6 * 8500 ~ 50k
+        sst2=dict(num_runs=3),  # 67k training size > 50k, default 3 epochs
+        mrpc=dict(num_train_epochs=14, num_runs=3),  # 3700 * 14 ~ 51k
+        stsb=dict(num_train_epochs=8, num_runs=3),  # 7000*8 > 50k
+        # hypothesis for qqp, mnli: training stable < 300k iterations
+        # more runs is better than 1 run with more epochs
+        qqp=dict(num_train_epochs=1, num_runs=3),  # 300k >> 50k
+        mnli=dict(num_train_epochs=1, num_runs=3),  # 300k >> 50k
+        qnli=dict(num_runs=3),  # 100k > 50k, defualt to 3 epochs
+        rte=dict(num_train_epochs=20, num_runs=3),  # exatly as in paper
+        wnli=dict(num_train_epochs=79, num_runs=3)  # large n_epochs to hit > 50k
+    )
+)
+
+finetuning_bert1mi_glue_simple = deepcopy(finetuning_bert100k_glue_simple)
+finetuning_bert1mi_glue_simple.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi"
+)
+
 finetuning_bert1mi_glue = deepcopy(finetuning_bert700k_glue)
 finetuning_bert1mi_glue.update(
     # logging
@@ -141,6 +173,15 @@ finetuning_bert100k_single_task.update(
     # logging
     task_name=None,
     task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
+)
+
+finetuning_bert1mi_wnli = deepcopy(finetuning_bert100k_single_task)
+finetuning_bert1mi_wnli.update(
+    task_name=None,
+    task_names=["wnli"],
+    evaluation_strategy="steps",
+    eval_steps=18
+
 )
 
 
@@ -209,7 +250,10 @@ CONFIGS = dict(
     finetuning_tiny_bert50k_glue=finetuning_tiny_bert50k_glue,
     finetuning_bert700k_glue=finetuning_bert700k_glue,
     finetuning_bert700k_single_task=finetuning_bert700k_single_task,
+    finetuning_bert100k_glue_simple=finetuning_bert100k_glue_simple,
     finetuning_bert1mi_glue=finetuning_bert1mi_glue,
+    finetuning_bert1mi_glue_simple=finetuning_bert1mi_glue_simple,
+    finetuning_bert1mi_wnli=finetuning_bert1mi_wnli,
     finetuning_bert1mi_single_task=finetuning_bert1mi_single_task,
     finetuning_sparse_bert_100k_glue=finetuning_sparse_bert_100k_glue,
     finetuning_sparse_encoder_bert_100k_glue=finetuning_sparse_encoder_bert_100k_glue,

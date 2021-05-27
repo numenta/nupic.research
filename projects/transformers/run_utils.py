@@ -144,7 +144,7 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     Evaluate tasks after finetuning.
     Returns evaluation dict with results.
     """
-    drop_last = toggle_drop_last(trainer, False)  # should_drop_last=False
+    # drop_last = toggle_drop_last(trainer, False)  # should_drop_last=False
     eval_results = {}
 
     for eval_dataset, task in zip(eval_datasets, tasks):
@@ -164,7 +164,7 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
                     writer.write(f"{key} = {value}\n")
 
     # if you want drop_last for training, this toggles it back on
-    _ = toggle_drop_last(trainer, drop_last)
+    # _ = toggle_drop_last(trainer, drop_last)
 
     return eval_results
 
@@ -174,7 +174,7 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
     Test tasks after finetuning.
     """
 
-    drop_last = toggle_drop_last(trainer, False)
+    # drop_last = toggle_drop_last(trainer, False)
 
     for test_dataset, task in zip(test_datasets, tasks):
         # Removing the `label` columns because it contains -1
@@ -198,12 +198,12 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
                         item = label_list[item]
                         writer.write(f"{index}\t{item}\n")
 
-    _ = toggle_drop_last(trainer, drop_last)
+    # _ = toggle_drop_last(trainer, drop_last)
 
 
 def evaluate_language_model(trainer, eval_dataset, output_dir):
     """Evaluate language model. Returns dict with results on perplexity metric. """
-    drop_last = toggle_drop_last(trainer, False)
+    # drop_last = toggle_drop_last(trainer, False)
 
     results = {}
     eval_output = trainer.evaluate(eval_dataset)
@@ -219,7 +219,7 @@ def evaluate_language_model(trainer, eval_dataset, output_dir):
                 logging.info(f"  {key} = {value}")
                 writer.write(f"{key} = {value}\n")
 
-    _ = toggle_drop_last(trainer, drop_last)
+    # _ = toggle_drop_last(trainer, drop_last)
 
     return results
 
@@ -708,6 +708,22 @@ def init_model(model_args, config, tokenizer, finetuning=False):
     return model
 
 
+def toggle_drop_last_factory(method):
+    """
+    Return a function that turns drop_last off before it is called.
+    Used for ensuring trainer.args.dataloader_drop_last is False
+    during evaluation steps, left on for others
+    """
+    def toggle_method(*args, **kwargs):
+        was_drop_last = method.__self__.args.dataloader_drop_last
+        method.__self__.args.dataloader_drop_last = False
+        result = method(*args, **kwargs)
+        method.__self__.args.dataloader_drop_last = was_drop_last
+        return result
+
+    return toggle_method
+
+
 def init_trainer(
     tokenizer,
     data_collator,
@@ -750,6 +766,13 @@ def init_trainer(
         trainer_kwargs.update(compute_metrics=compute_metrics)
 
     trainer = trainer_class(**trainer_kwargs)
+
+    # issue: labels gettings set to -100 due to drop_last
+    # fix: override the evaluate and predict functions
+    # previous fix covers any time we call either method
+    # this fix should cover every time HF calls it
+    trainer.evaluate = toggle_drop_last_factory(trainer.evaluate)
+    trainer.predict = toggle_drop_last_factory(trainer.predict)
 
     return trainer
 
