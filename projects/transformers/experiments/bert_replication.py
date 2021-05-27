@@ -140,6 +140,7 @@ bert_100k_deepspeed_bsz_2k.update(
         },
         "fp16": {
             "enabled": True,
+            "initial_scale_power": 14,
         },
         "gradient_clipping": 1.0,
         "sparse_gradients": True,
