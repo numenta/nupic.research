@@ -261,9 +261,14 @@ finetuning_bert_sparse_trifecta_100k_glue.update(
 finetuning_bert_sparse_trifecta_100k_glue_simple = deepcopy(
     finetuning_bert100k_glue_simple)
 finetuning_bert_sparse_trifecta_100k_glue_simple.update(
+    # Model arguments
     model_type="fully_static_sparse_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/"
+    "bert_sparse_80%_trifecta_100k",
 )
+
+# alias with a shorter variable name for pep8 compliance below
+ft_bert_sp_tri_100k_g_s = finetuning_bert_sparse_trifecta_100k_glue_simple
 
 
 CONFIGS = dict(
@@ -281,6 +286,6 @@ CONFIGS = dict(
     # BERT Base
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
-    finetuning_bert_sparse_trifecta_100k_glue_simple=finetuning_bert_sparse_trifecta_100k_glue_simple
+    finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
 
 )

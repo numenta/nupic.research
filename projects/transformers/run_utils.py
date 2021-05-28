@@ -676,17 +676,18 @@ def init_model(model_args, config, tokenizer, finetuning=False):
     return model
 
 
-def toggle_drop_last_factory(method):
+def toggle_drop_last_wrapper(method):
     """
-    Return a function that turns drop_last off before it is called.
-    Used for ensuring trainer.args.dataloader_drop_last is False
-    during evaluation steps, left on for others
+    Return a function that turns drop_last off before it is called. Used for ensuring
+        trainer.args.dataloader_drop_last is False during evaluation steps. After
+        the method is called, dataloader_drop_last is switched back to whatever it was
+        set to initially.
     """
     def toggle_method(*args, **kwargs):
-        was_drop_last = method.__self__.args.dataloader_drop_last
-        method.__self__.args.dataloader_drop_last = False
-        result = method(*args, **kwargs)
-        method.__self__.args.dataloader_drop_last = was_drop_last
+        was_drop_last = method.__self__.args.dataloader_drop_last  # initial drop_last
+        method.__self__.args.dataloader_drop_last = False  # turn drop_last off
+        result = method(*args, **kwargs)  # call method with drop_last off
+        method.__self__.args.dataloader_drop_last = was_drop_last  # restore drop_last
         return result
 
     return toggle_method
@@ -735,12 +736,12 @@ def init_trainer(
 
     trainer = trainer_class(**trainer_kwargs)
 
-    # issue: labels gettings set to -100 due to drop_last
-    # fix: override the evaluate and predict functions
-    # previous fix covers any time we call either method
-    # this fix should cover every time HF calls it
-    trainer.evaluate = toggle_drop_last_factory(trainer.evaluate)
-    trainer.predict = toggle_drop_last_factory(trainer.predict)
+    # Issue: labels get set to -100 due to drop_last.
+    # Fix: override the evaluate and predict methods.
+    # The previous fix covered cases when WE call trainer.{evaluate, predict}.
+    # This fix should cover all cases, including any time HF calls these methods.
+    trainer.evaluate = toggle_drop_last_wrapper(trainer.evaluate)
+    trainer.predict = toggle_drop_last_wrapper(trainer.predict)
 
     return trainer
 

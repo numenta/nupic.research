@@ -129,15 +129,27 @@ finetuning_bert100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
 )
 
-# the name 'simple' is in reference to the paper
-# "On the stability of finetuning BERT"
+# The name 'simple' is in reference to the paper "On the stability of finetuning BERT"
 # where they propose a "simple but hard to beat" approach
-# https://openreview.net/pdf?id=nzpLWnVAyah
-# num_train_epochs rationale:
-# they say rte for 20 is good ~ 50k iterations
-# train for 50k iterations unless 1 epoch > 50k samples
-# then set to 3 epochs for medium sized like sst2 (67k)
-# or set to 1 epoch for large datasets like qqp
+#       https://openreview.net/pdf?id=nzpLWnVAyah
+#
+# How to decided num_train_epochs for each task:
+# They recommend 20 epochs for rte, which is about 50k iterations. They also claim that
+# the number of iterations is more important than dataset size. Here I aim for 50k
+# iterations, unless the size of the training set is already > 50k.
+#
+#       if len(train_dataset) < 50k
+#           train for ~ 50k iterations = round(50k / len(train_dataset))
+#           (cola, mrpc, stsb, rte, wnli)
+#
+#       elif 50k <= len(train_dataset) < 300k
+#           use the default of 3 epochs
+#           (sst2, wnli)
+#
+#       elif len(train_dataset) >= 300k
+#           train for 1 epoch
+#           (qqp, mnli)
+
 finetuning_bert100k_glue_simple = deepcopy(finetuning_bert100k_glue)
 finetuning_bert100k_glue_simple.update(
     warmup_ratio=0.1,
@@ -180,8 +192,8 @@ finetuning_bert1mi_wnli.update(
     task_name=None,
     task_names=["wnli"],
     evaluation_strategy="steps",
-    eval_steps=18
-
+    eval_steps=15,
+    num_train_epochs=5,
 )
 
 
