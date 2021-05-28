@@ -18,7 +18,6 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
 from copy import deepcopy
 
 from ray import tune
@@ -291,6 +290,42 @@ finetuning_bert_sparse_kd_oncycle_lr_100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_kd_onecycle_lr_100k",  # noqa: E501
 )
 
+#############
+# Deepspeed #
+#############
+
+# This lr-range test is based on `bert_sparse_100k_kd_lr_range_test` and adapted
+# for deepspeed training.
+# With this test the best `max_lr` value found is `0.0017`.
+# On four p3.16xlarge it takes ~20m to run
+bert_sparse_100k_kd_lr_range_test_deepspeed = deepcopy(bert_sparse_100k_kd_lr_range_test)  # noqa: E501
+bert_sparse_100k_kd_lr_range_test_deepspeed.update(
+    max_steps=100,
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    fp16=False,  # Use deepspeed FP16 instead of apex
+    deepspeed={
+        "zero_optimization": {
+            "stage": 1,
+        },
+        # When using fp16 dynamic loss scale, deepspeed will skip the optimizer
+        # and LR scheduler steps whenever the loss value overflows (NaN/Inf).
+        # Using deepspeed default values the loss will likely overflow on the
+        # first few steps as the dynamic loss scale warms up. When the loss
+        # overflows, huggingface will detect the LR scheduler step was skipped
+        # and return zero as the current learning rate potentially affecting the
+        # results of the LR range test. To avoid loss overflow during the LR
+        # range test you could use static loss scale or use a smaller initial
+        # scale power.
+        # See https://www.deepspeed.ai/docs/config-json/#fp16-training-options
+        "fp16": {
+            "enabled": True,
+            "initial_scale_power": 14,
+        },
+        "gradient_clipping": 1.0,
+        "sparse_gradients": True,
+        "steps_per_print": 1,
+    }
+)
 
 CONFIGS = dict(
     # Tiny BERT
@@ -309,4 +344,7 @@ CONFIGS = dict(
     bert_sparse_100k_kd_oncycle_lr=bert_sparse_100k_kd_oncycle_lr,
     bert_sparse_100k_kd_lr_range_test=bert_sparse_100k_kd_lr_range_test,
     finetuning_bert_sparse_kd_oncycle_lr_100k_glue=finetuning_bert_sparse_kd_oncycle_lr_100k_glue,  # noqa: E501
+
+    # Deepspeed
+    bert_sparse_100k_kd_lr_range_test_deepspeed=bert_sparse_100k_kd_lr_range_test_deepspeed,  # noqa: E501
 )
