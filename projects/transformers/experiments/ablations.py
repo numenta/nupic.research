@@ -290,9 +290,9 @@ finetuning_bert_sparse_kd_oncycle_lr_100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_kd_onecycle_lr_100k",  # noqa: E501
 )
 
-#############
-# Deepspeed #
-#############
+# ---------
+# Deepspeed
+# ---------
 
 # This lr-range test is based on `bert_sparse_100k_kd_lr_range_test` and adapted
 # for deepspeed training.
