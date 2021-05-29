@@ -35,9 +35,6 @@ from experiments import CONFIGS
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
 from nupic.research.frameworks.vernon.run_with_raytune import run
 
-# TODO: there are mixins that assume create_optimizer is a class method. We made it
-#       a normal method, so need to fix
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
