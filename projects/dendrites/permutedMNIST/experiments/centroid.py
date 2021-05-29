@@ -28,14 +28,17 @@ import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
+from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
+    DendriteContinualLearningExperiment,
+)
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
+from nupic.research.frameworks.vernon import mixins
 
 
 class CentroidExperiment(mixins.RezeroWeights,
                          mixins.CentroidContext,
                          mixins.PermutedMNISTTaskIndices,
-                         ContinualLearningExperiment):
+                         DendriteContinualLearningExperiment):
     pass
 
 
@@ -94,9 +97,20 @@ CENTROID_50.update(
     num_classes=10 * 50,
 )
 
+# Two tasks only, for debugging
+CENTROID_2 = deepcopy(CENTROID_10)
+CENTROID_2["dataset_args"].update(num_tasks=2)
+CENTROID_2["model_args"].update(num_segments=2)
+CENTROID_2.update(
+    epochs=1,
+    num_samples=1,
+    num_tasks=2,
+    num_classes=10 * 2,
+)
 
 # Export configurations in this file
 CONFIGS = dict(
+    centroid_2=CENTROID_2,
     centroid_10=CENTROID_10,
     centroid_50=CENTROID_50,
 )

@@ -82,6 +82,7 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
             criterion=self.error_loss,
             share_labels=True,
             num_labels=10,
+            context_vector=self.context_vector,
             post_batch_callback=self.post_batch_wrapper
         )
 
