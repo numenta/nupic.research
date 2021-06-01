@@ -26,6 +26,8 @@ from copy import deepcopy
 
 from .base import transformers_base
 
+from callbacks import TrackEvalResults
+
 """
 Expected for qnli 0.9066 acc, 41 min training time. seed may affect result
 Achieved ~0.8896 acc, 11min training time on 4 GPUs.
@@ -187,6 +189,16 @@ finetuning_bert100k_single_task.update(
     task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
 )
 
+# notes for liveshare...
+# requirements:
+#   for each individual trial...
+#       track eval metrics throughout training, not just at end
+#       track the same metrics for training set and eval set
+#       separate metrics for each task
+# results = {
+#       "wnli/0/train_step": 50,
+#       "wnli/0/acc": 0.71,
+# }
 finetuning_bert1mi_wnli = deepcopy(finetuning_bert100k_single_task)
 finetuning_bert1mi_wnli.update(
     task_name=None,
@@ -194,6 +206,7 @@ finetuning_bert1mi_wnli.update(
     evaluation_strategy="steps",
     eval_steps=15,
     num_train_epochs=5,
+    trainer_callbacks=[TrackEvalResults()],
 )
 
 

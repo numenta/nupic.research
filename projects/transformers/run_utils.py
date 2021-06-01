@@ -768,17 +768,18 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
 
     if task_name is not None:
         if task_name == "cola":
-            result = {"matthews_correlation": matthews_corrcoef(ep.label_ids, preds)}
+            key = task_name + "_mathews_correlation"
+            result = {key: matthews_corrcoef(ep.label_ids, preds)}
         elif task_name == "stsb":
             result = pearson_and_spearman(preds, ep.label_ids)
         elif task_name in ["mrpc", "qqp"]:
             result = acc_and_f1(preds, ep.label_ids)
         elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
                            "qnli", "rte", "wnli", "hans"]:
-            result = {"accuracy": simple_accuracy(preds, ep.label_ids)}
+            result = {task_name + "_accuracy": simple_accuracy(preds, ep.label_ids)}
         # Consolidate if more than one metric
         if len(result) > 1:
-            result["combined_score"] = np.mean(list(result.values())).item()
+            result[task_name + "_combined_score"] = np.mean(list(result.values())).item()
         return result
     elif is_regression:
         return {"mse": ((preds - ep.label_ids) ** 2).mean().item()}
@@ -790,21 +791,25 @@ def simple_accuracy(preds, labels):
     return (preds == labels).mean()
 
 
-def acc_and_f1(preds, labels):
+def acc_and_f1(preds, labels, task_name=None):
     acc = simple_accuracy(preds, labels)
     f1 = f1_score(y_true=labels, y_pred=preds)
+    task_name = "" if task_name is None else task_name + "_"
+    # Include task name in results for clarity
     return {
-        "accuracy": acc,
-        "f1": f1,
+        task_name + "accuracy": acc,
+        task_name + "f1": f1,
     }
 
 
-def pearson_and_spearman(preds, labels):
+def pearson_and_spearman(preds, labels, task_name=None):
     pearson_corr = pearsonr(preds, labels)[0]
     spearman_corr = spearmanr(preds, labels)[0]
+    task_name = "" if task_name is None else task_name + "_"
+    # Include task name in results for clarity
     return {
-        "pearson": pearson_corr,
-        "spearmanr": spearman_corr,
+        task_name + "pearson": pearson_corr,
+        task_name + "spearmanr": spearman_corr,
     }
 
 
