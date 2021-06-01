@@ -346,7 +346,7 @@ def run_finetuning_single_task(
             tasks.append("mnli-mm")
             eval_datasets.append(tokenized_datasets["validation_mismatched"])
 
-        evaluate_tasks(
+        eval_results = evaluate_tasks(
             trainer, training_args.output_dir, tasks, eval_datasets
         )
 
@@ -416,7 +416,7 @@ def run_finetuning_multiple_tasks(
             # reset seed per run
             training_args.seed = random.randint(0, 1000000000)
             set_seed(training_args.seed)
-            # turn eval_results into a time series
+
             eval_results = run_finetuning_single_task(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
