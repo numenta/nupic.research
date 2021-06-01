@@ -768,7 +768,7 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
 
     if task_name is not None:
         if task_name == "cola":
-            result = {"mathews_correlation": matthews_corrcoef(ep.label_ids, preds)}
+            result = {"matthews_correlation": matthews_corrcoef(ep.label_ids, preds)}
         elif task_name == "stsb":
             result = pearson_and_spearman(preds, ep.label_ids)
         elif task_name in ["mrpc", "qqp"]:
