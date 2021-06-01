@@ -678,10 +678,10 @@ def init_model(model_args, config, tokenizer, finetuning=False):
 
 def toggle_drop_last_wrapper(method):
     """
-    Return a function that turns drop_last off before it is called. Used for ensuring
-        trainer.args.dataloader_drop_last is False during evaluation steps. After
-        the method is called, dataloader_drop_last is switched back to whatever it was
-        set to initially.
+    Return a function that turns drop_last off before it is called. Used for
+    ensuring trainer.args.dataloader_drop_last is False during evaluation
+    steps. After the method is called, dataloader_drop_last is switched back
+    to whatever it was set to initially.
     """
     def toggle_method(*args, **kwargs):
         was_drop_last = method.__self__.args.dataloader_drop_last  # initial drop_last
