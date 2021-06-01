@@ -334,10 +334,6 @@ def run_finetuning_single_task(
     if training_args.do_train:
         train(trainer, training_args.output_dir, last_checkpoint)
 
-    # after training, want access to time series of evaluation metrics
-    # https://huggingface.co/transformers/main_classes/callback.html#transformers.TrainerCallback
-    # maybe use on_evaluate callbacks
-
     # Evaluate
     eval_results = {}
     if training_args.do_eval:
@@ -353,12 +349,6 @@ def run_finetuning_single_task(
         evaluate_tasks(
             trainer, training_args.output_dir, tasks, eval_datasets
         )
-
-    # Retrieve all eval results
-    # eval_callback = trainer.callbacks["blah"]
-    # all_eval_results = eval_callback.all_eval_results
-    # make sure to pass this to the list of callbacks
-    # trainer_callbacks = model_args.trainer_callbacks
 
     # Test/Predict
     if training_args.do_predict:
@@ -421,8 +411,7 @@ def run_finetuning_multiple_tasks(
         # create Task Results
         task_results = TaskResults(task_name, training_args=training_args)
 
-        # Run finetuning and save resultsf
-        # livecoding note... can punch in the run number to eval_results keys
+        # Run finetuning and save results
         for _ in range(training_args.num_runs):
             # reset seed per run
             training_args.seed = random.randint(0, 1000000000)
