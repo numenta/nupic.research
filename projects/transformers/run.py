@@ -184,9 +184,6 @@ def main():
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
 
-        import pdb
-        pdb.set_trace()
-
         # destroy process group before launching another experiment
         if cmd_args.local_rank:
             torch.distributed.destroy_process_group()
@@ -435,9 +432,6 @@ def run_finetuning_multiple_tasks(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
             task_results.append(eval_results)
-
-        import pdb
-        pdb.set_trace()
 
         task_results.reduce_metrics(reduction="mean")
         logging.info(f"{task_name} results: {task_results.to_string()}")
