@@ -31,7 +31,7 @@ DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
 SPARSE_BASE = deepcopy(DEFAULT_BASE)
 SPARSE_BASE.update(
     dict(
-        wandb_args=dict(project="greedy_infomax", name="sparse_resnet34_base_0.5"),
+        wandb_args=dict(project="greedy_infomax-sparsity", name="sparse_resnet_base"),
         epochs=NUM_EPOCHS,
         batch_size=BATCH_SIZE,
         model_class=SparseFullVisionModel,

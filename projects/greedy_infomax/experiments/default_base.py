@@ -19,6 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from copy import deepcopy
+
 import numpy as np
 import torch
 from torch.utils.data.dataset import Subset
@@ -30,14 +32,19 @@ from nupic.research.frameworks.greedy_infomax.models import (
 )
 from nupic.research.frameworks.greedy_infomax.utils.data_utils import STL10_DATASET_ARGS
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
-    multiple_cross_entropy,
+    multiple_log_softmax_nll_loss,
 )
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
-from copy import deepcopy
+
 
 class GreedyInfoMaxExperiment(
     mixins.LogEveryLoss, experiments.SelfSupervisedExperiment
 ):
+    def transform_data_to_device_unsupervised(self, data, target, device, non_blocking):
+        data = data.to(self.device, non_blocking=non_blocking)
+        target = target.to(self.device, non_blocking=non_blocking)
+        return data, target
+
     def create_loaders(self, config):
         unsupervised_data = self.load_dataset(config, dataset_type="unsupervised")
         if config.get("reuse_unsupervised_dataset", False):
@@ -83,7 +90,7 @@ DEFAULT_BASE = dict(
     experiment_class=GreedyInfoMaxExperiment,
     # wandb
     wandb_args=dict(
-        project="greedy_infomax", name="paper-replication-small-pooling-after"
+        project="greedy_infomax-replication", name="s20/default-lr/full-epoch/"
     ),
     # Dataset
     dataset_class=STL10,
@@ -92,7 +99,7 @@ DEFAULT_BASE = dict(
     # 500 training images (10 pre-defined folds)
     # 8000 test images (800 test images per class)
     # 100,000 unlabeled images
-    # num_unsupervised_samples=10000,
+    # num_unsupervised_samples=1000,
     # num_supervised_samples=500,
     # num_validation_samples=32,
     reuse_actors=True,
@@ -107,7 +114,12 @@ DEFAULT_BASE = dict(
     # Validation batch size
     val_batch_size=32,
     # Number of batches per epoch. Useful for debugging
-    # batches_in_epoch=5,
+    # batches_in_epoch=25,
+    # Number of batches per supervised epoch
+    # batches_in_epoch_supervised = 25,
+    unsupervised_loader_drop_last=False,
+    supervised_loader_drop_last=False,
+    validation_loader_drop_last=False,
     # batches_in_epoch_supervised=1,
     # batches_in_epoch_val=1,
     # Update this to stop training when accuracy reaches the metric value
@@ -115,7 +127,7 @@ DEFAULT_BASE = dict(
     stop=dict(),
     # Number of epochs
     epochs=NUM_EPOCHS,
-    epochs_to_validate=[0, 5, 10, 20, 30, 40, 50, 59],
+    epochs_to_validate=range(0, NUM_EPOCHS, 10),
     # Which epochs to run and report inference over the validation dataset.
     # epochs_to_validate=range(-1, 30),  # defaults to the last 3 epochs
     # Model class. Must inherit from "torch.nn.Module"
@@ -136,14 +148,15 @@ DEFAULT_BASE = dict(
         # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
         optimizer_class=torch.optim.Adam,
         # Optimizer class class arguments passed to the constructor
-        optimizer_args=dict(lr=2e-3),
+        optimizer_args=dict(lr=2e-4),
     ),
-    supervised_training_epochs_per_validation=20,
-    loss_function=multiple_cross_entropy,  # each GIM layer has a cross-entropy
+    supervised_training_epochs_per_validation=30,
+    reset_on_validate=False,
+    loss_function=multiple_log_softmax_nll_loss,  # each GIM layer has a cross-entropy
     # Optimizer class. Must inherit from "torch.optim.Optimizer"
     optimizer_class=torch.optim.Adam,
     # Optimizer class class arguments passed to the constructor
-    optimizer_args=dict(lr=1.5e-3),
+    optimizer_args=dict(lr=2e-4),
     # # Learning rate scheduler class. Must inherit from "_LRScheduler"
     # lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
     # Distributed parameters
@@ -174,19 +187,34 @@ DEFAULT_BASE = dict(
     verbose=1,
 )
 
+# GIM_BASE = deepcopy(DEFAULT_BASE)
+# GIM_BASE.update(dict(
+#     wandb_args=dict(
+#         project="greedy_infomax", name="validation-paper-replication"
+#     ),
+#     model_class=GIMFullVisionModel,
+#     model_args=dict(
+#         negative_samples=16,
+#         k_predictions=5,
+#         resnet_50=False,
+#         grayscale=True,
+#         patch_size=16,
+#         overlap=2,
+#     ),
+# ))
+
 VALIDATE_ONLY = deepcopy(DEFAULT_BASE)
-VALIDATE_ONLY.update(dict(
-    wandb_args=dict(
-        project="greedy_infomax", name="validation-paper-replication"
-    ),
-    epochs=61,
-    epochs_to_validate=[60, 61],
-    supervised_training_epochs_per_validation=20,
-    num_unsupervised_samples=32,
-    # num_supervised_samples=500,
-    # num_validation_samples=32,
-))
+VALIDATE_ONLY.update(
+    dict(
+        wandb_args=dict(project="greedy_infomax", name="validation-paper-replication"),
+        epochs=61,
+        epochs_to_validate=[60, 61],
+        supervised_training_epochs_per_validation=20,
+        num_unsupervised_samples=32,
+        # num_supervised_samples=500,
+        # num_validation_samples=32,
+    )
+)
 
 
-CONFIGS = dict(default_base=DEFAULT_BASE,
-               validate_only=VALIDATE_ONLY)
+CONFIGS = dict(default_base=DEFAULT_BASE, validate_only=VALIDATE_ONLY)

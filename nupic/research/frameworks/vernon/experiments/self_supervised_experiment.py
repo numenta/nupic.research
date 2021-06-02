@@ -116,12 +116,6 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                                                          validation loop
             - reuse_unsupervised_dataset: if True, will reuse the unsupervised
                                           dataset during supervised training
-            - num_unsupervised_samples: optionally select a random subset from the
-                                        unsupervised dataset for faster training
-            - num_supervised_samples: optionally select a random subset from the
-                                      supervised dataset for faster training
-            - num_validation_samples: optionally select a random subset from the
-                                      validation dataset for faster validation
         """
 
         super().setup_experiment(config)
@@ -255,23 +249,14 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
     @classmethod
     def create_unsupervised_sampler(cls, config, dataset):
-        # num_samples = config.get("num_unsupervised_samples", -1)
-        # if num_samples > 0:
-        #     return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod
     def create_supervised_sampler(cls, config, dataset):
-        # num_samples = config.get("num_supervised_samples", -1)
-        # if num_samples > 0:
-        #     return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
-        # num_samples = config.get("num_validation_samples", -1)
-        # if num_samples > 0:
-        #     return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod

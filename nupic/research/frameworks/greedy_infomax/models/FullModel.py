@@ -138,7 +138,7 @@ class FullVisionModel(torch.nn.Module):
 
 class SparseFullVisionModel(FullVisionModel):
     """
-    A sparse weights version of the above FullVisionModel.
+    A version of the above FullVisionModel that uses sparse weights and activations.
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.
                           For example, if k_predictions is 5 and skip_step is 1,
@@ -162,8 +162,8 @@ class SparseFullVisionModel(FullVisionModel):
         grayscale=True,
         patch_size=16,
         overlap=2,
-        weight_sparsity=None,
-        activation_sparsity=None,
+        sparsity=None,
+        percent_on=None,
     ):
         super(SparseFullVisionModel, self).__init__(
             negative_samples=negative_samples,
@@ -173,10 +173,10 @@ class SparseFullVisionModel(FullVisionModel):
             patch_size=patch_size,
             overlap=overlap,
         )
-        if weight_sparsity is None:
-            weight_sparsity = [0.5, 0.5, 0.5]
-        if activation_sparsity is None:
-            activation_sparsity = [0.5, 0.5, 0.5]
+        if sparsity is None:
+            sparsity = [0.5, 0.5, 0.5]
+        if percent_on is None:
+            percent_on = [0.5, 0.5, 0.5]
 
         block_dims = [3, 4, 6]
         num_channels = [64, 128, 256]
@@ -203,7 +203,7 @@ class SparseFullVisionModel(FullVisionModel):
                     input_dims=input_dims,
                     k_predictions=self.k_predictions,
                     negative_samples=self.negative_samples,
-                    weight_sparsity=weight_sparsity[idx],
-                    activation_sparsity=activation_sparsity[idx]
+                    sparsity=sparsity[idx],
+                    percent_on=percent_on[idx],
                 )
             )

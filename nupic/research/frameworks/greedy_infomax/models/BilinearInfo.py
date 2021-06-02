@@ -27,9 +27,6 @@
 import torch
 import torch.nn as nn
 
-from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
-    make_delta_orthogonal,
-)
 from nupic.torch.modules import PrunableSparseWeights2d
 
 
@@ -83,18 +80,6 @@ class BilinearInfo(nn.Module):
             nn.Conv2d(in_channels, out_channels, 1, bias=False)
             for _ in range(self.k_predictions)
         )
-
-        if weight_init:
-            self.initialize()
-
-    def initialize(self):
-        for m in self.modules():
-            if isinstance(m, (nn.Conv2d,)):
-                if m in self.W_k:
-                    # nn.init.kaiming_normal_(
-                    #     m.weight, mode="fan_in", nonlinearity="tanh"
-                    # )
-                    make_delta_orthogonal(m.weight, nn.init.calculate_gain("sigmoid"))
 
     def forward(self, z, c, skip_step=1):
         """
