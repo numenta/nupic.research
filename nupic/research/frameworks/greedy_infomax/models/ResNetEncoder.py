@@ -30,7 +30,7 @@ from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import (
     BilinearInfo,
     SparseBilinearInfo,
 )
-from nupic.torch.modules import KWinners2d, PrunableSparseWeights2d
+from nupic.torch.modules import KWinners2d, SparseWeights2d
 
 
 class PreActBlockNoBN(nn.Module):
@@ -65,24 +65,28 @@ class PreActBlockNoBN(nn.Module):
 class SparsePreActBlockNoBN(PreActBlockNoBN):
     """Sparse version of the PreActBlockNoBN block."""
 
-    def __init__(self, in_planes, planes, stride=1, sparsity=0.2, percent_on=0.5):
+    def __init__(self,
+                 in_planes,
+                 planes,
+                 stride=1,
+                 sparse_weights_class=SparseWeights2d,
+                 sparsity=0.2,
+                 percent_on=0.5):
         super(SparsePreActBlockNoBN, self).__init__(in_planes, planes, stride=stride)
-        self.conv1 = PrunableSparseWeights2d(self.conv1, sparsity=sparsity)
+        self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity)
         self.kwinners1 = KWinners2d(in_planes, percent_on=percent_on)
-        self.conv2 = PrunableSparseWeights2d(self.conv2, sparsity=sparsity)
+        self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity)
         self.kwinners2 = KWinners2d(planes, percent_on=percent_on)
         self.kwinners3 = KWinners2d(planes, percent_on=percent_on)
         if hasattr(self, "shortcut"):
             self.shortcut = nn.Sequential(
-                PrunableSparseWeights2d(self.shortcut._modules["0"], sparsity=sparsity)
+                sparse_weights_class(self.shortcut._modules["0"], sparsity=sparsity)
             )
 
     def forward(self, x):
-        out = F.relu(x)
-        out = self.kwinners1(out)
+        out = self.kwinners1(x)
         shortcut = self.shortcut(out) if hasattr(self, "shortcut") else x
         out = self.conv1(out)
-        out = F.relu(x)
         out = self.kwinners2(out)
         out = self.conv2(out)
         out += shortcut
@@ -123,31 +127,36 @@ class PreActBottleneckNoBN(nn.Module):
 class SparsePreActBottleneckNoBN(PreActBottleneckNoBN):
     """Pre-activation version of the original Bottleneck module."""
 
-    def __init__(self, in_planes, planes, stride=1, sparsity=0.2, percent_on=0.5):
+    def __init__(self,
+                 in_planes,
+                 planes,
+                 stride=1,
+                 sparse_weights_class=SparseWeights2d,
+                 sparsity=0.5,
+                 percent_on=0.2):
         super(SparsePreActBottleneckNoBN, self).__init__(
             in_planes, planes, stride=stride
         )
-        self.conv1 = PrunableSparseWeights2d(self.conv1, sparsity=sparsity)
-        self.conv2 = PrunableSparseWeights2d(self.conv2, sparsity=sparsity)
-        self.conv3 = PrunableSparseWeights2d(self.conv3, sparsity=sparsity)
+        self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity)
+        self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity)
+        self.conv3 = sparse_weights_class(self.conv3, sparsity=sparsity)
         self.kwinners1 = KWinners2d(in_planes, percent_on=percent_on)
         self.kwinners2 = KWinners2d(planes, percent_on=percent_on)
         self.kwinners3 = KWinners2d(planes, percent_on=percent_on)
         self.kwinners4 = KWinners2d(planes, percent_on=percent_on)
         if hasattr(self, "shortcut"):
             self.shortcut = nn.Sequential(
-                PrunableSparseWeights2d(self.shortcut._modules["0"], sparsity=sparsity)
+                sparse_weights_class(self.shortcut._modules["0"], sparsity=sparsity)
             )
 
     def forward(self, x):
-        out = F.relu(x)
-        out = self.kwinners1(out)
+        out = self.kwinners1(x)
         shortcut = self.shortcut(out) if hasattr(self, "shortcut") else x
         out = self.conv1(out)
         out = self.kwinners2(out)
-        out = self.conv2(F.relu(out))
+        out = self.conv2(out)
         out = self.kwinners3(out)
-        out = self.conv3(F.relu(out))
+        out = self.conv3(out)
         out += shortcut
         out = self.kwinners4(out)
         return out
@@ -249,8 +258,8 @@ class SparseResNetEncoder(ResNetEncoder):
         k_predictions=5,
         patch_size=16,
         input_dims=3,
-        sparsity=None,
-        weight_init=False,
+        sparse_weights_class=SparseWeights2d,
+        sparsity=0.5,
         percent_on=0.5,
     ):
         super(SparseResNetEncoder, self).__init__(
@@ -268,7 +277,7 @@ class SparseResNetEncoder(ResNetEncoder):
         if encoder_num == 0:
             self.model.add_module(
                 "SparseConv1",
-                PrunableSparseWeights2d(
+                sparse_weights_class(
                     nn.Conv2d(
                         input_dims, self.filters[0], kernel_size=5, stride=1, padding=2
                     ),
@@ -295,6 +304,7 @@ class SparseResNetEncoder(ResNetEncoder):
                     self.filters[idx],
                     num_blocks[idx],
                     stride=self.first_stride,
+                    sparse_weights_class=sparse_weights_class,
                     sparsity=sparsity,
                     percent_on=percent_on,
                 ),
@@ -306,11 +316,18 @@ class SparseResNetEncoder(ResNetEncoder):
             out_channels=self.in_planes,
             negative_samples=negative_samples,
             k_predictions=k_predictions,
+            sparse_weights_class=sparse_weights_class,
             sparsity=sparsity,
         )
 
-    def _make_layer_sparse(
-        self, block, planes, num_blocks, stride=1, sparsity=0.1, percent_on=0.5
+    def _make_layer_sparse(self,
+                           block,
+                           planes,
+                           num_blocks,
+                           stride=1,
+                           sparse_weights_class=SparseWeights2d,
+                           sparsity=0.5,
+                           percent_on=0.2,
     ):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
@@ -320,6 +337,7 @@ class SparseResNetEncoder(ResNetEncoder):
                     self.in_planes,
                     planes,
                     stride=stride,
+                    sparse_weights_class=sparse_weights_class,
                     sparsity=sparsity,
                     percent_on=percent_on,
                 )

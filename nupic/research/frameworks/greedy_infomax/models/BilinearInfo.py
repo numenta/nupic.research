@@ -27,7 +27,7 @@
 import torch
 import torch.nn as nn
 
-from nupic.torch.modules import PrunableSparseWeights2d
+from nupic.torch.modules import SparseWeights2d
 
 
 class BilinearInfo(nn.Module):
@@ -68,7 +68,6 @@ class BilinearInfo(nn.Module):
         out_channels,
         negative_samples=16,
         k_predictions=5,
-        weight_init=False,
     ):
         super().__init__()
         self.negative_samples = negative_samples
@@ -169,10 +168,11 @@ class SparseBilinearInfo(BilinearInfo):
         out_channels,
         negative_samples=16,
         k_predictions=5,
-        sparsity=0.2,
+        sparse_weights_class=SparseWeights2d,
+        sparsity=0.5,
     ):
         super(SparseBilinearInfo, self).__init__(
             in_channels, out_channels, negative_samples, k_predictions
         )
         for i in range(len(self.W_k)):
-            self.W_k[i] = PrunableSparseWeights2d(self.W_k[i], sparsity=sparsity)
+            self.W_k[i] = sparse_weights_class(self.W_k[i], sparsity=sparsity)

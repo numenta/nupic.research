@@ -22,6 +22,7 @@
 from copy import deepcopy
 
 from nupic.research.frameworks.greedy_infomax.models import SparseFullVisionModel
+from nupic.torch.modules import SparseWeights2d
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
 
@@ -42,7 +43,9 @@ SPARSE_BASE.update(
             grayscale=True,
             patch_size=16,
             overlap=2,
+            sparse_weights_class=SparseWeights2d,
             sparsity=[0.5, 0.5, 0.5],
+            percent_on=[0.2, 0.2, 0.2]
         ),
     )
 )

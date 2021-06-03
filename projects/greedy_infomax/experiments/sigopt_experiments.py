@@ -137,7 +137,7 @@ class SparseGIMSigOpt(SigOptExperiment):
 
 
 BATCH_SIZE = 32
-NUM_EPOCHS = 10
+NUM_EPOCHS = 8
 DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
 SPARSE_BASE = SPARSE_CONFIGS["sparse_base"]
 SIGOPT_DENSE_BASE = deepcopy(DEFAULT_BASE)

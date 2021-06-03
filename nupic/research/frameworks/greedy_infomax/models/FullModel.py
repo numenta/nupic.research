@@ -26,6 +26,7 @@
 
 import torch
 import torch.nn as nn
+from nupic.torch.modules import SparseWeights2d
 
 from nupic.research.frameworks.greedy_infomax.models import (
     PreActBlockNoBN,
@@ -162,6 +163,7 @@ class SparseFullVisionModel(FullVisionModel):
         grayscale=True,
         patch_size=16,
         overlap=2,
+        sparse_weights_class=SparseWeights2d,
         sparsity=None,
         percent_on=None,
     ):
@@ -176,7 +178,7 @@ class SparseFullVisionModel(FullVisionModel):
         if sparsity is None:
             sparsity = [0.5, 0.5, 0.5]
         if percent_on is None:
-            percent_on = [0.5, 0.5, 0.5]
+            percent_on = [0.2, 0.2, 0.2]
 
         block_dims = [3, 4, 6]
         num_channels = [64, 128, 256]
@@ -203,6 +205,7 @@ class SparseFullVisionModel(FullVisionModel):
                     input_dims=input_dims,
                     k_predictions=self.k_predictions,
                     negative_samples=self.negative_samples,
+                    sparse_weights_class=sparse_weights_class,
                     sparsity=sparsity[idx],
                     percent_on=percent_on[idx],
                 )

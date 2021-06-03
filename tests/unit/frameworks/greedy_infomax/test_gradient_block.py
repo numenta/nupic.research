@@ -21,11 +21,10 @@
 
 
 import unittest
-from copy import deepcopy
 
 import torch
 from torchvision import transforms
-from torchvision.datasets import STL10
+from torchvision.datasets import FakeData
 
 from nupic.research.frameworks.greedy_infomax.models import FullVisionModel
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
@@ -34,68 +33,18 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
 )
 from nupic.research.frameworks.vernon import experiments
 
-
-# get transforms for the dataset
-def get_transforms(val=False, aug=None):
-    trans = []
-
-    if aug["randcrop"]:
-        if val:
-            trans.append(transforms.RandomCrop(aug["randcrop"]))
-        else:
-            trans.append(transforms.CenterCrop(aug["randcrop"]))
-
-    if aug["flip"] and not val:
-        trans.append(transforms.RandomHorizontalFlip())
-
-    if aug["grayscale"]:
-        trans.append(transforms.Grayscale())
-        trans.append(transforms.ToTensor())
-        trans.append(transforms.Normalize(mean=aug["bw_mean"], std=aug["bw_std"]))
-    elif aug["mean"]:
-        trans.append(transforms.ToTensor())
-        trans.append(transforms.Normalize(mean=aug["mean"], std=aug["std"]))
-    else:
-        trans.append(transforms.ToTensor())
-
-    trans = transforms.Compose(trans)
-    return trans
-
-
-# labeled train set: mean [0.4469, 0.4400, 0.4069], std [0.2603, 0.2566, 0.2713]
-aug = {
-    "randcrop": 64,
-    "flip": True,
-    "grayscale": True,
-    "mean": [0.4313, 0.4156, 0.3663],
-    "std": [0.2683, 0.2610, 0.2687],
-    "bw_mean": [0.4120],
-    "bw_std": [0.2570],
-}
-transform_unsupervised = transform_supervised = get_transforms(val=False, aug=aug)
-transform_validation = trans = get_transforms(val=True, aug=aug)
-
-base_dataset_args = dict(root="~/nta/data/STL10", download=False)
-
-unsupervised_dataset_args = deepcopy(base_dataset_args)
-unsupervised_dataset_args.update(
-    dict(transform=transform_unsupervised, split="unlabeled")
-)
-supervised_dataset_args = deepcopy(base_dataset_args)
-supervised_dataset_args.update(dict(transform=transform_supervised, split="train"))
-validation_dataset_args = deepcopy(base_dataset_args)
-validation_dataset_args.update(dict(transform=transform_validation, split="test"))
-
 BATCH_SIZE = 32
 NUM_CLASSES = 10
+fake_data_args = dict(transform=transforms.ToTensor(), image_size=(1, 64, 64))
+
 self_supervised_config = dict(
     experiment_class=experiments.SelfSupervisedExperiment,
     # Dataset
-    dataset_class=STL10,
+    dataset_class=FakeData,
     dataset_args=dict(
-        unsupervised=unsupervised_dataset_args,
-        supervised=supervised_dataset_args,
-        validation=validation_dataset_args,
+        unsupervised=fake_data_args,
+        supervised=fake_data_args,
+        validation=fake_data_args,
     ),
     #               STL10:
     # 500 training images (10 pre-defined folds)

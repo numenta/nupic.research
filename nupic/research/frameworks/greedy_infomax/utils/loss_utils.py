@@ -82,7 +82,7 @@ def true_gim_loss(data_lists, targets, reduction="mean"):
 
 def module_specific_cross_entropy(data_lists, targets, reduction="mean", module=-1):
     log_f_module_list, true_f_module_list = data_lists
-    device = data_lists[0][0].device
+    device = log_f_module_list[0][0].device
     total_loss = torch.tensor(0.0, requires_grad=True, device=device)
     # Sum losses from each module
     log_f_list, true_f_list = log_f_module_list[module], true_f_module_list[module]
