@@ -45,13 +45,16 @@ import transformers
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     DataCollatorWithPadding,
+    EarlyStoppingCallback,
     HfArgumentParser,
     default_data_collator,
     set_seed,
 )
+from transformers import trainer_callback
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
+from callbacks import TrackEvalMetrics
 from experiments import CONFIGS
 from integrations import CustomWandbCallback  # noqa I001
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
@@ -59,6 +62,7 @@ from run_utils import (
     TaskResults,
     evaluate_language_model,
     evaluate_tasks,
+    format_eval_results,
     get_labels,
     init_config,
     init_datasets_mlm,
@@ -183,9 +187,6 @@ def main():
             run_pretraining(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
-
-        import pdb
-        pdb.set_trace()
 
         # destroy process group before launching another experiment
         if cmd_args.local_rank:
@@ -322,6 +323,24 @@ def run_finetuning_single_task(
     else:
         data_collator = None
 
+    # If you're supposed to load best model at end, but evaluate() never gets
+    # called because eval_steps > number of training steps taken, you'll get
+    # an error at the end of training. If this is the case, set eval_steps
+    # equal to max_steps so it gets called at least once.
+    if training_args.load_best_model_at_end:
+            if training_args.max_steps == -1:
+                num_examples = training_args.num_train_epochs * len(train_dataset)
+                max_steps = num_examples // training_args.per_device_train_batch_size
+            else:
+                max_steps = training_args.max_steps
+            if max_steps < training_args.eval_steps:
+                logging.warning(
+                    f"max_steps({max_steps}) < "
+                    f"eval_steps({training_args.eval_steps}) "
+                    "To avoid issues, setting eval steps equal to max_steps"
+                )
+                training_args.eval_steps = max_steps
+
     # Train
     trainer = init_trainer(
         tokenizer=tokenizer,
@@ -337,57 +356,65 @@ def run_finetuning_single_task(
     if training_args.do_train:
         train(trainer, training_args.output_dir, last_checkpoint)
 
-    # after training, want access to time series of evaluation metrics
-    # https://huggingface.co/transformers/main_classes/callback.html#transformers.TrainerCallback
-    # maybe use on_evaluate callbacks
+    # In order to get time series of evaluation metrics, you need to grab the
+    # TrackEvalMetrics callback instance. This means you need to know its index
+    # in the model_args.trainer_callbacks list. This block finds it.
+    tracked_metrics = False
+    tracked_metrics_idx = None
+    for callback_idx in range(len(model_args.trainer_callbacks)):
+        if isinstance(model_args.trainer_callbacks[callback_idx], TrackEvalMetrics):
+            tracked_metrics = True
+            tracked_metrics_idx = callback_idx
 
-    # Evaluate
-    eval_results = {}
-    if training_args.do_eval:
-        logging.info("*** Evaluate ***")
+    if tracked_metrics:
+        # sometimes this only contains steps instead of metrics like eval_accuracy
+        tracked_eval_metrics = model_args.trainer_callbacks[tracked_metrics_idx].eval_metrics
+        tracked_eval_metrics['steps'] = model_args.trainer_callbacks[tracked_metrics_idx].steps
+        model.to("cpu")
+        return tracked_eval_metrics
 
-        # Handle special case of extra validation dataset for MNLI
-        tasks = [data_args.task_name]
-        eval_datasets = [eval_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            eval_datasets.append(tokenized_datasets["validation_mismatched"])
+    else:
+        # Evaluate
+        eval_results = {}
+        if training_args.do_eval:
+            logging.info("*** Evaluate ***")
 
-        evaluate_tasks(
-            trainer, training_args.output_dir, tasks, eval_datasets
-        )
+            # Handle special case of extra validation dataset for MNLI
+            tasks = [data_args.task_name]
+            eval_datasets = [eval_dataset]
+            if data_args.task_name == "mnli":
+                tasks.append("mnli-mm")
+                eval_datasets.append(tokenized_datasets["validation_mismatched"])
 
-    # Retrieve all eval results
-    # eval_callback = trainer.callbacks["blah"]
-    # all_eval_results = eval_callback.all_eval_results
-    # make sure to pass this to the list of callbacks
-    # trainer_callbacks = model_args.trainer_callbacks
+            eval_results = evaluate_tasks(
+                trainer, training_args.output_dir, tasks, eval_datasets
+            )
 
-    # Test/Predict
-    if training_args.do_predict:
-        logging.info("*** Test ***")
+        # Test/Predict
+        if training_args.do_predict:
+            logging.info("*** Test ***")
 
-        # Handle special case of extra test dataset for MNLI
-        tasks = [data_args.task_name]
-        test_datasets = [test_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            test_datasets.append(tokenized_datasets["test_mismatched"])
+            # Handle special case of extra test dataset for MNLI
+            tasks = [data_args.task_name]
+            test_datasets = [test_dataset]
+            if data_args.task_name == "mnli":
+                tasks.append("mnli-mm")
+                test_datasets.append(tokenized_datasets["test_mismatched"])
 
-        test_tasks(
-            trainer, training_args.output_dir, tasks, test_datasets,
-            is_regression, label_list
-        )
+            test_tasks(
+                trainer, training_args.output_dir, tasks, test_datasets,
+                is_regression, label_list
+            )
 
-    # There is an existing issue on training multiple models in sequence in this code
-    # There is a memory leakage on the model, a small amount of GPU memory remains after
-    # the run and accumulates over several runs. It fails with OOM after about 20 runs,
-    # even when all tensors on GPU are explicitly deleted, garbage is collected and
-    # cache is cleared. Tried multiple solutions but this weird little hack is the only
-    # thing that worked.
-    model.to("cpu")
+        # There is an existing issue on training multiple models in sequence in this code
+        # There is a memory leakage on the model, a small amount of GPU memory remains after
+        # the run and accumulates over several runs. It fails with OOM after about 20 runs,
+        # even when all tensors on GPU are explicitly deleted, garbage is collected and
+        # cache is cleared. Tried multiple solutions but this weird little hack is the only
+        # thing that worked.
+        model.to("cpu")
 
-    return eval_results
+        return eval_results
 
 
 def run_finetuning_multiple_tasks(
@@ -421,24 +448,33 @@ def run_finetuning_multiple_tasks(
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
                 setattr(training_args, hp_key, hp_val)
-        # create Task Results
-        task_results = TaskResults(task_name, training_args=training_args)
 
-        # Run finetuning and save resultsf
-        # livecoding note... can punch in the run number to eval_results keys
-        for _ in range(training_args.num_runs):
+        # create TaskResults instance
+        has_early_stopping = False
+        for callback in model_args.trainer_callbacks:
+            if isinstance(callback, EarlyStoppingCallback):
+                has_early_stopping = True
+                break
+
+        task_results = TaskResults(task_name,
+                                   has_early_stopping,
+                                   training_args=training_args)
+
+        # Run finetuning and save results
+        for run_idx in range(training_args.num_runs):
             # reset seed per run
-            training_args.seed = random.randint(0, 1000000000)
+            training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
-            # turn eval_results into a time series
+            # eval_results contains either a number for each metric
+            # or a list for each metric, depending on if TrackEvalMetrics
+            # callback is in use.
             eval_results = run_finetuning_single_task(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
             task_results.append(eval_results)
 
-        import pdb
-        pdb.set_trace()
-
+        # CHECK COMPATABILITY
+        task_results.get_formatted_results()  # punch in run numbers and task names
         task_results.reduce_metrics(reduction="mean")
         logging.info(f"{task_name} results: {task_results.to_string()}")
         logging.info(f"{task_name} consolidated: {task_results.consolidate()}")

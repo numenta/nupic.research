@@ -3,7 +3,7 @@ import logging
 import wandb
 from transformers import TrainerCallback
 
-class TrackEvalResults(TrainerCallback):
+class TrackEvalMetrics(TrainerCallback):
     """
     This callback is used to store a time series of metrics (e.g. accuracy),
     after trainer.evaluate() is called. It is designed to provide the same
@@ -22,7 +22,7 @@ class TrackEvalResults(TrainerCallback):
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
         """
         self.eval_metrics = {}
-        self.train_metrics = {}
+        self.train_metrics = {}  # ignore since this could slow down training
         self.steps = []
         self.step_counter = 0
 
@@ -30,7 +30,8 @@ class TrackEvalResults(TrainerCallback):
         """Update steps counter, training metrics, & eval metrics"""
         self.step_counter += args.eval_steps
         self.steps.append(self.step_counter)
-        print(f"Running TrackEvalResults callback on_evaluate at step {self.steps[-1]}")
+        print(f"Running TrackEvalMetrics callback on_evaluate at step {self.steps[-1]}")
+        print(f"metrics incoming are: {metrics}")
         
         # update eval_results
         for key in metrics.keys():
@@ -42,3 +43,9 @@ class TrackEvalResults(TrainerCallback):
         # update train_results
 
         # wandb logging
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        """
+        Stop from accumulating results accross multiple runs
+        """
+        self.__init__()

@@ -693,6 +693,21 @@ def toggle_drop_last_wrapper(method):
     return toggle_method
 
 
+def format_eval_results(eval_results, run, task_name):
+
+    ignore_keys = ["steps", "epoch"]
+    new_eval_results = {}
+    for key in eval_results.keys():
+        if key in ignore_keys:
+            new_eval_results[key] = eval_results[key]
+        else:
+            new_key = task_name + f"run{run}_" + key
+            new_eval_results[new_key] = eval_results[key]
+
+    return new_eval_results
+
+
+
 def init_trainer(
     tokenizer,
     data_collator,
@@ -768,15 +783,14 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
 
     if task_name is not None:
         if task_name == "cola":
-            key = task_name + "_mathews_correlation"
-            result = {key: matthews_corrcoef(ep.label_ids, preds)}
+            result = {"matthews_correlation": matthews_corrcoef(ep.label_ids, preds)}
         elif task_name == "stsb":
             result = pearson_and_spearman(preds, ep.label_ids)
         elif task_name in ["mrpc", "qqp"]:
             result = acc_and_f1(preds, ep.label_ids)
         elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
                            "qnli", "rte", "wnli", "hans"]:
-            result = {task_name + "_accuracy": simple_accuracy(preds, ep.label_ids)}
+            result = {"accuracy": simple_accuracy(preds, ep.label_ids)}
         # Consolidate if more than one metric
         if len(result) > 1:
             result[task_name + "_combined_score"] = np.mean(list(result.values())).item()
@@ -794,22 +808,18 @@ def simple_accuracy(preds, labels):
 def acc_and_f1(preds, labels, task_name=None):
     acc = simple_accuracy(preds, labels)
     f1 = f1_score(y_true=labels, y_pred=preds)
-    task_name = "" if task_name is None else task_name + "_"
-    # Include task name in results for clarity
     return {
-        task_name + "accuracy": acc,
-        task_name + "f1": f1,
+        "accuracy": acc,
+        "f1": f1,
     }
 
 
 def pearson_and_spearman(preds, labels, task_name=None):
     pearson_corr = pearsonr(preds, labels)[0]
     spearman_corr = spearmanr(preds, labels)[0]
-    task_name = "" if task_name is None else task_name + "_"
-    # Include task name in results for clarity
     return {
-        task_name + "pearson": pearson_corr,
-        task_name + "spearmanr": spearman_corr,
+        "pearson": pearson_corr,
+        "spearmanr": spearman_corr,
     }
 
 
@@ -830,28 +840,79 @@ class TaskResults():
         "wnli": ["eval_accuracy"]
     }
 
-    def __init__(self, task_name, training_args=None):
+    def __init__(self, task_name, early_stopping, training_args=None):
         self.task_name = task_name
         self.reporting_metrics = self.reporting_metrics_per_task[task_name]
         self.all_results = []
         self._results = None
         self.training_args = training_args
+        self.early_stopping = early_stopping
+        self.best_metric_key = self.training_args.metric_for_best_model
+        # If early stopping, need to track which step best results were at
+        # If not, -1 corresponds to end of training
+        self.best_idx_per_run = []  # One index for each run
+
+    def get_formatted_results(self):
+        """
+        Format eval_results to include task_name and run_idx for clarity when analyzing
+        multiple runs on multiple finetuning tasks.
+        """
+        self.all_fmt_results = []
+        for i in range(len(self.all_results)):
+            fmt_result = format_eval_results(self.all_results[i], i, self.task_name)
+            self.all_fmt_results.append(fmt_result)
 
     def append(self, results):
-        self.all_results.append(results)
+        """
+        Add results to all_results. Since results is a dict that can have values that
+        are either numbers or lists of numbers, pack all values in a list so they can
+        be processed more easily in subsequent steps.
+        """
+        self.all_results.append({})
+        for key in results.keys():
+            if not isinstance(results[key], list):
+                self.all_results[-1][key] = [results[key]]
+            else:
+                self.all_results[-1][key] = results[key]
 
     def reduce_metrics(self, reduction="mean"):
+        """
+        Get average or max over runs. Handles two cases:
+            1) If using early stopping, find the index where metric_for_best_model
+               is highest in each run. Get the max or mean of these.
+            2) If not using early stopping, get the last entry in each run, and take
+               the max or mean of these. This entry corresponds to the end of training.
+
+        Note that if you're not using TrackEvalMetrics callback, results dictionaries
+        are formatted so the values are lists fo length 1. Cases (1) and (2) above 
+        result in the same behavior in this case, since there is a single entry to 
+        reduce over in each run.
+        """
+        # all_results[run_idx][metric] is a number or a list
+        # aggregated_results[metric] is a list of metric values, one for each run
         aggregated_results = defaultdict(list)
+        # Loop over runs on the same task
         for results in self.all_results:
-            for metric, value in results.items():
-                aggregated_results[metric].append(value)
+            if self.early_stopping:
+                # Within a run, the step where best results were achieved
+                best_metric_best_idx = np.argmax(results[self.best_metric_key])
+            else:
+                # If not early stopping, grab results seen at end of training
+                best_metric_best_idx = -1
+
+            self.best_idx_per_run.append(best_metric_best_idx)
+            for metric, values in results.items():
+                aggregated_results[metric].append(values[best_metric_best_idx])
 
         if reduction == "mean":
             self._results = {k: np.average(v) for k, v in aggregated_results.items()}
 
         elif reduction == "max":
-            argmax_idx = np.argmax(aggregated_results[self.reporting_metrics[0]])
-            self._results = self.all_results[argmax_idx]
+            # Which run has the best results
+            argmax_run = np.argmax(aggregated_results[self.reporting_metrics[0]])
+            # Which step in the run has best results
+            argmax_step = self.best_idx_per_run[argmax_run]
+            self._results = {k: v[argmax_step] for k,v in self.all_results[argmax_run].items()}
 
     @property
     def results(self):
