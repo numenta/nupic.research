@@ -23,10 +23,7 @@ import abc
 
 import torch
 
-from nupic.research.frameworks.dendrites import (
-    evaluate_dendrite_model,
-    train_dendrite_model,
-)
+from nupic.research.frameworks.dendrites import evaluate_dendrite_model
 
 __all__ = [
     "CentroidContext",
@@ -63,6 +60,7 @@ class CentroidContext(metaclass=abc.ABCMeta):
         # Construct a context vector by computing the centroid of all training examples
         self.context_vector = compute_centroid(self.train_loader).to(self.device)
         self.contexts = torch.cat((self.contexts, self.context_vector.unsqueeze(0)))
+        self.train_context_fn = train_centroid(self.context_vector)
 
         return super().run_task()
 
@@ -96,6 +94,19 @@ def compute_centroid(loader):
 
     centroid_vector /= n_centroid
     return centroid_vector
+
+
+def train_centroid(context_vector):
+    """
+    Returns a function that takes a batch of training examples and returns the same
+    context vector for each
+    """
+
+    def _train_centroid(data):
+        context = context_vector.repeat(data.shape[0], 1)
+        return context
+
+    return _train_centroid
 
 
 def infer_centroid(contexts):

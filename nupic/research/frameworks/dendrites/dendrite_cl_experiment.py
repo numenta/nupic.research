@@ -34,7 +34,11 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
 
     def setup_experiment(self, config):
         super().setup_experiment(config)
+
+        # Can be set by mixins
         self.context_vector = None
+        self.train_context_fn = None
+        self.infer_context_fn = None
 
     def run_task(self):
         """
@@ -56,7 +60,8 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
         # TODO: add option to run validate on one task at a time during training
         ret = {}
         if self.current_task in self.tasks_to_validate:
-            self.val_loader.sampler.set_active_tasks(range(self.num_tasks))
+            self.val_loader.sampler.set_active_tasks(
+                range(self.current_task + 1))
             ret = self.validate()
             self.val_loader.sampler.set_active_tasks(self.current_task)
 
@@ -83,6 +88,7 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
             share_labels=True,
             num_labels=10,
             context_vector=self.context_vector,
+            train_context_fn=self.train_context_fn,
             post_batch_callback=self.post_batch_wrapper
         )
 
@@ -98,4 +104,5 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
                                        loader=loader,
                                        device=self.device,
                                        criterion=self.error_loss,
+                                       infer_context_fn=self.infer_context_fn,
                                        share_labels=True, num_labels=10)

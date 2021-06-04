@@ -37,6 +37,7 @@ def train_dendrite_model(
     share_labels=False,
     num_labels=None,
     active_classes=None,
+    train_context_fn=None,
     context_vector=None,
     post_batch_callback=None,
     complexity_loss_fn=None,
@@ -92,6 +93,9 @@ def train_dendrite_model(
             else:
                 data, _ = data
         data = data.flatten(start_dim=1)
+
+        if train_context_fn is not None:
+            context = train_context_fn(data)
 
         # Since labels are shared, target values should be in
         # [0, 1, ..., num_labels - 1]
