@@ -792,12 +792,8 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
             result = {"accuracy": simple_accuracy(preds, ep.label_ids)}
         # Consolidate if more than one metric
         if len(result) > 1:
-<<<<<<< HEAD
-            result["combined_score"] = np.mean(list(result.values())).item()
-=======
             combined_score = np.mean(list(result.values())).item()
             result[task_name + "_combined_score"] = combined_score
->>>>>>> eval_callback
         return result
     elif is_regression:
         return {"mse": ((preds - ep.label_ids) ** 2).mean().item()}
