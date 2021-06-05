@@ -707,7 +707,6 @@ def format_eval_results(eval_results, run, task_name):
     return new_eval_results
 
 
-
 def init_trainer(
     tokenizer,
     data_collator,
@@ -788,12 +787,13 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
             result = pearson_and_spearman(preds, ep.label_ids)
         elif task_name in ["mrpc", "qqp"]:
             result = acc_and_f1(preds, ep.label_ids)
-        elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
+        elif task_name in ["sst2", "mnli", "mnli_matched", "mnli-mm", "mnli_mismatched",
                            "qnli", "rte", "wnli", "hans"]:
             result = {"accuracy": simple_accuracy(preds, ep.label_ids)}
         # Consolidate if more than one metric
         if len(result) > 1:
-            result[task_name + "_combined_score"] = np.mean(list(result.values())).item()
+            combined_score = np.mean(list(result.values())).item()
+            result[task_name + "_combined_score"] = combined_score
         return result
     elif is_regression:
         return {"mse": ((preds - ep.label_ids) ** 2).mean().item()}
@@ -884,8 +884,8 @@ class TaskResults():
                the max or mean of these. This entry corresponds to the end of training.
 
         Note that if you're not using TrackEvalMetrics callback, results dictionaries
-        are formatted so the values are lists fo length 1. Cases (1) and (2) above 
-        result in the same behavior in this case, since there is a single entry to 
+        are formatted so the values are lists fo length 1. Cases (1) and (2) above
+        result in the same behavior in this case, since there is a single entry to
         reduce over in each run.
         """
         # all_results[run_idx][metric] is a number or a list
@@ -904,6 +904,7 @@ class TaskResults():
             for metric, values in results.items():
                 aggregated_results[metric].append(values[best_metric_best_idx])
 
+        # Might need to add special handling for MNLI-MM
         if reduction == "mean":
             self._results = {k: np.average(v) for k, v in aggregated_results.items()}
 
@@ -912,7 +913,9 @@ class TaskResults():
             argmax_run = np.argmax(aggregated_results[self.reporting_metrics[0]])
             # Which step in the run has best results
             argmax_step = self.best_idx_per_run[argmax_run]
-            self._results = {k: v[argmax_step] for k,v in self.all_results[argmax_run].items()}
+            self._results = {}
+            for k, v in self.all_results[argmax_run].items():
+                self._results[k] = v[argmax_step]
 
     @property
     def results(self):

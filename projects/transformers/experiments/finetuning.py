@@ -24,11 +24,11 @@ Base Transformers Experiment configuration.
 
 from copy import deepcopy
 
-from .base import transformers_base
-
-from callbacks import TrackEvalMetrics
 from transformers import EarlyStoppingCallback
 
+from callbacks import TrackEvalMetrics
+
+from .base import transformers_base
 
 """
 Expected for qnli 0.9066 acc, 41 min training time. seed may affect result
@@ -43,7 +43,7 @@ https://wandb.ai/numenta/huggingface/reports/Static-Sparse-Baselines--Vmlldzo1MT
 
 # Runs can easily break because metric_for_best_model varies by task,
 # but is required if using early_stopping. So it's easy to specify a metric
-# that isn't present for the current task. This is a reference to help avoid that. 
+# that isn't present for the current task. This is a reference to help avoid that.
 #
 # "cola": ["eval_matthews_correlation"],
 # "mnli": ["eval_accuracy", "mm_eval_accuracy"],
@@ -69,18 +69,19 @@ debug_finetuning.update(
     do_train=True,
     do_eval=True,
     do_predict=True,
+    eval_steps=10,
+    evaluation_strategy="steps",
+    load_best_model_at_end=True,
     per_device_train_batch_size=32,
     per_device_eval_batch_size=32,
     learning_rate=2e-5,
-    num_train_epochs=1,
+    warmup_ratio=0.1,
+    max_steps=50,  # made very short for fast debugging
+    metric_for_best_model="eval_accuracy",
     trainer_callbacks=[
         TrackEvalMetrics(),
         EarlyStoppingCallback(early_stopping_patience=5)
-        ],
-    metric_for_best_model="eval_accuracy",
-    load_best_model_at_end=True,
-    evaluation_strategy="steps",
-    eval_steps=1_000,
+    ],
 )
 
 
@@ -107,14 +108,14 @@ debug_finetuning_bert100k_ntasks.update(
     run_name="debug_finetuning_bert100k_ntasks",
     # task_name=None,
     # task_names=["cola", "stsb", "mnli"],
+    max_steps=300,
     override_finetuning_results=False,
-    max_steps = 300,
     task_hyperparams=dict(
         wnli=dict(num_runs=2, max_steps=20, learning_rate=2e-4),
         rte=dict(num_runs=1),
         cola=dict(num_runs=2),
         stsb=dict(num_runs=1,
-            metric_for_best_model='pearson'),
+                  metric_for_best_model="pearson"),
     ),
     do_predict=False,
 )
@@ -136,9 +137,13 @@ finetuning_bert700k_glue.update(
     do_train=True,
     do_eval=True,
     do_predict=False,
+    eval_steps=10,
+    evaluation_strategy="steps",
+    load_best_model_at_end=True,
     per_device_train_batch_size=32,
     per_device_eval_batch_size=32,
     learning_rate=2e-5,
+    metric_for_best_model="eval_accuracy",
     num_train_epochs=3,
     num_runs=1,
     task_hyperparams=dict(
@@ -165,24 +170,20 @@ finetuning_bert100k_glue.update(
 # where they propose a "simple but hard to beat" approach
 #       https://openreview.net/pdf?id=nzpLWnVAyah
 #
-# How to decided num_train_epochs for each task:
-# They recommend 20 epochs for rte, which is about 50k iterations. They also claim that
-# the number of iterations is more important than dataset size. Here I aim for 50k
-# iterations, unless the size of the training set is already > 50k.
+# How to training time for each task:
+# They recommend 20 epochs for rte, which is about 50k examples. With a batch size
+# of 32, thats about 1562 steps. They also claim that the number of examples is
+# more important than dataset size. Here I aim for 1562 steps unless the size of
+# the training set is already > 50k.
 #
 #       if len(train_dataset) < 50k
 #           train for ~ 50k iterations = round(50k / len(train_dataset))
 #           (cola, mrpc, stsb, rte, wnli)
 #
-#       elif 50k <= len(train_dataset) < 300k
+#       else
 #           use the default of 3 epochs
-#           (sst2, wnli)
 #
-#       elif len(train_dataset) >= 300k
-#           train for 1 epoch
-#           (qqp, mnli)
-#
-# 50k // batch_size=32 ~ 1562
+# Note that EarlyStoppingCallback is in use, which was not mentioned in the paper
 
 finetuning_bert100k_glue_simple = deepcopy(finetuning_bert100k_glue)
 finetuning_bert100k_glue_simple.update(
@@ -193,12 +194,10 @@ finetuning_bert100k_glue_simple.update(
         sst2=dict(num_runs=3),  # 67k training size > 50k, default 3 epochs
         mrpc=dict(max_steps=1562, num_runs=3),  # 50k / 3700 ~ 14 epochs
         stsb=dict(num_train_epochs=8, num_runs=3),  # 50k / 7000 ~ 8 epochs
-        # hypothesis for qqp, mnli: training stable < 300k iterations
-        # more runs is better than 1 run with more epochs
-        qqp=dict(num_train_epochs=1, num_runs=3),  # 300k >> 50k
-        mnli=dict(num_train_epochs=1, num_runs=3),  # 300k >> 50k
+        qqp=dict(num_runs=3),  # 300k >> 50k
+        mnli=dict(num_runs=3),  # 300k >> 50k
         qnli=dict(num_runs=3),  # 100k > 50k, defualt to 3 epochs
-        rte=dict(max_steps=1562, num_runs=3),  # 1562 steps * 32 batch // 2.5K samples ~~ 20 epochs from paper
+        rte=dict(max_steps=1562, num_runs=3),  # ~ 20 epochs from paper
         wnli=dict(max_steps=1562, num_runs=3)  # 50k / 634 ~ 79 epochs
     )
 )
@@ -225,18 +224,20 @@ finetuning_bert100k_single_task.update(
 
 finetuning_bert1mi_wnli = deepcopy(finetuning_bert100k_single_task)
 finetuning_bert1mi_wnli.update(
+    # Data arguments
     task_name=None,
     task_names=["wnli"],
+    # Training arguments
     evaluation_strategy="steps",
     eval_steps=5,
     load_best_model_at_end=True,
     metric_for_best_model="eval_accuracy",
-    max_steps=20,  # make short for quick check
+    max_steps=20,  # make short for quick check if debugging
     num_runs=3,
     trainer_callbacks=[
         TrackEvalMetrics(),
         EarlyStoppingCallback(early_stopping_patience=5)
-        ],
+    ],
 )
 
 

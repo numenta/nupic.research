@@ -19,5 +19,5 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .sparsity import *
 from .metrics import *
+from .sparsity import *
