@@ -45,6 +45,7 @@ import transformers
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     DataCollatorWithPadding,
+    EarlyStoppingCallback,
     HfArgumentParser,
     default_data_collator,
     set_seed,
@@ -52,6 +53,7 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
+from callbacks import TrackEvalMetrics
 from experiments import CONFIGS
 from integrations import CustomWandbCallback  # noqa I001
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
@@ -319,6 +321,24 @@ def run_finetuning_single_task(
     else:
         data_collator = None
 
+    # If you're supposed to load best model at end, but evaluate() never gets
+    # called because eval_steps > number of training steps taken, you'll get
+    # an error at the end of training. If this is the case, set eval_steps
+    # equal to max_steps so it gets called at least once.
+    if training_args.load_best_model_at_end:
+        if training_args.max_steps == -1:
+            num_examples = training_args.num_train_epochs * len(train_dataset)
+            max_steps = num_examples // training_args.per_device_train_batch_size
+        else:
+            max_steps = training_args.max_steps
+        if max_steps < training_args.eval_steps:
+            logging.warning(
+                f"max_steps({max_steps}) < "
+                f"eval_steps({training_args.eval_steps}) "
+                "To avoid issues, setting eval steps equal to max_steps"
+            )
+            training_args.eval_steps = max_steps
+
     # Train
     trainer = init_trainer(
         tokenizer=tokenizer,
@@ -334,6 +354,40 @@ def run_finetuning_single_task(
     if training_args.do_train:
         train(trainer, training_args.output_dir, last_checkpoint)
 
+    # In order to get time series of evaluation metrics, you need to grab the
+    # TrackEvalMetrics callback instance. This means you need to know its index
+    # in the model_args.trainer_callbacks list. This block finds it.
+    tracked_metrics = False
+    tracked_metrics_idx = None
+    for callback_idx in range(len(model_args.trainer_callbacks)):
+        if isinstance(model_args.trainer_callbacks[callback_idx], TrackEvalMetrics):
+            tracked_metrics = True
+            tracked_metrics_idx = callback_idx
+
+    # If already tracking metrics, no need to evaluate again at the very end
+    if tracked_metrics:
+        metric_callback = model_args.trainer_callbacks[tracked_metrics_idx]
+        tracked_eval_metrics = metric_callback.eval_metrics
+        tracked_eval_metrics["steps"] = metric_callback.steps
+        # mnli has two eval sets. For now, assume load_best_model_at_end is on
+        # and just evaluate once on mnli-mm once at the end. TrackEvalMetrics
+        # callback handles metrics.
+        if data_args.task_name == "mnli":
+            _ = trainer.evaluate(
+                eval_dataset=tokenized_datasets["validation_mismatched"],
+                metric_key_prefix="mm",
+            )
+            n_evals = len(tracked_eval_metrics["steps"])
+            mm_dict = metric_callback.mm_metrics
+            for key in mm_dict.keys():
+                key_name = "mm_eval_" + key
+                # Fill a list of same length as other metrics for consistency
+                tracked_eval_metrics[key_name] = [mm_dict[key] for i in range(n_evals)]
+
+        model.to("cpu")
+        return tracked_eval_metrics
+
+    # (if NOT tracked_metrics)
     # Evaluate
     eval_results = {}
     if training_args.do_eval:
@@ -408,15 +462,26 @@ def run_finetuning_multiple_tasks(
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
                 setattr(training_args, hp_key, hp_val)
-        # create Task Results
-        task_results = TaskResults(task_name, training_args=training_args)
+
+        # create TaskResults instance
+        has_early_stopping = False
+        for callback in model_args.trainer_callbacks:
+            if isinstance(callback, EarlyStoppingCallback):
+                has_early_stopping = True
+                break
+
+        task_results = TaskResults(task_name,
+                                   has_early_stopping,
+                                   training_args=training_args)
 
         # Run finetuning and save results
         for _ in range(training_args.num_runs):
             # reset seed per run
-            training_args.seed = random.randint(0, 1000000000)
+            training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
-
+            # eval_results contains either a number for each metric
+            # or a list for each metric, depending on if TrackEvalMetrics
+            # callback is in use.
             eval_results = run_finetuning_single_task(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )
