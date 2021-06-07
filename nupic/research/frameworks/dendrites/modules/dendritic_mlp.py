@@ -19,6 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from collections import Iterable
+
 import numpy as np
 import torch
 from torch import nn
@@ -28,7 +30,7 @@ from nupic.research.frameworks.dendrites.modules.dendritic_layers import (
     OneSegmentDendriticLayer,
 )
 from nupic.torch.modules import KWinners, SparseWeights, rezero_weights
-from collections import Iterable
+
 
 class DendriticMLP(nn.Module):
     """
@@ -73,11 +75,12 @@ class DendriticMLP(nn.Module):
     """
 
     def __init__(
-        self, input_size, output_size, hidden_sizes, num_segments, dim_context,
-        kw, kw_percent_on=0.05, context_percent_on=1.0, dendrite_weight_sparsity=0.95,
-        weight_sparsity=0.95, weight_init="modified", dendrite_init="modified",
-        freeze_dendrites=False, output_nonlinearity=None,
-        dendritic_layer_class=AbsoluteMaxGatingDendriticLayer,
+            self, input_size, output_size, hidden_sizes, num_segments, dim_context,
+            kw, kw_percent_on=0.05, context_percent_on=1.0,
+            dendrite_weight_sparsity=0.95,
+            weight_sparsity=0.95, weight_init="modified", dendrite_init="modified",
+            freeze_dendrites=False, output_nonlinearity=None,
+            dendritic_layer_class=AbsoluteMaxGatingDendriticLayer,
     ):
 
         # Forward & dendritic weight initialization must be either "kaiming" or
@@ -161,7 +164,7 @@ class DendriticMLP(nn.Module):
 
         self._single_output_head = not isinstance(output_size, Iterable)
         if self._single_output_head:
-            output_size = (output_size, )
+            output_size = (output_size,)
 
         self._output_layers = nn.ModuleList()
         for out_size in output_size:
@@ -169,13 +172,13 @@ class DendriticMLP(nn.Module):
             output_linear = SparseWeights(module=nn.Linear(input_size, out_size),
                                           sparsity=weight_sparsity, allow_extremes=True)
             if weight_init == "modified":
-                self._init_sparse_weights(output_linear, 1 - kw_percent_on if kw else 0.0)
+                self._init_sparse_weights(
+                    output_linear, 1 - kw_percent_on if kw else 0.0)
             output_layer.add_module("output_linear", output_linear)
 
             if self.output_nonlinearity is not None:
                 output_layer.add_module("non_linearity", output_nonlinearity)
             self._output_layers.append(output_layer)
-
 
     def forward(self, x, context):
         for layer, activation in zip(self._layers, self._activations):
