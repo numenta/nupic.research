@@ -387,7 +387,6 @@ def run_finetuning_single_task(
 
         eval_results = tracked_eval_metrics
 
-    # (if NOT tracked_metrics)
     # Evaluate
     eval_results = {}
     if training_args.do_eval and not tracked_metrics:

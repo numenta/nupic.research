@@ -77,11 +77,6 @@ debug_finetuning_no_early_stopping.update(
     learning_rate=2e-5,
     warmup_ratio=0.1,
     max_steps=50,  # made very short for fast debugging
-    metric_for_best_model="eval_accuracy",
-    trainer_callbacks=[
-        TrackEvalMetrics(),
-        EarlyStoppingCallback(early_stopping_patience=5)
-    ],
 )
 
 debug_finetuning = deepcopy(transformers_base)
@@ -328,6 +323,7 @@ finetuning_mini_sparse_bert_debug.update(
 # Export configurations in this file
 CONFIGS = dict(
     debug_finetuning=debug_finetuning,
+    debug_finetuning_no_early_stopping=debug_finetuning_no_early_stopping,
     debug_finetuning_bert100k=debug_finetuning_bert100k,
     debug_finetuning_bert100k_ntasks=debug_finetuning_bert100k_ntasks,
     finetuning_bert100k_glue=finetuning_bert100k_glue,
