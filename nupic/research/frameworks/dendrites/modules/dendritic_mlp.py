@@ -28,7 +28,7 @@ from nupic.research.frameworks.dendrites.modules.dendritic_layers import (
     OneSegmentDendriticLayer,
 )
 from nupic.torch.modules import KWinners, SparseWeights, rezero_weights
-
+from collections import Iterable
 
 class DendriticMLP(nn.Module):
     """
@@ -159,21 +159,32 @@ class DendriticMLP(nn.Module):
 
             input_size = self.hidden_sizes[i]
 
-        self._output_layer = nn.Sequential()
-        output_linear = SparseWeights(module=nn.Linear(input_size, output_size),
-                                      sparsity=weight_sparsity, allow_extremes=True)
-        if weight_init == "modified":
-            self._init_sparse_weights(output_linear, 1 - kw_percent_on if kw else 0.0)
-        self._output_layer.add_module("output_linear", output_linear)
+        self._single_output_head = not isinstance(output_size, Iterable)
+        if self._single_output_head:
+            output_size = (output_size, )
 
-        if self.output_nonlinearity is not None:
-            self._output_layer.add_module("non_linearity", output_nonlinearity)
+        self._output_layers = nn.ModuleList()
+        for out_size in output_size:
+            output_layer = nn.Sequential()
+            output_linear = SparseWeights(module=nn.Linear(input_size, out_size),
+                                          sparsity=weight_sparsity, allow_extremes=True)
+            if weight_init == "modified":
+                self._init_sparse_weights(output_linear, 1 - kw_percent_on if kw else 0.0)
+            output_layer.add_module("output_linear", output_linear)
+
+            if self.output_nonlinearity is not None:
+                output_layer.add_module("non_linearity", output_nonlinearity)
+            self._output_layers.append(output_layer)
+
 
     def forward(self, x, context):
         for layer, activation in zip(self._layers, self._activations):
             x = activation(layer(x, context))
 
-        return self._output_layer(x)
+        if self._single_output_head:
+            return self._output_layers[0](x)
+        else:
+            return [out_layer(x) for out_layer in self._output_layers]
 
     # ------ Weight initialization functions ------
     @staticmethod
