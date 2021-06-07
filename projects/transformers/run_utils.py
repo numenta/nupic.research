@@ -908,7 +908,7 @@ class TaskResults():
         # Average across runs
         if reduction == "mean":
             self._results = {k: np.average(v) for k, v in aggregated_results.items()}
-        
+
         # Max across runs
         elif reduction == "max":
             # Which run has the best results
