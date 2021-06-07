@@ -385,13 +385,12 @@ def run_finetuning_single_task(
                 # Fill a list of same length as other metrics for consistency
                 tracked_eval_metrics[key_name] = [mm_dict[key] for i in range(n_evals)]
 
-        model.to("cpu")
-        return tracked_eval_metrics
+        eval_results = tracked_eval_metrics
 
     # (if NOT tracked_metrics)
     # Evaluate
     eval_results = {}
-    if training_args.do_eval:
+    if training_args.do_eval and not tracked_metrics:
         logging.info("*** Evaluate ***")
 
         # Handle special case of extra validation dataset for MNLI

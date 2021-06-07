@@ -55,6 +55,35 @@ https://wandb.ai/numenta/huggingface/reports/Static-Sparse-Baselines--Vmlldzo1MT
 # "stsb": ["eval_pearson", "eval_spearmanr"],
 # "wnli": ["eval_accuracy"]
 
+debug_finetuning_no_early_stopping = deepcopy(transformers_base)
+debug_finetuning_no_early_stopping.update(
+    # Data arguments
+    task_name="wnli",
+    max_seq_length=128,
+
+    # Model arguments
+    finetuning=True,
+    model_name_or_path="bert-base-cased",
+
+    # Training arguments
+    do_train=True,
+    do_eval=True,
+    do_predict=True,
+    eval_steps=10,
+    evaluation_strategy="steps",
+    load_best_model_at_end=True,
+    per_device_train_batch_size=32,
+    per_device_eval_batch_size=32,
+    learning_rate=2e-5,
+    warmup_ratio=0.1,
+    max_steps=50,  # made very short for fast debugging
+    metric_for_best_model="eval_accuracy",
+    trainer_callbacks=[
+        TrackEvalMetrics(),
+        EarlyStoppingCallback(early_stopping_patience=5)
+    ],
+)
+
 debug_finetuning = deepcopy(transformers_base)
 debug_finetuning.update(
     # Data arguments
