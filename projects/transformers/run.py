@@ -371,7 +371,8 @@ def run_finetuning_single_task(
         tracked_eval_metrics["steps"] = metric_callback.steps
         # mnli has two eval sets. For now, assume load_best_model_at_end is on
         # and just evaluate once on mnli-mm once at the end. TrackEvalMetrics
-        # callback handles metrics.
+        # callback handles metrics, and looks for the mm_ prefix. If present,
+        # it stores results on the mm set in a separate dictionary
         if data_args.task_name == "mnli":
             _ = trainer.evaluate(
                 eval_dataset=tokenized_datasets["validation_mismatched"],

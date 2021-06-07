@@ -888,7 +888,8 @@ class TaskResults():
         result in the same behavior in this case, since there is a single entry to
         reduce over in each run.
         """
-        # all_results[run_idx][metric] is a number or a list
+        # all_results[run_idx][metric] is a number if not tracking eval metrics,
+        # or a list with a number for each time evaluate() is called.
         # aggregated_results[metric] is a list of metric values, one for each run
         aggregated_results = defaultdict(list)
         # Loop over runs on the same task
@@ -904,10 +905,11 @@ class TaskResults():
             for metric, values in results.items():
                 aggregated_results[metric].append(values[best_metric_best_idx])
 
-        # Might need to add special handling for MNLI-MM
+        # Average across runs
         if reduction == "mean":
             self._results = {k: np.average(v) for k, v in aggregated_results.items()}
-
+        
+        # Max across runs
         elif reduction == "max":
             # Which run has the best results
             argmax_run = np.argmax(aggregated_results[self.reporting_metrics[0]])
