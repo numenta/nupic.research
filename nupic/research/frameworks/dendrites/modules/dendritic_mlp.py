@@ -84,7 +84,7 @@ class DendriticMLP(nn.Module):
         # "modified"
         assert weight_init in ("kaiming", "modified")
         assert dendrite_init in ("kaiming", "modified")
-        assert kw_percent_on >= 0.0 and kw_percent_on < 1.0
+        assert kw_percent_on is None or (kw_percent_on >= 0.0 and kw_percent_on < 1.0)
         assert context_percent_on >= 0.0
 
         if kw_percent_on == 0.0:
