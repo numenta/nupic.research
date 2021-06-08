@@ -75,12 +75,12 @@ class DendriticMLP(nn.Module):
     """
 
     def __init__(
-            self, input_size, output_size, hidden_sizes, num_segments, dim_context,
-            kw, kw_percent_on=0.05, context_percent_on=1.0,
-            dendrite_weight_sparsity=0.95,
-            weight_sparsity=0.95, weight_init="modified", dendrite_init="modified",
-            freeze_dendrites=False, output_nonlinearity=None,
-            dendritic_layer_class=AbsoluteMaxGatingDendriticLayer,
+        self, input_size, output_size, hidden_sizes, num_segments, dim_context,
+        kw, kw_percent_on=0.05, context_percent_on=1.0,
+        dendrite_weight_sparsity=0.95,
+        weight_sparsity=0.95, weight_init="modified", dendrite_init="modified",
+        freeze_dendrites=False, output_nonlinearity=None,
+        dendritic_layer_class=AbsoluteMaxGatingDendriticLayer,
     ):
 
         # Forward & dendritic weight initialization must be either "kaiming" or
