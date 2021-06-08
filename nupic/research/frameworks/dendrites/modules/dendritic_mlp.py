@@ -40,7 +40,9 @@ class DendriticMLP(nn.Module):
     initializations and learning parameters
 
     :param input_size: size of the input to the network
-    :param output_size: the number of units in the output layer
+    :param output_size: the number of units in the output layer. Must be either an
+                        integer if there is a single output head, or an iterable
+                        of integers if there are multiple output heads.
     :param hidden_sizes: the number of units in each hidden layer
     :param num_segments: the number of dendritic segments that each hidden unit has
     :param dim_context: the size of the context input to the network
