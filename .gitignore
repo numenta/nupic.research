@@ -89,6 +89,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.deepspeed_env
 
 # Spyder project settings
 .spyderproject
@@ -124,3 +125,4 @@ checkcode.sh
 /projects/whydense/cifar/results1
 /projects/transformers/sample_files
 /projects/transformers/results
+/projects/transformers/.deepspeed_env

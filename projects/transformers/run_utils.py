@@ -119,32 +119,11 @@ def train(trainer, output_dir, last_checkpoint=None):
     ))
 
 
-def toggle_drop_last(trainer, should_drop_last):
-    """
-    Turn trainer.args.dataloader_drop_last on or off depending on use case
-    If drop_last is left on, then you can get skewed results anytime
-    trainer.evaluate or trainer.predict is called, since drop_last will set
-    the last batch with incomplete number of samples to be labeled -100
-    You'll want to use this if you want drop_last on for training, but off
-    for testing
-    Example usage at evaluation time
-        drop_last = toggle_drop_last(trainer, False)
-        trainer.evaluate(...)
-        _ = toggle_drop_last(trainer, drop_last)
-    """
-    if should_drop_last:
-        return False
-    else:
-        trainer.args.dataloader_drop_last = False
-        return True
-
-
 def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     """
     Evaluate tasks after finetuning.
     Returns evaluation dict with results.
     """
-    drop_last = toggle_drop_last(trainer, False)  # should_drop_last=False
     eval_results = {}
 
     for eval_dataset, task in zip(eval_datasets, tasks):
@@ -163,9 +142,6 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
                     logging.info(f"  {key} = {value}")
                     writer.write(f"{key} = {value}\n")
 
-    # if you want drop_last for training, this toggles it back on
-    _ = toggle_drop_last(trainer, drop_last)
-
     return eval_results
 
 
@@ -173,8 +149,6 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
     """
     Test tasks after finetuning.
     """
-
-    drop_last = toggle_drop_last(trainer, False)
 
     for test_dataset, task in zip(test_datasets, tasks):
         # Removing the `label` columns because it contains -1
@@ -198,13 +172,9 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
                         item = label_list[item]
                         writer.write(f"{index}\t{item}\n")
 
-    _ = toggle_drop_last(trainer, drop_last)
-
 
 def evaluate_language_model(trainer, eval_dataset, output_dir):
     """Evaluate language model. Returns dict with results on perplexity metric. """
-    drop_last = toggle_drop_last(trainer, False)
-
     results = {}
     eval_output = trainer.evaluate(eval_dataset)
 
@@ -218,8 +188,6 @@ def evaluate_language_model(trainer, eval_dataset, output_dir):
             for key, value in sorted(results.items()):
                 logging.info(f"  {key} = {value}")
                 writer.write(f"{key} = {value}\n")
-
-    _ = toggle_drop_last(trainer, drop_last)
 
     return results
 
@@ -708,6 +676,23 @@ def init_model(model_args, config, tokenizer, finetuning=False):
     return model
 
 
+def toggle_drop_last_wrapper(method):
+    """
+    Return a function that turns drop_last off before it is called. Used for
+    ensuring trainer.args.dataloader_drop_last is False during evaluation
+    steps. After the method is called, dataloader_drop_last is switched back
+    to whatever it was set to initially.
+    """
+    def toggle_method(*args, **kwargs):
+        was_drop_last = method.__self__.args.dataloader_drop_last  # initial drop_last
+        method.__self__.args.dataloader_drop_last = False  # turn drop_last off
+        result = method(*args, **kwargs)  # call method with drop_last off
+        method.__self__.args.dataloader_drop_last = was_drop_last  # restore drop_last
+        return result
+
+    return toggle_method
+
+
 def init_trainer(
     tokenizer,
     data_collator,
@@ -750,6 +735,13 @@ def init_trainer(
         trainer_kwargs.update(compute_metrics=compute_metrics)
 
     trainer = trainer_class(**trainer_kwargs)
+
+    # Issue: labels get set to -100 due to drop_last.
+    # Fix: override the evaluate and predict methods.
+    # The previous fix covered cases when WE call trainer.{evaluate, predict}.
+    # This fix should cover all cases, including any time HF calls these methods.
+    trainer.evaluate = toggle_drop_last_wrapper(trainer.evaluate)
+    trainer.predict = toggle_drop_last_wrapper(trainer.predict)
 
     return trainer
 
