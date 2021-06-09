@@ -250,7 +250,27 @@ bert_sparse_trifecta_100k.update(
 )
 
 
-# This fine-tunes a pretrained model from `bert_sparse_100k_kd_oncycle_lr` above.
+# The is like the one above, but 85% sparse
+bert_sparse_85_trifecta_100k = deepcopy(bert_sparse_trifecta_100k)
+bert_sparse_85_trifecta_100k["config_kwargs"].update(
+    sparsity=0.85,
+)
+bert_sparse_85_trifecta_100k["trainer_mixin_args"].update(
+    max_lr=0.001,
+)
+
+
+# The is like the one above, but 90% sparse
+bert_sparse_90_trifecta_100k = deepcopy(bert_sparse_trifecta_100k)
+bert_sparse_90_trifecta_100k["config_kwargs"].update(
+    sparsity=0.90,
+)
+bert_sparse_90_trifecta_100k["trainer_mixin_args"].update(
+    max_lr=0.0012,
+)
+
+
+# This fine-tunes a pretrained model from `bert_sparse_trifecta_100k` above.
 finetuning_bert_sparse_trifecta_100k_glue = deepcopy(finetuning_bert700k_glue)
 finetuning_bert_sparse_trifecta_100k_glue.update(
     # Model arguments
@@ -271,6 +291,24 @@ finetuning_bert_sparse_trifecta_100k_glue_simple.update(
 ft_bert_sp_tri_100k_g_s = finetuning_bert_sparse_trifecta_100k_glue_simple
 
 
+# This fine-tunes a pretrained model from `bert_sparse_85_trifecta_100k` above.
+finetuning_bert_sparse_85_trifecta_100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_bert_sparse_85_trifecta_100k_glue.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k",  # noqa: E501
+)
+
+
+# This fine-tunes a pretrained model from `bert_sparse_90_trifecta_100k` above.
+finetuning_bert_sparse_90_trifecta_100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_bert_sparse_90_trifecta_100k_glue.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k",  # noqa: E501
+)
+
+
 CONFIGS = dict(
     # Tiny BERT
     tiny_bert_trifecta_100k=tiny_bert_trifecta_100k,
@@ -284,8 +322,15 @@ CONFIGS = dict(
     small_bert_trifecta_lr_range_test=small_bert_trifecta_lr_range_test,
 
     # BERT Base
+    #   80% sparse
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
     finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
+    #   85% sparse
+    bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
+    finetuning_bert_sparse_85_trifecta_100k_glue=finetuning_bert_sparse_85_trifecta_100k_glue,  # noqa: E501
+    #   90% sparse
+    bert_sparse_90_trifecta_100k=bert_sparse_90_trifecta_100k,
+    finetuning_bert_sparse_90_trifecta_100k_glue=finetuning_bert_sparse_90_trifecta_100k_glue,  # noqa: E501
 
 )
