@@ -125,6 +125,7 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     Returns evaluation dict with results.
     """
     eval_results = {}
+
     for eval_dataset, task in zip(eval_datasets, tasks):
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
         if task == "mnli-mm":
@@ -148,6 +149,7 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
     """
     Test tasks after finetuning.
     """
+
     for test_dataset, task in zip(test_datasets, tasks):
         # Removing the `label` columns because it contains -1
         # and Trainer won't like that.
@@ -674,6 +676,23 @@ def init_model(model_args, config, tokenizer, finetuning=False):
     return model
 
 
+def toggle_drop_last_wrapper(method):
+    """
+    Return a function that turns drop_last off before it is called. Used for
+    ensuring trainer.args.dataloader_drop_last is False during evaluation
+    steps. After the method is called, dataloader_drop_last is switched back
+    to whatever it was set to initially.
+    """
+    def toggle_method(*args, **kwargs):
+        was_drop_last = method.__self__.args.dataloader_drop_last  # initial drop_last
+        method.__self__.args.dataloader_drop_last = False  # turn drop_last off
+        result = method(*args, **kwargs)  # call method with drop_last off
+        method.__self__.args.dataloader_drop_last = was_drop_last  # restore drop_last
+        return result
+
+    return toggle_method
+
+
 def init_trainer(
     tokenizer,
     data_collator,
@@ -708,17 +727,28 @@ def init_trainer(
     # Add specific metrics for finetuning task
     if finetuning:
         compute_metrics = partial(
-            compute_metrics_task, task_name=task_name, is_regression=is_regression,
+            compute_metrics_task,
+            task_name=task_name,
+            is_regression=is_regression,
+            output_dir=training_args.output_dir
         )
         trainer_kwargs.update(compute_metrics=compute_metrics)
 
     trainer = trainer_class(**trainer_kwargs)
 
+    # Issue: labels get set to -100 due to drop_last.
+    # Fix: override the evaluate and predict methods.
+    # The previous fix covered cases when WE call trainer.{evaluate, predict}.
+    # This fix should cover all cases, including any time HF calls these methods.
+    trainer.evaluate = toggle_drop_last_wrapper(trainer.evaluate)
+    trainer.predict = toggle_drop_last_wrapper(trainer.predict)
+
     return trainer
 
 
 def compute_metrics_task(ep: EvalPrediction, metric=None,
-                         task_name=None, is_regression=None):
+                         task_name=None, is_regression=None,
+                         output_dir=None):
     """
     You can define your custom compute_metrics function. It takes an
     `EvalPrediction` object (a namedtuple with a predictions and label_ids
@@ -727,41 +757,33 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
     preds = (ep.predictions[0] if isinstance(ep.predictions, tuple) else ep.predictions)
     preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
 
+    # -100 labels can come up when drop_last batch setting gets set to true during
+    # evaluation. That is fixed, so any -100 labels should not pass silently.
+    assert -100 not in ep.label_ids, "Unknown source of -100 labels"
+
     if not is_regression:
-        logging.info(f"Label distribution for {task_name} before cleaning")
+        logging.info(f"Label distribution for {task_name}")
         logging.info(f"Predictions: {Counter(preds).most_common()}")
         logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
 
-    # Ignore the -100 labels - not able to tokenize?
-    # TODO: investigate why a few labels are -100 in all tasks
-    label_ids = ep.label_ids[np.where(ep.label_ids != -100)]
-    preds = preds[np.where(ep.label_ids != -100)]
-    logging.info(f"Removing {1-(len(label_ids) / len(ep.label_ids)):.2%} samples "
-                 "from evaluation set where label == -100")
-
-    if not is_regression:
-        logging.info(f"Label distribution for {task_name} after cleaning")
-        logging.info(f"Predictions: {Counter(preds).most_common()}")
-        logging.info(f"Labels: {Counter(label_ids).most_common()}")
-
     if task_name is not None:
         if task_name == "cola":
-            result = {"matthews_correlation": matthews_corrcoef(label_ids, preds)}
+            result = {"matthews_correlation": matthews_corrcoef(ep.label_ids, preds)}
         elif task_name == "stsb":
-            result = pearson_and_spearman(preds, label_ids)
+            result = pearson_and_spearman(preds, ep.label_ids)
         elif task_name in ["mrpc", "qqp"]:
-            result = acc_and_f1(preds, label_ids)
+            result = acc_and_f1(preds, ep.label_ids)
         elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
                            "qnli", "rte", "wnli", "hans"]:
-            result = {"accuracy": simple_accuracy(preds, label_ids)}
+            result = {"accuracy": simple_accuracy(preds, ep.label_ids)}
         # Consolidate if more than one metric
         if len(result) > 1:
             result["combined_score"] = np.mean(list(result.values())).item()
         return result
     elif is_regression:
-        return {"mse": ((preds - label_ids) ** 2).mean().item()}
+        return {"mse": ((preds - ep.label_ids) ** 2).mean().item()}
     else:
-        return {"accuracy": (preds == label_ids).astype(np.float32).mean().item()}
+        return {"accuracy": (preds == ep.label_ids).astype(np.float32).mean().item()}
 
 
 def simple_accuracy(preds, labels):

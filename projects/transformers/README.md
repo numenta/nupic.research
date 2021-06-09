@@ -9,9 +9,9 @@ In progress, current results:
 |            | Average w/o wnli | Average all tasks | Matthew's corr | Matched acc./Mismatched acc. | F1/Accuracy | Accuracy | Accuracy/F1 | Accuracy | Accuracy | Person/Spearman corr. | Accuracy |            | log(perplexity) |
 | bert_HF    | 81.67            | 78.85             | 56.53          | 83.91/84.10                  | 88.85/84.07 | 90.66    | 90.71/87.49 | 65.70    | 92.32    | 88.64/88.48           | 56.34    |            | |
 | bert_paper|          79.60 |             -  |  52.10 | 84.60/83.40          | 88.90/- | 90.50     | 71.20/-     | 66.40     | 93.50     | 85.80        |      - | 3.99 (RoBERTa) | 1.384 |
-| bert_1mi |          80.76 |          76.82 |  48.87 | 84.08/84.57 | 89.76/85.68 |  91.19 | 90.58/87.17 | 66.02 |  91.44 | 87.67/87.54 |  45.31 | 5.013 | 1.612 |
-| bert_100k |          75.71 |          72.51 |  40.98 | 78.26/78.65 | 84.05/77.86 |  87.74 | 89.12/85.25 |  58.2 |  88.31 | 83.90/83.80 |  46.88 | 8.619 | 2.154 |
-| sparse_80%_kd_onecycle_lr_rigl |            75.3 |          72.83 |  38.29 | 79.72/80.88 | 87.31/82.81 |  87.65 | 89.19/85.25 |  54.3 |  88.89 | 80.74/80.59 |  53.12 | 8.482 | 2.138 |
+| bert_1mi |          80.13 |          77.17 |  45.81 | 84.27/84.63 | 88.26/83.82 |  91.21 | 90.54/87.20 | 65.34 |  91.86 | 87.41/87.43 |  53.52 | 5.013 | 1.612 |
+| bert_100k |          75.36 |          71.68 |  39.56 | 78.88/79.08 | 82.71/76.23 |  87.77 | 89.31/85.57 |  58.12 |  87.61 | 83.95/83.84 |  42.25 | 8.619 | 2.154 |
+| sparse_80%_kd_onecycle_lr_rigl |            75.3 |          72.57 |  36.49 | 79.23/79.66 | 86.55/81.86 |  88.23 | 89.39/85.64 |  54.51 |  90.6 | 81.31/81.24 |  50.7 | 8.482 | 2.138 |
 | sparse_80%_kd_onecycle_lr |       74.17 |          72.18 |   27.2 | 78.34/79.97 | 87.29/82.55 |  88.57 | 88.91/84.97 | 58.59 |  88.77 | 79.11/79.33 |  56.25 | 9.78  | 2.28 |
 
 <br/><br/>
@@ -34,6 +34,9 @@ Known issues, to be investigated/fixed:
 * To add to the table perplexity of the original pretrained models.
 
 > Finetuning is important to evaluate a language model effectiveness when being used for transfer learning in downstream tasks. However, it is not a reliable metric to use for optimization. These numbers will vary with a significant margin of error between two different runs. Use perplexity instead to guide hyperparameter search and development of language models.
+
+Known Bugs
+* Finetuning occasionally stalls and needs restarting. This may be related to [this](https://github.com/huggingface/transformers/issues/5486) documented issue. Although this deadlock doesn't happen every time, the only way found to entirely avoid this is to disable wandb logging.
 
 ## How to run - single node
 

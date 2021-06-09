@@ -22,7 +22,7 @@ from copy import deepcopy
 
 from transformers import Trainer
 
-from callbacks import PlotDensitiesCallback, RezeroWeightsCallback
+from callbacks import RezeroWeightsCallback
 from trainer_mixins import (
     DistillationTrainerMixin,
     LRRangeTestMixin,
@@ -30,7 +30,7 @@ from trainer_mixins import (
     RigLMixin,
 )
 
-from .finetuning import finetuning_bert700k_glue
+from .finetuning import finetuning_bert100k_glue_simple, finetuning_bert700k_glue
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
 
@@ -70,7 +70,6 @@ tiny_bert_trifecta_300k.update(
     # Sparsity callback
     trainer_callbacks=[
         RezeroWeightsCallback(),
-        PlotDensitiesCallback(plot_freq=1000),
     ],
     fp16=True,
 
@@ -97,6 +96,20 @@ tiny_bert_trifecta_300k.update(
         prune_fraction=0.3,
         prune_freq=100,
     ),
+)
+
+tiny_bert_trifecta_100k = deepcopy(tiny_bert_trifecta_300k)
+tiny_bert_trifecta_100k.update(
+    max_steps=100000,
+)
+
+
+# This fine-tunes a pretrained model from `tiny_bert_trifecta_100k`
+finetuning_tiny_bert_trifecta_100k = deepcopy(finetuning_bert700k_glue)
+finetuning_tiny_bert_trifecta_100k.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/tiny_bert_trifecta_100k",  # noqa: E501
 )
 
 
@@ -148,7 +161,7 @@ small_bert_trifecta_300k.update(
     trainer_mixin_args=dict(
 
         # One cycle lr
-        max_lr=0.0025,
+        max_lr=0.003,
         pct_start=0.10,
         anneal_strategy="linear",
         cycle_momentum=True,
@@ -167,6 +180,12 @@ small_bert_trifecta_300k.update(
         prune_fraction=0.3,
         prune_freq=100,
     ),
+)
+
+
+small_bert_trifecta_100k = deepcopy(small_bert_trifecta_300k)
+small_bert_trifecta_100k.update(
+    max_steps=100000,
 )
 
 
@@ -239,17 +258,34 @@ finetuning_bert_sparse_trifecta_100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
 )
 
+finetuning_bert_sparse_trifecta_100k_glue_simple = deepcopy(
+    finetuning_bert100k_glue_simple)
+finetuning_bert_sparse_trifecta_100k_glue_simple.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/"
+    "bert_sparse_80%_trifecta_100k",
+)
+
+# alias with a shorter variable name for pep8 compliance below
+ft_bert_sp_tri_100k_g_s = finetuning_bert_sparse_trifecta_100k_glue_simple
+
 
 CONFIGS = dict(
     # Tiny BERT
+    tiny_bert_trifecta_100k=tiny_bert_trifecta_100k,
     tiny_bert_trifecta_300k=tiny_bert_trifecta_300k,
     tiny_bert_trifecta_lr_range_test=tiny_bert_trifecta_lr_range_test,
+    finetuning_tiny_bert_trifecta_100k=finetuning_tiny_bert_trifecta_100k,
 
     # Small BERT
+    small_bert_trifecta_100k=small_bert_trifecta_100k,
     small_bert_trifecta_300k=small_bert_trifecta_300k,
     small_bert_trifecta_lr_range_test=small_bert_trifecta_lr_range_test,
 
     # BERT Base
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
+    finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
+
 )

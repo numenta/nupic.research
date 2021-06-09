@@ -18,7 +18,6 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
 from copy import deepcopy
 
 from ray import tune
@@ -123,7 +122,7 @@ tiny_bert_sparse_300k_onecycle_lr_kd.update(
     max_steps=300000,
     trainer_class=KDOneCycleLRTrainer,
     trainer_mixin_args=dict(
-        max_lr=0.00375,
+        max_lr=0.0075,
         **kd_args,
         **onecycle_args,
     ),
@@ -132,7 +131,14 @@ tiny_bert_sparse_300k_onecycle_lr_kd.update(
 )
 
 
-# Search for the best lr parameters for tiny BERT trained with KD and OneCycle LR
+# KD + OneCycleLR (100k) (eval/loss=4.031)
+tiny_bert_sparse_100k_onecycle_lr_kd = deepcopy(tiny_bert_sparse_300k_onecycle_lr_kd)
+tiny_bert_sparse_100k_onecycle_lr_kd.update(
+    max_steps=100000,
+)
+
+
+# Search for the best max_lr parameters for tiny BERT trained with KD and OneCycle LR
 def max_lr_hp_space(trial):
     return dict(
         trainer_mixin_args=dict(
@@ -153,6 +159,41 @@ tiny_bert_kd_onecycle_50k_maxlr_search.update(
     hp_num_trials=1,
     hp_validation_dataset_pct=0.05,  # default
     hp_extra_kwargs=dict()  # default
+)
+
+
+# Search for the best pct_start parameters for tiny BERT trained with KD and OneCycle LR
+def pct_start_hp_space(trial):
+    return dict(
+        trainer_mixin_args=dict(
+            # Vary percent-start as 10%, 20%, or 30%.
+            # The lr will then peak at either 30k, 60k, 90k steps.
+            pct_start=tune.grid_search([0.1, 0.2, 0.3]),
+
+            # Use the same max_lr and KD args for each run.
+            max_lr=0.01,
+            **kd_args,
+        )
+    )
+
+
+tiny_bert_kd_onecycle_300k_pct_start_search = deepcopy(tiny_bert_sparse_300k_onecycle_lr_kd)  # noqa E501
+tiny_bert_kd_onecycle_300k_pct_start_search.update(
+    # hyperparameter search
+    hp_space=pct_start_hp_space,
+    hp_num_trials=1,
+    hp_validation_dataset_pct=0.05,  # default
+    hp_extra_kwargs=dict(),  # default
+
+    # Using batch_size of 16 instead of 128 since we're training on 8 GPUs.
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+)
+
+
+tiny_bert_kd_onecycle_100k_pct_start_search = deepcopy(tiny_bert_kd_onecycle_300k_pct_start_search)  # noqa E501
+tiny_bert_kd_onecycle_100k_pct_start_search.update(
+    max_steps=100000,
 )
 
 
@@ -189,8 +230,10 @@ small_bert_rigl_100k_onecycle_lr.update(
 # ---------
 
 
+# BERT Base with KD + OneCycle LR
 # This achieves and eval-loss of 2.28, just slightly over 2.154 from its dense
 # counterpart. See `sparse_v4_kd_100k` in the README for more details.
+# This took 22h 17m to run on four ps.16xlarges
 bert_sparse_100k_kd_oncycle_lr = deepcopy(fully_static_sparse_bert_100k_fp16)
 bert_sparse_100k_kd_oncycle_lr.update(
     trainer_class=KDOneCycleLRTrainer,
@@ -218,9 +261,10 @@ bert_sparse_100k_kd_oncycle_lr.update(
 
 # This is an lr-range test for `bert_sparse_100k_kd_oncycle_lr` above.
 # This test helped decide to set `max_lr=0.0012`.
+# This took 20m to run on four ps.16xlarges
 bert_sparse_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
 bert_sparse_100k_kd_lr_range_test.update(
-    max_steps=100,
+    max_steps=100000,
     trainer_class=KDLRRangeTestTrainer,
     trainer_mixin_args=dict(
         # LR Range Test
@@ -246,13 +290,52 @@ finetuning_bert_sparse_kd_oncycle_lr_100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_kd_onecycle_lr_100k",  # noqa: E501
 )
 
+# ---------
+# Deepspeed
+# ---------
+
+# This lr-range test is based on `bert_sparse_100k_kd_lr_range_test` and adapted
+# for deepspeed training.
+# With this test the best `max_lr` value found is `0.0017`.
+# On four p3.16xlarge it takes ~20m to run
+bert_sparse_100k_kd_lr_range_test_deepspeed = deepcopy(bert_sparse_100k_kd_lr_range_test)  # noqa: E501
+bert_sparse_100k_kd_lr_range_test_deepspeed.update(
+    max_steps=100,
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    fp16=False,  # Use deepspeed FP16 instead of apex
+    deepspeed={
+        "zero_optimization": {
+            "stage": 1,
+        },
+        # When using fp16 dynamic loss scale, deepspeed will skip the optimizer
+        # and LR scheduler steps whenever the loss value overflows (NaN/Inf).
+        # Using deepspeed default values the loss will likely overflow on the
+        # first few steps as the dynamic loss scale warms up. When the loss
+        # overflows, huggingface will detect the LR scheduler step was skipped
+        # and return zero as the current learning rate potentially affecting the
+        # results of the LR range test. To avoid loss overflow during the LR
+        # range test you could use static loss scale or use a smaller initial
+        # scale power.
+        # See https://www.deepspeed.ai/docs/config-json/#fp16-training-options
+        "fp16": {
+            "enabled": True,
+            "initial_scale_power": 14,
+        },
+        "gradient_clipping": 1.0,
+        "sparse_gradients": True,
+        "steps_per_print": 1,
+    }
+)
 
 CONFIGS = dict(
     # Tiny BERT
     tiny_bert_rigl_100k_onecycle_lr=tiny_bert_rigl_100k_onecycle_lr,
     tiny_bert_rigl_100k_kd=tiny_bert_rigl_100k_kd,
+    tiny_bert_sparse_100k_onecycle_lr_kd=tiny_bert_sparse_100k_onecycle_lr_kd,
     tiny_bert_sparse_300k_onecycle_lr_kd=tiny_bert_sparse_300k_onecycle_lr_kd,
     tiny_bert_kd_onecycle_50k_maxlr_search=tiny_bert_kd_onecycle_50k_maxlr_search,
+    tiny_bert_kd_onecycle_100k_pct_start_search=tiny_bert_kd_onecycle_100k_pct_start_search,  # noqa: E501
+    tiny_bert_kd_onecycle_300k_pct_start_search=tiny_bert_kd_onecycle_300k_pct_start_search,  # noqa: E501
 
     # Small BERT
     small_bert_rigl_100k_onecycle_lr=small_bert_rigl_100k_onecycle_lr,
@@ -261,4 +344,7 @@ CONFIGS = dict(
     bert_sparse_100k_kd_oncycle_lr=bert_sparse_100k_kd_oncycle_lr,
     bert_sparse_100k_kd_lr_range_test=bert_sparse_100k_kd_lr_range_test,
     finetuning_bert_sparse_kd_oncycle_lr_100k_glue=finetuning_bert_sparse_kd_oncycle_lr_100k_glue,  # noqa: E501
+
+    # Deepspeed
+    bert_sparse_100k_kd_lr_range_test_deepspeed=bert_sparse_100k_kd_lr_range_test_deepspeed,  # noqa: E501
 )
