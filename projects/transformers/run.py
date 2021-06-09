@@ -357,6 +357,7 @@ def run_finetuning_single_task(
     # In order to get time series of evaluation metrics, you need to grab the
     # TrackEvalMetrics callback instance. This means you need to know its index
     # in the model_args.trainer_callbacks list. This block finds it.
+    eval_results = {}
     tracked_metrics = False
     tracked_metrics_idx = None
     for callback_idx in range(len(model_args.trainer_callbacks)):
@@ -388,7 +389,6 @@ def run_finetuning_single_task(
         eval_results = tracked_eval_metrics
 
     # Evaluate
-    eval_results = {}
     if training_args.do_eval and not tracked_metrics:
         logging.info("*** Evaluate ***")
 

@@ -161,7 +161,7 @@ finetuning_bert700k_glue.update(
     do_train=True,
     do_eval=True,
     do_predict=False,
-    eval_steps=10,
+    eval_steps=50,
     evaluation_strategy="steps",
     load_best_model_at_end=True,
     per_device_train_batch_size=32,
@@ -211,19 +211,31 @@ finetuning_bert100k_glue.update(
 
 finetuning_bert100k_glue_simple = deepcopy(finetuning_bert100k_glue)
 finetuning_bert100k_glue_simple.update(
-    warmup_ratio=0.1,
-    trainer_callbacks=[TrackEvalMetrics(), EarlyStoppingCallback()],
+    run_name="finetuning_bert100k_glue_simple",
     task_hyperparams=dict(
-        cola=dict(max_steps=1562, num_runs=5),  # 50k / 8500 ~ 6 epochs
+
+        cola=dict(eval_steps=50,
+                  max_steps=1562,
+                  metric_for_best_model="eval_matthews_correlation",
+                  num_runs=5,
+                  ),  # 50k / 8500 ~ 6 epochs
+
         sst2=dict(num_runs=3),  # 67k training size > 50k, default 3 epochs
         mrpc=dict(max_steps=1562, num_runs=3),  # 50k / 3700 ~ 14 epochs
-        stsb=dict(num_train_epochs=8, num_runs=3),  # 50k / 7000 ~ 8 epochs
+
+        stsb=dict(metric_for_best_model="eval_pearson",
+                  num_train_epochs=8,
+                  num_runs=3),  # 50k / 7000 ~ 8 epochs
+
         qqp=dict(num_runs=3),  # 300k >> 50k
         mnli=dict(num_runs=3),  # 300k >> 50k
         qnli=dict(num_runs=3),  # 100k > 50k, defualt to 3 epochs
         rte=dict(max_steps=1562, num_runs=3),  # ~ 20 epochs from paper
         wnli=dict(max_steps=1562, num_runs=3)  # 50k / 634 ~ 79 epochs
-    )
+    ),
+    trainer_callbacks=[TrackEvalMetrics(),
+                       EarlyStoppingCallback(early_stopping_patience=5)],
+    warmup_ratio=0.1,
 )
 
 finetuning_bert1mi_glue_simple = deepcopy(finetuning_bert100k_glue_simple)

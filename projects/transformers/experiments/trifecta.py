@@ -265,6 +265,7 @@ finetuning_bert_sparse_trifecta_100k_glue_simple.update(
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/"
     "bert_sparse_80%_trifecta_100k",
+    run_name="finetuning_bert_sparse_trifecta_100k_glue_simple"
 )
 
 # alias with a shorter variable name for pep8 compliance below
