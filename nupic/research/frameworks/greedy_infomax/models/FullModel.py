@@ -92,6 +92,12 @@ class FullVisionModel(torch.nn.Module):
         else:
             input_dims = 3
 
+        self.encoder.append(
+            nn.Conv2d(
+                input_dims, num_channels[0], kernel_size=5, stride=1, padding=2
+            ),
+        )
+
         for idx in range(len(block_dims)):
             self.encoder.append(
                 ResNetEncoder(
@@ -102,6 +108,9 @@ class FullVisionModel(torch.nn.Module):
                     input_dims=input_dims,
                     k_predictions=self.k_predictions,
                     negative_samples=self.negative_samples,
+                    previous_input_dim=num_channels[0] if idx==0 else num_channels[
+                        idx-1],
+                    first_stride=1 if idx==0 else 2,
                 )
             )
 
@@ -160,13 +169,15 @@ class SparseFullVisionModel(FullVisionModel):
         negative_samples=16,
         k_predictions=5,
         resnet_50=False,
+        block_dims=None,
+        num_channels=None,
         grayscale=True,
         patch_size=16,
         overlap=2,
         sparse_weights_class=SparseWeights2d,
         sparsity=None,
         percent_on=None,
-    ):
+        ):
         super(SparseFullVisionModel, self).__init__(
             negative_samples=negative_samples,
             k_predictions=k_predictions,
@@ -176,14 +187,37 @@ class SparseFullVisionModel(FullVisionModel):
             overlap=overlap,
         )
         if sparsity is None:
-            sparsity = [0.5, 0.5, 0.5]
+            #reverts to dense weights
+            sparsity = [0.01, 0.01, 0.01]
         if percent_on is None:
-            percent_on = [0.2, 0.2, 0.2]
+            #reverts to relu
+            percent_on = [0.9, 0.9, 0.9]
+        if block_dims is None:
+            block_dims = [3, 4, 6]
+        if num_channels is None:
+            num_channels = [64, 128, 256]
 
-        block_dims = [3, 4, 6]
-        num_channels = [64, 128, 256]
+        if grayscale:
+            input_dims = 1
+        else:
+            input_dims = 3
 
         self.encoder = nn.ModuleList([])
+        if sparsity[0] > 0.3:
+            self.encoder.append(
+                sparse_weights_class(
+                    nn.Conv2d(
+                        input_dims, num_channels[0], kernel_size=5, stride=1, padding=2
+                    ),
+                    sparsity=sparsity[0],
+                )
+            )
+        else:
+            self.encoder.append(
+                nn.Conv2d(
+                    input_dims, num_channels[0], kernel_size=5, stride=1, padding=2
+                ),
+            )
 
         if resnet_50:
             self.block = SparsePreActBottleneckNoBN
@@ -208,5 +242,8 @@ class SparseFullVisionModel(FullVisionModel):
                     sparse_weights_class=sparse_weights_class,
                     sparsity=sparsity[idx],
                     percent_on=percent_on[idx],
+                    previous_input_dim=num_channels[0] if idx == 0 else num_channels[
+                        idx - 1],
+                    first_stride=1 if idx == 0 else 2,
                 )
             )

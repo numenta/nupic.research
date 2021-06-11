@@ -73,24 +73,27 @@ class SparsePreActBlockNoBN(PreActBlockNoBN):
                  sparsity=0.2,
                  percent_on=0.5):
         super(SparsePreActBlockNoBN, self).__init__(in_planes, planes, stride=stride)
-        self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity)
-        self.kwinners1 = KWinners2d(in_planes, percent_on=percent_on)
-        self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity)
-        self.kwinners2 = KWinners2d(planes, percent_on=percent_on)
-        self.kwinners3 = KWinners2d(planes, percent_on=percent_on)
-        if hasattr(self, "shortcut"):
-            self.shortcut = nn.Sequential(
-                sparse_weights_class(self.shortcut._modules["0"], sparsity=sparsity)
-            )
+        if sparsity > 0.3:
+            self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity)
+            self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity)
+            if hasattr(self, "shortcut"):
+                self.shortcut = nn.Sequential(
+                    sparse_weights_class(self.shortcut._modules["0"], sparsity=sparsity)
+                )
+        if percent_on >= 0.5:
+            self.nonlinearity1 = F.relu
+            self.nonlinearity2 = F.relu
+        else:
+            self.nonlinearity1 = KWinners2d(in_planes, percent_on=percent_on)
+            self.nonlinearity2 = KWinners2d(planes, percent_on=percent_on)
 
     def forward(self, x):
-        out = self.kwinners1(x)
+        out = self.nonlinearity1(x)
         shortcut = self.shortcut(out) if hasattr(self, "shortcut") else x
         out = self.conv1(out)
-        out = self.kwinners2(out)
+        out = self.nonlinearity2(out)
         out = self.conv2(out)
         out += shortcut
-        out = self.kwinners3(out)
         return out
 
 
@@ -137,28 +140,34 @@ class SparsePreActBottleneckNoBN(PreActBottleneckNoBN):
         super(SparsePreActBottleneckNoBN, self).__init__(
             in_planes, planes, stride=stride
         )
-        self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity)
-        self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity)
-        self.conv3 = sparse_weights_class(self.conv3, sparsity=sparsity)
-        self.kwinners1 = KWinners2d(in_planes, percent_on=percent_on)
-        self.kwinners2 = KWinners2d(planes, percent_on=percent_on)
-        self.kwinners3 = KWinners2d(planes, percent_on=percent_on)
-        self.kwinners4 = KWinners2d(planes, percent_on=percent_on)
-        if hasattr(self, "shortcut"):
-            self.shortcut = nn.Sequential(
-                sparse_weights_class(self.shortcut._modules["0"], sparsity=sparsity)
-            )
+
+        if sparsity > 0.3:
+            self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity)
+            self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity)
+            self.conv3 = sparse_weights_class(self.conv3, sparsity=sparsity)
+            if hasattr(self, "shortcut"):
+                self.shortcut = nn.Sequential(
+                    sparse_weights_class(self.shortcut._modules["0"], sparsity=sparsity)
+                )
+        if percent_on >= 0.5:
+            self.nonlinearity1 = F.relu
+            self.nonlinearity2 = F.relu
+            self.nonlinearity3 = F.relu
+        else:
+            self.nonlinearity1 = KWinners2d(in_planes, percent_on=percent_on)
+            self.nonlinearity2 = KWinners2d(planes, percent_on=percent_on)
+            self.nonlinearity3 = KWinners2d(planes, percent_on=percent_on)
+
 
     def forward(self, x):
-        out = self.kwinners1(x)
+        out = self.nonlinearity1(x)
         shortcut = self.shortcut(out) if hasattr(self, "shortcut") else x
         out = self.conv1(out)
-        out = self.kwinners2(out)
+        out = self.nonlinearity1(out)
         out = self.conv2(out)
-        out = self.kwinners3(out)
+        out = self.nonlinearity3(out)
         out = self.conv3(out)
         out += shortcut
-        out = self.kwinners4(out)
         return out
 
 
@@ -179,6 +188,8 @@ class ResNetEncoder(nn.Module):
         k_predictions=5,
         patch_size=16,
         input_dims=3,
+        previous_input_dim=64,
+        first_stride = 1
     ):
         super(ResNetEncoder, self).__init__()
         self.encoder_num = encoder_num
@@ -189,22 +200,8 @@ class ResNetEncoder(nn.Module):
         self.filters = filters
 
         self.model = nn.Sequential()
-
-        if encoder_num == 0:
-            self.model.add_module(
-                "Conv1",
-                nn.Conv2d(
-                    input_dims, self.filters[0], kernel_size=5, stride=1, padding=2
-                ),
-            )
-            self.in_planes = self.filters[0]
-            self.first_stride = 1
-        elif encoder_num > 2:
-            self.in_planes = self.filters[0] * block.expansion
-            self.first_stride = 2
-        else:
-            self.in_planes = (self.filters[0] // 2) * block.expansion
-            self.first_stride = 2
+        self.in_planes = previous_input_dim
+        self.first_stride = first_stride
 
         for idx in range(len(num_blocks)):
             self.model.add_module(
@@ -261,6 +258,8 @@ class SparseResNetEncoder(ResNetEncoder):
         sparse_weights_class=SparseWeights2d,
         sparsity=0.5,
         percent_on=0.5,
+        previous_input_dim=64,
+        first_stride=1,
     ):
         super(SparseResNetEncoder, self).__init__(
             block,
@@ -271,31 +270,13 @@ class SparseResNetEncoder(ResNetEncoder):
             k_predictions=k_predictions,
             patch_size=patch_size,
             input_dims=input_dims,
+            previous_input_dim=previous_input_dim,
+            first_stride=first_stride,
         )
 
         self.model = nn.Sequential()
-        if encoder_num == 0:
-            self.model.add_module(
-                "SparseConv1",
-                sparse_weights_class(
-                    nn.Conv2d(
-                        input_dims, self.filters[0], kernel_size=5, stride=1, padding=2
-                    ),
-                    sparsity=sparsity,
-                ),
-            )
-            self.model.add_module(
-                "Kwinners2d1", KWinners2d(self.filters[0], percent_on=percent_on)
-            )
-            self.in_planes = self.filters[0]
-            self.first_stride = 1
-        elif encoder_num > 2:
-            self.in_planes = self.filters[0] * block.expansion
-            self.first_stride = 2
-        else:
-            self.in_planes = (self.filters[0] // 2) * block.expansion
-            self.first_stride = 2
-
+        self.in_planes = previous_input_dim
+        self.first_stride = first_stride
         for idx in range(len(num_blocks)):
             self.model.add_module(
                 "sparse_layer {}".format((idx)),

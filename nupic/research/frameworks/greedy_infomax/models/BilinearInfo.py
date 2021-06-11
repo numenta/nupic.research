@@ -174,5 +174,6 @@ class SparseBilinearInfo(BilinearInfo):
         super(SparseBilinearInfo, self).__init__(
             in_channels, out_channels, negative_samples, k_predictions
         )
-        for i in range(len(self.W_k)):
-            self.W_k[i] = sparse_weights_class(self.W_k[i], sparsity=sparsity)
+        if sparsity > 0.3:
+            for i in range(len(self.W_k)):
+                self.W_k[i] = sparse_weights_class(self.W_k[i], sparsity=sparsity)

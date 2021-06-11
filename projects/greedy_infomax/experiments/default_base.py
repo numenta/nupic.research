@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 from copy import deepcopy
-
+import ray.tune as tune
 import numpy as np
 import torch
 from torch.utils.data.dataset import Subset
@@ -81,6 +81,10 @@ class GreedyInfoMaxExperiment(
             config, supervised_data
         )
         self.val_loader = self.create_validation_dataloader(config, validation_data)
+    # avoid changing key names for sigopt
+    @classmethod
+    def get_readable_result(cls, result):
+        return result
 
 
 BATCH_SIZE = 32
@@ -104,7 +108,7 @@ DEFAULT_BASE = dict(
     # num_validation_samples=32,
     reuse_actors=True,
     # Seed
-    seed=5,
+    seed=tune.sample_from(lambda spec: np.random.randint(1, 10000)),
     # Number of times to sample from the hyperparameter space. If `grid_search` is
     # provided the grid will be repeated `num_samples` of times.
     # Training batch size
@@ -127,7 +131,7 @@ DEFAULT_BASE = dict(
     stop=dict(),
     # Number of epochs
     epochs=NUM_EPOCHS,
-    epochs_to_validate=range(0, NUM_EPOCHS, 10),
+    epochs_to_validate=range(10, NUM_EPOCHS, 10),
     # Which epochs to run and report inference over the validation dataset.
     # epochs_to_validate=range(-1, 30),  # defaults to the last 3 epochs
     # Model class. Must inherit from "torch.nn.Module"
@@ -187,21 +191,23 @@ DEFAULT_BASE = dict(
     verbose=1,
 )
 
-# GIM_BASE = deepcopy(DEFAULT_BASE)
-# GIM_BASE.update(dict(
-#     wandb_args=dict(
-#         project="greedy_infomax", name="validation-paper-replication"
-#     ),
-#     model_class=GIMFullVisionModel,
-#     model_args=dict(
-#         negative_samples=16,
-#         k_predictions=5,
-#         resnet_50=False,
-#         grayscale=True,
-#         patch_size=16,
-#         overlap=2,
-#     ),
-# ))
+
+SMALL_SAMPLES = deepcopy(DEFAULT_BASE)
+SMALL_SAMPLES.update(dict(
+    wandb_args=dict(project="greedy_infomax-replication",
+                    name="small_samples_2_epoch"),
+    model_args=dict(
+        negative_samples=8,
+        k_predictions=5,
+        resnet_50=False,
+        grayscale=True,
+        patch_size=16,
+        overlap=2,
+    ),
+    epochs=2,
+    batches_in_epoch = 2,
+    epochs_to_validate=[1,],
+))
 
 VALIDATE_ONLY = deepcopy(DEFAULT_BASE)
 VALIDATE_ONLY.update(
@@ -217,4 +223,6 @@ VALIDATE_ONLY.update(
 )
 
 
-CONFIGS = dict(default_base=DEFAULT_BASE, validate_only=VALIDATE_ONLY)
+CONFIGS = dict(default_base=DEFAULT_BASE,
+               small_samples=SMALL_SAMPLES,
+               validate_only=VALIDATE_ONLY)
