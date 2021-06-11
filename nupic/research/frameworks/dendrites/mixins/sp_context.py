@@ -33,10 +33,10 @@ class SP(nn.Module):
 
     :param input_size: size of the input to the network
     :param output_size: the number of units in the output layer
-    :param kw_percent_on: percent of hidden units activated by K-winners. If 0, use ReLU
-    :param boost_strength:
+    :param kw_percent_on: percent of hidden units activated by K-winners.
+    :param boost_strength: boost strength parameter for K-winners. Must be >= 0.0
     :param weight_sparsity: the sparsity level of feed-forward weights.
-    :param duty_cycle_period:
+    :param duty_cycle_period: duty cycle parameter for K-winners
     """
 
     def __init__(
@@ -72,26 +72,44 @@ class SP(nn.Module):
 
 class SpatialPoolerContext(metaclass=abc.ABCMeta):
     """
-    Use an untrained SP to output context vectors.
+    This mixin uses an untrained SP to output context vectors. The mixin assumes that
+    the experiment config contains a `context_model_args` dict containing the parameters
+    for the SP network.
+
+    The model_args dict must also contain `input_size` and `dim_context` keys. These
+    values are used to set the input and output sizes, respectively, for the SP.
+
+    Example config:
+    ```
+    config=dict(
+        model_args=dict(
+            input_size=784,
+            output_size=10,
+            hidden_sizes=[2048, 2048],
+            dim_context=500,
+        ),
+        context_model_args=dict(
+            kw_percent_on=0.05,
+            boost_strength=0.0,
+            weight_sparsity=0.75,
+        )
+    )
+    ```
     """
 
     def setup_experiment(self, config):
-        context_model_args = config.get("context_model_args")
-        context_out = context_model_args.get("output_size")
-        dim_context = config["model_args"].get("dim_context")
-
-        assert dim_context == context_out, \
-            ("`dim_context` must match context network output")
-
         super().setup_experiment(config)
 
+        context_model_args = config.get("context_model_args")
+        context_model_args["output_size"] = config["model_args"].get("dim_context")
+        context_model_args["input_size"] = config["model_args"].get("input_size")
         self.context_network = SP(**context_model_args)
         self.context_network.to(self.device)
 
         print(self.context_network)
 
-        # We're not going to train this network, but we need ta accumulate k-winner
-        # duty cycle if boost strength is positive
+        # We're not going to train this network, but we need ta accumulate k-winner duty
+        # cycle if boost strength is positive
         self.context_network.eval()
         self.context_network.context_kw.train()
 

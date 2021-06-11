@@ -74,8 +74,6 @@ SP_CONTEXT_10 = dict(
     ),
 
     context_model_args=dict(
-        input_size=784,
-        output_size=500,
         kw_percent_on=0.05,
         boost_strength=0.0,
         weight_sparsity=0.75,
@@ -121,8 +119,6 @@ SP_CONTEXT_4_SEARCH.update(
     tasks_to_validate=(0, 1, 2, 3, 4),
 
     context_model_args=dict(
-        input_size=784,
-        output_size=500,
         kw_percent_on=tune.sample_from(
             lambda spec: np.random.choice([0.02, 0.05, 0.1, 0.15, 0.2])),
         boost_strength=tune.sample_from(
