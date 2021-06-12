@@ -39,7 +39,8 @@ class TrackEvalMetrics(TrainerCallback):
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
         """
         self.eval_metrics = {}
-        self.train_metrics = {}  # ignore since this could slow down training
+        # TODO: track train_metrics, ignore for now
+        self.train_metrics = {}
         self.steps = []
         self.step_counter = 0
 
@@ -58,8 +59,8 @@ class TrackEvalMetrics(TrainerCallback):
                 else:
                     self.eval_metrics[key].append(metrics[key])
 
+            # TODO
             # Possibly update train_results
-
             # Possibly wandb logging
 
     def on_train_begin(self, args, state, control, **kwargs):
@@ -72,19 +73,10 @@ class TrackEvalMetrics(TrainerCallback):
 
         # Using a workaround for mnli, and only evaluating mnli-mm at the very
         # end of training. Therefore don't update anything
-        is_mnli_mm = False
-        for key in metrics.keys():
-            if key == "mm_accuracy":
-                is_mnli_mm = True
-                break
-
+        is_mnli_mm = "mm_accuracy" in metrics.keys()
+        ksplit = lambda k: k.split("_", 1)[1] if "_" in k else k
+    
         if is_mnli_mm:
-            self.mm_metrics = {}
-            for key in metrics.keys():
-                if "_" in key:
-                    raw_key = key.split("_", 1)[1]  # "mm_accuracy" -> "accuracy"
-                else:
-                    raw_key = key
-                self.mm_metrics[raw_key] = metrics[key]
+            self.mm_metrics = {ksplit(k): v for k,v in metrics.items()}
 
         return is_mnli_mm

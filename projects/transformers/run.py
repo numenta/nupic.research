@@ -78,6 +78,18 @@ from run_utils import (
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
+REPORTING_METRICS_PER_TASK = {
+        "cola": ["eval_matthews_correlation"],
+        "mnli": ["eval_accuracy", "mm_eval_accuracy"],
+        "mrpc": ["eval_f1", "eval_accuracy"],
+        "qnli": ["eval_accuracy"],
+        "qqp": ["eval_accuracy", "eval_f1"],
+        "rte": ["eval_accuracy"],
+        "sst2": ["eval_accuracy"],
+        "stsb": ["eval_pearson", "eval_spearmanr"],
+        "wnli": ["eval_accuracy"]
+    }
+
 
 def bold(text):
     """Bold inputed text for printing."""
@@ -339,6 +351,19 @@ def run_finetuning_single_task(
             )
             training_args.eval_steps = max_steps
 
+        # Runs can easily break if load_best_model_at_end because you specified a metric for 
+        # a diferent task. You can get all the way through training and have it break. This 
+        # will at least break earlier on / help you readjust.
+
+        if training_args.metric_for_best_model not in REPORTING_METRICS_PER_TASK:
+            if training_args.metric_for_best_model != "eval_loss":
+                logging.warning(
+                    "Warning, code will break because the current metric for best model"
+                    f" (training_args.metric_for_best_model) is not being tracked." 
+                    "Defaulting metric_for_best_model to eval_loss"
+                )
+                training_args.metric_for_best_model = "eval_loss"
+
     # Train
     trainer = init_trainer(
         tokenizer=tokenizer,
@@ -354,54 +379,10 @@ def run_finetuning_single_task(
     if training_args.do_train:
         train(trainer, training_args.output_dir, last_checkpoint)
 
-    # In order to get time series of evaluation metrics, you need to grab the
-    # TrackEvalMetrics callback instance. This means you need to know its index
-    # in the model_args.trainer_callbacks list. This block finds it.
-    eval_results = {}
-    tracked_metrics = False
-    tracked_metrics_idx = None
-    for callback_idx in range(len(model_args.trainer_callbacks)):
-        if isinstance(model_args.trainer_callbacks[callback_idx], TrackEvalMetrics):
-            tracked_metrics = True
-            tracked_metrics_idx = callback_idx
-
-    # If already tracking metrics, no need to evaluate again at the very end
-    if tracked_metrics:
-        metric_callback = model_args.trainer_callbacks[tracked_metrics_idx]
-        tracked_eval_metrics = metric_callback.eval_metrics
-        tracked_eval_metrics["steps"] = metric_callback.steps
-        # mnli has two eval sets. For now, assume load_best_model_at_end is on
-        # and just evaluate once on mnli-mm once at the end. TrackEvalMetrics
-        # callback handles metrics, and looks for the mm_ prefix. If present,
-        # it stores results on the mm set in a separate dictionary
-        if data_args.task_name == "mnli":
-            _ = trainer.evaluate(
-                eval_dataset=tokenized_datasets["validation_mismatched"],
-                metric_key_prefix="mm",
-            )
-            n_evals = len(tracked_eval_metrics["steps"])
-            mm_dict = metric_callback.mm_metrics
-            for key in mm_dict.keys():
-                key_name = "mm_eval_" + key
-                # Fill a list of same length as other metrics for consistency
-                tracked_eval_metrics[key_name] = [mm_dict[key] for i in range(n_evals)]
-
-        eval_results = tracked_eval_metrics
-
-    # Evaluate
-    if training_args.do_eval and not tracked_metrics:
-        logging.info("*** Evaluate ***")
-
-        # Handle special case of extra validation dataset for MNLI
-        tasks = [data_args.task_name]
-        eval_datasets = [eval_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            eval_datasets.append(tokenized_datasets["validation_mismatched"])
-
-        eval_results = evaluate_tasks(
-            trainer, training_args.output_dir, tasks, eval_datasets
-        )
+    if training_args.do_eval:
+        eval_results = evaluate_task_handler(
+            trainer, data_args, model_args, training_args,
+            eval_dataset, tokenized_datasets)
 
     # Test/Predict
     if training_args.do_predict:

@@ -47,6 +47,7 @@ from transformers import (
     TrainerCallback,
 )
 
+from callbacks import TrackEvalMetrics
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 __all__ = [
@@ -705,6 +706,83 @@ def format_eval_results(eval_results, run, task_name):
             new_eval_results[new_key] = eval_results[key]
 
     return new_eval_results
+
+def check_for_callback(model_args, class_of_callback):
+    
+    has_callback = False
+    callback_instance = None
+    for callback_idx in range(len(model_args.trainer_callbacks)):
+        if isinstance(model_args.trainer_callbacks[callback_idx], class_of_callback):
+            has_callback = True
+            callback_instance = model_args.trainer_callbacks[callback_idx]
+    
+    return has_callback, callback_instance
+
+
+def evaluate_tasks_handler(trainer,
+                           data_args,
+                           model_args,
+                           training_args,
+                           eval_dataset,
+                           tokenized_datasets):
+    
+    logging.info("*** Evaluate ***")
+
+    eval_results = {}
+    tracked_metrics, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
+    tasks = [data_args.task_name]
+    eval_datasets = [eval_dataset]
+    
+    if tracked_metrics:
+
+        tracked_eval_metrics = metric_callback.eval_metrics
+        tracked_eval_metrics["steps"] = metric_callback.steps
+        offset = training_args.max_steps % training_args.eval_steps
+
+        # If 
+        if offset != 0 and not training_args.load_best_model_at_end:
+
+            eval_results = evaluate_tasks(
+                trainer, training_args.output_dir, tasks, eval_datasets
+                )
+            metric_callback = model_args.trainer_callbacks[tracked_metrics_idx]
+            metric_callback.eval_metrics["steps"][-1] -= offset
+
+        # mnli has two eval sets. For now, assume load_best_model_at_end is on
+        # and just evaluate once on mnli-mm once at the end. TrackEvalMetrics
+        # callback handles metrics, and looks for the mm_ prefix. If present,
+        # it stores results on the mm set in a separate dictionary
+        if data_args.task_name == "mnli":
+            _ = trainer.evaluate(
+                eval_dataset=tokenized_datasets["validation_mismatched"],
+                metric_key_prefix="mm",
+            )
+            n_evals = len(tracked_eval_metrics["steps"])
+            mm_dict = metric_callback.mm_metrics
+            for key in mm_dict.keys():
+                key_name = "mm_eval_" + key
+                # Fill a list of same length as other metrics for consistency
+                tracked_eval_metrics[key_name] = [mm_dict[key] for i in range(n_evals)]
+
+        eval_results = tracked_eval_metrics
+    
+    else:
+
+        # In this case, you need to do the usualy evaluation
+        # Regardless of load_best_model, you have the correct model loaded
+        if data_args.task_name == "mnli":
+            tasks.append("mnli-mm")
+            eval_datasets.append(tokenized_datasets["validation_mismatched"])
+
+        eval_results = evaluate_tasks(
+            trainer, training_args.output_dir, tasks, eval_datasets
+        )
+
+    return eval_results
+
+
+
+
 
 
 def init_trainer(

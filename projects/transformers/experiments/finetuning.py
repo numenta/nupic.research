@@ -194,7 +194,7 @@ finetuning_bert100k_glue.update(
 # where they propose a "simple but hard to beat" approach
 #       https://openreview.net/pdf?id=nzpLWnVAyah
 #
-# How to training time for each task:
+# How to decide training time for each task:
 # They recommend 20 epochs for rte, which is about 50k examples. With a batch size
 # of 32, thats about 1562 steps. They also claim that the number of examples is
 # more important than dataset size. Here I aim for 1562 steps unless the size of
@@ -223,8 +223,8 @@ finetuning_bert100k_glue_simple.update(
         sst2=dict(num_runs=3),  # 67k training size > 50k, default 3 epochs
         mrpc=dict(max_steps=1562, num_runs=3),  # 50k / 3700 ~ 14 epochs
 
-        stsb=dict(metric_for_best_model="eval_pearson",
-                  num_train_epochs=8,
+        stsb=dict(max_steps=1562,
+                  metric_for_best_model="eval_pearson",
                   num_runs=3),  # 50k / 7000 ~ 8 epochs
 
         qqp=dict(num_runs=3),  # 300k >> 50k
@@ -234,13 +234,14 @@ finetuning_bert100k_glue_simple.update(
         wnli=dict(max_steps=1562, num_runs=3)  # 50k / 634 ~ 79 epochs
     ),
     trainer_callbacks=[TrackEvalMetrics(),
-                       EarlyStoppingCallback(early_stopping_patience=5)],
+                       EarlyStoppingCallback(early_stopping_patience=10)],
     warmup_ratio=0.1,
 )
 
 finetuning_bert1mi_glue_simple = deepcopy(finetuning_bert100k_glue_simple)
 finetuning_bert1mi_glue_simple.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi"
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
+    run_name="debug_finetuning_bert100k",
 )
 
 finetuning_bert1mi_glue = deepcopy(finetuning_bert700k_glue)
@@ -248,6 +249,7 @@ finetuning_bert1mi_glue.update(
     # logging
     overwrite_output_dir=True,
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
+    run_name="debug_finetuning_bert100k",
 )
 
 finetuning_bert100k_single_task = deepcopy(finetuning_bert100k_glue)
