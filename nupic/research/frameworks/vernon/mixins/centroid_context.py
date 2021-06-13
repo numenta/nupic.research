@@ -23,10 +23,7 @@ import abc
 
 import torch
 
-from nupic.research.frameworks.dendrites import (
-    evaluate_dendrite_model,
-    train_dendrite_model,
-)
+from nupic.research.frameworks.dendrites import evaluate_dendrite_model
 
 __all__ = [
     "CentroidContext",
@@ -53,16 +50,9 @@ class CentroidContext(metaclass=abc.ABCMeta):
 
         super().setup_experiment(config)
 
-        # Store batch size
-        self.batch_size = config.get("batch_size", 1)
-
         # Tensor for accumulating each task's centroid vector
         self.contexts = torch.zeros((0, self.model.input_size))
         self.contexts = self.contexts.to(self.device)
-
-        # The following will point to the the 'active' context vector used to train on
-        # the current task
-        self.context_vector = None
 
     def run_task(self):
         self.train_loader.sampler.set_active_tasks(self.current_task)
@@ -70,22 +60,9 @@ class CentroidContext(metaclass=abc.ABCMeta):
         # Construct a context vector by computing the centroid of all training examples
         self.context_vector = compute_centroid(self.train_loader).to(self.device)
         self.contexts = torch.cat((self.contexts, self.context_vector.unsqueeze(0)))
+        self.train_context_fn = train_centroid(self.context_vector)
 
         return super().run_task()
-
-    def train_epoch(self):
-        # TODO: take out constants in the call below. How do we determine num_labels?
-        train_dendrite_model(
-            model=self.model,
-            loader=self.train_loader,
-            optimizer=self.optimizer,
-            device=self.device,
-            criterion=self.error_loss,
-            share_labels=True,
-            num_labels=10,
-            context_vector=self.context_vector,
-            post_batch_callback=self.post_batch_wrapper,
-        )
 
     def validate(self, loader=None):
         if loader is None:
@@ -117,6 +94,19 @@ def compute_centroid(loader):
 
     centroid_vector /= n_centroid
     return centroid_vector
+
+
+def train_centroid(context_vector):
+    """
+    Returns a function that takes a batch of training examples and returns the same
+    context vector for each
+    """
+
+    def _train_centroid(data):
+        context = context_vector.repeat(data.shape[0], 1)
+        return context
+
+    return _train_centroid
 
 
 def infer_centroid(contexts):
