@@ -33,12 +33,19 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
 )
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
+from nupic.torch.modules import KWinners
 
 
 class CentroidExperiment(mixins.RezeroWeights,
                          mixins.CentroidContext,
                          mixins.PermutedMNISTTaskIndices,
                          DendriteContinualLearningExperiment):
+    pass
+
+
+class CentroidFigure1BExperiment(mixins.CentroidFigure1B,
+                                 mixins.PlotHiddenActivations,
+                                 CentroidExperiment):
     pass
 
 
@@ -53,7 +60,8 @@ CENTROID_10 = dict(
     dataset_class=PermutedMNIST,
     dataset_args=dict(
         num_tasks=10,
-        root=os.path.expanduser("~/nta/results/data/"),
+        # root=os.path.expanduser("~/nta/results/data/"),
+        root=os.path.expanduser("~/nta/nupic.research/"),
         download=False,  # Change to True if running for the first time
         seed=42,
     ),
@@ -109,9 +117,24 @@ CENTROID_2.update(
     seed=6024,
 )
 
+# This config saves hidden unit activations per task for later plotting
+FIGURE_1B = deepcopy(CENTROID_10)
+FIGURE_1B.update(
+    experiment_class=CentroidFigure1BExperiment,
+    num_tasks=2,
+    num_samples=1,
+
+    plot_hidden_activations_args=dict(
+        include_modules=[KWinners],
+        plot_freq=1,
+        max_samples_to_plot=5000
+    ),
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     centroid_2=CENTROID_2,
     centroid_10=CENTROID_10,
     centroid_50=CENTROID_50,
+    figure_1b=FIGURE_1B,
 )
