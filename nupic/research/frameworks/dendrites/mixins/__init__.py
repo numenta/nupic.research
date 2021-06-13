@@ -19,5 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .centroid_figure_1b import *
 from .sp_context_analysis import *
 from .sp_context import SpatialPoolerContext

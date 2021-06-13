@@ -31,6 +31,7 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
+from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 from nupic.torch.modules import KWinners
@@ -43,7 +44,7 @@ class CentroidExperiment(mixins.RezeroWeights,
     pass
 
 
-class CentroidFigure1BExperiment(mixins.CentroidFigure1B,
+class CentroidFigure1BExperiment(CentroidFigure1B,
                                  mixins.PlotHiddenActivations,
                                  CentroidExperiment):
     pass

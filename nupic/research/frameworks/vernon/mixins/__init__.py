@@ -20,7 +20,6 @@
 # ----------------------------------------------------------------------
 
 from .centroid_context import *
-from .centroid_figure_1b import *
 from .composite_loss import CompositeLoss
 from .configure_optimizer_param_groups import ConfigureOptimizerParamGroups
 from .constrain_parameters import ConstrainParameters
