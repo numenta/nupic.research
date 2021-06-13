@@ -60,8 +60,7 @@ CENTROID_10 = dict(
     dataset_class=PermutedMNIST,
     dataset_args=dict(
         num_tasks=10,
-        # root=os.path.expanduser("~/nta/results/data/"),
-        root=os.path.expanduser("~/nta/nupic.research/"),
+        root=os.path.expanduser("~/nta/results/data/"),
         download=False,  # Change to True if running for the first time
         seed=42,
     ),
