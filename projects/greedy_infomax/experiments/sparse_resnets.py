@@ -72,6 +72,56 @@ SPARSE_BASE.update(
     )
 )
 
+def make_reg_schedule(
+    epochs, pct_ramp_start, pct_ramp_end, peak_value, pct_drop, final_value
+):
+    def reg_schedule(epoch, batch_idx, steps_per_epoch):
+        pct = (epoch + batch_idx / steps_per_epoch) / epochs
+
+        if pct < pct_ramp_start:
+            return 0.0
+        elif pct < pct_ramp_end:
+            progress = (pct - pct_ramp_start) / (pct_ramp_end - pct_ramp_start)
+            return progress * peak_value
+        elif pct < pct_drop:
+            return peak_value
+        else:
+            return final_value
+
+    return reg_schedule
+class GreedyInfoMaxExperimentSparsePruning(
+    mixins.LogEveryLoss,
+    mixins.LogBackpropStructure,
+    mixins.LogEveryLearningRate,
+    mixins.ExtraValidationsPerEpoch,
+    mixins.ReportMaxAccuracy,
+    mixins.RegularizeLoss,
+    mixins.ConstrainParameters,
+    mixins.MultiCycleLR,
+    mixins.PruneLowSNR,
+    GreedyInfoMaxExperiment):
+    pass
+
+SPARSE_VDROP = deepcopy(SPARSE_BASE)
+SPARSE_VDROP.update(dict(
+    reg_scalar=make_reg_schedule(
+                epochs=NUM_EPOCHS,
+                pct_ramp_start=10 / 120,
+                pct_ramp_end=30 / 60,
+                peak_value=0.01,
+                pct_drop=45 / 60,
+                final_value=0.0005,
+            ),
+            prune_schedule=[
+                (30, 1 / 6),
+                (33, 2 / 6),
+                (36, 3 / 6),
+                (39, 4 / 6),
+                (42, 5 / 6),
+                (45, 6 / 6),
+            ],
+))
+
 LARGE_SPARSE = deepcopy(SPARSE_BASE)
 NUM_CLASSES = 10
 LARGE_SPARSE.update(dict(

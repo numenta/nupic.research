@@ -209,6 +209,23 @@ SMALL_SAMPLES.update(dict(
     epochs_to_validate=[1,],
 ))
 
+
+ONE_CYCLE_LR = deepcopy(DEFAULT_BASE)
+ONE_CYCLE_LR.update(dict(
+    lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
+    lr_scheduler_args=dict(
+        max_lr=0.01,
+        div_factor=50,
+        final_div_factor=4000,
+        pct_start=0.15,
+        epochs=30,
+        anneal_strategy="linear",
+        max_momentum=0.01,
+        cycle_momentum=False,
+    ),
+)
+)
+
 VALIDATE_ONLY = deepcopy(DEFAULT_BASE)
 VALIDATE_ONLY.update(
     dict(
