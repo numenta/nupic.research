@@ -23,7 +23,7 @@ import unittest
 
 import numpy as np
 import torch
-from torchvision.datasets import MNIST
+from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
 from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
@@ -46,13 +46,14 @@ class SimpleMLP(torch.nn.Module):
         y = self.flatten(x)
         return self.classifier(y)
 
+def fake_data(size=100, image_size=(1, 28, 28), train=False):
+    return FakeData(size=size, image_size=image_size, transform=ToTensor())
 
 simple_supervised_config = dict(
     experiment_class=NoiseRobustnessSupervisedExperiment,
     num_classes=10,
     # Dataset
-    dataset_class=MNIST,
-    dataset_args=dict(root="~/nta/data/MNIST", download=False, transform=ToTensor()),
+    dataset_class=fake_data,
     # Number of epochs
     epochs=5,
     batch_size=32,
