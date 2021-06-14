@@ -46,8 +46,10 @@ class SimpleMLP(torch.nn.Module):
         y = self.flatten(x)
         return self.classifier(y)
 
+
 def fake_data(size=100, image_size=(1, 28, 28), train=False):
     return FakeData(size=size, image_size=image_size, transform=ToTensor())
+
 
 simple_supervised_config = dict(
     experiment_class=NoiseRobustnessSupervisedExperiment,
