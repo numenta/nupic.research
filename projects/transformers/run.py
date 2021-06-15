@@ -60,7 +60,7 @@ from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArgume
 from run_utils import (
     TaskResults,
     evaluate_language_model,
-    evaluate_tasks,
+    evaluate_tasks_handler,
     get_labels,
     init_config,
     init_datasets_mlm,

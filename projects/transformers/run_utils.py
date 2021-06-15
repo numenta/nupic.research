@@ -48,6 +48,12 @@ from transformers import (
 )
 
 from callbacks import TrackEvalMetrics
+from constants import (
+    REPORTING_METRICS_PER_TASK,
+    TRAIN_SIZES_PER_TASK,
+)
+
+
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 __all__ = [
@@ -742,6 +748,8 @@ def evaluate_tasks_handler(trainer,
         # If 
         if offset != 0 and not training_args.load_best_model_at_end:
 
+            print(f"Evaluating again because offset was {offset}")
+
             eval_results = evaluate_tasks(
                 trainer, training_args.output_dir, tasks, eval_datasets
                 )
@@ -906,17 +914,7 @@ class TaskResults():
     Collects and reports results for each finetuning task
     """
 
-    reporting_metrics_per_task = {
-        "cola": ["eval_matthews_correlation"],
-        "mnli": ["eval_accuracy", "mm_eval_accuracy"],
-        "mrpc": ["eval_f1", "eval_accuracy"],
-        "qnli": ["eval_accuracy"],
-        "qqp": ["eval_accuracy", "eval_f1"],
-        "rte": ["eval_accuracy"],
-        "sst2": ["eval_accuracy"],
-        "stsb": ["eval_pearson", "eval_spearmanr"],
-        "wnli": ["eval_accuracy"]
-    }
+    reporting_metrics_per_task = REPORTING_METRICS_PER_TASK
 
     def __init__(self, task_name, early_stopping, training_args=None):
         self.task_name = task_name

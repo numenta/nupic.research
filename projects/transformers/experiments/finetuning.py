@@ -27,8 +27,15 @@ from copy import deepcopy
 from transformers import EarlyStoppingCallback
 
 from callbacks import TrackEvalMetrics
-
+from constants import (
+    REPORTING_METRICS_PER_TASK,
+    TRAIN_SIZES_PER_TASK,
+)
 from .base import transformers_base
+from ..constants import (
+    REPORTING_METRICS_PER_TASK,
+    TRAIN_SIZES_PER_TASK,
+)
 
 """
 Expected for qnli 0.9066 acc, 41 min training time. seed may affect result
@@ -44,7 +51,7 @@ https://wandb.ai/numenta/huggingface/reports/Static-Sparse-Baselines--Vmlldzo1MT
 # Runs can easily break because metric_for_best_model varies by task,
 # but is required if using early_stopping. So it's easy to specify a metric
 # that isn't present for the current task. This is a reference to help avoid that.
-#
+# There is also an assert statement in run.py that will catch errors before training.
 # "cola": ["eval_matthews_correlation"],
 # "mnli": ["eval_accuracy", "mm_eval_accuracy"],
 # "mrpc": ["eval_f1", "eval_accuracy"],
@@ -77,6 +84,7 @@ debug_finetuning_no_early_stopping.update(
     learning_rate=2e-5,
     warmup_ratio=0.1,
     max_steps=50,  # made very short for fast debugging
+    num_runs=3,
 )
 
 debug_finetuning = deepcopy(transformers_base)
@@ -209,29 +217,31 @@ finetuning_bert100k_glue.update(
 #
 # Note that EarlyStoppingCallback is in use, which was not mentioned in the paper
 
+steps_50k = 50_000 // 32
+
 finetuning_bert100k_glue_simple = deepcopy(finetuning_bert100k_glue)
 finetuning_bert100k_glue_simple.update(
     run_name="finetuning_bert100k_glue_simple",
     task_hyperparams=dict(
 
         cola=dict(eval_steps=50,
-                  max_steps=1562,
+                  max_steps=steps_50k,
                   metric_for_best_model="eval_matthews_correlation",
                   num_runs=5,
                   ),  # 50k / 8500 ~ 6 epochs
 
         sst2=dict(num_runs=3),  # 67k training size > 50k, default 3 epochs
-        mrpc=dict(max_steps=1562, num_runs=3),  # 50k / 3700 ~ 14 epochs
+        mrpc=dict(max_steps=steps_50k, num_runs=3),  # 50k / 3700 ~ 14 epochs
 
-        stsb=dict(max_steps=1562,
+        stsb=dict(max_steps=steps_50k,
                   metric_for_best_model="eval_pearson",
                   num_runs=3),  # 50k / 7000 ~ 8 epochs
 
         qqp=dict(num_runs=3),  # 300k >> 50k
         mnli=dict(num_runs=3),  # 300k >> 50k
         qnli=dict(num_runs=3),  # 100k > 50k, defualt to 3 epochs
-        rte=dict(max_steps=1562, num_runs=3),  # ~ 20 epochs from paper
-        wnli=dict(max_steps=1562, num_runs=3)  # 50k / 634 ~ 79 epochs
+        rte=dict(max_steps=steps_50k, num_runs=3),  # ~ 20 epochs from paper
+        wnli=dict(max_steps=steps_50k, num_runs=3)  # 50k / 634 ~ 79 epochs
     ),
     trainer_callbacks=[TrackEvalMetrics(),
                        EarlyStoppingCallback(early_stopping_patience=10)],

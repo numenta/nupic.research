@@ -32,7 +32,74 @@ import argparse
 import os
 import pickle
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+
+class TaskResultsAnalysis:
+
+    def _get_time_and_label(self, run_idx):
+
+        if "steps" in self.all_results[run_idx].keys():
+            x = self.all_results[run_idx]['steps']
+            xlabel = "steps"
+            if self.training_args is not None:
+                suffix = f"\n(batch_size={self.training_args.per_device_train_batch_size})"
+                xlabel = xlabel + suffix
+        elif "epoch" in self.all_results[run_idx].keys():
+            x = self.all_results[run_idx]['epoch']
+            xlabel = "epoch"
+        else:
+            print("Warning, unknown time metric")
+            key0 = list(self.all_results[run_idx].keys())
+            x = np.arange(len(self.all_results[run_idx][key0]))
+            xlabel = ""
+
+        return x, xlabel
+
+
+    def plot_run(self, run_idx, metric, save_name=False):
+        """Plot one metric on one run over time"""
+
+        fig, ax = plt.subplots()
+        y = self.all_results[run_idx][metric]
+        x, xlabel = self._get_time_and_label(run_idx)
+        ax.plot(x, y, ".", ms=10, linestyle='dashed')
+
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(metric)
+        ax.set_title(f"{metric} on run {run_idx}")
+
+        if save_name:
+            plt.savefig(save_name)
+
+        print("Figure ready, hit plt.show() to visualize")
+
+        return fig, ax
+
+
+    def plot_metric(self, metric, save_name=False):
+        """Plot one metric across all runs, you type plt.show()"""
+
+        fig, ax = plt.subplots()
+        for run_idx in range(len(self.all_results)):
+            x, xlabel = self._get_time_and_label(run_idx)
+            y = self.all_results[run_idx][metric]
+
+            ax.plot(x, y, ".", linestyle='dashed', label=f"{run_idx}")
+
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(metric)
+        ax.set_title(f"{metric} on all runs")
+        plt.legend()
+
+        if save_name:
+            plt.savefig(save_name)
+
+        print("Figure ready, hit plt.show() to visualize")
+
+        return fig, ax
+
 
 
 def results_to_markdown(results_files, model_name, reduction):
