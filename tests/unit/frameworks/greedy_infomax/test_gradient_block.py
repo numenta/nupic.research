@@ -26,7 +26,7 @@ import torch
 from torchvision import transforms
 from torchvision.datasets import FakeData
 
-from nupic.research.frameworks.greedy_infomax.models import FullVisionModel
+from nupic.research.frameworks.greedy_infomax.models.FullModel import FullVisionModel
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     module_specific_cross_entropy,
     multiple_cross_entropy,

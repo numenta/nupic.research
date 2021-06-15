@@ -27,9 +27,8 @@
 import torch
 import torch.nn as nn
 from nupic.torch.modules import SparseWeights2d
-from nupic.research.frameworks.greedy_infomax.utils.model_utils import calculate_required_sparsity
 
-from nupic.research.frameworks.greedy_infomax.models import (
+from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
     PreActBlockNoBN,
     PreActBottleneckNoBN,
     ResNetEncoder,
@@ -124,9 +123,10 @@ class FullVisionModel(torch.nn.Module):
         x, n_patches_x, n_patches_y = model_utils.patchify_inputs(
             x, self.patch_size, self.overlap
         )
+        x = self.encoder[0](x)
         # Save positive/contrastive samples for each encoder block
         log_f_module_list, true_f_module_list = [], []
-        for module in self.encoder:
+        for module in self.encoder[1:]:
             # log_f_list and true_f_list each have k_predictions elements
             log_f_list, true_f_list, z = module(x, n_patches_x, n_patches_y)
             log_f_module_list.append(log_f_list)
@@ -252,33 +252,3 @@ class SparseFullVisionModel(FullVisionModel):
                     first_stride=1 if idx == 0 else 2,
                 )
             )
-
-class FixedNonzeroParamsSparseFullVisionModel(SparseFullVisionModel):
-    def __init__(
-            self,
-            negative_samples=16,
-            k_predictions=5,
-            resnet_50=False,
-            block_dims=None,
-            num_channels=None,
-            grayscale=True,
-            patch_size=16,
-            overlap=2,
-            sparse_weights_class=SparseWeights2d,
-            sparsity=None,
-            percent_on=None,
-    ):
-        required_sparsity = calculate_required_sparsity(num_channels)
-        super(FixedNonzeroParamsSparseFullVisionModel, self).__init__(
-            negative_samples=negative_samples,
-            k_predictions=k_predictions,
-            resnet_50=resnet_50,
-            grayscale=grayscale,
-            patch_size=patch_size,
-            overlap=overlap,
-            num_channels=num_channels,
-            block_dims=block_dims,
-            sparse_weights_class=sparse_weights_class,
-            sparsity=required_sparsity,
-            percent_on=percent_on,
-        )

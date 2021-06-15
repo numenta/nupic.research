@@ -25,7 +25,6 @@
 # ----------------------------------------------------------------------
 
 import torch
-from nupic.research.frameworks.greedy_infomax.models.FullModel import FullVisionModel
 
 def gen_orthgonal(dim):
     a = torch.zeros((dim, dim)).normal_(0, 1)
@@ -50,12 +49,6 @@ def make_delta_orthogonal(weights, gain):
     with torch.no_grad():
         weights[:, :, mid1, mid2] = q[: weights.size(0), : weights.size(1)]
         weights.mul_(gain)
-
-def calculate_required_sparsity(num_channels):
-    full_model = FullVisionModel(num_channels=num_channels)
-    total_params = sum([x.view(-1).shape[0] for x in full_model.parameters()])
-    #number of parameters in original dense model
-    return 3310336. / total_params
 
 def patchify_inputs(x, patch_size, overlap):
     x = (
