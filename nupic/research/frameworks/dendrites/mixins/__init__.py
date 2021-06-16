@@ -19,26 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .base import CONFIGS as BASE
-from .centroid import CONFIGS as CENTROID
-from .standard_mlp import CONFIGS as STANDARD
-from .sparse_mlp import CONFIGS as SPARSE
-from .num_segment_search import CONFIGS as SEGSEARCH
-from .sp_context_search import CONFIGS as SP_PROTO
-from .sp_context import CONFIGS as SP_CONTEXT
-
-"""
-Import and collect all experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
-
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(BASE)
-CONFIGS.update(CENTROID)
-CONFIGS.update(STANDARD)
-CONFIGS.update(SPARSE)
-CONFIGS.update(SEGSEARCH)
-CONFIGS.update(SP_PROTO)
-CONFIGS.update(SP_CONTEXT)
-
+from .centroid_figure_1b import *
+from .sp_context_analysis import *
+from .sp_context import SpatialPoolerContext

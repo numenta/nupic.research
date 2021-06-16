@@ -31,29 +31,22 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B
+from nupic.research.frameworks.dendrites.mixins import SpatialPoolerContext
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
-from nupic.torch.modules import KWinners
 
 
-class CentroidExperiment(mixins.RezeroWeights,
-                         mixins.CentroidContext,
-                         mixins.PermutedMNISTTaskIndices,
-                         DendriteContinualLearningExperiment):
+class SPExperiment(mixins.RezeroWeights,
+                   mixins.PermutedMNISTTaskIndices,
+                   SpatialPoolerContext,
+                   DendriteContinualLearningExperiment):
     pass
 
 
-class CentroidFigure1BExperiment(CentroidFigure1B,
-                                 mixins.PlotHiddenActivations,
-                                 CentroidExperiment):
-    pass
-
-
-# Centroid method for inferring contexts: 10 permutedMNIST tasks
-CENTROID_10 = dict(
-    experiment_class=CentroidExperiment,
-    num_samples=8,
+# Spatial pooler for inferring contexts: 10 permutedMNIST tasks
+SP_CONTEXT_10 = dict(
+    experiment_class=SPExperiment,
+    num_samples=2,
 
     # Results path
     local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
@@ -66,24 +59,30 @@ CENTROID_10 = dict(
         seed=42,
     ),
 
-    model_class=DendriticMLP,  # CentroidDendriticMLP does not affect accuracy..??
+    model_class=DendriticMLP,
     model_args=dict(
         input_size=784,
         output_size=10,  # Single output head shared by all tasks
         hidden_sizes=[2048, 2048],
-        num_segments=10,
-        dim_context=784,
+        num_segments=14,
+        dim_context=500,
         kw=True,
         kw_percent_on=0.1,
         dendrite_weight_sparsity=0.0,
         weight_sparsity=0.5,
-        context_percent_on=0.1,
+        context_percent_on=0.05,
+    ),
+
+    context_model_args=dict(
+        kw_percent_on=0.05,
+        boost_strength=0.0,
+        weight_sparsity=0.75,
     ),
 
     batch_size=256,
     val_batch_size=512,
-    epochs=3,
-    tasks_to_validate=(0, 1, 2, 3, 4, 9, 24, 49),
+    epochs=2,
+    tasks_to_validate=(0, 1, 4, 9, 24, 49),
     num_tasks=10,
     num_classes=10 * 10,
     distributed=False,
@@ -95,46 +94,49 @@ CENTROID_10 = dict(
     optimizer_args=dict(lr=5e-4),
 )
 
-# Centroid method for inferring contexts: 50 permutedMNIST tasks
-CENTROID_50 = deepcopy(CENTROID_10)
-CENTROID_50["dataset_args"].update(num_tasks=50)
-CENTROID_50["model_args"].update(num_segments=50)
-CENTROID_50.update(
-    epochs=2,
-    num_tasks=50,
-    num_classes=10 * 50,
-)
-
 # Two tasks only, for debugging
-CENTROID_2 = deepcopy(CENTROID_10)
-CENTROID_2["dataset_args"].update(num_tasks=2)
-CENTROID_2["model_args"].update(num_segments=2)
-CENTROID_2.update(
-    epochs=1,
-    num_samples=1,
+SP_CONTEXT_2 = deepcopy(SP_CONTEXT_10)
+SP_CONTEXT_2["dataset_args"].update(num_tasks=2)
+SP_CONTEXT_2["model_args"].update(num_segments=2)
+SP_CONTEXT_2.update(
+    epochs=2,
+    num_samples=2,
     num_tasks=2,
     num_classes=10 * 2,
-    seed=6024,
 )
 
-# This config saves hidden unit activations per task for later plotting
-FIGURE_1B = deepcopy(CENTROID_10)
-FIGURE_1B.update(
-    experiment_class=CentroidFigure1BExperiment,
-    num_tasks=2,
-    num_samples=1,
+# Search using 4 tasks only
+SP_CONTEXT_4_SEARCH = deepcopy(SP_CONTEXT_10)
+SP_CONTEXT_4_SEARCH["dataset_args"].update(num_tasks=4)
+SP_CONTEXT_4_SEARCH["model_args"].update(num_segments=6)
+SP_CONTEXT_4_SEARCH.update(
+    epochs=2,
+    batch_size=tune.sample_from(
+        lambda spec: int(np.random.choice([64, 256]))),
+    num_samples=20,
+    num_tasks=4,
+    num_classes=10 * 4,
+    tasks_to_validate=(0, 1, 2, 3, 4),
 
-    plot_hidden_activations_args=dict(
-        include_modules=[KWinners],
-        plot_freq=1,
-        max_samples_to_plot=5000
+    context_model_args=dict(
+        kw_percent_on=tune.sample_from(
+            lambda spec: np.random.choice([0.02, 0.05, 0.1, 0.15, 0.2])),
+        boost_strength=tune.sample_from(
+            lambda spec: np.random.choice([0.0, 0.5, 1.0, 2.0, 3.0])),
+        weight_sparsity=tune.sample_from(
+            lambda spec: np.random.choice([0.5, 0.75, 0.9])),
+        duty_cycle_period=10240,
+    ),
+
+    optimizer_args=dict(
+        lr=tune.sample_from(
+            lambda spec: np.random.choice([0.001, 0.0001, 0.00001])),
     ),
 )
 
 # Export configurations in this file
 CONFIGS = dict(
-    centroid_2=CENTROID_2,
-    centroid_10=CENTROID_10,
-    centroid_50=CENTROID_50,
-    figure_1b=FIGURE_1B,
+    sp_context_2=SP_CONTEXT_2,
+    sp_context_4_search=SP_CONTEXT_4_SEARCH,
+    sp_context_10=SP_CONTEXT_10,
 )

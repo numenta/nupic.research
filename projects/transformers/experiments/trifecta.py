@@ -30,7 +30,7 @@ from trainer_mixins import (
     RigLMixin,
 )
 
-from .finetuning import finetuning_bert700k_glue
+from .finetuning import finetuning_bert100k_glue_simple, finetuning_bert700k_glue
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
 
@@ -258,6 +258,18 @@ finetuning_bert_sparse_trifecta_100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
 )
 
+finetuning_bert_sparse_trifecta_100k_glue_simple = deepcopy(
+    finetuning_bert100k_glue_simple)
+finetuning_bert_sparse_trifecta_100k_glue_simple.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/"
+    "bert_sparse_80%_trifecta_100k",
+)
+
+# alias with a shorter variable name for pep8 compliance below
+ft_bert_sp_tri_100k_g_s = finetuning_bert_sparse_trifecta_100k_glue_simple
+
 
 CONFIGS = dict(
     # Tiny BERT
@@ -274,4 +286,6 @@ CONFIGS = dict(
     # BERT Base
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
+    finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
+
 )

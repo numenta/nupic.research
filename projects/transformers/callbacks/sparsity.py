@@ -144,10 +144,10 @@ class PlotDensitiesCallback(TrainerCallback):
             return
 
         # Plot densities for each layer.
-        df_dendity_by_layer = get_density_by_layer(self.sparse_modules)
+        df_density_by_layer = get_density_by_layer(self.sparse_modules)
         fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
         sns.stripplot(
-            data=df_dendity_by_layer,
+            data=df_density_by_layer,
             y="density",
             x="layer",
             hue=None,
