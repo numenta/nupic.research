@@ -54,7 +54,10 @@ class PruneLowSNRLayers:
         super().pre_epoch()
         if self.current_epoch in self.prune_schedule:
             prune_progress = self.prune_schedule[self.current_epoch]
-            vdrop_data = self.model.module.vdrop_data
+            model = self.model
+            if hasattr(model, "module"):
+                model = model.module
+            vdrop_data = model.vdrop_central_data
 
             for (module, z_mask, z_mu, z_logvar, z_logalpha) in zip(
                 vdrop_data.modules,
@@ -125,24 +128,34 @@ class PruneLowSNRGlobal:
     def setup_experiment(self, config):
         """
         :param config:
-            - prune_schedule: A list of (epoch, sparsity) pairs.
+            - prune_schedule: A list of (epoch, density) pairs.
             - validate_on_prune: Whether to run validation after pruning.
         """
         super().setup_experiment(config)
         self.prune_schedule = dict(config["prune_schedule"])
         self.validate_on_prune = config.get("validate_on_prune", False)
         self.log_module_sparsities = config.get("log_module_sparsities", False)
+        model = self.model
+        if hasattr(model, "module"):
+            model = model.module
+        assert all(num_weights == 1 for num_weights in
+                   model.vdrop_central_data.z_num_weights), \
+            "This mixin does not support group sparsity"
 
     def pre_epoch(self):
         super().pre_epoch()
         if self.current_epoch in self.prune_schedule:
             target_density = self.prune_schedule[self.current_epoch]
+            model = self.model
+            if hasattr(model, "module"):
+                model = model.module
             vdrop_data = self.model.vdrop_central_data
 
             z_logalpha = vdrop_data.compute_z_logalpha()
             z_mask = vdrop_data.z_mask
             z_mu = vdrop_data.z_mu
             z_logvar = vdrop_data.z_logvar
+
 
             num_weights = math.floor(z_logalpha.numel() * target_density)
             on_indices = z_logalpha.topk(num_weights, largest=False)[1]
@@ -153,8 +166,8 @@ class PruneLowSNRGlobal:
             with torch.no_grad():
                 z_logvar[~z_mask.bool()] = vdrop_data.pruned_logvar_sentinel
 
-            if not self.logger.disabled:
-                self.logger.info(f"Pruned global model to {target_density} ")
+
+            self.logger.info(f"Pruned global model to {target_density} ")
 
             for parameter, mask in vdrop_data.masked_parameters():
                 zero_momentum(self.optimizer, parameter, mask)
