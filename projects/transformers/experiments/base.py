@@ -46,7 +46,8 @@ transformers_base = dict(
     do_train=True,
     do_eval=True,
     dataloader_drop_last=True,  # keeps consistent batch size
-    num_train_epochs=3  # is overriden if max_steps is defined
+    num_train_epochs=3,  # is overridden if max_steps is defined
+    ddp_find_unused_parameters=False,  # Should not have any unused parameters
 )
 
 bert_base = deepcopy(transformers_base)

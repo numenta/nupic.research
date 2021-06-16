@@ -89,6 +89,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.deepspeed_env
 
 # Spyder project settings
 .spyderproject
@@ -125,3 +126,4 @@ checkcode.sh
 /projects/transformers/sample_files
 /projects/transformers/results
 /nupic/research/frameworks/greedy_infomax/Greedy_InfoMax/
+/projects/transformers/.deepspeed_env
