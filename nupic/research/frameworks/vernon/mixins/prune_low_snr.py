@@ -138,9 +138,9 @@ class PruneLowSNRGlobal:
         model = self.model
         if hasattr(model, "module"):
             model = model.module
-        assert all(num_weights == 1 for num_weights in
-                   model.vdrop_central_data.z_num_weights), \
-            "This mixin does not support group sparsity"
+        assert all(
+            num_weights == 1 for num_weights in model.vdrop_central_data.z_num_weights
+        ), "This mixin does not support group sparsity"
 
     def pre_epoch(self):
         super().pre_epoch()
@@ -156,7 +156,6 @@ class PruneLowSNRGlobal:
             z_mu = vdrop_data.z_mu
             z_logvar = vdrop_data.z_logvar
 
-
             num_weights = math.floor(z_logalpha.numel() * target_density)
             on_indices = z_logalpha.topk(num_weights, largest=False)[1]
 
@@ -165,7 +164,6 @@ class PruneLowSNRGlobal:
             z_mu.data *= z_mask
             with torch.no_grad():
                 z_logvar[~z_mask.bool()] = vdrop_data.pruned_logvar_sentinel
-
 
             self.logger.info(f"Pruned global model to {target_density} ")
 
