@@ -42,6 +42,7 @@ from .log_every_loss import LogEveryLoss
 from .lr_range_test import LRRangeTest, create_lr_test_experiment
 from .maxup import MaxupPerSample, MaxupStandard
 from .multi_cycle_lr import MultiCycleLR
+from .noise_robustness_test import NoiseRobustnessTest
 from .oml import OnlineMetaLearning
 from .permuted_mnist_task_indices import *
 from .profile import Profile
