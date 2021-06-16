@@ -22,7 +22,6 @@
 import math
 
 import torch
-from torch.nn.utils import parameters_to_vector
 
 
 class PruneLowSNRLayers:
@@ -31,6 +30,7 @@ class PruneLowSNRLayers:
     modules. Annotate each module with its their target density by setting
     attribute module._target_density.
     """
+
     def setup_experiment(self, config):
         """
         :param config:
@@ -56,27 +56,19 @@ class PruneLowSNRLayers:
             prune_progress = self.prune_schedule[self.current_epoch]
             vdrop_data = self.model.module.vdrop_data
 
-            for (module,
-                 z_mask,
-                 z_mu,
-                 z_logvar,
-                 z_logalpha) in zip(vdrop_data.modules,
-                                    vdrop_data.z_mask.split(
-                                        vdrop_data.z_chunk_sizes),
-                                    vdrop_data.z_mu.split(
-                                        vdrop_data.z_chunk_sizes),
-                                    vdrop_data.z_logvar.split(
-                                        vdrop_data.z_chunk_sizes),
-                                    vdrop_data.compute_z_logalpha().split(
-                                        vdrop_data.z_chunk_sizes)):
+            for (module, z_mask, z_mu, z_logvar, z_logalpha) in zip(
+                vdrop_data.modules,
+                vdrop_data.z_mask.split(vdrop_data.z_chunk_sizes),
+                vdrop_data.z_mu.split(vdrop_data.z_chunk_sizes),
+                vdrop_data.z_logvar.split(vdrop_data.z_chunk_sizes),
+                vdrop_data.compute_z_logalpha().split(vdrop_data.z_chunk_sizes),
+            ):
 
                 if hasattr(module, "_target_density"):
                     if self.prune_curve_shape == "exponential":
                         density = module._target_density ** prune_progress
                     elif self.prune_curve_shape == "linear":
-                        density = 1 - (
-                            (1 - module._target_density) * prune_progress
-                        )
+                        density = 1 - ((1 - module._target_density) * prune_progress)
 
                     num_weights = math.floor(z_logalpha.numel() * density)
                     on_indices = z_logalpha.topk(num_weights, largest=False)[1]
@@ -87,9 +79,11 @@ class PruneLowSNRLayers:
                     z_logvar[~z_mask.bool()] = vdrop_data.pruned_logvar_sentinel
 
                     if not self.logger.disabled:
-                        name = [name
-                                for name, m in self.model.named_modules()
-                                if m is module][0]
+                        name = [
+                            name
+                            for name, m in self.model.named_modules()
+                            if m is module
+                        ][0]
                         self.logger.info(f"Pruned {name} to {density} ")
 
             for parameter, mask in vdrop_data.masked_parameters():
@@ -99,9 +93,7 @@ class PruneLowSNRLayers:
 
             if self.validate_on_prune:
                 result = self.validate()
-                self.extra_val_results.append(
-                    (self.current_timestep, result)
-                )
+                self.extra_val_results.append((self.current_timestep, result))
 
     def run_epoch(self):
         results = super().run_epoch()
@@ -129,6 +121,7 @@ class PruneLowSNRGlobal:
     variational dropout modules. For this mixin to work, the model must have a
     VDropCentralData module stored in the model as self.vdrop_central_data.
     """
+
     def setup_experiment(self, config):
         """
         :param config:
@@ -170,9 +163,7 @@ class PruneLowSNRGlobal:
 
             if self.validate_on_prune:
                 result = self.validate()
-                self.extra_val_results.append(
-                    (self.current_timestep, result)
-                )
+                self.extra_val_results.append((self.current_timestep, result))
 
     def run_epoch(self):
         results = super().run_epoch()
@@ -185,12 +176,14 @@ class PruneLowSNRGlobal:
         results["model_density"] = model_density
         if self.log_module_sparsities:
             module_idx = 0
-            for module, z_mask in zip(vdrop_data.modules,
-                                    vdrop_data.z_mask.split(
-                                        vdrop_data.z_chunk_sizes)):
-                density = z_mask.sum()/z_mask.numel()
+            for module, z_mask in zip(
+                vdrop_data.modules, vdrop_data.z_mask.split(vdrop_data.z_chunk_sizes)
+            ):
+                density = z_mask.sum() / z_mask.numel()
                 module_class = module.__class__.__name__
-                results[str(module_class)+ "_"+str(module_idx) +"_density"] = density
+                results[
+                    str(module_class) + "_" + str(module_idx) + "_density"
+                ] = density
                 module_idx += 1
         return results
 

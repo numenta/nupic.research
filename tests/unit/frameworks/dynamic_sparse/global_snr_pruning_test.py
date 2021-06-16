@@ -21,38 +21,33 @@
 
 import unittest
 
-import numpy as np
 import torch
-from torch.nn.utils import parameters_to_vector
-
-from torchvision.datasets import FakeData
 from torchvision import transforms
+from torchvision.datasets import FakeData
 
-from nupic.research.frameworks.vernon import mixins, experiments
-from nupic.torch.modules import SparseWeights, rezero_weights
-from nupic.research.frameworks.backprop_structure.modules import MaskedVDropCentralData, \
-    VDropLinear, VDropConv2d
-
+from nupic.research.frameworks.backprop_structure.modules import (
+    MaskedVDropCentralData,
+    VDropConv2d,
+    VDropLinear,
+)
+from nupic.research.frameworks.vernon import experiments, mixins
 
 # Chosen so that all linear transformations can be of shape 4 x 4
 INPUT_SHAPE = (1, 10, 10)
 
 
 class SimpleVDropNet(torch.nn.Sequential):
-    def __init__(self, input_shape=INPUT_SHAPE,
-                 hidden_size=100,
-                 output_size=10):
+    def __init__(self, input_shape=INPUT_SHAPE, hidden_size=100, output_size=10):
         super().__init__()
 
         self.vdrop_central_data = MaskedVDropCentralData()
         self.flatten = torch.nn.Flatten()
         self.vdrop_conv2d = VDropConv2d(1, 10, 3, self.vdrop_central_data)
-        self.vdrop_linear_1 = VDropLinear(640, hidden_size,
-                                         self.vdrop_central_data)
-        self.vdrop_linear_2 = VDropLinear(hidden_size, output_size,
-                                          self.vdrop_central_data)
+        self.vdrop_linear_1 = VDropLinear(640, hidden_size, self.vdrop_central_data)
+        self.vdrop_linear_2 = VDropLinear(
+            hidden_size, output_size, self.vdrop_central_data
+        )
         self.vdrop_central_data.finalize()
-
 
     def forward(self, x):
         self.vdrop_central_data.compute_forward_data()
@@ -68,11 +63,10 @@ def fake_data(size=100, image_size=(1, 10, 10), train=False):
     return FakeData(size=size, image_size=image_size, transform=transforms.ToTensor())
 
 
-class GlobalVDropSupervisedExperiment(mixins.PruneLowSNRGlobal,
-                                      mixins.StepBasedLogging,
-                                     experiments.SupervisedExperiment):
+class GlobalVDropSupervisedExperiment(
+    mixins.PruneLowSNRGlobal, mixins.StepBasedLogging, experiments.SupervisedExperiment
+):
     pass
-
 
 
 simple_supervised_config = dict(
@@ -87,16 +81,13 @@ simple_supervised_config = dict(
     # Model class. Must inherit from "torch.nn.Module"
     model_class=SimpleVDropNet,
     # model model class arguments passed to the constructor
-    prune_schedule = [(0, 0.9),
-                      (1, 0.8),
-                      (2, 0.3)],
-    log_module_sparsities = True,
+    prune_schedule=[(0, 0.9), (1, 0.8), (2, 0.3)],
+    log_module_sparsities=True,
     # Optimizer class class arguments passed to the constructor
     optimizer_args=dict(lr=0.1),
     # Suppress logging.
     log_level="NOTSET",
 )
-
 
 
 class GlobalSNRPruningTest(unittest.TestCase):
@@ -105,13 +96,14 @@ class GlobalSNRPruningTest(unittest.TestCase):
         exp.setup_experiment(simple_supervised_config)
         # Loop through some pseudo epochs.
         exp.pre_epoch()
-        for i in range(exp.epochs):
+        for _ in range(exp.epochs):
             ret = exp.run_epoch()
         nonzero_params = ret["remaining_nonzero_parameters"]
         total_params = ret["total_prunable_parameters"]
-        actual_density = nonzero_params/total_params
+        actual_density = nonzero_params / total_params
         desired_density = ret["model_density"]
         assert desired_density - 0.01 < actual_density < desired_density + 0.01
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
