@@ -28,7 +28,7 @@ import torch
 import torch.nn as nn
 
 from nupic.torch.modules import SparseWeights2d
-
+from nupic.research.frameworks.backprop_structure.modules import VDropConv2d
 
 class BilinearInfo(nn.Module):
     """
@@ -177,3 +177,25 @@ class SparseBilinearInfo(BilinearInfo):
         if sparsity > 0.3:
             for i in range(len(self.W_k)):
                 self.W_k[i] = sparse_weights_class(self.W_k[i], sparsity=sparsity)
+
+
+class VDropSparseBilinearInfo(BilinearInfo):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        negative_samples=16,
+        k_predictions=5,
+        central_data=None
+    ):
+        super(VDropSparseBilinearInfo, self).__init__(
+            in_channels, out_channels, negative_samples, k_predictions
+        )
+        self.W_k = nn.ModuleList(
+            VDropConv2d(in_channels,
+                        out_channels,
+                        kernel_size=1,
+                        central_data=central_data,
+                        bias=False)
+            for _ in range(self.k_predictions)
+        )

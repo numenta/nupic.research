@@ -27,6 +27,7 @@
 import torch
 import torch.nn as nn
 from nupic.torch.modules import SparseWeights2d
+from nupic.research.frameworks.backprop_structure.modules import VDropConv2d, MaskedVDropCentralData
 
 from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
     PreActBlockNoBN,
@@ -35,6 +36,9 @@ from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
     SparsePreActBlockNoBN,
     SparsePreActBottleneckNoBN,
     SparseResNetEncoder,
+    VDropSparsePreActBottleneckNoBN,
+    VDropSparsePreActBlockNoBN,
+    VDropSparseResNetEncoder,
 )
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
 
@@ -167,6 +171,8 @@ class SparseFullVisionModel(FullVisionModel):
                        y dimensions.
     :param overlap: number of pixels of overlap between neighboring patches
     :param sparsity: a list of sparsity values, one for each ResNetEncoder
+    :param percent_on:  a list of 3 values between (0, 1) which represent the
+    percentage of units on in each block of the ResNetEncoder
     """
 
     def __init__(
@@ -252,3 +258,101 @@ class SparseFullVisionModel(FullVisionModel):
                     first_stride=1 if idx == 0 else 2,
                 )
             )
+
+class VDropSparseFullVisionModel(FullVisionModel):
+    """
+    A version of the above FullVisionModel that uses global variational dropout to
+    achieve sparse weights and k-winners modules for sparse activations. Note that
+    the weight sparsity is controlled by the PruneLowSNR mixin config.
+
+    :param negative_samples: number of negative samples to contrast per positive sample
+    :param k_predictions: number of prediction steps to compare positive examples.
+                          For example, if k_predictions is 5 and skip_step is 1,
+                          then this module will compare z_{t} with z_{t+2}...z{t+6}.
+    :param resnet_50: If True, uses the full ResNet50 model. If False, uses the
+                      smaller Resnet34.
+    :param grayscale: This parameter should match the transform used on the dataset.
+                      This does not actively grayscale the incoming data, but rather
+                      informs the model to use either 1 or 3 channels.
+    :param patch_size: The size of patches to split each image along both the x and
+                       y dimensions.
+    :param overlap: number of pixels of overlap between neighboring patches
+    :param percent_on:  a list of 3 values between (0, 1) which represent the
+    percentage of units on in each block of the ResNetEncoder
+    """
+
+    def __init__(
+        self,
+        negative_samples=16,
+        k_predictions=5,
+        resnet_50=False,
+        block_dims=None,
+        num_channels=None,
+        grayscale=True,
+        patch_size=16,
+        overlap=2,
+        percent_on=None,
+        ):
+        super(VDropSparseFullVisionModel, self).__init__(
+            negative_samples=negative_samples,
+            k_predictions=k_predictions,
+            resnet_50=resnet_50,
+            grayscale=grayscale,
+            patch_size=patch_size,
+            overlap=overlap,
+        )
+        if percent_on is None:
+            #reverts to relu
+            percent_on = [0.9, 0.9, 0.9]
+        if block_dims is None:
+            block_dims = [3, 4, 6]
+        if num_channels is None:
+            num_channels = [64, 128, 256]
+
+        if grayscale:
+            input_dims = 1
+        else:
+            input_dims = 3
+
+        self.vdrop_central_data = MaskedVDropCentralData()
+
+        self.encoder = nn.ModuleList([])
+        self.encoder.append(
+            VDropConv2d(
+                input_dims,
+                num_channels[0],
+                kernel_size=5,
+                central_data=self.vdrop_central_data,
+                stride=1,
+                padding=2
+                )
+        )
+
+        if resnet_50:
+            self.block = VDropSparsePreActBottleneckNoBN
+        else:
+            self.block = VDropSparsePreActBlockNoBN
+
+        if grayscale:
+            input_dims = 1
+        else:
+            input_dims = 3
+
+        for idx in range(len(block_dims)):
+            self.encoder.append(
+                VDropSparseResNetEncoder(
+                    self.block,
+                    [block_dims[idx]],
+                    [num_channels[idx]],
+                    idx,
+                    input_dims=input_dims,
+                    k_predictions=self.k_predictions,
+                    negative_samples=self.negative_samples,
+                    percent_on=percent_on[idx],
+                    previous_input_dim=num_channels[0] if idx == 0 else num_channels[
+                        idx - 1],
+                    first_stride=1 if idx == 0 else 2,
+                    central_data = self.vdrop_central_data
+                )
+            )
+
