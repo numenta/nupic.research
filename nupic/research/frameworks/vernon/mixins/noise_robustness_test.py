@@ -19,11 +19,9 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import sys
 from functools import partial
 
 import torch
-import torch.nn.functional as F
 from torchvision import transforms
 
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model
@@ -34,16 +32,32 @@ class NoiseRobustnessTest:
     Replaces the standard evaluate model function with a loop over the same function
     that conducts a noise robustness test on each iteration. In the test, validation
     accuracy is reported for samples with varying percentages of Gaussian
-    noise. The output of this mixin is a curve with noise percentage on the x axis
-    and validation accuracy on the y axis.
+    noise. The output of this mixin is a results dictionary which has all of the
+    standard metrics for the default evaluation loop and also reports the value of each
+    metric at each level of specified noise.
     """
 
     def setup_experiment(self, config):
         """
         :param config:
             - noise_levels: Optional, a list of floats between 0 and 1 which specify
-            how many units of the input image will receive Gaussian noise. Note that
-            the zero noise case is included by default
+            how many units of the input image will receive Gaussian noise. For
+            example, if the noise level is 0.1, then about 10% of the incoming
+            inputs per sample will receive additive Gaussian noise. Note that
+            the zero noise case is included by default, and leaving noise_levels out
+            of the config will result in 0.1 to 0.9 in increments of 0.1.
+            - noise_mean: The mean of the noise which will be added to the incoming
+            data, defaults to 0
+            - noise_std: The standard deviation of the noise which will be added to
+            the incoming data, defaults to 1
+
+        Example config:
+        config = dict(
+            noise_levels = [0.1, 0.25, 0.5, 0.9]
+            noise_mean = 0.2
+            noise_sd = 0.5
+        )
+
         """
         super().setup_experiment(config)
         noise_levels = config.get("noise_levels", torch.arange(0.1, 1, 0.1))
@@ -72,47 +86,23 @@ def evaluate_model_with_noise(
     model,
     loader,
     device,
-    batches_in_epoch=sys.maxsize,
-    criterion=F.nll_loss,
-    complexity_loss_fn=None,
-    active_classes=None,
-    progress=None,
-    post_batch_callback=None,
-    transform_to_device_fn=None,
-    evaluate_model_func=None,
     noise_levels=None,
     noise_mean=0,
     noise_std=1,
+    evaluate_model_func=None,
+    **kwargs,
 ):
+    if noise_levels is None:
+        noise_levels = []
     noise_results = {}
     dataset_transform = loader.dataset.transform
-    zero_noise_results = evaluate_model_func(
-        model,
-        loader,
-        device,
-        batches_in_epoch=batches_in_epoch,
-        criterion=criterion,
-        complexity_loss_fn=complexity_loss_fn,
-        active_classes=active_classes,
-        progress=progress,
-        post_batch_callback=post_batch_callback,
-        transform_to_device_fn=transform_to_device_fn,
-    )
+    zero_noise_results = evaluate_model_func(model, loader, device, **kwargs)
     for noise_level in noise_levels:
         loader.dataset.transform = transforms.Compose(
-            [dataset_transform, GaussianNoise(noise_level, noise_mean, noise_std)]
+            [dataset_transform, AddGaussianNoise(noise_level, noise_mean, noise_std)]
         )
         noise_results[noise_level] = evaluate_model_func(
-            model,
-            loader,
-            device,
-            batches_in_epoch=batches_in_epoch,
-            criterion=criterion,
-            complexity_loss_fn=complexity_loss_fn,
-            active_classes=active_classes,
-            progress=progress,
-            post_batch_callback=post_batch_callback,
-            transform_to_device_fn=transform_to_device_fn,
+            model, loader, device, **kwargs
         )
     loader.dataset.transform = dataset_transform
     all_results = {
@@ -131,7 +121,7 @@ def noisy_getitem(idx, get_item_func=None, noise_level=0, noise_mean=0, noise_st
     return data + noise, target
 
 
-class GaussianNoise:
+class AddGaussianNoise:
     def __init__(self, noise_level, mean, std):
         self.mean = mean
         self.std = std
