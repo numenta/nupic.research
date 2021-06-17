@@ -20,16 +20,17 @@
 # ----------------------------------------------------------------------
 
 from copy import deepcopy
-import ray.tune as tune
+
 import numpy as np
+import ray.tune as tune
 import torch
 from torch.utils.data.dataset import Subset
 from torchvision.datasets import STL10
 
-from nupic.research.frameworks.greedy_infomax.models import (
+from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
     ClassificationModel,
-    FullVisionModel,
 )
+from nupic.research.frameworks.greedy_infomax.models.FullModel import FullVisionModel
 from nupic.research.frameworks.greedy_infomax.utils.data_utils import STL10_DATASET_ARGS
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_log_softmax_nll_loss,
@@ -81,6 +82,7 @@ class GreedyInfoMaxExperiment(
             config, supervised_data
         )
         self.val_loader = self.create_validation_dataloader(config, validation_data)
+
     # avoid changing key names for sigopt
     @classmethod
     def get_readable_result(cls, result):
@@ -108,7 +110,7 @@ DEFAULT_BASE = dict(
     # num_validation_samples=32,
     reuse_actors=True,
     # Seed
-    seed=tune.sample_from(lambda spec: np.random.randint(1, 10000)),
+    # seed=tune.sample_from(lambda spec: np.random.randint(1, 100)),
     # Number of times to sample from the hyperparameter space. If `grid_search` is
     # provided the grid will be repeated `num_samples` of times.
     # Training batch size
@@ -193,37 +195,41 @@ DEFAULT_BASE = dict(
 
 
 SMALL_SAMPLES = deepcopy(DEFAULT_BASE)
-SMALL_SAMPLES.update(dict(
-    wandb_args=dict(project="greedy_infomax-replication",
-                    name="small_samples_2_epoch"),
-    model_args=dict(
-        negative_samples=8,
-        k_predictions=5,
-        resnet_50=False,
-        grayscale=True,
-        patch_size=16,
-        overlap=2,
-    ),
-    epochs=2,
-    batches_in_epoch = 2,
-    epochs_to_validate=[1,],
-))
+SMALL_SAMPLES.update(
+    dict(
+        wandb_args=dict(
+            project="greedy_infomax-replication", name="small_samples_2_epoch"
+        ),
+        model_args=dict(
+            negative_samples=8,
+            k_predictions=5,
+            resnet_50=False,
+            grayscale=True,
+            patch_size=16,
+            overlap=2,
+        ),
+        epochs=2,
+        batches_in_epoch=2,
+        epochs_to_validate=[1],
+    )
+)
 
 
 ONE_CYCLE_LR = deepcopy(DEFAULT_BASE)
-ONE_CYCLE_LR.update(dict(
-    lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
-    lr_scheduler_args=dict(
-        max_lr=0.01,
-        div_factor=50,
-        final_div_factor=4000,
-        pct_start=0.15,
-        epochs=30,
-        anneal_strategy="linear",
-        max_momentum=0.01,
-        cycle_momentum=False,
-    ),
-)
+ONE_CYCLE_LR.update(
+    dict(
+        lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
+        lr_scheduler_args=dict(
+            max_lr=0.01,
+            div_factor=50,
+            final_div_factor=4000,
+            pct_start=0.15,
+            epochs=30,
+            anneal_strategy="linear",
+            max_momentum=0.01,
+            cycle_momentum=False,
+        ),
+    )
 )
 
 VALIDATE_ONLY = deepcopy(DEFAULT_BASE)
@@ -240,6 +246,6 @@ VALIDATE_ONLY.update(
 )
 
 
-CONFIGS = dict(default_base=DEFAULT_BASE,
-               small_samples=SMALL_SAMPLES,
-               validate_only=VALIDATE_ONLY)
+CONFIGS = dict(
+    default_base=DEFAULT_BASE, small_samples=SMALL_SAMPLES, validate_only=VALIDATE_ONLY
+)

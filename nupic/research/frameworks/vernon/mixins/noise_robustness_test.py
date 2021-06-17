@@ -60,7 +60,8 @@ class NoiseRobustnessTest:
 
         """
         super().setup_experiment(config)
-        noise_levels = config.get("noise_levels", torch.arange(0.1, 1, 0.1))
+        noise_levels = config.get("noise_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7,
+                                                   0.8, 0.9])
         assert all(
             0 < noise <= 1 for noise in noise_levels
         ), "Noise levels must be between (0, 1]"

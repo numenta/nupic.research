@@ -100,7 +100,7 @@ class SparsePreActBlockNoBN(PreActBlockNoBN):
 
 class VDropSparsePreActBlockNoBN(nn.Module):
     """VDrop version of the PreActBlockNoBN block."""
-
+    expansion = 1
     def __init__(self,
                  in_planes,
                  planes,
@@ -110,10 +110,11 @@ class VDropSparsePreActBlockNoBN(nn.Module):
         super(VDropSparsePreActBlockNoBN, self).__init__()
         self.conv1 = VDropConv2d(
             in_planes,
-            planes, kernel_size=3,
+            planes,
+            kernel_size=3,
             central_data=central_data,
             stride=stride,
-            padding=1
+            padding=1,
         )
         self.conv2 = VDropConv2d(planes,
                                  planes,
@@ -433,7 +434,7 @@ class SparseResNetEncoder(ResNetEncoder):
         return nn.Sequential(*layers)
 
 
-class VDropSparseResNetEncoder(ResNetEncoder):
+class VDropSparseResNetEncoder(nn.Module):
     """
     A sparse version of the above ResNetEncoder.
     """
@@ -453,18 +454,14 @@ class VDropSparseResNetEncoder(ResNetEncoder):
         first_stride=1,
         central_data=None,
     ):
-        super(VDropSparseResNetEncoder, self).__init__(
-            block,
-            num_blocks,
-            filters,
-            encoder_num,
-            negative_samples,
-            k_predictions=k_predictions,
-            patch_size=patch_size,
-            input_dims=input_dims,
-            previous_input_dim=previous_input_dim,
-            first_stride=first_stride,
-        )
+        super(VDropSparseResNetEncoder, self).__init__()
+
+        self.encoder_num = encoder_num
+
+        self.overlap = 2
+
+        self.patch_size = patch_size
+        self.filters = filters
 
         self.model = nn.Sequential()
         self.in_planes = previous_input_dim
@@ -506,10 +503,22 @@ class VDropSparseResNetEncoder(ResNetEncoder):
                 block(
                     self.in_planes,
                     planes,
+                    central_data=central_data,
                     stride=stride,
                     percent_on=percent_on,
-                    central_data=central_data,
                 )
             )
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
+
+    def encode(self, x, n_patches_x, n_patches_y):
+        z = self.model(x)
+        out = F.adaptive_avg_pool2d(z, 1)
+        out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
+        out = out.permute(0, 3, 1, 2).contiguous()
+        return z, out
+
+    def forward(self, x, n_patches_x, n_patches_y):
+        z, out = self.encode(x, n_patches_x, n_patches_y)
+        log_f_list, true_f_list = self.bilinear_model(out, out)
+        return log_f_list, true_f_list, z

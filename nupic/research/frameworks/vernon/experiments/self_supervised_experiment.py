@@ -126,8 +126,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         self.encoder = self.model
         self.classifier = self.create_model(classifier_config, self.device)
         self.logger.debug(self.classifier)
-        self.model = EncoderClassifier(self.encoder, self.classifier)
-        self.model.to(self.device)
+        self.encoder_classifier = EncoderClassifier(self.encoder, self.classifier)
+        self.encoder_classifier.to(self.device)
 
         self.encoder_optimizer = self.optimizer
         self.classifier_optimizer = self.create_optimizer(
@@ -323,7 +323,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         pass
 
     def post_batch_wrapper_supervised(self, **kwargs):
-        self.post_optimizer_step_supervised(self.model)
+        self.post_optimizer_step_supervised(self.encoder_classifier)
         self.post_batch_supervised(**kwargs)
 
     def transform_data_to_device_unsupervised(self, data, target, device, non_blocking):
@@ -366,7 +366,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         supervised_epochs_per_validation is enough for the classifier to converge.
 
         Second, this method trains the classifier in a supervised fashion for a
-        specified number of epochs. self.model refers to the entire
+        specified number of epochs. self.encoder_classifier refers to the entire
         EncoderClassifier model, whose .forward() method is as follows:
 
             def forward(self, x):
@@ -392,7 +392,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
         for _ in range(self.supervised_training_epochs_per_validation):
             self.train_model(
-                model=self.model,
+                model=self.encoder_classifier,
                 loader=self.supervised_loader,
                 optimizer=self.classifier_optimizer,
                 device=self.device,
@@ -405,7 +405,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             )
 
         return self.evaluate_model(
-            model=self.model,
+            model=self.encoder_classifier,
             loader=self.val_loader,
             device=self.device,
             criterion=self.supervised_loss,

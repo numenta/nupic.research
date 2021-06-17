@@ -21,26 +21,29 @@
 
 from copy import deepcopy
 
-from nupic.research.frameworks.greedy_infomax.models import SparseFullVisionModel, \
-    ClassificationModel, FixedNonzeroParamsSparseFullVisionModel
+import numpy as np
+import ray.tune as tune
+import torch
+from torch.optim.lr_scheduler import OneCycleLR
+
+from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
+    ClassificationModel,
+)
+from nupic.research.frameworks.greedy_infomax.models.FullModel import (
+    SparseFullVisionModel,
+    VDropSparseFullVisionModel,
+)
+from nupic.research.frameworks.vernon.distributed import mixins
 from nupic.torch.modules import SparseWeights2d
-from nupic.research.frameworks.vernon.distributed import mixins, experiments
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
 from .default_base import GreedyInfoMaxExperiment
-import torch
-import ray.tune as tune
-import numpy as np
-
 
 
 class GreedyInfoMaxExperimentSparse(
-    mixins.RezeroWeights,
-    mixins.LogBackpropStructure,
-    GreedyInfoMaxExperiment,
+    mixins.RezeroWeights, mixins.LogBackpropStructure, GreedyInfoMaxExperiment
 ):
     pass
-
 
 
 DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
@@ -50,11 +53,12 @@ NUM_EPOCHS = 5
 SPARSE_BASE = deepcopy(DEFAULT_BASE)
 SPARSE_BASE.update(
     dict(
-        wandb_args=dict(project="greedy_infomax-sparsity-tests",
-                        name="sparse_resnet_base"),
+        wandb_args=dict(
+            project="greedy_infomax-sparsity-tests", name="sparse_resnet_base"
+        ),
         experiment_class=GreedyInfoMaxExperimentSparse,
         epochs=NUM_EPOCHS,
-        epochs_to_validate=[NUM_EPOCHS - 1,],
+        epochs_to_validate=[NUM_EPOCHS - 1],
         supervised_training_epochs_per_validation=10,
         batch_size=BATCH_SIZE,
         model_class=SparseFullVisionModel,
@@ -67,10 +71,11 @@ SPARSE_BASE.update(
             overlap=2,
             sparse_weights_class=SparseWeights2d,
             sparsity=[0.5, 0.5, 0.5],
-            percent_on=[0.9, 0.9, 0.9]
+            percent_on=[0.9, 0.9, 0.9],
         ),
     )
 )
+
 
 def make_reg_schedule(
     epochs, pct_ramp_start, pct_ramp_end, peak_value, pct_drop, final_value
@@ -89,47 +94,78 @@ def make_reg_schedule(
             return final_value
 
     return reg_schedule
+
+
 class GreedyInfoMaxExperimentSparsePruning(
-    mixins.LogEveryLoss,
     mixins.LogBackpropStructure,
-    mixins.LogEveryLearningRate,
-    mixins.ExtraValidationsPerEpoch,
+    mixins.NoiseRobustnessTest,
     mixins.ReportMaxAccuracy,
     mixins.RegularizeLoss,
     mixins.ConstrainParameters,
-    mixins.MultiCycleLR,
-    mixins.PruneLowSNR,
-    GreedyInfoMaxExperiment):
+    mixins.PruneLowSNRGlobal,
+    GreedyInfoMaxExperiment,
+):
     pass
 
+
 SPARSE_VDROP = deepcopy(SPARSE_BASE)
-SPARSE_VDROP.update(dict(
-    reg_scalar=make_reg_schedule(
-                epochs=NUM_EPOCHS,
-                pct_ramp_start=10 / 120,
-                pct_ramp_end=30 / 60,
-                peak_value=0.01,
-                pct_drop=45 / 60,
-                final_value=0.0005,
-            ),
-            prune_schedule=[
-                (30, 1 / 6),
-                (33, 2 / 6),
-                (36, 3 / 6),
-                (39, 4 / 6),
-                (42, 5 / 6),
-                (45, 6 / 6),
-            ],
-))
+SPARSE_VDROP.update(
+    dict(
+        wandb_args=dict(
+            project="greedy_infomax-sparsity-tests", name="sparse_resnet_vdrop"
+        ),
+        experiment_class=GreedyInfoMaxExperimentSparsePruning,
+        epochs=10,
+        epochs_to_validate=[-1, 0, 3, 6, 9],
+        model_class=VDropSparseFullVisionModel,
+        model_args=dict(
+            negative_samples=16,
+            k_predictions=5,
+            resnet_50=False,
+            block_dims=None,
+            num_channels=None,
+            grayscale=True,
+            patch_size=16,
+            overlap=2,
+            percent_on=None,
+        ),
+        prune_schedule=[
+            (2, 0.8),
+            (4, 0.6),
+            (6, 0.4),
+            (8, 0.2),
+        ],
+        log_module_sparsities=True,
+        reg_scalar=make_reg_schedule(
+            epochs=10,
+            pct_ramp_start=1/10,
+            pct_ramp_end=3/10,
+            peak_value=0.01,
+            pct_drop=6/10,
+            final_value=0.0005,
+        ),
+        lr_scheduler_class=OneCycleLR,
+        lr_scheduler_args=dict(
+            max_lr=0.01,  # Optimized in Sig-Opt
+            div_factor=50,  # Optimized in Sig-Opt
+            final_div_factor=2000,
+            pct_start=0.15,  # Optimized in Sig-Opt
+            epochs=10,
+            anneal_strategy="linear",
+            max_momentum=0.01,
+            cycle_momentum=False,
+        ),
+    )
+)
 
 LARGE_SPARSE = deepcopy(SPARSE_BASE)
 NUM_CLASSES = 10
-LARGE_SPARSE.update(dict(
-        wandb_args=dict(project="greedy_infomax-sparsity-tests",
-                        name="large_sparse"),
+LARGE_SPARSE.update(
+    dict(
+        wandb_args=dict(project="greedy_infomax-sparsity-tests", name="large_sparse"),
         experiment_class=GreedyInfoMaxExperimentSparse,
         epochs=NUM_EPOCHS,
-        epochs_to_validate=[NUM_EPOCHS - 1,],
+        epochs_to_validate=[NUM_EPOCHS - 1],
         batch_size=16,
         supervised_training_epochs_per_validation=10,
         model_class=SparseFullVisionModel,
@@ -140,11 +176,11 @@ LARGE_SPARSE.update(dict(
             grayscale=True,
             patch_size=16,
             overlap=2,
-            block_dims = [3, 4, 6],
-            num_channels = [512, 512, 512],
+            block_dims=[3, 4, 6],
+            num_channels=[512, 512, 512],
             sparse_weights_class=SparseWeights2d,
-            sparsity=[0.128,]*3,
-            percent_on=[0.51,]*3,
+            sparsity=[0.128] * 3,
+            percent_on=[0.51] * 3,
         ),
         classifier_config=dict(
             model_class=ClassificationModel,
@@ -154,23 +190,21 @@ LARGE_SPARSE.update(dict(
             optimizer_class=torch.optim.Adam,
             # Optimizer class class arguments passed to the constructor
             optimizer_args=dict(lr=2e-4),
-    ),
+        ),
     )
 )
 
 
-
-
 LARGE_SPARSE_GRID_SEARCH = deepcopy(LARGE_SPARSE)
-LARGE_SPARSE_GRID_SEARCH.update(dict(
-        wandb_args=dict(project="greedy_infomax-large_sparse",
-                        name="gridsearch"),
+LARGE_SPARSE_GRID_SEARCH.update(
+    dict(
+        wandb_args=dict(project="greedy_infomax-large_sparse", name="gridsearch"),
         experiment_class=GreedyInfoMaxExperimentSparse,
         epochs=NUM_EPOCHS,
-        epochs_to_validate=[NUM_EPOCHS - 1,],
+        epochs_to_validate=[NUM_EPOCHS - 1],
         batch_size=16,
         supervised_training_epochs_per_validation=10,
-        model_class=FixedNonzeroParamsSparseFullVisionModel,
+        model_class=VDropSparseFullVisionModel,
         model_args=dict(
             negative_samples=16,
             k_predictions=5,
@@ -178,13 +212,17 @@ LARGE_SPARSE_GRID_SEARCH.update(dict(
             grayscale=True,
             patch_size=16,
             overlap=2,
-            block_dims = [3, 4, 6],
-            num_channels = tune.grid_search([[64, 128, 256],
-                                             [128, 128, 256],
-                                             [128, 256, 256],
-                                             [256, 256, 256],
-                                             [256, 512, 256],
-                                             [512, 512, 256],],),
+            block_dims=[3, 4, 6],
+            num_channels=tune.grid_search(
+                [
+                    [64, 128, 256],
+                    [128, 128, 256],
+                    [128, 256, 256],
+                    [256, 256, 256],
+                    [256, 512, 256],
+                    [512, 512, 256],
+                ]
+            ),
             sparse_weights_class=SparseWeights2d,
             sparsity=None,
             percent_on=tune.grid_search(np.logspace(-2, -0.3, num=5)),
@@ -197,13 +235,14 @@ LARGE_SPARSE_GRID_SEARCH.update(dict(
             optimizer_class=torch.optim.Adam,
             # Optimizer class class arguments passed to the constructor
             optimizer_args=dict(lr=2e-4),
-    ),
+        ),
     )
 )
 
 
-
-
-CONFIGS = dict(sparse_base=SPARSE_BASE,
-               large_sparse=LARGE_SPARSE,
-               large_sparse_grid_search=LARGE_SPARSE_GRID_SEARCH,)
+CONFIGS = dict(
+    sparse_base=SPARSE_BASE,
+    large_sparse=LARGE_SPARSE,
+    sparse_vdrop=SPARSE_VDROP,
+    large_sparse_grid_search=LARGE_SPARSE_GRID_SEARCH,
+)

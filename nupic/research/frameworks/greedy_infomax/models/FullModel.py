@@ -26,9 +26,11 @@
 
 import torch
 import torch.nn as nn
-from nupic.torch.modules import SparseWeights2d
-from nupic.research.frameworks.backprop_structure.modules import VDropConv2d, MaskedVDropCentralData
 
+from nupic.research.frameworks.backprop_structure.modules import (
+    MaskedVDropCentralData,
+    VDropConv2d,
+)
 from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
     PreActBlockNoBN,
     PreActBottleneckNoBN,
@@ -36,11 +38,12 @@ from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
     SparsePreActBlockNoBN,
     SparsePreActBottleneckNoBN,
     SparseResNetEncoder,
-    VDropSparsePreActBottleneckNoBN,
     VDropSparsePreActBlockNoBN,
+    VDropSparsePreActBottleneckNoBN,
     VDropSparseResNetEncoder,
 )
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
+from nupic.torch.modules import SparseWeights2d
 
 
 class FullVisionModel(torch.nn.Module):
@@ -101,9 +104,7 @@ class FullVisionModel(torch.nn.Module):
             input_dims = 3
 
         self.encoder.append(
-            nn.Conv2d(
-                input_dims, num_channels[0], kernel_size=5, stride=1, padding=2
-            ),
+            nn.Conv2d(input_dims, num_channels[0], kernel_size=5, stride=1, padding=2)
         )
 
         for idx in range(len(block_dims)):
@@ -116,9 +117,10 @@ class FullVisionModel(torch.nn.Module):
                     input_dims=input_dims,
                     k_predictions=self.k_predictions,
                     negative_samples=self.negative_samples,
-                    previous_input_dim=num_channels[0] if idx==0 else num_channels[
-                        idx-1],
-                    first_stride=1 if idx==0 else 2,
+                    previous_input_dim=num_channels[0]
+                    if idx == 0
+                    else num_channels[idx - 1],
+                    first_stride=1 if idx == 0 else 2,
                 )
             )
 
@@ -146,8 +148,9 @@ class FullVisionModel(torch.nn.Module):
         x, n_patches_x, n_patches_y = model_utils.patchify_inputs(
             x, self.patch_size, self.overlap
         )
+        x = self.encoder[0](x)
         # Compute encoded patch-level representation for each encoder block
-        for module in self.encoder:
+        for module in self.encoder[1:]:
             # no need to detach between modules as .encode() will only be called
             # under a torch.no_grad() scope
             x, out = module.encode(x, n_patches_x, n_patches_y)
@@ -188,7 +191,7 @@ class SparseFullVisionModel(FullVisionModel):
         sparse_weights_class=SparseWeights2d,
         sparsity=None,
         percent_on=None,
-        ):
+    ):
         super(SparseFullVisionModel, self).__init__(
             negative_samples=negative_samples,
             k_predictions=k_predictions,
@@ -198,10 +201,10 @@ class SparseFullVisionModel(FullVisionModel):
             overlap=overlap,
         )
         if sparsity is None:
-            #reverts to dense weights
+            # reverts to dense weights
             sparsity = [0.01, 0.01, 0.01]
         if percent_on is None:
-            #reverts to relu
+            # reverts to relu
             percent_on = [0.9, 0.9, 0.9]
         if block_dims is None:
             block_dims = [3, 4, 6]
@@ -227,7 +230,7 @@ class SparseFullVisionModel(FullVisionModel):
             self.encoder.append(
                 nn.Conv2d(
                     input_dims, num_channels[0], kernel_size=5, stride=1, padding=2
-                ),
+                )
             )
 
         if resnet_50:
@@ -253,11 +256,13 @@ class SparseFullVisionModel(FullVisionModel):
                     sparse_weights_class=sparse_weights_class,
                     sparsity=sparsity[idx],
                     percent_on=percent_on[idx],
-                    previous_input_dim=num_channels[0] if idx == 0 else num_channels[
-                        idx - 1],
+                    previous_input_dim=num_channels[0]
+                    if idx == 0
+                    else num_channels[idx - 1],
                     first_stride=1 if idx == 0 else 2,
                 )
             )
+
 
 class VDropSparseFullVisionModel(FullVisionModel):
     """
@@ -279,6 +284,7 @@ class VDropSparseFullVisionModel(FullVisionModel):
     :param overlap: number of pixels of overlap between neighboring patches
     :param percent_on:  a list of 3 values between (0, 1) which represent the
     percentage of units on in each block of the ResNetEncoder
+    :param central_data: a VDropCentralData module for intializing VDrop
     """
 
     def __init__(
@@ -292,7 +298,7 @@ class VDropSparseFullVisionModel(FullVisionModel):
         patch_size=16,
         overlap=2,
         percent_on=None,
-        ):
+    ):
         super(VDropSparseFullVisionModel, self).__init__(
             negative_samples=negative_samples,
             k_predictions=k_predictions,
@@ -302,7 +308,7 @@ class VDropSparseFullVisionModel(FullVisionModel):
             overlap=overlap,
         )
         if percent_on is None:
-            #reverts to relu
+            # reverts to relu
             percent_on = [0.9, 0.9, 0.9]
         if block_dims is None:
             block_dims = [3, 4, 6]
@@ -324,8 +330,8 @@ class VDropSparseFullVisionModel(FullVisionModel):
                 kernel_size=5,
                 central_data=self.vdrop_central_data,
                 stride=1,
-                padding=2
-                )
+                padding=2,
+            )
         )
 
         if resnet_50:
@@ -349,10 +355,28 @@ class VDropSparseFullVisionModel(FullVisionModel):
                     k_predictions=self.k_predictions,
                     negative_samples=self.negative_samples,
                     percent_on=percent_on[idx],
-                    previous_input_dim=num_channels[0] if idx == 0 else num_channels[
-                        idx - 1],
+                    previous_input_dim=num_channels[0]
+                    if idx == 0
+                    else num_channels[idx - 1],
                     first_stride=1 if idx == 0 else 2,
-                    central_data = self.vdrop_central_data
+                    central_data=self.vdrop_central_data,
                 )
             )
+        self.vdrop_central_data.finalize()
 
+    def forward(self, *args, **kwargs):
+        self.vdrop_central_data.compute_forward_data()
+        ret = super().forward(*args, **kwargs)
+        self.vdrop_central_data.clear_forward_data()
+        return ret
+
+    def encode(self, *args, **kwargs):
+        self.vdrop_central_data.compute_forward_data()
+        ret = super().encode(*args, **kwargs)
+        self.vdrop_central_data.clear_forward_data()
+        return ret
+
+    def to(self, *args, **kwargs):
+        ret = super().to(*args, **kwargs)
+        self.vdrop_central_data = self.vdrop_central_data.to(*args, **kwargs)
+        return ret

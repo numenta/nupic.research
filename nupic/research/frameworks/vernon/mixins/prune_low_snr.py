@@ -138,9 +138,9 @@ class PruneLowSNRGlobal:
         model = self.model
         if hasattr(model, "module"):
             model = model.module
-        assert all(
-            num_weights == 1 for num_weights in model.vdrop_central_data.z_num_weights
-        ), "This mixin does not support group sparsity"
+        z_num_weights = model.vdrop_central_data.z_num_weights
+        assert torch.equal(z_num_weights, torch.ones_like(z_num_weights)), \
+            "This mixin does not support group sparsity"
 
     def pre_epoch(self):
         super().pre_epoch()

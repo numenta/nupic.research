@@ -19,26 +19,16 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.greedy_infomax.models import SparseFullVisionModel
-
+from nupic.research.frameworks.greedy_infomax.models.FullModel import VDropSparseFullVisionModel
+from projects.greedy_infomax.experiments.sparse_resnets import CONFIGS
 
 def main():
-    # create models of both kinds
-    vernon_model = SparseFullVisionModel(
-            negative_samples=16,
-            block_dims = [3, 4, 6],
-            num_channels = [64, 128, 128],
-            k_predictions=5,
-            resnet_50=False,
-            grayscale=True,
-            patch_size=16,
-            overlap=2,
-    )
-
-    total_params = sum([x.view(-1).shape[0] for x in vernon_model.parameters()])
-    required_sparsity  = 3310336./total_params
+    sparse_base = CONFIGS["sparse_vdrop"]
+    sparse_base.update(distributed=False)
+    exp = sparse_base["experiment_class"]()
+    exp.setup_experiment(sparse_base)
+    exp.run_epoch()
     print("Done")
-
 
 if __name__ == "__main__":
     main()
