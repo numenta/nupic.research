@@ -37,6 +37,7 @@ def train_dendrite_model(
     share_labels=False,
     num_labels=None,
     active_classes=None,
+    train_context_fn=None,
     context_vector=None,
     post_batch_callback=None,
     complexity_loss_fn=None,
@@ -92,6 +93,9 @@ def train_dendrite_model(
             else:
                 data, _ = data
         data = data.flatten(start_dim=1)
+
+        if train_context_fn is not None:
+            context = train_context_fn(data)
 
         # Since labels are shared, target values should be in
         # [0, 1, ..., num_labels - 1]
@@ -167,8 +171,6 @@ def evaluate_dendrite_model(
 
     loss = torch.tensor(0., device=device)
     correct = torch.tensor(0, device=device)
-
-    infer_context = (infer_context_fn is not None)
     context = None
 
     with torch.no_grad():
@@ -188,7 +190,7 @@ def evaluate_dendrite_model(
 
             data = data.to(device)
             target = target.to(device)
-            if infer_context:
+            if infer_context_fn is not None:
                 # Use `infer_context_fn` to retrieve the context vector
                 context = infer_context_fn(data)
             if context is not None:

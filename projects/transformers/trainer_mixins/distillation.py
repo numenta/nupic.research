@@ -103,6 +103,8 @@ class DistillationTrainerMixin:
                 model_name_or_path,
                 cache_dir=teacher_models_cache_dir
             )
+            if self.args.fp16:
+                teacher_model.half()
             teacher_model.resize_token_embeddings(len(self.tokenizer))
             teacher_models.append(teacher_model)
 
