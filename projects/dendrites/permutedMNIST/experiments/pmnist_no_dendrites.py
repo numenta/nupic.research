@@ -92,18 +92,13 @@ SPARSE_CL_2 = dict(
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
     optimizer_args=dict(lr=5e-4),
-    # optimizer_class=torch.optim.SGD,
-    # optimizer_args=dict(
-    #     lr=0.1,
-    #     momentum=0.9,
-    # ),
 
     # For wandb
     env_config=dict(
         wandb=dict(
             entity="nupic-research",
             project="dendrite_baselines",
-            # name="sparse_cl_2",
+            name="sparse_cl_2",
             group="sparse_cl_2",
             notes="""
             Sparse network with continual learning
@@ -116,7 +111,7 @@ SPARSE_CL_2 = dict(
 SPARSE_CL_10 = deepcopy(SPARSE_CL_2)
 SPARSE_CL_10["dataset_args"].update(num_tasks=10)
 SPARSE_CL_10["env_config"]["wandb"].update(
-    # name="sparse_cl_10",
+    name="sparse_cl_10",
     group="sparse_cl_10",
 )
 SPARSE_CL_10.update(
@@ -130,7 +125,7 @@ SPARSE_CL_10.update(
 SPARSE_CL_50 = deepcopy(SPARSE_CL_2)
 SPARSE_CL_50["dataset_args"].update(num_tasks=50)
 SPARSE_CL_50["env_config"]["wandb"].update(
-    # name="sparse_cl_50",
+    name="sparse_cl_50",
     group="sparse_cl_50",
 )
 SPARSE_CL_50.update(
