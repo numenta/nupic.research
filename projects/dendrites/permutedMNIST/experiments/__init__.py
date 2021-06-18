@@ -25,6 +25,7 @@ from .batch_mnist import CONFIGS as BATCH_MNIST
 from .sp_context_search import CONFIGS as SP_PROTO
 from .sp_context import CONFIGS as SP_CONTEXT
 from .pmnist_no_dendrites import CONFIGS as PMNIST_NO_DENDRITES
+from .batch_pmnist import CONFIGS as BATCH_PMNIST
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -39,3 +40,4 @@ CONFIGS.update(BATCH_MNIST)
 CONFIGS.update(SP_PROTO)
 CONFIGS.update(SP_CONTEXT)
 CONFIGS.update(PMNIST_NO_DENDRITES)
+CONFIGS.update(BATCH_PMNIST)
