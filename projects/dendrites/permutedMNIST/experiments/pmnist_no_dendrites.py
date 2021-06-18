@@ -18,6 +18,10 @@
 #  http://numenta.org/licenses/
 #
 
+"""
+These are baseline experiments testing how well standard sparse and dense networks
+perform on permuted MNIST in a continual learning setting without any dendrites.
+"""
 
 import os
 from copy import deepcopy
@@ -31,30 +35,29 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites.mixins import SpatialPoolerContext
+from nupic.research.frameworks.dendrites.modules.dendritic_layers import (
+    ZeroSegmentDendriticLayer,
+)
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 
 
-class SPExperiment(mixins.RezeroWeights,
-                   mixins.PermutedMNISTTaskIndices,
-                   mixins.UpdateBoostStrength,
-                   SpatialPoolerContext,
-                   DendriteContinualLearningExperiment):
+class NoDendriteExperiment(mixins.RezeroWeights,
+                           mixins.PermutedMNISTTaskIndices,
+                           DendriteContinualLearningExperiment):
     pass
 
 
-# Spatial pooler for inferring contexts: 10 permutedMNIST tasks
-SP_CONTEXT_10 = dict(
-    experiment_class=SPExperiment,
-    num_samples=2,
+# Run two MNIST tasks in batch mode
+SPARSE_CL_2 = dict(
+    experiment_class=NoDendriteExperiment,
 
     # Results path
     local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
 
     dataset_class=PermutedMNIST,
     dataset_args=dict(
-        num_tasks=10,
+        num_tasks=2,
         root=os.path.expanduser("~/nta/results/data/"),
         download=False,  # Change to True if running for the first time
         seed=42,
@@ -65,79 +68,81 @@ SP_CONTEXT_10 = dict(
         input_size=784,
         output_size=10,  # Single output head shared by all tasks
         hidden_sizes=[2048, 2048],
-        num_segments=14,
-        dim_context=500,
+        num_segments=0,
+        dim_context=0,
         kw=True,
         kw_percent_on=0.1,
         dendrite_weight_sparsity=0.0,
         weight_sparsity=0.5,
-        context_percent_on=0.05,
+        context_percent_on=0.0,
+        dendritic_layer_class=ZeroSegmentDendriticLayer,
     ),
 
-    context_model_args=dict(
-        kw_percent_on=0.05,
-        boost_strength=0.0,
-        weight_sparsity=0.75,
-    ),
-
-    batch_size=256,
+    batch_size=128,
     val_batch_size=512,
     epochs=2,
-    tasks_to_validate=(0, 1, 4, 9, 24, 49),
-    num_tasks=10,
-    num_classes=10 * 10,
+    tasks_to_validate=range(100),
+    num_classes=10 * 2,
+    num_tasks=2,
     distributed=False,
     seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
+    num_samples=1,  # Increase to run multiple experiments in parallel
 
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
     optimizer_args=dict(lr=5e-4),
-)
+    # optimizer_class=torch.optim.SGD,
+    # optimizer_args=dict(
+    #     lr=0.1,
+    #     momentum=0.9,
+    # ),
 
-# Two tasks only, for debugging
-SP_CONTEXT_2 = deepcopy(SP_CONTEXT_10)
-SP_CONTEXT_2["dataset_args"].update(num_tasks=2)
-SP_CONTEXT_2["model_args"].update(num_segments=2)
-SP_CONTEXT_2.update(
-    epochs=2,
-    num_samples=2,
-    num_tasks=2,
-    num_classes=10 * 2,
-)
-
-# Search using 4 tasks only
-SP_CONTEXT_4_SEARCH = deepcopy(SP_CONTEXT_10)
-SP_CONTEXT_4_SEARCH["dataset_args"].update(num_tasks=4)
-SP_CONTEXT_4_SEARCH["model_args"].update(num_segments=6)
-SP_CONTEXT_4_SEARCH.update(
-    epochs=2,
-    batch_size=tune.sample_from(
-        lambda spec: int(np.random.choice([64, 256]))),
-    num_samples=20,
-    num_tasks=4,
-    num_classes=10 * 4,
-    tasks_to_validate=(0, 1, 2, 3, 4),
-
-    context_model_args=dict(
-        kw_percent_on=tune.sample_from(
-            lambda spec: np.random.choice([0.02, 0.05, 0.1, 0.15, 0.2])),
-        boost_strength=tune.sample_from(
-            lambda spec: np.random.choice([0.0, 0.5, 1.0, 2.0, 3.0])),
-        weight_sparsity=tune.sample_from(
-            lambda spec: np.random.choice([0.5, 0.75, 0.9])),
-        duty_cycle_period=10240,
+    # For wandb
+    env_config=dict(
+        wandb=dict(
+            entity="nupic-research",
+            project="dendrite_baselines",
+            # name="sparse_cl_2",
+            group="sparse_cl_2",
+            notes="""
+            Sparse network with continual learning
+            """
+        )
     ),
 
-    optimizer_args=dict(
-        lr=tune.sample_from(
-            lambda spec: np.random.choice([0.001, 0.0001, 0.00001])),
-    ),
+)
+
+SPARSE_CL_10 = deepcopy(SPARSE_CL_2)
+SPARSE_CL_10["dataset_args"].update(num_tasks=10)
+SPARSE_CL_10["env_config"]["wandb"].update(
+    # name="sparse_cl_10",
+    group="sparse_cl_10",
+)
+SPARSE_CL_10.update(
+    epochs=2,
+    num_tasks=10,
+    num_classes=10 * 10,
+    num_samples=1,
+)
+
+
+SPARSE_CL_50 = deepcopy(SPARSE_CL_2)
+SPARSE_CL_50["dataset_args"].update(num_tasks=50)
+SPARSE_CL_50["env_config"]["wandb"].update(
+    # name="sparse_cl_50",
+    group="sparse_cl_50",
+)
+SPARSE_CL_50.update(
+    epochs=2,
+    num_tasks=50,
+    num_classes=10 * 50,
+    num_samples=1,
 )
 
 # Export configurations in this file
 CONFIGS = dict(
-    sp_context_2=SP_CONTEXT_2,
-    sp_context_4_search=SP_CONTEXT_4_SEARCH,
-    sp_context_10=SP_CONTEXT_10,
+    sparse_cl_2=SPARSE_CL_2,
+    sparse_cl_10=SPARSE_CL_10,
+    sparse_cl_50=SPARSE_CL_50,
 )
