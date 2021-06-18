@@ -47,8 +47,6 @@ class ContinualLearningExperiment(
     def setup_experiment(self, config):
 
         super().setup_experiment(config)
-        # Override epochs to validate to not validate within the inner loop over epochs
-        self.epochs_to_validate = []
         self.current_task = 0
 
         self.optimizer_class = config.get("optimizer_class", torch.optim.SGD)
