@@ -309,6 +309,98 @@ finetuning_bert_sparse_90_trifecta_100k_glue.update(
 )
 
 
+# BERT Base 2x Wide
+bert_sparse_trifecta_2x_100k = deepcopy(bert_sparse_trifecta_100k)
+bert_sparse_trifecta_2x_100k.update(
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text"
+)
+bert_sparse_trifecta_2x_100k["trainer_mixin_args"].update(
+    max_lr=0.0022,
+)
+bert_sparse_trifecta_2x_100k["config_kwargs"].update(
+    hidden_size=768 * 2,
+    intermediate_size=3072 * 2,
+    sparsity=0.9606,  # this will have 16 M on-params
+)
+
+
+# LR range test for bert_sparse_trifecta_2x_100k
+# Run: https://wandb.ai/numenta/huggingface/runs/y1tg8g36
+bert_sparse_2x_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
+bert_sparse_2x_100k_kd_lr_range_test.update(
+    max_steps=100,
+    per_device_train_batch_size=8,
+    per_evice_eval_batch_size=8,
+
+    trainer_class=KDLRRangeTestTrainer,
+    trainer_mixin_args=dict(
+        # LR Range Test
+        min_lr=0.0001,
+        max_lr=0.005,
+        test_mode="linear",
+
+        # KD
+        teacher_model_names_or_paths=[
+            "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi"
+        ],
+    ),
+    overwrite_output_dir=True,
+)
+bert_sparse_2x_100k_kd_lr_range_test["config_kwargs"].update(
+    hidden_size=768 * 2,
+    intermediate_size=3072 * 2,
+    sparsity=0.9606,  # this will have 16 M on-params
+)
+
+
+# BERT Base 4x Wide
+# NOTE: Note ready yet, still need to run bert_sparse_trifecta_4x_100k
+# bert_sparse_trifecta_4x_100k = deepcopy(bert_sparse_trifecta_100k)
+# bert_sparse_trifecta_4x_100k.update(
+#     per_device_train_batch_size=4,
+#     per_evice_eval_batch_size=4,
+#     tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text"
+# )
+# bert_sparse_trifecta_4x_100k["trainer_mixin_args"].update(
+#     # max_lr=TBD,
+# )
+# bert_sparse_trifecta_4x_100k["config_kwargs"].update(
+#     hidden_size=768 * 4,
+#     intermediate_size=3072 * 4,
+#     sparsity=0.99399,  # this will have 11 M on-params
+# )
+
+
+# LR range test for bert_sparse_trifecta_4x_100k
+# Run: 
+bert_sparse_4x_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
+bert_sparse_4x_100k_kd_lr_range_test.update(
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    per_device_train_batch_size=4,
+    per_evice_eval_batch_size=4,
+    gradient_accumulation_steps=2,
+
+    trainer_class=KDLRRangeTestTrainer,
+    trainer_mixin_args=dict(
+        # LR Range Test
+        min_lr=0.0001,
+        max_lr=0.005,
+        test_mode="linear",
+
+        # KD
+        teacher_model_names_or_paths=[
+            "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi"
+        ],
+    ),
+    overwrite_output_dir=True,
+)
+bert_sparse_4x_100k_kd_lr_range_test["config_kwargs"].update(
+    hidden_size=768 * 4,
+    intermediate_size=3072 * 4,
+    sparsity=0.99399,  # this will have 11 M on-params
+)
+
+
 CONFIGS = dict(
     # Tiny BERT
     tiny_bert_trifecta_100k=tiny_bert_trifecta_100k,
@@ -332,5 +424,10 @@ CONFIGS = dict(
     #   90% sparse
     bert_sparse_90_trifecta_100k=bert_sparse_90_trifecta_100k,
     finetuning_bert_sparse_90_trifecta_100k_glue=finetuning_bert_sparse_90_trifecta_100k_glue,  # noqa: E501
-
+    #   2x wide ~16 Mi Params
+    bert_sparse_trifecta_2x_100k=bert_sparse_trifecta_2x_100k,
+    bert_sparse_2x_100k_kd_lr_range_test=bert_sparse_2x_100k_kd_lr_range_test,
+    #   4x wide ~11 Mi Params
+    bert_sparse_trifecta_4x_100k=bert_sparse_trifecta_4x_100k,
+    bert_sparse_4x_100k_kd_lr_range_test=bert_sparse_4x_100k_kd_lr_range_test,
 )
