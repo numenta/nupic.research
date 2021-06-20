@@ -44,6 +44,7 @@ from nupic.research.frameworks.vernon import mixins
 
 class NoDendriteExperiment(mixins.RezeroWeights,
                            mixins.PermutedMNISTTaskIndices,
+                           mixins.UpdateBoostStrength,
                            DendriteContinualLearningExperiment):
     pass
 
@@ -71,7 +72,7 @@ SPARSE_CL_2 = dict(
         num_segments=0,
         dim_context=0,
         kw=True,
-        kw_percent_on=0.1,
+        kw_percent_on=0.05,
         dendrite_weight_sparsity=0.0,
         weight_sparsity=0.5,
         context_percent_on=0.0,
@@ -80,7 +81,8 @@ SPARSE_CL_2 = dict(
 
     batch_size=128,
     val_batch_size=512,
-    epochs=2,
+    epochs=1,
+    epochs_to_validate=[],
     tasks_to_validate=range(100),
     num_classes=10 * 2,
     num_tasks=2,
@@ -108,36 +110,53 @@ SPARSE_CL_2 = dict(
 
 )
 
-SPARSE_CL_10 = deepcopy(SPARSE_CL_2)
-SPARSE_CL_10["dataset_args"].update(num_tasks=10)
-SPARSE_CL_10["env_config"]["wandb"].update(
-    name="sparse_cl_10",
-    group="sparse_cl_10",
-)
-SPARSE_CL_10.update(
-    epochs=2,
-    num_tasks=10,
-    num_classes=10 * 10,
-    num_samples=1,
-)
-
-
 SPARSE_CL_50 = deepcopy(SPARSE_CL_2)
 SPARSE_CL_50["dataset_args"].update(num_tasks=50)
 SPARSE_CL_50["env_config"]["wandb"].update(
     name="sparse_cl_50",
-    group="sparse_cl_50",
+    group="sparse_cl_50_optimized",
 )
 SPARSE_CL_50.update(
-    epochs=2,
     num_tasks=50,
     num_classes=10 * 50,
     num_samples=1,
 )
 
+# Used for hyperparameter optimization. No wandb for now until we figure out multiple
+# runs.
+SPARSE_CL_10_SEARCH = deepcopy(SPARSE_CL_2)
+SPARSE_CL_10_SEARCH["dataset_args"].update(num_tasks=10)
+SPARSE_CL_10_SEARCH.pop("env_config")
+SPARSE_CL_10_SEARCH.update(
+    model_args=dict(
+        input_size=784,
+        output_size=10,  # Single output head shared by all tasks
+        hidden_sizes=[2048, 2048],
+        num_segments=0,
+        dim_context=0,
+        kw=True,
+        kw_percent_on=tune.sample_from(
+            lambda spec: np.random.choice([0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5])),
+        dendrite_weight_sparsity=0.0,
+        weight_sparsity=tune.sample_from(
+            lambda spec: np.random.choice([0.4, 0.5, 0.75, 0.9])),
+        context_percent_on=0.0,
+        dendritic_layer_class=ZeroSegmentDendriticLayer,
+    ),
+    epochs=tune.sample_from(
+        lambda spec: int(np.random.choice([1, 2, 3]))),
+    num_tasks=10,
+    num_classes=10 * 10,
+    num_samples=10,
+    optimizer_args=dict(
+        lr=tune.sample_from(
+            lambda spec: np.random.choice([0.001, 0.0001, 0.00001])),
+    ),
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     sparse_cl_2=SPARSE_CL_2,
-    sparse_cl_10=SPARSE_CL_10,
+    sparse_cl_10_search=SPARSE_CL_10_SEARCH,
     sparse_cl_50=SPARSE_CL_50,
 )
