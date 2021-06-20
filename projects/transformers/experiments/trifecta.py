@@ -372,7 +372,7 @@ bert_sparse_2x_100k_kd_lr_range_test["config_kwargs"].update(
 
 
 # LR range test for bert_sparse_trifecta_4x_100k
-# Run: 
+# Run:
 bert_sparse_4x_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
 bert_sparse_4x_100k_kd_lr_range_test.update(
     tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
@@ -428,6 +428,6 @@ CONFIGS = dict(
     bert_sparse_trifecta_2x_100k=bert_sparse_trifecta_2x_100k,
     bert_sparse_2x_100k_kd_lr_range_test=bert_sparse_2x_100k_kd_lr_range_test,
     #   4x wide ~11 Mi Params
-    bert_sparse_trifecta_4x_100k=bert_sparse_trifecta_4x_100k,
+    # bert_sparse_trifecta_4x_100k=bert_sparse_trifecta_4x_100k,
     bert_sparse_4x_100k_kd_lr_range_test=bert_sparse_4x_100k_kd_lr_range_test,
 )
