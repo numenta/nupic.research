@@ -48,7 +48,7 @@ class SNPruneExperiment(mixins.LogEveryLoss,
                         mixins.LogEveryLearningRate,
                         mixins.KnowledgeDistillation,
                         mixins.MultiCycleLR,
-                        mixins.PruneLowSNR,
+                        mixins.PruneLowSNRLayers,
                         mixins.RegularizeLoss,
                         mixins.ConstrainParameters,
                         ImagenetExperiment):
