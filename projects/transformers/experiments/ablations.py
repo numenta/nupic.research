@@ -264,7 +264,7 @@ bert_sparse_100k_kd_oncycle_lr.update(
 # This took 20m to run on four ps.16xlarges
 bert_sparse_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
 bert_sparse_100k_kd_lr_range_test.update(
-    max_steps=100000,
+    max_steps=100,
     trainer_class=KDLRRangeTestTrainer,
     trainer_mixin_args=dict(
         # LR Range Test
@@ -288,6 +288,30 @@ finetuning_bert_sparse_kd_oncycle_lr_100k_glue.update(
     # Model arguments
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_kd_onecycle_lr_100k",  # noqa: E501
+)
+
+
+# This is like the one above, but for 85% sparsity.
+bert_sparse_85_kd_lr_range_test = deepcopy(bert_sparse_100k_kd_lr_range_test)
+bert_sparse_85_kd_lr_range_test["config_kwargs"].update(
+    sparsity=0.85,
+)
+
+
+# This is like the one above, but for 90% sparsity.
+bert_sparse_90_kd_lr_range_test = deepcopy(bert_sparse_100k_kd_lr_range_test)
+bert_sparse_90_kd_lr_range_test["config_kwargs"].update(
+    sparsity=0.90,
+    # logging
+    overwrite_output_dir=False,
+    override_finetuning_results=False,
+    task_name=None,
+    task_names=["rte", "wnli", "cola"],
+    task_hyperparams=dict(
+        wnli=dict(num_train_epochs=5, num_runs=20),
+        cola=dict(num_train_epochs=5, num_runs=20),
+        rte=dict(num_runs=20),
+    ),
 )
 
 # ---------
@@ -341,9 +365,14 @@ CONFIGS = dict(
     small_bert_rigl_100k_onecycle_lr=small_bert_rigl_100k_onecycle_lr,
 
     # BERT Base
+    #   80% sparse
     bert_sparse_100k_kd_oncycle_lr=bert_sparse_100k_kd_oncycle_lr,
     bert_sparse_100k_kd_lr_range_test=bert_sparse_100k_kd_lr_range_test,
     finetuning_bert_sparse_kd_oncycle_lr_100k_glue=finetuning_bert_sparse_kd_oncycle_lr_100k_glue,  # noqa: E501
+    #   85% sparse
+    bert_sparse_85_kd_lr_range_test=bert_sparse_85_kd_lr_range_test,
+    #   90% sparse
+    bert_sparse_90_kd_lr_range_test=bert_sparse_90_kd_lr_range_test,
 
     # Deepspeed
     bert_sparse_100k_kd_lr_range_test_deepspeed=bert_sparse_100k_kd_lr_range_test_deepspeed,  # noqa: E501
