@@ -303,7 +303,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         """
         return self._loss_function_supervised(output, target, reduction=reduction)
 
-    def encoder_complexity_loss(self, model):
+    def encoder_classifier_complexity_loss(self, model):
         """
         The encoder complexity component of the loss function.
         """
@@ -349,7 +349,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             optimizer=self.encoder_optimizer,
             device=self.device,
             criterion=self.error_loss,
-            complexity_loss_fn=self.encoder_complexity_loss,
+            complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch_wrapper,
@@ -397,7 +397,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                 optimizer=self.classifier_optimizer,
                 device=self.device,
                 criterion=self.supervised_loss,
-                complexity_loss_fn=self.complexity_loss,
+                complexity_loss_fn=self.encoder_classifier_complexity_loss,
                 batches_in_epoch=self.batches_in_epoch_supervised,
                 pre_batch_callback=self.pre_batch_supervised,
                 post_batch_callback=self.post_batch_wrapper_supervised,
@@ -409,7 +409,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             loader=self.val_loader,
             device=self.device,
             criterion=self.supervised_loss,
-            complexity_loss_fn=self.complexity_loss,
+            complexity_loss_fn=self.encoder_classifier_complexity_loss,
             batches_in_epoch=self.batches_in_epoch_val,
             transform_to_device_fn=self.transform_data_to_device,
         )
@@ -429,7 +429,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             create_supervised_sampler=[exp + ".create_supervised_sampler"],
             unsupervised_loss=[exp + ".unsupervised_loss"],
             supervised_loss=[exp + ".supervised_loss"],
-            encoder_complexity_loss=[exp + ".encoder_complexity_loss"],
+            encoder_classifier_complexity_loss=[exp +
+                                                ".encoder_classifier_complexity_loss"],
             pre_batch_supervised=[exp + ".pre_batch_supervised"],
             post_batch_supervised=[exp + ".post_batch_supervised"],
             post_optimizer_step_supervised=[exp + ".post_optimizer_step_supervised"],

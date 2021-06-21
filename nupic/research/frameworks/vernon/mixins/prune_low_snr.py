@@ -100,7 +100,10 @@ class PruneLowSNRLayers:
 
     def run_epoch(self):
         results = super().run_epoch()
-        vdrop_data = self.model.module.vdrop_data
+        model = self.model
+        if hasattr(model, "module"):
+            model = model.module
+        vdrop_data = model.module.vdrop_data
         total_prunable_parameters = vdrop_data.z_mask.size(0)
         remaining_nonzero_parameters = vdrop_data.z_mask.double().sum().item()
         model_density = remaining_nonzero_parameters / total_prunable_parameters
@@ -149,7 +152,7 @@ class PruneLowSNRGlobal:
             model = self.model
             if hasattr(model, "module"):
                 model = model.module
-            vdrop_data = self.model.vdrop_central_data
+            vdrop_data = model.vdrop_central_data
 
             z_logalpha = vdrop_data.compute_z_logalpha()
             z_mask = vdrop_data.z_mask
@@ -178,7 +181,10 @@ class PruneLowSNRGlobal:
 
     def run_epoch(self):
         results = super().run_epoch()
-        vdrop_data = self.model.vdrop_central_data
+        model = self.model
+        if hasattr(model, "module"):
+            model = model.module
+        vdrop_data = model.vdrop_central_data
         total_prunable_parameters = vdrop_data.z_mask.size(0)
         remaining_nonzero_parameters = vdrop_data.z_mask.double().sum().item()
         model_density = remaining_nonzero_parameters / total_prunable_parameters
@@ -190,7 +196,7 @@ class PruneLowSNRGlobal:
             for module, z_mask in zip(
                 vdrop_data.modules, vdrop_data.z_mask.split(vdrop_data.z_chunk_sizes)
             ):
-                density = z_mask.sum() / z_mask.numel()
+                density = z_mask.double().sum().item() / z_mask.numel()
                 module_class = module.__class__.__name__
                 results[
                     str(module_class) + "_" + str(module_idx) + "_density"

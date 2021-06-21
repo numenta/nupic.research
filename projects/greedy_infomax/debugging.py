@@ -21,14 +21,15 @@
 
 from nupic.research.frameworks.greedy_infomax.models.FullModel import VDropSparseFullVisionModel
 from projects.greedy_infomax.experiments.sparse_resnets import CONFIGS
+import torch
 
 def main():
     sparse_base = CONFIGS["sparse_vdrop"]
-    sparse_base.update(distributed=False)
+    sparse_base.update(distributed=True)
     exp = sparse_base["experiment_class"]()
+    exp.device=torch.device("cuda:0")
     exp.setup_experiment(sparse_base)
-    exp.run_epoch()
-    print("Done")
+    result = exp.run_epoch()
 
 if __name__ == "__main__":
     main()

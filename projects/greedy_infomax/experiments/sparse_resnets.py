@@ -32,6 +32,7 @@ from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import 
 from nupic.research.frameworks.greedy_infomax.models.FullModel import (
     SparseFullVisionModel,
     VDropSparseFullVisionModel,
+    FullVisionModel
 )
 from nupic.research.frameworks.vernon.distributed import mixins
 from nupic.torch.modules import SparseWeights2d
@@ -97,11 +98,10 @@ def make_reg_schedule(
 
 
 class GreedyInfoMaxExperimentSparsePruning(
-    mixins.LogBackpropStructure,
     mixins.NoiseRobustnessTest,
-    mixins.ReportMaxAccuracy,
     mixins.RegularizeLoss,
     mixins.ConstrainParameters,
+    mixins.LogBackpropStructure,
     mixins.PruneLowSNRGlobal,
     GreedyInfoMaxExperiment,
 ):
@@ -112,11 +112,12 @@ SPARSE_VDROP = deepcopy(SPARSE_BASE)
 SPARSE_VDROP.update(
     dict(
         wandb_args=dict(
-            project="greedy_infomax-sparsity-tests", name="sparse_resnet_vdrop"
+            project="greedy_infomax-sparsity-tests",
+            name="sparse_resnet_vdrop_2"
         ),
         experiment_class=GreedyInfoMaxExperimentSparsePruning,
-        epochs=10,
-        epochs_to_validate=[-1, 0, 3, 6, 9],
+        epochs=30,
+        epochs_to_validate=[0, 3, 6, 9, 12, 15, 19, 23, 27, 29],
         model_class=VDropSparseFullVisionModel,
         model_args=dict(
             negative_samples=16,
@@ -127,34 +128,39 @@ SPARSE_VDROP.update(
             grayscale=True,
             patch_size=16,
             overlap=2,
-            percent_on=None,
+            # percent_on=None,
         ),
         prune_schedule=[
-            (2, 0.8),
-            (4, 0.6),
-            (6, 0.4),
-            (8, 0.2),
+            (8, 0.8),
+            (14, 0.6),
+            (20, 0.4),
+            (25, 0.2),
         ],
         log_module_sparsities=True,
         reg_scalar=make_reg_schedule(
-            epochs=10,
-            pct_ramp_start=1/10,
-            pct_ramp_end=3/10,
-            peak_value=0.01,
-            pct_drop=6/10,
+            epochs=30,
+            pct_ramp_start=2/20,
+            pct_ramp_end=4/20,
+            peak_value=0.001,
+            pct_drop=18/20,
             final_value=0.0005,
         ),
         lr_scheduler_class=OneCycleLR,
         lr_scheduler_args=dict(
-            max_lr=0.01,  # Optimized in Sig-Opt
+            max_lr=0.0005,
             div_factor=50,  # Optimized in Sig-Opt
             final_div_factor=2000,
-            pct_start=0.15,  # Optimized in Sig-Opt
-            epochs=10,
+            pct_start=0.2,  # Optimized in Sig-Opt
+            epochs=20,
             anneal_strategy="linear",
             max_momentum=0.01,
             cycle_momentum=False,
         ),
+        # batches_in_epoch=1,
+        # batches_in_epoch_supervised=1,
+        # batches_in_epoch_val=1,
+        # supervised_training_epochs_per_validation=1,
+        # batch_size=16,
     )
 )
 
