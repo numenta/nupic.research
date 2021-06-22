@@ -60,8 +60,9 @@ class NoiseRobustnessTest:
 
         """
         super().setup_experiment(config)
-        noise_levels = config.get("noise_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7,
-                                                   0.8, 0.9])
+        noise_levels = config.get(
+            "noise_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        )
         assert all(
             0 < noise <= 1 for noise in noise_levels
         ), "Noise levels must be between (0, 1]"
@@ -93,6 +94,11 @@ def evaluate_model_with_noise(
     evaluate_model_func=None,
     **kwargs,
 ):
+    """
+    Executes the function evaluate_model_func with varying levels of noise.
+    For each noise level provided in noise_levels, evaluate_model_func is called with a
+    modified data transform which includes AddGaussianNoise for that noise level.
+    """
     if noise_levels is None:
         noise_levels = []
     noise_results = {}
@@ -105,6 +111,8 @@ def evaluate_model_with_noise(
         noise_results[noise_level] = evaluate_model_func(
             model, loader, device, **kwargs
         )
+    # Completed testing with noise; reset data transform to its original setting
+    # (i.e., zero noise)
     loader.dataset.transform = dataset_transform
     all_results = {
         key + "_" + str(noise_level) + "_noise": results[key]
@@ -113,13 +121,6 @@ def evaluate_model_with_noise(
     }
     all_results.update(zero_noise_results)
     return all_results
-
-
-def noisy_getitem(idx, get_item_func=None, noise_level=0, noise_mean=0, noise_std=1):
-    data, target = get_item_func(idx)
-    noise_indices = torch.bernoulli(torch.ones_like(data) * noise_level)
-    noise = torch.normal(noise_mean, noise_std, data.shape) * noise_indices
-    return data + noise, target
 
 
 class AddGaussianNoise:
