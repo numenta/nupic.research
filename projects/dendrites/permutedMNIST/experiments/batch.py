@@ -130,11 +130,12 @@ SPARSE_BATCH_2 = dict(
 SPARSE_BATCH_50 = deepcopy(SPARSE_BATCH_2)
 SPARSE_BATCH_50["dataset_args"].update(num_tasks=50)
 SPARSE_BATCH_50["env_config"]["wandb"].update(
-    name="sparse_batch_50",
+    name="sparse_batch_50_3x",
     group="sparse_batch_50",
 )
 SPARSE_BATCH_50.update(
-    epochs=10,
+    batches_in_epoch=1404,  # About 3*60K samples/epoch, completes in num_tasks epochs
+    epochs=50,
     num_tasks=50,
     num_classes=10 * 50,
     num_samples=1,

@@ -19,6 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import sys
+
 import torch
 import torch.nn.functional as F
 
@@ -41,7 +43,7 @@ def train_dendrite_model(
     context_vector=None,
     post_batch_callback=None,
     complexity_loss_fn=None,
-    batches_in_epoch=None,
+    batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
     transform_to_device_fn=None,
     progress_bar=None,
@@ -84,6 +86,8 @@ def train_dendrite_model(
         context = context_vector.repeat(loader.batch_size, 1)
 
     for batch_idx, (data, target) in enumerate(loader):
+        if batch_idx >= batches_in_epoch:
+            break
 
         # `data` may be a 2-item list comprising the example data and context signal in
         # case context is explicitly provided

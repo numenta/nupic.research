@@ -82,7 +82,6 @@ SPARSE_CL_2 = dict(
     batch_size=128,
     val_batch_size=512,
     epochs=1,
-    epochs_to_validate=[],
     tasks_to_validate=range(100),
     num_classes=10 * 2,
     num_tasks=2,

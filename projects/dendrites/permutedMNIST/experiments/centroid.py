@@ -74,7 +74,7 @@ CENTROID_10 = dict(
         num_segments=10,
         dim_context=784,
         kw=True,
-        kw_percent_on=0.1,
+        kw_percent_on=0.05,
         dendrite_weight_sparsity=0.0,
         weight_sparsity=0.5,
         context_percent_on=0.1,
@@ -83,7 +83,7 @@ CENTROID_10 = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=3,
-    tasks_to_validate=(0, 1, 2, 3, 4, 9, 24, 49),
+    tasks_to_validate=range(50),
     num_tasks=10,
     num_classes=10 * 10,
     distributed=False,
@@ -103,6 +103,20 @@ CENTROID_50.update(
     epochs=2,
     num_tasks=50,
     num_classes=10 * 50,
+    num_samples=1,
+
+    # For wandb
+    env_config=dict(
+        wandb=dict(
+            entity="nupic-research",
+            project="dendrite_baselines",
+            name="sparse_prototype_50",
+            group="sparse_prototype_50",
+            notes="""
+            Sparse network using prototypes as context.
+            """
+        )
+    ),
 )
 
 # Two tasks only, for debugging
