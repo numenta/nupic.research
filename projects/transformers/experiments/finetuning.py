@@ -32,10 +32,10 @@ from constants import (
     TRAIN_SIZES_PER_TASK,
 )
 from .base import transformers_base
-from ..constants import (
-    REPORTING_METRICS_PER_TASK,
-    TRAIN_SIZES_PER_TASK,
-)
+# from ..constants import (
+#     REPORTING_METRICS_PER_TASK,
+#     TRAIN_SIZES_PER_TASK,
+# )
 
 """
 Expected for qnli 0.9066 acc, 41 min training time. seed may affect result
@@ -187,7 +187,6 @@ finetuning_bert700k_glue.update(
     ),
     trainer_callbacks=[
         TrackEvalMetrics(),
-        EarlyStoppingCallback(early_stopping_patience=5)
         ],
 )
 
@@ -221,7 +220,6 @@ steps_50k = 50_000 // 32
 
 finetuning_bert100k_glue_simple = deepcopy(finetuning_bert100k_glue)
 finetuning_bert100k_glue_simple.update(
-    run_name="finetuning_bert100k_glue_simple",
     task_hyperparams=dict(
 
         cola=dict(eval_steps=50,
@@ -237,9 +235,12 @@ finetuning_bert100k_glue_simple.update(
                   metric_for_best_model="eval_pearson",
                   num_runs=3),  # 50k / 7000 ~ 8 epochs
 
-        qqp=dict(num_runs=3),  # 300k >> 50k
-        mnli=dict(num_runs=3),  # 300k >> 50k
-        qnli=dict(num_runs=3),  # 100k > 50k, defualt to 3 epochs
+        qqp=dict(eval_steps=1_000,
+                  num_runs=3),  # 300k >> 50k
+        mnli=dict(eval_steps=1_000,
+                  num_runs=3),  # 300k >> 50k
+        qnli=dict(eval_steps=500,
+                  num_runs=3),  # 100k > 50k, defualt to 3 epochs
         rte=dict(max_steps=steps_50k, num_runs=3),  # ~ 20 epochs from paper
         wnli=dict(max_steps=steps_50k, num_runs=3)  # 50k / 634 ~ 79 epochs
     ),
@@ -251,7 +252,6 @@ finetuning_bert100k_glue_simple.update(
 finetuning_bert1mi_glue_simple = deepcopy(finetuning_bert100k_glue_simple)
 finetuning_bert1mi_glue_simple.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
-    run_name="debug_finetuning_bert100k",
 )
 
 finetuning_bert1mi_glue = deepcopy(finetuning_bert700k_glue)
@@ -259,7 +259,6 @@ finetuning_bert1mi_glue.update(
     # logging
     overwrite_output_dir=True,
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
-    run_name="debug_finetuning_bert100k",
 )
 
 finetuning_bert100k_single_task = deepcopy(finetuning_bert100k_glue)
@@ -269,6 +268,26 @@ finetuning_bert100k_single_task.update(
     task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
 )
 
+finetuning_bert_sparse_80_trifecta_cola = deepcopy(finetuning_bert100k_single_task)
+finetuning_bert_sparse_80_trifecta_cola.update(
+    # Data arguments
+    task_name=None,
+    task_names=["cola"],
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",
+    # Training arguments
+    evaluation_strategy="steps",
+    eval_steps=50,
+    learning_rate=1e-5,
+    load_best_model_at_end=True,
+    metric_for_best_model="eval_accuracy",
+    max_steps=16_000,  # 10x previous
+    num_runs=3,
+    trainer_callbacks=[
+        TrackEvalMetrics(),
+    ],
+)
 
 finetuning_bert1mi_wnli = deepcopy(finetuning_bert100k_single_task)
 finetuning_bert1mi_wnli.update(
@@ -360,6 +379,7 @@ CONFIGS = dict(
     finetuning_bert1mi_glue_simple=finetuning_bert1mi_glue_simple,
     finetuning_bert1mi_wnli=finetuning_bert1mi_wnli,
     finetuning_bert1mi_single_task=finetuning_bert1mi_single_task,
+    finetuning_bert_sparse_80_trifecta_cola=finetuning_bert_sparse_80_trifecta_cola,
     finetuning_sparse_bert_100k_glue=finetuning_sparse_bert_100k_glue,
     finetuning_sparse_encoder_bert_100k_glue=finetuning_sparse_encoder_bert_100k_glue,
     finetuning_mini_sparse_bert_debug=finetuning_mini_sparse_bert_debug,

@@ -2,6 +2,18 @@
 Constants used in various places
 """
 
+TASK_NAMES = [
+    "cola",
+    "mnli",
+    "mrpc",
+    "qnli",
+    "qqp",
+    "rte",
+    "sst2",
+    "stsb",
+    "wnli"
+]
+
 REPORTING_METRICS_PER_TASK = {
     "cola": ["eval_matthews_correlation"],
     "mnli": ["eval_accuracy", "mm_eval_accuracy"],

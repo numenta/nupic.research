@@ -38,37 +38,54 @@ import pandas as pd
 
 class TaskResultsAnalysis:
 
-    def _get_time_and_label(self, run_idx):
+    def __init__(self, task_results_dict):
+        """
+        run_utils.TaskResults contains data for a single task, but spans multiple
+        runs. TaskResultsAnalysis takes a list of TaskResults objects, so you can
+        analyze multiple tasks and multiple runs per task. 
 
-        if "steps" in self.all_results[run_idx].keys():
-            x = self.all_results[run_idx]['steps']
+        e.g.
+            self.TRD["wnli"] returns a TaskResults object
+        """
+
+        self.task_results_dict = task_results_dict
+
+    def __getitem__(self, key):
+        return self.task_results_dict[key]
+
+    def _get_time_and_label(self, task, run_idx):
+
+        if "steps" in self[task].all_results[run_idx].keys():
+            x = self[task].all_results[run_idx]['steps']
             xlabel = "steps"
-            if self.training_args is not None:
-                suffix = f"\n(batch_size={self.training_args.per_device_train_batch_size})"
+            if self[task].training_args is not None:
+                suffix = f"\n(batch_size={self[task].training_args.per_device_train_batch_size})"
                 xlabel = xlabel + suffix
-        elif "epoch" in self.all_results[run_idx].keys():
-            x = self.all_results[run_idx]['epoch']
+        elif "epoch" in self[task].all_results[run_idx].keys():
+            x = self[task].all_results[run_idx]['epoch']
             xlabel = "epoch"
         else:
             print("Warning, unknown time metric")
-            key0 = list(self.all_results[run_idx].keys())
-            x = np.arange(len(self.all_results[run_idx][key0]))
+            key0 = list(self[task].all_results[run_idx].keys())
+            x = np.arange(len(self[task].all_results[run_idx][key0]))
             xlabel = ""
 
         return x, xlabel
 
 
-    def plot_run(self, run_idx, metric, save_name=False):
+    def plot_run(self, task, run_idx, metric, save_name=False, fig=None, ax=None):
         """Plot one metric on one run over time"""
 
-        fig, ax = plt.subplots()
-        y = self.all_results[run_idx][metric]
-        x, xlabel = self._get_time_and_label(run_idx)
+        if not ax:
+            fig, ax = plt.subplots()
+
+        y = self[task].all_results[run_idx][metric]
+        x, xlabel = self._get_time_and_label(task, run_idx)
         ax.plot(x, y, ".", ms=10, linestyle='dashed')
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(metric)
-        ax.set_title(f"{metric} on run {run_idx}")
+        ax.set_title(f"{task}: {metric} on run {run_idx}")
 
         if save_name:
             plt.savefig(save_name)
@@ -78,19 +95,21 @@ class TaskResultsAnalysis:
         return fig, ax
 
 
-    def plot_metric(self, metric, save_name=False):
+    def plot_metric(self, task, metric, save_name=False, fig=None, ax=None):
         """Plot one metric across all runs, you type plt.show()"""
 
-        fig, ax = plt.subplots()
-        for run_idx in range(len(self.all_results)):
-            x, xlabel = self._get_time_and_label(run_idx)
-            y = self.all_results[run_idx][metric]
+        if not ax:
+            fig, ax = plt.subplots()
 
-            ax.plot(x, y, ".", linestyle='dashed', label=f"{run_idx}")
+        for run_idx in range(len(self[task].all_results)):
+            x, xlabel = self._get_time_and_label(task, run_idx)
+            y = self[task].all_results[run_idx][metric]
+
+            ax.plot(x, y, ".", linestyle='dashed', label=f"run: {run_idx}")
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(metric)
-        ax.set_title(f"{metric} on all runs")
+        ax.set_title(f"{task}: {metric} on all runs")
         plt.legend()
 
         if save_name:
@@ -101,14 +120,63 @@ class TaskResultsAnalysis:
         return fig, ax
 
 
+def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
+    """
+    Compare a series of models using a single metric. Each model can
+    include data about multiple tasks and multiple runs.
 
-def results_to_markdown(results_files, model_name, reduction):
+    Arguments
+        dict_of_task_analyses: dict  --  key points to model, value
+            points to a TaskResultsAnalysis object
+
+        tasks: list of str  --  e.g. ['wnli', 'mrpc'], must key into
+            TaskResultsAnalysis objects
+
+        metric: str  --  name of measure to compare with, e.g. "eval_loss"
+    """
+
+    if isinstance(tasks, str):
+        tasks = [tasks]
+
+    n_models = len(dict_of_task_analyses)
+    xwidth = 5 * n_models
+    for task in tasks:
+
+        fig, ax = plt.subplots(1, n_models, figsize=(xwidth, 10), sharex=True, sharey=True)
+
+        c = 0
+        for model in dict_of_task_analyses.keys():
+            _,_ = dict_of_task_analyses[model].plot_metric(
+                task,
+                metric,
+                ax=ax[c]
+            )
+
+            plt.legend()
+
+            ttl = ax[c].get_title()
+            ttl = ttl + f"\n{model}"
+            ax[c].set_title(ttl)
+            c = c + 1
+
+        if save_prefix:
+            save_name = os.path.join(save_prefix, f"{task}_{metric}_simple_no_esc.png")
+            plt.tight_layout()
+            plt.savefig(save_name)
+
+
+def load_results(results_files):
     results = {}
     for results_file in results_files:
         if os.path.isdir(results_file):
             results_file = os.path.join(results_file, "task_results.p")
         with open(results_file, "rb") as f:
             results.update(pickle.load(f))
+
+    return results
+
+
+def results_to_df(results, reduction, model_name):
 
     # Aggregate using chosen reduction method
     for _, task_results in results.items():
@@ -128,8 +196,47 @@ def results_to_markdown(results_files, model_name, reduction):
     report_results["average_bert"] = f"{average_bert*100:.2f}"
     report_results["average_glue"] = f"{average_glue*100:.2f}"
 
+    # Format dataframe with model_name as a column, as this doesn't
+    # affect markown printing, but it makes csv io easier.
     df = pd.DataFrame.from_dict({model_name: report_results}).transpose()
-    print(df.to_markdown())
+    df["model_name"] = df.index
+    df = df.reset_index(drop=True)
+    cols = df.columns.tolist()
+    cols = cols[-1:] + cols[:-1] # Reorder so model_name is first column
+    df = df[cols]
+
+    return df
+
+def process_results(results_files, model_name, reduction, csv, md):
+
+    results = load_results(results_files)
+
+    # load a csv file if specified
+    if len(csv) > 0:
+        if os.path.exists(csv):
+            print(f"...loading data from {csv}")
+            csv_df = pd.read_csv(csv)
+        else:
+            csv_df = None
+
+    # Aggregate using chosen reduction method
+    df = results_to_df(results, reduction, model_name)
+
+    # print markdown
+    print(df.to_markdown(index=False))
+
+    # create a new csv file to store results
+    if csv_df is None:
+        print(f"saving results to a new file: {csv}")
+        df.to_csv(csv, index=False)
+    # merge csv file with current results
+    else:
+        df = pd.concat([csv_df, df], ignore_index=True)
+        df.to_csv(csv, index=False)
+
+    # save a markdown file
+    if len(md) > 0:
+        df.to_markdown(md, index=False)
 
 
 if __name__ == "__main__":
@@ -143,5 +250,13 @@ if __name__ == "__main__":
                         default="max", choices=["mean", "max"],
                         help="Reduction method to use to aggregate results"
                              "from multiple runs")
+    parser.add_argument("-csv", "--csv", type=str,
+                        default="",
+                        help="Path to a csv file you want results to go to."
+                             "If it exists, it will update the csv,"
+                             "and if not, it will create a new file")
+    parser.add_argument("-md", "--md", type=str,
+                         default="",
+                         help="Path to a markdown file. Will overwrite.")
     args = parser.parse_args()
-    results_to_markdown(**args.__dict__)
+    process_results(**args.__dict__)

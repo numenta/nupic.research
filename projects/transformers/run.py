@@ -380,7 +380,7 @@ def run_finetuning_single_task(
         train(trainer, training_args.output_dir, last_checkpoint)
 
     if training_args.do_eval:
-        eval_results = evaluate_task_handler(
+        eval_results = evaluate_tasks_handler(
             trainer, data_args, model_args, training_args,
             eval_dataset, tokenized_datasets)
 

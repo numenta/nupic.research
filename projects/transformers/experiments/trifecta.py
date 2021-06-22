@@ -251,11 +251,25 @@ bert_sparse_trifecta_100k.update(
 
 
 # This fine-tunes a pretrained model from `bert_sparse_100k_kd_oncycle_lr` above.
-finetuning_bert_sparse_trifecta_100k_glue = deepcopy(finetuning_bert700k_glue)
-finetuning_bert_sparse_trifecta_100k_glue.update(
+finetuning_bert_sparse_80_trifecta_100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_bert_sparse_80_trifecta_100k_glue.update(
     # Model arguments
     model_type="fully_static_sparse_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k"
+)
+
+finetuning_bert_sparse_85_trifecta_100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_bert_sparse_85_trifecta_100k_glue.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k"
+)
+
+finetuning_bert_sparse_90_trifecta_100k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_bert_sparse_90_trifecta_100k_glue.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"
 )
 
 finetuning_bert_sparse_trifecta_100k_glue_simple = deepcopy(
@@ -265,7 +279,12 @@ finetuning_bert_sparse_trifecta_100k_glue_simple.update(
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/"
     "bert_sparse_80%_trifecta_100k",
-    run_name="finetuning_bert_sparse_trifecta_100k_glue_simple"
+)
+
+finetuning_bert_sparse_trifecta_100k_single = deepcopy(
+    finetuning_bert100k_glue_simple)
+finetuning_bert_sparse_trifecta_100k_single.update(
+
 )
 
 # alias with a shorter variable name for pep8 compliance below
@@ -286,7 +305,8 @@ CONFIGS = dict(
 
     # BERT Base
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
-    finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
+    finetuning_bert_sparse_80_trifecta_100k_glue=finetuning_bert_sparse_80_trifecta_100k_glue,
+    finetuning_bert_sparse_85_trifecta_100k_glue=finetuning_bert_sparse_85_trifecta_100k_glue,
+    finetuning_bert_sparse_90_trifecta_100k_glue=finetuning_bert_sparse_90_trifecta_100k_glue,
     finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
-
 )
