@@ -19,6 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import sys
+
 import torch
 import torch.nn.functional as F
 
@@ -37,10 +39,11 @@ def train_dendrite_model(
     share_labels=False,
     num_labels=None,
     active_classes=None,
+    train_context_fn=None,
     context_vector=None,
     post_batch_callback=None,
     complexity_loss_fn=None,
-    batches_in_epoch=None,
+    batches_in_epoch=sys.maxsize,
     pre_batch_callback=None,
     transform_to_device_fn=None,
     progress_bar=None,
@@ -83,6 +86,8 @@ def train_dendrite_model(
         context = context_vector.repeat(loader.batch_size, 1)
 
     for batch_idx, (data, target) in enumerate(loader):
+        if batch_idx >= batches_in_epoch:
+            break
 
         # `data` may be a 2-item list comprising the example data and context signal in
         # case context is explicitly provided
@@ -92,6 +97,9 @@ def train_dendrite_model(
             else:
                 data, _ = data
         data = data.flatten(start_dim=1)
+
+        if train_context_fn is not None:
+            context = train_context_fn(data)
 
         # Since labels are shared, target values should be in
         # [0, 1, ..., num_labels - 1]
@@ -167,8 +175,6 @@ def evaluate_dendrite_model(
 
     loss = torch.tensor(0., device=device)
     correct = torch.tensor(0, device=device)
-
-    infer_context = (infer_context_fn is not None)
     context = None
 
     with torch.no_grad():
@@ -188,7 +194,7 @@ def evaluate_dendrite_model(
 
             data = data.to(device)
             target = target.to(device)
-            if infer_context:
+            if infer_context_fn is not None:
                 # Use `infer_context_fn` to retrieve the context vector
                 context = infer_context_fn(data)
             if context is not None:

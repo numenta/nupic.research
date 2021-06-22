@@ -18,7 +18,6 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
 from copy import deepcopy
 
 from ray import tune
@@ -265,7 +264,7 @@ bert_sparse_100k_kd_oncycle_lr.update(
 # This took 20m to run on four ps.16xlarges
 bert_sparse_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
 bert_sparse_100k_kd_lr_range_test.update(
-    max_steps=100000,
+    max_steps=100,
     trainer_class=KDLRRangeTestTrainer,
     trainer_mixin_args=dict(
         # LR Range Test
@@ -292,6 +291,66 @@ finetuning_bert_sparse_kd_oncycle_lr_100k_glue.update(
 )
 
 
+# This is like the one above, but for 85% sparsity.
+bert_sparse_85_kd_lr_range_test = deepcopy(bert_sparse_100k_kd_lr_range_test)
+bert_sparse_85_kd_lr_range_test["config_kwargs"].update(
+    sparsity=0.85,
+)
+
+
+# This is like the one above, but for 90% sparsity.
+bert_sparse_90_kd_lr_range_test = deepcopy(bert_sparse_100k_kd_lr_range_test)
+bert_sparse_90_kd_lr_range_test["config_kwargs"].update(
+    sparsity=0.90,
+    # logging
+    overwrite_output_dir=False,
+    override_finetuning_results=False,
+    task_name=None,
+    task_names=["rte", "wnli", "cola"],
+    task_hyperparams=dict(
+        wnli=dict(num_train_epochs=5, num_runs=20),
+        cola=dict(num_train_epochs=5, num_runs=20),
+        rte=dict(num_runs=20),
+    ),
+)
+
+# ---------
+# Deepspeed
+# ---------
+
+# This lr-range test is based on `bert_sparse_100k_kd_lr_range_test` and adapted
+# for deepspeed training.
+# With this test the best `max_lr` value found is `0.0017`.
+# On four p3.16xlarge it takes ~20m to run
+bert_sparse_100k_kd_lr_range_test_deepspeed = deepcopy(bert_sparse_100k_kd_lr_range_test)  # noqa: E501
+bert_sparse_100k_kd_lr_range_test_deepspeed.update(
+    max_steps=100,
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    fp16=False,  # Use deepspeed FP16 instead of apex
+    deepspeed={
+        "zero_optimization": {
+            "stage": 1,
+        },
+        # When using fp16 dynamic loss scale, deepspeed will skip the optimizer
+        # and LR scheduler steps whenever the loss value overflows (NaN/Inf).
+        # Using deepspeed default values the loss will likely overflow on the
+        # first few steps as the dynamic loss scale warms up. When the loss
+        # overflows, huggingface will detect the LR scheduler step was skipped
+        # and return zero as the current learning rate potentially affecting the
+        # results of the LR range test. To avoid loss overflow during the LR
+        # range test you could use static loss scale or use a smaller initial
+        # scale power.
+        # See https://www.deepspeed.ai/docs/config-json/#fp16-training-options
+        "fp16": {
+            "enabled": True,
+            "initial_scale_power": 14,
+        },
+        "gradient_clipping": 1.0,
+        "sparse_gradients": True,
+        "steps_per_print": 1,
+    }
+)
+
 CONFIGS = dict(
     # Tiny BERT
     tiny_bert_rigl_100k_onecycle_lr=tiny_bert_rigl_100k_onecycle_lr,
@@ -306,7 +365,15 @@ CONFIGS = dict(
     small_bert_rigl_100k_onecycle_lr=small_bert_rigl_100k_onecycle_lr,
 
     # BERT Base
+    #   80% sparse
     bert_sparse_100k_kd_oncycle_lr=bert_sparse_100k_kd_oncycle_lr,
     bert_sparse_100k_kd_lr_range_test=bert_sparse_100k_kd_lr_range_test,
     finetuning_bert_sparse_kd_oncycle_lr_100k_glue=finetuning_bert_sparse_kd_oncycle_lr_100k_glue,  # noqa: E501
+    #   85% sparse
+    bert_sparse_85_kd_lr_range_test=bert_sparse_85_kd_lr_range_test,
+    #   90% sparse
+    bert_sparse_90_kd_lr_range_test=bert_sparse_90_kd_lr_range_test,
+
+    # Deepspeed
+    bert_sparse_100k_kd_lr_range_test_deepspeed=bert_sparse_100k_kd_lr_range_test_deepspeed,  # noqa: E501
 )
