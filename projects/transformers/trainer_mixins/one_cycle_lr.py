@@ -67,7 +67,7 @@ class OneCycleLRMixin:
         anneal_strategy = mixin_args.get("anneal_strategy", "linear")
         if anneal_strategy != "linear":
             warnings.warn(
-                f"Deepspeed does not supprt {anneal_strategy} anneal_strategy")
+                f"Deepspeed does not support {anneal_strategy} anneal_strategy")
 
         max_steps = training_args.max_steps
         initial_lr = max_lr / div_factor
