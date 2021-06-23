@@ -53,7 +53,7 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from callbacks import RezeroWeightsCallback
+from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from experiments import CONFIGS
 from integrations import CustomWandbCallback  # noqa I001
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
@@ -428,6 +428,15 @@ def run_finetuning_multiple_tasks(
     else:
         results = {}
 
+    # Different callbacks result in different control flow.
+    has_early_stopping, _ = check_for_callback(model_args, EarlyStoppingCallback)
+    has_track_eval, _ = check_for_callback(model_args, TrackEvalMetrics)
+    if not has_track_eval:
+        logging.warn(
+            "You are running without tracking metrics throughout training."
+            "This is strongly discouraged."
+        )
+
     # Do not finetune sparse models without RezeroWeightsCallback. Otherwise,
     # you will be "unsparsifying" or "depruning" as you train.
     if "sparse" in model_args.model_type.lower():
@@ -450,13 +459,6 @@ def run_finetuning_multiple_tasks(
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
                 setattr(training_args, hp_key, hp_val)
-
-        # create TaskResults instance
-        has_early_stopping = False
-        for callback in model_args.trainer_callbacks:
-            if isinstance(callback, EarlyStoppingCallback):
-                has_early_stopping = True
-                break
 
         task_results = TaskResults(task_name,
                                    has_early_stopping,
