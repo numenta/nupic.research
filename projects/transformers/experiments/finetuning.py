@@ -31,10 +31,10 @@ from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from .base import transformers_base
 
 # uncomment if you need direct access to either variable
-# from constants import REPORTING_METRICS_PER_TASK, TRAIN_SIZES_PER_TASK
+# from finetuning_constants import REPORTING_METRICS_PER_TASK, TRAIN_SIZES_PER_TASK
 
 
-# from ..constants import (
+# from ..finetuning_constants import (
 #     REPORTING_METRICS_PER_TASK,
 #     TRAIN_SIZES_PER_TASK,
 # )

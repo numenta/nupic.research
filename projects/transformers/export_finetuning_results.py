@@ -129,7 +129,7 @@ class TaskResultsAnalysis:
 
     """
     No quality assurance or testing below this line within this class. These
-    methods are being rapidly prototyped and will be revised greddily as
+    methods are being rapidly prototyped and will be revised greedily as
     needed for further analysis.
     """
 

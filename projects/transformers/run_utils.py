@@ -48,7 +48,7 @@ from transformers import (
 )
 
 from callbacks import TrackEvalMetrics
-from constants import REPORTING_METRICS_PER_TASK
+from finetuning_constants import REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 __all__ = [
