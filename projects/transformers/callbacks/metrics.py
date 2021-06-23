@@ -17,6 +17,7 @@
 #
 #  http://numenta.org/licenses/
 #
+from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from transformers import TrainerCallback
 
 
@@ -39,6 +40,7 @@ class TrackEvalMetrics(TrainerCallback):
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
         """
         self.eval_metrics = {}
+        self.eval_metrics["sparsity"] = []
         # TODO: track train_metrics, ignore for now
         self.train_metrics = {}
         self.steps = []
@@ -58,6 +60,10 @@ class TrackEvalMetrics(TrainerCallback):
                     self.eval_metrics[key] = [metrics[key]]
                 else:
                     self.eval_metrics[key].append(metrics[key])
+
+            num_total, num_nonzero = count_nonzero_params(kwargs["model"])
+            model_sparsity = 1 - (num_nonzero / num_total)
+            self.eval_metrics["sparsity"].append(model_sparsity)
 
             # TODO
             # Possibly update train_results

@@ -53,12 +53,13 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from callbacks import TrackEvalMetrics
+from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from experiments import CONFIGS
 from integrations import CustomWandbCallback  # noqa I001
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
+    check_for_callback,
     evaluate_language_model,
     evaluate_tasks_handler,
     get_labels,
@@ -426,6 +427,12 @@ def run_finetuning_multiple_tasks(
             results = pickle.load(f)
     else:
         results = {}
+
+    # Do not finetune sparse models without RezeroWeightsCallback. Otherwise,
+    # you will be "unsparsifying" or "depruning" as you train.
+    if "sparse" in model_args.model_type.lower():
+        has_rezero, _ = check_for_callback(model_args, RezeroWeightsCallback)
+        assert has_rezero, "Finetuning sparse models without rezeroing weights is prohibited"
 
     base_training_args = deepcopy(training_args)
     for task_name in data_args.task_names:

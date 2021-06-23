@@ -422,7 +422,7 @@ CONFIGS = dict(
     # BERT Base
     #   80% sparse
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
-    finetuning_bert_sparse_80_trifecta_100k_glue=finetuning_bert_sparse_80_trifecta_100k_glue,
+    finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
     finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
     #   85% sparse
     bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
