@@ -26,7 +26,6 @@ from copy import deepcopy
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 
-
 from .base import debug_bert
 from .bert_replication import bert_100k
 
@@ -93,8 +92,7 @@ mini_sparse_bert_debug.update(
     ),
     trainer_callbacks=[
         RezeroWeightsCallback(),
-        TrackEvalMetrics()
-],
+        TrackEvalMetrics()],
 )
 
 
