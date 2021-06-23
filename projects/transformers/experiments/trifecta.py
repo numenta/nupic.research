@@ -255,6 +255,15 @@ bert_sparse_trifecta_100k.update(
 )
 
 
+verify_bert_sparse_trifecta_100k = deepcopy(bert_sparse_trifecta_100k)
+verify_bert_sparse_trifecta_100k.update(
+    # Training arguments
+    do_train=False,
+    do_eval=True,
+    overwrite_output_dir = False,
+)
+
+
 # The is like the one above, but 85% sparse
 bert_sparse_85_trifecta_100k = deepcopy(bert_sparse_trifecta_100k)
 bert_sparse_85_trifecta_100k["config_kwargs"].update(
@@ -427,6 +436,7 @@ CONFIGS = dict(
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
     finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
+    verify_bert_sparse_trifecta_100k=verify_bert_sparse_trifecta_100k,
     #   85% sparse
     bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
     finetuning_bert_sparse_85_trifecta_100k_glue=finetuning_bert_sparse_85_trifecta_100k_glue,  # noqa: E501

@@ -42,6 +42,8 @@ class TrackEvalMetrics(TrainerCallback):
         """
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
+        self.eval_metrics["num_total_params"] = []
+        self.eval_metrics["num_nonzero_params"] = []
         self.eval_metrics["lr"] = []
         # TODO: track train_metrics, ignore for now
         self.train_metrics = {}
@@ -63,9 +65,11 @@ class TrackEvalMetrics(TrainerCallback):
                 else:
                     self.eval_metrics[key].append(metrics[key])
 
-            # track sparsity
+            # track sparsity information
             num_total, num_nonzero = count_nonzero_params(kwargs["model"])
             model_sparsity = 1 - (num_nonzero / num_total)
+            self.eval_metrics["num_total_params"].append(num_total)
+            self.eval_metrics["num_nonzero_params"].append(num_nonzero)
             self.eval_metrics["sparsity"].append(model_sparsity)
 
             # track learning rate
