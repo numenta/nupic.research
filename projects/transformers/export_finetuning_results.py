@@ -47,10 +47,17 @@ class TaskResultsAnalysis:
         analyze multiple tasks and multiple runs per task.
 
         e.g.
-            self.TRD["wnli"] returns a TaskResults object
+            self.task_results_dict["wnli"] returns a TaskResults object
+
+        Note that __getitem__ is overridden so you can also just type
+            self["wnli"] to get a TaskResults object
         """
 
         self.task_results_dict = task_results_dict
+
+        # Do not run an analysis without checking sparsity first
+        for task in task_results_dict.keys():
+            self.verify_sparsity(task)
 
     def __getitem__(self, key):
         return self.task_results_dict[key]
@@ -186,6 +193,10 @@ class TaskResultsAnalysis:
                 self[task].all_results[run_idx][metric])
 
         return metric_all_runs
+
+    def verify_sparsity(self, task):
+
+        self.plot_metric(task, "sparsity")
 
 
 def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
