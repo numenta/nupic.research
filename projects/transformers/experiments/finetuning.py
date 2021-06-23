@@ -173,7 +173,7 @@ finetuning_bert700k_glue.update(
     do_predict=False,
     eval_steps=50,
     evaluation_strategy="steps",
-    load_best_model_at_end=True,
+    # load_best_model_at_end=True,
     per_device_train_batch_size=32,
     per_device_eval_batch_size=32,
     learning_rate=2e-5,

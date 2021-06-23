@@ -35,6 +35,7 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 
 class TaskResultsAnalysis:
@@ -118,6 +119,73 @@ class TaskResultsAnalysis:
         print("Figure ready, hit plt.show() to visualize")
 
         return fig, ax
+
+    """
+    No quality assurance or testing below this line within this class. These
+    methods are being rapidly prototyped and will be revised greddily as
+    needed for further analysis.
+    """
+
+    def trajectory_stats(self, task, run_idx, metric, start=None, stop=None):
+
+        if start is None:
+            start = 0
+        if stop is None:
+            trajectory = np.array(
+                self[task].all_results[run_idx][metric][start:])
+        else:
+            trajectory = np.array(
+                self[task].all_results[run_idx][metric][start:stop])
+
+        descriptive_stats = stats.describe(trajectory)
+        print(descriptive_stats)
+
+        return descriptive_stats
+
+    def gather_trajectory_stats(self, task, start=None, stop=None):
+
+        self[task].trajectory_stats = []
+        for run_idx in range(len(self[task].all_results)):
+            self[task].trajectory_stats.append({})
+            for metric in self[task].all_results[run_idx].keys():
+                descriptive_stats = self.trajectory_stats(
+                    task, run_idx, metric, start, stop)
+                self[task].trajectory_stats[-1][metric] = descriptive_stats
+
+    def get_stats_by_timepoint(self, task, metric, idx):
+
+        time_point_across_runs = []
+        for run_idx in range(len(self[task].all_results)):
+            point = self[task].all_results[run_idx][metric][idx]
+            time_point_across_runs.append(point)
+
+        descriptive_stats = stats.describe(time_point_across_runs)
+
+        return np.array(time_point_across_runs), descriptive_stats
+
+    def get_all_stats_by_timepoint(self, task, metric):
+
+        # TODO
+        n_steps = len(self[task].all_results[0]["steps"])
+
+    def get_metric_from_runs(self, task, metric):
+        """
+        Create a 2d numpy array where each row represents a run. The
+        row contains a trajectory for a given metric.
+
+        e.g.
+            metric_all_runs[2] could return eval_loss at every time step
+            on the 3rd run for a given task.
+        """
+        n_steps = len(self[task].all_results[0]["steps"])
+        n_runs = len(self[task].all_results)
+
+        metric_all_runs = np.zeros((n_runs, n_steps))
+        for run_idx in range(n_runs):
+            metric_all_runs = np.array(
+                self[task].all_results[run_idx][metric])
+
+        return metric_all_runs
 
 
 def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
@@ -208,6 +276,9 @@ def results_to_df(results, reduction, model_name):
     cols = df.columns.tolist()
     cols = cols[-1:] + cols[:-1]  # Reorder so model_name is first column
     df = df[cols]
+
+    # Add timing information for added context
+    df["date_added"] = pd.to_datetime("today")    
 
     return df
 
