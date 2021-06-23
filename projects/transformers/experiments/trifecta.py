@@ -260,7 +260,7 @@ verify_bert_sparse_trifecta_100k.update(
     # Training arguments
     do_train=False,
     do_eval=True,
-    overwrite_output_dir = False,
+    overwrite_output_dir=False,
 )
 
 
