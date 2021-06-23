@@ -298,20 +298,6 @@ finetuning_bert_sparse_trifecta_100k_glue.update(
 )
 
 
-finetuning_bert_sparse_trifecta_100k_glue_simple = deepcopy(
-    finetuning_bert_sparse_trifecta_100k_glue)
-finetuning_bert_sparse_trifecta_100k_glue_simple.update(
-    # Model arguments
-    model_type="fully_static_sparse_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/"
-    "bert_sparse_80%_trifecta_100k",
-)
-
-
-# alias with a shorter variable name for pep8 compliance below
-ft_bert_sp_tri_100k_g_s = finetuning_bert_sparse_trifecta_100k_glue_simple
-
-
 # This fine-tunes a pretrained model from `bert_sparse_85_trifecta_100k` above.
 finetuning_bert_sparse_85_trifecta_100k_glue = deepcopy(
     finetuning_bert_sparse_trifecta_100k_glue)
@@ -330,6 +316,21 @@ finetuning_bert_sparse_90_trifecta_100k_glue.update(
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k",  # noqa: E501
 )
+
+finetuning_bert_sparse_trifecta_100k_glue_simple = deepcopy(
+    finetuning_bert100k_glue_simple)
+finetuning_bert_sparse_trifecta_100k_glue_simple.update(
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/"
+    "bert_sparse_80%_trifecta_100k",
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        TrackEvalMetrics()],
+)
+
+# alias with a shorter variable name for pep8 compliance below
+ft_bert_sp_tri_100k_g_s = finetuning_bert_sparse_trifecta_100k_glue_simple
 
 
 # BERT Base 2x Wide

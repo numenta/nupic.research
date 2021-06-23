@@ -183,8 +183,10 @@ finetuning_bert700k_glue.update(
     task_hyperparams=dict(
         mrpc=dict(num_train_epochs=5, num_runs=3),
         wnli=dict(num_train_epochs=5, num_runs=10),
-        cola=dict(num_train_epochs=5, num_runs=10),
-        stsb=dict(num_runs=3),
+        cola=dict(num_train_epochs=5,
+                  num_runs=10,
+                  metric_for_best_model="eval_matthews_correlation"),
+        stsb=dict(num_runs=3, metric_for_best_model="eval_pearson"),
         rte=dict(num_runs=10),
     ),
     trainer_callbacks=[
@@ -271,6 +273,10 @@ finetuning_bert100k_single_task.update(
     task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
 )
 
+
+# known issue: the config copied here has task hyperparameters, including
+# metric_for_best_model. Even though metric_for_best_model (used here for
+# testing assertions in run.py) is set here, it will get overwritten.
 finetuning_bert_sparse_80_trifecta_cola = deepcopy(finetuning_bert100k_single_task)
 finetuning_bert_sparse_80_trifecta_cola.update(
     # Data arguments
@@ -288,6 +294,7 @@ finetuning_bert_sparse_80_trifecta_cola.update(
     max_steps=16_000,  # 10x previous
     num_runs=3,
     trainer_callbacks=[
+        RezeroWeightsCallback(),
         TrackEvalMetrics(),
     ],
 )
