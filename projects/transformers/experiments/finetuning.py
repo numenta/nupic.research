@@ -188,7 +188,6 @@ finetuning_bert700k_glue.update(
         rte=dict(num_runs=10),
     ),
     trainer_callbacks=[
-        RezeroWeightsCallback(),
         TrackEvalMetrics(),
         ],
 )
