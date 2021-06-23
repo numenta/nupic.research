@@ -53,7 +53,7 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from callbacks import RezeroWeightsCallback, TrackEvalMetrics
+from callbacks import RezeroWeightsCallback
 from experiments import CONFIGS
 from integrations import CustomWandbCallback  # noqa I001
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
@@ -80,16 +80,16 @@ MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
 REPORTING_METRICS_PER_TASK = {
-        "cola": ["eval_matthews_correlation"],
-        "mnli": ["eval_accuracy", "mm_eval_accuracy"],
-        "mrpc": ["eval_f1", "eval_accuracy"],
-        "qnli": ["eval_accuracy"],
-        "qqp": ["eval_accuracy", "eval_f1"],
-        "rte": ["eval_accuracy"],
-        "sst2": ["eval_accuracy"],
-        "stsb": ["eval_pearson", "eval_spearmanr"],
-        "wnli": ["eval_accuracy"]
-    }
+    "cola": ["eval_matthews_correlation"],
+    "mnli": ["eval_accuracy", "mm_eval_accuracy"],
+    "mrpc": ["eval_f1", "eval_accuracy"],
+    "qnli": ["eval_accuracy"],
+    "qqp": ["eval_accuracy", "eval_f1"],
+    "rte": ["eval_accuracy"],
+    "sst2": ["eval_accuracy"],
+    "stsb": ["eval_pearson", "eval_spearmanr"],
+    "wnli": ["eval_accuracy"]
+}
 
 
 def bold(text):
@@ -352,15 +352,15 @@ def run_finetuning_single_task(
             )
             training_args.eval_steps = max_steps
 
-        # Runs can easily break if load_best_model_at_end because you specified a metric for 
-        # a diferent task. You can get all the way through training and have it break. This 
-        # will at least break earlier on / help you readjust.
+        # Runs can easily break if load_best_model_at_end because you specified a metric
+        # for a diferent task. You can get all the way through training and have it
+        # break. This will at least break earlier on / help you readjust.
 
         if training_args.metric_for_best_model not in REPORTING_METRICS_PER_TASK:
             if training_args.metric_for_best_model != "eval_loss":
                 logging.warning(
                     "Warning, code will break because the current metric for best model"
-                    f" (training_args.metric_for_best_model) is not being tracked." 
+                    f" (training_args.metric_for_best_model) is not being tracked."
                     "Defaulting metric_for_best_model to eval_loss"
                 )
                 training_args.metric_for_best_model = "eval_loss"
@@ -432,7 +432,8 @@ def run_finetuning_multiple_tasks(
     # you will be "unsparsifying" or "depruning" as you train.
     if "sparse" in model_args.model_type.lower():
         has_rezero, _ = check_for_callback(model_args, RezeroWeightsCallback)
-        assert has_rezero, "Finetuning sparse models without rezeroing weights is prohibited"
+        assert has_rezero, "Finetuning sparse models without rezeroing weights"
+        " is prohibited"
 
     base_training_args = deepcopy(training_args)
     for task_name in data_args.task_names:

@@ -17,8 +17,9 @@
 #
 #  http://numenta.org/licenses/
 #
-from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from transformers import TrainerCallback
+
+from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 
 class TrackEvalMetrics(TrainerCallback):
@@ -80,9 +81,12 @@ class TrackEvalMetrics(TrainerCallback):
         # Using a workaround for mnli, and only evaluating mnli-mm at the very
         # end of training. Therefore don't update anything
         is_mnli_mm = "mm_accuracy" in metrics.keys()
-        ksplit = lambda k: k.split("_", 1)[1] if "_" in k else k
-    
+
+        # flake8 wants this to be a def, not a lambda
+        def ksplit(k):
+            return k.split("_", 1)[1] if "_" in k else k
+
         if is_mnli_mm:
-            self.mm_metrics = {ksplit(k): v for k,v in metrics.items()}
+            self.mm_metrics = {ksplit(k): v for k, v in metrics.items()}
 
         return is_mnli_mm

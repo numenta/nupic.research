@@ -48,12 +48,7 @@ from transformers import (
 )
 
 from callbacks import TrackEvalMetrics
-from constants import (
-    REPORTING_METRICS_PER_TASK,
-    TRAIN_SIZES_PER_TASK,
-)
-
-
+from constants import REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 __all__ = [
@@ -713,15 +708,16 @@ def format_eval_results(eval_results, run, task_name):
 
     return new_eval_results
 
+
 def check_for_callback(model_args, class_of_callback):
-    
+
     has_callback = False
     callback_instance = None
     for callback_idx in range(len(model_args.trainer_callbacks)):
         if isinstance(model_args.trainer_callbacks[callback_idx], class_of_callback):
             has_callback = True
             callback_instance = model_args.trainer_callbacks[callback_idx]
-    
+
     return has_callback, callback_instance
 
 
@@ -731,29 +727,28 @@ def evaluate_tasks_handler(trainer,
                            training_args,
                            eval_dataset,
                            tokenized_datasets):
-    
+
     logging.info("*** Evaluate ***")
 
     eval_results = {}
     tracked_metrics, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
     tasks = [data_args.task_name]
     eval_datasets = [eval_dataset]
-    
+
     if tracked_metrics:
 
         tracked_eval_metrics = metric_callback.eval_metrics
         tracked_eval_metrics["steps"] = metric_callback.steps
         offset = training_args.max_steps % training_args.eval_steps
 
-        # If 
+        # If max_steps % eval_steps is not 0, make sure to eval one last time
         if offset != 0 and not training_args.load_best_model_at_end:
 
             print(f"Evaluating again because offset was {offset}")
 
             eval_results = evaluate_tasks(
                 trainer, training_args.output_dir, tasks, eval_datasets
-                )
-            metric_callback = model_args.trainer_callbacks[tracked_metrics_idx]
+            )
             metric_callback.eval_metrics["steps"][-1] -= offset
 
         # mnli has two eval sets. For now, assume load_best_model_at_end is on
@@ -773,7 +768,7 @@ def evaluate_tasks_handler(trainer,
                 tracked_eval_metrics[key_name] = [mm_dict[key] for i in range(n_evals)]
 
         eval_results = tracked_eval_metrics
-    
+
     else:
 
         # In this case, you need to do the usualy evaluation
@@ -787,10 +782,6 @@ def evaluate_tasks_handler(trainer,
         )
 
     return eval_results
-
-
-
-
 
 
 def init_trainer(

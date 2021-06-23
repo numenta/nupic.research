@@ -27,11 +27,13 @@ from copy import deepcopy
 from transformers import EarlyStoppingCallback
 
 from callbacks import TrackEvalMetrics
-from constants import (
-    REPORTING_METRICS_PER_TASK,
-    TRAIN_SIZES_PER_TASK,
-)
+
 from .base import transformers_base
+
+# uncomment if you need direct access to either variable
+# from constants import REPORTING_METRICS_PER_TASK, TRAIN_SIZES_PER_TASK
+
+
 # from ..constants import (
 #     REPORTING_METRICS_PER_TASK,
 #     TRAIN_SIZES_PER_TASK,
@@ -235,8 +237,7 @@ finetuning_bert100k_glue_simple.update(
                   metric_for_best_model="eval_pearson",
                   num_runs=3),  # 50k / 7000 ~ 8 epochs
 
-        qqp=dict(eval_steps=1_000,
-                  num_runs=3),  # 300k >> 50k
+        qqp=dict(eval_steps=1_000, num_runs=3),  # 300k >> 50k
         mnli=dict(eval_steps=1_000,
                   num_runs=3),  # 300k >> 50k
         qnli=dict(eval_steps=500,
@@ -275,7 +276,7 @@ finetuning_bert_sparse_80_trifecta_cola.update(
     task_names=["cola"],
     # Model arguments
     model_type="fully_static_sparse_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
     # Training arguments
     evaluation_strategy="steps",
     eval_steps=50,

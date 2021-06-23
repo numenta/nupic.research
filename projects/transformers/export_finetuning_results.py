@@ -36,13 +36,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+
 class TaskResultsAnalysis:
 
     def __init__(self, task_results_dict):
         """
         run_utils.TaskResults contains data for a single task, but spans multiple
         runs. TaskResultsAnalysis takes a list of TaskResults objects, so you can
-        analyze multiple tasks and multiple runs per task. 
+        analyze multiple tasks and multiple runs per task.
 
         e.g.
             self.TRD["wnli"] returns a TaskResults object
@@ -56,13 +57,14 @@ class TaskResultsAnalysis:
     def _get_time_and_label(self, task, run_idx):
 
         if "steps" in self[task].all_results[run_idx].keys():
-            x = self[task].all_results[run_idx]['steps']
+            x = self[task].all_results[run_idx]["steps"]
             xlabel = "steps"
             if self[task].training_args is not None:
-                suffix = f"\n(batch_size={self[task].training_args.per_device_train_batch_size})"
+                suffix = "\n(batch_size="
+                f"{self[task].training_args.per_device_train_batch_size})"
                 xlabel = xlabel + suffix
         elif "epoch" in self[task].all_results[run_idx].keys():
-            x = self[task].all_results[run_idx]['epoch']
+            x = self[task].all_results[run_idx]["epoch"]
             xlabel = "epoch"
         else:
             print("Warning, unknown time metric")
@@ -72,7 +74,6 @@ class TaskResultsAnalysis:
 
         return x, xlabel
 
-
     def plot_run(self, task, run_idx, metric, save_name=False, fig=None, ax=None):
         """Plot one metric on one run over time"""
 
@@ -81,7 +82,7 @@ class TaskResultsAnalysis:
 
         y = self[task].all_results[run_idx][metric]
         x, xlabel = self._get_time_and_label(task, run_idx)
-        ax.plot(x, y, ".", ms=10, linestyle='dashed')
+        ax.plot(x, y, ".", ms=10, linestyle="dashed")
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(metric)
@@ -94,7 +95,6 @@ class TaskResultsAnalysis:
 
         return fig, ax
 
-
     def plot_metric(self, task, metric, save_name=False, fig=None, ax=None):
         """Plot one metric across all runs, you type plt.show()"""
 
@@ -105,7 +105,7 @@ class TaskResultsAnalysis:
             x, xlabel = self._get_time_and_label(task, run_idx)
             y = self[task].all_results[run_idx][metric]
 
-            ax.plot(x, y, ".", linestyle='dashed', label=f"run: {run_idx}")
+            ax.plot(x, y, ".", linestyle="dashed", label=f"run: {run_idx}")
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(metric)
@@ -142,11 +142,15 @@ def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
     xwidth = 5 * n_models
     for task in tasks:
 
-        fig, ax = plt.subplots(1, n_models, figsize=(xwidth, 10), sharex=True, sharey=True)
+        fig, ax = plt.subplots(1,
+                               n_models,
+                               figsize=(xwidth, 10),
+                               sharex=True,
+                               sharey=True)
 
         c = 0
         for model in dict_of_task_analyses.keys():
-            _,_ = dict_of_task_analyses[model].plot_metric(
+            _, _ = dict_of_task_analyses[model].plot_metric(
                 task,
                 metric,
                 ax=ax[c]
@@ -202,10 +206,11 @@ def results_to_df(results, reduction, model_name):
     df["model_name"] = df.index
     df = df.reset_index(drop=True)
     cols = df.columns.tolist()
-    cols = cols[-1:] + cols[:-1] # Reorder so model_name is first column
+    cols = cols[-1:] + cols[:-1]  # Reorder so model_name is first column
     df = df[cols]
 
     return df
+
 
 def process_results(results_files, model_name, reduction, csv, md):
 
@@ -255,8 +260,7 @@ if __name__ == "__main__":
                         help="Path to a csv file you want results to go to."
                              "If it exists, it will update the csv,"
                              "and if not, it will create a new file")
-    parser.add_argument("-md", "--md", type=str,
-                         default="",
-                         help="Path to a markdown file. Will overwrite.")
+    parser.add_argument("-md", "--md", type=str, default="",
+                        help="Path to a markdown file. Will overwrite.")
     args = parser.parse_args()
     process_results(**args.__dict__)
