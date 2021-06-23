@@ -356,7 +356,7 @@ def run_finetuning_single_task(
         # for a diferent task. You can get all the way through training and have it
         # break. This will at least break earlier on / help you readjust.
 
-        if training_args.metric_for_best_model not in REPORTING_METRICS_PER_TASK:
+        if training_args.metric_for_best_model not in REPORTING_METRICS_PER_TASK[data_args.task_name]:
             if training_args.metric_for_best_model != "eval_loss":
                 logging.warning(
                     "Warning, code will break because the current metric for best model"

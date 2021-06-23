@@ -177,7 +177,7 @@ finetuning_bert700k_glue.update(
     per_device_train_batch_size=32,
     per_device_eval_batch_size=32,
     learning_rate=2e-5,
-    metric_for_best_model="eval_accuracy",
+    # metric_for_best_model="eval_accuracy",
     num_train_epochs=3,
     num_runs=1,
     task_hyperparams=dict(
@@ -188,6 +188,7 @@ finetuning_bert700k_glue.update(
         rte=dict(num_runs=10),
     ),
     trainer_callbacks=[
+        RezeroWeightsCallback(),
         TrackEvalMetrics(),
         ],
 )
