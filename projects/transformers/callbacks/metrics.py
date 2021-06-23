@@ -70,8 +70,7 @@ class TrackEvalMetrics(TrainerCallback):
 
             # track learning rate
             # get_last_lr() returns lr for each parameter group. For now,
-            # assume learning rates are the same for all and just track
-            # one lr. 
+            # assume lrs are the same for all and just track one.
             last_lr = kwargs["lr_scheduler"].get_last_lr()
             self.eval_metrics["lr"].append(last_lr[0])
 

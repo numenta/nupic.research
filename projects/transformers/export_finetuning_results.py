@@ -166,7 +166,7 @@ class TaskResultsAnalysis:
     def get_all_stats_by_timepoint(self, task, metric):
 
         # TODO
-        n_steps = len(self[task].all_results[0]["steps"])
+        pass
 
     def get_metric_from_runs(self, task, metric):
         """
@@ -278,7 +278,7 @@ def results_to_df(results, reduction, model_name):
     df = df[cols]
 
     # Add timing information for added context
-    df["date_added"] = pd.to_datetime("today")    
+    df["date_added"] = pd.to_datetime("today")
 
     return df
 
