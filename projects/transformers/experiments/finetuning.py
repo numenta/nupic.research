@@ -26,7 +26,7 @@ from copy import deepcopy
 
 from transformers import EarlyStoppingCallback
 
-from callbacks import TrackEvalMetrics
+from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 
 from .base import transformers_base
 
@@ -188,6 +188,7 @@ finetuning_bert700k_glue.update(
         rte=dict(num_runs=10),
     ),
     trainer_callbacks=[
+        RezeroWeightsCallback(),
         TrackEvalMetrics(),
         ],
 )
@@ -245,8 +246,9 @@ finetuning_bert100k_glue_simple.update(
         rte=dict(max_steps=steps_50k, num_runs=3),  # ~ 20 epochs from paper
         wnli=dict(max_steps=steps_50k, num_runs=3)  # 50k / 634 ~ 79 epochs
     ),
-    trainer_callbacks=[TrackEvalMetrics(),
-                       EarlyStoppingCallback(early_stopping_patience=10)],
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        TrackEvalMetrics()],
     warmup_ratio=0.1,
 )
 
@@ -277,6 +279,27 @@ finetuning_bert_sparse_80_trifecta_cola.update(
     # Model arguments
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
+    # Training arguments
+    evaluation_strategy="steps",
+    eval_steps=50,
+    learning_rate=1e-5,
+    load_best_model_at_end=True,
+    metric_for_best_model="eval_accuracy",
+    max_steps=16_000,  # 10x previous
+    num_runs=3,
+    trainer_callbacks=[
+        TrackEvalMetrics(),
+    ],
+)
+
+finetuning_bert_sparse_85_trifecta_cola = deepcopy(finetuning_bert100k_single_task)
+finetuning_bert_sparse_85_trifecta_cola.update(
+    # Data arguments
+    task_name=None,
+    task_names=["cola"],
+    # Model arguments
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k",  # noqa: E501
     # Training arguments
     evaluation_strategy="steps",
     eval_steps=50,

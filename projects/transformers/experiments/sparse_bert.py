@@ -24,7 +24,8 @@ Base Transformers Experiment configuration.
 
 from copy import deepcopy
 
-from callbacks import RezeroWeightsCallback
+from callbacks import RezeroWeightsCallback, TrackEvalMetrics
+
 
 from .base import debug_bert
 from .bert_replication import bert_100k
@@ -38,7 +39,9 @@ sparse_bert_100k.update(
     config_kwargs=dict(
         sparsity=0.8,
     ),
-    trainer_callbacks=[RezeroWeightsCallback()],
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        TrackEvalMetrics()],
     overwrite_output_dir=False,
 )
 
@@ -51,7 +54,9 @@ static_sparse_encoder_bert_100k.update(
     config_kwargs=dict(
         sparsity=0.8,
     ),
-    trainer_callbacks=[RezeroWeightsCallback()]
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        TrackEvalMetrics()]
 )
 
 
@@ -64,7 +69,9 @@ fully_static_sparse_bert_100k.update(
         sparsity=0.8,
         sparsify_all_embeddings=False,
     ),
-    trainer_callbacks=[RezeroWeightsCallback()]
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        TrackEvalMetrics()]
 )
 
 fully_static_sparse_bert_100k_fp16 = deepcopy(fully_static_sparse_bert_100k)
@@ -84,7 +91,10 @@ mini_sparse_bert_debug.update(
         hidden_size=64,
         intermediate_size=64 * 4,
     ),
-    trainer_callbacks=[RezeroWeightsCallback()],
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        TrackEvalMetrics()
+],
 )
 
 
