@@ -33,6 +33,7 @@ from .eighty_percent_sparse import CONFIGS as EIGHT_PERCENT_SPARSE
 from .finetuning import CONFIGS as FINETUNING
 from .hpsearch import CONFIGS as HPSEARCH
 from .one_cycle_lr import CONFIGS as ONE_CYCLE_LR
+from .profiler import CONFIGS as PROFILER
 from .regressions import CONFIGS as REGRESSIONS
 from .rigl_bert import CONFIGS as RIGL_BERT
 from .sparse_bert import CONFIGS as SPARSE_BERT
@@ -57,6 +58,7 @@ CONFIGS.update(EIGHT_PERCENT_SPARSE)
 CONFIGS.update(FINETUNING)
 CONFIGS.update(HPSEARCH)
 CONFIGS.update(ONE_CYCLE_LR)
+CONFIGS.update(PROFILER)
 CONFIGS.update(REGRESSIONS)
 CONFIGS.update(RIGL_BERT)
 CONFIGS.update(SPARSE_BERT)
