@@ -27,6 +27,7 @@ from .ablations import CONFIGS as ABLATIONS
 from .base import CONFIGS as BASE
 from .bert_replication import CONFIGS as BERT_REPLICATION
 from .bertitos import CONFIGS as BERTITOS
+from .deepspeed import CONFIGS as DEEPSPEED
 from .distillation import CONFIGS as DISTILLATION
 from .eighty_percent_sparse import CONFIGS as EIGHT_PERCENT_SPARSE
 from .finetuning import CONFIGS as FINETUNING
@@ -50,6 +51,7 @@ CONFIGS.update(ABLATIONS)
 CONFIGS.update(BASE)
 CONFIGS.update(BERT_REPLICATION)
 CONFIGS.update(BERTITOS)
+CONFIGS.update(DEEPSPEED)
 CONFIGS.update(DISTILLATION)
 CONFIGS.update(EIGHT_PERCENT_SPARSE)
 CONFIGS.update(FINETUNING)
