@@ -49,7 +49,8 @@ class NoDendriteExperiment(mixins.RezeroWeights,
     pass
 
 
-# Run two MNIST tasks in batch mode
+# Continual learning with sparse networks.
+# Run two MNIST tasks for debugging
 SPARSE_CL_2 = dict(
     experiment_class=NoDendriteExperiment,
 
@@ -153,9 +154,51 @@ SPARSE_CL_10_SEARCH.update(
     ),
 )
 
+
+# Continual learning with fully dense networks.
+DENSE_CL_2 = deepcopy(SPARSE_CL_2)
+DENSE_CL_2.update(
+    model_args=dict(
+        input_size=784,
+        output_size=10,  # Single output head shared by all tasks
+        hidden_sizes=[2048, 2048],
+        num_segments=0,
+        dim_context=0,
+        kw=False,
+        dendrite_weight_sparsity=0.0,
+        weight_sparsity=0.0,
+        context_percent_on=0.0,
+        dendritic_layer_class=ZeroSegmentDendriticLayer,
+    ),
+)
+
+DENSE_CL_50 = deepcopy(DENSE_CL_2)
+DENSE_CL_50["dataset_args"].update(num_tasks=50)
+DENSE_CL_50.update(
+    num_tasks=50,
+    num_classes=10 * 50,
+
+    # For wandb
+    env_config=dict(
+        wandb=dict(
+            entity="nupic-research",
+            project="dendrite_baselines",
+            name="dense_cl_50",
+            group="dense_cl_50",
+            notes="""
+        Dense network with continual learning
+        """
+        )
+    ),
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     sparse_cl_2=SPARSE_CL_2,
     sparse_cl_10_search=SPARSE_CL_10_SEARCH,
     sparse_cl_50=SPARSE_CL_50,
+
+    dense_cl_2=DENSE_CL_2,
+    dense_cl_50=DENSE_CL_50,
 )
