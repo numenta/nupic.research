@@ -83,7 +83,7 @@ class CustomTrainingArguments(TrainingArguments):
     hp_resources_per_trial: Dict = field(
         default_factory=lambda: dict(
             cpu=os.cpu_count() / torch.cuda.device_count() - 1,
-            gpu=1 # this can also be a hyperparameter
+            gpu=1
         ),
     )
 
