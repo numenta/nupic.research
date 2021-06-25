@@ -34,6 +34,21 @@ TASK_NAMES = [
     "wnli"
 ]
 
+# Names of files with test set predictions for uplodaing to glue
+GLUE_NAMES_PER_TASK = {
+    "cola": "CoLA",
+    "sst2": "SST-2",
+    "mrcp": "MRPC",
+    "stsb": "STS-B",
+    "qqp": "QQP",
+    "mnli": "MNLI-M",
+    "mnli-mm": "MNLI-MM",
+    "qnli": "QNLI",
+    "rte": "RTE",
+    "wnli": "WNLI",
+    "": "AX"  # diagnostic set, not yet implemented
+}
+
 REPORTING_METRICS_PER_TASK = {
     "cola": ["eval_matthews_correlation"],
     "mnli": ["eval_accuracy", "mm_eval_accuracy"],

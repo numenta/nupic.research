@@ -48,7 +48,7 @@ from transformers import (
 )
 
 from callbacks import TrackEvalMetrics
-from finetuning_constants import REPORTING_METRICS_PER_TASK
+from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 __all__ = [
@@ -149,8 +149,13 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
 
 def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_list):
     """
-    Test tasks after finetuning.
+    Write a file of predictions on the test set used for uploading to GLUE leaderboard
+        TODO: make sure this works for all tasks
     """
+
+    logging.info("At test time: total params: {:,} non zero params: {:,}".format(
+        *count_nonzero_params(trainer.model)
+    ))
 
     for test_dataset, task in zip(test_datasets, tasks):
         # Removing the `label` columns because it contains -1
@@ -161,7 +166,7 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
                        else np.argmax(predictions, axis=1))
 
         output_test_file = os.path.join(
-            output_dir, f"test_results_{task}.txt"
+            output_dir, f"{GLUE_NAMES_PER_TASK[task]}.tsv"
         )
         if trainer.is_world_process_zero():
             with open(output_test_file, "w") as writer:
@@ -1049,7 +1054,7 @@ def run_hyperparameter_search(
     """
 
     training_args.load_best_model_at_end = True
-    training_args.disable_tqdm = True
+    training_args.disable_tqdm = True  # competes with ray output
     # TODO: sync metric_for_best_model with compute_objective, should be same metric
     # and accept custom metrics defined by user
     training_args.metric_for_best_model = "eval_loss"
@@ -1059,7 +1064,7 @@ def run_hyperparameter_search(
 
     # Get fraction of the validation dataset to use in hp search
     hp_eval_dataset = eval_dataset.shard(
-        index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
+        index=1, num_shards=int(1 / training_args.hp_validation_dataset_pct)
     )
 
     # Specify how to re-init model each training run.
@@ -1097,20 +1102,17 @@ def run_hyperparameter_search(
     hp_search_kwargs = dict(
         direction="maximize",
         backend="ray",
-        n_trials=model_args.hp_num_trials,
-        hp_space=model_args.hp_space,
-        compute_objective=model_args.hp_compute_objective,
+        n_trials=training_args.hp_num_trials,
+        hp_space=training_args.hp_space,
+        compute_objective=training_args.hp_compute_objective,
         local_dir=training_args.output_dir,
-        resources_per_trial=dict(
-            cpu=os.cpu_count() / torch.cuda.device_count() - 1,
-            gpu=1
-        ),
+        resources_per_trial=training_args.hp_resources_per_trial,
         checkpoint_freq=0,
         keep_checkpoints_num=0,
         checkpoint_at_end=False,
     )
     # Update any extra kwargs defined in config
-    hp_search_kwargs.update(**model_args.hp_extra_kwargs)
+    hp_search_kwargs.update(**training_args.hp_extra_kwargs)
 
     # Run hp search and save results
     best_run = trainer.hyperparameter_search(**hp_search_kwargs)
@@ -1130,3 +1132,21 @@ def run_hyperparameter_search(
 
 def compute_objective_eval_loss(metrics):
     return metrics["eval_loss"]
+
+def compute_objective_eval_accuracy(metrics):
+    # TODO
+    # can do in configs, can be lambda
+    pass
+
+
+
+# pretrained model
+# task
+# 
+
+
+# parent model
+#   wnli
+#       checkpoints/
+#       eval_results.txt
+#   cola

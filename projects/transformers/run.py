@@ -252,7 +252,7 @@ def run_pretraining(
     )
 
     # Run hp search or regular training
-    if model_args.hp_num_trials >= 1:
+    if training_args.hp_num_trials >= 1:
         run_hyperparameter_search(
             model_args=model_args,
             config=config,
@@ -467,6 +467,9 @@ def run_finetuning_multiple_tasks(
 
         # Run finetuning and save results
         for _ in range(training_args.num_runs):
+            # live notes:
+            # Put hyperparameter search under run_finetuning_single_task
+            # but if running hyperparameter search, ensure one run
             # reset seed per run
             training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
@@ -478,16 +481,18 @@ def run_finetuning_multiple_tasks(
             )
             task_results.append(eval_results)
 
-        task_results.reduce_metrics(reduction="mean")
-        logging.info(f"{task_name} results: {task_results.to_string()}")
-        logging.info(f"{task_name} consolidated: {task_results.consolidate()}")
-        results[task_name] = task_results
+        # If this is just a prediction run, ignore this block
+        if training_args.do_eval:
+            task_results.reduce_metrics(reduction="mean")
+            logging.info(f"{task_name} results: {task_results.to_string()}")
+            logging.info(f"{task_name} consolidated: {task_results.consolidate()}")
+            results[task_name] = task_results
 
-        # Pickle and save results
-        if is_main_process(base_training_args.local_rank):
-            logging.info(f"Saving task_results to {results_path}")
-            with open(results_path, "wb") as file:
-                pickle.dump(results, file)
+            # Pickle and save results
+            if is_main_process(base_training_args.local_rank):
+                logging.info(f"Saving task_results to {results_path}")
+                with open(results_path, "wb") as file:
+                    pickle.dump(results, file)
 
 
 def _mp_fn(index):
