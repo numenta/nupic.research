@@ -30,7 +30,6 @@ from functools import partial
 from hashlib import blake2b
 
 import numpy as np
-import torch
 from datasets import concatenate_datasets, load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
 from scipy.stats import pearsonr, spearmanr
@@ -1064,7 +1063,7 @@ def run_hyperparameter_search(
 
     # Get fraction of the validation dataset to use in hp search
     hp_eval_dataset = eval_dataset.shard(
-        index=1, num_shards=int(1 / training_args.hp_validation_dataset_pct)
+        index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
     )
 
     # Specify how to re-init model each training run.
@@ -1100,19 +1099,21 @@ def run_hyperparameter_search(
     )
 
     hp_search_kwargs = dict(
-        direction="maximize",
+        direction=model_args.hp_compute_objective[0],
         backend="ray",
-        n_trials=training_args.hp_num_trials,
-        hp_space=training_args.hp_space,
-        compute_objective=training_args.hp_compute_objective,
+        n_trials=model_args.hp_num_trials,
+        hp_space=model_args.hp_space,
+        compute_objective=partial(
+            compute_objective, objective=model_args.hp_compute_objective[1]
+        ),
         local_dir=training_args.output_dir,
-        resources_per_trial=training_args.hp_resources_per_trial,
+        resources_per_trial=model_args.hp_resources_per_trial,
         checkpoint_freq=0,
         keep_checkpoints_num=0,
         checkpoint_at_end=False,
     )
     # Update any extra kwargs defined in config
-    hp_search_kwargs.update(**training_args.hp_extra_kwargs)
+    hp_search_kwargs.update(**model_args.hp_extra_kwargs)
 
     # Run hp search and save results
     best_run = trainer.hyperparameter_search(**hp_search_kwargs)
@@ -1130,19 +1131,15 @@ def run_hyperparameter_search(
                 writer.write(f"{key} = {value}\n")
 
 
-def compute_objective_eval_loss(metrics):
-    return metrics["eval_loss"]
-
-def compute_objective_eval_accuracy(metrics):
-    # TODO
-    # can do in configs, can be lambda
-    pass
-
+def compute_objective(metrics, objective):
+    print("****************")
+    print(metrics)
+    return metrics[objective]
 
 
 # pretrained model
 # task
-# 
+#
 
 
 # parent model

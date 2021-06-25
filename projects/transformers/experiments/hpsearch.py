@@ -76,41 +76,26 @@ debug_hp_search.update(
 
 finetuning_hp_search = deepcopy(finetuning_bert100k_glue)
 finetuning_hp_search.update(
-
-    task_hyperparams=dict(
-
-        cola=dict(
-                  hp_space = lambda trial: dict(
-                    eval_steps=tune.random
-                    learning_rate=tune.
-                  )
-                  eval_steps=50,
-                  max_steps=steps_50k,
-                  metric_for_best_model="eval_matthews_correlation",
-                  num_runs=5,
-                  ),  # 50k / 8500 ~ 6 epochs
-
-        sst2=dict(num_runs=3),  # 67k training size > 50k, default 3 epochs
-        mrpc=dict(max_steps=steps_50k, num_runs=3),  # 50k / 3700 ~ 14 epochs
-
-        stsb=dict(max_steps=steps_50k,
-                  metric_for_best_model="eval_pearson",
-                  num_runs=3),  # 50k / 7000 ~ 8 epochs
-
-        qqp=dict(eval_steps=1_000, num_runs=3),  # 300k >> 50k
-        mnli=dict(eval_steps=1_000,
-                  num_runs=3),  # 300k >> 50k
-        qnli=dict(eval_steps=500,
-                  num_runs=3),  # 100k > 50k, defualt to 3 epochs
-        rte=dict(max_steps=steps_50k, num_runs=3),  # ~ 20 epochs from paper
-        wnli=dict(max_steps=steps_50k, num_runs=3)  # 50k / 634 ~ 79 epochs
-    ),
-    trainer_callbacks=[
-        TrackEvalMetrics()],
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
+    task_name="cola",
+    task_names=None,
+    num_runs=1,
+    max_steps=2000,
+    save_steps=1,
     warmup_ratio=0.1,
+    hp_validation_dataset_pct=1.0,
+    report_to="none",
+    task_hyperparams=dict(
+        cola=dict(
+            hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-4, 1e-2)),
+            hp_num_trials=10,
+            hp_compute_objective=("maximize", "eval_matthews_correlation")
+        )
+    ),
 )
 
 # Export configurations in this file
 CONFIGS = dict(
-    debug_hp_search=debug_hp_search
+    debug_hp_search=debug_hp_search,
+    finetuning_hp_search=finetuning_hp_search
 )
