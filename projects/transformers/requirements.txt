@@ -22,9 +22,12 @@
 # Run pip install -r requirements.txt to reproduce the currently tested environment
 # Last update: 3/29/2021
 
-transformers>=4.5.1,<4.6.0
+# requirements Lucas used for hp_search
+transformers=4.9.0.dev0
+ray==1.4.0
+pickle5==0.0.11
+cloudpickle==1.6.0
+
 datasets>=1.6.1,<1.7.0
 torch>=1.8.1,<1.9.0
 wandb>=0.10.27
-cloudpickle>=1.6.0
-pickle5>=0.0.11
