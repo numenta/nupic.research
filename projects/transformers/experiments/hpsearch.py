@@ -74,20 +74,20 @@ debug_hp_search.update(
 #  num_trials, hp_space, hp_compute_objective, hp_validation_pct
 #  resources per trial (kp_search_kwargs)
 
-finetuning_hp_search = deepcopy(finetuning_bert100k_glue)
-finetuning_hp_search.update(
+debug_finetuning_hp_search = deepcopy(finetuning_bert100k_glue)
+debug_finetuning_hp_search.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
     task_name="cola",
     task_names=None,
     num_runs=1,
-    max_steps=2000,
+    max_steps=200,
     save_steps=1,
     warmup_ratio=0.1,
     hp_validation_dataset_pct=1.0,
     report_to="none",
     task_hyperparams=dict(
         cola=dict(
-            hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-4, 1e-2)),
+            hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-5, 1e-2)),
             hp_num_trials=10,
             hp_compute_objective=("maximize", "eval_matthews_correlation")
         )
@@ -97,5 +97,5 @@ finetuning_hp_search.update(
 # Export configurations in this file
 CONFIGS = dict(
     debug_hp_search=debug_hp_search,
-    finetuning_hp_search=finetuning_hp_search
+    debug_finetuning_hp_search=debug_finetuning_hp_search
 )

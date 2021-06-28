@@ -43,6 +43,7 @@ from functools import partial
 
 # FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
 import ray  # noqa: F401, I001
+
 import torch.distributed
 import transformers
 from transformers import (
@@ -638,6 +639,10 @@ def run_finetuning_multiple_tasks(
         task_results = TaskResults(task_name,
                                    has_early_stopping,
                                    training_args=training_args)
+
+        # Hack to ensure we don't do hp search num_runs times
+        if model_args.hp_num_trials > 1:
+            training_args.num_runs = 1
 
         # Run finetuning and save results
         for _ in range(training_args.num_runs):
