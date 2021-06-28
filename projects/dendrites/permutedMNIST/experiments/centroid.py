@@ -50,6 +50,11 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
     pass
 
 
+class SICentroidExperiment(mixins.SynapticIntelligence,
+                           CentroidExperiment):
+    pass
+
+
 # Centroid method for inferring contexts: 10 permutedMNIST tasks
 CENTROID_10 = dict(
     experiment_class=CentroidExperiment,
@@ -145,10 +150,38 @@ FIGURE_1B.update(
     ),
 )
 
+# Synaptic Intelligence + Dendrites on 10 permutedMNIST tasks
+SI_CENTROID_10 = deepcopy(CENTROID_10)
+SI_CENTROID_10["model_args"].update(hidden_sizes=[2000, 2000])
+SI_CENTROID_10.update(
+    experiment_class=SICentroidExperiment,
+    epochs=20,  # Note that SI only works well with ~20 epochs of training per task
+
+    si_args=dict(
+        c=0.1,
+        damping=0.1,
+    ),
+
+    reset_optimizer_after_task=False,  # The SI paper reports not resetting the Adam
+                                       # optimizer between tasks, and this
+                                       # works well with dendrites too
+)
+
+# Synaptic Intelligence + Dendrites on 50 permutedMNIST tasks
+SI_CENTROID_50 = deepcopy(SI_CENTROID_10)
+SI_CENTROID_50["dataset_args"].update(num_tasks=50)
+SI_CENTROID_50["model_args"].update(num_segments=50)
+SI_CENTROID_50.update(
+    num_tasks=50,
+    num_classes=10 * 50,
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     centroid_2=CENTROID_2,
     centroid_10=CENTROID_10,
     centroid_50=CENTROID_50,
     figure_1b=FIGURE_1B,
+    si_centroid_10=SI_CENTROID_10,
+    si_centroid_50=SI_CENTROID_50,
 )
