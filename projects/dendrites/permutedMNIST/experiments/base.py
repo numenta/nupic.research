@@ -79,7 +79,6 @@ DEFAULT_BASE = dict(
     val_batch_size=512,
     epochs=1,
     tasks_to_validate=(0, 1, 2),  # Tasks on which to run validate
-    epochs_to_validate=[],
     num_tasks=NUM_TASKS,
     num_classes=10 * NUM_TASKS,
     distributed=False,

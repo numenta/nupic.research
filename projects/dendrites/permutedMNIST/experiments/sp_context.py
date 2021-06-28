@@ -38,6 +38,7 @@ from nupic.research.frameworks.vernon import mixins
 
 class SPExperiment(mixins.RezeroWeights,
                    mixins.PermutedMNISTTaskIndices,
+                   mixins.UpdateBoostStrength,
                    SpatialPoolerContext,
                    DendriteContinualLearningExperiment):
     pass

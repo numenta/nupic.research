@@ -16,6 +16,8 @@ In progress, current results:
 
 <br/><br/>
 
+[More results related to finetuning can be found here](./finetuning_results.md)
+
 **Note:** `sparse_80%_kd_onecycle_lr_rigl` is not actually 80% sparse. It's just under at 79.58%. This is because the token embeddings are fully dense. Future work will either sparsify these, or make the other layers more sparse to achieve the full 80%.
 
 

@@ -24,8 +24,11 @@ from .centroid import CONFIGS as CENTROID
 from .standard_mlp import CONFIGS as STANDARD
 from .sparse_mlp import CONFIGS as SPARSE
 from .num_segment_search import CONFIGS as SEGSEARCH
+from .batch_mnist import CONFIGS as BATCH_MNIST
 from .sp_context_search import CONFIGS as SP_PROTO
 from .sp_context import CONFIGS as SP_CONTEXT
+from .no_dendrites import CONFIGS as NO_DENDRITES
+from .batch import CONFIGS as BATCH
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -41,4 +44,8 @@ CONFIGS.update(SPARSE)
 CONFIGS.update(SEGSEARCH)
 CONFIGS.update(SP_PROTO)
 CONFIGS.update(SP_CONTEXT)
-
+CONFIGS.update(BATCH_MNIST)
+CONFIGS.update(SP_PROTO)
+CONFIGS.update(SP_CONTEXT)
+CONFIGS.update(NO_DENDRITES)
+CONFIGS.update(BATCH)

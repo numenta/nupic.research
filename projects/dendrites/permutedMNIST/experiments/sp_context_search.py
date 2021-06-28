@@ -36,6 +36,7 @@ from nupic.torch.modules import KWinners, SparseWeights
 
 
 class SPExperiment(mixins.RezeroWeights,
+                   mixins.UpdateBoostStrength,
                    mixins.PermutedMNISTTaskIndices,
                    SpatialPoolerAnalysis,
                    DendriteContinualLearningExperiment):
