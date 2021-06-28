@@ -450,6 +450,7 @@ def run_finetuning_single_task_with_hp_search(
         model_init=model_init,  # changed
         task_name=data_args.task_name,  # does it matter?
         is_regression=is_regression,  # does it matter?
+        finetuning=True  # see if it fixes key error issue
     )
 
     hp_search_kwargs = dict(
