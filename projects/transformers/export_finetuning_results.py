@@ -29,6 +29,7 @@ Useful if you only need to rerun one or more tasks instead of all
 """
 
 import argparse
+from copy import deepcopy
 import os
 import pickle
 
@@ -197,6 +198,15 @@ class TaskResultsAnalysis:
     def verify_sparsity(self, task):
 
         self.plot_metric(task, "sparsity")
+
+    def glue_load_best_model_at_end(self, reduction="max"):
+        """
+        Compute the glue score as though load_best_model_at_end were true.
+        Just rely on existing code in TaskResults to do this by flipping
+        class attributes. 
+        """
+ 
+        pass
 
 
 def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
