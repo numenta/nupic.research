@@ -23,7 +23,7 @@
 # Last update: 3/29/2021
 
 # requirements Lucas used for hp_search
-transformers=4.9.0.dev0
+transformers==4.9.0.dev0
 ray==1.4.0
 pickle5==0.0.11
 cloudpickle==1.6.0
