@@ -33,7 +33,7 @@ from transformers import AutoModelForMaskedLM
 
 # Import models. This will update Transformer's model mappings so that custom models can
 # be loaded via AutoModelForMaskedLM.
-import models # noqa F401
+import models  # noqa F401
 
 
 def save_pretrained(checkpoint_folder, destination_folder, model_name):
