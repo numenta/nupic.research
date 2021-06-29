@@ -19,8 +19,9 @@
 #
 
 """
-Experiment file that runs dendritic networks which infer the context vector via
-constructing a prototype during inference.
+Experiment file that runs dendritic networks where (a) the context vector is inferred
+during inference via prototyping, and (b) Synaptic Intelligence (SI) is applied to the
+feed-forward parameters.
 """
 
 import os
@@ -35,28 +36,21 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
-from nupic.torch.modules import KWinners
 
 
-class CentroidExperiment(mixins.RezeroWeights,
-                         mixins.CentroidContext,
-                         mixins.PermutedMNISTTaskIndices,
-                         DendriteContinualLearningExperiment):
+class SICentroidExperiment(mixins.SynapticIntelligence,
+                           mixins.RezeroWeights,
+                           mixins.CentroidContext,
+                           mixins.PermutedMNISTTaskIndices,
+                           DendriteContinualLearningExperiment):
     pass
 
 
-class CentroidFigure1BExperiment(CentroidFigure1B,
-                                 mixins.PlotHiddenActivations,
-                                 CentroidExperiment):
-    pass
-
-
-# Centroid method for inferring contexts: 10 permutedMNIST tasks
-CENTROID_10 = dict(
-    experiment_class=CentroidExperiment,
+# Synaptic Intelligence + Dendrites on 10 permutedMNIST tasks
+SI_CENTROID_10 = dict(
+    experiment_class=SICentroidExperiment,
     num_samples=8,
 
     # Results path
@@ -70,11 +64,12 @@ CENTROID_10 = dict(
         seed=42,
     ),
 
-    model_class=DendriticMLP,  # CentroidDendriticMLP does not affect accuracy..??
+    model_class=DendriticMLP,
     model_args=dict(
         input_size=784,
-        output_size=10,  # Single output head shared by all tasks
-        hidden_sizes=[2048, 2048],
+        output_size=10,
+        hidden_sizes=[2000, 2000],  # Note we use 2000 hidden units instead of 2048 for
+                                    # a better comparison with SI and XdG
         num_segments=10,
         dim_context=784,
         kw=True,
@@ -84,9 +79,14 @@ CENTROID_10 = dict(
         context_percent_on=0.1,
     ),
 
+    si_args=dict(
+        c=0.1,
+        damping=0.1,
+    ),
+
     batch_size=256,
     val_batch_size=512,
-    epochs=3,
+    epochs=20,  # Note that SI only works well with ~20 epochs of training per task
     tasks_to_validate=range(50),
     num_tasks=10,
     num_classes=10 * 10,
@@ -97,62 +97,22 @@ CENTROID_10 = dict(
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
     optimizer_args=dict(lr=5e-4),
+    reset_optimizer_after_task=False,  # The SI paper reports not resetting the Adam
+                                       # optimizer between tasks, and this
+                                       # works well with dendrites too
 )
 
-# Centroid method for inferring contexts: 50 permutedMNIST tasks
-CENTROID_50 = deepcopy(CENTROID_10)
-CENTROID_50["dataset_args"].update(num_tasks=50)
-CENTROID_50["model_args"].update(num_segments=50)
-CENTROID_50.update(
-    epochs=2,
+# Synaptic Intelligence + Dendrites on 50 permutedMNIST tasks
+SI_CENTROID_50 = deepcopy(SI_CENTROID_10)
+SI_CENTROID_50["dataset_args"].update(num_tasks=50)
+SI_CENTROID_50["model_args"].update(num_segments=50)
+SI_CENTROID_50.update(
     num_tasks=50,
     num_classes=10 * 50,
-    num_samples=1,
-
-    # For wandb
-    env_config=dict(
-        wandb=dict(
-            entity="nupic-research",
-            project="dendrite_baselines",
-            name="sparse_prototype_50",
-            group="sparse_prototype_50",
-            notes="""
-            Sparse network using prototypes as context.
-            """
-        )
-    ),
-)
-
-# Two tasks only, for debugging
-CENTROID_2 = deepcopy(CENTROID_10)
-CENTROID_2["dataset_args"].update(num_tasks=2)
-CENTROID_2["model_args"].update(num_segments=2)
-CENTROID_2.update(
-    epochs=1,
-    num_samples=1,
-    num_tasks=2,
-    num_classes=10 * 2,
-    seed=6024,
-)
-
-# This config saves hidden unit activations per task for later plotting
-FIGURE_1B = deepcopy(CENTROID_10)
-FIGURE_1B.update(
-    experiment_class=CentroidFigure1BExperiment,
-    num_tasks=2,
-    num_samples=1,
-
-    plot_hidden_activations_args=dict(
-        include_modules=[KWinners],
-        plot_freq=1,
-        max_samples_to_plot=5000
-    ),
 )
 
 # Export configurations in this file
 CONFIGS = dict(
-    centroid_2=CENTROID_2,
-    centroid_10=CENTROID_10,
-    centroid_50=CENTROID_50,
-    figure_1b=FIGURE_1B,
+    si_centroid_10=SI_CENTROID_10,
+    si_centroid_50=SI_CENTROID_50,
 )
