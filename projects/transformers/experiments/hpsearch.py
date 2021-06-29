@@ -88,7 +88,7 @@ debug_finetuning_hp_search.update(
     task_hyperparams=dict(
         cola=dict(
             hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-5, 1e-2)),
-            hp_num_trials=10,
+            hp_num_trials=3,
             hp_compute_objective=("maximize", "eval_matthews_correlation")
         )
     ),

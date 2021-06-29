@@ -60,7 +60,7 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from experiments import CONFIGS
-from integrations import CustomWandbCallback  # noqa I001
+from integrations import CustomWandbCallback, CustomRayReporter  # noqa I001
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
@@ -453,6 +453,9 @@ def run_finetuning_single_task_with_hp_search(
         finetuning=True  # see if it fixes key error issue
     )
 
+    # define a reporter to customize how hp_search results are tracked
+    reporter = CustomRayReporter()
+
     hp_search_kwargs = dict(
         direction=model_args.hp_compute_objective[0],
         backend="ray",
@@ -462,6 +465,7 @@ def run_finetuning_single_task_with_hp_search(
             compute_objective, objective=model_args.hp_compute_objective[1]
         ),
         local_dir=training_args.output_dir,
+        progress_reporter=reporter,
         resources_per_trial=model_args.hp_resources_per_trial,
         checkpoint_freq=0,
         keep_checkpoints_num=0,
@@ -475,7 +479,17 @@ def run_finetuning_single_task_with_hp_search(
     best_run = trainer.hyperparameter_search(**hp_search_kwargs)
     logging.info(f"Best run: {best_run}")
 
-    hp_res_file = os.path.join(training_args.output_dir, "hp_search_results.txt")
+    # TODO
+    # get the trial.local_dir, and concatenate the csv files
+
+    import pdb
+    pdb.set_trace()
+
+    # TODO
+    # This will currently overwrite existing best_run_results with the best
+    # run from the current experiment. It's worth checking to see if the best
+    # local run beat previous or not. 
+    hp_res_file = os.path.join(training_args.output_dir, "best_run_results.txt")
     if trainer.is_world_process_zero():
         with open(hp_res_file, "w") as writer:
             writer.write("Hyperparameter search best run:\n")

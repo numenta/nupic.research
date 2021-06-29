@@ -23,6 +23,7 @@ import math
 import os
 from collections import MutableMapping
 
+from ray.tune import CLIReporter
 import wandb
 from transformers.integrations import (
     INTEGRATION_TO_CALLBACK,
@@ -157,3 +158,32 @@ def flatten_dict(d, parent_key="", seperator="."):
             items.append((new_key, v))
 
     return dict(items)
+
+
+# -----
+# Ray tune reporting
+# -----
+
+class CustomRayReporter(CLIReporter):
+
+    def __init__(self):
+        
+        super().__init__()
+
+    def report(self, trials, *sys_info):
+
+        # name of output files
+        report_dir = trials[0].local_dir
+        result_file = os.path.join(report_dir, "progress.txt")
+
+        # print results to screen before sending to file
+        progress_str = self._progress_str(trials, sys_info[0], *sys_info[1:])
+        print(progress_str)
+
+        # save to file
+        with open(result_file, 'w') as f:
+            progress_line_split = progress_str.spit("\n")
+            for line in progress_line_split:
+                f.write(line + "\n")
+
+
