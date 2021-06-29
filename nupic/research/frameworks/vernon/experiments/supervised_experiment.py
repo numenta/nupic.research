@@ -79,7 +79,7 @@ class SupervisedExperiment(ExperimentBase):
         self.total_batches = 0
         self.epochs_to_validate = []
         self.current_epoch = 0
-        self.rank = 0
+        self.distributed = False
 
     def setup_experiment(self, config):
         """
@@ -425,9 +425,10 @@ class SupervisedExperiment(ExperimentBase):
                 # Compute actual batch size from distributed sampler
                 total_batches *= self.train_loader.sampler.num_replicas
                 current_batch *= self.train_loader.sampler.num_replicas
+            rank = -1 if not self.distributed else self.rank
             self.logger.debug("End of batch for rank: %s. Epoch: %s, Batch: %s/%s, "
                               "loss: %s, Learning rate: %s num_images: %s",
-                              self.rank, self.current_epoch, current_batch,
+                              rank, self.current_epoch, current_batch,
                               total_batches, error_loss, self.get_lr(),
                               num_images)
             self.logger.debug("Timing: %s", time_string)
