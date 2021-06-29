@@ -25,12 +25,14 @@ __all__ = ["SynapticIntelligence"]
 
 class SynapticIntelligence:
     """
-    Implementation of Synaptic Intelligence (Zenke, Poole, Ganguli (2017)) that applies
-    the surrogate loss to all feed-forward parameters in a neural network.
+    Implementation of Synaptic Intelligence (Zenke, Poole, Ganguli; paper:
+    https://arxiv.org/pdf/1703.04200.pdf) that applies the surrogate loss to all feed-
+    forward parameters in a neural network. This mixin is only compatible with
+    `ContinualLearningExperiment` and its subclasses.
 
-    The config should contain `si_args` should be a dict that specifies the strength of
-    the SI surrogate loss and damping parameter. If any parameters are missing, or if
-    `si_args` is absent, the default values in the example below are used.
+    The config should contain a dict `si_args` that specifies the strength of the SI
+    surrogate loss coefficient and damping parameter. If any parameters are missing, or
+    if `si_args` is absent, the default values in the example below are used.
 
     Example config:
     ```
@@ -99,7 +101,8 @@ class SynapticIntelligence:
 
     def error_loss(self, output, target, reduction="mean"):
         """
-        Returns the value of the SI surrogate loss on the current task.
+        Returns the value of the SI loss on the current task: the loss from the
+        training objective plus the SI surrogate loss.
         """
         regular_loss = super().error_loss(output, target, reduction)
 
@@ -115,7 +118,6 @@ class SynapticIntelligence:
                 surrogate_loss += (big_omega * ((param - old_param) ** 2)).sum()
 
         surrogate_loss = self.c * surrogate_loss
-
         return regular_loss + surrogate_loss
 
     def post_batch(self, **kwargs):

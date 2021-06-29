@@ -18,8 +18,9 @@
 # http://numenta.org/licenses/
 
 """
-Experiment file that runs Synaptic Intelligence (Zenke, Poole, Ganguli (2017)) in a
-continual learning experiment on permutedMNIST.
+Experiment file that runs Synaptic Intelligence (Zenke, Poole, Ganguli; paper:
+https://arxiv.org/pdf/1703.04200.pdf) in a continual learning experiment on
+permutedMNIST.
 """
 
 import os
