@@ -37,7 +37,8 @@ import random
 import sys
 from copy import deepcopy
 from pprint import pformat
-from run_utils import compute_objective
+from transformers.run_utils import check_if_current_hp_best
+from run_utils import collate_hp_csvs, compute_objective
 from functools import partial
 
 
@@ -453,8 +454,11 @@ def run_finetuning_single_task_with_hp_search(
         finetuning=True  # see if it fixes key error issue
     )
 
-    # define a reporter to customize how hp_search results are tracked
-    reporter = CustomRayReporter()
+    # You can customize reporter for logging. Currently needed
+    # for pooling results.
+    reporter = CustomRayReporter(
+        parameter_columns = model_args.hp_space,
+    )
 
     hp_search_kwargs = dict(
         direction=model_args.hp_compute_objective[0],
@@ -480,17 +484,19 @@ def run_finetuning_single_task_with_hp_search(
     logging.info(f"Best run: {best_run}")
 
     # TODO
-    # get the trial.local_dir, and concatenate the csv files
+    # collate hp_search results. old code:
+    # collate_hp_csvs(reporter.report_dir)
+    # new code will be more comprehensive and will live in 
+    # export_finetuning_hp_search_results.py
 
-    import pdb
-    pdb.set_trace()
+    # If previous run tracked the same metric, and current run got better
+    # results, then overwrite. Else, leave it. The data for this run are
+    # still available in reporter.report_dir.
+    hp_res_file = os.path.join(training_args.output_dir,
+        f"best_run_results_{model_args.hp_compute_objective[1]}.txt")
+    write_new = check_if_current_hp_best(hp_res_file, model_args, best_run)
 
-    # TODO
-    # This will currently overwrite existing best_run_results with the best
-    # run from the current experiment. It's worth checking to see if the best
-    # local run beat previous or not. 
-    hp_res_file = os.path.join(training_args.output_dir, "best_run_results.txt")
-    if trainer.is_world_process_zero():
+    if trainer.is_world_process_zero() and write_new:
         with open(hp_res_file, "w") as writer:
             writer.write("Hyperparameter search best run:\n")
             writer.write(f"run_id = {best_run.run_id}\n")

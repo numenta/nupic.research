@@ -173,7 +173,7 @@ class ModelArguments:
         default_factory=dict,
         metadata={
             "help": "Dictionary with extra parameters to be passed to "
-                    "`trainer.hyperparameter_search`. Includse arguments to `tune.run`"
+                    "`trainer.hyperparameter_search`. Includes arguments to `tune.run`"
         }
     )
     hp_resources_per_trial: Dict = field(

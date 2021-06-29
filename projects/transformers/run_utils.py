@@ -32,6 +32,7 @@ from hashlib import blake2b
 import numpy as np
 from datasets import concatenate_datasets, load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
+import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import f1_score, matthews_corrcoef
 from transformers import (
@@ -1135,6 +1136,50 @@ def compute_objective(metrics, objective):
     print("****************")
     print(metrics)
     return metrics[objective]
+
+def check_if_current_hp_best(old_file, model_args, best_run):
+
+    # if previous file
+    if not os.path.exists(old_file):
+        return True
+
+    with open(old_file, 'r') as f:
+        data = f.read()
+        line_split = data.split("\n")
+
+    previous_best = None
+    for line in line_split:
+        if model_args.hp_compute_objective[1] in line:
+            previous_best = float(line.split("=")[-1])
+
+
+    if model_args.hp_compute_objective[0] == "maximize":
+        operator = "__gt__"
+    else:
+        operator = "__lt__"
+    
+    if getattr(previous_best, operator)(best_run.objective):
+        return False
+    else:
+        return True
+
+
+def collate_hp_csvs(report_dir):
+
+    files = os.listdir(report_dir)
+    subdirs = []
+    for file in files:
+        full_path = os.path.join(report_dir, file)
+        if os.path.isdir(full_path):
+            subdirs.append(full_path)
+
+    dfs = []
+    for subdir in subdirs:
+        df = pd.read_csv(os.path.join(subdir, "progress.csv"))
+        dfs.append(df)
+
+    big_df = pd.concat(dfs)
+    big_df.to_csv(os.path.join(report_dir, "all_progress.csv"))
 
 
 # pretrained model
