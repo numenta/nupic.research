@@ -79,6 +79,7 @@ class SupervisedExperiment(ExperimentBase):
         self.total_batches = 0
         self.epochs_to_validate = []
         self.current_epoch = 0
+        self.rank = 0
 
     def setup_experiment(self, config):
         """
