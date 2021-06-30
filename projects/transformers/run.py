@@ -315,8 +315,6 @@ def init_dataset_for_finetuning(
 
     # Code safety
     check_sparsity_callback(model, model_args)
-    check_eval_and_max_steps(training_args)
-    training_args = check_best_metric(data_args, training_args)
 
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
@@ -377,7 +375,7 @@ def run_finetuning_single_task_with_hp_search(
     training_args.do_predict = False
 
     # Code safety run a second time due to training_args being changed above
-    check_eval_and_max_steps(training_args)
+    check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(data_args, training_args)
 
     # Get fraction of the validation dataset to use in hp search
@@ -477,6 +475,10 @@ def run_finetuning_single_task(
         init_dataset_for_finetuning(
             model_args, data_args, training_args, last_checkpoint
         )
+
+    # Code safety
+    check_eval_and_max_steps(training_args, train_dataset)
+    training_args = check_best_metric(data_args, training_args)
 
     # Train
     trainer = init_trainer(

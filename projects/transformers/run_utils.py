@@ -745,7 +745,7 @@ def check_sparsity_callback(model, model_args):
         " is prohibited"
 
 
-def check_eval_and_max_steps(training_args):
+def check_eval_and_max_steps(training_args, train_dataset):
     """
     If you're supposed to load best model at end, but evaluate() never gets
     called because eval_steps > number of training steps taken, you'll get
@@ -798,7 +798,7 @@ def check_best_metric(data_args, training_args):
                 )
         training_args.greater_is_better = False
 
-    return data_args, training_args
+    return training_args
 
 
 def evaluate_tasks_handler(trainer,
@@ -1208,8 +1208,6 @@ def run_hyperparameter_search(
 
 
 def compute_objective(metrics, objective):
-    print("****************")
-    print(metrics)
     return metrics[objective]
 
 def check_if_current_hp_best(old_file, model_args, best_run):
