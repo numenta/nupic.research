@@ -107,13 +107,11 @@ debug_finetuning_sparse_hp_search.update(
     report_to="none",
     task_hyperparams=dict(
         cola=dict(
-            hp_space=lambda trial: dict(
-                learning_rate=tune.loguniform(1e-5, 1e-2),
-                max_steps=tune.randint(10, 500),
-                hp_num_trials=3,
-                hp_compute_objective=("maximize", "eval_matthews_correlation"))
+            hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-5, 1e-2)),
+            hp_num_trials=3,
+            hp_compute_objective=("maximize", "eval_matthews_correlation")
         )
-    )
+    ),
 )
 
 # Export configurations in this file
