@@ -58,12 +58,16 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from experiments import CONFIGS
-from integrations import CustomWandbCallback, CustomRayReporter  # noqa I001
+from integrations import CustomWandbCallback  # noqa I001
+from nupic.torch.modules.sparse_weights import SparseWeightsBase
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
+    check_best_metric,
+    check_eval_and_max_steps,
     check_for_callback,
     check_if_current_hp_best,
+    check_sparsity_callback,
     compute_objective,
     evaluate_language_model,
     evaluate_tasks_handler,
@@ -309,6 +313,11 @@ def init_dataset_for_finetuning(
     # TODO: avoid loading the model at this stage when using hp search
     model = init_model(model_args, config, tokenizer, finetuning=True)
 
+    # Code safety
+    check_sparsity_callback(model, model_args)
+    check_eval_and_max_steps(training_args)
+    training_args = check_best_metric(data_args, training_args)
+
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
     logging.info(f"Tokenizing datasets for finetuning ...")
@@ -367,6 +376,10 @@ def run_finetuning_single_task_with_hp_search(
     training_args.do_eval = False
     training_args.do_predict = False
 
+    # Code safety run a second time due to training_args being changed above
+    check_eval_and_max_steps(training_args)
+    training_args = check_best_metric(data_args, training_args)
+
     # Get fraction of the validation dataset to use in hp search
     if model_args.hp_validation_dataset_pct < 1:
         hp_eval_dataset = eval_dataset.shard(
@@ -374,40 +387,6 @@ def run_finetuning_single_task_with_hp_search(
         )
     else:
         hp_eval_dataset = eval_dataset
-
-    # TODO: Move into separate function
-    # If you're supposed to load best model at end, but evaluate() never gets
-    # called because eval_steps > number of training steps taken, you'll get
-    # an error at the end of training. If this is the case, set eval_steps
-    # equal to max_steps so it gets called at least once.
-    if training_args.load_best_model_at_end:
-        if training_args.max_steps == -1:
-            num_examples = training_args.num_train_epochs * len(train_dataset)
-            max_steps = num_examples // training_args.per_device_train_batch_size
-        else:
-            max_steps = training_args.max_steps
-        if max_steps < training_args.eval_steps:
-            logging.warning(
-                f"max_steps({max_steps}) < "
-                f"eval_steps({training_args.eval_steps}) "
-                "To avoid issues, setting eval steps equal to max_steps"
-            )
-            training_args.eval_steps = max_steps
-
-        # Runs can easily break if load_best_model_at_end because you specified a metric
-        # for a diferent task. You can get all the way through training and have it
-        # break. This will at least break earlier on / help you readjust.
-
-        allowed_metrics = REPORTING_METRICS_PER_TASK[data_args.task_name]
-        if training_args.metric_for_best_model not in allowed_metrics:
-            if training_args.metric_for_best_model != "eval_loss":
-                logging.warning(
-                    "Warning, code will break because the current metric for best model"
-                    f" (training_args.metric_for_best_model) is not being tracked."
-                    "Defaulting metric_for_best_model to eval_loss"
-                )
-                training_args.metric_for_best_model = "eval_loss"
-                model_args.hp_compute_objective = ("minimize", "eval_loss")
 
     # Specify how to re-init model each training run.
     def model_init():
@@ -421,22 +400,8 @@ def run_finetuning_single_task_with_hp_search(
         model = AutoModelForSequenceClassification.from_pretrained(
             model_args.model_name_or_path, **model_kwargs
         )
+
         return model
-
-    # def model_init():
-
-    #     # Our custom model mapping made for sparse models must be imported here
-    #     # as ray uses an independently imported version of transformers which
-    #     # doesn't have access to this updated mapping.
-    #     from models import MODEL_FOR_MASKED_LM_MAPPING as CUSTOM_MASKED_LM_MAPPING
-    #     from models import CONFIG_MAPPING as CUSTOM_CONFIG_MAPPING
-
-    #     # Instantiate model; possibly one of our custom sparse models.
-    #     config_cls = CUSTOM_CONFIG_MAPPING[config.model_type]
-    #     model_for_lm_cls = CUSTOM_MASKED_LM_MAPPING[config_cls]
-    #     model = model_for_lm_cls(config)
-    #     model.resize_token_embeddings(len(tokenizer))
-    #     return model
 
     # Train
     trainer = init_trainer(
@@ -453,12 +418,6 @@ def run_finetuning_single_task_with_hp_search(
         finetuning=True  # see if it fixes key error issue
     )
 
-    # You can customize reporter for logging. Currently needed
-    # for pooling results.
-    reporter = CustomRayReporter(
-        parameter_columns = model_args.hp_space,
-    )
-
     hp_search_kwargs = dict(
         direction=model_args.hp_compute_objective[0],
         backend="ray",
@@ -468,7 +427,6 @@ def run_finetuning_single_task_with_hp_search(
             compute_objective, objective=model_args.hp_compute_objective[1]
         ),
         local_dir=training_args.output_dir,
-        progress_reporter=reporter,
         resources_per_trial=model_args.hp_resources_per_trial,
         checkpoint_freq=0,
         keep_checkpoints_num=0,
@@ -481,12 +439,6 @@ def run_finetuning_single_task_with_hp_search(
     # Run hp search and save results
     best_run = trainer.hyperparameter_search(**hp_search_kwargs)
     logging.info(f"Best run: {best_run}")
-
-    # TODO
-    # collate hp_search results. old code:
-    # collate_hp_csvs(reporter.report_dir)
-    # new code will be more comprehensive and will live in 
-    # export_finetuning_hp_search_results.py
 
     # If previous run tracked the same metric, and current run got better
     # results, then overwrite. Else, leave it. The data for this run are
@@ -525,38 +477,6 @@ def run_finetuning_single_task(
         init_dataset_for_finetuning(
             model_args, data_args, training_args, last_checkpoint
         )
-
-    # If you're supposed to load best model at end, but evaluate() never gets
-    # called because eval_steps > number of training steps taken, you'll get
-    # an error at the end of training. If this is the case, set eval_steps
-    # equal to max_steps so it gets called at least once.
-    if training_args.load_best_model_at_end:
-        if training_args.max_steps == -1:
-            num_examples = training_args.num_train_epochs * len(train_dataset)
-            max_steps = num_examples // training_args.per_device_train_batch_size
-        else:
-            max_steps = training_args.max_steps
-        if max_steps < training_args.eval_steps:
-            logging.warning(
-                f"max_steps({max_steps}) < "
-                f"eval_steps({training_args.eval_steps}) "
-                "To avoid issues, setting eval steps equal to max_steps"
-            )
-            training_args.eval_steps = max_steps
-
-        # Runs can easily break if load_best_model_at_end because you specified a metric
-        # for a diferent task. You can get all the way through training and have it
-        # break. This will at least break earlier on / help you readjust.
-
-        allowed_metrics = REPORTING_METRICS_PER_TASK[data_args.task_name]
-        if training_args.metric_for_best_model not in allowed_metrics:
-            if training_args.metric_for_best_model != "eval_loss":
-                logging.warning(
-                    "Warning, code will break because the current metric for best model"
-                    f" (training_args.metric_for_best_model) is not being tracked."
-                    "Defaulting metric_for_best_model to eval_loss"
-                )
-                training_args.metric_for_best_model = "eval_loss"
 
     # Train
     trainer = init_trainer(
@@ -668,15 +588,9 @@ def run_finetuning_multiple_tasks(
 
         # Run finetuning and save results
         for _ in range(training_args.num_runs):
-            # live notes:
-            # Put hyperparameter search under run_finetuning_single_task
-            # but if running hyperparameter search, ensure one run
-            # reset seed per run
             training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
-            # eval_results contains either a number for each metric
-            # or a list for each metric, depending on if TrackEvalMetrics
-            # callback is in use.
+
             training_fn = (
                 run_finetuning_single_task_with_hp_search if
                 model_args.hp_num_trials > 1 else run_finetuning_single_task

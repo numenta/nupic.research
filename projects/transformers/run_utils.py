@@ -47,9 +47,11 @@ from transformers import (
     TrainerCallback,
 )
 
-from callbacks import TrackEvalMetrics
+from callbacks import RezeroWeightsCallback, TrackEvalMetrics
+
 from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
+from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
 __all__ = [
     "evaluate_language_model",
@@ -713,6 +715,9 @@ def format_eval_results(eval_results, run, task_name):
 
     return new_eval_results
 
+#####
+# Code to make sure training / finetuning / hp optimization runs safely
+#####
 
 def check_for_callback(model_args, class_of_callback):
 
@@ -724,6 +729,76 @@ def check_for_callback(model_args, class_of_callback):
             callback_instance = model_args.trainer_callbacks[callback_idx]
 
     return has_callback, callback_instance
+
+
+def check_sparsity_callback(model, model_args):
+    
+    is_sparse = False
+    for module in model.modules():
+        if isinstance(module, SparseWeightsBase):
+            is_sparse = True
+            break
+
+    if is_sparse:
+        has_rezero = check_for_callback(model_args, RezeroWeightsCallback)
+        assert has_rezero, "Finetuning sparse models without rezeroing weights"
+        " is prohibited"
+
+
+def check_eval_and_max_steps(training_args):
+    """
+    If you're supposed to load best model at end, but evaluate() never gets
+    called because eval_steps > number of training steps taken, you'll get
+    an error at the end of training. If this is the case, set eval_steps
+    equal to max_steps so it gets called at least once.
+    """
+    if training_args.load_best_model_at_end:
+            if training_args.max_steps == -1:
+                num_examples = training_args.num_train_epochs * len(train_dataset)
+                max_steps = num_examples // training_args.per_device_train_batch_size
+            else:
+                max_steps = training_args.max_steps
+            if max_steps < training_args.eval_steps:
+                logging.warning(
+                    f"max_steps({max_steps}) < "
+                    f"eval_steps({training_args.eval_steps}) "
+                    "To avoid issues, setting eval steps equal to max_steps"
+                )
+                training_args.eval_steps = max_steps
+    
+    return training_args
+
+
+def check_best_metric(data_args, training_args):
+    """
+    Runs can easily break if load_best_model_at_end because you
+    specified a metric for a diferent task. You can get all the way through
+    training and have it break. This will flip best_metric to eval_loss in
+    that case. It also checks to make sure greater_is_better is set properly.
+    """
+
+    allowed_metrics = REPORTING_METRICS_PER_TASK[data_args.task_name]
+    if training_args.metric_for_best_model not in allowed_metrics:
+        if training_args.metric_for_best_model != "eval_loss":
+            logging.warning(
+                "Warning, code will break because the current metric for best model"
+                f" (training_args.metric_for_best_model) is not being tracked."
+                "Defaulting metric_for_best_model to eval_loss"
+            )
+            training_args.metric_for_best_model = "eval_loss"
+            training_args.greater_is_better = False
+            
+    if training_args.metric_for_best_model == "eval_loss":
+        if hasattr(training_args, "greater_is_better"):
+            if training_args.greater_is_better != False:
+                logging.warning(
+                    "Greater is better is set to True with eval_loss as "
+                    "metric_for_best_model. Flipping greater is better to"
+                    "False, since we want small loss"
+                )
+        training_args.greater_is_better = False
+
+    return data_args, training_args
 
 
 def evaluate_tasks_handler(trainer,
