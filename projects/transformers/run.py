@@ -37,14 +37,11 @@ import random
 import sys
 from copy import deepcopy
 from pprint import pformat
-from transformers.run_utils import check_if_current_hp_best
-from run_utils import collate_hp_csvs, compute_objective
 from functools import partial
 
 
 # FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
 import ray  # noqa: F401, I001
-
 import torch.distributed
 import transformers
 from transformers import (
@@ -66,6 +63,8 @@ from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArgume
 from run_utils import (
     TaskResults,
     check_for_callback,
+    check_if_current_hp_best,
+    compute_objective,
     evaluate_language_model,
     evaluate_tasks_handler,
     get_labels,
@@ -634,7 +633,7 @@ def run_finetuning_multiple_tasks(
     # Do not finetune sparse models without RezeroWeightsCallback. Otherwise,
     # you will be "unsparsifying" or "depruning" as you train.
 
-    # possible better assert that checks for sparse_weights_base in module
+    # possible better assert that checks
     if "spars" in model_args.model_type.lower():
         has_rezero, _ = check_for_callback(model_args, RezeroWeightsCallback)
         assert has_rezero, "Finetuning sparse models without rezeroing weights"

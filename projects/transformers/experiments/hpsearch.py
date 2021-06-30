@@ -119,5 +119,6 @@ debug_finetuning_sparse_hp_search.update(
 # Export configurations in this file
 CONFIGS = dict(
     debug_hp_search=debug_hp_search,
-    debug_finetuning_hp_search=debug_finetuning_hp_search
+    debug_finetuning_hp_search=debug_finetuning_hp_search,
+    debug_finetuning_sparse_hp_search=debug_finetuning_sparse_hp_search,
 )
