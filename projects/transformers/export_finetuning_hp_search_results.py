@@ -60,7 +60,7 @@ def round_mean(s):
 stats = ["min", "max", "mean", "std"]
 
 
-def agg(df, columns, metric="mean_accuracy_max", filter_by=None, decimals=3):
+def agg(df, columns, metric="eval_loss", filter_by=None, decimals=3):
     if filter_by is None:
         return (
             df.groupby(columns).agg(
@@ -166,8 +166,6 @@ def load(
                 )
             )
 
-    import pdb
-    pdb.set_trace()
     # concats all dataframes if there are any and return
     if not dataframes:
         return pd.DataFrame([])
@@ -214,14 +212,6 @@ def _read_experiment(experiment_state, experiment_path):
 
     return progress, params
 
-
-def append_if(metrics, key, columns):
-    """Check if key in columns and add to metrics if so"""
-
-    if key in columns:
-        metrics.append(key)
-
-    return metrics
 
 def _get_value(  # noqa: C901
     progress,
@@ -373,4 +363,6 @@ def _get_experiment_states(experiment_path, exit_on_fail=False):
 
 if __name__ == "__main__":
     experiment_path = str(sys.argv[1])
-    load(experiment_path)
+    df = load(experiment_path)
+    import pdb
+    pdb.set_trace()

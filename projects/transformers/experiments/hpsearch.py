@@ -30,6 +30,7 @@ from .base import bert_base
 
 # use bert_100k for task-specific hp search prototyping
 from .finetuning import finetuning_bert100k_glue
+from .trifecta import finetuning_bert_sparse_85_trifecta_100k_glue_get_info
 
 
 def hp_space(trial):
@@ -92,6 +93,27 @@ debug_finetuning_hp_search.update(
             hp_compute_objective=("maximize", "eval_matthews_correlation")
         )
     ),
+)
+
+debug_finetuning_sparse_hp_search = deepcopy(finetuning_bert_sparse_85_trifecta_100k_glue_get_info)
+debug_finetuning_sparse_hp_search.update(
+    task_name="cola",
+    task_names=None,
+    num_runs=1,
+    max_steps=200,
+    save_steps=1,
+    warmup_ratio=0.1,
+    hp_validation_dataset_pct=1.0,
+    report_to="none",
+    task_hyperparams=dict(
+        cola=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-5, 1e-2),
+                max_steps=tune.randint(10, 500),
+                hp_num_trials=3,
+                hp_compute_objective=("maximize", "eval_matthews_correlation"))
+        )
+    )
 )
 
 # Export configurations in this file
