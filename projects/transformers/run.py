@@ -633,7 +633,9 @@ def run_finetuning_multiple_tasks(
 
     # Do not finetune sparse models without RezeroWeightsCallback. Otherwise,
     # you will be "unsparsifying" or "depruning" as you train.
-    if "sparse" in model_args.model_type.lower():
+
+    # possible better assert that checks for sparse_weights_base in module
+    if "spars" in model_args.model_type.lower():
         has_rezero, _ = check_for_callback(model_args, RezeroWeightsCallback)
         assert has_rezero, "Finetuning sparse models without rezeroing weights"
         " is prohibited"

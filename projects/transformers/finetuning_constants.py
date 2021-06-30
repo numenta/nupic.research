@@ -61,6 +61,16 @@ REPORTING_METRICS_PER_TASK = {
     "wnli": ["eval_accuracy"]
 }
 
+ALL_REPORTING_METRICS = [
+    "eval_matthews_correlation",
+    "eval_accuracy",
+    "eval_mm_accuracy",
+    "eval_f1",
+    "eval_pearson",
+    "eval_spearmanr",
+    "eval_loss"
+]
+
 # These are approximate and taken from the table in the paper
 # https://arxiv.org/pdf/1804.07461.pdf
 TRAIN_SIZES_PER_TASK = {
