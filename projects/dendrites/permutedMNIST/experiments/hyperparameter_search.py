@@ -51,18 +51,13 @@ class NbSegmentSearchExperiment(
     pass
 
 
-NUM_TASKS = 50
-
-NB_SEGMENT_SEARCH = dict(
+BASE10 = dict(
     experiment_class=NbSegmentSearchExperiment,
     # Results path
-    local_dir=os.path.expanduser(
-        "~/nta/results/experiments/dendrites/weights_sparsity_search_50"
-    ),
-    # dataset_class=ContextDependentPermutedMNIST,
+    local_dir=os.path.expanduser("~/nta/results/experiments/dendrites/"),
     dataset_class=PermutedMNIST,
     dataset_args=dict(
-        num_tasks=NUM_TASKS,
+        num_tasks=10,
         # Consistent location outside of git repo
         root=os.path.expanduser("~/nta/results/data/"),
         seed=42,
@@ -73,21 +68,22 @@ NB_SEGMENT_SEARCH = dict(
         input_size=784,
         output_size=10,
         hidden_sizes=[2048, 2048],
-        num_segments=tune.grid_search([2, 3, 5, 7, 10]),
+        num_segments=tune.grid_search([2, 3, 5, 7, 10, 14, 20, 30, 50, 100]),
         dim_context=784,
         kw=True,
-        kw_percent_on=tune.grid_search([0.01, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9]),
+        kw_percent_on=tune.grid_search(
+            [0.01, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9, 0.99]
+        ),
         dendrite_weight_sparsity=0.0,
-        weight_sparsity=tune.grid_search([0.1, 0.5, 0.7, 0.9, 0.95, 0.99]),
+        weight_sparsity=tune.grid_search([0.01, 0.05, 0.1, 0.5, 0.7, 0.9, 0.95, 0.99]),
         context_percent_on=0.1,
     ),
     batch_size=256,
     val_batch_size=512,
     epochs=3,
-    tasks_to_validate=range(NUM_TASKS),  # Tasks on which to run validate
-    epochs_to_validate=[],
-    num_tasks=NUM_TASKS,
-    num_classes=10 * NUM_TASKS,
+    num_tasks=10,
+    tasks_to_validate=range(10),  # Tasks on which to run validate
+    num_classes=10 * 10,
     distributed=False,
     seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
     num_samples=10,
@@ -97,62 +93,57 @@ NB_SEGMENT_SEARCH = dict(
 )
 
 # varying only num segments
-NB_SEGMENT_SEARCH_2 = deepcopy(NB_SEGMENT_SEARCH)
-NB_SEGMENT_SEARCH_2["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5)
-
-# need to add a bit more data points
-NB_SEGMENT_SEARCH_3 = deepcopy(NB_SEGMENT_SEARCH_2)
-NB_SEGMENT_SEARCH_3["model_args"].update(num_segments=tune.grid_search([14, 20]))
-
-# adding 100 segments for 10 tasks
-NB_SEGMENT_SEARCH_4 = deepcopy(NB_SEGMENT_SEARCH_2)
-NB_SEGMENT_SEARCH_4["model_args"].update(num_segments=100)
+SEGMENT_SEARCH = deepcopy(BASE10)
+SEGMENT_SEARCH["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5)
 
 # varying only kw sparsity
-KW_SPARSITY_SEARCH = deepcopy(NB_SEGMENT_SEARCH)
+KW_SPARSITY_SEARCH = deepcopy(BASE10)
 KW_SPARSITY_SEARCH["model_args"].update(num_segments=10, weight_sparsity=0.5)
 
 # varying only weights sparsity
-W_SPARSITY_SEARCH = deepcopy(NB_SEGMENT_SEARCH)
+W_SPARSITY_SEARCH = deepcopy(BASE10)
 W_SPARSITY_SEARCH["model_args"].update(num_segments=10, kw_percent_on=0.1)
 
-# adding a couple of parameters
-W_SPARSITY_SEARCH2 = deepcopy(W_SPARSITY_SEARCH)
-W_SPARSITY_SEARCH2["model_args"].update(weight_sparsity=tune.grid_search([0.05, 0.01]))
+TEST = deepcopy(BASE10)
+TEST["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2)
+TEST["num_samples"] = 1
 
 # Idem on 50 tasks
-NUM_TASKS = 50
+BASE50 = deepcopy(BASE10)
+BASE50["dataset_args"].update(num_tasks=50)
+BASE50["tasks_to_validate"] = range(50)
+BASE50["num_classes"] = 10 * 50
+
 # Segment search
-NB_SEGMENT_SEARCH_50 = deepcopy(NB_SEGMENT_SEARCH_2)
-NB_SEGMENT_SEARCH_50["dataset_args"].update(num_tasks=NUM_TASKS)
-NB_SEGMENT_SEARCH_50["model_args"].update(
-    num_segments=tune.grid_search([2, 3, 5, 7, 10, 20, 30, 50, 100])
-)
+SEGMENT_SEARCH_50 = deepcopy(BASE50)
+SEGMENT_SEARCH_50["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5)
 
 # kw sparsity search
-KW_SPARSITY_SEARCH_50 = deepcopy(KW_SPARSITY_SEARCH)
-KW_SPARSITY_SEARCH_50["dataset_args"].update(num_tasks=NUM_TASKS)
-KW_SPARSITY_SEARCH_50["model_args"].update(num_segments=50)
+KW_SPARSITY_SEARCH_50 = deepcopy(BASE50)
+KW_SPARSITY_SEARCH_50["model_args"].update(num_segments=50, weight_sparsity=0.5)
 
 # weight sparsity search
-W_SPARSITY_SEARCH_50 = deepcopy(W_SPARSITY_SEARCH)
-W_SPARSITY_SEARCH_50["dataset_args"].update(num_tasks=NUM_TASKS)
-W_SPARSITY_SEARCH_50["model_args"].update(
-    weight_sparsity=tune.grid_search([0.01, 0.05, 0.1, 0.5, 0.7, 0.9, 0.95, 0.99]),
-    num_segments=50,
-)
+W_SPARSITY_SEARCH_50 = deepcopy(BASE50)
+W_SPARSITY_SEARCH_50["model_args"].update(num_segments=50, kw_percent_on=0.1)
 
+TEST50 = deepcopy(BASE50)
+TEST50["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2)
+TEST50["num_samples"] = 1
+
+OPTIMAL_50 = deepcopy(BASE50)
+OPTIMAL_50["model_args"].update(
+    kw_percent_on=0.05, weight_sparsity=0.5, num_segments=100
+)
 
 # Export configurations in this file
 CONFIGS = dict(
-    nb_segment_search=NB_SEGMENT_SEARCH,
-    nb_segment_search2=NB_SEGMENT_SEARCH_2,
-    nb_segment_search3=NB_SEGMENT_SEARCH_3,
-    nb_segment_search4=NB_SEGMENT_SEARCH_4,
-    kw_sparsity_search=KW_SPARSITY_SEARCH,  # old name is sparsity_search
-    weights_sparsity_search=W_SPARSITY_SEARCH,
-    weights_sparsity_search2=W_SPARSITY_SEARCH2,
-    nb_segment_search_50=NB_SEGMENT_SEARCH_50,
+    segment_search=SEGMENT_SEARCH,
+    kw_sparsity_search=KW_SPARSITY_SEARCH,
+    w_sparsity_search=W_SPARSITY_SEARCH,
+    segment_search_50=SEGMENT_SEARCH_50,
     kw_sparsity_search_50=KW_SPARSITY_SEARCH_50,
-    weights_sparsity_search_50=W_SPARSITY_SEARCH_50,
+    w_sparsity_search_50=W_SPARSITY_SEARCH_50,
+    test=TEST,
+    test50=TEST50,
+    optimal_50=OPTIMAL_50,
 )

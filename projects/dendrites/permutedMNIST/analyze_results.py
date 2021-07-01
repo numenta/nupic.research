@@ -41,7 +41,41 @@ def key_func(x):
     return s
 
 
-def parse_one_experiment(exp, state, df):
+def parse(best_result, trial_checkpoint, df_entries, exp, tag):
+
+    config = trial_checkpoint["config"]
+    model_args = config["model_args"]
+    kw_percent_on = model_args["kw_percent_on"]
+    weight_sparsity = model_args.get("weight_sparsity", 0.0)
+    dendrite_weight_sparsity = model_args.get("dendrite_weight_sparsity", 0.0)
+    num_segments = model_args.get("num_segments")
+    dim_context = model_args["dim_context"]
+    epochs = config["epochs"]
+    num_tasks = config["num_tasks"]
+    lr = config["optimizer_args"]["lr"]
+    momentum = config["optimizer_args"].get("momentum", 0.0)
+
+    # This list must match the column headers in collect_results
+    df_entries.append(
+        [
+            exp,
+            kw_percent_on,
+            weight_sparsity,
+            dendrite_weight_sparsity,
+            num_segments,
+            dim_context,
+            epochs,
+            num_tasks,
+            lr,
+            momentum,
+            config["seed"],
+            best_result,
+            "{} {}".format(exp, tag),
+        ]
+    )
+
+
+def parse_one_experiment(exp, state, df, outmethod):
     """
     Parse the trials in one experiment and append data to the given dataframe.
 
@@ -72,39 +106,39 @@ def parse_one_experiment(exp, state, df):
                     results = trial_checkpoint["results"]
                     if results is None:
                         continue
-
-                    # For each checkpoint select the iteration with the best accuracy as
-                    # the best epoch
-                    best_results = max(results,
-                                       key=lambda x: x.get("mean_accuracy", 0.0))
-                    best_result = best_results["mean_accuracy"]
-                    if best_result > 0.0:
-                        # Get the trial parameters we care about
-                        config = trial_checkpoint["config"]
-                        model_args = config["model_args"]
-                        kw_percent_on = model_args["kw_percent_on"]
-                        weight_sparsity = model_args.get("weight_sparsity", 0.0)
-                        dendrite_weight_sparsity = model_args.get(
-                            "dendrite_weight_sparsity", 0.0)
-                        num_segments = model_args.get("num_segments")
-                        dim_context = model_args["dim_context"]
-                        epochs = config["epochs"]
-                        num_tasks = config["num_tasks"]
-                        lr = config["optimizer_args"]["lr"]
-                        momentum = config["optimizer_args"].get("momentum", 0.0)
-
-                        # This list must match the column headers in collect_results
-                        df_entries.append([
-                            exp, kw_percent_on, weight_sparsity,
-                            dendrite_weight_sparsity, num_segments, dim_context,
-                            epochs, num_tasks, lr, momentum,
-                            config["seed"], best_result,
-                            "{} {}".format(exp, tag)
-                        ])
+                    if outmethod == "best":
+                        # For each checkpoint select the iteration with the best accuracy as
+                        # the best epoch
+                        best_results = max(
+                            results, key=lambda x: x.get("mean_accuracy", 0.0)
+                        )
+                        best_result = best_results["mean_accuracy"]
+                        if best_result > 0.0:
+                            parse(best_result, trial_checkpoint, df_entries, exp, tag)
+                    elif outmethod == "lasttask":
+                        best_results = results[-1]
+                        best_result = best_results["mean_accuracy"]
+                        if best_result > 0.0:
+                            parse(best_result, trial_checkpoint, df_entries, exp, tag)
+                    elif outmethod == "all":
+                        for i, _ in enumerate(results):
+                            best_results = results[i]
+                            best_result = best_results["mean_accuracy"]
+                            if best_result > 0.0:
+                                parse(
+                                    best_result, trial_checkpoint, df_entries, exp, tag
+                                )
+                    else:
+                        print("define outmethod: best, lasttask, all")
 
             except Exception:
-                print("Problem with checkpoint group" + tag + " in " + exp
-                      + " ...skipping")
+                print(
+                    "Problem with checkpoint group"
+                    + tag
+                    + " in "
+                    + exp
+                    + " ...skipping"
+                )
                 continue
 
     # Create new dataframe from the entries with same dimensions as df
@@ -112,7 +146,7 @@ def parse_one_experiment(exp, state, df):
     return df.append(df2)
 
 
-def collect_results(configs, basefilename):
+def collect_results(configs, basefilename, outmethod):
     """
     Parse the results for each specified experiment in each config file. Creates a
     dataframe containing one row for every trial for every network configuration in
@@ -126,12 +160,21 @@ def collect_results(configs, basefilename):
     """
 
     # The results table
-    columns = ["Experiment name",
-               "Activation sparsity", "FF weight sparsity",
-               "Dendrite weight sparsity", "Num segments",
-               "Dim context", "Epochs", "Num tasks", "LR", "Momentum", "Seed",
-               "Accuracy", "ID"
-               ]
+    columns = [
+        "Experiment name",
+        "Activation sparsity",
+        "FF weight sparsity",
+        "Dendrite weight sparsity",
+        "Num segments",
+        "Dim context",
+        "Epochs",
+        "Num tasks",
+        "LR",
+        "Momentum",
+        "Seed",
+        "Accuracy",
+        "ID",
+    ]
     df = pd.DataFrame(columns=columns)
 
     for exp in configs:
@@ -153,7 +196,7 @@ def collect_results(configs, basefilename):
             print("Could not locate experiment state for " + exp + " ...skipping")
             continue
 
-        df = parse_one_experiment(exp, states, df)
+        df = parse_one_experiment(exp, states, df, outmethod)
 
     df.to_csv(basefilename + ".csv")
     df.to_pickle(basefilename + ".pkl")
@@ -168,14 +211,26 @@ def analyze_experiment_data(filename_df, output_filename):
     :param output_filename: filename to use to save the csv
     """
     df = pd.read_pickle(filename_df)
-
     # Create a dataframe containing one row per configuration. The accuracy
-    df_id = df.groupby(["ID"]).agg(
+    df_id = df.groupby(["ID", "Seed"]).agg(
         num_trials=("ID", "count"),
         ff_weight_sparsity=("FF weight sparsity", "first"),
         activation_sparsity=("Activation sparsity", "first"),
+        num_segments=("Num segments", "first"),
         mean_accuracy=("Accuracy", "mean"),
         stdev=("Accuracy", "std"),
+    )
+    # keep consistent columns names
+    df_id.rename(
+        columns={
+            "num_trials": "ID",
+            "ff_weight_sparsity": "FF weight sparsity",
+            "activation_sparsity": "Activation sparsity",
+            "num_segments": "Num segments",
+            "mean_accuracy": "Accuracy",
+            "stdev": "std",
+        },
+        inplace=True,
     )
     print(df_id)
     df_id.to_csv(output_filename)
@@ -183,11 +238,23 @@ def analyze_experiment_data(filename_df, output_filename):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("experiments", nargs="+",
-                        help="Experiments to run", choices=CONFIGS.keys())
-    parser.add_argument("-f", dest="format", default="grid",
-                        help="Table format", choices=["grid", "latex_raw"])
+    parser.add_argument(
+        "experiments", nargs="+", help="Experiments to run", choices=CONFIGS.keys()
+    )
+    parser.add_argument(
+        "-f",
+        dest="format",
+        default="grid",
+        help="Table format",
+        choices=["grid", "latex_raw"],
+    )
     parser.add_argument("-n", dest="name", default="temp", help="Base filename")
+    parser.add_argument(
+        "-o",
+        dest="outmethod",
+        default="best",
+        help="keep only the considered task/run. choose between best, lasttask or all",
+    )
     args = parser.parse_args()
 
     # Get configuration values
@@ -195,6 +262,6 @@ if __name__ == "__main__":
     for name in args.experiments:
         configs[name] = copy.deepcopy(CONFIGS[name])
 
-    collect_results(configs, args.name)
+    collect_results(configs, args.name, args.outmethod)
 
     analyze_experiment_data(args.name + ".pkl", args.name + "_analysis.csv")

@@ -21,9 +21,7 @@
 
 from .base import CONFIGS as BASE
 from .centroid import CONFIGS as CENTROID
-from .standard_mlp import CONFIGS as STANDARD
-from .sparse_mlp import CONFIGS as SPARSE
-from .num_segment_search import CONFIGS as SEGSEARCH
+from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
 from .batch_mnist import CONFIGS as BATCH_MNIST
 from .sp_context_search import CONFIGS as SP_PROTO
 from .sp_context import CONFIGS as SP_CONTEXT
@@ -39,9 +37,7 @@ __all__ = ["CONFIGS"]
 CONFIGS = dict()
 CONFIGS.update(BASE)
 CONFIGS.update(CENTROID)
-CONFIGS.update(STANDARD)
-CONFIGS.update(SPARSE)
-CONFIGS.update(SEGSEARCH)
+CONFIGS.update(HYPERPARAMETERSEARCH)
 CONFIGS.update(SP_PROTO)
 CONFIGS.update(SP_CONTEXT)
 CONFIGS.update(BATCH_MNIST)
