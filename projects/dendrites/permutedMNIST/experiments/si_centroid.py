@@ -62,6 +62,7 @@ SI_CENTROID_10 = dict(
         root=os.path.expanduser("~/nta/results/data/"),
         download=False,  # Change to True if running for the first time
         seed=42,
+        normalize=False, # Required for SI
     ),
 
     model_class=DendriticMLP,
@@ -87,7 +88,7 @@ SI_CENTROID_10 = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=20,  # Note that SI only works well with ~20 epochs of training per task
-    tasks_to_validate=range(50),
+    tasks_to_validate=[1, 2, 3, 4, 9, 24, 49, 74, 99],
     num_tasks=10,
     num_classes=10 * 10,
     distributed=False,
