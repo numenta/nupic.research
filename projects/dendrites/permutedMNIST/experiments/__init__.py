@@ -22,11 +22,13 @@
 from .base import CONFIGS as BASE
 from .centroid import CONFIGS as CENTROID
 from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
-from .batch_mnist import CONFIGS as BATCH_MNIST
-from .sp_context_search import CONFIGS as SP_PROTO
-from .sp_context import CONFIGS as SP_CONTEXT
-from .no_dendrites import CONFIGS as NO_DENDRITES
 from .batch import CONFIGS as BATCH
+from .batch_mnist import CONFIGS as BATCH_MNIST
+from .centroid import CONFIGS as CENTROID
+from .no_dendrites import CONFIGS as NO_DENDRITES
+from .si_centroid import CONFIGS as SI_CENTROID
+from .sp_context import CONFIGS as SP_CONTEXT
+from .sp_context_search import CONFIGS as SP_PROTO
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -40,8 +42,10 @@ CONFIGS.update(CENTROID)
 CONFIGS.update(HYPERPARAMETERSEARCH)
 CONFIGS.update(SP_PROTO)
 CONFIGS.update(SP_CONTEXT)
+CONFIGS.update(BATCH)
 CONFIGS.update(BATCH_MNIST)
+CONFIGS.update(CENTROID)
+CONFIGS.update(NO_DENDRITES)
+CONFIGS.update(SI_CENTROID)
 CONFIGS.update(SP_PROTO)
 CONFIGS.update(SP_CONTEXT)
-CONFIGS.update(NO_DENDRITES)
-CONFIGS.update(BATCH)

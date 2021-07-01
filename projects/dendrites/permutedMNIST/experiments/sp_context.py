@@ -83,7 +83,7 @@ SP_CONTEXT_10 = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=2,
-    tasks_to_validate=(0, 1, 4, 9, 24, 49),
+    tasks_to_validate=(0, 1, 4, 9, 14, 19, 24, 29, 34, 39, 44, 49),
     num_tasks=10,
     num_classes=10 * 10,
     distributed=False,
@@ -104,6 +104,39 @@ SP_CONTEXT_2.update(
     num_samples=2,
     num_tasks=2,
     num_classes=10 * 2,
+)
+
+SP_CONTEXT_50 = deepcopy(SP_CONTEXT_10)
+SP_CONTEXT_50["dataset_args"].update(num_tasks=50)
+SP_CONTEXT_50["model_args"].update(
+    num_segments=50,
+)
+SP_CONTEXT_50.update(
+    epochs=2,
+    num_samples=1,
+    num_tasks=50,
+    num_classes=10 * 50,
+    batch_size=64,
+
+    context_model_args=dict(
+        kw_percent_on=0.05,
+        boost_strength=1.0,
+        weight_sparsity=0.5,
+    ),
+
+    optimizer_args=dict(lr=1e-4),
+
+    env_config=dict(
+        wandb=dict(
+            entity="nupic-research",
+            project="dendrite_baselines",
+            name="spatial_pooler_50_2",
+            group="spatial_pooler_50_2",
+            notes="""
+            Sparse network using random spatial pooler output as context.
+            """
+        )
+    ),
 )
 
 # Search using 4 tasks only
@@ -140,4 +173,5 @@ CONFIGS = dict(
     sp_context_2=SP_CONTEXT_2,
     sp_context_4_search=SP_CONTEXT_4_SEARCH,
     sp_context_10=SP_CONTEXT_10,
+    sp_context_50=SP_CONTEXT_50,
 )
