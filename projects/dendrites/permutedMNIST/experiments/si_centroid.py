@@ -62,7 +62,6 @@ SI_CENTROID_10 = dict(
         root=os.path.expanduser("~/nta/results/data/"),
         download=False,  # Change to True if running for the first time
         seed=42,
-        normalize=False, # Required for SI
     ),
 
     model_class=DendriticMLP,

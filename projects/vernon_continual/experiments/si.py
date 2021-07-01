@@ -133,6 +133,7 @@ SI_PERMUTEDMNIST_5 = dict(
         root=os.path.expanduser("~/nta/results/data/"),
         download=False,
         seed=42,
+        normalize=False,
     ),
 
     model_class=SINetwork,
