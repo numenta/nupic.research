@@ -265,6 +265,25 @@ verify_bert_sparse_trifecta_100k.update(
 )
 
 
+# First I tried verify_bert_sparse_trifecta_100k, which did not reproduce original perplexity score
+# Next I did
+#   python export_model.py
+#   /mnt/efs/results/mcaporale/mcaporale/mcaporale/experiments/transformers/bert_sparse_trifecta_100k
+#   --model_name bert_sparse_80%_trifecta_100k
+# and tried finetuning, which still lead to bad scores. Therefore, try verifying using the exact path
+# or perhaps finetuning with the exact path
+verify_bert_sparse_trifecta_100k_mc_direct = deepcopy(bert_sparse_trifecta_100k)
+verify_bert_sparse_trifecta_100k_mc_direct.update(
+    # Model arguments
+    model_name_or_path="/mnt/efs/results/mcaporale/mcaporale/mcaporale/experiments/transformers/bert_sparse_trifecta_100k",  # noqa: E501
+    # Training arguments
+    do_train=False,
+    do_eval=True,
+    overwrite_output_dir=False,
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",  # noqa: E501
+)
+
+
 # The is like the one above, but 85% sparse
 bert_sparse_85_trifecta_100k = deepcopy(bert_sparse_trifecta_100k)
 bert_sparse_85_trifecta_100k["config_kwargs"].update(
@@ -443,6 +462,7 @@ CONFIGS = dict(
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
     finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
     verify_bert_sparse_trifecta_100k=verify_bert_sparse_trifecta_100k,
+    verify_bert_sparse_trifecta_100k_mc_direct=verify_bert_sparse_trifecta_100k_mc_direct,
     #   85% sparse
     bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
     finetuning_bert_sparse_85_trifecta_100k_glue=finetuning_bert_sparse_85_trifecta_100k_glue,  # noqa: E501
