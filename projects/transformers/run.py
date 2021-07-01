@@ -571,6 +571,8 @@ def run_finetuning_multiple_tasks(
             base_training_args.output_dir, task_name
         )
 
+        print(f"model args before: {model_args}")
+
         # Update any custom training hyperparameter
         # TODO: allow hyperparameter search for each task
         if task_name in model_args.task_hyperparams:
@@ -583,6 +585,10 @@ def run_finetuning_multiple_tasks(
         task_results = TaskResults(task_name,
                                    has_early_stopping,
                                    training_args=training_args)
+
+        print(f"model args after: {model_args}")
+
+
 
         # Hack to ensure we don't do hp search num_runs times
         if model_args.hp_num_trials > 1:

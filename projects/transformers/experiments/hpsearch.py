@@ -110,16 +110,77 @@ debug_finetuning_sparse_hp_search.update(
             hp_space=lambda trial: dict(
                 learning_rate=tune.loguniform(1e-5, 1e-2),
                 max_steps=tune.randint(10, 1000),
-                warmup_ratio=tune.choice([0., 0.05, 0.1, 0.2, 0.4]))
+                warmup_ratio=tune.choice([0., 0.05, 0.1, 0.2, 0.4])),
             hp_num_trials=3,
             hp_compute_objective=("maximize", "eval_matthews_correlation")
         )
     ),
 )
 
+
+# small tasks refers to tasks with smaller datasets that can be
+# run with a larger number of trials
+hp_search_finetuning_trifecta_85_100k_small_tasks = deepcopy(debug_finetuning_sparse_hp_search)
+hp_search_finetuning_trifecta_85_100k_small_tasks.update(
+    task_name="glue",
+    task_names=None,
+    task_hyperparams=dict(
+        cola=dict(
+                hp_space=lambda trial: dict(
+                    learning_rate=tune.loguniform(1e-5, 1e-2),
+                    max_steps=tune.randint(100, 5000),
+                    # if warmup 0, no learning rate scheduler
+                    warmup_ratio=tune.choice([0., 0.1,])),
+                hp_num_trials=25,
+                hp_compute_objective=("maximize", "eval_matthews_correlation"),
+        ),
+        mrpc=dict(
+                hp_space=lambda trial: dict(
+                    learning_rate=tune.loguniform(1e-5, 1e-2),
+                    max_steps=tune.randint(100, 5000),
+                    # if warmup 0, no learning rate scheduler
+                    warmup_ratio=tune.choice([0., 0.1])),
+                hp_num_trials=25,
+                hp_compute_objective=("maximize", "eval_f1"),
+        ),
+        rte=dict(
+                hp_space=lambda trial: dict(
+                    learning_rate=tune.loguniform(1e-5, 1e-2),
+                    max_steps=tune.randint(100, 5000),
+                    warmup_ratio=tune.choice([0., 0.1])),
+                hp_num_trials=25,
+                hp_compute_objective=("maximize", "eval_accuracy"),
+        ),
+        stsb=dict(
+                hp_space=lambda trial: dict(
+                    learning_rate=tune.loguniform(1e-5, 1e-2),
+                    max_steps=tune.randint(100, 5000),
+                    warmup_ratio=tune.choice([0., 0.1])),
+                hp_num_trials=25,
+                hp_compute_objective=("maximize", "eval_accuracy"),
+        ),
+        wnli=dict(
+                hp_space=lambda trial: dict(
+                    learning_rate=tune.loguniform(1e-5, 1e-2),
+                    max_steps=tune.randint(1, 120),
+                    warmup_ratio=tune.choice([0., 0.1])),
+                hp_num_trials=35,
+                hp_compute_objective=("maximize", "eval_accuracy")
+        )
+    )
+)
+
+hp_search_finetuning_trifecta_90_100k_small_tasks = deepcopy(hp_search_finetuning_trifecta_85_100k_small_tasks)
+hp_search_finetuning_trifecta_90_100k_small_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
     debug_hp_search=debug_hp_search,
     debug_finetuning_hp_search=debug_finetuning_hp_search,
     debug_finetuning_sparse_hp_search=debug_finetuning_sparse_hp_search,
+    hp_search_finetuning_trifecta_85_100k_small_tasks=hp_search_finetuning_trifecta_85_100k_small_tasks,
+    hp_search_finetuning_trifecta_90_100k_small_tasks=hp_search_finetuning_trifecta_90_100k_small_tasks,
 )
