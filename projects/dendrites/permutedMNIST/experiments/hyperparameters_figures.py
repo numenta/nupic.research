@@ -192,8 +192,4 @@ def hyperparameter_search_panel():
 
 
 if __name__ == "__main__":
-    # first_iteration()
-    # second_iteration()
-    # third_iteration()
-    # cns_figure_1c()
-    fourth_iteration()
+    hyperparameter_search_panel()
