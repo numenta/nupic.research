@@ -65,6 +65,7 @@ from run_utils import (
     TaskResults,
     check_best_metric,
     check_eval_and_max_steps,
+    check_hp_compute_objective,
     check_for_callback,
     check_if_current_hp_best,
     check_sparsity_callback,
@@ -376,7 +377,8 @@ def run_finetuning_single_task_with_hp_search(
 
     # Code safety run a second time due to training_args being changed above
     check_eval_and_max_steps(training_args, train_dataset)
-    training_args = check_best_metric(data_args, training_args)
+    training_args = check_best_metric(training_args, data_args.task_name)
+    model_args = check_hp_compute_objective(model_args, data_args.task_name)
 
     # Get fraction of the validation dataset to use in hp search
     if model_args.hp_validation_dataset_pct < 1:
@@ -478,7 +480,7 @@ def run_finetuning_single_task(
 
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
-    training_args = check_best_metric(data_args, training_args)
+    training_args = check_best_metric(training_args, data_args.task_name)
 
     # Train
     trainer = init_trainer(

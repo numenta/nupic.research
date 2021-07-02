@@ -315,6 +315,11 @@ finetuning_bert_sparse_trifecta_100k_glue_get_info.update(
     warmup_ratio=0.1,
 )
 
+finetuning_bert_sparse_trifecta_100k_glue_get_info_MC_direct = deepcopy(finetuning_bert_sparse_trifecta_100k_glue_get_info)
+finetuning_bert_sparse_trifecta_100k_glue_get_info_MC_direct.update(
+    model_name_or_path="/mnt/efs/results/mcaporale/mcaporale/mcaporale/experiments/transformers/bert_sparse_trifecta_100k"  # noqa: E501
+)
+
 # As above, but 85% sparse
 finetuning_bert_sparse_85_trifecta_100k_glue_get_info = deepcopy(
     finetuning_bert_sparse_trifecta_100k_glue_get_info)
@@ -477,6 +482,7 @@ CONFIGS = dict(
     finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
     finetuning_bert_sparse_trifecta_100k_glue_get_info=finetuning_bert_sparse_trifecta_100k_glue_get_info,
     verify_bert_sparse_trifecta_100k=verify_bert_sparse_trifecta_100k,
+    finetuning_bert_sparse_trifecta_100k_glue_get_info_MC_direct=finetuning_bert_sparse_trifecta_100k_glue_get_info_MC_direct,
     #   85% sparse
     bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
     finetuning_bert_sparse_85_trifecta_100k_glue=finetuning_bert_sparse_85_trifecta_100k_glue,  # noqa: E501

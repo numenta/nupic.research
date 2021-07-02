@@ -157,7 +157,7 @@ hp_search_finetuning_trifecta_85_100k_small_tasks.update(
                     max_steps=tune.randint(100, 5000),
                     warmup_ratio=tune.choice([0., 0.1])),
                 hp_num_trials=25,
-                hp_compute_objective=("maximize", "eval_accuracy"),
+                hp_compute_objective=("maximize", "eval_pearson"),
         ),
         wnli=dict(
                 hp_space=lambda trial: dict(

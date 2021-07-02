@@ -768,8 +768,34 @@ def check_eval_and_max_steps(training_args, train_dataset):
     
     return training_args
 
+def check_hp_compute_objective(model_args, task_name):
 
-def check_best_metric(data_args, training_args):
+    if hasattr(model_args, "hp_compute_objective"):
+        if model_args.hp_compute_objective is not None:
+            direction, objective = model_args.hp_compute_objective
+            if objective == "eval_loss":
+                if direction != "minimize":
+                    logging.warning(
+                        "You are asking hp search to find parameters"
+                        "that MAXIMIZE loss instead of MINIMIZING it."
+                        "Setting this to minimize"
+                    )
+                    model_args.hp_compute_objective[0] = "minimize"
+            else:
+                if objective not in REPORTING_METRICS_PER_TASK[task_name]:
+                    logging.warning(
+                        "Warning, code will break when you try to tune"
+                        "hyperparameters on this task because"
+                        "hp_compute_objective is incorrect. Setting it to"
+                        "first reporting metric"
+                    )
+                    model_args.hp_compute_objective[1] = REPORTING_METRICS_PER_TASK[task_name][0]
+                    model_args.hp_compute_objective[0] = "maximize"
+
+    return model_args
+
+
+def check_best_metric(training_args, task_name):
     """
     Runs can easily break if load_best_model_at_end because you
     specified a metric for a diferent task. You can get all the way through
@@ -777,17 +803,17 @@ def check_best_metric(data_args, training_args):
     that case. It also checks to make sure greater_is_better is set properly.
     """
 
-    allowed_metrics = REPORTING_METRICS_PER_TASK[data_args.task_name]
+    allowed_metrics = REPORTING_METRICS_PER_TASK[task_name]
     if training_args.metric_for_best_model not in allowed_metrics:
         if training_args.metric_for_best_model != "eval_loss":
             logging.warning(
                 "Warning, code will break because the current metric for best model"
                 f" (training_args.metric_for_best_model) is not being tracked."
-                "Defaulting metric_for_best_model to eval_loss"
+                "Defaulting metric_for_best_model to first reporting metric"
             )
-            training_args.metric_for_best_model = "eval_loss"
+            training_args.metric_for_best_model = REPORTING_METRICS_PER_TASK[task_name][0]
             training_args.greater_is_better = False
-            
+
     if training_args.metric_for_best_model == "eval_loss":
         if hasattr(training_args, "greater_is_better"):
             if training_args.greater_is_better != False:
