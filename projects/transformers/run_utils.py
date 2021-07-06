@@ -182,7 +182,7 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
                         writer.write(f"{index}\t{item}\n")
 
 
-def evaluate_language_model(trainer, eval_dataset, output_dir):
+def evaluate_language_model(trainer, eval_dataset, output_dir, metric_callback=None):
     """Evaluate language model. Returns dict with results on perplexity metric. """
     results = {}
     eval_output = trainer.evaluate(eval_dataset)
@@ -197,6 +197,11 @@ def evaluate_language_model(trainer, eval_dataset, output_dir):
             for key, value in sorted(results.items()):
                 logging.info(f"  {key} = {value}")
                 writer.write(f"{key} = {value}\n")
+
+        if metric_callback:
+            tracked_eval_metrics = metric_callback.eval_metrics
+            with open(os.path.join(output_dir, "eval_metrics.p"), "wb") as file:
+                pickle.dump(tracked_eval_metrics, file)
 
     return results
 

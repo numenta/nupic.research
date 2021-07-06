@@ -264,6 +264,8 @@ def run_pretraining(
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
+    has_track_eval, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
+
     # Run hp search or regular training
     if model_args.hp_num_trials >= 1:
         run_hyperparameter_search(
@@ -293,12 +295,13 @@ def run_pretraining(
     # if using hp search, load best model before running evaluate
     if training_args.do_eval:
         logging.info("*** Evaluate ***")
-        evaluate_language_model(trainer, eval_dataset, training_args.output_dir)
+        evaluate_language_model(trainer, eval_dataset, training_args.output_dir, metri_callback)
 
 
 
 def init_dataset_for_finetuning(
-    model_args, data_args, training_args, last_checkpoint=None
+    model_args, data_args, training_args,
+    last_checkpoint=None, load_model=True
 ):
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
@@ -311,11 +314,12 @@ def init_dataset_for_finetuning(
     )
     config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
     tokenizer = init_tokenizer(model_args)
-    # TODO: avoid loading the model at this stage when using hp search
-    model = init_model(model_args, config, tokenizer, finetuning=True)
-
-    # Code safety
-    check_sparsity_callback(model, model_args)
+    # TODO: move loading model to within finetuning functions
+    if load_model:
+        model = init_model(model_args, config, tokenizer, finetuning=True)
+        check_sparsity_callback(model, model_args)
+    else:
+        model = None
 
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
@@ -379,6 +383,7 @@ def run_finetuning_single_task_with_hp_search(
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
     model_args = check_hp_compute_objective(model_args, data_args.task_name)
+    # TODO: check sparsity without instantiated model
 
     # Get fraction of the validation dataset to use in hp search
     if model_args.hp_validation_dataset_pct < 1:
@@ -554,15 +559,6 @@ def run_finetuning_multiple_tasks(
             "This is strongly discouraged."
         )
 
-    # Do not finetune sparse models without RezeroWeightsCallback. Otherwise,
-    # you will be "unsparsifying" or "depruning" as you train.
-
-    # possible better assert that checks
-    if "spars" in model_args.model_type.lower():
-        has_rezero, _ = check_for_callback(model_args, RezeroWeightsCallback)
-        assert has_rezero, "Finetuning sparse models without rezeroing weights"
-        " is prohibited"
-
     base_training_args = deepcopy(training_args)
     for task_name in data_args.task_names:
         data_args.task_name = task_name
@@ -573,23 +569,18 @@ def run_finetuning_multiple_tasks(
             base_training_args.output_dir, task_name
         )
 
-        print(f"model args before: {model_args}")
-
-        # Update any custom training hyperparameter
-        # TODO: allow hyperparameter search for each task
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
                 if "hp_" in hp_key:
                     setattr(model_args, hp_key, hp_val)
                 else:
+                    # I forget why this is here
+                    # TODO: check when this happens
                     setattr(training_args, hp_key, hp_val)
 
         task_results = TaskResults(task_name,
                                    has_early_stopping,
                                    training_args=training_args)
-
-        print(f"model args after: {model_args}")
-
 
 
         # Hack to ensure we don't do hp search num_runs times

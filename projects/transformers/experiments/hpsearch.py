@@ -95,7 +95,8 @@ debug_finetuning_hp_search.update(
     ),
 )
 
-debug_finetuning_sparse_hp_search = deepcopy(finetuning_bert_sparse_85_trifecta_100k_glue_get_info)
+debug_finetuning_sparse_hp_search = deepcopy(
+    finetuning_bert_sparse_85_trifecta_100k_glue_get_info)
 debug_finetuning_sparse_hp_search.update(
     task_name="cola",
     task_names=None,
@@ -120,10 +121,11 @@ debug_finetuning_sparse_hp_search.update(
 
 # small tasks refers to tasks with smaller datasets that can be
 # run with a larger number of trials
-hp_search_finetuning_trifecta_85_100k_small_tasks = deepcopy(debug_finetuning_sparse_hp_search)
+hp_search_finetuning_trifecta_85_100k_small_tasks = deepcopy(
+    debug_finetuning_sparse_hp_search)
 hp_search_finetuning_trifecta_85_100k_small_tasks.update(
-    task_name="glue",
-    task_names=None,
+    task_name=None,
+    task_names=["cola", "mrpc", "rte", "stsb", "wnli"],
     task_hyperparams=dict(
         cola=dict(
                 hp_space=lambda trial: dict(
@@ -170,9 +172,10 @@ hp_search_finetuning_trifecta_85_100k_small_tasks.update(
     )
 )
 
-hp_search_finetuning_trifecta_90_100k_small_tasks = deepcopy(hp_search_finetuning_trifecta_85_100k_small_tasks)
+hp_search_finetuning_trifecta_90_100k_small_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_small_tasks)
 hp_search_finetuning_trifecta_90_100k_small_tasks.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa
 )
 
 
