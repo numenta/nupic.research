@@ -101,7 +101,22 @@ tiny_bert_sparse_100k_kd_lr_range_test_deepspeed["deepspeed"].update(
             "lr_range_test_step_rate": 125,  # For max_lr=0.05, the rate is 125.0
             "lr_range_test_staircase": False,
         },
-    }
+    },
+    # When using fp16 dynamic loss scale, deepspeed will skip the optimizer
+    # and LR scheduler steps whenever the loss value overflows (NaN/Inf).
+    # Using deepspeed default values the loss will likely overflow on the
+    # first few steps as the dynamic loss scale warms up. When the loss
+    # overflows, huggingface will detect the LR scheduler step was skipped
+    # and return zero as the current learning rate potentially affecting the
+    # results of the LR range test. To avoid loss overflow during the LR
+    # range test you could use static loss scale or use a smaller initial
+    # scale power.
+    # See https://www.deepspeed.ai/docs/config-json/#fp16-training-options
+    fp16={
+        "enabled": "auto",
+        "initial_scale_power": 15,
+    },
+    steps_per_print=1,
 )
 
 CONFIGS = dict(
