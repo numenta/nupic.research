@@ -785,7 +785,10 @@ def check_hp_compute_objective(model_args, task_name):
                         "that MAXIMIZE loss instead of MINIMIZING it."
                         "Setting this to minimize"
                     )
-                    model_args.hp_compute_objective[0] = "minimize"
+                    # Can't modify tuples, so convert to list and then back
+                    hp_compute_objective = list(model_args.hp_compute_objective)
+                    hp_compute_objective[0] = "minimize"
+                    model_args.hp_compute_objective = tuple(hp_compute_objective)
             else:
                 if objective not in REPORTING_METRICS_PER_TASK[task_name]:
                     logging.warning(
@@ -794,8 +797,10 @@ def check_hp_compute_objective(model_args, task_name):
                         "hp_compute_objective is incorrect. Setting it to"
                         "first reporting metric"
                     )
-                    model_args.hp_compute_objective[1] = REPORTING_METRICS_PER_TASK[task_name][0]
-                    model_args.hp_compute_objective[0] = "maximize"
+                    hp_compute_objective = list(model_args.hp_compute_objective)
+                    hp_compute_objective[1] = REPORTING_METRICS_PER_TASK[task_name][0]
+                    hp_compute_objective[0] = "maximize"
+                    model_args.hp_compute_objective = tuple(hp_compute_objective)
 
     return model_args
 
