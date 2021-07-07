@@ -179,7 +179,7 @@ class TaskResultsAnalysis:
         # TODO
         pass
 
-    def get_metric_from_runs(self, task, metric):
+    def get_metrics_from_runs(self, task):
         """
         Create a 2d numpy array where each row represents a run. The
         row contains a trajectory for a given metric.
@@ -188,15 +188,74 @@ class TaskResultsAnalysis:
             metric_all_runs[2] could return eval_loss at every time step
             on the 3rd run for a given task.
         """
+        metrics = [m for m in self[task].reporting_metrics]
+
+
+        if hasattr(self[task], "score_mats"):
+            return self[task].score_mats
+
         n_steps = len(self[task].all_results[0]["steps"])
         n_runs = len(self[task].all_results)
 
-        metric_all_runs = np.zeros((n_runs, n_steps))
-        for run_idx in range(n_runs):
-            metric_all_runs = np.array(
-                self[task].all_results[run_idx][metric])
+        metrics_all_runs = [np.zeros((n_runs, n_steps)) for m in self[task].reporting_metrics]
+        for m in range(len(metrics)):
+            for run_idx in range(n_runs):
+                metrics_all_runs[m][run_idx,:] = np.array(
+                    self[task].all_results[run_idx][metrics[m]])
 
-        return metric_all_runs
+        self[task].score_mats = metrics_all_runs
+
+        return metrics_all_runs
+
+    def get_best_scores_per_run(self, task):
+        metrics = self[task].reporting_metrics
+        metrics_all_runs = self.get_metrics_from_runs(task)
+        if len(metrics) > 1:
+            metric_all_runs = np.zeros_like(metrics_all_runs[0])
+            for m in range(len(metrics)):
+                metric_all_runs += metrics_all_runs[m]
+            metric_all_runs /= len(metrics)
+        else:
+            metric_all_runs = metrics_all_runs[0]
+        best_idx_per_run = np.argmax(metric_all_runs, axis=1)
+        best_avg_metric_scores = metric_all_runs[np.arange(len(self[task])), best_idx_per_run]
+        best_metric_scores = [metrics_all_runs[m][np.arange(len(self[task])), best_idx_per_run] for m in range(len(metrics))]
+        return best_avg_metric_scores, best_metric_scores
+
+    # TODO
+    # def get_best_scores_mean_run(self, task):
+    #     metrics = self[task].reporting_metrics
+    #     scores = self.get_best_scores_per_run(task)
+    #     return [np.mean(best_metric) for best_metric in scores]
+
+    def get_best_scores_best_run(self, task):
+        metrics = self[task].reporting_metrics
+        best_avg_metric_scores, best_metric_scores = self.get_best_scores_per_run(task)
+        very_best_idx = np.argmax(best_avg_metric_scores)
+        best_score = best_avg_metric_scores[very_best_idx]
+        best_metric_scores = [best_metric[very_best_idx] for best_metric in best_metric_scores]
+        return best_score, best_metric_scores
+
+    def max_scores(self):
+
+        maxes = {task: self.get_best_scores_best_run(task) for task in self.task_results_dict.keys()}
+        _max_scores = {task: maxes[task][0] for task in maxes.keys()}
+        str_scores = dict()  # f"{self.results[m]*100:.2f}"
+        for task in maxes.keys():
+            metrics = maxes[task][1]
+            str_list_score = [f"{metrics[i]*100:.2f}" for i in range(len(metrics))]
+            str_score = "/".join(str_list_score)
+            str_scores[task] = str_score
+            print(str_score)
+
+        # Calculate totals for bert and glue
+        num_tasks_bert = len(maxes) - 1 if "wnli" in maxes else len(maxes)
+        average_bert = sum(
+            [value for task, value in _max_scores.items() if task != "wnli"]
+        ) / num_tasks_bert
+        average_glue = sum(_max_scores.values()) / len(_max_scores)
+
+        return average_bert, average_glue, str_scores
 
     def verify_sparsity(self, task):
 
@@ -272,6 +331,8 @@ def results_to_df(results, reduction, model_name):
     for _, task_results in results.items():
         task_results.reduce_metrics(reduction=reduction)
 
+    import pdb
+    pdb.set_trace()
     # Get results in string format and consolidated per task
     report_results = {t: r.to_string() for t, r in results.items()}
     consolidated_results = {t: r.consolidate() for t, r in results.items()}

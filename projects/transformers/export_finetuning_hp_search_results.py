@@ -39,7 +39,12 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from finetuning_constants import ALL_REPORTING_METRICS
+from finetuning_constants import (
+    ALL_REPORTING_METRICS,
+    GLUE_NAMES_PER_TASK,
+    REPORTING_METRICS_PER_TASK,
+    TASK_NAMES,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -172,15 +177,81 @@ def load(
     return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
 
 
-def load_many(
-    experiment_paths, performance_metrics=None, raw_metrics=None, required_epochs=None
+def get_all_subdirs(experiment_path):
+    """
+    This assumes a directory structure as follows:
+
+        name_of_model
+            - task 1
+                - experiment 1
+                - experiment 2
+                - ...
+            - task 2
+            - ...
+        name_of_next_model
+        ...
+    
+    experiment path points towards a single model
+    """
+
+    experiment_path = os.path.expanduser(experiment_path)
+    files = os.listdir(experiment_path)
+
+    subdirs = []
+    for f in files:
+        file_path = os.path.join(experiment_path, f)
+        if os.path.isdir(file_path):
+            subdirs.append(file_path)
+
+    experiment_state_paths = glob.glob(
+        os.path.join(experiment_path, "experiment_state*.json")
+    )
+
+    has_exp = False
+    if experiment_state_paths:
+        has_exp = True
+
+    return subdirs, has_exp
+
+
+def check_for_tasks(base_path):
+
+    results = []
+    task_2_path = {}
+    files = os.listdir(base_path)
+    for file in files:
+        file_path = os.path.join(base_path, file)
+        if os.path.isdir(file_path):
+            if file in TASK_NAMES:
+                task_2_path[file] = file_path
+                results.append(file_path)
+    
+    return results, task_2_path
+
+
+def load_from_base(
+    base_path, performance_metrics=None, raw_metrics=None, required_epochs=None
 ):
-    """Load several experiments into a single dataframe"""
-    dataframes = [
-        load(path, performance_metrics, raw_metrics, required_epochs)
-        for path in experiment_paths
-    ]
-    return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
+    """Look for all experimental subdirectories and load each into a dataframe"""
+
+    # gather tasks for which we have hp searches, for the model specified in
+    # base_path
+    results, task_2_path = check_for_tasks(base_path)
+    task_2_subdirs = {}
+    for task in task_2_path.keys():
+        task_path = task_2_path[task]
+        experiment_paths, has_exp = get_all_subdirs(task_path)
+        task_2_subdirs[task] = experiment_paths
+
+    task_2_dfs = {}
+    for task in task_2_subdirs.keys():
+        task_2_dfs[task] = []
+        for subdir in task_2_subdirs[task]:
+            df = load(subdir, performance_metrics, raw_metrics, required_epochs)
+            task_2_dfs[task].append(df)
+        task_2_dfs[task] = pd.concat(task_2_dfs[task])
+
+    return task_2_dfs
 
 
 def _read_experiment(experiment_state, experiment_path):
@@ -198,12 +269,14 @@ def _read_experiment(experiment_state, experiment_path):
         exp_dir = os.path.basename(exp["logdir"])
         exp_tag = exp["experiment_tag"]
         csv = os.path.join(experiment_path, exp_dir, "progress.csv")
-        # check if file size is > 0 before proceeding
-        if os.stat(csv).st_size:
-            progress[exp_tag] = pd.read_csv(csv)
-            exp_directories[exp_tag] = os.path.abspath(
-                os.path.join(experiment_path, exp_dir)
-            )
+
+        # check if file exists and size > 0
+        if os.path.exists(csv):
+            if os.stat(csv).st_size:
+                progress[exp_tag] = pd.read_csv(csv)
+                exp_directories[exp_tag] = os.path.abspath(
+                    os.path.join(experiment_path, exp_dir)
+                )
 
             # Read in the configs for this experiment
             params_file = os.path.join(experiment_path, exp_dir, "params.json")
@@ -363,6 +436,5 @@ def _get_experiment_states(experiment_path, exit_on_fail=False):
 
 if __name__ == "__main__":
     experiment_path = str(sys.argv[1])
-    df = load(experiment_path)
-    import pdb
-    pdb.set_trace()
+    task_2_df = load_from_base(experiment_path)
+    # for task in task_2_df.keys():

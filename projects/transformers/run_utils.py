@@ -1035,6 +1035,9 @@ class TaskResults():
         # If not, -1 corresponds to end of training
         self.best_idx_per_run = []  # One index for each run
 
+    def __len__(self):
+        return len(self.all_results)
+
     def get_formatted_results(self):
         """
         Format eval_results to include task_name and run_idx for clarity when analyzing
@@ -1057,6 +1060,15 @@ class TaskResults():
                 self.all_results[-1][key] = [results[key]]
             else:
                 self.all_results[-1][key] = results[key]
+
+    def get_best_idx_per_run(self, metric=None):
+
+        if not metric:
+            metric = self.best_metric_key
+
+        best_idx_per_run = [np.argmax(run[metric]) for run in self.all_results]
+
+        return best_idx_per_run
 
     def reduce_metrics(self, reduction="mean"):
         """
