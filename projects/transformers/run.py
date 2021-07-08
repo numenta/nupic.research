@@ -295,7 +295,7 @@ def run_pretraining(
     # if using hp search, load best model before running evaluate
     if training_args.do_eval:
         logging.info("*** Evaluate ***")
-        evaluate_language_model(trainer, eval_dataset, training_args.output_dir, metri_callback)
+        evaluate_language_model(trainer, eval_dataset, training_args.output_dir, metric_callback)
 
 
 
