@@ -252,8 +252,7 @@ def _read_experiment(experiment_state, experiment_path):
 
     progress = {}
     params = {}
-    # TODO: no real use for exp_directories outside this function, why get it?
-    exp_directories = {}
+
     for exp in checkpoint_dicts:
         if exp.get("logdir", None) is None:
             continue
@@ -265,9 +264,6 @@ def _read_experiment(experiment_state, experiment_path):
         if os.path.exists(csv):
             if os.stat(csv).st_size:
                 progress[exp_tag] = pd.read_csv(csv)
-                exp_directories[exp_tag] = os.path.abspath(
-                    os.path.join(experiment_path, exp_dir)
-                )
 
             # Read in the configs for this experiment
             params_file = os.path.join(experiment_path, exp_dir, "params.json")
