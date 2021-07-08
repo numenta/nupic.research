@@ -147,13 +147,12 @@ def unpickle_within_dataframe(df, conditions):
 # ---------------------------
 
 
-def load(
-    experiment_path, performance_metrics=None, raw_metrics=None, required_epochs=None
-):
+def load(experiment_path):
     """Load a single experiment into a dataframe"""
     experiment_path = os.path.expanduser(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
 
+    print(f"parsing data from {experiment_path} which has {len(experiment_path)} exp states")
     # run once per experiment state
     # columns might differ between experiments
     dataframes = []
@@ -161,14 +160,7 @@ def load(
         progress, params = _read_experiment(exp_state, experiment_path)
         if len(progress) != 0:
             dataframes.append(
-                _get_value(
-                    progress,
-                    params,
-                    exp_name,
-                    performance_metrics,
-                    raw_metrics=raw_metrics,
-                    required_epochs=required_epochs,
-                )
+                _get_value(progress, params, exp_name)
             )
 
     # concats all dataframes if there are any and return
@@ -229,9 +221,7 @@ def check_for_tasks(base_path):
     return results, task_2_path
 
 
-def load_from_base(
-    base_path, performance_metrics=None, raw_metrics=None, required_epochs=None
-):
+def load_from_base(base_path):
     """Look for all experimental subdirectories and load each into a dataframe"""
 
     # gather tasks for which we have hp searches, for the model specified in
@@ -247,7 +237,8 @@ def load_from_base(
     for task in task_2_subdirs.keys():
         task_2_dfs[task] = []
         for subdir in task_2_subdirs[task]:
-            df = load(subdir, performance_metrics, raw_metrics, required_epochs)
+            print(f"About to load data from {subdir}")
+            df = load(subdir)
             task_2_dfs[task].append(df)
         task_2_dfs[task] = pd.concat(task_2_dfs[task])
 
@@ -286,16 +277,7 @@ def _read_experiment(experiment_state, experiment_path):
     return progress, params
 
 
-def _get_value(  # noqa: C901
-    progress,
-    params,
-    exp_name,
-    performance_metrics=None,
-    full_metrics=None,
-    raw_metrics=None,
-    exp_substring="",
-    required_epochs=None,
-):
+def _get_value(progress, params, exp_name):
     """
     For every experiment whose name matches exp_substring, scan the history
     and return the appropriate value associated with tag.
@@ -311,31 +293,19 @@ def _get_value(  # noqa: C901
     Modified to run once per experiment state
     """
 
-    # Collect experiment names that match exp at all
-    exps = [e for e in progress if exp_substring in e]
+    # Collect experiment names
+    exps = [e for e in progress]
 
-    # try to automatically determine what are the performance metrics, if not given
-    if performance_metrics is None:
-        performance_metrics = []
-        columns = progress[exps[0]].keys()
-        for metric in ALL_REPORTING_METRICS:
-            if metric in columns:
-                performance_metrics.append(metric)
-
-    # TODO: currently not working, refactor
-    if full_metrics is None:
-        full_metrics = ["val_acc"]
-    if raw_metrics is None:
-        raw_metrics = []
+    # Use all performance metrics from ALL_REPORTING_METRICS, if present
+    performance_metrics = []
+    columns = progress[exps[0]].keys()
+    for metric in ALL_REPORTING_METRICS:
+        if metric in columns:
+            performance_metrics.append(metric)
 
     # populate stats
     stats = defaultdict(list)
     for e in exps:
-
-        # skip unfinished experiments
-        if required_epochs:
-            if progress[e]["training_iteration"].iloc[-1] != required_epochs:
-                continue
 
         # add relevant progress metrics
         stats["Experiment Name"].append(e)
@@ -351,40 +321,12 @@ def _get_value(  # noqa: C901
             stats[m + "_median"].append(progress[e][m].median())
             stats[m + "_last"].append(progress[e][m].iloc[-1])
 
-        # add all data for one metric - required to plot
-        for m in full_metrics:
-
-            if m in progress[e]:
-                stats[m + "_all"].append(progress[e][m])
-
-        # add specific metrics without any processing
-        for m in raw_metrics:
-            for k, v in progress[e].items():
-                if callable(m) and m(k):
-                    stats[k].append(v)
-                elif m in progress[e]:
-                    stats[k].append(progress[e][m])
-
         # remaining custom tags - specific
         stats["epochs"].append(progress[e]["training_iteration"].iloc[-1])
         stats["experiment_file_name"].append(exp_name)
         stats["trial_time"].append(progress[e]["time_this_iter_s"].sum() / 60)
         stats["mean_epoch_time"].append(progress[e]["time_this_iter_s"].mean() / 60)
 
-        # removed - couldn't find related in current dataset
-        # stats["start_learning_rate"].append(progress[e]["learning_rate"].iloc[0])
-        # stats["end_learning_rate"].append(progress[e]["learning_rate"].iloc[-1])
-        # stats["trial_train_time"].append(progress[e]["time_this_iter_s"].sum() / 60)
-        # stats["mean_epoch_train_time"].append(progress[e]["time_this_iter_s"].mean()/60)
-
-        # early stop
-        # if (
-        #     params[e]["iterations"] != progress[e]["training_iteration"].iloc[-1]
-        #     and progress[e]["stop"].iloc[-1]
-        # ):
-        #     stats["early_stop"].append(1)
-        # else:
-        #     stats["early_stop"].append(0)
 
         # add all remaining params, for easy aggregations
         for k, v in params[e].items():
@@ -434,7 +376,17 @@ def _get_experiment_states(experiment_path, exit_on_fail=False):
     return experiment_states
 
 
+def save_agg_results(task_2_df, experiment_path):
+
+    for task in task_2_df.keys():
+        save_path = os.path.join(experiment_path, task)
+        assert os.path.exists(save_path)
+        save_file = os.path.join(save_path, f"{task}.csv")
+        print(f"Saving {task} results to {save_file}")
+        task_2_df[task].to_csv(save_file)
+
+
 if __name__ == "__main__":
     experiment_path = str(sys.argv[1])
     task_2_df = load_from_base(experiment_path)
-    # for task in task_2_df.keys():
+    save_agg_results(task_2_df, experiment_path)
