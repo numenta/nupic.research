@@ -331,8 +331,6 @@ def results_to_df(results, reduction, model_name):
     for _, task_results in results.items():
         task_results.reduce_metrics(reduction=reduction)
 
-    import pdb
-    pdb.set_trace()
     # Get results in string format and consolidated per task
     report_results = {t: r.to_string() for t, r in results.items()}
     consolidated_results = {t: r.consolidate() for t, r in results.items()}
