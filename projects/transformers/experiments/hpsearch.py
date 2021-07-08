@@ -28,6 +28,8 @@ from ray import tune
 
 from .base import bert_base
 
+from callbacks import TrackEvalMetrics
+
 # use bert_100k for task-specific hp search prototyping
 from .finetuning import finetuning_bert100k_glue
 from .trifecta import finetuning_bert_sparse_85_trifecta_100k_glue_get_info
@@ -178,12 +180,23 @@ hp_search_finetuning_trifecta_90_100k_small_tasks.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa
 )
 
+hp_search_finetuning_bert_100k_small_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_small_tasks
+)
+hp_search_finetuning_bert_100k_small_tasks.update(
+    model_type="bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",
+    trainer_callbacks=[TrackEvalMetrics()],
+)
+
+
 
 # Export configurations in this file
 CONFIGS = dict(
     debug_hp_search=debug_hp_search,
     debug_finetuning_hp_search=debug_finetuning_hp_search,
     debug_finetuning_sparse_hp_search=debug_finetuning_sparse_hp_search,
+    hp_search_finetuning_bert_100k_small_tasks=hp_search_finetuning_bert_100k_small_tasks,
     hp_search_finetuning_trifecta_85_100k_small_tasks=hp_search_finetuning_trifecta_85_100k_small_tasks,
     hp_search_finetuning_trifecta_90_100k_small_tasks=hp_search_finetuning_trifecta_90_100k_small_tasks,
 )
