@@ -38,6 +38,8 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+from scipy import stats
+from sklearn import linear_model
 
 from finetuning_constants import (
     ALL_REPORTING_METRICS,
@@ -49,7 +51,7 @@ from finetuning_constants import (
 warnings.filterwarnings("ignore")
 
 # ---------
-# Panda Utils
+# Panda Utils (old / not currently used)
 # ---------
 
 
@@ -81,7 +83,7 @@ def agg(df, columns, metric="eval_loss", filter_by=None, decimals=3):
 
 
 # ---------
-# Utils
+# Utils (old / barely used)
 # ---------
 
 
@@ -143,7 +145,7 @@ def unpickle_within_dataframe(df, conditions):
 
 
 # ---------------------------
-# Browsing functionalities.
+# Functions for aggregating data from hyperparameter tuning experiments
 # ---------------------------
 
 
@@ -380,6 +382,68 @@ def save_agg_results(task_2_df, experiment_path):
         save_file = os.path.join(save_path, f"{task}.csv")
         print(f"Saving {task} results to {save_file}")
         task_2_df[task].to_csv(save_file)
+
+
+# ---------------------------
+# Analysis (plots, regression, etc.)
+# ---------------------------
+
+
+def plot_categorical(df, column_name):
+    pass
+
+
+def plot_categorical_bar(df, column_name):
+    pass
+
+
+def lin_regress_1d_metric_onto_hps(df, metric, column_names=None):
+
+    if column_names is None:
+        column_names = ['learning_rate', 'max_steps', 'warmup_ratio']
+
+
+    hp_regs = {}
+    y = df[metric].values
+    X = df[column_names].values
+    for col in column_names:
+        x = df[col].values
+        result = linregress(x, y)
+        print(result)
+        hp_regs[col] = result
+
+    return hp_regs, X, y
+
+
+def plot_hp_regs(X, y, hp_regs, **subplot_kwargs):
+
+    fig, ax = plt.subplots(len(hp_regs), **subplot_kwargs)
+
+    for idx, param in enumerate(hp_regs):
+
+        reg = hp_regs[param]
+        ax[idx].plot(X[param], y, "b.", label="data")
+        ax[idx].plot(X[param], reg.intercept + reg.slope * X[param],
+            'r', linestyle='dashed', label="lin reg"
+        )
+        ax[idx].set_title(param)
+
+    return fig, ax
+
+
+def reg_and_plot(df, metric, column_names, **kwargs):
+
+    hp_regs, X, y = lin_regress_1d_metric_onto_hps(df, metric, column_names)
+    fig, ax = plot_hp_regs(X, y, hp_regs, **kwargs)
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
