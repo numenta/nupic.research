@@ -396,11 +396,10 @@ def plot_categorical_bar(df, column_name):
     pass
 
 
-def lin_regress_1d_metric_onto_hps(df, metric, column_names=None):
+def lin_regress_1d_metric_onto_hps(df, metric, column_names=None, task_name=None):
 
     if column_names is None:
         column_names = ['learning_rate', 'max_steps', 'warmup_ratio']
-
 
     hp_regs = {}
     y = df[metric].values
@@ -414,11 +413,11 @@ def lin_regress_1d_metric_onto_hps(df, metric, column_names=None):
     return hp_regs, X, y
 
 
-def plot_hp_regs(X, y, hp_regs, **subplot_kwargs):
+def plot_hp_regs(X, y, hp_regs, task_name=None, **subplot_kwargs):
+
+    task_name = task_name if task_name else ""
 
     fig, ax = plt.subplots(1, len(hp_regs), **subplot_kwargs)
-    # import pdb
-    # pdb.set_trace()
     for idx, param in enumerate(hp_regs):
 
         reg = hp_regs[param]
@@ -426,15 +425,15 @@ def plot_hp_regs(X, y, hp_regs, **subplot_kwargs):
         ax[idx].plot(X[:,idx], reg.intercept + reg.slope * X[:,idx],
             'r', linestyle='dashed', label="lin reg"
         )
-        ax[idx].set_title(param)
+        ax[idx].set_title(task_name + "_" + param)
 
     return fig, ax
 
 
-def reg_and_plot(df, metric, column_names=None, **kwargs):
+def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
 
     hp_regs, X, y = lin_regress_1d_metric_onto_hps(df, metric, column_names)
-    fig, ax = plot_hp_regs(X, y, hp_regs, **kwargs)
+    fig, ax = plot_hp_regs(X, y, hp_regs, task_name, **kwargs)
 
     return hp_regs, X, y, fig, ax
 
