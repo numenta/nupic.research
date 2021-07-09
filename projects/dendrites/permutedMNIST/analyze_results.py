@@ -41,8 +41,7 @@ def key_func(x):
     return s
 
 
-def parse(best_result, trial_checkpoint, df_entries, exp, tag):
-
+def parse(best_result, results, trial_checkpoint, df_entries, exp, tag):
     config = trial_checkpoint["config"]
     model_args = config["model_args"]
     kw_percent_on = model_args["kw_percent_on"]
@@ -54,6 +53,7 @@ def parse(best_result, trial_checkpoint, df_entries, exp, tag):
     num_tasks = config["num_tasks"]
     lr = config["optimizer_args"]["lr"]
     momentum = config["optimizer_args"].get("momentum", 0.0)
+    iteration = results["training_iteration"]
 
     # This list must match the column headers in collect_results
     df_entries.append(
@@ -70,6 +70,7 @@ def parse(best_result, trial_checkpoint, df_entries, exp, tag):
             momentum,
             config["seed"],
             best_result,
+            iteration,
             "{} {}".format(exp, tag),
         ]
     )
@@ -109,27 +110,47 @@ def parse_one_experiment(exp, state, df, outmethod):
                     if outmethod == "best":
                         # For each checkpoint select the iteration with the best accuracy as
                         # the best epoch
+                        print("using parsing method : best")
                         best_results = max(
                             results, key=lambda x: x.get("mean_accuracy", 0.0)
                         )
                         best_result = best_results["mean_accuracy"]
                         if best_result > 0.0:
-                            parse(best_result, trial_checkpoint, df_entries, exp, tag)
+                            parse(
+                                best_result,
+                                results,
+                                trial_checkpoint,
+                                df_entries,
+                                exp,
+                                tag,
+                            )
                     elif outmethod == "lasttask":
-                        best_results = results[-1]
-                        best_result = best_results["mean_accuracy"]
-                        if best_result > 0.0:
-                            parse(best_result, trial_checkpoint, df_entries, exp, tag)
+                        print("using parsing method : lasttask")
+                        last_results = results[-1]
+                        last_result = last_results["mean_accuracy"]
+                        if last_result > 0.0:
+                            parse(
+                                last_result,
+                                last_results,
+                                trial_checkpoint,
+                                df_entries,
+                                exp,
+                                tag,
+                            )
                     elif outmethod == "all":
+                        print("using parsing method : all")
                         for i, _ in enumerate(results):
-                            best_results = results[i]
-                            best_result = best_results["mean_accuracy"]
-                            if best_result > 0.0:
+                            i_results = results[i]
+                            i_result = i_results["mean_accuracy"]
+                            if i_result > 0.0:
                                 parse(
-                                    best_result, trial_checkpoint, df_entries, exp, tag
+                                    i_result,
+                                    i_results,
+                                    trial_checkpoint,
+                                    df_entries,
+                                    exp,
+                                    tag,
                                 )
-                    else:
-                        print("define outmethod: best, lasttask, all")
 
             except Exception:
                 print(
@@ -173,6 +194,7 @@ def collect_results(configs, basefilename, outmethod):
         "Momentum",
         "Seed",
         "Accuracy",
+        "Iteration",
         "ID",
     ]
     df = pd.DataFrame(columns=columns)
@@ -198,8 +220,8 @@ def collect_results(configs, basefilename, outmethod):
 
         df = parse_one_experiment(exp, states, df, outmethod)
 
-    df.to_csv(basefilename + ".csv")
-    df.to_pickle(basefilename + ".pkl")
+    df.to_csv(f"{basefilename}_{outmethod}.csv")
+    df.to_pickle(f"{basefilename}_{outmethod}.pkl")
 
 
 def analyze_experiment_data(filename_df, output_filename):
@@ -211,7 +233,6 @@ def analyze_experiment_data(filename_df, output_filename):
     :param output_filename: filename to use to save the csv
     """
     df = pd.read_pickle(filename_df)
-    # Create a dataframe containing one row per configuration. The accuracy
     df_id = df.groupby(["ID", "Seed"]).agg(
         num_trials=("ID", "count"),
         ff_weight_sparsity=("FF weight sparsity", "first"),
@@ -264,4 +285,7 @@ if __name__ == "__main__":
 
     collect_results(configs, args.name, args.outmethod)
 
-    analyze_experiment_data(args.name + ".pkl", args.name + "_analysis.csv")
+    analyze_experiment_data(
+        f"{args.name}_{args.outmethod}.pkl",
+        f"{args.name}_{args.outmethod}_analysis.csv",
+    )
