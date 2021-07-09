@@ -120,7 +120,7 @@ class SNRPruningGSCVDrop(
     mixins.RegularizeLoss,
     mixins.ConstrainParameters,
     mixins.MultiCycleLR,
-    mixins.PruneLowSNR,
+    mixins.PruneLowSNRLayers,
     experiments.SupervisedExperiment,
 ):
     pass

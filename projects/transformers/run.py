@@ -45,6 +45,7 @@ import transformers
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     DataCollatorWithPadding,
+    EarlyStoppingCallback,
     HfArgumentParser,
     default_data_collator,
     set_seed,
@@ -52,13 +53,15 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
+from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from experiments import CONFIGS
 from integrations import CustomWandbCallback  # noqa I001
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
+    check_for_callback,
     evaluate_language_model,
-    evaluate_tasks,
+    evaluate_tasks_handler,
     get_labels,
     init_config,
     init_datasets_mlm,
@@ -75,6 +78,18 @@ from run_utils import (
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+
+REPORTING_METRICS_PER_TASK = {
+    "cola": ["eval_matthews_correlation"],
+    "mnli": ["eval_accuracy", "mm_eval_accuracy"],
+    "mrpc": ["eval_f1", "eval_accuracy"],
+    "qnli": ["eval_accuracy"],
+    "qqp": ["eval_accuracy", "eval_f1"],
+    "rte": ["eval_accuracy"],
+    "sst2": ["eval_accuracy"],
+    "stsb": ["eval_pearson", "eval_spearmanr"],
+    "wnli": ["eval_accuracy"]
+}
 
 
 def bold(text):
@@ -299,12 +314,13 @@ def run_finetuning_single_task(
     eval_dataset = tokenized_datasets[
         "validation_matched" if data_args.task_name == "mnli" else "validation"
     ]
+
     test_dataset = None
-    if ((data_args.task_name is not None or data_args.test_file is not None)
-       and training_args.do_predict):
-        test_dataset = tokenized_datasets[
-            "test_matched" if data_args.task_name == "mnli" else "test"
-        ]
+    if (data_args.task_name is not None or data_args.test_file is not None):
+        if training_args.do_predict:
+            test_dataset = tokenized_datasets[
+                "test_matched" if data_args.task_name == "mnli" else "test"
+            ]
 
     # Log fingerprint used in HF smart caching
     logging.info(f"Dataset fingerprint: {train_dataset._fingerprint}")
@@ -318,6 +334,38 @@ def run_finetuning_single_task(
     else:
         data_collator = None
 
+    # If you're supposed to load best model at end, but evaluate() never gets
+    # called because eval_steps > number of training steps taken, you'll get
+    # an error at the end of training. If this is the case, set eval_steps
+    # equal to max_steps so it gets called at least once.
+    if training_args.load_best_model_at_end:
+        if training_args.max_steps == -1:
+            num_examples = training_args.num_train_epochs * len(train_dataset)
+            max_steps = num_examples // training_args.per_device_train_batch_size
+        else:
+            max_steps = training_args.max_steps
+        if max_steps < training_args.eval_steps:
+            logging.warning(
+                f"max_steps({max_steps}) < "
+                f"eval_steps({training_args.eval_steps}) "
+                "To avoid issues, setting eval steps equal to max_steps"
+            )
+            training_args.eval_steps = max_steps
+
+        # Runs can easily break if load_best_model_at_end because you specified a metric
+        # for a diferent task. You can get all the way through training and have it
+        # break. This will at least break earlier on / help you readjust.
+
+        allowed_metrics = REPORTING_METRICS_PER_TASK[data_args.task_name]
+        if training_args.metric_for_best_model not in allowed_metrics:
+            if training_args.metric_for_best_model != "eval_loss":
+                logging.warning(
+                    "Warning, code will break because the current metric for best model"
+                    f" (training_args.metric_for_best_model) is not being tracked."
+                    "Defaulting metric_for_best_model to eval_loss"
+                )
+                training_args.metric_for_best_model = "eval_loss"
+
     # Train
     trainer = init_trainer(
         tokenizer=tokenizer,
@@ -329,24 +377,14 @@ def run_finetuning_single_task(
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
+
     if training_args.do_train:
         train(trainer, training_args.output_dir, last_checkpoint)
 
-    # Evaluate
-    eval_results = {}
     if training_args.do_eval:
-        logging.info("*** Evaluate ***")
-
-        # Handle special case of extra validation dataset for MNLI
-        tasks = [data_args.task_name]
-        eval_datasets = [eval_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            eval_datasets.append(tokenized_datasets["validation_mismatched"])
-
-        eval_results = evaluate_tasks(
-            trainer, training_args.output_dir, tasks, eval_datasets
-        )
+        eval_results = evaluate_tasks_handler(
+            trainer, data_args, model_args, training_args,
+            eval_dataset, tokenized_datasets)
 
     # Test/Predict
     if training_args.do_predict:
@@ -391,6 +429,22 @@ def run_finetuning_multiple_tasks(
     else:
         results = {}
 
+    # Different callbacks result in different control flow.
+    has_early_stopping, _ = check_for_callback(model_args, EarlyStoppingCallback)
+    has_track_eval, _ = check_for_callback(model_args, TrackEvalMetrics)
+    if not has_track_eval:
+        logging.warn(
+            "You are running without tracking metrics throughout training."
+            "This is strongly discouraged."
+        )
+
+    # Do not finetune sparse models without RezeroWeightsCallback. Otherwise,
+    # you will be "unsparsifying" or "depruning" as you train.
+    if "sparse" in model_args.model_type.lower():
+        has_rezero, _ = check_for_callback(model_args, RezeroWeightsCallback)
+        assert has_rezero, "Finetuning sparse models without rezeroing weights"
+        " is prohibited"
+
     base_training_args = deepcopy(training_args)
     for task_name in data_args.task_names:
         data_args.task_name = task_name
@@ -400,20 +454,25 @@ def run_finetuning_multiple_tasks(
         training_args.output_dir = os.path.join(
             base_training_args.output_dir, task_name
         )
+
         # Update any custom training hyperparameter
         # TODO: allow hyperparameter search for each task
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
                 setattr(training_args, hp_key, hp_val)
-        # create Task Results
-        task_results = TaskResults(task_name, training_args=training_args)
+
+        task_results = TaskResults(task_name,
+                                   has_early_stopping,
+                                   training_args=training_args)
 
         # Run finetuning and save results
         for _ in range(training_args.num_runs):
             # reset seed per run
-            training_args.seed = random.randint(0, 1000000000)
+            training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
-
+            # eval_results contains either a number for each metric
+            # or a list for each metric, depending on if TrackEvalMetrics
+            # callback is in use.
             eval_results = run_finetuning_single_task(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
             )

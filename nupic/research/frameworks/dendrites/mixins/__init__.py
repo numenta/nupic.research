@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,15 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .ewc import CONFIGS as EWC
-from .si import CONFIGS as SI
-
-"""
-Import and collect all Continual Learning experiment configurations into one CONFIG
-"""
-__all__ = ["CONFIGS"]
-
-# Collect all configurations
-CONFIGS = dict()
-CONFIGS.update(EWC)
-CONFIGS.update(SI)
+from .centroid_figure_1b import *
+from .sp_context_analysis import *
+from .sp_context import SpatialPoolerContext

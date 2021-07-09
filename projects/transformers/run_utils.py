@@ -47,6 +47,8 @@ from transformers import (
     TrainerCallback,
 )
 
+from callbacks import TrackEvalMetrics
+from finetuning_constants import REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 __all__ = [
@@ -125,6 +127,7 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
     Returns evaluation dict with results.
     """
     eval_results = {}
+
     for eval_dataset, task in zip(eval_datasets, tasks):
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
         if task == "mnli-mm":
@@ -148,6 +151,7 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
     """
     Test tasks after finetuning.
     """
+
     for test_dataset, task in zip(test_datasets, tasks):
         # Removing the `label` columns because it contains -1
         # and Trainer won't like that.
@@ -674,6 +678,112 @@ def init_model(model_args, config, tokenizer, finetuning=False):
     return model
 
 
+def toggle_drop_last_wrapper(method):
+    """
+    Return a function that turns drop_last off before it is called. Used for
+    ensuring trainer.args.dataloader_drop_last is False during evaluation
+    steps. After the method is called, dataloader_drop_last is switched back
+    to whatever it was set to initially.
+    """
+    def toggle_method(*args, **kwargs):
+        was_drop_last = method.__self__.args.dataloader_drop_last  # initial drop_last
+        method.__self__.args.dataloader_drop_last = False  # turn drop_last off
+        result = method(*args, **kwargs)  # call method with drop_last off
+        method.__self__.args.dataloader_drop_last = was_drop_last  # restore drop_last
+        return result
+
+    return toggle_method
+
+
+def format_eval_results(eval_results, run, task_name):
+
+    ignore_keys = ["steps", "epoch"]
+    new_eval_results = {}
+    for key in eval_results.keys():
+        if key in ignore_keys:
+            new_eval_results[key] = eval_results[key]
+        else:
+            new_key = task_name + f"run{run}_" + key
+            new_eval_results[new_key] = eval_results[key]
+
+    return new_eval_results
+
+
+def check_for_callback(model_args, class_of_callback):
+
+    has_callback = False
+    callback_instance = None
+    for callback_idx in range(len(model_args.trainer_callbacks)):
+        if isinstance(model_args.trainer_callbacks[callback_idx], class_of_callback):
+            has_callback = True
+            callback_instance = model_args.trainer_callbacks[callback_idx]
+
+    return has_callback, callback_instance
+
+
+def evaluate_tasks_handler(trainer,
+                           data_args,
+                           model_args,
+                           training_args,
+                           eval_dataset,
+                           tokenized_datasets):
+
+    logging.info("*** Evaluate ***")
+
+    eval_results = {}
+    tracked_metrics, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
+    tasks = [data_args.task_name]
+    eval_datasets = [eval_dataset]
+
+    if tracked_metrics:
+
+        tracked_eval_metrics = metric_callback.eval_metrics
+        tracked_eval_metrics["steps"] = metric_callback.steps
+        offset = training_args.max_steps % training_args.eval_steps
+
+        # If max_steps % eval_steps is not 0, make sure to eval one last time
+        if offset != 0 and not training_args.load_best_model_at_end:
+
+            print(f"Evaluating again because offset was {offset}")
+
+            eval_results = evaluate_tasks(
+                trainer, training_args.output_dir, tasks, eval_datasets
+            )
+            metric_callback.eval_metrics["steps"][-1] -= offset
+
+        # mnli has two eval sets. For now, assume load_best_model_at_end is on
+        # and just evaluate once on mnli-mm once at the end. TrackEvalMetrics
+        # callback handles metrics, and looks for the mm_ prefix. If present,
+        # it stores results on the mm set in a separate dictionary
+        if data_args.task_name == "mnli":
+            _ = trainer.evaluate(
+                eval_dataset=tokenized_datasets["validation_mismatched"],
+                metric_key_prefix="mm",
+            )
+            n_evals = len(tracked_eval_metrics["steps"])
+            mm_dict = metric_callback.mm_metrics
+            for key in mm_dict.keys():
+                key_name = "mm_eval_" + key
+                # Fill a list of same length as other metrics for consistency
+                tracked_eval_metrics[key_name] = [mm_dict[key] for i in range(n_evals)]
+
+        eval_results = tracked_eval_metrics
+
+    else:
+
+        # In this case, you need to do the usualy evaluation
+        # Regardless of load_best_model, you have the correct model loaded
+        if data_args.task_name == "mnli":
+            tasks.append("mnli-mm")
+            eval_datasets.append(tokenized_datasets["validation_mismatched"])
+
+        eval_results = evaluate_tasks(
+            trainer, training_args.output_dir, tasks, eval_datasets
+        )
+
+    return eval_results
+
+
 def init_trainer(
     tokenizer,
     data_collator,
@@ -708,17 +818,28 @@ def init_trainer(
     # Add specific metrics for finetuning task
     if finetuning:
         compute_metrics = partial(
-            compute_metrics_task, task_name=task_name, is_regression=is_regression,
+            compute_metrics_task,
+            task_name=task_name,
+            is_regression=is_regression,
+            output_dir=training_args.output_dir
         )
         trainer_kwargs.update(compute_metrics=compute_metrics)
 
     trainer = trainer_class(**trainer_kwargs)
 
+    # Issue: labels get set to -100 due to drop_last.
+    # Fix: override the evaluate and predict methods.
+    # The previous fix covered cases when WE call trainer.{evaluate, predict}.
+    # This fix should cover all cases, including any time HF calls these methods.
+    trainer.evaluate = toggle_drop_last_wrapper(trainer.evaluate)
+    trainer.predict = toggle_drop_last_wrapper(trainer.predict)
+
     return trainer
 
 
 def compute_metrics_task(ep: EvalPrediction, metric=None,
-                         task_name=None, is_regression=None):
+                         task_name=None, is_regression=None,
+                         output_dir=None):
     """
     You can define your custom compute_metrics function. It takes an
     `EvalPrediction` object (a namedtuple with a predictions and label_ids
@@ -727,41 +848,34 @@ def compute_metrics_task(ep: EvalPrediction, metric=None,
     preds = (ep.predictions[0] if isinstance(ep.predictions, tuple) else ep.predictions)
     preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
 
+    # -100 labels can come up when drop_last batch setting gets set to true during
+    # evaluation. That is fixed, so any -100 labels should not pass silently.
+    assert -100 not in ep.label_ids, "Unknown source of -100 labels"
+
     if not is_regression:
-        logging.info(f"Label distribution for {task_name} before cleaning")
+        logging.info(f"Label distribution for {task_name}")
         logging.info(f"Predictions: {Counter(preds).most_common()}")
         logging.info(f"Labels: {Counter(ep.label_ids).most_common()}")
 
-    # Ignore the -100 labels - not able to tokenize?
-    # TODO: investigate why a few labels are -100 in all tasks
-    label_ids = ep.label_ids[np.where(ep.label_ids != -100)]
-    preds = preds[np.where(ep.label_ids != -100)]
-    logging.info(f"Removing {1-(len(label_ids) / len(ep.label_ids)):.2%} samples "
-                 "from evaluation set where label == -100")
-
-    if not is_regression:
-        logging.info(f"Label distribution for {task_name} after cleaning")
-        logging.info(f"Predictions: {Counter(preds).most_common()}")
-        logging.info(f"Labels: {Counter(label_ids).most_common()}")
-
     if task_name is not None:
         if task_name == "cola":
-            result = {"matthews_correlation": matthews_corrcoef(label_ids, preds)}
+            result = {"matthews_correlation": matthews_corrcoef(ep.label_ids, preds)}
         elif task_name == "stsb":
-            result = pearson_and_spearman(preds, label_ids)
+            result = pearson_and_spearman(preds, ep.label_ids)
         elif task_name in ["mrpc", "qqp"]:
-            result = acc_and_f1(preds, label_ids)
-        elif task_name in ["sst2", "mnli", "mnli-mm", "mnli_mismatched", "mnli_matched",
+            result = acc_and_f1(preds, ep.label_ids)
+        elif task_name in ["sst2", "mnli", "mnli_matched", "mnli-mm", "mnli_mismatched",
                            "qnli", "rte", "wnli", "hans"]:
-            result = {"accuracy": simple_accuracy(preds, label_ids)}
+            result = {"accuracy": simple_accuracy(preds, ep.label_ids)}
         # Consolidate if more than one metric
         if len(result) > 1:
-            result["combined_score"] = np.mean(list(result.values())).item()
+            combined_score = np.mean(list(result.values())).item()
+            result[task_name + "_combined_score"] = combined_score
         return result
     elif is_regression:
-        return {"mse": ((preds - label_ids) ** 2).mean().item()}
+        return {"mse": ((preds - ep.label_ids) ** 2).mean().item()}
     else:
-        return {"accuracy": (preds == label_ids).astype(np.float32).mean().item()}
+        return {"accuracy": (preds == ep.label_ids).astype(np.float32).mean().item()}
 
 
 def simple_accuracy(preds, labels):
@@ -791,40 +905,86 @@ class TaskResults():
     Collects and reports results for each finetuning task
     """
 
-    reporting_metrics_per_task = {
-        "cola": ["eval_matthews_correlation"],
-        "mnli": ["eval_accuracy", "mm_eval_accuracy"],
-        "mrpc": ["eval_f1", "eval_accuracy"],
-        "qnli": ["eval_accuracy"],
-        "qqp": ["eval_accuracy", "eval_f1"],
-        "rte": ["eval_accuracy"],
-        "sst2": ["eval_accuracy"],
-        "stsb": ["eval_pearson", "eval_spearmanr"],
-        "wnli": ["eval_accuracy"]
-    }
+    reporting_metrics_per_task = REPORTING_METRICS_PER_TASK
 
-    def __init__(self, task_name, training_args=None):
+    def __init__(self, task_name, early_stopping, training_args=None):
         self.task_name = task_name
         self.reporting_metrics = self.reporting_metrics_per_task[task_name]
         self.all_results = []
         self._results = None
         self.training_args = training_args
+        self.early_stopping = early_stopping
+        self.best_metric_key = self.training_args.metric_for_best_model
+        # If early stopping, need to track which step best results were at
+        # If not, -1 corresponds to end of training
+        self.best_idx_per_run = []  # One index for each run
+
+    def get_formatted_results(self):
+        """
+        Format eval_results to include task_name and run_idx for clarity when analyzing
+        multiple runs on multiple finetuning tasks.
+        """
+        self.all_fmt_results = []
+        for i in range(len(self.all_results)):
+            fmt_result = format_eval_results(self.all_results[i], i, self.task_name)
+            self.all_fmt_results.append(fmt_result)
 
     def append(self, results):
-        self.all_results.append(results)
+        """
+        Add results to all_results. Since results is a dict that can have values that
+        are either numbers or lists of numbers, pack all values in a list so they can
+        be processed more easily in subsequent steps.
+        """
+        self.all_results.append({})
+        for key in results.keys():
+            if not isinstance(results[key], list):
+                self.all_results[-1][key] = [results[key]]
+            else:
+                self.all_results[-1][key] = results[key]
 
     def reduce_metrics(self, reduction="mean"):
-        aggregated_results = defaultdict(list)
-        for results in self.all_results:
-            for metric, value in results.items():
-                aggregated_results[metric].append(value)
+        """
+        Get average or max over runs. Handles two cases:
+            1) If using early stopping, find the index where metric_for_best_model
+               is highest in each run. Get the max or mean of these.
+            2) If not using early stopping, get the last entry in each run, and take
+               the max or mean of these. This entry corresponds to the end of training.
 
+        Note that if you're not using TrackEvalMetrics callback, results dictionaries
+        are formatted so the values are lists fo length 1. Cases (1) and (2) above
+        result in the same behavior in this case, since there is a single entry to
+        reduce over in each run.
+        """
+        # all_results[run_idx][metric] is a number if not tracking eval metrics,
+        # or a list with a number for each time evaluate() is called.
+        # aggregated_results[metric] is a list of metric values, one for each run
+        aggregated_results = defaultdict(list)
+        # Loop over runs on the same task
+        for results in self.all_results:
+            if self.early_stopping:
+                # Within a run, the step where best results were achieved
+                best_metric_best_idx = np.argmax(results[self.best_metric_key])
+            else:
+                # If not early stopping, grab results seen at end of training
+                best_metric_best_idx = -1
+
+            self.best_idx_per_run.append(best_metric_best_idx)
+            for metric, values in results.items():
+                aggregated_results[metric].append(values[best_metric_best_idx])
+
+        # Average across runs
         if reduction == "mean":
             self._results = {k: np.average(v) for k, v in aggregated_results.items()}
 
+        # Max across runs
         elif reduction == "max":
-            argmax_idx = np.argmax(aggregated_results[self.reporting_metrics[0]])
-            self._results = self.all_results[argmax_idx]
+            # Which run has the best results
+            argmax_run = np.argmax(aggregated_results[self.reporting_metrics[0]])
+            # Which step in the run has best results
+            argmax_step = self.best_idx_per_run[argmax_run]
+            self._results = {}
+            for k, v in self.all_results[argmax_run].items():
+                self._results[k] = v[argmax_step]
 
     @property
     def results(self):

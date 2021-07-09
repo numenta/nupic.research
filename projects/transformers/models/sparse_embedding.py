@@ -53,15 +53,15 @@ class SparseEmbeddings(SparseWeightsBase):
         num_embeddings = self.module.num_embeddings
         embedding_dim = self.module.embedding_dim
         num_nz = int(round((1 - self.sparsity) * embedding_dim))
-        zero_mask = torch.ones(num_embeddings, embedding_dim, dtype=torch.bool)
+        zero_mask = torch.ones(num_embeddings, embedding_dim, dtype=torch.bool,
+                               device=module.weight.device)
         for embedding_j in range(num_embeddings):
             on_indices = np.random.choice(embedding_dim, num_nz, replace=False)
             zero_mask[embedding_j, on_indices] = False
 
-        # Use float16 because pytorch distributed nccl doesn't support bools
-        self.register_buffer("zero_mask", zero_mask.half())
+        self.register_buffer("zero_mask", zero_mask)
 
         self.rezero_weights()
 
     def rezero_weights(self):
-        self.module.weight.data[self.zero_mask.bool()] = 0
+        self.module.weight.data[self.zero_mask] = 0
