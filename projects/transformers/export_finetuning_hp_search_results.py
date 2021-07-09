@@ -36,9 +36,10 @@ import sys
 import warnings
 from collections import defaultdict
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy import stats
+from scipy import stats as ss
 from sklearn import linear_model
 
 from finetuning_constants import (
@@ -154,7 +155,6 @@ def load(experiment_path):
     experiment_path = os.path.expanduser(experiment_path)
     experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
 
-    print(f"parsing data from {experiment_path} which has {len(experiment_path)} exp states")
     # run once per experiment state
     # columns might differ between experiments
     dataframes = []
@@ -239,7 +239,6 @@ def load_from_base(base_path):
     for task in task_2_subdirs.keys():
         task_2_dfs[task] = []
         for subdir in task_2_subdirs[task]:
-            print(f"About to load data from {subdir}")
             df = load(subdir)
             task_2_dfs[task].append(df)
         task_2_dfs[task] = pd.concat(task_2_dfs[task])
@@ -408,7 +407,7 @@ def lin_regress_1d_metric_onto_hps(df, metric, column_names=None):
     X = df[column_names].values
     for col in column_names:
         x = df[col].values
-        result = linregress(x, y)
+        result = ss.linregress(x, y)
         print(result)
         hp_regs[col] = result
 
@@ -417,13 +416,14 @@ def lin_regress_1d_metric_onto_hps(df, metric, column_names=None):
 
 def plot_hp_regs(X, y, hp_regs, **subplot_kwargs):
 
-    fig, ax = plt.subplots(len(hp_regs), **subplot_kwargs)
-
+    fig, ax = plt.subplots(1, len(hp_regs), **subplot_kwargs)
+    # import pdb
+    # pdb.set_trace()
     for idx, param in enumerate(hp_regs):
 
         reg = hp_regs[param]
-        ax[idx].plot(X[param], y, "b.", label="data")
-        ax[idx].plot(X[param], reg.intercept + reg.slope * X[param],
+        ax[idx].plot(X[:,idx], y, "b.", label="data")
+        ax[idx].plot(X[:,idx], reg.intercept + reg.slope * X[:,idx],
             'r', linestyle='dashed', label="lin reg"
         )
         ax[idx].set_title(param)
@@ -431,10 +431,12 @@ def plot_hp_regs(X, y, hp_regs, **subplot_kwargs):
     return fig, ax
 
 
-def reg_and_plot(df, metric, column_names, **kwargs):
+def reg_and_plot(df, metric, column_names=None, **kwargs):
 
     hp_regs, X, y = lin_regress_1d_metric_onto_hps(df, metric, column_names)
     fig, ax = plot_hp_regs(X, y, hp_regs, **kwargs)
+
+    return hp_regs, X, y, fig, ax
 
 
 
