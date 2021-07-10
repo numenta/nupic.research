@@ -25,11 +25,21 @@ from .distillation import DistillationTrainer
 
 # from .trifecta import tiny_bert_trifecta_100k
 
+__all__ = ["CONFIGS"]
+
+
 # Deepspeed stage 2 default arguments. Args marked with "auto" will be replaced
 # with huggingface's values.
 DEEPSPEED_STAGE2_ARGS = {
+    "tokenized_data_cache_dir": "/mnt/datasets/huggingface/preprocessed-datasets/text",
     "deepspeed": {
+        "steps_per_print": 100,
         # "wall_clock_breakdown": True,
+        "sparse_gradients": True,
+        "gradient_accumulation_steps": "auto",
+        "gradient_clipping": "auto",
+        "train_batch_size": "auto",
+        "train_micro_batch_size_per_gpu": "auto",
         "optimizer": {
             "type": "AdamW",
             "params": {
@@ -41,31 +51,11 @@ DEEPSPEED_STAGE2_ARGS = {
         },
         "zero_optimization": {
             "stage": 2,
-            "offload_optimizer": {
-                "device": "cpu",
-                "pin_memory": "True",
-            },
-            "overlap_comm": True,
-            "allgather_partitions": True,
-            "allgather_bucket_size": 2e8,
-            "reduce_scatter": True,
-            "reduce_bucket_size": 2e8,
-            "contiguous_gradients": True,
         },
         "fp16": {
             "enabled": "auto",
-            "loss_scale": 0,
-            "loss_scale_window": 1000,
-            "initial_scale_power": 16,
-            "hysteresis": 2,
-            "min_loss_scale": 1
+            "initial_scale_power": 15,
         },
-        "gradient_accumulation_steps": "auto",
-        "gradient_clipping": "auto",
-        "train_batch_size": "auto",
-        "train_micro_batch_size_per_gpu": "auto",
-        "sparse_gradients": True,
-        "steps_per_print": 100,
     },
 }
 
