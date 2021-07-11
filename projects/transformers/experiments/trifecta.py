@@ -258,6 +258,7 @@ bert_sparse_trifecta_100k.update(
 verify_bert_sparse_trifecta_100k = deepcopy(bert_sparse_trifecta_100k)
 verify_bert_sparse_trifecta_100k.update(
     # Training arguments
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
     do_train=False,
     do_eval=True,
     overwrite_output_dir=False,
