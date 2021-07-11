@@ -116,7 +116,7 @@ SI_CENTROID_100["dataset_args"].update(num_tasks=100)
 SI_CENTROID_100["model_args"].update(num_segments=100)
 SI_CENTROID_100.update(
     num_tasks=100,
-    num_classes=100 * 50,
+    num_classes=10 * 100,
     optimizer_args=dict(lr=5e-4),
 )
 
