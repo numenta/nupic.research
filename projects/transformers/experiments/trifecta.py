@@ -482,11 +482,7 @@ CONFIGS = dict(
     finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
     finetuning_bert_sparse_trifecta_100k_glue_get_info=finetuning_bert_sparse_trifecta_100k_glue_get_info,
     verify_bert_sparse_trifecta_100k=verify_bert_sparse_trifecta_100k,
-<<<<<<< HEAD
-    finetuning_bert_sparse_trifecta_100k_glue_get_info_MC_direct=finetuning_bert_sparse_trifecta_100k_glue_get_info_MC_direct,
-=======
     verify_bert_sparse_trifecta_100k_mc_direct=verify_bert_sparse_trifecta_100k_mc_direct,
->>>>>>> master
     #   85% sparse
     bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
     finetuning_bert_sparse_85_trifecta_100k_glue=finetuning_bert_sparse_85_trifecta_100k_glue,  # noqa: E501
