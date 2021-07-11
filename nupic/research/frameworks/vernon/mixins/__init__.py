@@ -56,6 +56,7 @@ from .report_max_accuracy import ReportMaxAccuracy
 from .representation_overlap import *
 from .rezero_weights import RezeroWeights
 from .save_final_checkpoint import SaveFinalCheckpoint
+from .si import *
 from .step_based_logging import *
 from .track_representation_sparsity import *
 from .update_boost_strength import UpdateBoostStrength
