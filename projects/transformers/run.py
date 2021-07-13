@@ -370,7 +370,7 @@ def run_finetuning_single_task_with_hp_search(
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
             model_args, data_args, training_args, last_checkpoint,
-            load_model=False,
+            load_model=True,
         )
 
     # Defines defaults required for hp search
