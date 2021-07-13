@@ -85,12 +85,17 @@ class RigLMixin:
         sparse_modules = self.sparse_modules
 
         # Pre-prune sparsities (for verbose logging).
+        model.apply(rezero_weights)
         if self.verbose_rigl_logging:
             param_sparsity0, mask_sparsity0 = calc_cumulative_sparsity(sparse_modules)
 
-        # Prune weights.
-        model.apply(rezero_weights)
+        # If prune fraction is 0, say for a warmup step, return and don't prune.
         prune_fraction = self.prune_scheduler.get_prune_fraction()
+        if prune_fraction == 0:
+            self.prune_scheduler.step()
+            return train_loss
+
+        # Prune weights.
         num_removed = global_prune_by_abs_weight(self.sparse_modules, prune_fraction)
         model.apply(rezero_weights)
 
