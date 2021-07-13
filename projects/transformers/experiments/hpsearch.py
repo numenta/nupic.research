@@ -174,6 +174,48 @@ hp_search_finetuning_trifecta_85_100k_small_tasks.update(
     )
 )
 
+# bigger datasets, small number of trials
+hp_search_finetuning_trifecta_85_100k_big_tasks = deepcopy(
+    debug_finetuning_sparse_hp_search)
+hp_search_finetuning_trifecta_85_100k_big_tasks.update(
+    task_name=None,
+    task_names=["mnli", "qnli", "qqp", "sst2"],
+    task_hyperparams=dict(
+        mnli=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-5, 1e-2),
+                max_steps=tune.choice([20_000, 60_000, 100_000]),
+                warmup_ratio=tune.choice([0, 0.1])),
+            hp_num_trials=8,
+            hp_compute_objective=("maximize", "mm_eval_accuracy")
+        ),
+        qnli=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-5, 1e-2),
+                max_steps=tune.choice([20_000, 60_000, 100_000]),
+                warmup_ratio=tune.choice([0., 0.1])),
+            hp_num_trials=8,
+            hp_compute_objective=("maximize", "eval_accuracy")
+        ),
+        qqp=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-5, 1e-2),
+                max_steps=tune.choice([20_000, 60_000, 100_000]),
+                warmup_ratio=tune.choice([0., 0.1])),
+            hp_num_trials=8,
+            hp_compute_objective=("maximize", "eval_f1")
+        ),
+        sst2=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-5, 1e-2),
+                max_steps=tune.choice([20_000, 60_000, 100_000]),
+                warmup_ratio=tune.choice([0., 0.1])),
+            hp_num_trials=12,
+            hp_compute_objective=("maximize", "eval_accuracy")
+        ),
+    )
+)
+
 hp_search_finetuning_trifecta_90_100k_small_tasks = deepcopy(
     hp_search_finetuning_trifecta_85_100k_small_tasks)
 hp_search_finetuning_trifecta_90_100k_small_tasks.update(
@@ -190,6 +232,13 @@ hp_search_finetuning_bert_100k_small_tasks.update(
 )
 
 
+hp_search_finetuning_trifecta_90_100k_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_big_tasks)
+hp_search_finetuning_trifecta_90_100k_big_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa
+)
+
+
 
 # Export configurations in this file
 CONFIGS = dict(
@@ -199,4 +248,6 @@ CONFIGS = dict(
     hp_search_finetuning_bert_100k_small_tasks=hp_search_finetuning_bert_100k_small_tasks,
     hp_search_finetuning_trifecta_85_100k_small_tasks=hp_search_finetuning_trifecta_85_100k_small_tasks,
     hp_search_finetuning_trifecta_90_100k_small_tasks=hp_search_finetuning_trifecta_90_100k_small_tasks,
+    hp_search_finetuning_trifecta_85_100k_big_tasks=hp_search_finetuning_trifecta_85_100k_big_tasks,
+    hp_search_finetuning_trifecta_90_100k_big_tasks=hp_search_finetuning_trifecta_90_100k_big_tasks,
 )
