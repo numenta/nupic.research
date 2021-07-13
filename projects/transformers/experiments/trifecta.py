@@ -335,23 +335,31 @@ ft_bert_sp_tri_100k_g_s = finetuning_bert_sparse_trifecta_100k_glue_simple
 
 
 # BERT Base 2x Wide
+# This is ran with four p4d.24xlarge instances with 8 GPUs each for an effective batch
+# size of 256. GPU memory ~26 GB. Time to completion is roughly 35 hrs.
 bert_sparse_trifecta_2x_100k = deepcopy(bert_sparse_trifecta_100k)
 bert_sparse_trifecta_2x_100k.update(
-    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text"  # noqa: E501
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    overwrite_output_dir=False,
+    save_steps=500,
 )
 bert_sparse_trifecta_2x_100k["trainer_mixin_args"].update(
-    max_lr=0.0022,
+    # The lr range test suggested to use 0.0023, but that resulted in
+    # unstable training, so this lower lr will be used.
+    max_lr=0.0015,
 )
 bert_sparse_trifecta_2x_100k["config_kwargs"].update(
     hidden_size=768 * 2,
     intermediate_size=3072 * 2,
-    sparsity=0.9606,  # this will have 16 M on-params
+    sparsity=0.9595,  # this will have 16.56 M on-params
 )
 
 
 # LR range test for bert_sparse_trifecta_2x_100k
-# Run: https://wandb.ai/numenta/huggingface/runs/y1tg8g36
-bert_sparse_2x_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)  # noqa: E501
+# Run: https://wandb.ai/numenta/huggingface/runs/e7iurznf
+bert_sparse_2x_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
 bert_sparse_2x_100k_kd_lr_range_test.update(
     max_steps=100,
     per_device_train_batch_size=8,
@@ -374,42 +382,53 @@ bert_sparse_2x_100k_kd_lr_range_test.update(
 bert_sparse_2x_100k_kd_lr_range_test["config_kwargs"].update(
     hidden_size=768 * 2,
     intermediate_size=3072 * 2,
-    sparsity=0.9606,  # this will have 16 M on-params
+    sparsity=0.9595,  # this will have 16.56 M on-params
 )
 
 
 # BERT Base 4x Wide
-# NOTE: Note ready yet, still need to run bert_sparse_trifecta_4x_100k
-# bert_sparse_trifecta_4x_100k = deepcopy(bert_sparse_trifecta_100k)
-# bert_sparse_trifecta_4x_100k.update(
-#     per_device_train_batch_size=4,
-#     per_evice_eval_batch_size=4,
-#     tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text"
-# )
-# bert_sparse_trifecta_4x_100k["trainer_mixin_args"].update(
-#     # max_lr=TBD,
-# )
-# bert_sparse_trifecta_4x_100k["config_kwargs"].update(
-#     hidden_size=768 * 4,
-#     intermediate_size=3072 * 4,
-#     sparsity=0.99399,  # this will have 11 M on-params
-# )
+# This config is still in progress. We've yet to understand the memory requirements
+# and whether some number of p4d.24xlarge can be used to complete the run.
+bert_sparse_trifecta_4x_100k = deepcopy(bert_sparse_trifecta_100k)
+bert_sparse_trifecta_4x_100k.update(
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+
+    # We'll skip eval in this config as it takes a lot more GPU memory.
+    do_eval=False,
+)
+bert_sparse_trifecta_4x_100k["trainer_mixin_args"].update(
+    max_lr=0.005,
+
+
+    # RigL
+    prune_fraction=0.3,
+    prune_freq=100,
+)
+bert_sparse_trifecta_4x_100k["config_kwargs"].update(
+    hidden_size=768 * 4,
+    intermediate_size=3072 * 4,
+    sparsity=0.99365,  # this will have 11.41 M on-params
+)
 
 
 # LR range test for bert_sparse_trifecta_4x_100k
-# Run:
-bert_sparse_4x_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)  # noqa: E501
+# Run: https://wandb.ai/numenta/huggingface/runs/uipplb2n
+# This is ran on four p4d.24xlarge instances for an effective batch size of 256
+bert_sparse_4x_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
 bert_sparse_4x_100k_kd_lr_range_test.update(
-    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",  # noqa: E501
-    per_device_train_batch_size=4,
-    per_evice_eval_batch_size=4,
-    gradient_accumulation_steps=2,
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    per_device_train_batch_size=2,
+    per_device_eval_batch_size=2,
+    gradient_accumulation_steps=4,
+    max_steps=100,
 
     trainer_class=KDLRRangeTestTrainer,
     trainer_mixin_args=dict(
         # LR Range Test
         min_lr=0.0001,
-        max_lr=0.005,
+        max_lr=0.01,
         test_mode="linear",
 
         # KD
@@ -422,7 +441,7 @@ bert_sparse_4x_100k_kd_lr_range_test.update(
 bert_sparse_4x_100k_kd_lr_range_test["config_kwargs"].update(
     hidden_size=768 * 4,
     intermediate_size=3072 * 4,
-    sparsity=0.99399,  # this will have 11 M on-params
+    sparsity=0.99365,  # this will have 11 M on-params
 )
 
 
@@ -454,6 +473,6 @@ CONFIGS = dict(
     bert_sparse_trifecta_2x_100k=bert_sparse_trifecta_2x_100k,
     bert_sparse_2x_100k_kd_lr_range_test=bert_sparse_2x_100k_kd_lr_range_test,
     #   4x wide ~11 Mi Params
-    # bert_sparse_trifecta_4x_100k=bert_sparse_trifecta_4x_100k,
+    bert_sparse_trifecta_4x_100k=bert_sparse_trifecta_4x_100k,
     bert_sparse_4x_100k_kd_lr_range_test=bert_sparse_4x_100k_kd_lr_range_test,
 )
