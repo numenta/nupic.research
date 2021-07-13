@@ -59,8 +59,9 @@ class RigLMixin:
         self.prune_fraction = mixin_args.get("prune_fraction", 0.3)
         self.prune_freq = mixin_args.get("prune_freq", 100)
         self.warmup_steps = mixin_args.get("warmup_steps", self.prune_freq)
+        total_steps = self.args.max_steps * self.args.gradient_accumulation_steps
         self.prune_scheduler = CosineDecayPruneScheduler(
-            total_steps=self.args.max_steps,
+            total_steps=total_steps,
             prune_fraction=self.prune_fraction,
             warmup_steps=self.warmup_steps
         )
