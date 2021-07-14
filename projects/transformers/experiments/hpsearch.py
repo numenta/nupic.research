@@ -181,38 +181,31 @@ hp_search_finetuning_trifecta_85_100k_big_tasks.update(
     task_name=None,
     task_names=["mnli", "qnli", "qqp", "sst2"],
     eval_steps=2_000,
+    hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-6, 1e-3),
+                max_steps=tune.randint(20_000, 100_000),
+    ),
+    hp_num_trials=8,
     task_hyperparams=dict(
         mnli=dict(
-            hp_space=lambda trial: dict(
-                learning_rate=tune.loguniform(1e-5, 1e-2),
-                max_steps=tune.choice([20_000, 60_000, 100_000]),
-                warmup_ratio=tune.choice([0, 0.1])),
-            hp_num_trials=8,
-            hp_compute_objective=("maximize", "eval_accuracy")
+            hp_num_trials=6,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
         ),
         qnli=dict(
-            hp_space=lambda trial: dict(
-                learning_rate=tune.loguniform(1e-5, 1e-2),
-                max_steps=tune.choice([20_000, 60_000, 100_000]),
-                warmup_ratio=tune.choice([0., 0.1])),
-            hp_num_trials=8,
-            hp_compute_objective=("maximize", "eval_accuracy")
+            hp_num_trials=6,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
         ),
         qqp=dict(
-            hp_space=lambda trial: dict(
-                learning_rate=tune.loguniform(1e-5, 1e-2),
-                max_steps=tune.choice([20_000, 60_000, 100_000]),
-                warmup_ratio=tune.choice([0., 0.1])),
-            hp_num_trials=8,
-            hp_compute_objective=("maximize", "eval_f1")
+            hp_num_trials=6,
+            hp_compute_objective=("maximize", "eval_f1"),
+            eval_steps=4_000,
         ),
         sst2=dict(
-            hp_space=lambda trial: dict(
-                learning_rate=tune.loguniform(1e-5, 1e-2),
-                max_steps=tune.choice([20_000, 60_000, 100_000]),
-                warmup_ratio=tune.choice([0., 0.1])),
-            hp_num_trials=12,
-            hp_compute_objective=("maximize", "eval_accuracy")
+            hp_num_trials=18,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
         ),
     )
 )
