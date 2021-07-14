@@ -39,16 +39,26 @@ from run_args import ModelArguments
 from run_utils import init_config, init_tokenizer
 
 
-def calculate_sparsity_param(sparsity_desired, experiment, test_sparsity=False):
+def calculate_sparsity_param(
+    sparsity_desired,
+    parameters_desired,
+    experiment,
+    test_sparsity=False
+):
     """
     :param sparsity_desired: desired sparsity of model
+    :param parameters_desired: desired number of on-params;
+                               can't be used with sparsity_desired
     :param experiment: name of experiment config with a sparse architecture
     :param test_sparsity: whether to test the calculated sparsity param, this test loads
                           the model and calculates the resulting sparsity.
     """
 
+    # Ensure sparsity_desired or parameters_desired is specified but not both.
+    assert not (sparsity_desired is None and parameters_desired is None)
+    assert sparsity_desired is not None or parameters_desired is not None
+
     print(bold("Initializing model... ") + "(this may take a minute)")
-    print(f"   sparsity_desired: {sparsity_desired}")
     print(f"   experiment: {experiment}")
 
     # Load and parse model args from config.
@@ -75,12 +85,17 @@ def calculate_sparsity_param(sparsity_desired, experiment, test_sparsity=False):
 
     # Calculate the total number of params and the needed sparsity.
     total_params, _ = count_nonzero_params(model.bert)
-    target_params = total_params * (1 - sparsity_desired)
-    dense_params = total_params - sparsifiable_params
-    target_sparsity = 1 - (target_params - dense_params) / sparsifiable_params
 
-    print(f"   desired sparsity: {sparsity_desired}")
-    print(f"   target_params: {target_params}")
+    if parameters_desired is None:
+        parameters_desired = total_params * (1 - sparsity_desired)
+    elif sparsity_desired is None:
+        sparsity_desired = parameters_desired / total_params
+
+    dense_params = total_params - sparsifiable_params
+    target_sparsity = 1 - (parameters_desired - dense_params) / sparsifiable_params
+
+    print(f"   sparsity_desired: {sparsity_desired}")
+    print(f"   parameters_desired: {parameters_desired}")
     print(f"   sparsifiable_params: {sparsifiable_params}")
     print(f"   target_sparsity: {target_sparsity} (set your sparsity to this)")
     print()
@@ -109,9 +124,11 @@ def calculate_sparsity_param(sparsity_desired, experiment, test_sparsity=False):
     model.apply(rezero_weights)  # set off weights to zero.
 
     resulting_sparsity = calc_model_sparsity(model.bert)
-    print("    Resulting sparsity of model.bert using "
-          f"`sparsity={target_sparsity}`: {resulting_sparsity}\n"
-          "    Note this may not be exactly as desired as there are "
+    _, nz_params = count_nonzero_params(model.bert)
+    print(f"    Resulting sparsity of model.bert using sparsity={target_sparsity}\n"
+          f"       actual_sparsity={resulting_sparsity}\n"
+          f"       num_nonzero_params={nz_params}\n")
+    print(f"    Note this may not be exactly as desired as there are "
           "discrete levels of allowable sparsity")
     print()
 
@@ -122,13 +139,26 @@ param one should set for a desired level of sparsity. For instance, in some mode
 desired sparsity is 80%, but not all weights, such as those for layer norm, will be
 sparsified. Thus, one may need to set `sparsity=0.85` to achieve the desired 80%.
     """)
-    parser.add_argument("-s", "--sparsity_desired", type=float,
+    parser.add_argument("-s", "--sparsity_desired", type=float, required=False,
                         help="Desired sparsity of BERT model.")
+    parser.add_argument("-p", "--parameters_desired", type=float, required=False,
+                        help="Desired on-params of BERT model. "
+                        "Can't be used with `sparsity_desired`") 
     parser.add_argument("-e", "--experiment", choices=list(CONFIGS.keys()),
                         help="Available experiments", required=True)
     parser.add_argument("-t", "--test_sparsity", type=bool, default=True,
                         help="Whether to test the sparsity params by loading a new "
                              "model and measuring the resulting sparsity.")
 
+    # Ensure sparsity_desired or parameters_desired is specified, but not both.
     args = parser.parse_args()
+    if args.sparsity_desired is None and args.parameters_desired is None:
+        print("Must specify one of `sparsity_desired` or `parameters_desired`.")
+        parser.print_help()
+        exit(1)
+    if args.sparsity_desired is not None and args.parameters_desired is not None:
+        print("Must specify only one of `sparsity_desired` or `parameters_desired`.")
+        parser.print_help()
+        exit(1)
+
     calculate_sparsity_param(**args.__dict__)
