@@ -180,6 +180,7 @@ hp_search_finetuning_trifecta_85_100k_big_tasks = deepcopy(
 hp_search_finetuning_trifecta_85_100k_big_tasks.update(
     task_name=None,
     task_names=["mnli", "qnli", "qqp", "sst2"],
+    eval_steps=1_000,
     task_hyperparams=dict(
         mnli=dict(
             hp_space=lambda trial: dict(
@@ -187,7 +188,7 @@ hp_search_finetuning_trifecta_85_100k_big_tasks.update(
                 max_steps=tune.choice([20_000, 60_000, 100_000]),
                 warmup_ratio=tune.choice([0, 0.1])),
             hp_num_trials=8,
-            hp_compute_objective=("maximize", "mm_eval_accuracy")
+            hp_compute_objective=("maximize", "eval_accuracy")
         ),
         qnli=dict(
             hp_space=lambda trial: dict(
