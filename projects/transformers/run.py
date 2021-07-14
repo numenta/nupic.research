@@ -299,9 +299,8 @@ def run_pretraining(
 
 
 
-def init_dataset_for_finetuning(
-    model_args, data_args, training_args,
-    last_checkpoint=None, load_model=True
+def init_dataset_for_finetuning(model_args, data_args, training_args,
+    last_checkpoint=None
 ):
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
@@ -314,12 +313,8 @@ def init_dataset_for_finetuning(
     )
     config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
     tokenizer = init_tokenizer(model_args)
-    # TODO: move loading model to within finetuning functions
-    if load_model:
-        model = init_model(model_args, config, tokenizer, finetuning=True)
-        check_sparsity_callback(model, model_args)
-    else:
-        model = None
+    model = init_model(model_args, config, tokenizer, finetuning=True)
+    check_sparsity_callback(model, model_args)
 
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
@@ -370,7 +365,6 @@ def run_finetuning_single_task_with_hp_search(
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
             model_args, data_args, training_args, last_checkpoint,
-            load_model=True,
         )
 
     # Defines defaults required for hp search
@@ -384,7 +378,7 @@ def run_finetuning_single_task_with_hp_search(
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
     model_args = check_hp_compute_objective(model_args, data_args.task_name)
-    # TODO: check sparsity without instantiated model
+    check_sparsity_callback(model, model_args)
 
     # Get fraction of the validation dataset to use in hp search
     if model_args.hp_validation_dataset_pct < 1:
@@ -446,9 +440,6 @@ def run_finetuning_single_task_with_hp_search(
     best_run = trainer.hyperparameter_search(**hp_search_kwargs)
     logging.info(f"Best run: {best_run}")
 
-    # If previous run tracked the same metric, and current run got better
-    # results, then overwrite. Else, leave it. The data for this run are
-    # still available in reporter.report_dir.
     hp_res_file = os.path.join(training_args.output_dir,
         f"best_run_results_{model_args.hp_compute_objective[1]}.txt")
     write_new = check_if_current_hp_best(hp_res_file, model_args, best_run)

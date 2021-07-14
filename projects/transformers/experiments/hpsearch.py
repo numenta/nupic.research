@@ -180,7 +180,7 @@ hp_search_finetuning_trifecta_85_100k_big_tasks = deepcopy(
 hp_search_finetuning_trifecta_85_100k_big_tasks.update(
     task_name=None,
     task_names=["mnli", "qnli", "qqp", "sst2"],
-    eval_steps=1_000,
+    eval_steps=2_000,
     task_hyperparams=dict(
         mnli=dict(
             hp_space=lambda trial: dict(
