@@ -21,6 +21,8 @@ from transformers import TrainerCallback
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
+import wandb
+
 
 class TrackEvalMetrics(TrainerCallback):
     """
@@ -28,7 +30,7 @@ class TrackEvalMetrics(TrainerCallback):
     after trainer.evaluate() is called. It is designed to provide the same
     metrics for training and validation sets, at the same time points.
     """
-    def __init__(self):
+    def __init__(self, sparsity_tolerance=None):
         """
         Set up two dictionaries to track training and eval metrics, and a list
         to track steps.
@@ -40,6 +42,7 @@ class TrackEvalMetrics(TrainerCallback):
             self.eval_metrics['acc'] -> [acc1, acc2, ..., accn]
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
         """
+        self.sparsity_tolerance = sparsity_tolerance if sparsity_tolerance is not None else 0.01
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
@@ -72,12 +75,27 @@ class TrackEvalMetrics(TrainerCallback):
             self.eval_metrics["num_nonzero_params"].append(num_nonzero)
             self.eval_metrics["sparsity"].append(model_sparsity)
 
+            # guarantee that everything stayed sparse,
+            # up to specified tolerance
+            if (self.sparsity_tolerance < 1) and len(self.eval_metrics["sparsity"]) > 1:
+                sparse_diff = self.eval_metrics["sparsity"][0] - self.eval_metrics["sparsity"][-1]  # noqa
+                assert abs(sparse_diff) < self.sparsity_tolerance, "Model sparsity fluctuated"
+                f"beyond acceptable range. {self.eval_metrics['sparsity']}"
+
             # track learning rate
             # get_last_lr() returns lr for each parameter group. For now,
             # assume lrs are the same for all and just track one.
-            last_lr = kwargs["lr_scheduler"].get_last_lr()
-            self.eval_metrics["lr"].append(last_lr[0])
+            if kwargs["lr_scheduler"] is not None:
+                last_lr = kwargs["lr_scheduler"].get_last_lr()
+                self.eval_metrics["lr"].append(last_lr[0])
 
+            # if wandb.run is not None:
+            #     print("logging wandb stuff here")
+            #     wandb.run.summary.update(self.eval_metrics)  # or [-1]
+            # if self.step_counter > 100:
+            #     import pdb
+            #     pdb.set_trace()
+            # # wandb.log(self.eval_metrics, commit=False)
             # TODO
             # Possibly update train_results
             # Possibly wandb logging
@@ -102,3 +120,10 @@ class TrackEvalMetrics(TrainerCallback):
             self.mm_metrics = {ksplit(k): v for k, v in metrics.items()}
 
         return is_mnli_mm
+
+
+    # TODO
+    # Aggregate data on train end or at least make it an option
+    # this would make hyperparameter tuning easier.
+
+    

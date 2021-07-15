@@ -18,12 +18,14 @@
 #  http://numenta.org/licenses/
 #
 
+import os
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
+import torch
 from transformers import MODEL_FOR_MASKED_LM_MAPPING, Trainer, TrainingArguments
 
-from run_utils import TASK_TO_KEYS, compute_objective_eval_loss
+from run_utils import TASK_TO_KEYS
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -47,6 +49,7 @@ class CustomTrainingArguments(TrainingArguments):
                     "for addition arguments when trainer mixins are used."
         }
     )
+
 
 
 @dataclass
@@ -159,19 +162,27 @@ class ModelArguments:
             "help": "Percentage of the validation dataset to be used in hp search"
         }
     )
-    hp_compute_objective: Callable = field(
-        default=compute_objective_eval_loss,
+    hp_compute_objective: Tuple = field(
+        default=("minimize", "eval_loss"),
         metadata={
-            "help": "Defines the objective function be used in hyperparameter search"
+            "help": "Defines the direction we want to move towards and the "
+                    "objective function to be used in hyperparameter search "
         }
     )
     hp_extra_kwargs: Dict = field(
         default_factory=dict,
         metadata={
             "help": "Dictionary with extra parameters to be passed to "
-                    "`trainer.hyperparameter_search`. Includse arguments to `tune.run`"
+                    "`trainer.hyperparameter_search`. Includes arguments to `tune.run`"
         }
     )
+    hp_resources_per_trial: Dict = field(
+        default_factory=lambda: dict(
+            cpu=os.cpu_count() / torch.cuda.device_count() - 1,
+            gpu=1
+        ),
+    )
+
 
 
 @dataclass

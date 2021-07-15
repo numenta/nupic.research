@@ -30,9 +30,9 @@ from functools import partial
 from hashlib import blake2b
 
 import numpy as np
-import torch
 from datasets import concatenate_datasets, load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
+import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import f1_score, matthews_corrcoef
 from transformers import (
@@ -47,9 +47,11 @@ from transformers import (
     TrainerCallback,
 )
 
-from callbacks import TrackEvalMetrics
-from finetuning_constants import REPORTING_METRICS_PER_TASK
+from callbacks import RezeroWeightsCallback, TrackEvalMetrics
+
+from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
+from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
 __all__ = [
     "evaluate_language_model",
@@ -149,8 +151,13 @@ def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
 
 def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_list):
     """
-    Test tasks after finetuning.
+    Write a file of predictions on the test set used for uploading to GLUE leaderboard
+        TODO: make sure this works for all tasks
     """
+
+    logging.info("At test time: total params: {:,} non zero params: {:,}".format(
+        *count_nonzero_params(trainer.model)
+    ))
 
     for test_dataset, task in zip(test_datasets, tasks):
         # Removing the `label` columns because it contains -1
@@ -161,7 +168,7 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
                        else np.argmax(predictions, axis=1))
 
         output_test_file = os.path.join(
-            output_dir, f"test_results_{task}.txt"
+            output_dir, f"{GLUE_NAMES_PER_TASK[task]}.tsv"
         )
         if trainer.is_world_process_zero():
             with open(output_test_file, "w") as writer:
@@ -175,7 +182,7 @@ def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_l
                         writer.write(f"{index}\t{item}\n")
 
 
-def evaluate_language_model(trainer, eval_dataset, output_dir):
+def evaluate_language_model(trainer, eval_dataset, output_dir, metric_callback=None):
     """Evaluate language model. Returns dict with results on perplexity metric. """
     results = {}
     eval_output = trainer.evaluate(eval_dataset)
@@ -190,6 +197,11 @@ def evaluate_language_model(trainer, eval_dataset, output_dir):
             for key, value in sorted(results.items()):
                 logging.info(f"  {key} = {value}")
                 writer.write(f"{key} = {value}\n")
+
+        if metric_callback:
+            tracked_eval_metrics = metric_callback.eval_metrics
+            with open(os.path.join(output_dir, "eval_metrics.p"), "wb") as file:
+                pickle.dump(tracked_eval_metrics, file)
 
     return results
 
@@ -348,6 +360,13 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
     return tokenized_datasets
 
 
+
+# TODO
+# {ossibly refactor this function so it tokenizes the data in a default way
+# without needing access to a loaded model, since it is currently 
+# requiring us to load a model twice for hyperparameter tuning. 
+# Instead we can add checks right before training to see if we need 
+# to tokenize differently.
 def preprocess_datasets_task(datasets, tokenizer, data_args, model,
                              num_labels, label_list, is_regression):
     """Preprocess datasets for finetuning"""
@@ -708,6 +727,9 @@ def format_eval_results(eval_results, run, task_name):
 
     return new_eval_results
 
+#####
+# Code to make sure training / finetuning / hp optimization runs safely
+#####
 
 def check_for_callback(model_args, class_of_callback):
 
@@ -719,6 +741,107 @@ def check_for_callback(model_args, class_of_callback):
             callback_instance = model_args.trainer_callbacks[callback_idx]
 
     return has_callback, callback_instance
+
+
+def check_sparsity_callback(model, model_args):
+    
+    is_sparse = False
+    for module in model.modules():
+        if isinstance(module, SparseWeightsBase):
+            is_sparse = True
+            break
+
+    if is_sparse:
+        has_rezero = check_for_callback(model_args, RezeroWeightsCallback)
+        assert has_rezero, "Finetuning sparse models without rezeroing weights"
+        " is prohibited"
+
+
+def check_eval_and_max_steps(training_args, train_dataset):
+    """
+    If you're supposed to load best model at end, but evaluate() never gets
+    called because eval_steps > number of training steps taken, you'll get
+    an error at the end of training. If this is the case, set eval_steps
+    equal to max_steps so it gets called at least once.
+    """
+    if training_args.load_best_model_at_end:
+            if training_args.max_steps == -1:
+                num_examples = training_args.num_train_epochs * len(train_dataset)
+                max_steps = num_examples // training_args.per_device_train_batch_size
+            else:
+                max_steps = training_args.max_steps
+            if max_steps < training_args.eval_steps:
+                logging.warning(
+                    f"max_steps({max_steps}) < "
+                    f"eval_steps({training_args.eval_steps}) "
+                    "To avoid issues, setting eval steps equal to max_steps"
+                )
+                training_args.eval_steps = max_steps
+    
+    return training_args
+
+def check_hp_compute_objective(model_args, task_name):
+
+    if hasattr(model_args, "hp_compute_objective"):
+        if model_args.hp_compute_objective is not None:
+            direction, objective = model_args.hp_compute_objective
+            if objective == "eval_loss":
+                if direction != "minimize":
+                    logging.warning(
+                        "You are asking hp search to find parameters"
+                        "that MAXIMIZE loss instead of MINIMIZING it."
+                        "Setting this to minimize"
+                    )
+                    # Can't modify tuples, so convert to list and then back
+                    hp_compute_objective = list(model_args.hp_compute_objective)
+                    hp_compute_objective[0] = "minimize"
+                    model_args.hp_compute_objective = tuple(hp_compute_objective)
+            else:
+                if objective not in REPORTING_METRICS_PER_TASK[task_name]:
+                    logging.warning(
+                        "Warning, code will break when you try to tune"
+                        "hyperparameters on this task because"
+                        "hp_compute_objective is incorrect. Setting it to"
+                        "first reporting metric"
+                    )
+                    hp_compute_objective = list(model_args.hp_compute_objective)
+                    hp_compute_objective[1] = REPORTING_METRICS_PER_TASK[task_name][0]
+                    hp_compute_objective[0] = "maximize"
+                    model_args.hp_compute_objective = tuple(hp_compute_objective)
+
+    return model_args
+
+
+def check_best_metric(training_args, task_name):
+    """
+    Runs can easily break if load_best_model_at_end because you
+    specified a metric for a diferent task. You can get all the way through
+    training and have it break. This will flip best_metric to eval_loss in
+    that case. It also checks to make sure greater_is_better is set properly.
+    """
+
+    allowed_metrics = REPORTING_METRICS_PER_TASK[task_name]
+    if training_args.metric_for_best_model not in allowed_metrics:
+        if training_args.metric_for_best_model != "eval_loss":
+            logging.warning(
+                "Warning, code will break because the current metric for best model"
+                f" (training_args.metric_for_best_model) is not being tracked."
+                "Defaulting metric_for_best_model to first reporting metric"
+            )
+            training_args.metric_for_best_model = REPORTING_METRICS_PER_TASK[task_name][0]
+            training_args.greater_is_better = False
+
+    if training_args.metric_for_best_model == "eval_loss":
+        if hasattr(training_args, "greater_is_better"):
+            if training_args.greater_is_better != False:
+                logging.warning(
+                    "Greater is better is set to True with eval_loss as "
+                    "metric_for_best_model. Flipping greater is better to"
+                    "False, since we want small loss"
+                )
+        training_args.greater_is_better = False
+
+    return training_args
 
 
 def evaluate_tasks_handler(trainer,
@@ -919,6 +1042,9 @@ class TaskResults():
         # If not, -1 corresponds to end of training
         self.best_idx_per_run = []  # One index for each run
 
+    def __len__(self):
+        return len(self.all_results)
+
     def get_formatted_results(self):
         """
         Format eval_results to include task_name and run_idx for clarity when analyzing
@@ -941,6 +1067,15 @@ class TaskResults():
                 self.all_results[-1][key] = [results[key]]
             else:
                 self.all_results[-1][key] = results[key]
+
+    def get_best_idx_per_run(self, metric=None):
+
+        if not metric:
+            metric = self.best_metric_key
+
+        best_idx_per_run = [np.argmax(run[metric]) for run in self.all_results]
+
+        return best_idx_per_run
 
     def reduce_metrics(self, reduction="mean"):
         """
@@ -1049,7 +1184,7 @@ def run_hyperparameter_search(
     """
 
     training_args.load_best_model_at_end = True
-    training_args.disable_tqdm = True
+    training_args.disable_tqdm = True  # competes with ray output
     # TODO: sync metric_for_best_model with compute_objective, should be same metric
     # and accept custom metrics defined by user
     training_args.metric_for_best_model = "eval_loss"
@@ -1095,16 +1230,15 @@ def run_hyperparameter_search(
     )
 
     hp_search_kwargs = dict(
-        direction="maximize",
+        direction=model_args.hp_compute_objective[0],
         backend="ray",
         n_trials=model_args.hp_num_trials,
         hp_space=model_args.hp_space,
-        compute_objective=model_args.hp_compute_objective,
-        local_dir=training_args.output_dir,
-        resources_per_trial=dict(
-            cpu=os.cpu_count() / torch.cuda.device_count() - 1,
-            gpu=1
+        compute_objective=partial(
+            compute_objective, objective=model_args.hp_compute_objective[1]
         ),
+        local_dir=training_args.output_dir,
+        resources_per_trial=model_args.hp_resources_per_trial,
         checkpoint_freq=0,
         keep_checkpoints_num=0,
         checkpoint_at_end=False,
@@ -1128,5 +1262,61 @@ def run_hyperparameter_search(
                 writer.write(f"{key} = {value}\n")
 
 
-def compute_objective_eval_loss(metrics):
-    return metrics["eval_loss"]
+def compute_objective(metrics, objective):
+    return metrics[objective]
+
+def check_if_current_hp_best(old_file, model_args, best_run):
+
+    # if previous file
+    if not os.path.exists(old_file):
+        return True
+
+    with open(old_file, 'r') as f:
+        data = f.read()
+        line_split = data.split("\n")
+
+    previous_best = None
+    for line in line_split:
+        if model_args.hp_compute_objective[1] in line:
+            previous_best = float(line.split("=")[-1])
+
+
+    if model_args.hp_compute_objective[0] == "maximize":
+        operator = "__gt__"
+    else:
+        operator = "__lt__"
+    
+    if getattr(previous_best, operator)(best_run.objective):
+        return False
+    else:
+        return True
+
+
+def collate_hp_csvs(report_dir):
+
+    files = os.listdir(report_dir)
+    subdirs = []
+    for file in files:
+        full_path = os.path.join(report_dir, file)
+        if os.path.isdir(full_path):
+            subdirs.append(full_path)
+
+    dfs = []
+    for subdir in subdirs:
+        df = pd.read_csv(os.path.join(subdir, "progress.csv"))
+        dfs.append(df)
+
+    big_df = pd.concat(dfs)
+    big_df.to_csv(os.path.join(report_dir, "all_progress.csv"))
+
+
+# pretrained model
+# task
+#
+
+
+# parent model
+#   wnli
+#       checkpoints/
+#       eval_results.txt
+#   cola
