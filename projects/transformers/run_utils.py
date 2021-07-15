@@ -1310,15 +1310,3 @@ def collate_hp_csvs(report_dir):
 
     big_df = pd.concat(dfs)
     big_df.to_csv(os.path.join(report_dir, "all_progress.csv"))
-
-
-# pretrained model
-# task
-#
-
-
-# parent model
-#   wnli
-#       checkpoints/
-#       eval_results.txt
-#   cola

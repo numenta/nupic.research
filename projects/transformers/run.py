@@ -424,7 +424,6 @@ def run_finetuning_single_task_with_hp_search(
     hp_search_kwargs = dict(
         direction=model_args.hp_compute_objective[0],
         backend="ray",
-        callbacks=init_ray_wandb_logger_callback(training_args),
         n_trials=model_args.hp_num_trials,
         hp_space=model_args.hp_space,
         compute_objective=partial(
@@ -440,9 +439,8 @@ def run_finetuning_single_task_with_hp_search(
     # TODO
     # Get wandb to log properly
     # trainer.hyperparameter_search calls ray.tune()
-    # you can set config as a kwarg to trainer.hyperparameter_search
-    # which gets passed to ray.tune, which is where wandb stuff is usually
-    # set up.
+    # you can set config or callbacks as a kwarg to trainer.hyperparameter_search
+    # which gets passed to ray.tune
 
     # Update any extra kwargs defined in config
     hp_search_kwargs.update(**model_args.hp_extra_kwargs)

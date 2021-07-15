@@ -88,13 +88,6 @@ class TrackEvalMetrics(TrainerCallback):
                 last_lr = kwargs["lr_scheduler"].get_last_lr()
                 self.eval_metrics["lr"].append(last_lr[0])
 
-            # if wandb.run is not None:
-            #     print("logging wandb stuff here")
-            #     wandb.run.summary.update(self.eval_metrics)  # or [-1]
-            # if self.step_counter > 100:
-            #     import pdb
-            #     pdb.set_trace()
-            # # wandb.log(self.eval_metrics, commit=False)
             # TODO
             # Possibly update train_results
             # Possibly wandb logging
