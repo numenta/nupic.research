@@ -40,14 +40,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats as ss
-from sklearn import linear_model
 
-from finetuning_constants import (
-    ALL_REPORTING_METRICS,
-    GLUE_NAMES_PER_TASK,
-    REPORTING_METRICS_PER_TASK,
-    TASK_NAMES,
-)
+from finetuning_constants import ALL_REPORTING_METRICS, TASK_NAMES
 
 warnings.filterwarnings("ignore")
 
@@ -184,7 +178,7 @@ def get_all_subdirs(experiment_path):
             - ...
         name_of_next_model
         ...
-    
+
     experiment path points towards a single model
     """
 
@@ -219,7 +213,7 @@ def check_for_tasks(base_path):
             if file in TASK_NAMES:
                 task_2_path[file] = file_path
                 results.append(file_path)
-    
+
     return results, task_2_path
 
 
@@ -324,7 +318,6 @@ def _get_value(progress, params, exp_name):
         stats["trial_time"].append(progress[e]["time_this_iter_s"].sum() / 60)
         stats["mean_epoch_time"].append(progress[e]["time_this_iter_s"].mean() / 60)
 
-
         # add all remaining params, for easy aggregations
         for k, v in params[e].items():
             # TODO: fix this hard coded check, added as temporary fix
@@ -399,11 +392,11 @@ def plot_categorical_bar(df, column_name):
 def lin_regress_1d_metric_onto_hps(df, metric, column_names=None, task_name=None):
 
     if column_names is None:
-        column_names = ['learning_rate', 'max_steps', 'warmup_ratio']
+        column_names = ["learning_rate", "max_steps", "warmup_ratio"]
 
     hp_regs = {}
     y = df[metric].values
-    X = df[column_names].values
+    X = df[column_names].values  # noqa: capital X is a matrix
     for col in column_names:
         x = df[col].values
         result = ss.linregress(x, y)
@@ -413,7 +406,7 @@ def lin_regress_1d_metric_onto_hps(df, metric, column_names=None, task_name=None
     return hp_regs, X, y
 
 
-def plot_hp_regs(X, y, hp_regs, task_name=None, **subplot_kwargs):
+def plot_hp_regs(X, y, hp_regs, task_name=None, **subplot_kwargs):  # noqa: capital X is a matrix
 
     task_name = task_name if task_name else ""
 
@@ -421,10 +414,9 @@ def plot_hp_regs(X, y, hp_regs, task_name=None, **subplot_kwargs):
     for idx, param in enumerate(hp_regs):
 
         reg = hp_regs[param]
-        ax[idx].plot(X[:,idx], y, "b.", label="data")
-        ax[idx].plot(X[:,idx], reg.intercept + reg.slope * X[:,idx],
-            'r', linestyle='dashed', label="lin reg"
-        )
+        ax[idx].plot(X[:, idx], y, "b.", label="data")
+        ax[idx].plot(X[:, idx], reg.intercept + reg.slope * X[:, idx],
+                     "r", linestyle="dashed", label="lin reg")
         ax[idx].set_title(task_name + "_" + param)
 
     return fig, ax
@@ -432,22 +424,15 @@ def plot_hp_regs(X, y, hp_regs, task_name=None, **subplot_kwargs):
 
 def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
 
-    hp_regs, X, y = lin_regress_1d_metric_onto_hps(df, metric, column_names)
+    hp_regs, X, y = lin_regress_1d_metric_onto_hps(df, metric, column_names)  # noqa: capital X is a matrix
     fig, ax = plot_hp_regs(X, y, hp_regs, task_name, **kwargs)
 
     return hp_regs, X, y, fig, ax
 
 
-
-
-
-
-
-
-
-
-
 if __name__ == "__main__":
+    # Pass in the path to the outer-most directory. This script
+    # will save a csv file for each task.
     experiment_path = str(sys.argv[1])
     task_2_df = load_from_base(experiment_path)
     save_agg_results(task_2_df, experiment_path)

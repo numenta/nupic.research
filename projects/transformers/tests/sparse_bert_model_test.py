@@ -32,7 +32,6 @@ from transformers import (
     AutoModelForSequenceClassification,
 )
 
-sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers")) # noqa
 from models import (
     SparseEmbeddings,
     StaticSparseEncoderBertConfig,
@@ -40,6 +39,8 @@ from models import (
     StaticSparseEncoderBertForSequenceClassification,
 )
 from nupic.torch.modules import SparseWeights
+
+sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers")) # noqa
 # noqa
 
 

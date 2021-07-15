@@ -265,7 +265,7 @@ finetuning_bert100k_glue_simple.update(
 # Previous runs had bugs, like not including RezeroWeightsCallback. This
 # run is mainly to run for a long time and save the trajectories, and use
 # that information to inform hyperparameter tuning. The exception is WNLI,
-# which we consistently overfit on almost immediately. 
+# which we consistently overfit on almost immediately.
 # load_best_model_at_end makes it so there is little cost to running for
 # longer - just pick the best from the trajectories.
 
@@ -294,22 +294,20 @@ finetuning_bert100k_glue_get_info.update(
                  num_runs=3),  # run for a long time
         mnli=dict(eval_steps=1_000,
                   max_steps=50_000,
-                  num_runs=3),  # run for a long time 
+                  num_runs=3),  # run for a long time
         qnli=dict(eval_steps=500,
                   max_steps=25_000,
                   num_runs=3),  # run for a long time
         rte=dict(max_steps=steps_50k,
                  num_runs=3),  # ~ 20 epochs from paper
         wnli=dict(max_steps=50,
-                 num_runs=3)  # run for a short time to avoid overfitting
+                  num_runs=3)  # run for a short time to avoid overfitting
     ),
     trainer_callbacks=[
         RezeroWeightsCallback(),
         TrackEvalMetrics()],
     warmup_ratio=0.1,
 )
-
-
 
 finetuning_bert1mi_glue_simple = deepcopy(finetuning_bert100k_glue_simple)
 finetuning_bert1mi_glue_simple.update(

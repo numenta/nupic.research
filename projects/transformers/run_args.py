@@ -51,7 +51,6 @@ class CustomTrainingArguments(TrainingArguments):
     )
 
 
-
 @dataclass
 class ModelArguments:
     """
@@ -182,7 +181,6 @@ class ModelArguments:
             gpu=1
         ),
     )
-
 
 
 @dataclass

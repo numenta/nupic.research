@@ -25,14 +25,15 @@ import logging
 import math
 import multiprocessing
 import os
+import pickle
 from collections import Counter, defaultdict
 from functools import partial
 from hashlib import blake2b
 
 import numpy as np
+import pandas as pd
 from datasets import concatenate_datasets, load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
-import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import f1_score, matthews_corrcoef
 from transformers import (
@@ -48,7 +49,6 @@ from transformers import (
 )
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
-
 from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
@@ -360,12 +360,11 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
     return tokenized_datasets
 
 
-
 # TODO
 # {ossibly refactor this function so it tokenizes the data in a default way
-# without needing access to a loaded model, since it is currently 
-# requiring us to load a model twice for hyperparameter tuning. 
-# Instead we can add checks right before training to see if we need 
+# without needing access to a loaded model, since it is currently
+# requiring us to load a model twice for hyperparameter tuning.
+# Instead we can add checks right before training to see if we need
 # to tokenize differently.
 def preprocess_datasets_task(datasets, tokenizer, data_args, model,
                              num_labels, label_list, is_regression):
@@ -731,6 +730,7 @@ def format_eval_results(eval_results, run, task_name):
 # Code to make sure training / finetuning / hp optimization runs safely
 #####
 
+
 def check_for_callback(model_args, class_of_callback):
 
     has_callback = False
@@ -744,7 +744,7 @@ def check_for_callback(model_args, class_of_callback):
 
 
 def check_sparsity_callback(model, model_args):
-    
+
     is_sparse = False
     for module in model.modules():
         if isinstance(module, SparseWeightsBase):
@@ -765,20 +765,21 @@ def check_eval_and_max_steps(training_args, train_dataset):
     equal to max_steps so it gets called at least once.
     """
     if training_args.load_best_model_at_end:
-            if training_args.max_steps == -1:
-                num_examples = training_args.num_train_epochs * len(train_dataset)
-                max_steps = num_examples // training_args.per_device_train_batch_size
-            else:
-                max_steps = training_args.max_steps
-            if max_steps < training_args.eval_steps:
-                logging.warning(
-                    f"max_steps({max_steps}) < "
-                    f"eval_steps({training_args.eval_steps}) "
-                    "To avoid issues, setting eval steps equal to max_steps"
-                )
-                training_args.eval_steps = max_steps
-    
+        if training_args.max_steps == -1:
+            num_examples = training_args.num_train_epochs * len(train_dataset)
+            max_steps = num_examples // training_args.per_device_train_batch_size
+        else:
+            max_steps = training_args.max_steps
+        if max_steps < training_args.eval_steps:
+            logging.warning(
+                f"max_steps({max_steps}) < "
+                f"eval_steps({training_args.eval_steps}) "
+                "To avoid issues, setting eval steps equal to max_steps"
+            )
+            training_args.eval_steps = max_steps
+
     return training_args
+
 
 def check_hp_compute_objective(model_args, task_name):
 
@@ -828,12 +829,13 @@ def check_best_metric(training_args, task_name):
                 f" (training_args.metric_for_best_model) is not being tracked."
                 "Defaulting metric_for_best_model to first reporting metric"
             )
-            training_args.metric_for_best_model = REPORTING_METRICS_PER_TASK[task_name][0]
+            training_args.metric_for_best_model = REPORTING_METRICS_PER_TASK[
+                task_name][0]
             training_args.greater_is_better = False
 
     if training_args.metric_for_best_model == "eval_loss":
         if hasattr(training_args, "greater_is_better"):
-            if training_args.greater_is_better != False:
+            if training_args.greater_is_better:
                 logging.warning(
                     "Greater is better is set to True with eval_loss as "
                     "metric_for_best_model. Flipping greater is better to"
@@ -1265,13 +1267,14 @@ def run_hyperparameter_search(
 def compute_objective(metrics, objective):
     return metrics[objective]
 
+
 def check_if_current_hp_best(old_file, model_args, best_run):
 
     # if previous file
     if not os.path.exists(old_file):
         return True
 
-    with open(old_file, 'r') as f:
+    with open(old_file, "r") as f:
         data = f.read()
         line_split = data.split("\n")
 
@@ -1280,12 +1283,11 @@ def check_if_current_hp_best(old_file, model_args, best_run):
         if model_args.hp_compute_objective[1] in line:
             previous_best = float(line.split("=")[-1])
 
-
     if model_args.hp_compute_objective[0] == "maximize":
         operator = "__gt__"
     else:
         operator = "__lt__"
-    
+
     if getattr(previous_best, operator)(best_run.objective):
         return False
     else:

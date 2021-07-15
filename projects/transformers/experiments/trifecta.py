@@ -31,9 +31,9 @@ from trainer_mixins import (
 )
 
 from .finetuning import (
+    finetuning_bert100k_glue_get_info,
     finetuning_bert100k_glue_simple,
     finetuning_bert700k_glue,
-    finetuning_bert100k_glue_get_info
 )
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
@@ -315,23 +315,18 @@ finetuning_bert_sparse_trifecta_100k_glue_get_info.update(
     warmup_ratio=0.1,
 )
 
-finetuning_bert_sparse_trifecta_100k_glue_get_info_MC_direct = deepcopy(finetuning_bert_sparse_trifecta_100k_glue_get_info)
-finetuning_bert_sparse_trifecta_100k_glue_get_info_MC_direct.update(
-    model_name_or_path="/mnt/efs/results/mcaporale/mcaporale/mcaporale/experiments/transformers/bert_sparse_trifecta_100k"  # noqa: E501
-)
-
 # As above, but 85% sparse
 finetuning_bert_sparse_85_trifecta_100k_glue_get_info = deepcopy(
     finetuning_bert_sparse_trifecta_100k_glue_get_info)
 finetuning_bert_sparse_85_trifecta_100k_glue_get_info.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k"
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k"  # noqa: E501
 )
 
 # As above, but 90% sparse
 finetuning_bert_sparse_90_trifecta_100k_glue_get_info = deepcopy(
     finetuning_bert_sparse_trifecta_100k_glue_get_info)
 finetuning_bert_sparse_90_trifecta_100k_glue_get_info.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa: E501
 )
 
 # This fine-tunes a pretrained model from `bert_sparse_85_trifecta_100k` above.
@@ -343,7 +338,7 @@ finetuning_bert_sparse_85_trifecta_100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k",  # noqa: E501
 )
 finetuning_bert_sparse_85_trifecta_100k_glue["task_hyperparams"].update(
-        mnli=dict(eval_steps=123, save_steps=123)
+    mnli=dict(eval_steps=123, save_steps=123)
 )
 
 # This fine-tunes a pretrained model from `bert_sparse_90_trifecta_100k` above.
@@ -478,18 +473,18 @@ CONFIGS = dict(
     # BERT Base
     #   80% sparse
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
-    finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,
+    finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,  # noqa: E501
     finetuning_bert_sparse_trifecta_100k_glue_simple=ft_bert_sp_tri_100k_g_s,
-    finetuning_bert_sparse_trifecta_100k_glue_get_info=finetuning_bert_sparse_trifecta_100k_glue_get_info,
+    finetuning_bert_sparse_trifecta_100k_glue_get_info=finetuning_bert_sparse_trifecta_100k_glue_get_info,  # noqa: E501
     verify_bert_sparse_trifecta_100k=verify_bert_sparse_trifecta_100k,
     #   85% sparse
     bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
     finetuning_bert_sparse_85_trifecta_100k_glue=finetuning_bert_sparse_85_trifecta_100k_glue,  # noqa: E501
-    finetuning_bert_sparse_85_trifecta_100k_glue_get_info=finetuning_bert_sparse_85_trifecta_100k_glue_get_info,
+    finetuning_bert_sparse_85_trifecta_100k_glue_get_info=finetuning_bert_sparse_85_trifecta_100k_glue_get_info,  # noqa: E501
     #   90% sparse
     bert_sparse_90_trifecta_100k=bert_sparse_90_trifecta_100k,
     finetuning_bert_sparse_90_trifecta_100k_glue=finetuning_bert_sparse_90_trifecta_100k_glue,  # noqa: E501
-    finetuning_bert_sparse_90_trifecta_100k_glue_get_info=finetuning_bert_sparse_90_trifecta_100k_glue_get_info,
+    finetuning_bert_sparse_90_trifecta_100k_glue_get_info=finetuning_bert_sparse_90_trifecta_100k_glue_get_info,  # noqa: E501
     #   2x wide ~16 Mi Params
     bert_sparse_trifecta_2x_100k=bert_sparse_trifecta_2x_100k,
     bert_sparse_2x_100k_kd_lr_range_test=bert_sparse_2x_100k_kd_lr_range_test,

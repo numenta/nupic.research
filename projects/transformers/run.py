@@ -36,9 +36,8 @@ import pickle
 import random
 import sys
 from copy import deepcopy
-from pprint import pformat
 from functools import partial
-
+from pprint import pformat
 
 # FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
 import ray  # noqa: F401, I001
@@ -46,27 +45,29 @@ import torch.distributed
 import transformers
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
+    AutoModelForSequenceClassification,
     DataCollatorWithPadding,
     EarlyStoppingCallback,
     HfArgumentParser,
     default_data_collator,
     set_seed,
-    AutoModelForSequenceClassification
 )
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from callbacks import RezeroWeightsCallback, TrackEvalMetrics
+from callbacks import TrackEvalMetrics
 from experiments import CONFIGS
-from integrations import CustomWandbCallback, init_ray_wandb_logger_callback  # noqa I001
-from nupic.torch.modules.sparse_weights import SparseWeightsBase
+from integrations import (  # noqa I001
+    CustomWandbCallback,
+    init_ray_wandb_logger_callback,
+)
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
     check_best_metric,
     check_eval_and_max_steps,
-    check_hp_compute_objective,
     check_for_callback,
+    check_hp_compute_objective,
     check_if_current_hp_best,
     check_sparsity_callback,
     compute_objective,
@@ -295,13 +296,14 @@ def run_pretraining(
     # if using hp search, load best model before running evaluate
     if training_args.do_eval:
         logging.info("*** Evaluate ***")
-        evaluate_language_model(trainer, eval_dataset, training_args.output_dir, metric_callback)
-
+        evaluate_language_model(trainer,
+                                eval_dataset,
+                                training_args.output_dir,
+                                metric_callback)
 
 
 def init_dataset_for_finetuning(model_args, data_args, training_args,
-    last_checkpoint=None
-):
+                                last_checkpoint=None):
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
     logging.info(f"Training {data_args.task_name} with {num_labels} labels")
@@ -449,8 +451,8 @@ def run_finetuning_single_task_with_hp_search(
     best_run = trainer.hyperparameter_search(**hp_search_kwargs)
     logging.info(f"Best run: {best_run}")
 
-    hp_res_file = os.path.join(training_args.output_dir,
-        f"best_run_results_{model_args.hp_compute_objective[1]}.txt")
+    hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
+    hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
     write_new = check_if_current_hp_best(hp_res_file, model_args, best_run)
 
     if trainer.is_world_process_zero() and write_new:
@@ -472,6 +474,7 @@ def run_finetuning_single_task_with_hp_search(
     model.to("cpu")
 
     return {}
+
 
 def run_finetuning_single_task(
     model_args, data_args, training_args, last_checkpoint=None
@@ -582,7 +585,6 @@ def run_finetuning_multiple_tasks(
         task_results = TaskResults(task_name,
                                    has_early_stopping,
                                    training_args=training_args)
-
 
         # Hack to ensure we don't do hp search num_runs times
         if model_args.hp_num_trials > 1:

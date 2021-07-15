@@ -23,9 +23,8 @@ import math
 import os
 from collections import MutableMapping
 
-from ray.tune.integration.wandb import WandbLoggerCallback
-
 import wandb
+from ray.tune.integration.wandb import WandbLoggerCallback
 from transformers.integrations import (
     INTEGRATION_TO_CALLBACK,
     WandbCallback,
@@ -161,7 +160,6 @@ def flatten_dict(d, parent_key="", seperator="."):
     return dict(items)
 
 
-
 def init_ray_wandb_logger_callback(training_args):
     """
     Initialize the ray wandb integration, used specifically for hyperparameter
@@ -171,8 +169,8 @@ def init_ray_wandb_logger_callback(training_args):
     has_wandb = is_wandb_available()
     if not has_wandb:
         return None
-    
-    project=os.getenv("WANDB_PROJECT", "huggingface")
+
+    project = os.getenv("WANDB_PROJECT", "huggingface")
     group = training_args.run_name
     callbacks = [WandbLoggerCallback(
         project=project,
@@ -180,5 +178,3 @@ def init_ray_wandb_logger_callback(training_args):
     )]
 
     return callbacks
-
-

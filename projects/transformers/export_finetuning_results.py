@@ -29,7 +29,6 @@ Useful if you only need to rerun one or more tasks instead of all
 """
 
 import argparse
-from copy import deepcopy
 import os
 import pickle
 
@@ -191,17 +190,19 @@ class TaskResultsAnalysis:
         """
         metrics = [m for m in self[task].reporting_metrics]
 
-
         if hasattr(self[task], "score_mats"):
             return self[task].score_mats
 
         n_steps = len(self[task].all_results[0]["steps"])
         n_runs = len(self[task].all_results)
 
-        metrics_all_runs = [np.zeros((n_runs, n_steps)) for m in self[task].reporting_metrics]
+        metrics_all_runs = []
+        for _ in range(len(self[task].reporting_metrics)):
+            metrics_all_runs.append(np.zeros((n_runs, n_steps)))
+
         for m in range(len(metrics)):
             for run_idx in range(n_runs):
-                metrics_all_runs[m][run_idx,:] = np.array(
+                metrics_all_runs[m][run_idx, :] = np.array(
                     self[task].all_results[run_idx][metrics[m]])
 
         self[task].score_mats = metrics_all_runs
@@ -219,8 +220,13 @@ class TaskResultsAnalysis:
         else:
             metric_all_runs = metrics_all_runs[0]
         best_idx_per_run = np.argmax(metric_all_runs, axis=1)
-        best_avg_metric_scores = metric_all_runs[np.arange(len(self[task])), best_idx_per_run]
-        best_metric_scores = [metrics_all_runs[m][np.arange(len(self[task])), best_idx_per_run] for m in range(len(metrics))]
+        best_avg_metric_scores = metric_all_runs[np.arange(len(self[task])),
+                                                 best_idx_per_run]
+
+        best_metric_scores = []
+        for m in range(len(metrics)):
+            data = metrics_all_runs[m][np.arange(len(self[task])), best_idx_per_run]
+            best_metric_scores.append(data)
         return best_avg_metric_scores, best_metric_scores
 
     # TODO
@@ -230,16 +236,18 @@ class TaskResultsAnalysis:
     #     return [np.mean(best_metric) for best_metric in scores]
 
     def get_best_scores_best_run(self, task):
-        metrics = self[task].reporting_metrics
-        best_avg_metric_scores, best_metric_scores = self.get_best_scores_per_run(task)
-        very_best_idx = np.argmax(best_avg_metric_scores)
-        best_score = best_avg_metric_scores[very_best_idx]
-        best_metric_scores = [best_metric[very_best_idx] for best_metric in best_metric_scores]
+        best_avg_metric_scores, best_scores = self.get_best_scores_per_run(task)
+        best_idx = np.argmax(best_avg_metric_scores)
+        best_score = best_avg_metric_scores[best_idx]
+        best_metric_scores = [best_score[best_idx] for best_score in best_scores]
         return best_score, best_metric_scores
 
     def max_scores(self):
 
-        maxes = {task: self.get_best_scores_best_run(task) for task in self.task_results_dict.keys()}
+        maxes = {}
+        for task in self.task_results_dict.keys():
+            maxes[task] = self.get_best_scores_best_run(task)
+
         _max_scores = {task: maxes[task][0] for task in maxes.keys()}
         str_scores = dict()  # f"{self.results[m]*100:.2f}"
         for task in maxes.keys():
@@ -269,9 +277,8 @@ class TaskResultsAnalysis:
         """
         Compute the glue score as though load_best_model_at_end were true.
         Just rely on existing code in TaskResults to do this by flipping
-        class attributes. 
+        class attributes.
         """
- 
         pass
 
 

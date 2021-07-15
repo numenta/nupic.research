@@ -17,11 +17,10 @@
 #
 #  http://numenta.org/licenses/
 #
+# import wandb
 from transformers import TrainerCallback
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
-
-import wandb
 
 
 class TrackEvalMetrics(TrainerCallback):
@@ -30,7 +29,7 @@ class TrackEvalMetrics(TrainerCallback):
     after trainer.evaluate() is called. It is designed to provide the same
     metrics for training and validation sets, at the same time points.
     """
-    def __init__(self, sparsity_tolerance=None):
+    def __init__(self, sparsity_tol=None):
         """
         Set up two dictionaries to track training and eval metrics, and a list
         to track steps.
@@ -42,7 +41,7 @@ class TrackEvalMetrics(TrainerCallback):
             self.eval_metrics['acc'] -> [acc1, acc2, ..., accn]
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
         """
-        self.sparsity_tolerance = sparsity_tolerance if sparsity_tolerance is not None else 0.01
+        self.sparsity_tolerance = sparsity_tol if sparsity_tol is not None else 0.01
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
@@ -79,8 +78,8 @@ class TrackEvalMetrics(TrainerCallback):
             # up to specified tolerance
             if (self.sparsity_tolerance < 1) and len(self.eval_metrics["sparsity"]) > 1:
                 sparse_diff = self.eval_metrics["sparsity"][0] - self.eval_metrics["sparsity"][-1]  # noqa
-                assert abs(sparse_diff) < self.sparsity_tolerance, "Model sparsity fluctuated"
-                f"beyond acceptable range. {self.eval_metrics['sparsity']}"
+                assert abs(sparse_diff) < self.sparsity_tolerance, "Model sparsity"
+                f"fluctuated beyond acceptable range. {self.eval_metrics['sparsity']}"
 
             # track learning rate
             # get_last_lr() returns lr for each parameter group. For now,
@@ -121,9 +120,6 @@ class TrackEvalMetrics(TrainerCallback):
 
         return is_mnli_mm
 
-
     # TODO
     # Aggregate data on train end or at least make it an option
     # this would make hyperparameter tuning easier.
-
-    
