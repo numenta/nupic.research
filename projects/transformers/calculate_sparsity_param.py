@@ -143,7 +143,7 @@ sparsified. Thus, one may need to set `sparsity=0.85` to achieve the desired 80%
                         help="Desired sparsity of BERT model.")
     parser.add_argument("-p", "--parameters_desired", type=float, required=False,
                         help="Desired on-params of BERT model. "
-                        "Can't be used with `sparsity_desired`") 
+                        "Can't be used with `sparsity_desired`")
     parser.add_argument("-e", "--experiment", choices=list(CONFIGS.keys()),
                         help="Available experiments", required=True)
     parser.add_argument("-t", "--test_sparsity", type=bool, default=True,
