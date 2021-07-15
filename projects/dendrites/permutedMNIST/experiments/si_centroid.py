@@ -111,8 +111,18 @@ SI_CENTROID_50.update(
     num_classes=10 * 50,
 )
 
+SI_CENTROID_100 = deepcopy(SI_CENTROID_50)
+SI_CENTROID_100["dataset_args"].update(num_tasks=100)
+SI_CENTROID_100["model_args"].update(num_segments=100)
+SI_CENTROID_100.update(
+    num_tasks=100,
+    num_classes=10 * 100,
+    optimizer_args=dict(lr=5e-4),
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     si_centroid_10=SI_CENTROID_10,
     si_centroid_50=SI_CENTROID_50,
+    si_centroid_100=SI_CENTROID_100,
 )
