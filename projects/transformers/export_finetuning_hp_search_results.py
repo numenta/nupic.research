@@ -41,7 +41,11 @@ import numpy as np
 import pandas as pd
 from scipy import stats as ss
 
-from finetuning_constants import ALL_REPORTING_METRICS, TASK_NAMES
+from finetuning_constants import (
+    ALL_REPORTING_METRICS,
+    REPORTING_METRICS_PER_TASK,
+    TASK_NAMES
+)
 
 warnings.filterwarnings("ignore")
 
@@ -143,6 +147,20 @@ def unpickle_within_dataframe(df, conditions):
 # Functions for aggregating data from hyperparameter tuning experiments
 # ---------------------------
 
+def params_to_set(params):
+    """
+    _read_experiment gathers params as a nested dictionary where each key has
+    multiple hyperparameters as values. Compress all values to the set of
+    parameters used in all experiments.
+    """
+
+    hyperparams = set()
+    for exp in params.keys():
+        for hp in params[exp].keys():
+            hyperparams.add(hp)
+
+    return hyperparams
+
 
 def load(experiment_path):
     """Load a single experiment into a dataframe"""
@@ -152,17 +170,20 @@ def load(experiment_path):
     # run once per experiment state
     # columns might differ between experiments
     dataframes = []
+    all_hyperparams = set()
     for exp_state, exp_name in experiment_states:
         progress, params = _read_experiment(exp_state, experiment_path)
+        local_hyperparams = params_to_set(params)
         if len(progress) != 0:
             dataframes.append(
                 _get_value(progress, params, exp_name)
             )
+            all_hyperparams = all_hyperparams.union(local_hyperparams)
 
     # concats all dataframes if there are any and return
     if not dataframes:
-        return pd.DataFrame([])
-    return pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
+        return pd.DataFrame([]), all_hyperparams
+    return pd.concat(dataframes, axis=0, ignore_index=True, sort=False), all_hyperparams
 
 
 def get_all_subdirs(experiment_path):
@@ -230,14 +251,17 @@ def load_from_base(base_path):
         task_2_subdirs[task] = experiment_paths
 
     task_2_dfs = {}
+    task_2_hps = {}
     for task in task_2_subdirs.keys():
         task_2_dfs[task] = []
+        task_2_hps[task] = set()
         for subdir in task_2_subdirs[task]:
-            df = load(subdir)
+            df, task_hps_subdir = load(subdir)
             task_2_dfs[task].append(df)
+            task_2_hps[task] = task_2_hps[task].union(task_hps_subdir)
         task_2_dfs[task] = pd.concat(task_2_dfs[task])
 
-    return task_2_dfs
+    return task_2_dfs, task_2_hps
 
 
 def _read_experiment(experiment_state, experiment_path):
@@ -430,6 +454,35 @@ def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
     return hp_regs, X, y, fig, ax
 
 
+def get_best_params(task_2_df, task_2_hps, config_path):
+
+    best_idx_per_task = {}
+    best_params_per_task = {}
+    for task in task_2_df.keys():
+        hps = list(task_2_hps[task])
+        metric = REPORTING_METRICS_PER_TASK[task][0] + "_max"
+        scores = task_2_df[task][metric].values
+        best_idx = np.argmax(scores)
+        best_params = task_2_df[task].iloc[best_idx][hps]
+        best_idx_per_task[task] = best_idx
+        best_params_per_task[task] = best_params
+        print(f"{task}: \n best score: {scores[best_idx]}")
+        print(f"best params: {task_2_df[task].iloc[best_idx][hps]}")
+        print("\n")
+
+    # Save results to a config
+    if config_path:
+        if not os.path.exists(config_path):
+            os.makedirs(config_path)
+        for task in best_params_per_task.keys():
+            full_config_name = os.path.join(f"{task}_hps.txt")
+
+            with open(full_confg_name, 'w') as f:
+                pickle.dump(dict(best_params), f)
+            # pickle dictionary
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="""Pass in the path to the outer-most directory for a
@@ -438,8 +491,13 @@ if __name__ == "__main__":
 
     parser.add_argument("-d", "--directory", type=str, required=True,
                         help="Path to a hyperparameter search run")
+    parser.add_argument("-c", "--config", type=str, required=False,
+                        help="Find the best hyperparameters for each task "
+                             "and save each set of parameters as a dictionary"
+                             " that can be accessed for subsequent finetuning")
 
     args = parser.parse_args()
     experiment_path = args.directory
-    task_2_df = load_from_base(experiment_path)
+    task_2_df, task_2_hps = load_from_base(experiment_path)
     save_agg_results(task_2_df, experiment_path)
+    get_best_params(task_2_df, task_2_hps, args.config)
