@@ -25,6 +25,7 @@ Adapted from nupic.research/nupic/research/archive/dynamic_sparse/browser.
 
 from __future__ import absolute_import, division, print_function
 
+import argparse
 import codecs
 import copy
 import glob
@@ -32,7 +33,6 @@ import json
 import numbers
 import os
 import pickle
-import sys
 import warnings
 from collections import defaultdict
 
@@ -431,8 +431,15 @@ def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
 
 
 if __name__ == "__main__":
-    # Pass in the path to the outer-most directory. This script
-    # will save a csv file for each task.
-    experiment_path = str(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description="""Pass in the path to the outer-most directory for a
+            run. This script will agregate results and save a csv file for
+            each task.""")
+
+    parser.add_argument("-d", "--directory", type=str, required=True,
+                        help="Path to a hyperparameter search run")
+
+    args = parser.parse_args()
+    experiment_path = args.directory
     task_2_df = load_from_base(experiment_path)
     save_agg_results(task_2_df, experiment_path)
