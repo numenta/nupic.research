@@ -58,7 +58,7 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from experiments import CONFIGS
-from integrations import CustomWandbCallback  # noqa I001
+from integrations import CustomWandbCallback, init_ray_wandb_logger_callback  # noqa I001
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
@@ -401,6 +401,7 @@ def run_finetuning_single_task_with_hp_search(
             model_args.model_name_or_path, **model_kwargs
         )
 
+        check_sparsity_callback(model, model_args)
         return model
 
     # Train
@@ -421,6 +422,7 @@ def run_finetuning_single_task_with_hp_search(
     hp_search_kwargs = dict(
         direction=model_args.hp_compute_objective[0],
         backend="ray",
+        callbacks=init_ray_wandb_logger_callback(training_args),
         n_trials=model_args.hp_num_trials,
         hp_space=model_args.hp_space,
         compute_objective=partial(
@@ -432,6 +434,13 @@ def run_finetuning_single_task_with_hp_search(
         keep_checkpoints_num=0,
         checkpoint_at_end=False,
     )
+
+    # TODO
+    # Get wandb to log properly
+    # trainer.hyperparameter_search calls ray.tune()
+    # you can set config as a kwarg to trainer.hyperparameter_search
+    # which gets passed to ray.tune, which is where wandb stuff is usually
+    # set up.
 
     # Update any extra kwargs defined in config
     hp_search_kwargs.update(**model_args.hp_extra_kwargs)

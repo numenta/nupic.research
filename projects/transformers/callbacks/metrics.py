@@ -21,6 +21,8 @@ from transformers import TrainerCallback
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
+import wandb
+
 
 class TrackEvalMetrics(TrainerCallback):
     """
@@ -87,6 +89,13 @@ class TrackEvalMetrics(TrainerCallback):
                 last_lr = kwargs["lr_scheduler"].get_last_lr()
                 self.eval_metrics["lr"].append(last_lr[0])
 
+            # if wandb.run is not None:
+            #     print("logging wandb stuff here")
+            #     wandb.run.summary.update(self.eval_metrics)  # or [-1]
+            # if self.step_counter > 100:
+            #     import pdb
+            #     pdb.set_trace()
+            # # wandb.log(self.eval_metrics, commit=False)
             # TODO
             # Possibly update train_results
             # Possibly wandb logging
@@ -111,3 +120,10 @@ class TrackEvalMetrics(TrainerCallback):
             self.mm_metrics = {ksplit(k): v for k, v in metrics.items()}
 
         return is_mnli_mm
+
+
+    # TODO
+    # Aggregate data on train end or at least make it an option
+    # this would make hyperparameter tuning easier.
+
+    

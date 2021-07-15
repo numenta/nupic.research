@@ -360,6 +360,13 @@ def preprocess_datasets_mlm(datasets, tokenizer, data_args, column_names,
     return tokenized_datasets
 
 
+
+# TODO
+# {ossibly refactor this function so it tokenizes the data in a default way
+# without needing access to a loaded model, since it is currently 
+# requiring us to load a model twice for hyperparameter tuning. 
+# Instead we can add checks right before training to see if we need 
+# to tokenize differently.
 def preprocess_datasets_task(datasets, tokenizer, data_args, model,
                              num_labels, label_list, is_regression):
     """Preprocess datasets for finetuning"""

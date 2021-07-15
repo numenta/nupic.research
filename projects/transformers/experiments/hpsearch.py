@@ -107,7 +107,7 @@ debug_finetuning_sparse_hp_search.update(
     save_steps=1,
     warmup_ratio=0.1,
     hp_validation_dataset_pct=1.0,
-    report_to="none",
+    report_to="wandb",
     task_hyperparams=dict(
         cola=dict(
             hp_space=lambda trial: dict(
