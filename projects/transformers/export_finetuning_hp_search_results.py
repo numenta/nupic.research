@@ -475,12 +475,10 @@ def get_best_params(task_2_df, task_2_hps, config_path):
         if not os.path.exists(config_path):
             os.makedirs(config_path)
         for task in best_params_per_task.keys():
-            full_config_name = os.path.join(f"{task}_hps.txt")
-
-            with open(full_confg_name, 'w') as f:
+            full_config_name = os.path.join(config_path, f"{task}_hps.p")
+            with open(full_config_name, 'wb') as f:
                 pickle.dump(dict(best_params), f)
             # pickle dictionary
-
 
 
 if __name__ == "__main__":

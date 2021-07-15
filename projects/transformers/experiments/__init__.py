@@ -31,6 +31,7 @@ from .deepspeed import CONFIGS as DEEPSPEED
 from .distillation import CONFIGS as DISTILLATION
 from .eighty_percent_sparse import CONFIGS as EIGHT_PERCENT_SPARSE
 from .finetuning import CONFIGS as FINETUNING
+from .hpchase import *
 from .hpsearch import CONFIGS as HPSEARCH
 from .one_cycle_lr import CONFIGS as ONE_CYCLE_LR
 from .profiler import CONFIGS as PROFILER
