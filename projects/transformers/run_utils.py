@@ -1318,13 +1318,11 @@ def update_run_number(training_args, run_idx):
         return training_args
 
     print(f"output dir before update: {training_args.output_dir}")
-    out_split = training_args.output_dir.split("_")
     if run_idx == 0:
-        assert out_split[-2] != "run"
-        new_dir = training_args.output_dir + "_run_0"
+        new_dir = os.path.join(training_args.output_dir, "run_0")
     else:
-        out_split[-1] = str(run_idx)
-        new_dir = "_".join(out_split)
+        dirname, basename = os.path.split(training_args.output_dir)
+        new_dir = os.path.join(dirname, f"run_{run_idx}")
     training_args.output_dir = new_dir
     print(f"output dir after update: {training_args.output_dir}")
     return training_args

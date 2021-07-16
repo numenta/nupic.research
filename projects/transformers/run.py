@@ -614,6 +614,13 @@ def run_finetuning_multiple_tasks(
             )
             task_results.append(eval_results)
 
+        # TODO
+        # Grab the model with the best eval score. 
+        # Denote which model is best so it is easy to load / look for later.
+        # If predict, get predictions for the best model. 
+        # Store predictions in a way that's easy to manage, perhaps in the 
+        # overall task directory.
+
         # If this is just a prediction run, ignore this block
         if training_args.do_eval:
             task_results.reduce_metrics(reduction="mean")
