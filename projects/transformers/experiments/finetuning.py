@@ -104,14 +104,14 @@ debug_finetuning.update(
     do_train=True,
     do_eval=True,
     do_predict=True,
-    eval_steps=10,
+    eval_steps=15,
     evaluation_strategy="steps",
     load_best_model_at_end=True,
     per_device_train_batch_size=32,
     per_device_eval_batch_size=32,
     learning_rate=2e-5,
     warmup_ratio=0.1,
-    max_steps=50,  # made very short for fast debugging
+    max_steps=45,  # made very short for fast debugging
     metric_for_best_model="eval_accuracy",
     num_runs=3,
     trainer_callbacks=[

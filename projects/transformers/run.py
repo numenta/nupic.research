@@ -617,7 +617,7 @@ def run_finetuning_multiple_tasks(
         # Find the predictions of the best model and sym link to a file
         # labeled with "_best" at the end. Warning, assumes
         # load_best_model_at_end is on.
-        link_best_predictions(training_args)
+        link_best_predictions(training_args, task_results, task_name)
 
         # If this is just a prediction run, ignore this block
         if training_args.do_eval:
