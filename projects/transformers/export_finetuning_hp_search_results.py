@@ -478,8 +478,21 @@ def get_best_params(task_2_df, task_2_hps, config_path):
             full_config_name = os.path.join(config_path, f"{task}_hps.p")
             with open(full_config_name, 'wb') as f:
                 pickle.dump(dict(best_params), f)
-            # pickle dictionary
 
+
+def load_csv_per_task(base_dir):
+    files = os.listdir(base_dir)
+    task_2_df = {}
+    for file in files:
+        file_path = os.path.join(base_dir, file)
+        if os.path.isdir(file_path):
+            if file in TASK_NAMES:
+                maybe_csv = os.path.join(file_path, file + ".csv")
+                if os.path.exists(maybe_csv):
+                    task_data = pd.read_csv(maybe_csv)
+                    task_2_df[file] = task_data
+
+    return task_2_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

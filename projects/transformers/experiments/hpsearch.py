@@ -207,6 +207,15 @@ hp_search_finetuning_bert_100k_small_tasks.update(
     trainer_callbacks=[TrackEvalMetrics()],
 )
 
+hp_search_finetuning_bert_100k_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_big_tasks
+)
+hp_search_finetuning_bert_100k_big_tasks.update(
+    model_type="bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa
+    trainer_callbacks=[TrackEvalMetrics()],
+)
+
 hp_search_finetuning_trifecta_80_100k_big_tasks = deepcopy(
     hp_search_finetuning_trifecta_85_100k_big_tasks)
 hp_search_finetuning_trifecta_80_100k_big_tasks.update(
@@ -220,7 +229,6 @@ hp_search_finetuning_trifecta_90_100k_big_tasks.update(
 )
 
 
-
 # Export configurations in this file
 CONFIGS = dict(
     debug_hp_search=debug_hp_search,
@@ -230,6 +238,7 @@ CONFIGS = dict(
     hp_search_finetuning_trifecta_80_100k_small_tasks=hp_search_finetuning_trifecta_80_100k_small_tasks,  # noqa
     hp_search_finetuning_trifecta_85_100k_small_tasks=hp_search_finetuning_trifecta_85_100k_small_tasks,  # noqa
     hp_search_finetuning_trifecta_90_100k_small_tasks=hp_search_finetuning_trifecta_90_100k_small_tasks,  # noqa
+    hp_search_finetuning_bert_100k_big_tasks=hp_search_finetuning_bert_100k_big_tasks,
     hp_search_finetuning_trifecta_80_100k_big_tasks=hp_search_finetuning_trifecta_80_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_85_100k_big_tasks=hp_search_finetuning_trifecta_85_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_90_100k_big_tasks=hp_search_finetuning_trifecta_90_100k_big_tasks,  # noqa
