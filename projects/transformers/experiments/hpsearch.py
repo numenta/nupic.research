@@ -164,26 +164,32 @@ hp_search_finetuning_trifecta_85_100k_big_tasks.update(
     hp_num_trials=8,
     task_hyperparams=dict(
         mnli=dict(
-            hp_num_trials=6,
+            hp_num_trials=5,
             hp_compute_objective=("maximize", "eval_accuracy"),
             eval_steps=4_000,
         ),
         qnli=dict(
-            hp_num_trials=6,
+            hp_num_trials=5,
             hp_compute_objective=("maximize", "eval_accuracy"),
             eval_steps=4_000,
         ),
         qqp=dict(
-            hp_num_trials=6,
+            hp_num_trials=5,
             hp_compute_objective=("maximize", "eval_f1"),
             eval_steps=4_000,
         ),
         sst2=dict(
-            hp_num_trials=18,
+            hp_num_trials=12,
             hp_compute_objective=("maximize", "eval_accuracy"),
             eval_steps=4_000,
         ),
     )
+)
+
+hp_search_finetuning_trifecta_80_100k_small_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_small_tasks)
+hp_search_finetuning_trifecta_80_100k_small_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k"  # noqa
 )
 
 hp_search_finetuning_trifecta_90_100k_small_tasks = deepcopy(
@@ -201,11 +207,19 @@ hp_search_finetuning_bert_100k_small_tasks.update(
     trainer_callbacks=[TrackEvalMetrics()],
 )
 
+hp_search_finetuning_trifecta_80_100k_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_big_tasks)
+hp_search_finetuning_trifecta_80_100k_big_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k"  # noqa
+)
+
 hp_search_finetuning_trifecta_90_100k_big_tasks = deepcopy(
     hp_search_finetuning_trifecta_85_100k_big_tasks)
 hp_search_finetuning_trifecta_90_100k_big_tasks.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa
 )
+
+
 
 # Export configurations in this file
 CONFIGS = dict(
@@ -213,8 +227,10 @@ CONFIGS = dict(
     debug_finetuning_hp_search=debug_finetuning_hp_search,
     debug_finetuning_sparse_hp_search=debug_finetuning_sparse_hp_search,
     hp_search_finetuning_bert_100k_small_tasks=hp_search_finetuning_bert_100k_small_tasks,  # noqa
+    hp_search_finetuning_trifecta_80_100k_small_tasks=hp_search_finetuning_trifecta_80_100k_small_tasks,  # noqa
     hp_search_finetuning_trifecta_85_100k_small_tasks=hp_search_finetuning_trifecta_85_100k_small_tasks,  # noqa
     hp_search_finetuning_trifecta_90_100k_small_tasks=hp_search_finetuning_trifecta_90_100k_small_tasks,  # noqa
+    hp_search_finetuning_trifecta_80_100k_big_tasks=hp_search_finetuning_trifecta_80_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_85_100k_big_tasks=hp_search_finetuning_trifecta_85_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_90_100k_big_tasks=hp_search_finetuning_trifecta_90_100k_big_tasks,  # noqa
 )
