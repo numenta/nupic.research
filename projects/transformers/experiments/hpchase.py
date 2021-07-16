@@ -43,16 +43,18 @@ for model in HP_SETS.keys():
     tasks = [i for i in tasks if i.split("_")[-1] == "hps.p"]
     task_hps = {}
     for task in tasks:
-        task_name = os.path.basename(task)
-        with open(task, "rb") as f:
+        task_name = os.path.basename(task).split("_")[0]
+        task_file = os.path.join(hp_path, task)
+        with open(task_file, "rb") as f:
             task_hps[task_name] = pickle.load(f)
     
     HP_SETS[model] = task_hps
 
 def update_task_hyperparams(local_config, model_name):
     for task in HP_SETS[model_name]:
-        for param, value in HP_SETS[model_name][task].items():
-            local_config["task_hyperparams"][task][param] = value
+        task_name = task.split("_")[0]
+        for param, value in HP_SETS[model_name][task_name].items():
+            local_config["task_hyperparams"][task_name][param] = value
 
     return local_config
 
