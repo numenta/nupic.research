@@ -112,6 +112,7 @@ debug_finetuning.update(
     warmup_ratio=0.1,
     max_steps=50,  # made very short for fast debugging
     metric_for_best_model="eval_accuracy",
+    num_runs=10,
     trainer_callbacks=[
         TrackEvalMetrics(),
         EarlyStoppingCallback(early_stopping_patience=5)
