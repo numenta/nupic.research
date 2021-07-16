@@ -620,6 +620,23 @@ def run_finetuning_multiple_tasks(
         # If predict, get predictions for the best model. 
         # Store predictions in a way that's easy to manage, perhaps in the 
         # overall task directory.
+        #
+        # Well, actually, we can just predict on all the runs during finetuning_single_task
+        # in which case we just need a) a command to pull the best predictions and
+        # b) a way to tell which are the best
+        if training_args.do_predict:
+            import pdb
+            pdb.set_trace()
+            best_run = task_results.get_model_with_best_max
+            best_run_path = os.path.join(training_args.output_dir, f"run_{best_run}")
+            pred_file = GLUE_NAMES_PER_TASK[task_name] + ".tsv"
+            best_run_predictions = os.path.join(best_run_path, pred_file)
+            link_file_name = GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"
+            link_file_path = os.path.join(training_args.output_dir, link_file_name)
+            os.link(best_run_predictions, link_file_path)
+            logging.info(f"best run predictions for {task_name} saved to "
+                         "{link_file_path}")
+
 
         # If this is just a prediction run, ignore this block
         if training_args.do_eval:

@@ -1091,6 +1091,10 @@ class TaskResults():
         are formatted so the values are lists fo length 1. Cases (1) and (2) above
         result in the same behavior in this case, since there is a single entry to
         reduce over in each run.
+
+        Known bug: looking for max is incorrect if metric for zucess is eval loss. 
+        Fortunately reduce_metrics is being used for printing purposes, not for a
+        final analysis.
         """
         # all_results[run_idx][metric] is a number if not tracking eval metrics,
         # or a list with a number for each time evaluate() is called.
@@ -1140,6 +1144,35 @@ class TaskResults():
             f"{self.results[m]*100:.2f}" for m in self.reporting_metrics
         ]
         return "/".join(results_to_string)
+
+
+    def get_model_with_best_max(self):
+        """
+        Utility added to get predictions of the best model at the end of 
+        run_finetuning_multiple_tasks. For now this is assuming 
+        load_best_model_at_end is True
+        """
+
+        greater_is_better = True
+        op = max
+        if "loss" in self.best_metric_key:
+            greater_is_better = False
+            op = min
+
+        bests = [
+            op(self.all_results[i][self.best_metric_key])
+            for i in range(len(self.all_results))
+        ]
+
+        if greater_is_better:
+            best_model_idx = np.argmax(bests)
+        else:
+            best_model_idx = np.argmin(bests)
+
+        return best_model_idx
+        
+
+
 
 
 def hash_dataset_folder_name(data_args):

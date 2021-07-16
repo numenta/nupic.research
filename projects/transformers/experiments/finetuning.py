@@ -92,7 +92,8 @@ debug_finetuning_no_early_stopping.update(
 debug_finetuning = deepcopy(transformers_base)
 debug_finetuning.update(
     # Data arguments
-    task_name="glue",
+    task_name=None,
+    task_names=["wnli", "rte"],
     max_seq_length=128,
 
     # Model arguments
@@ -112,11 +113,17 @@ debug_finetuning.update(
     warmup_ratio=0.1,
     max_steps=50,  # made very short for fast debugging
     metric_for_best_model="eval_accuracy",
-    num_runs=10,
+    num_runs=3,
     trainer_callbacks=[
         TrackEvalMetrics(),
         EarlyStoppingCallback(early_stopping_patience=5)
     ],
+)
+
+
+debug_finetuning_test = deepcopy(debug_finetuning)
+debug_finetuning_test.update(
+    trainer_callbacks=[TrackEvalMetrics()],
 )
 
 debug_finetuning_predict = deepcopy(debug_finetuning)
@@ -453,6 +460,7 @@ finetuning_mini_sparse_bert_debug.update(
 # Export configurations in this file
 CONFIGS = dict(
     debug_finetuning=debug_finetuning,
+    debug_finetuning_test=debug_finetuning_test,
     debug_finetuning_no_early_stopping=debug_finetuning_no_early_stopping,
     debug_finetuning_bert100k=debug_finetuning_bert100k,
     debug_finetuning_bert100k_ntasks=debug_finetuning_bert100k_ntasks,
