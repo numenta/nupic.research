@@ -1310,3 +1310,23 @@ def collate_hp_csvs(report_dir):
 
     big_df = pd.concat(dfs)
     big_df.to_csv(os.path.join(report_dir, "all_progress.csv"))
+
+
+def update_run_number(training_args, run_idx):
+
+    if run_idx is None:
+        return training_args
+
+    print(f"output dir before update: {training_args.output_dir}")
+    out_split = training_args.output_dir.split("_")
+    if run_idx == 0:
+        assert out_split[-2] != "run"
+        new_dir = training_args.output_dir + "_run_0"
+    else:
+        out_split[-1] = str(run_idx)
+        new_dir = "_".join(out_split)
+    training_args.output_dir = new_dir
+    print(f"output dir after update: {training_args.output_dir}")
+    return training_args
+
+

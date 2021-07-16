@@ -85,6 +85,7 @@ from run_utils import (
     run_hyperparameter_search,
     test_tasks,
     train,
+    update_run_number,
 )
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
@@ -475,10 +476,15 @@ def run_finetuning_single_task_with_hp_search(
 
 
 def run_finetuning_single_task(
-    model_args, data_args, training_args, last_checkpoint=None
+    model_args, data_args, training_args, last_checkpoint=None, run_idx=None,
 ):
     """On a single task train, evaluate, and save results"""
 
+    print(f"{training_args.output_dir}")
+
+    # TODO
+    # accept run# as an argument for finetuning with multiple runs on a single task
+    # update the save directory to include run#
     tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
@@ -488,6 +494,9 @@ def run_finetuning_single_task(
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
+
+    # Update where model is saved for each run
+    training_args = update_run_number(training_args, run_idx)
 
     # Train
     trainer = init_trainer(
@@ -589,7 +598,7 @@ def run_finetuning_multiple_tasks(
             training_args.num_runs = 1
 
         # Run finetuning and save results
-        for _ in range(training_args.num_runs):
+        for run_idx in range(training_args.num_runs):
             training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
 
@@ -597,8 +606,11 @@ def run_finetuning_multiple_tasks(
                 run_finetuning_single_task_with_hp_search if
                 model_args.hp_num_trials > 1 else run_finetuning_single_task
             )
+            run_number = run_idx if training_args.num_runs > 1 else None
+            # TODO: pass run # into run_finetuning_single_task
             eval_results = training_fn(
-                model_args, data_args, training_args, last_checkpoint=last_checkpoint
+                model_args, data_args, training_args, last_checkpoint=last_checkpoint,
+                run_idx=run_number
             )
             task_results.append(eval_results)
 
