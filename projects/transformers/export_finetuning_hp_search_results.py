@@ -506,9 +506,14 @@ if __name__ == "__main__":
                         help="Find the best hyperparameters for each task "
                              "and save each set of parameters as a dictionary"
                              " that can be accessed for subsequent finetuning")
+    parser.add_argument("-p", "--plots", type=bool, required=False,
+                        help="Make simple 1d plots with a regression line "
+                             "fitting a success metric like eval_accuracy "
+                             "to each hyperparameter individually")
 
     args = parser.parse_args()
     experiment_path = args.directory
     task_2_df, task_2_hps = load_from_base(experiment_path)
     save_agg_results(task_2_df, experiment_path)
     get_best_params(task_2_df, task_2_hps, args.config)
+    
