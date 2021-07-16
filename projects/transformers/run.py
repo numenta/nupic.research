@@ -80,6 +80,7 @@ from run_utils import (
     init_model,
     init_tokenizer,
     init_trainer,
+    link_best_predictions,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
     run_hyperparameter_search,
@@ -606,37 +607,17 @@ def run_finetuning_multiple_tasks(
                 run_finetuning_single_task_with_hp_search if
                 model_args.hp_num_trials > 1 else run_finetuning_single_task
             )
-            run_number = run_idx if training_args.num_runs > 1 else None
             # TODO: pass run # into run_finetuning_single_task
             eval_results = training_fn(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint,
-                run_idx=run_number
+                run_idx=run_idx
             )
             task_results.append(eval_results)
 
-        # TODO
-        # Grab the model with the best eval score. 
-        # Denote which model is best so it is easy to load / look for later.
-        # If predict, get predictions for the best model. 
-        # Store predictions in a way that's easy to manage, perhaps in the 
-        # overall task directory.
-        #
-        # Well, actually, we can just predict on all the runs during finetuning_single_task
-        # in which case we just need a) a command to pull the best predictions and
-        # b) a way to tell which are the best
-        if training_args.do_predict:
-            import pdb
-            pdb.set_trace()
-            best_run = task_results.get_model_with_best_max
-            best_run_path = os.path.join(training_args.output_dir, f"run_{best_run}")
-            pred_file = GLUE_NAMES_PER_TASK[task_name] + ".tsv"
-            best_run_predictions = os.path.join(best_run_path, pred_file)
-            link_file_name = GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"
-            link_file_path = os.path.join(training_args.output_dir, link_file_name)
-            os.link(best_run_predictions, link_file_path)
-            logging.info(f"best run predictions for {task_name} saved to "
-                         "{link_file_path}")
-
+        # Find the predictions of the best model and sym link to a file
+        # labeled with "_best" at the end. Warning, assumes
+        # load_best_model_at_end is on.
+        link_best_predictions(training_args)
 
         # If this is just a prediction run, ignore this block
         if training_args.do_eval:

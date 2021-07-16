@@ -1360,4 +1360,22 @@ def update_run_number(training_args, run_idx):
     print(f"output dir after update: {training_args.output_dir}")
     return training_args
 
+def link_best_predictions(training_args):
+    if not training_args.do_predict:
+        return
 
+    import pdb
+    pdb.set_trace()
+    # get the filename with predictions from the best model
+    best_run = task_results.get_model_with_best_max()
+    task_path = os.path.dirname(training_args.output_dir)
+    best_run_path = os.path.join(task_path, f"run_{best_run}")
+    pred_file = GLUE_NAMES_PER_TASK[task_name] + ".tsv"
+    best_run_predictions = os.path.join(best_run_path, pred_file)
+
+    # link task_best.tsv
+    link_file_name = GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"
+    link_file_path = os.path.join(training_args.output_dir, link_file_name)
+    os.link(best_run_predictions, link_file_path)
+    logging.info(f"best run predictions for {task_name} saved to "
+                    "{link_file_path}")
