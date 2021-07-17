@@ -31,15 +31,18 @@ class SynapticIntelligence:
     `ContinualLearningExperiment` and its subclasses.
 
     The config should contain a dict `si_args` that specifies the strength of the SI
-    surrogate loss coefficient and damping parameter. If any parameters are missing, or
-    if `si_args` is absent, the default values in the example below are used.
+    surrogate loss coefficient and damping parameter. By default, SI is not applied to
+    dendritic weights, but can be by setting `apply_to_dendrites=True`. If any
+    parameters are missing, or if `si_args` is absent, the default values in the
+    example below are used.
 
     Example config:
     ```
     config=dict(
         si_args=dict(
             c=1.0,
-            damping=1e-3
+            damping=1e-3,
+            apply_to_dendrites=False
         )
     )
     ```
@@ -52,12 +55,13 @@ class SynapticIntelligence:
         si_args = config.get("si_args", {})
         self.c = si_args.get("c", 1.0)
         self.damping = si_args.get("damping", 1e-3)
+        self.apply_to_dendrites = si_args.get("apply_to_dendrites", False)
 
         self.small_omega = {}
         self.delta = {}
         self.big_omega = {}
 
-        for name, param in self.named_forward_parameters():
+        for name, param in self.named_si_parameters():
 
             # Track importance weights assigned to each synapse
             self.small_omega[name] = torch.zeros(param.size()).to(self.device)
@@ -84,7 +88,7 @@ class SynapticIntelligence:
         # Compute the following:
         # 1) Delta values - parameter change while learning the most recent task
         # 2) Big omega values - parameter regularization strength in surrogate loss
-        for name, param in self.named_forward_parameters():
+        for name, param in self.named_si_parameters():
 
             self.delta[name] = torch.clone(param - self.stable_params[name]).detach()
             self.big_omega[name] += F.relu(self.small_omega[name]) / \
@@ -94,7 +98,7 @@ class SynapticIntelligence:
         self.update_stable_params()
 
         # Reset small omega values
-        for name, _param in self.named_forward_parameters():
+        for name, _param in self.named_si_parameters():
             self.small_omega[name].fill_(0.0)
 
         return ret
@@ -110,7 +114,7 @@ class SynapticIntelligence:
         surrogate_loss = torch.tensor(0., device=self.device)
 
         if self.current_task > 1:
-            for name, param in self.named_forward_parameters():
+            for name, param in self.named_si_parameters():
 
                 big_omega = self.big_omega[name]
                 old_param = self.stable_params[name]
@@ -126,7 +130,7 @@ class SynapticIntelligence:
         """
         super().post_batch(**kwargs)
 
-        for name, param in self.named_forward_parameters():
+        for name, param in self.named_si_parameters():
 
             param_change = torch.clone(param - self.unstable_params[name]).detach()
             self.small_omega[name] += -(param.grad * param_change)
@@ -134,17 +138,20 @@ class SynapticIntelligence:
         self.update_unstable_params()
 
     def update_stable_params(self):
-        for name, param in self.named_forward_parameters():
+        for name, param in self.named_si_parameters():
             self.stable_params[name] = torch.clone(param).detach()
 
     def update_unstable_params(self):
-        for name, param in self.named_forward_parameters():
+        for name, param in self.named_si_parameters():
             self.unstable_params[name] = torch.clone(param).detach()
 
-    def named_forward_parameters(self):
+    def named_si_parameters(self):
         """
-        Yields the model's `named_parameters` which are not dendritic segment weights.
+        Yields the model's `named_parameters` to which SI will be applied.
         """
         for name, param in self.model.named_parameters():
-            if "segment" not in name:
+            if self.apply_to_dendrites or "segment" not in name:
+
+                # This line will not be reached if `self.apply_to_dendrites=False` and
+                # "segment" occurs in `name`
                 yield name, param
