@@ -207,6 +207,12 @@ hp_search_finetuning_bert_100k_small_tasks.update(
     trainer_callbacks=[TrackEvalMetrics()],
 )
 
+hp_search_finetuning_trifecta_2x_small_tasks = deepcopy(
+    hp_search_finetuning_trifecta_80_100k_small_tasks)
+hp_search_finetuning_trifecta_2x_small_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k"  # noqa
+)
+
 hp_search_finetuning_bert_100k_big_tasks = deepcopy(
     hp_search_finetuning_trifecta_85_100k_big_tasks
 )
@@ -228,6 +234,12 @@ hp_search_finetuning_trifecta_90_100k_big_tasks.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa
 )
 
+hp_search_finetuning_trifecta_2x_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_80_100k_big_tasks)
+hp_search_finetuning_trifecta_2x_big_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k"  # noqa
+)
+
 
 # Export configurations in this file
 CONFIGS = dict(
@@ -238,8 +250,10 @@ CONFIGS = dict(
     hp_search_finetuning_trifecta_80_100k_small_tasks=hp_search_finetuning_trifecta_80_100k_small_tasks,  # noqa
     hp_search_finetuning_trifecta_85_100k_small_tasks=hp_search_finetuning_trifecta_85_100k_small_tasks,  # noqa
     hp_search_finetuning_trifecta_90_100k_small_tasks=hp_search_finetuning_trifecta_90_100k_small_tasks,  # noqa
+    hp_search_finetuning_trifecta_2x_small_tasks=hp_search_finetuning_trifecta_2x_small_tasks,  # noqa
     hp_search_finetuning_bert_100k_big_tasks=hp_search_finetuning_bert_100k_big_tasks,
     hp_search_finetuning_trifecta_80_100k_big_tasks=hp_search_finetuning_trifecta_80_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_85_100k_big_tasks=hp_search_finetuning_trifecta_85_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_90_100k_big_tasks=hp_search_finetuning_trifecta_90_100k_big_tasks,  # noqa
+    hp_search_finetuning_trifecta_2x_big_tasks=hp_search_finetuning_trifecta_2x_big_tasks,  # noqa
 )
