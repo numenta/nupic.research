@@ -68,7 +68,7 @@ def update_task_hyperparams(local_config, model_name):
 
 # bet_100k
 bert_100k_hp_chase = deepcopy(finetuning_bert100k_glue_get_info)
-bert_100k_hp_chase = update_task_hyperparams(bert_100k_hp_search, 'bert_100k')
+bert_100k_hp_chase = update_task_hyperparams(bert_100k_hp_chase, 'bert_100k')
 
 # 80%
 trifecta_80_hp_chase = deepcopy(finetuning_bert_sparse_trifecta_100k_glue_get_info)
