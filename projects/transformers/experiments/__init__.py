@@ -31,7 +31,7 @@ from .deepspeed import CONFIGS as DEEPSPEED
 from .distillation import CONFIGS as DISTILLATION
 from .eighty_percent_sparse import CONFIGS as EIGHT_PERCENT_SPARSE
 from .finetuning import CONFIGS as FINETUNING
-from .hpchase import *
+from .hpchase import CONFIGS as HPCHASE
 from .hpsearch import CONFIGS as HPSEARCH
 from .one_cycle_lr import CONFIGS as ONE_CYCLE_LR
 from .profiler import CONFIGS as PROFILER
@@ -58,6 +58,7 @@ CONFIGS.update(DISTILLATION)
 CONFIGS.update(EIGHT_PERCENT_SPARSE)
 CONFIGS.update(FINETUNING)
 CONFIGS.update(HPSEARCH)
+CONFIGS.update(HPCHASE)
 CONFIGS.update(ONE_CYCLE_LR)
 CONFIGS.update(PROFILER)
 CONFIGS.update(REGRESSIONS)
