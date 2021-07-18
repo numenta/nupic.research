@@ -826,7 +826,7 @@ def check_best_metric(training_args, task_name):
         if training_args.metric_for_best_model != "eval_loss":
             logging.warning(
                 "Warning, code will break because the current metric for best model"
-                f" (training_args.metric_for_best_model) is not being tracked."
+                f" ({training_args.metric_for_best_model}) is not being tracked."
                 "Defaulting metric_for_best_model to first reporting metric"
             )
             training_args.metric_for_best_model = REPORTING_METRICS_PER_TASK[
