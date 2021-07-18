@@ -462,7 +462,7 @@ def get_best_params(task_2_df, task_2_hps, config_path):
         hps = list(task_2_hps[task])
         metric = REPORTING_METRICS_PER_TASK[task][0] + "_max"
         scores = task_2_df[task][metric].values
-        best_idx = np.argmax(scores)
+        best_idx = np.nanargmax(scores)
         best_params = task_2_df[task].iloc[best_idx][hps]
         best_idx_per_task[task] = best_idx
         best_params_per_task[task] = best_params
