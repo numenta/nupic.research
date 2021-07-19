@@ -454,6 +454,26 @@ def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
     return hp_regs, X, y, fig, ax
 
 
+def sanitize_best_params(best_params):
+    """
+    I'm getting errors that data types are not JSON serializable
+    and the current hypothesis is that this is due to saving numpy
+    int and floats, and we need to use native typing.
+    """
+    clean_best = copy.deepcopy(best_params)
+    for key, val in clean_best.items():
+        if isinstance(val, numbers.Real):
+            clean_best[key] = float(clean_best[key])
+        elif np.issubdtype(val, np.integer):
+            clean_best[key] = int(clean_best[key])
+        else:
+            print("Not sure what to do with the following data type: "
+                  f"{val}, which is of type {type(val)}."
+                  "Ignoring for now.."
+            )
+    return clean_best
+
+
 def get_best_params(task_2_df, task_2_hps, config_path):
 
     best_idx_per_task = {}
@@ -476,6 +496,7 @@ def get_best_params(task_2_df, task_2_hps, config_path):
             os.makedirs(config_path)
         for task in best_params_per_task.keys():
             full_config_name = os.path.join(config_path, f"{task}_hps.p")
+            best_params = sanitize_best_params(best_params_per_task[task])
             with open(full_config_name, 'wb') as f:
                 pickle.dump(dict(best_params), f)
 
