@@ -481,8 +481,6 @@ def run_finetuning_single_task(
 ):
     """On a single task train, evaluate, and save results"""
 
-    print(f"{training_args.output_dir}")
-
     # TODO
     # accept run# as an argument for finetuning with multiple runs on a single task
     # update the save directory to include run#

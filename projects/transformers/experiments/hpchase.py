@@ -82,7 +82,6 @@ trifecta_85_hp_chase = update_task_hyperparams(trifecta_85_hp_chase, 'trifecta_8
 trifecta_90_hp_chase = deepcopy(finetuning_bert_sparse_90_trifecta_100k_glue_get_info)
 trifecta_90_hp_chase = update_task_hyperparams(trifecta_90_hp_chase, 'trifecta_90')
 
-
 CONFIGS = dict(
     bert_100k_hp_chase=bert_100k_hp_chase,
     trifecta_80_hp_chase=trifecta_80_hp_chase,
