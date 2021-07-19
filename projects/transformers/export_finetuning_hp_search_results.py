@@ -463,7 +463,10 @@ def sanitize_best_params(best_params):
     clean_best = copy.deepcopy(best_params)
     for key, val in clean_best.items():
         if isinstance(val, numbers.Real):
-            clean_best[key] = float(clean_best[key])
+            clean_val = float(clean_best[key])
+            if clean_val.is_integer():
+                clean_val = int(clean_val)
+            clean_best[key] = clean_val
         elif np.issubdtype(val, np.integer):
             clean_best[key] = int(clean_best[key])
         else:

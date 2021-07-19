@@ -1350,14 +1350,12 @@ def update_run_number(training_args, run_idx):
     if run_idx is None:
         return training_args
 
-    print(f"output dir before update: {training_args.output_dir}")
     if run_idx == 0:
         new_dir = os.path.join(training_args.output_dir, "run_0")
     else:
         dirname, basename = os.path.split(training_args.output_dir)
         new_dir = os.path.join(dirname, f"run_{run_idx}")
     training_args.output_dir = new_dir
-    print(f"output dir after update: {training_args.output_dir}")
     return training_args
 
 def link_best_predictions(training_args, task_results, task_name):
