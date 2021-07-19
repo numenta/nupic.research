@@ -29,7 +29,7 @@ class TrackEvalMetrics(TrainerCallback):
     after trainer.evaluate() is called. It is designed to provide the same
     metrics for training and validation sets, at the same time points.
     """
-    def __init__(self, sparsity_tol=None):
+    def __init__(self, sparsity_tolerance=None):
         """
         Set up two dictionaries to track training and eval metrics, and a list
         to track steps.
@@ -41,7 +41,11 @@ class TrackEvalMetrics(TrainerCallback):
             self.eval_metrics['acc'] -> [acc1, acc2, ..., accn]
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
         """
-        self.sparsity_tolerance = sparsity_tol if sparsity_tol is not None else 0.01
+        if sparsity_tolerance is not None:
+            self.sparsity_tolerance = sparsity_tolerance
+        else:
+            self.sparsity_tolerance = 0.01
+
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []

@@ -1302,25 +1302,36 @@ def compute_objective(metrics, objective):
 
 
 def check_if_current_hp_best(old_file, model_args, best_run):
+    """
+    If you run multiple finetuning experiments, you want one file with
+    the best params / results. If the current run beats the old best,
+    overwrite the best_run_results file. This function returns a bool,
+    indicating if you should overwrite, or not.
+    """
 
-    # if previous file
+    # If there is no current fil, write a new file
     if not os.path.exists(old_file):
         return True
 
+    # Read the file with current best results
     with open(old_file, "r") as f:
         data = f.read()
         line_split = data.split("\n")
 
+    # Search though the file to get the best score
     previous_best = None
     for line in line_split:
         if model_args.hp_compute_objective[1] in line:
             previous_best = float(line.split("=")[-1])
 
+    # To compare new scores with current scores, need to decide
+    # if greater is better.
     if model_args.hp_compute_objective[0] == "maximize":
         operator = "__gt__"
     else:
         operator = "__lt__"
 
+    # If new run is better, overwrite. Else, pass.
     if getattr(previous_best, operator)(best_run.objective):
         return False
     else:
@@ -1357,6 +1368,7 @@ def update_run_number(training_args, run_idx):
         new_dir = os.path.join(dirname, f"run_{run_idx}")
     training_args.output_dir = new_dir
     return training_args
+
 
 def link_best_predictions(training_args, task_results, task_name):
     if not training_args.do_predict:

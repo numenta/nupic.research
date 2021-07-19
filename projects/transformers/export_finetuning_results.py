@@ -190,8 +190,8 @@ class TaskResultsAnalysis:
         """
         metrics = [m for m in self[task].reporting_metrics]
 
-        if hasattr(self[task], "score_mats"):
-            return self[task].score_mats
+        if hasattr(self[task], "score_matrix"):
+            return self[task].score_matrix
 
         n_steps = len(self[task].all_results[0]["steps"])
         n_runs = len(self[task].all_results)
@@ -205,7 +205,7 @@ class TaskResultsAnalysis:
                 metrics_all_runs[m][run_idx, :] = np.array(
                     self[task].all_results[run_idx][metrics[m]])
 
-        self[task].score_mats = metrics_all_runs
+        self[task].score_matrix = metrics_all_runs
 
         return metrics_all_runs
 
@@ -229,11 +229,6 @@ class TaskResultsAnalysis:
             best_metric_scores.append(data)
         return best_avg_metric_scores, best_metric_scores
 
-    # TODO
-    # def get_best_scores_mean_run(self, task):
-    #     metrics = self[task].reporting_metrics
-    #     scores = self.get_best_scores_per_run(task)
-    #     return [np.mean(best_metric) for best_metric in scores]
 
     def get_best_scores_best_run(self, task):
         best_avg_metric_scores, best_scores = self.get_best_scores_per_run(task)
