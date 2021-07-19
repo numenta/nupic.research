@@ -229,7 +229,6 @@ class TaskResultsAnalysis:
             best_metric_scores.append(data)
         return best_avg_metric_scores, best_metric_scores
 
-
     def get_best_scores_best_run(self, task):
         best_avg_metric_scores, best_scores = self.get_best_scores_per_run(task)
         best_idx = np.argmax(best_avg_metric_scores)

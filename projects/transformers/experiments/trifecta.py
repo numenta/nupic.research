@@ -341,9 +341,7 @@ finetuning_bert_sparse_trifecta_2x_get_info.update(
     warmup_ratio=0.1,
 )
 
-
-
-# This fine-tunes a pretrained model from `bert_sparse_85_trifecta_100k` above.
+# This fine-tunes a pretrained model from `bert_sparse_85_trifecta_100k`.
 finetuning_bert_sparse_85_trifecta_100k_glue = deepcopy(
     finetuning_bert_sparse_trifecta_100k_glue)
 finetuning_bert_sparse_85_trifecta_100k_glue.update(
@@ -355,7 +353,7 @@ finetuning_bert_sparse_85_trifecta_100k_glue["task_hyperparams"].update(
     mnli=dict(eval_steps=123, save_steps=123)
 )
 
-# This fine-tunes a pretrained model from `bert_sparse_90_trifecta_100k` above.
+# This fine-tunes a pretrained model from `bert_sparse_90_trifecta_100k`.
 finetuning_bert_sparse_90_trifecta_100k_glue = deepcopy(
     finetuning_bert_sparse_trifecta_100k_glue)
 finetuning_bert_sparse_90_trifecta_100k_glue.update(
@@ -502,7 +500,7 @@ CONFIGS = dict(
     #   2x wide ~16 Mi Params
     bert_sparse_trifecta_2x_100k=bert_sparse_trifecta_2x_100k,
     bert_sparse_2x_100k_kd_lr_range_test=bert_sparse_2x_100k_kd_lr_range_test,
-    finetuning_bert_sparse_trifecta_2x_get_info=finetuning_bert_sparse_trifecta_2x_get_info,
+    finetuning_bert_sparse_trifecta_2x_get_info=finetuning_bert_sparse_trifecta_2x_get_info,  # noqa E501
     #   4x wide ~11 Mi Params
     # bert_sparse_trifecta_4x_100k=bert_sparse_trifecta_4x_100k,
     bert_sparse_4x_100k_kd_lr_range_test=bert_sparse_4x_100k_kd_lr_range_test,

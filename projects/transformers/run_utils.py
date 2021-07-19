@@ -1092,7 +1092,7 @@ class TaskResults():
         result in the same behavior in this case, since there is a single entry to
         reduce over in each run.
 
-        Known bug: looking for max is incorrect if metric for zucess is eval loss. 
+        Known bug: looking for max is incorrect if metric for zucess is eval loss.
         Fortunately reduce_metrics is being used for printing purposes, not for a
         final analysis.
         """
@@ -1145,11 +1145,10 @@ class TaskResults():
         ]
         return "/".join(results_to_string)
 
-
     def get_model_with_best_max(self):
         """
-        Utility added to get predictions of the best model at the end of 
-        run_finetuning_multiple_tasks. For now this is assuming 
+        Utility added to get predictions of the best model at the end of
+        run_finetuning_multiple_tasks. For now this is assuming
         load_best_model_at_end is True
         """
 
@@ -1170,9 +1169,6 @@ class TaskResults():
             best_model_idx = np.argmin(bests)
 
         return best_model_idx
-        
-
-
 
 
 def hash_dataset_folder_name(data_args):
@@ -1386,4 +1382,4 @@ def link_best_predictions(training_args, task_results, task_name):
     link_file_path = os.path.join(task_path, link_file_name)
     os.symlink(best_run_predictions, link_file_path)
     logging.info(f"best run predictions for {task_name} saved to "
-                    "{link_file_path}")
+                 "{link_file_path}")

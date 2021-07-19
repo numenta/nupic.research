@@ -18,23 +18,17 @@
 #  http://numenta.org/licenses/
 #
 
-from copy import deepcopy
+import os
 import pathlib
 import pickle
-import os
+from copy import deepcopy
 
-from callbacks import TrackEvalMetrics
-
-from .base import bert_base
 # use bert_100k for task-specific hp search prototyping
-from .finetuning import (
-    finetuning_bert100k_glue,
-    finetuning_bert100k_glue_get_info,
-)
+from .finetuning import finetuning_bert100k_glue_get_info
 from .trifecta import (
-    finetuning_bert_sparse_trifecta_100k_glue_get_info,
     finetuning_bert_sparse_85_trifecta_100k_glue_get_info,
-    finetuning_bert_sparse_90_trifecta_100k_glue_get_info
+    finetuning_bert_sparse_90_trifecta_100k_glue_get_info,
+    finetuning_bert_sparse_trifecta_100k_glue_get_info,
 )
 
 # Get all experiments where hyperparameters have been extracted
@@ -54,8 +48,9 @@ for model in HP_SETS.keys():
         task_file = os.path.join(hp_path, task)
         with open(task_file, "rb") as f:
             task_hps[task_name] = pickle.load(f)
-    
+
     HP_SETS[model] = task_hps
+
 
 def update_task_hyperparams(local_config, model_name):
     for task in HP_SETS[model_name]:
@@ -68,19 +63,19 @@ def update_task_hyperparams(local_config, model_name):
 
 # bet_100k
 bert_100k_hp_chase = deepcopy(finetuning_bert100k_glue_get_info)
-bert_100k_hp_chase = update_task_hyperparams(bert_100k_hp_chase, 'bert_100k')
+bert_100k_hp_chase = update_task_hyperparams(bert_100k_hp_chase, "bert_100k")
 
 # 80%
 trifecta_80_hp_chase = deepcopy(finetuning_bert_sparse_trifecta_100k_glue_get_info)
-trifecta_80_hp_chase = update_task_hyperparams(trifecta_80_hp_chase, 'trifecta_80')
+trifecta_80_hp_chase = update_task_hyperparams(trifecta_80_hp_chase, "trifecta_80")
 
 # 85%
 trifecta_85_hp_chase = deepcopy(finetuning_bert_sparse_85_trifecta_100k_glue_get_info)
-trifecta_85_hp_chase = update_task_hyperparams(trifecta_85_hp_chase, 'trifecta_85')
+trifecta_85_hp_chase = update_task_hyperparams(trifecta_85_hp_chase, "trifecta_85")
 
 # 90%
 trifecta_90_hp_chase = deepcopy(finetuning_bert_sparse_90_trifecta_100k_glue_get_info)
-trifecta_90_hp_chase = update_task_hyperparams(trifecta_90_hp_chase, 'trifecta_90')
+trifecta_90_hp_chase = update_task_hyperparams(trifecta_90_hp_chase, "trifecta_90")
 
 CONFIGS = dict(
     bert_100k_hp_chase=bert_100k_hp_chase,

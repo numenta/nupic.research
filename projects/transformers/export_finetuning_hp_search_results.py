@@ -44,7 +44,7 @@ from scipy import stats as ss
 from finetuning_constants import (
     ALL_REPORTING_METRICS,
     REPORTING_METRICS_PER_TASK,
-    TASK_NAMES
+    TASK_NAMES,
 )
 
 warnings.filterwarnings("ignore")
@@ -472,8 +472,7 @@ def sanitize_best_params(best_params):
         else:
             print("Not sure what to do with the following data type: "
                   f"{val}, which is of type {type(val)}."
-                  "Ignoring for now.."
-            )
+                  "Ignoring for now..")
     return clean_best
 
 
@@ -500,7 +499,7 @@ def get_best_params(task_2_df, task_2_hps, config_path):
         for task in best_params_per_task.keys():
             full_config_name = os.path.join(config_path, f"{task}_hps.p")
             best_params = sanitize_best_params(best_params_per_task[task])
-            with open(full_config_name, 'wb') as f:
+            with open(full_config_name, "wb") as f:
                 pickle.dump(dict(best_params), f)
 
 
@@ -517,6 +516,7 @@ def load_csv_per_task(base_dir):
                     task_2_df[file] = task_data
 
     return task_2_df
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -540,4 +540,3 @@ if __name__ == "__main__":
     task_2_df, task_2_hps = load_from_base(experiment_path)
     save_agg_results(task_2_df, experiment_path)
     get_best_params(task_2_df, task_2_hps, args.config)
-    
