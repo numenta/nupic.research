@@ -33,6 +33,7 @@ from .eighty_percent_sparse import CONFIGS as EIGHT_PERCENT_SPARSE
 from .finetuning import CONFIGS as FINETUNING
 from .hpchase import CONFIGS as HPCHASE
 from .hpsearch import CONFIGS as HPSEARCH
+from .gmp_bert import CONFIGS as GMP_BERT
 from .one_cycle_lr import CONFIGS as ONE_CYCLE_LR
 from .profiler import CONFIGS as PROFILER
 from .regressions import CONFIGS as REGRESSIONS
@@ -60,6 +61,7 @@ CONFIGS.update(EIGHT_PERCENT_SPARSE)
 CONFIGS.update(FINETUNING)
 CONFIGS.update(HPSEARCH)
 CONFIGS.update(HPCHASE)
+CONFIGS.update(GMP_BERT)
 CONFIGS.update(ONE_CYCLE_LR)
 CONFIGS.update(PROFILER)
 CONFIGS.update(REGRESSIONS)
