@@ -17,7 +17,6 @@
 #
 #  http://numenta.org/licenses/
 #
-# import wandb
 from transformers import TrainerCallback
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
@@ -29,7 +28,7 @@ class TrackEvalMetrics(TrainerCallback):
     after trainer.evaluate() is called. It is designed to provide the same
     metrics for training and validation sets, at the same time points.
     """
-    def __init__(self, sparsity_tolerance=None):
+    def __init__(self, sparsity_tolerance=0.01):
         """
         Set up two dictionaries to track training and eval metrics, and a list
         to track steps.
@@ -40,18 +39,19 @@ class TrackEvalMetrics(TrainerCallback):
         Example:
             self.eval_metrics['acc'] -> [acc1, acc2, ..., accn]
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
+
+        This callback also keeps track of model sparsity, and breaks if
+        sparsity changes in absolute value by more than sparsity_tolerance.
+        If you are using a training approach that sparsifies the model, be sure
+        to set sparsity_tolerance to something like 1, so large changes in
+        sparsity are accepted.
         """
-        if sparsity_tolerance is not None:
-            self.sparsity_tolerance = sparsity_tolerance
-        else:
-            self.sparsity_tolerance = 0.01
 
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
         self.eval_metrics["num_nonzero_params"] = []
         self.eval_metrics["lr"] = []
-        # TODO: track train_metrics, ignore for now
         self.train_metrics = {}
         self.steps = []
         self.step_counter = 0
