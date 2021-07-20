@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .deepspeed import DeepspeedTransformerLayerMixin
 from .distillation import DistillationTrainerMixin
 from .lr_range_test import LRRangeTestMixin
 from .gmp import GradualMagnitudePruningMixin, ThreeStageLRMixin

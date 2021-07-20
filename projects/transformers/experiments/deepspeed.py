@@ -21,11 +21,26 @@
 from copy import deepcopy
 
 from .ablations import tiny_bert_sparse_100k_onecycle_lr_kd
+from transformers import Trainer
+
+from trainer_mixins import DeepspeedTransformerLayerMixin
+
 from .distillation import DistillationTrainer
 
 # from .trifecta import tiny_bert_trifecta_100k
 
 __all__ = ["CONFIGS"]
+
+
+def _inject_trainer_mixin(config, mixin):
+    """
+    Injects trainer mixin to the given config
+    """
+    trainer_class = config["trainer_class"]
+    assert issubclass(trainer_class, Trainer)
+    config["trainer_class"] = type(
+        f"{mixin.__name__}{trainer_class.__name__}", (mixin, trainer_class), {}
+    )
 
 
 # Deepspeed stage 2 default arguments. Args marked with "auto" will be replaced
@@ -56,6 +71,12 @@ DEEPSPEED_STAGE2_ARGS = {
             "enabled": "auto",
             "initial_scale_power": 15,
         },
+        # See https://arxiv.org/pdf/2010.13369.pdf
+        # "progressive_layer_drop": {
+            # "enabled": True,
+            # "theta": 0.5,
+            # "gamma": 0.001,
+        # }
     },
 }
 
@@ -67,6 +88,14 @@ DEEPSPEED_STAGE2_ARGS = {
 # tiny_bert_100k with KD, OneCycleLR and deepspeed
 tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed = deepcopy(tiny_bert_sparse_100k_onecycle_lr_kd)  # noqa: E501
 tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed.update(DEEPSPEED_STAGE2_ARGS)
+
+# tiny_bert_100k with KD, OneCycleLR, deepspeed and fused transformer
+tiny_bert_sparse_100k_onecycle_lr_kd_fused_transformer_deepspeed = deepcopy(tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed)  # noqa: E501
+# Replace HF Transformer Layer with Deepspeed transformetn
+_inject_trainer_mixin(
+    config=tiny_bert_sparse_100k_onecycle_lr_kd_fused_transformer_deepspeed,
+    mixin=DeepspeedTransformerLayerMixin
+)
 
 # LR Range Test for tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed
 tiny_bert_sparse_100k_kd_lr_range_test_deepspeed = deepcopy(tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed)  # noqa: E501
@@ -112,5 +141,6 @@ tiny_bert_sparse_100k_kd_lr_range_test_deepspeed["deepspeed"].update(
 CONFIGS = dict(
     # tiny_bert_trifecta_100k_deepspeed=tiny_bert_trifecta_100k_deepspeed,
     tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed=tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed,  # noqa: E501
+    tiny_bert_sparse_100k_onecycle_lr_kd_fused_transformer_deepspeed=tiny_bert_sparse_100k_onecycle_lr_kd_fused_transformer_deepspeed,  # noqa: E501
     tiny_bert_sparse_100k_kd_lr_range_test_deepspeed=tiny_bert_sparse_100k_kd_lr_range_test_deepspeed,  # noqa: E501
 )
