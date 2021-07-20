@@ -22,7 +22,7 @@
 import sys
 import tempfile
 import unittest
-from os.path import expanduser
+from os.path import abspath
 
 from transformers import (
     CONFIG_MAPPING,
@@ -40,8 +40,7 @@ from models import (
 )
 from nupic.torch.modules import SparseWeights
 
-sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers")) # noqa
-# noqa
+sys.path.insert(0, abspath("../"))
 
 
 class SparseBertModelTest(unittest.TestCase):
