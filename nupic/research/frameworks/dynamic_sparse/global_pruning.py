@@ -29,17 +29,23 @@ __all__ = [
 ]
 
 
-def global_prune_by_abs_weight(sparse_modules, prune_fraction):
+def global_prune_by_abs_weight(sparse_modules, prune_fraction=None, num_remove=None):
     """
     Globally prune 'num_remove' weights from a list of sparse modules by ranking and
-    selecting the top absolute weights. Modules are pruned adjusting their `zero_masks`;
-    switching off the weight occurs by changing 0 to 1. Be sure to call
-    `rezero_weights` following this function to zero out the pruned weights.
+    selecting the top absolute weights. If prune_fraction is given, then num_removed is
+    calculated. Modules are pruned adjusting their `zero_masks`; switching off the
+    weight occurs by changing 0 to 1. Be sure to call `rezero_weights` following this
+    function to zero out the pruned weights.
 
     :param sparse_modules: list of modules of type SparseWeightsBase
-    :param prune_fraction: fraction of weights to prune; between 0 and 1
+    :param prune_fraction: fraction of weights to prune; between 0 and 1; can't be
+                           specified if num_remove is not None
+    :param num_remove: how many parameters to remove; can't be specified if
+                       prune_fraction is not None
     """
-    assert 0 <= prune_fraction <= 1
+
+    # Only one of these arguments may be given.
+    assert not (prune_fraction is not None and num_remove is not None)
 
     # Flatten parameters to compare them all at once for global pruning.
     flattened_params = parameters_to_vector([m.weight for m in sparse_modules])
@@ -48,7 +54,9 @@ def global_prune_by_abs_weight(sparse_modules, prune_fraction):
 
     # Calculate the number of parameters to keep.
     total_on = flattened_on_mask.sum().item()
-    num_remove = int(round(total_on * prune_fraction))
+    if prune_fraction is not None:
+        assert 0 <= prune_fraction <= 1
+        num_remove = int(round(total_on * prune_fraction))
     num_keep = total_on - num_remove
 
     # Prune by only keeping the top weights ranked by their absolute values.
