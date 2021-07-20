@@ -75,8 +75,9 @@ class TrackEvalMetrics(TrainerCallback):
             # track learning rate
             # get_last_lr() returns lr for each parameter group. For now,
             # assume lrs are the same for all and just track one.
-            last_lr = kwargs["lr_scheduler"].get_last_lr()
-            self.eval_metrics["lr"].append(last_lr[0])
+            if kwargs["lr_scheduler"] is not None:
+                last_lr = kwargs["lr_scheduler"].get_last_lr()
+                self.eval_metrics["lr"].append(last_lr[0])
 
             # TODO
             # Possibly update train_results
