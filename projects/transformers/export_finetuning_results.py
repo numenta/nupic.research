@@ -391,7 +391,7 @@ def process_results(results_files, model_name, reduction, csv, md):
     # create a new csv file to store results
     if csv_df is None:
         print(f"saving results to a new file: {csv}")
-        df.to_csv(csv, index=False)
+        df.to_csv(os.path.abspath(csv), index=False)
     # merge csv file with current results
     else:
         df = pd.concat([csv_df, df], ignore_index=True)
@@ -399,7 +399,7 @@ def process_results(results_files, model_name, reduction, csv, md):
 
     # save a markdown file
     if len(md) > 0:
-        df.to_markdown(md, index=False)
+        df.to_markdown(os.path.abspath(md), index=False)
 
 
 if __name__ == "__main__":
