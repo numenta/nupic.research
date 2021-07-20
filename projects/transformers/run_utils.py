@@ -1331,7 +1331,7 @@ def check_if_current_hp_best(old_file, model_args, best_run):
     # To compare new scores with current scores, need to decide
     # if greater is better.
     if model_args.hp_compute_objective[0] == "maximize":
-        return best_run.objective > previous best
+        return best_run.objective > previous_best
     else:
         return best_run.objective < previous_best
 
