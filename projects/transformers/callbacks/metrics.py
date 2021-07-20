@@ -82,8 +82,11 @@ class TrackEvalMetrics(TrainerCallback):
             # up to specified tolerance
             if (self.sparsity_tolerance < 1) and len(self.eval_metrics["sparsity"]) > 1:
                 sparse_diff = self.eval_metrics["sparsity"][0] - self.eval_metrics["sparsity"][-1]  # noqa
-                assert abs(sparse_diff) < self.sparsity_tolerance, "Model sparsity"
-                f"fluctuated beyond acceptable range. {self.eval_metrics['sparsity']}"
+                if abs(sparse_diff) < self.sparsity_tolerance:
+                    logging.warn(
+                        f"Model sparsity fluctuated beyond acceptable range."
+                        "Current sparsity level: {self.eval_metrics['sparsity']}"
+                    )
 
             # track learning rate
             # get_last_lr() returns lr for each parameter group. For now,
