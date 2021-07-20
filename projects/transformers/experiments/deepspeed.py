@@ -20,11 +20,11 @@
 # ----------------------------------------------------------------------
 from copy import deepcopy
 
-from .ablations import tiny_bert_sparse_100k_onecycle_lr_kd
 from transformers import Trainer
 
 from trainer_mixins import DeepspeedTransformerLayerMixin
 
+from .ablations import tiny_bert_sparse_100k_onecycle_lr_kd
 from .distillation import DistillationTrainer
 
 # from .trifecta import tiny_bert_trifecta_100k
@@ -71,12 +71,6 @@ DEEPSPEED_STAGE2_ARGS = {
             "enabled": "auto",
             "initial_scale_power": 15,
         },
-        # See https://arxiv.org/pdf/2010.13369.pdf
-        # "progressive_layer_drop": {
-            # "enabled": True,
-            # "theta": 0.5,
-            # "gamma": 0.001,
-        # }
     },
 }
 

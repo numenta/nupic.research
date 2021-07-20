@@ -20,22 +20,18 @@
 # ----------------------------------------------------------------------
 import copy
 import sys
-import torch
 import unittest
 from os.path import expanduser
 
-import transformers
-from deepspeed import replace_transformer_layer
-from deepspeed.module_inject import HFBertLayerPolicy
-from transformers import CONFIG_MAPPING, AutoModelForMaskedLM, BertLayer
+import torch
+from transformers import CONFIG_MAPPING, AutoModelForMaskedLM
 
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.torch.modules import rezero_weights
 
-
 sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers"))  # noqa
 import models  # noqa :F401
-from trainer_mixins.deepspeed import replace_sparse_transformer_layer
+from trainer_mixins.deepspeed import replace_sparse_transformer_layer  # noqa
 
 
 class SparseBertModelTest(unittest.TestCase):
@@ -73,20 +69,32 @@ class SparseBertModelTest(unittest.TestCase):
         batch_size = 10
         num_embeddings = self.config.max_position_embeddings
         attention_mask = torch.ones(
-            training_steps, batch_size, num_embeddings, dtype=torch.half,
-            device=self.device
+            training_steps,
+            batch_size,
+            num_embeddings,
+            dtype=torch.half,
+            device=self.device,
         )
         input_ids = torch.ones(
-            training_steps, batch_size, num_embeddings, dtype=torch.long,
-            device=self.device
+            training_steps,
+            batch_size,
+            num_embeddings,
+            dtype=torch.long,
+            device=self.device,
         )
         token_type_ids = torch.ones(
-            training_steps, batch_size, num_embeddings, dtype=torch.long,
-            device=self.device
+            training_steps,
+            batch_size,
+            num_embeddings,
+            dtype=torch.long,
+            device=self.device,
         )
         labels = torch.ones(
-            training_steps, batch_size, num_embeddings, dtype=torch.long,
-            device=self.device
+            training_steps,
+            batch_size,
+            num_embeddings,
+            dtype=torch.long,
+            device=self.device,
         )
 
         # Train for a few steps
@@ -115,4 +123,3 @@ class SparseBertModelTest(unittest.TestCase):
 
             deepspeed_model.apply(rezero_weights)
             original_model.apply(rezero_weights)
-
