@@ -299,51 +299,6 @@ STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_1.update(dict(
     ),
 )
 
-STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_2 = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
-STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_2.update(dict(
-        experiment_class = GreedyInfoMaxExperimentSparse2,
-        wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="static_sparse_small_dimensionality_grid_search_2"
-        ),
-        model_class=WrappedSparseSmallVisionModel,
-        model_args=grid_search_model_args_2,
-        classifier_config=dict(
-            model_class=ClassificationModel,
-            model_args=dict(num_classes=10),
-            loss_function=torch.nn.functional.cross_entropy,
-            # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
-            optimizer_class=torch.optim.Adam,
-            # Optimizer class class arguments passed to the constructor
-            optimizer_args=dict(lr=2e-4),
-        ),
-    ),
-)
-
-
-STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_3 = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
-STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_3.update(dict(
-        experiment_class = GreedyInfoMaxExperimentSparse2,
-        wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="static_sparse_small_dimensionality_grid_search_3"
-        ),
-        batch_size=16,
-        batch_size_supervised=16,
-        val_batch_size=16,
-        model_class=WrappedSparseSmallVisionModel,
-        model_args=grid_search_model_args_3,
-        classifier_config=dict(
-            model_class=ClassificationModel,
-            model_args=dict(num_classes=10),
-            loss_function=torch.nn.functional.cross_entropy,
-            # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
-            optimizer_class=torch.optim.Adam,
-            # Optimizer class class arguments passed to the constructor
-            optimizer_args=dict(lr=2e-4),
-        ),
-    ),
-)
 def make_reg_schedule(
     epochs, pct_ramp_start, pct_ramp_end, peak_value, pct_drop, final_value
 ):
@@ -729,7 +684,7 @@ MAX_LR_GRID_SEARCH.update(dict(
 
 # Super Greedy Implementation (all blocks trained concurrently)
 
-experiment_idx = 2
+experiment_idx = 5
 exp_num_channels, exp_required_density = channels_density[experiment_idx]
 exp_required_sparsity = 1.0 - exp_required_density
 super_greedy_model_args = deepcopy(model_args)
@@ -758,8 +713,8 @@ SUPER_GREEDY_BASE.update(dict(
         optimizer_args=dict(lr=2e-4),
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
-                max_lr=0.19, #change based on sparsity/dimensionality
-                div_factor=5,  # initial_lr = 0.01
+                max_lr=0.24, #change based on sparsity/dimensionality
+                div_factor=100,  # initial_lr = 0.01
                 final_div_factor=1000,  # min_lr = 0.0000025
                 pct_start=1.0 / 10.0,
                 epochs=10,
@@ -788,8 +743,6 @@ CONFIGS = dict(
     static_sparse_weights_activations_small=STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS_SMALL,
     static_sparse_small_dimensionality_grid_search=STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH,
     static_sparse_small_dimensionality_grid_search_1=STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_1,
-    static_sparse_small_dimensionality_grid_search_2=STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_2,
-    static_sparse_small_dimensionality_grid_search_3=STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_3,
     small_sparse_largest_dimension=SMALL_SPARSE_LARGEST_DIMENSION,
     static_sparse_small_dimensionality_study=STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY,
     one_cycle_lr_dimensionality_sigopt=ONE_CYCLE_LR_DIMENSIONALITY_SIGOPT,
