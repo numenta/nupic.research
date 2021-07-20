@@ -169,7 +169,7 @@ def inputs_to_device(inputs, device):
 def calc_cumulative_sparsity(sparse_modules):
     """
     Calculate the sparsities across a list of sparse modules. Both the weight sparsity
-    and the zero mask sparsity is calculated.
+    and the zero mask sparsity are calculated.
     """
     total_off = 0
     total_zero = 0
