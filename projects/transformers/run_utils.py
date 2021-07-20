@@ -782,33 +782,41 @@ def check_eval_and_max_steps(training_args, train_dataset):
 
 
 def check_hp_compute_objective(model_args, task_name):
+    """
+    When hyperparameter tuning, you need to specify an objective, like
+    eval_accuracy, and also if it should be minimized or maximized. It is easy
+    to make a mistake because you copied a config and changed the task, but
+    the objective no longer applies to this task. Or, you changed the
+    objective but forget to switch minimize / maximize. This function checks
+    for both types of mistakes and issues a warning before correcting it.
+    """
 
-    if hasattr(model_args, "hp_compute_objective"):
-        if model_args.hp_compute_objective is not None:
-            direction, objective = model_args.hp_compute_objective
-            if objective == "eval_loss":
-                if direction != "minimize":
-                    logging.warning(
-                        "You are asking hp search to find parameters"
-                        "that MAXIMIZE loss instead of MINIMIZING it."
-                        "Setting this to minimize"
-                    )
-                    # Can't modify tuples, so convert to list and then back
-                    hp_compute_objective = list(model_args.hp_compute_objective)
-                    hp_compute_objective[0] = "minimize"
-                    model_args.hp_compute_objective = tuple(hp_compute_objective)
-            else:
-                if objective not in REPORTING_METRICS_PER_TASK[task_name]:
-                    logging.warning(
-                        "Warning, code will break when you try to tune"
-                        "hyperparameters on this task because"
-                        "hp_compute_objective is incorrect. Setting it to"
-                        "first reporting metric"
-                    )
-                    hp_compute_objective = list(model_args.hp_compute_objective)
-                    hp_compute_objective[1] = REPORTING_METRICS_PER_TASK[task_name][0]
-                    hp_compute_objective[0] = "maximize"
-                    model_args.hp_compute_objective = tuple(hp_compute_objective)
+    hp_compute_objective = getattr(model_args, "hp_compute_objective", None)
+    if hp_compute_objective is not None:
+        direction, objective = model_args.hp_compute_objective
+        if objective == "eval_loss":
+            if direction != "minimize":
+                logging.warning(
+                    "You are asking hp search to find parameters"
+                    "that MAXIMIZE loss instead of MINIMIZING it."
+                    "Setting this to minimize"
+                )
+                # Can't modify tuples, so convert to list and then back
+                hp_compute_objective = list(model_args.hp_compute_objective)
+                hp_compute_objective[0] = "minimize"
+                model_args.hp_compute_objective = tuple(hp_compute_objective)
+        else:
+            if objective not in REPORTING_METRICS_PER_TASK[task_name]:
+                logging.warning(
+                    "Warning, code will break when you try to tune"
+                    "hyperparameters on this task because"
+                    "hp_compute_objective is incorrect. Setting it to"
+                    "first reporting metric"
+                )
+                hp_compute_objective = list(model_args.hp_compute_objective)
+                hp_compute_objective[1] = REPORTING_METRICS_PER_TASK[task_name][0]
+                hp_compute_objective[0] = "maximize"
+                model_args.hp_compute_objective = tuple(hp_compute_objective)
 
     return model_args
 
@@ -1323,15 +1331,9 @@ def check_if_current_hp_best(old_file, model_args, best_run):
     # To compare new scores with current scores, need to decide
     # if greater is better.
     if model_args.hp_compute_objective[0] == "maximize":
-        operator = "__gt__"
+        return best_run.objective > previous best
     else:
-        operator = "__lt__"
-
-    # If new run is better, overwrite. Else, pass.
-    if getattr(previous_best, operator)(best_run.objective):
-        return False
-    else:
-        return True
+        return best_run.objective < previous_best
 
 
 def collate_hp_csvs(report_dir):
@@ -1353,7 +1355,10 @@ def collate_hp_csvs(report_dir):
 
 
 def update_run_number(training_args, run_idx):
-
+    """
+    Simple util so that when you are finetuning one task for multiple runs,
+    we update the output directory for each run.
+    """
     if run_idx is None:
         return training_args
 
@@ -1367,6 +1372,18 @@ def update_run_number(training_args, run_idx):
 
 
 def link_best_predictions(training_args, task_results, task_name):
+    """
+    Create a symlink between {task_name}_best.tsv ad the test set
+    predictions of the run with the best eval scores.
+
+    This util is for helping upload predictions to glue leaderboard. When
+    finetuning a model on the same task for multiple runs, you want to pick
+    the best run and save those predictions. This approach assumes that on
+    every run, you predict on the test set at the end of training. Then it
+    finds the run with the best eval scores, and links the test set
+    predictionand for this model to a file called {task_name}_best.tsv
+    (e.g. CoLA_best.tsv).
+    """
     if not training_args.do_predict:
         return
 
