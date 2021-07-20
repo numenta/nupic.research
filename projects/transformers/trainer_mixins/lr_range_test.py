@@ -19,6 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from functools import partial
+
 from torch.optim.lr_scheduler import LambdaLR
 from transformers import IntervalStrategy
 
@@ -89,14 +91,19 @@ class LRRangeTestMixin:
         min_lr = self.min_lr
         max_lr = self.max_lr
 
-        # Linearly increase lr
-        if self.test_mode == "linear":
-            def lr_lambda(step: int):
-                return (max_lr - min_lr) / (total_steps - 1) * step + min_lr
-
-        # Exponentially increase lr
-        elif self.test_mode == "exponential":
-            def lr_lambda(step):
-                return (max_lr / min_lr) ** (step / (total_steps - 1)) * min_lr
+        lr_lambda = partial(
+            linear_lr if self.test_mode == "linear" else exponential_lr,
+            total_steps=total_steps,
+            min_lr=min_lr,
+            max_lr=max_lr
+        )
 
         self.lr_scheduler = LambdaLR(self.optimizer, lr_lambda)
+
+
+def linear_lr(step, total_steps, min_lr, max_lr):
+    return (max_lr - min_lr) / (total_steps - 1) * step + min_lr
+
+
+def exponential_lr(step, total_steps, min_lr, max_lr):
+    return (max_lr / min_lr) ** (step / (total_steps - 1)) * min_lr
