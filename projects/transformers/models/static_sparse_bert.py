@@ -181,7 +181,7 @@ class FullyStaticSparseBertModel(BertModel):
         device = self.device
 
         # Use `getattr` here for backwards compatibility for configs without this param.
-        sparsify_all_embeddings = getattr(self.config, "sparsify_all_embeddings", True)
+        sparsify_all_embeddings = getattr(self.config, "sparsify_all_embeddings", False)
 
         def get_sparsity(name):
             if isinstance(sparsity, dict):
