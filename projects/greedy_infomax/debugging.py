@@ -19,17 +19,57 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.greedy_infomax.models.FullModel import VDropSparseFullVisionModel
-from projects.greedy_infomax.experiments.sparse_resnets import CONFIGS
+import numpy as np
 import torch
+from torch.nn import DataParallel
+from torch.utils.data import DataLoader, RandomSampler, Subset
+from torchvision.datasets import STL10
+from nupic.research.frameworks.greedy_infomax.models.FullModel import WrappedSuperGreedySmallSparseVisionModel
+from nupic.research.frameworks.greedy_infomax.utils.data_utils import (
+    supervised_dataset_args,
+    unsupervised_dataset_args,
+    validation_dataset_args,
+)
+from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
+    module_specific_log_softmax_nll_loss,
+    multiple_log_softmax_nll_loss,
+)
+
 
 def main():
-    sparse_base = CONFIGS["sparse_vdrop"]
-    sparse_base.update(distributed=True)
-    exp = sparse_base["experiment_class"]()
-    exp.device=torch.device("cuda:0")
-    exp.setup_experiment(sparse_base)
-    result = exp.run_epoch()
+    # load dataset
+    dataset_args = unsupervised_dataset_args
+    dataset_args.update(root="~/nta/data/STL10/")
+    dataset = STL10(**dataset_args)
+    subset = Subset(dataset, range(1000))
+    dataloader = DataLoader(dataset=subset, batch_size=5, shuffle=False, num_workers=0)
+
+    # create models of both kinds
+    model = DataParallel(
+        WrappedSuperGreedySmallSparseVisionModel(
+            negative_samples=16,
+            k_predictions=5,
+            resnet_50=False,
+            grayscale=True,
+            patch_size=16,
+            overlap=2,
+            sparsity=0.4,
+        )
+    )
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
+
+    for (img, label) in dataloader:
+        output = model.forward(img)
+        encoding = model.module.encode(img)
+        block_wise_losses = module_specific_log_softmax_nll_loss(output, None)
+        loss = block_wise_losses[2]
+        loss.backward()
+        optimizer.step()
+        break
+
+    print("Done")
+
 
 if __name__ == "__main__":
     main()

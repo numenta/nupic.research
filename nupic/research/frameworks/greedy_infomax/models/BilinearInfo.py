@@ -169,12 +169,12 @@ class SparseBilinearInfo(BilinearInfo):
         negative_samples=16,
         k_predictions=5,
         sparse_weights_class=SparseWeights2d,
-        sparsity=0.5,
+        sparsity=0.1,
     ):
         super(SparseBilinearInfo, self).__init__(
             in_channels, out_channels, negative_samples, k_predictions
         )
-        if sparsity > 0.3:
+        if sparsity and sparsity > 0.3:
             for i in range(len(self.W_k)):
                 self.W_k[i] = sparse_weights_class(self.W_k[i], sparsity=sparsity)
 

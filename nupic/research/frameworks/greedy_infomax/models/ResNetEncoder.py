@@ -72,22 +72,40 @@ class SparsePreActBlockNoBN(PreActBlockNoBN):
                  planes,
                  stride=1,
                  sparse_weights_class=SparseWeights2d,
-                 sparsity=0.2,
-                 percent_on=0.5):
+                 sparsity=None,
+                 percent_on=None):
         super(SparsePreActBlockNoBN, self).__init__(in_planes, planes, stride=stride)
-        if sparsity > 0.3:
-            self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity)
-            self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity)
-            if hasattr(self, "shortcut"):
-                self.shortcut = nn.Sequential(
-                    sparse_weights_class(self.shortcut._modules["0"], sparsity=sparsity)
-                )
-        if percent_on >= 0.5:
+        if sparsity is None:
+            sparsity = {"conv1": 0.01,
+                        "conv2": 0.01,
+                        "shortcut": 0.01}
+        if percent_on is None:
+            percent_on = {"nonlinearity1": 0.9,
+                          "nonlinearity2": 0.9,}
+
+        # weight sparsity
+        if sparsity["conv1"] > 0.3:
+            self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity["conv1"], allow_extremes=True,)
+        if sparsity["conv2"] > 0.3:
+            self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity["conv2"], allow_extremes=True,)
+        if hasattr(self, "shortcut") and sparsity["shortcut"] > 0.3:
+            self.shortcut = nn.Sequential(
+                sparse_weights_class(self.shortcut._modules["0"],
+                                     sparsity=sparsity["shortcut"],
+                                     allow_extremes=True,)
+            )
+        # activation sparsity
+        if not percent_on["nonlinearity1"] or percent_on["nonlinearity1"] >= 0.5:
             self.nonlinearity1 = F.relu
+        else:
+            self.nonlinearity1 = KWinners2d(in_planes,
+                                            percent_on=percent_on["nonlinearity1"])
+
+        if not percent_on["nonlinearity2"] or percent_on["nonlinearity2"] >= 0.5:
             self.nonlinearity2 = F.relu
         else:
-            self.nonlinearity1 = KWinners2d(in_planes, percent_on=percent_on)
-            self.nonlinearity2 = KWinners2d(planes, percent_on=percent_on)
+            self.nonlinearity2 = KWinners2d(planes,
+                                            percent_on=percent_on["nonlinearity2"])
 
     def forward(self, x):
         out = self.nonlinearity1(x)
@@ -105,9 +123,12 @@ class VDropSparsePreActBlockNoBN(nn.Module):
                  in_planes,
                  planes,
                  stride=1,
-                 percent_on=0.5,
+                 percent_on=None,
                  central_data=None):
         super(VDropSparsePreActBlockNoBN, self).__init__()
+        if percent_on is None:
+            percent_on = {"nonlinearity1": 0.9,
+                          "nonlinearity2": 0.9,}
         self.conv1 = VDropConv2d(
             in_planes,
             planes,
@@ -133,12 +154,18 @@ class VDropSparsePreActBlockNoBN(nn.Module):
                     stride=stride
                 )
             )
-        if percent_on >= 0.5:
+        # activation sparsity
+        if percent_on["nonlinearity1"] >= 0.5:
             self.nonlinearity1 = F.relu
+        else:
+            self.nonlinearity1 = KWinners2d(in_planes,
+                                            percent_on=percent_on["nonlinearity1"])
+
+        if percent_on["nonlinearity2"] >= 0.5:
             self.nonlinearity2 = F.relu
         else:
-            self.nonlinearity1 = KWinners2d(in_planes, percent_on=percent_on)
-            self.nonlinearity2 = KWinners2d(planes, percent_on=percent_on)
+            self.nonlinearity2 = KWinners2d(planes,
+                                            percent_on=percent_on["nonlinearity2"])
 
     def forward(self, x):
         out = self.nonlinearity1(x)
@@ -190,28 +217,52 @@ class SparsePreActBottleneckNoBN(PreActBottleneckNoBN):
                  planes,
                  stride=1,
                  sparse_weights_class=SparseWeights2d,
-                 sparsity=0.5,
-                 percent_on=0.2):
+                 sparsity=None,
+                 percent_on=None):
         super(SparsePreActBottleneckNoBN, self).__init__(
             in_planes, planes, stride=stride
         )
-
-        if sparsity > 0.3:
-            self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity)
-            self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity)
-            self.conv3 = sparse_weights_class(self.conv3, sparsity=sparsity)
-            if hasattr(self, "shortcut"):
-                self.shortcut = nn.Sequential(
-                    sparse_weights_class(self.shortcut._modules["0"], sparsity=sparsity)
-                )
-        if percent_on >= 0.5:
+        if sparsity is None:
+            sparsity = {"conv1": 0.01,
+                        "conv2": 0.01,
+                        "conv3": 0.01,
+                        "shortcut": 0.01}
+        if percent_on is None:
+            percent_on = {"nonlinearity1": 0.9,
+                          "nonlinearity2": 0.9,
+                          "nonlinearity3": 0.9}
+        # weight sparsity
+        if sparsity["conv1"] > 0.3:
+            self.conv1 = sparse_weights_class(self.conv1, sparsity=sparsity["conv1"],
+                                              allow_extremes=True,)
+        if sparsity["conv2"] > 0.3:
+            self.conv2 = sparse_weights_class(self.conv2, sparsity=sparsity["conv2"],
+                                              allow_extremes=True,)
+        if sparsity["conv3"] > 0.3:
+            self.conv3 = sparse_weights_class(self.conv3, sparsity=sparsity["conv3"],
+                                              allow_extremes=True,)
+        if hasattr(self, "shortcut") and sparsity["shortcut"] > 0.3:
+            self.shortcut = nn.Sequential(
+                sparse_weights_class(self.shortcut._modules["0"],
+                                     sparsity=sparsity["shortcut"],
+                                     allow_extremes=True,)
+            )
+        # activation sparsity
+        if percent_on["nonlinearity1"] >= 0.5:
             self.nonlinearity1 = F.relu
-            self.nonlinearity2 = F.relu
-            self.nonlinearity3 = F.relu
         else:
-            self.nonlinearity1 = KWinners2d(in_planes, percent_on=percent_on)
-            self.nonlinearity2 = KWinners2d(planes, percent_on=percent_on)
-            self.nonlinearity3 = KWinners2d(planes, percent_on=percent_on)
+            self.nonlinearity1 = KWinners2d(in_planes,
+                                            percent_on=percent_on["nonlinearity1"])
+        if percent_on["nonlinearity2"] >= 0.5:
+            self.nonlinearity1 = F.relu
+        else:
+            self.nonlinearity1 = KWinners2d(in_planes,
+                                            percent_on=percent_on["nonlinearity2"])
+        if percent_on["nonlinearity3"] >= 0.5:
+            self.nonlinearity1 = F.relu
+        else:
+            self.nonlinearity1 = KWinners2d(in_planes,
+                                            percent_on=percent_on["nonlinearity3"])
 
 
     def forward(self, x):
@@ -231,8 +282,13 @@ class VDropSparsePreActBottleneckNoBN(nn.Module):
 
     expansion = 4
 
-    def __init__(self, in_planes, planes, stride=1, percent_on=0.5, central_data=None):
+    def __init__(self, in_planes, planes, stride=1, percent_on=None, central_data=None):
         super(VDropSparsePreActBottleneckNoBN, self).__init__()
+        if percent_on is None:
+            percent_on = {"nonlinearity1": 0.9,
+                          "nonlinearity2": 0.9,
+                          "nonlinearity3": 0.9}
+
         self.conv1 = VDropConv2d(in_planes,
                                  planes,
                                  kernel_size=1,
@@ -257,14 +313,22 @@ class VDropSparsePreActBottleneckNoBN(nn.Module):
                     stride=stride
                 )
             )
-        if percent_on >= 0.5:
+        # activation sparsity
+        if percent_on["nonlinearity1"] >= 0.5:
             self.nonlinearity1 = F.relu
-            self.nonlinearity2 = F.relu
-            self.nonlinearity3 = F.relu
         else:
-            self.nonlinearity1 = KWinners2d(in_planes, percent_on=percent_on)
-            self.nonlinearity2 = KWinners2d(planes, percent_on=percent_on)
-            self.nonlinearity3 = KWinners2d(planes, percent_on=percent_on)
+            self.nonlinearity1 = KWinners2d(in_planes,
+                                            percent_on=percent_on["nonlinearity1"])
+        if percent_on["nonlinearity2"] >= 0.5:
+            self.nonlinearity1 = F.relu
+        else:
+            self.nonlinearity1 = KWinners2d(in_planes,
+                                            percent_on=percent_on["nonlinearity2"])
+        if percent_on["nonlinearity3"] >= 0.5:
+            self.nonlinearity1 = F.relu
+        else:
+            self.nonlinearity1 = KWinners2d(in_planes,
+                                            percent_on=percent_on["nonlinearity3"])
 
 
     def forward(self, x):
@@ -363,8 +427,8 @@ class SparseResNetEncoder(ResNetEncoder):
         patch_size=16,
         input_dims=3,
         sparse_weights_class=SparseWeights2d,
-        sparsity=0.5,
-        percent_on=0.5,
+        sparsity=None,
+        percent_on=None,
         previous_input_dim=64,
         first_stride=1,
     ):
@@ -384,9 +448,27 @@ class SparseResNetEncoder(ResNetEncoder):
         self.model = nn.Sequential()
         self.in_planes = previous_input_dim
         self.first_stride = first_stride
+        if sparsity is None:
+            sparsity = {"block1": None,
+                        "block2": None,
+                        "block3": None,
+                        "block4": None,
+                        "block5": None,
+                        "block6": None,
+                        "bilinear_info": None
+                        }
+        if percent_on is None:
+            percent_on = {"block1": None,
+                          "block2": None,
+                          "block3": None,
+                          "block4": None,
+                          "block5": None,
+                          "block6": None,
+                          }
+
         for idx in range(len(num_blocks)):
             self.model.add_module(
-                "sparse_layer {}".format((idx)),
+                "sparse_layer_{}".format((idx)),
                 self._make_layer_sparse(
                     block,
                     self.filters[idx],
@@ -405,8 +487,9 @@ class SparseResNetEncoder(ResNetEncoder):
             negative_samples=negative_samples,
             k_predictions=k_predictions,
             sparse_weights_class=sparse_weights_class,
-            sparsity=sparsity,
+            sparsity=sparsity["bilinear_info"],
         )
+
 
     def _make_layer_sparse(self,
                            block,
@@ -414,24 +497,152 @@ class SparseResNetEncoder(ResNetEncoder):
                            num_blocks,
                            stride=1,
                            sparse_weights_class=SparseWeights2d,
-                           sparsity=0.5,
-                           percent_on=0.2,
+                           sparsity=None,
+                           percent_on=None,
     ):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
-        for stride in strides:
+        for idx, stride in enumerate(strides):
             layers.append(
                 block(
                     self.in_planes,
                     planes,
                     stride=stride,
                     sparse_weights_class=sparse_weights_class,
-                    sparsity=sparsity,
-                    percent_on=percent_on,
+                    sparsity=sparsity[f"block{idx+1}"],
+                    percent_on=percent_on[f"block{idx+1}"],
                 )
             )
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
+
+
+class SuperGreedySparseResNetEncoder(nn.Module):
+    """
+    A block-wise greedy version of the above SparseResNetEncoder.
+    """
+
+    def __init__(
+        self,
+        block,
+        num_blocks,
+        filters,
+        encoder_num,
+        negative_samples=16,
+        k_predictions=5,
+        patch_size=16,
+        input_dims=3,
+        sparse_weights_class=SparseWeights2d,
+        sparsity=None,
+        percent_on=None,
+        previous_input_dim=64,
+        first_stride=1,
+    ):
+        super(SuperGreedySparseResNetEncoder, self).__init__()
+
+        self.encoder_num = encoder_num
+
+        self.overlap = 2
+
+        self.patch_size = patch_size
+        self.filters = filters
+
+        self.model = nn.ModuleList()
+        self.in_planes = previous_input_dim
+        self.first_stride = first_stride
+        if sparsity is None:
+            sparsity = {"block1": None,
+                        "block2": None,
+                        "block3": None,
+                        "block4": None,
+                        "block5": None,
+                        "block6": None,
+                        "bilinear_info": None
+                        }
+        if percent_on is None:
+            percent_on = {"block1": None,
+                          "block2": None,
+                          "block3": None,
+                          "block4": None,
+                          "block5": None,
+                          "block6": None,
+                          }
+
+        self.bilinear_models = nn.ModuleList()
+        for idx in range(len(num_blocks)):
+            self.model.add_module(
+                "sparse_layer_{}".format((idx)),
+                self._make_layer_sparse(
+                    block,
+                    self.filters[idx],
+                    num_blocks[idx],
+                    stride=self.first_stride,
+                    sparse_weights_class=sparse_weights_class,
+                    sparsity=sparsity,
+                    percent_on=percent_on,
+                ),
+            )
+            self.first_stride = 2
+
+        for _ in range(num_blocks[encoder_num]):
+            self.bilinear_models.append(
+                SparseBilinearInfo(
+                in_channels=self.in_planes,
+                out_channels=self.in_planes,
+                negative_samples=negative_samples,
+                k_predictions=k_predictions,
+                sparse_weights_class=sparse_weights_class,
+                sparsity=sparsity["bilinear_info"],)
+            )
+
+    def _make_layer_sparse(self,
+                           block,
+                           planes,
+                           num_blocks,
+                           stride=1,
+                           sparse_weights_class=SparseWeights2d,
+                           sparsity=None,
+                           percent_on=None,
+                           ):
+        strides = [stride] + [1] * (num_blocks - 1)
+        layers = []
+        for idx, stride in enumerate(strides):
+            layers.append(
+                block(
+                    self.in_planes,
+                    planes,
+                    stride=stride,
+                    sparse_weights_class=sparse_weights_class,
+                    sparsity=sparsity[f"block{idx + 1}"],
+                    percent_on=percent_on[f"block{idx + 1}"],
+                )
+            )
+            self.in_planes = planes * block.expansion
+        return nn.Sequential(*layers)
+
+    def encode(self, x, n_patches_x, n_patches_y):
+        z = x
+        for block in self.model:
+            z = block(x)
+        out = F.adaptive_avg_pool2d(z, 1)
+        out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
+        out = out.permute(0, 3, 1, 2).contiguous()
+        return z, out
+
+    def forward(self, x, n_patches_x, n_patches_y):
+        z = x
+        full_log_f_list, full_true_f_list = [], []
+        for block, bilinear_info in zip(self.model.sparse_layer_0, self.bilinear_models):
+            z = block(x)
+            out = F.adaptive_avg_pool2d(z, 1)
+            out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
+            out = out.permute(0, 3, 1, 2).contiguous()
+            block_log_f_list, block_true_f_list = bilinear_info(out, out)
+            full_log_f_list.append(block_log_f_list)
+            full_true_f_list.append(block_true_f_list)
+            x = z.detach()
+        return full_log_f_list, full_true_f_list, z
+
 
 
 class VDropSparseResNetEncoder(nn.Module):
@@ -449,7 +660,7 @@ class VDropSparseResNetEncoder(nn.Module):
         k_predictions=5,
         patch_size=16,
         input_dims=3,
-        percent_on=0.5,
+        percent_on=None,
         previous_input_dim=64,
         first_stride=1,
         central_data=None,
@@ -457,6 +668,14 @@ class VDropSparseResNetEncoder(nn.Module):
         super(VDropSparseResNetEncoder, self).__init__()
 
         self.encoder_num = encoder_num
+
+        if percent_on is None:
+            percent_on = {"block1": None,
+                          "block2": None,
+                          "block3": None,
+                          "block4": None,
+                          "block5": None,
+                          "block6": None,}
 
         self.overlap = 2
 
@@ -468,7 +687,7 @@ class VDropSparseResNetEncoder(nn.Module):
         self.first_stride = first_stride
         for idx in range(len(num_blocks)):
             self.model.add_module(
-                "sparse_layer {}".format((idx)),
+                "sparse_layer_{}".format((idx)),
                 self._make_layer_vdrop_sparse(
                     block,
                     self.filters[idx],
@@ -493,19 +712,19 @@ class VDropSparseResNetEncoder(nn.Module):
                            planes,
                            num_blocks,
                            stride=1,
-                           percent_on=0.2,
+                           percent_on=None,
                            central_data=None,
     ):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
-        for stride in strides:
+        for idx, stride in enumerate(strides):
             layers.append(
                 block(
                     self.in_planes,
                     planes,
                     central_data=central_data,
                     stride=stride,
-                    percent_on=percent_on,
+                    percent_on=percent_on[f"block{idx+1}"],
                 )
             )
             self.in_planes = planes * block.expansion

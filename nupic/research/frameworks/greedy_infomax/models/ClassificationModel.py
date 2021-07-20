@@ -38,6 +38,26 @@ class ClassificationModel(nn.Module):
         )
 
     def forward(self, x):
+        #detach x just in case it's still connected to active parts of the
+        # computation graph
+        x = x.detach()
         x = self.avg_pool(x).squeeze()
         x = self.model(x).squeeze()
         return x
+
+class MultipleClassificationModel(nn.Module):
+    def __init__(self, in_channels=None, num_classes=10, hidden_nodes=None):
+        super().__init__()
+        if self.in_channels is None:
+            raise Exception("In channels list is required")
+        if hidden_nodes is None or len(hidden_nodes) != len(in_channels):
+            hidden_nodes = [0 for _ in range(len(in_channels))]
+        self.classifiers = nn.ModuleList([
+            ClassificationModel(in_channels=in_channels[i], num_classes=num_classes,
+                                hidden_nodes=hidden_nodes[i])
+            for i in range(len(hidden_nodes))
+        ])
+
+    def forward(self, encodings):
+        return [classifier(encoding)
+                for (classifier, encoding) in zip(self.classifiers, encodings)]
