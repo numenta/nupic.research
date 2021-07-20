@@ -92,7 +92,8 @@ debug_finetuning_no_early_stopping.update(
 debug_finetuning = deepcopy(transformers_base)
 debug_finetuning.update(
     # Data arguments
-    task_name="mnli",
+    task_name=None,
+    task_names=["wnli", "rte"],
     max_seq_length=128,
 
     # Model arguments
@@ -103,19 +104,33 @@ debug_finetuning.update(
     do_train=True,
     do_eval=True,
     do_predict=True,
-    eval_steps=10,
+    eval_steps=15,
     evaluation_strategy="steps",
     load_best_model_at_end=True,
     per_device_train_batch_size=32,
     per_device_eval_batch_size=32,
     learning_rate=2e-5,
     warmup_ratio=0.1,
-    max_steps=50,  # made very short for fast debugging
+    max_steps=45,  # made very short for fast debugging
     metric_for_best_model="eval_accuracy",
+    num_runs=3,
     trainer_callbacks=[
         TrackEvalMetrics(),
         EarlyStoppingCallback(early_stopping_patience=5)
     ],
+)
+
+
+debug_finetuning_test = deepcopy(debug_finetuning)
+debug_finetuning_test.update(
+    trainer_callbacks=[TrackEvalMetrics()],
+)
+
+debug_finetuning_predict = deepcopy(debug_finetuning)
+debug_finetuning_predict.update(
+    do_train=False,
+    do_eval=False,
+    do_predict=True
 )
 
 
@@ -173,24 +188,27 @@ finetuning_bert700k_glue.update(
     do_predict=False,
     eval_steps=50,
     evaluation_strategy="steps",
-    # load_best_model_at_end=True,
+    load_best_model_at_end=True,
     per_device_train_batch_size=32,
     per_device_eval_batch_size=32,
     learning_rate=2e-5,
     # metric_for_best_model="eval_accuracy",
     num_train_epochs=3,
     num_runs=1,
+    # set eval_steps and save_steps proportional to dataset size
     task_hyperparams=dict(
-        mrpc=dict(num_train_epochs=5, num_runs=3),
-        wnli=dict(num_train_epochs=5, num_runs=10),
+        mrpc=dict(num_train_epochs=5, num_runs=3, save_steps=10),
+        wnli=dict(num_train_epochs=5, num_runs=10, save_steps=2),
         cola=dict(num_train_epochs=5,
                   num_runs=10,
                   metric_for_best_model="eval_matthews_correlation"),
         stsb=dict(num_runs=3, metric_for_best_model="eval_pearson"),
         rte=dict(num_runs=10),
+        mnli=dict(eval_steps=1_000, save_steps=1_000),
+        qnli=dict(eval_steps=300, save_steps=300),
+        qqp=dict(eval_steps=1_000, save_steps=1_000)
     ),
     trainer_callbacks=[
-        RezeroWeightsCallback(),
         TrackEvalMetrics(),
         ],
 )
@@ -219,7 +237,6 @@ finetuning_bert100k_glue.update(
 #       else
 #           use the default of 3 epochs
 #
-# Note that EarlyStoppingCallback is in use, which was not mentioned in the paper
 
 steps_50k = 50_000 // 32
 
@@ -247,6 +264,52 @@ finetuning_bert100k_glue_simple.update(
                   num_runs=3),  # 100k > 50k, defualt to 3 epochs
         rte=dict(max_steps=steps_50k, num_runs=3),  # ~ 20 epochs from paper
         wnli=dict(max_steps=steps_50k, num_runs=3)  # 50k / 634 ~ 79 epochs
+    ),
+    trainer_callbacks=[
+        TrackEvalMetrics()],
+    warmup_ratio=0.1,
+)
+
+# Previous runs had bugs, like not including RezeroWeightsCallback. This
+# run is mainly to run for a long time and save the trajectories, and use
+# that information to inform hyperparameter tuning. The exception is WNLI,
+# which we consistently overfit on almost immediately.
+# load_best_model_at_end makes it so there is little cost to running for
+# longer - just pick the best from the trajectories.
+
+finetuning_bert100k_glue_get_info = deepcopy(finetuning_bert100k_glue)
+finetuning_bert100k_glue_get_info.update(
+    task_hyperparams=dict(
+
+        cola=dict(eval_steps=50,
+                  max_steps=steps_50k,
+                  metric_for_best_model="eval_matthews_correlation",
+                  num_runs=5,
+                  ),  # 50k / 8500 ~ 6 epochs
+
+        sst2=dict(eval_steps=100,
+                  max_steps=10_000,
+                  num_runs=3),  # 67k training size > 50k, default 3 epochs
+        mrpc=dict(max_steps=steps_50k,
+                  num_runs=3),
+
+        stsb=dict(max_steps=steps_50k * 2,
+                  metric_for_best_model="eval_pearson",
+                  num_runs=3),  # 50k / 7000 ~ 8 epochs
+
+        qqp=dict(eval_steps=1_000,
+                 max_steps=50_000,
+                 num_runs=3),  # run for a long time
+        mnli=dict(eval_steps=1_000,
+                  max_steps=50_000,
+                  num_runs=3),  # run for a long time
+        qnli=dict(eval_steps=500,
+                  max_steps=25_000,
+                  num_runs=3),  # run for a long time
+        rte=dict(max_steps=steps_50k,
+                 num_runs=3),  # ~ 20 epochs from paper
+        wnli=dict(max_steps=50,
+                  num_runs=3)  # run for a short time to avoid overfitting
     ),
     trainer_callbacks=[
         RezeroWeightsCallback(),
@@ -397,10 +460,13 @@ finetuning_mini_sparse_bert_debug.update(
 # Export configurations in this file
 CONFIGS = dict(
     debug_finetuning=debug_finetuning,
+    debug_finetuning_test=debug_finetuning_test,
     debug_finetuning_no_early_stopping=debug_finetuning_no_early_stopping,
     debug_finetuning_bert100k=debug_finetuning_bert100k,
     debug_finetuning_bert100k_ntasks=debug_finetuning_bert100k_ntasks,
+    debug_finetuning_predict=debug_finetuning_predict,
     finetuning_bert100k_glue=finetuning_bert100k_glue,
+    finetuning_bert100k_glue_get_info=finetuning_bert100k_glue_get_info,
     finetuning_bert100k_single_task=finetuning_bert100k_single_task,
     finetuning_tiny_bert50k_glue=finetuning_tiny_bert50k_glue,
     finetuning_bert700k_glue=finetuning_bert700k_glue,

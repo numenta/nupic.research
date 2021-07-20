@@ -28,7 +28,7 @@ class TrackEvalMetrics(TrainerCallback):
     after trainer.evaluate() is called. It is designed to provide the same
     metrics for training and validation sets, at the same time points.
     """
-    def __init__(self):
+    def __init__(self, sparsity_tolerance=0.01):
         """
         Set up two dictionaries to track training and eval metrics, and a list
         to track steps.
@@ -39,13 +39,19 @@ class TrackEvalMetrics(TrainerCallback):
         Example:
             self.eval_metrics['acc'] -> [acc1, acc2, ..., accn]
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
+
+        This callback also keeps track of model sparsity, and breaks if
+        sparsity changes in absolute value by more than sparsity_tolerance.
+        If you are using a training approach that sparsifies the model, be sure
+        to set sparsity_tolerance to something like 1, so large changes in
+        sparsity are accepted.
         """
+
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
         self.eval_metrics["num_nonzero_params"] = []
         self.eval_metrics["lr"] = []
-        # TODO: track train_metrics, ignore for now
         self.train_metrics = {}
         self.steps = []
         self.step_counter = 0
@@ -71,6 +77,13 @@ class TrackEvalMetrics(TrainerCallback):
             self.eval_metrics["num_total_params"].append(num_total)
             self.eval_metrics["num_nonzero_params"].append(num_nonzero)
             self.eval_metrics["sparsity"].append(model_sparsity)
+
+            # guarantee that everything stayed sparse,
+            # up to specified tolerance
+            if (self.sparsity_tolerance < 1) and len(self.eval_metrics["sparsity"]) > 1:
+                sparse_diff = self.eval_metrics["sparsity"][0] - self.eval_metrics["sparsity"][-1]  # noqa
+                assert abs(sparse_diff) < self.sparsity_tolerance, "Model sparsity"
+                f"fluctuated beyond acceptable range. {self.eval_metrics['sparsity']}"
 
             # track learning rate
             # get_last_lr() returns lr for each parameter group. For now,
@@ -103,3 +116,7 @@ class TrackEvalMetrics(TrainerCallback):
             self.mm_metrics = {ksplit(k): v for k, v in metrics.items()}
 
         return is_mnli_mm
+
+    # TODO
+    # Aggregate data on train end or at least make it an option
+    # this would make hyperparameter tuning easier.
