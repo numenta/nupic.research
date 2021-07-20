@@ -41,6 +41,7 @@ from .sparse_bert import CONFIGS as SPARSE_BERT
 from .sparse_bertitos import CONFIGS as SPARSE_BERTITOS
 from .trifecta import CONFIGS as TRIFECTA
 from .wide_bert import CONFIGS as WIDE_BERT
+from .wide_bert_fixed_num_params import CONFIGS as WIDE_BERT_FIXED_NUM_PARAMS
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -67,3 +68,4 @@ CONFIGS.update(SPARSE_BERT)
 CONFIGS.update(SPARSE_BERTITOS)
 CONFIGS.update(TRIFECTA)
 CONFIGS.update(WIDE_BERT)
+CONFIGS.update(WIDE_BERT_FIXED_NUM_PARAMS)
