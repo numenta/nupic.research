@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .ewc import CONFIGS as EWC
+from .si import CONFIGS as SI
 
 """
 Import and collect all Continual Learning experiment configurations into one CONFIG
@@ -29,3 +30,4 @@ __all__ = ["CONFIGS"]
 # Collect all configurations
 CONFIGS = dict()
 CONFIGS.update(EWC)
+CONFIGS.update(SI)

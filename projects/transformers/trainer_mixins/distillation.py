@@ -30,6 +30,12 @@ from nupic.research.frameworks.pytorch.model_utils import (
     set_module_attr,
 )
 
+try:
+    import deepspeed
+except ImportError:
+    # Fails later if using deepspeed configuration without installing deepspeed
+    pass
+
 
 class DistillationTrainerMixin:
     """
@@ -103,9 +109,16 @@ class DistillationTrainerMixin:
                 model_name_or_path,
                 cache_dir=teacher_models_cache_dir
             )
-            if self.args.fp16:
-                teacher_model.half()
             teacher_model.resize_token_embeddings(len(self.tokenizer))
+
+            # Use deepspeed inference mode on teacher models
+            if self.args.deepspeed:
+                ds_engine = deepspeed.init_inference(
+                    teacher_model, dtype=torch.half, replace_method="auto")
+                teacher_model = ds_engine.module
+            elif self.args.fp16:
+                teacher_model.half()
+
             teacher_models.append(teacher_model)
 
         if len(teacher_models) == 1:
@@ -422,7 +435,9 @@ def resize_position_embeddings(model, new_seq_length):
         original_embed_data = module.weight.data
         max_position_embeddings, embed_hidden_size = original_embed_data.size()
         if max_position_embeddings != new_seq_length:
-            new_embed = torch.nn.Embedding(new_seq_length, embed_hidden_size)
+            new_embed = torch.nn.Embedding(new_seq_length, embed_hidden_size).to(
+                device=original_embed_data.device, dtype=original_embed_data.dtype
+            )
             new_embed.weight.data[:, :] = original_embed_data[:new_seq_length, :]
             set_module_attr(model, module_name, new_embed)
 

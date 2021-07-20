@@ -18,6 +18,10 @@
 #  http://numenta.org/licenses/
 #
 
+"""
+Experiment file that runs dendritic networks which infer the context vector via
+constructing a prototype during inference.
+"""
 
 import os
 from copy import deepcopy
@@ -74,7 +78,7 @@ CENTROID_10 = dict(
         num_segments=10,
         dim_context=784,
         kw=True,
-        kw_percent_on=0.1,
+        kw_percent_on=0.05,
         dendrite_weight_sparsity=0.0,
         weight_sparsity=0.5,
         context_percent_on=0.1,
@@ -83,7 +87,7 @@ CENTROID_10 = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=3,
-    tasks_to_validate=(0, 1, 2, 3, 4, 9, 24, 49),
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
     num_tasks=10,
     num_classes=10 * 10,
     distributed=False,
@@ -103,6 +107,20 @@ CENTROID_50.update(
     epochs=2,
     num_tasks=50,
     num_classes=10 * 50,
+    num_samples=1,
+
+    # For wandb
+    env_config=dict(
+        wandb=dict(
+            entity="nupic-research",
+            project="dendrite_baselines",
+            name="sparse_prototype_50",
+            group="sparse_prototype_50",
+            notes="""
+            Sparse network using prototypes as context.
+            """
+        )
+    ),
 )
 
 # Two tasks only, for debugging
@@ -131,10 +149,21 @@ FIGURE_1B.update(
     ),
 )
 
+CENTROID_100 = deepcopy(CENTROID_10)
+CENTROID_100["dataset_args"].update(num_tasks=100)
+CENTROID_100["model_args"].update(num_segments=100)
+CENTROID_100.update(
+    num_samples=8,
+    num_tasks=100,
+    num_classes=10 * 100,
+    optimizer_args=dict(lr=1e-4),
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     centroid_2=CENTROID_2,
     centroid_10=CENTROID_10,
     centroid_50=CENTROID_50,
+    centroid_100=CENTROID_100,
     figure_1b=FIGURE_1B,
 )

@@ -89,7 +89,8 @@ class DendriteContinualLearningExperiment(ContinualLearningExperiment):
             num_labels=10,
             context_vector=self.context_vector,
             train_context_fn=self.train_context_fn,
-            post_batch_callback=self.post_batch_wrapper
+            post_batch_callback=self.post_batch_wrapper,
+            batches_in_epoch=self.batches_in_epoch,
         )
 
     def validate(self, loader=None):

@@ -51,7 +51,9 @@ except ImportError:
     amp = None
 
 
-__all__ = ["SupervisedExperiment"]
+__all__ = [
+    "SupervisedExperiment",
+]
 
 
 # Improves performance when using fixed size images (224) and CNN
@@ -62,7 +64,6 @@ class SupervisedExperiment(ExperimentBase):
     """
     General experiment class used to train neural networks in supervised learning tasks.
     """
-
     def __init__(self):
         self.model = None
         self.optimizer = None
@@ -78,6 +79,7 @@ class SupervisedExperiment(ExperimentBase):
         self.total_batches = 0
         self.epochs_to_validate = []
         self.current_epoch = 0
+        self.distributed = False
 
     def setup_experiment(self, config):
         """
@@ -142,7 +144,8 @@ class SupervisedExperiment(ExperimentBase):
 
         self.launch_time = config.get("launch_time", time.time())
         super().setup_experiment(config)
-        self.logger.info("Execution order: %s", pformat(self.get_execution_order()))
+        self.logger.info("Execution order: %s",
+                         pformat(self.get_execution_order()))
 
         # Configure model
         self.device = config.get("device", self.device)
@@ -161,15 +164,13 @@ class SupervisedExperiment(ExperimentBase):
             self.logger.error(
                 "Mixed precision requires NVIDA APEX."
                 "Please install apex from https://www.github.com/nvidia/apex"
-                "Disabling mixed precision training."
-            )
+                "Disabling mixed precision training.")
 
         # Configure mixed precision training
         if self.mixed_precision:
             amp_args = config.get("mixed_precision_args", {})
             self.model, self.optimizer = amp.initialize(
-                self.model, self.optimizer, **amp_args
-            )
+                self.model, self.optimizer, **amp_args)
             self.logger.info("Using mixed precision")
 
         self._loss_function = config.get(
@@ -184,16 +185,15 @@ class SupervisedExperiment(ExperimentBase):
 
         # Configure data loaders
         self.create_loaders(config)
-        self.total_batches = len(self.train_loader)
+        self.total_batches = len(self.train_loader,)
 
-        self.epochs_to_validate = config.get(
-            "epochs_to_validate", range(self.epochs - 3, self.epochs + 1)
-        )
+        self.epochs_to_validate = config.get("epochs_to_validate",
+                                             range(self.epochs - 3,
+                                                   self.epochs + 1))
 
         # Configure learning rate scheduler
         self.lr_scheduler = self.create_lr_scheduler(
-            config, self.optimizer, self.total_batches
-        )
+            config, self.optimizer, self.total_batches)
         if self.lr_scheduler is not None:
             lr_scheduler_class = self.lr_scheduler.__class__.__name__
             lr_scheduler_args = config.get("lr_scheduler_args", {})
@@ -271,8 +271,7 @@ class SupervisedExperiment(ExperimentBase):
                 optimizer=optimizer,
                 lr_scheduler_class=lr_scheduler_class,
                 lr_scheduler_args=lr_scheduler_args,
-                steps_per_epoch=total_batches,
-            )
+                steps_per_epoch=total_batches)
 
     def create_loaders(self, config):
         """Create and assign train and val dataloaders"""
@@ -330,7 +329,8 @@ class SupervisedExperiment(ExperimentBase):
         sampler = cls.create_validation_sampler(config, dataset)
         return DataLoader(
             dataset=dataset,
-            batch_size=config.get("val_batch_size", config.get("batch_size", 1)),
+            batch_size=config.get("val_batch_size",
+                                  config.get("batch_size", 1)),
             shuffle=False,
             num_workers=config.get("workers", 0),
             sampler=sampler,
@@ -391,7 +391,9 @@ class SupervisedExperiment(ExperimentBase):
                 "mean_accuracy": 0.0,
             }
 
-        ret.update(learning_rate=self.get_lr()[0])
+        ret.update(
+            learning_rate=self.get_lr()[0],
+        )
 
         self.logger.debug("validate time: %s", time.time() - t1)
         self.logger.debug("---------- End of run epoch ------------")
@@ -406,17 +408,15 @@ class SupervisedExperiment(ExperimentBase):
     def pre_batch(self, model, batch_idx):
         pass
 
-    def post_batch(
-        self, model, error_loss, complexity_loss, batch_idx, num_images, time_string
-    ):
+    def post_batch(self, model, error_loss, complexity_loss, batch_idx,
+                   num_images, time_string):
         # Update 1cycle learning rate after every batch
         if self.step_lr_every_batch:
             self.lr_scheduler.step()
 
         if self.progress and self.current_epoch == 0 and batch_idx == 0:
-            self.logger.info(
-                "Launch time to end of first batch: %s", time.time() - self.launch_time
-            )
+            self.logger.info("Launch time to end of first batch: %s",
+                             time.time() - self.launch_time)
 
         if self.progress and (batch_idx % 40) == 0:
             total_batches = self.total_batches
@@ -425,17 +425,12 @@ class SupervisedExperiment(ExperimentBase):
                 # Compute actual batch size from distributed sampler
                 total_batches *= self.train_loader.sampler.num_replicas
                 current_batch *= self.train_loader.sampler.num_replicas
-            self.logger.debug(
-                "End of batch for rank: %s. Epoch: %s, Batch: %s/%s, "
-                "loss: %s, Learning rate: %s num_images: %s",
-                self.rank,
-                self.current_epoch,
-                current_batch,
-                total_batches,
-                error_loss,
-                self.get_lr(),
-                num_images,
-            )
+            rank = -1 if not self.distributed else self.rank
+            self.logger.debug("End of batch for rank: %s. Epoch: %s, Batch: %s/%s, "
+                              "loss: %s, Learning rate: %s num_images: %s",
+                              rank, self.current_epoch, current_batch,
+                              total_batches, error_loss, self.get_lr(),
+                              num_images)
             self.logger.debug("Timing: %s", time_string)
 
     def post_batch_wrapper(self, **kwargs):
@@ -446,23 +441,15 @@ class SupervisedExperiment(ExperimentBase):
         pass
 
     def post_epoch(self):
-        self.logger.debug(
-            "End of epoch %s LR/weight decay before step: %s/%s",
-            self.current_epoch,
-            self.get_lr(),
-            self.get_weight_decay(),
-        )
+        self.logger.debug("End of epoch %s LR/weight decay before step: %s/%s",
+                          self.current_epoch, self.get_lr(), self.get_weight_decay())
 
         # Update learning rate
         if self.lr_scheduler is not None and not self.step_lr_every_batch:
             self.lr_scheduler.step()
 
-        self.logger.debug(
-            "End of epoch %s LR/weight decay after step: %s/%s",
-            self.current_epoch,
-            self.get_lr(),
-            self.get_weight_decay(),
-        )
+        self.logger.debug("End of epoch %s LR/weight decay after step: %s/%s",
+                          self.current_epoch, self.get_lr(), self.get_weight_decay())
 
     def error_loss(self, output, target, reduction="mean"):
         """
@@ -487,20 +474,18 @@ class SupervisedExperiment(ExperimentBase):
 
     @classmethod
     def get_readable_result(cls, result):
-        keep_keys = [
-            "total_correct",
-            "total_tested",
-            "complexity_loss",
-            "learning_rate",
-        ]
-        change_keys = {
-            "mean_loss": "validation_loss",
-            "mean_accuracy": "validation_accuracy",
-        }
+        keep_keys = ["total_correct", "total_tested", "complexity_loss",
+                     "learning_rate"]
+        change_keys = {"mean_loss": "validation_loss",
+                       "mean_accuracy": "validation_accuracy"}
 
         return {
-            **{k: result[k] for k in keep_keys if k in result},
-            **{k2: result[k1] for k1, k2 in change_keys.items() if k1 in result},
+            **{k: result[k]
+               for k in keep_keys
+               if k in result},
+            **{k2: result[k1]
+               for k1, k2 in change_keys.items()
+               if k1 in result}
         }
 
     def get_state(self):
@@ -508,7 +493,9 @@ class SupervisedExperiment(ExperimentBase):
         Get experiment serialized state as a dictionary of  byte arrays
         :return: dictionary with "model", "optimizer" and "lr_scheduler" states
         """
-        state = {"current_epoch": self.current_epoch}
+        state = {
+            "current_epoch": self.current_epoch,
+        }
 
         # Save state into a byte array to avoid ray's GPU serialization issues
         # See https://github.com/ray-project/ray/issues/5519
@@ -630,6 +617,7 @@ class SupervisedExperiment(ExperimentBase):
             run_iteration=[exp + ".run_iteration"],
             should_stop=[exp + ".should_stop"],
             run_pre_experiment=[exp + ".run_pre_experiment"],
+
             # New methods
             create_model=[exp + ".create_model"],
             create_lr_scheduler=[exp + ".create_lr_scheduler"],

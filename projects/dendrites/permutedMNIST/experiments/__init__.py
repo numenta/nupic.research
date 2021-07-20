@@ -20,11 +20,13 @@
 # ----------------------------------------------------------------------
 
 from .base import CONFIGS as BASE
+from .batch import CONFIGS as BATCH
+from .batch_mnist import CONFIGS as BATCH_MNIST
 from .centroid import CONFIGS as CENTROID
-from .standard_mlp import CONFIGS as STANDARD
-from .sparse_mlp import CONFIGS as SPARSE
-from .sp_context_search import CONFIGS as SP_PROTO
+from .no_dendrites import CONFIGS as NO_DENDRITES
+from .si_centroid import CONFIGS as SI_CENTROID
 from .sp_context import CONFIGS as SP_CONTEXT
+from .sp_context_search import CONFIGS as SP_PROTO
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -34,8 +36,10 @@ __all__ = ["CONFIGS"]
 # Collect all configurations
 CONFIGS = dict()
 CONFIGS.update(BASE)
+CONFIGS.update(BATCH)
+CONFIGS.update(BATCH_MNIST)
 CONFIGS.update(CENTROID)
-CONFIGS.update(STANDARD)
-CONFIGS.update(SPARSE)
+CONFIGS.update(NO_DENDRITES)
+CONFIGS.update(SI_CENTROID)
 CONFIGS.update(SP_PROTO)
 CONFIGS.update(SP_CONTEXT)

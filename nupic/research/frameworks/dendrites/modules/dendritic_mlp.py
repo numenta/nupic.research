@@ -182,7 +182,8 @@ class DendriticMLP(nn.Module):
                 output_layer.add_module("non_linearity", output_nonlinearity)
             self._output_layers.append(output_layer)
 
-    def forward(self, x, context):
+    def forward(self, x, context=None):
+        assert (context is not None) or (self.num_segments == 0)
         for layer, activation in zip(self._layers, self._activations):
             x = activation(layer(x, context))
 
@@ -212,12 +213,13 @@ class DendriticMLP(nn.Module):
         sparsity and dendritic weight sparsity.
         """
         # Assume `m` is an instance of `DendriticLayerBase`
-        input_density = 1.0 - input_sparsity
-        weight_density = 1.0 - m.segments.sparsity
-        fan_in = m.dim_context
-        bound = 1.0 / np.sqrt(input_density * weight_density * fan_in)
-        nn.init.uniform_(m.segment_weights, -bound, bound)
-        m.apply(rezero_weights)
+        if m.segments is not None:
+            input_density = 1.0 - input_sparsity
+            weight_density = 1.0 - m.segments.sparsity
+            fan_in = m.dim_context
+            bound = 1.0 / np.sqrt(input_density * weight_density * fan_in)
+            nn.init.uniform_(m.segment_weights, -bound, bound)
+            m.apply(rezero_weights)
 
     def hardcode_dendritic_weights(self, context_vectors, init):
         """
@@ -241,8 +243,10 @@ class DendriticMLP(nn.Module):
         :param context_vectors:
         :param init: a string "overlapping" or "non_overlapping"
         """
-        for dendrite in self._layers:
-            self._hardcode_dendritic_weights(dendrite.weights, context_vectors, init)
+        if self.num_segments > 0:
+            for dendrite in self._layers:
+                self._hardcode_dendritic_weights(dendrite.weights, context_vectors,
+                                                 init)
 
     @staticmethod
     def _hardcode_dendritic_weights(dendrite_weights, context_vectors, init):
