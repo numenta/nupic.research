@@ -454,7 +454,32 @@ def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
     return hp_regs, X, y, fig, ax
 
 
-def sanitize_best_params(best_params):
+def handle_nan_factory(nan_preferance):
+
+    if nan_preferance is None:
+        def nan_handler(param):
+            print(f"{param} is getting set to nan")
+            return np.nan
+    elif isinstance(nan_preferance, str):
+        lower_preferance = nan_preferance.lower()
+        if lower_preferance == "":
+            def nan_handler(param):
+                print(f"{param} is getting set to nan")
+                return np.nan
+        if lower_preferance in ["0", "zero"]:
+            def nan_handler(param):
+                print(f"{param} is getting set to 0")
+                return 0
+        elif lower_preferance in ["usr", "user", "input"]:
+            def nan_handler():
+                value = input(f"Please enter a value for {param}")
+                value = float(value)
+                print(f"{param} is getting set to {value}")
+                return value
+    return nan_handler
+
+
+def sanitize_best_params(best_params, nan_handler):
     """
     I'm getting errors that data types are not JSON serializable
     and the current hypothesis is that this is due to saving numpy
@@ -462,7 +487,15 @@ def sanitize_best_params(best_params):
     """
     clean_best = copy.deepcopy(best_params)
     for key, val in clean_best.items():
-        if isinstance(val, numbers.Real):
+        if np.isnan(val):
+            print(
+                f"Warning, parameter {key} is set to NaN. This can happen because of"
+                " merging dataframes where a parameter is present in one, but not"
+                " the other."
+            )
+            clean_val = nan_handler(val)
+            clean_best[key] = clean_val
+        elif isinstance(val, numbers.Real):
             clean_val = float(clean_best[key])
             if clean_val.is_integer():
                 clean_val = int(clean_val)
@@ -476,7 +509,7 @@ def sanitize_best_params(best_params):
     return clean_best
 
 
-def get_best_params(task_2_df, task_2_hps, config_path):
+def get_best_params(task_2_df, task_2_hps, config_path, nan_preferance):
 
     best_idx_per_task = {}
     best_params_per_task = {}
@@ -492,13 +525,16 @@ def get_best_params(task_2_df, task_2_hps, config_path):
         print(f"best params: {task_2_df[task].iloc[best_idx][hps]}")
         print("\n")
 
+    nan_handler = handle_nan_factory(nan_preferance)
+
     # Save results to a config
     if config_path:
         if not os.path.exists(config_path):
             os.makedirs(config_path)
         for task in best_params_per_task.keys():
             full_config_name = os.path.join(config_path, f"{task}_hps.p")
-            best_params = sanitize_best_params(best_params_per_task[task])
+            best_params = sanitize_best_params(best_params_per_task[task], nan_handler)
+            # best_params = 
             with open(full_config_name, "wb") as f:
                 pickle.dump(dict(best_params), f)
 
@@ -534,9 +570,13 @@ if __name__ == "__main__":
                         help="Make simple 1d plots with a regression line "
                              "fitting a success metric like eval_accuracy "
                              "to each hyperparameter individually")
+    parser.add_argument("-n", "--nan", type=str, required=False,
+                        help="How to handles NaNs. If 0, NaN parameters will "
+                             "be set to 0. If user, user input will be "
+                             "requested. If None, defaults to leaving NaN.")
 
     args = parser.parse_args()
     experiment_path = args.directory
     task_2_df, task_2_hps = load_from_base(experiment_path)
     save_agg_results(task_2_df, experiment_path)
-    get_best_params(task_2_df, task_2_hps, args.config)
+    get_best_params(task_2_df, task_2_hps, args.config, args.nan)

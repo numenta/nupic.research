@@ -9,20 +9,20 @@ HP_RESULTS_DIR=~/nta/hp_search
 
 
 # BERT_100K big and small tasks
-python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_bert_100k_big_tasks -c ${HP_CONFIG_DIR}/bert_100k
-python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_bert_100k_small_tasks -c ${HP_CONFIG_DIR}/bert_100k
+python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_bert_100k_big_tasks -c ${HP_CONFIG_DIR}/bert_100k -n 0
+python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_bert_100k_small_tasks -c ${HP_CONFIG_DIR}/bert_100k -n 0
 
 # TRIFECTA 80
-python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_80_100k_big_tasks -c ${HP_CONFIG_DIR}/trifecta_80
-python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_80_100k_small_tasks -c ${HP_CONFIG_DIR}/trifecta_80
+python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_80_100k_big_tasks -c ${HP_CONFIG_DIR}/trifecta_80 -n 0
+python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_80_100k_small_tasks -c ${HP_CONFIG_DIR}/trifecta_80 -n 0
 
 # TRIFECTA 85
-python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_85_100k_big_tasks -c ${HP_CONFIG_DIR}/trifecta_85
-python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_85_100k_small_tasks -c ${HP_CONFIG_DIR}/trifecta_85
+python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_85_100k_big_tasks -c ${HP_CONFIG_DIR}/trifecta_85 -n 0
+python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_85_100k_small_tasks -c ${HP_CONFIG_DIR}/trifecta_85 -n 0
 
 # TRIFECTA 90
-python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_90_100k_big_tasks -c ${HP_CONFIG_DIR}/trifecta_90
-python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_90_100k_small_tasks -c ${HP_CONFIG_DIR}/trifecta_90
+python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_90_100k_big_tasks -c ${HP_CONFIG_DIR}/trifecta_90 -n 0
+python ../export_finetuning_hp_search_results.py -d ${HP_RESULTS_DIR}/hp_search_finetuning_trifecta_90_100k_small_tasks -c ${HP_CONFIG_DIR}/trifecta_90 -n 0
 
 
 ################      TO DO 
