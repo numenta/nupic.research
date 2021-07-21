@@ -154,7 +154,7 @@ class FullyStaticSparseBertModel(BertModel):
     class ConfigKWargs:
         """Keyword arguments to configure sparsity."""
         sparsity: Union[float, dict] = 0.5
-        sparsify_all_embeddings: bool = True
+        sparsify_all_embeddings: bool = False
 
     def __init__(self, config, add_pooling_layer=True):
         # Call the init one parent class up. Otherwise, the model will be defined twice.
@@ -181,7 +181,7 @@ class FullyStaticSparseBertModel(BertModel):
         device = self.device
 
         # Use `getattr` here for backwards compatibility for configs without this param.
-        sparsify_all_embeddings = getattr(self.config, "sparsify_all_embeddings", True)
+        sparsify_all_embeddings = getattr(self.config, "sparsify_all_embeddings", False)
 
         def get_sparsity(name):
             if isinstance(sparsity, dict):
