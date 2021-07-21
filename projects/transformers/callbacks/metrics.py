@@ -47,6 +47,7 @@ class TrackEvalMetrics(TrainerCallback):
         sparsity are accepted.
         """
 
+        self.sparsity_tolerance = sparsity_tolerance
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
