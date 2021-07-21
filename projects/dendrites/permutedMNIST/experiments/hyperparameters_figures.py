@@ -12,8 +12,11 @@ import matplotlib.ticker as ticker
 
 def hyperparameter_search_panel():
     """
-    New graph after fixing error in understanding processing in analyze_result
-    and re-running the 10 tasks data because it looked weird. Added 50 tasks.
+    Plots a 6 panels figure on 2 rows x 3 columns
+    Rows contains figures representing hyperparameters search for 10 and 50
+    permutedMNIST tasks resulting from hyperparameter_search.py config file.
+    Columns 1 is the number of dendritic segments, columns 2 the activation
+    sparsity and column 3 the weight sparsity.
     """
 
     df_path1 = f"{experiment_folder}segment_search_lasttask.csv"
@@ -184,7 +187,13 @@ def hyperparameter_search_panel():
         plt.savefig(f"{figs_dir}/hyperparameter_search_panel.png", bbox_inches="tight")
 
 
-def performance_accross_tasks():
+def performance_across_tasks():
+    """
+    Similar representation as previous function (hyperparameter_search_panel) but
+    in this case, it represents the performance along the number of tasks and
+    we plot all the hyperparameters on the same figure for each figures.
+    """
+
     df_path1 = f"{experiment_folder}segment_search_all.csv"
     df1 = pd.read_csv(df_path1)
 
@@ -379,7 +388,7 @@ if __name__ == "__main__":
         if not os.path.isdir(f"{figs_dir}"):
             os.makedirs(f"{figs_dir}")
 
-    experiment_folder = "~/nta/nupic.research/projects/dendrites/permutedMNIST/experiments/data_hyperparameter_search/"
+    experiment_folder = "data_hyperparameter_search/"
 
     hyperparameter_search_panel()
-    performance_accross_tasks()
+    performance_across_tasks()

@@ -19,7 +19,10 @@
 #
 
 """
-Search hyperparameter configuration
+Experiment file to run hyperparameter searches on different types of dendritic
+networks in a continual learning setting using permutedMNIST as benchmark.
+This config file was used to generate the data in CNS 2021's poster and
+Bernstein Conference 2021 submission.
 """
 
 import os
