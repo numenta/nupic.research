@@ -44,7 +44,12 @@ class RezeroWeightsCallback(TrainerCallback):
     """
     This rezeros the weights of a sparse model after each iteration and logs the
     sparsity of the BERT model and its encoder.
+
+    :param log_steps: how often to log the sparsity of the model
     """
+
+    def __init__(self, log_steps=1000):
+        self.log_steps = log_steps
 
     def on_init_end(self, args, state, control, model, **kwargs):
         """Log sparsity of the model and the sparsity of just the encoder."""
@@ -88,7 +93,7 @@ class RezeroWeightsCallback(TrainerCallback):
         model.apply(rezero_weights)
 
         # Log sparsity to wandb
-        if wandb.run is not None:
+        if wandb.run is not None and state.global_step % self.log_steps == 0:
             num_total, num_nonzero = count_nonzero_params(model)
             model_sparsity = 1 - (num_nonzero / num_total)
 
@@ -105,6 +110,9 @@ class RezeroWeightsCallback(TrainerCallback):
             )
 
             wandb.log(logs, commit=False)
+            control.should_log = True
+
+        return control
 
 
 class PlotDensitiesCallback(TrainerCallback):
@@ -192,6 +200,8 @@ class PlotDensitiesCallback(TrainerCallback):
         )
         plot = wandb.Image(ax)
         wandb.log({"delta_on_params": plot}, commit=False)
+        control.should_log = True
+        return control
 
 
 # -------------

@@ -85,7 +85,7 @@ tiny_bert_125_percent_wide_args = dict(
     sparsify_all_embeddings=False,
 )
 
-# Bert with layers of 12.5 percent wider
+# Bert with layers of 50 percent wider
 tiny_bert_150_percent_wide_args = dict(
     hidden_size=192,
     intermediate_size=768,
@@ -93,15 +93,25 @@ tiny_bert_150_percent_wide_args = dict(
     sparsify_all_embeddings=False,
 )
 
-# Bert with layers of 12.5 percent wider
+# Bert with layers of 100 percent wider
 tiny_bert_200_percent_wide_args = dict(
     hidden_size=256,
     intermediate_size=1024,
-    sparsity=0.9083,
+    # sparsity=0.9083,
+    sparsity=0.9283,
     sparsify_all_embeddings=False,
 )
 
-# Bert with layers of 12.5 percent wider
+# Bert with layers of 300 percent wider
+tiny_bert_400_percent_wide_args = dict(
+    hidden_size=512,
+    intermediate_size=2048,
+    sparsity=0.973,
+    # sparsity=0.963,
+    sparsify_all_embeddings=False,
+)
+
+# Bert with layers of 387.5 percent wider
 tiny_bert_487_percent_wide_args = dict(
     hidden_size=624,
     intermediate_size=2496,
@@ -142,19 +152,41 @@ tiny_bert_trifecta_200_perc_wide_100k["config_kwargs"].update(
     **tiny_bert_200_percent_wide_args,
 )
 
+
+# This helps decide the max_lr for `tiny_bert_trifecta_200_perc_wide_100k` above.
+tiny_bert_trifecta_200_perc_wide_lr_range_test = deepcopy(tiny_bert_trifecta_200_perc_wide_100k)  # noqa E501
+tiny_bert_trifecta_200_perc_wide_lr_range_test.update(
+    **lr_range_test_args,
+)
+
+# Sparse Tiny BERT with hidden and intermediate sizes 4.0x bigger.
+# Trained with RigL + KD + OneCycle LR (Trifecta)
+tiny_bert_trifecta_400_perc_wide_100k = deepcopy(tiny_bert_trifecta_100k)
+tiny_bert_trifecta_400_perc_wide_100k["config_kwargs"].update(
+    **tiny_bert_400_percent_wide_args,
+)
+
+
+# This helps decide the max_lr for `tiny_bert_trifecta_400_perc_wide_100k` above.
+tiny_bert_trifecta_400_perc_wide_lr_range_test = deepcopy(tiny_bert_trifecta_400_perc_wide_100k)  # noqa E501
+tiny_bert_trifecta_400_perc_wide_lr_range_test.update(
+    **lr_range_test_args,
+)
+
+
 # Sparse Tiny BERT with hidden and intermediate sizes 4.87x bigger.
 # This is the same size in terms of parameters as Small BERT.
 # Trained with RigL + KD + OneCycle LR (Trifecta)
 tiny_bert_trifecta_487_perc_wide_100k = deepcopy(tiny_bert_trifecta_100k)
 tiny_bert_trifecta_487_perc_wide_100k["config_kwargs"].update(
     **tiny_bert_487_percent_wide_args,
-    sparsity=0.97,  # this sparsity mimics dense Tiny BERT 1.0x Wide
+    sparsity=0.972,  # this sparsity mimics dense Tiny BERT 1.0x Wide
 )
-tiny_bert_trifecta_487_perc_wide_100k.update(
-    # Using batch_size of 16 instead of 128 since we're training on 8 GPUs.
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
-)
+# tiny_bert_trifecta_487_perc_wide_100k.update(
+#     # Using batch_size of 16 instead of 128 since we're training on 8 GPUs.
+#     per_device_train_batch_size=16,
+#     per_device_eval_batch_size=16,
+# )
 
 # This experiment is like the one of the same name above, but it's meant to be
 # compared to Small BERT. Thus, it uses the same number of attention heads and
@@ -166,7 +198,7 @@ tiny_bert_trifecta_487_perc_wide_100k.update(
 #     # This better mimics Small BERT's architecture. Tiny BERT usually just has 2.
 #     attention_heads=8,
 #     # This mimics Small BERT 1.0x Wide at 96.95% sparse
-#     sparsity=0.972,
+#     sparsity=0.97,
 # )
 # tiny_bert_trifecta_487_perc_wide_100k["trainer_mixin_args"].update(
 #     # This max_lr is determined by the test below:
@@ -214,6 +246,9 @@ CONFIGS = dict(
     tiny_bert_trifecta_125_perc_wide_100k=tiny_bert_trifecta_125_perc_wide_100k,
     tiny_bert_trifecta_150_perc_wide_100k=tiny_bert_trifecta_150_perc_wide_100k,
     tiny_bert_trifecta_200_perc_wide_100k=tiny_bert_trifecta_200_perc_wide_100k,
+    tiny_bert_trifecta_200_perc_wide_lr_range_test=tiny_bert_trifecta_200_perc_wide_lr_range_test,  # noqa E501
+    tiny_bert_trifecta_400_perc_wide_100k=tiny_bert_trifecta_400_perc_wide_100k,
+    tiny_bert_trifecta_400_perc_wide_lr_range_test=tiny_bert_trifecta_400_perc_wide_lr_range_test,  # noqa E501
     tiny_bert_trifecta_487_perc_wide_100k=tiny_bert_trifecta_487_perc_wide_100k,
     tiny_bert_trifecta_487_perc_wide_lr_range_test=tiny_bert_trifecta_487_perc_wide_lr_range_test,  # noqa E501
 
