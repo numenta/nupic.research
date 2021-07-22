@@ -22,6 +22,7 @@
 import numpy as np
 import wandb
 from torch.nn.parallel import DistributedDataParallel
+from transformers.modeling_utils import unwrap_model
 
 from nupic.research.frameworks.dynamic_sparse import (
     ThreeStageGMPLR,
@@ -161,7 +162,7 @@ class GradualMagnitudePruningMixin:
         Prune every `prune_period` steps during the pruning phase.
         """
 
-        model = get_model(model)  # extract from DistributedDataParallel
+        model = unwrap_model(model)  # extract from DistributedDataParallel
         train_loss = super().training_step(model, inputs)
 
         if not self._setup_done:
@@ -275,14 +276,6 @@ class ThreeStageLRMixin:
             cooldown_steps=self.cooldown_steps,
             cooldown_gamma=self.cooldown_gamma,
         )
-
-
-def get_model(model):
-    """Extract model from DistributedDataParallel."""
-    if isinstance(model, DistributedDataParallel):
-        return model.module
-    else:
-        return model
 
 
 def calc_on_params(sparse_modules):
