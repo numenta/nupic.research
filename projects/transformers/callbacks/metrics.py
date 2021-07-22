@@ -17,6 +17,8 @@
 #
 #  http://numenta.org/licenses/
 #
+import logging
+
 from transformers import TrainerCallback
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params

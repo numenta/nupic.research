@@ -79,8 +79,8 @@ debug_hp_search.update(
 debug_finetuning_hp_search = deepcopy(finetuning_bert100k_glue)
 debug_finetuning_hp_search.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
-    task_name="cola",
-    task_names=None,
+    task_name=None,
+    task_names=["cola", "rte"],
     num_runs=1,
     max_steps=200,
     save_steps=1,
@@ -92,7 +92,12 @@ debug_finetuning_hp_search.update(
             hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-5, 1e-2)),
             hp_num_trials=3,
             hp_compute_objective=("maximize", "eval_matthews_correlation")
-        )
+        ),
+        rte=dict(
+            hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-5, 1e-2)),
+            hp_num_trials=3,
+            hp_compute_objective=("maximize", "eval_accuracy")
+        ),
     ),
 )
 

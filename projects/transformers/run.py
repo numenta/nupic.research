@@ -30,11 +30,13 @@ github.com/huggingface/transformers/blob/master/examples/text-classification/run
 """
 
 import argparse
+import glob
 import logging
 import os
 import pickle
 import random
 import sys
+import shutil
 from copy import deepcopy
 from functools import partial
 from pprint import pformat
@@ -451,6 +453,15 @@ def run_finetuning_single_task_with_hp_search(
     best_run = trainer.hyperparameter_search(**hp_search_kwargs)
     logging.info(f"Best run: {best_run}")
 
+    # Delete all saved models and checkpoints to save space. All we need
+    # are the params and scores. Currently this is a hack that is specific
+    # to ray. 
+    subdirs = os.path.join(training_args.output_dir, "run-*")
+    run_dirs = glob.glob(subdirs)
+    logging.info(f"Removing run-* dirctories in {training_args.output_dir}")
+    for run_dir in run_dirs:
+        shutil.rmtree(run_dir)
+
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
     hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
     write_new = check_if_current_hp_best(hp_res_file, model_args, best_run)
@@ -533,6 +544,13 @@ def run_finetuning_single_task(
             is_regression, label_list
         )
 
+    # TODO
+    # Remove any unnecessary checkpoints to reduce space
+    if training_args.load_best_model_at_end:
+        pass
+        # find best model checkpoint
+        # delete the rest
+
     # There is an existing issue on training multiple models in sequence in this code
     # There is a memory leakage on the model, a small amount of GPU memory remains after
     # the run and accumulates over several runs. It fails with OOM after about 20 runs,
@@ -601,21 +619,31 @@ def run_finetuning_multiple_tasks(
             training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
 
-            training_fn = (
-                run_finetuning_single_task_with_hp_search if
-                model_args.hp_num_trials > 1 else run_finetuning_single_task
-            )
-            # TODO: pass run # into run_finetuning_single_task
-            eval_results = training_fn(
-                model_args, data_args, training_args, last_checkpoint=last_checkpoint,
-                run_idx=run_idx
-            )
+            if model_args.hp_num_trials > 1:
+                eval_results = run_finetuning_single_task_with_hp_search(
+                    model_args,
+                    data_args,
+                    training_args,
+                    last_checkpoint=last_checkpoint
+                )
+            else:
+                eval_results = run_finetuning_single_task(
+                    model_args,
+                    data_args,
+                    training_args,
+                    last_checkpoint=last_checkpoint,
+                    run_idx=run_idx
+                )
+
             task_results.append(eval_results)
 
         # Find the predictions of the best model and sym link to a file
         # labeled with "_best" at the end. Warning, assumes
         # load_best_model_at_end is on.
         link_best_predictions(training_args, task_results, task_name)
+
+        # TODO
+        # Delete all run directories except for the best one
 
         # If this is just a prediction run, ignore this block
         if training_args.do_eval:
