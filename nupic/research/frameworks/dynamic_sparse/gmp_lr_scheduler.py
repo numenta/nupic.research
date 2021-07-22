@@ -36,6 +36,7 @@ class ThreeStageGMPLR(LambdaLR):
         3) cooldown - decay the learning rate twice (like a StepLR)
 
     :param max_lr: this is the maximum lr reached
+    :param min_lr: initial lr during the warmup phase
     :param warmup_steps: number of steps for the warmup phase
     :param cooldown_steps: number of steps for the cooldown phase
     :param total_steps: total number of steps; used to derive pruning steps
@@ -50,8 +51,10 @@ class ThreeStageGMPLR(LambdaLR):
         warmup_steps,
         cooldown_steps,
         total_steps,
-        cooldown_gamma
+        cooldown_gamma,
+        min_lr=0,
     ):
+        self.min_lr = min_lr
         self.max_lr = max_lr
         self.warmup_steps = warmup_steps
         self.cooldown_steps = cooldown_steps
@@ -87,9 +90,9 @@ class ThreeStageGMPLR(LambdaLR):
 
     # Warm-up phase.
     def warmup_lr(self, step: int):
-        """Linearly ramp up the lr from 0 to max_lr in `warmup_steps`"""
-        min_lr = 0
-        return (self.max_lr - min_lr) / (self.warmup_steps - 1) * step + min_lr
+        """Linearly ramp up the lr from min_lr to max_lr in `warmup_steps`"""
+        slope = (self.max_lr - self.min_lr) / (self.warmup_steps - 1)
+        return slope * step + self.min_lr
 
     # Pruning phase
     def pruning_lr(self, step: int):
