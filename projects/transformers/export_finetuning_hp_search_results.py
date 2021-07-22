@@ -34,6 +34,7 @@ import numbers
 import os
 import pickle
 import warnings
+import yaml
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
@@ -481,9 +482,8 @@ def handle_nan_factory(nan_preferance):
 
 def sanitize_best_params(best_params, nan_handler):
     """
-    I'm getting errors that data types are not JSON serializable
-    and the current hypothesis is that this is due to saving numpy
-    int and floats, and we need to use native typing.
+    Make sure types are native pythong int/float/str since otherwise you get
+    errors that data is not JSON serializable.
     """
     clean_best = copy.deepcopy(best_params)
     for key, val in clean_best.items():
@@ -493,7 +493,7 @@ def sanitize_best_params(best_params, nan_handler):
                 " merging dataframes where a parameter is present in one, but not"
                 " the other."
             )
-            clean_val = nan_handler(val)
+            clean_val = nan_handler(key)
             clean_best[key] = clean_val
         elif isinstance(val, numbers.Real):
             clean_val = float(clean_best[key])
@@ -532,11 +532,10 @@ def get_best_params(task_2_df, task_2_hps, config_path, nan_preferance):
         if not os.path.exists(config_path):
             os.makedirs(config_path)
         for task in best_params_per_task.keys():
-            full_config_name = os.path.join(config_path, f"{task}_hps.p")
+            full_config_name = os.path.join(config_path, f"{task}_hps.yaml")
             best_params = sanitize_best_params(best_params_per_task[task], nan_handler)
-            # best_params = 
-            with open(full_config_name, "wb") as f:
-                pickle.dump(dict(best_params), f)
+            with open(full_config_name, "w") as f:
+                yaml.dump(dict(best_params), f)
 
 
 def load_csv_per_task(base_dir):
