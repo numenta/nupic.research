@@ -21,7 +21,6 @@
 
 import numpy as np
 import wandb
-from torch.nn.parallel import DistributedDataParallel
 from transformers.modeling_utils import unwrap_model
 
 from nupic.research.frameworks.dynamic_sparse import (
