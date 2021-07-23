@@ -296,7 +296,8 @@ def run_pretraining(
             trainer_callbacks=model_args.trainer_callbacks or None,
         )
         if training_args.do_train:
-            train(trainer, training_args.output_dir, last_checkpoint)
+            train(trainer, training_args.output_dir,
+            training_args.rm_checkpoints, last_checkpoint)
 
     # Evaluate in full eval dataset.
     # if using hp search, load best model before running evaluate
@@ -460,12 +461,8 @@ def run_finetuning_single_task_with_hp_search(
 
     # Delete all saved models and checkpoints to save space. All we need
     # are the params and scores. Currently this is a hack that is specific
-    # to ray. 
-    subdirs = os.path.join(training_args.output_dir, "run-*")
-    run_dirs = glob.glob(subdirs)
-    logging.info(f"Removing run-* dirctories in {training_args.output_dir}")
-    for run_dir in run_dirs:
-        shutil.rmtree(run_dir)
+    # to ray.
+    rm_prefixed_dirs(training_args.output_dir, "run-")
 
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
     hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
@@ -526,7 +523,8 @@ def run_finetuning_single_task(
     )
 
     if training_args.do_train:
-        train(trainer, training_args.output_dir, last_checkpoint)
+        train(trainer, training_args.output_dir,
+        training_args.rm_checkpoints, last_checkpoint)
 
     if training_args.do_eval:
         eval_results = evaluate_tasks_handler(
@@ -548,6 +546,8 @@ def run_finetuning_single_task(
             trainer, training_args.output_dir, tasks, test_datasets,
             is_regression, label_list
         )
+
+    
 
     # TODO
     # Remove any unnecessary checkpoints to reduce space demands
@@ -645,10 +645,12 @@ def run_finetuning_multiple_tasks(
         # Find the predictions of the best model and sym link to a file
         # labeled with "_best" at the end. Warning, assumes
         # load_best_model_at_end is on.
-        link_best_predictions(training_args, task_results, task_name)
+        best_run = link_best_predictions(
+            training_args, task_results, task_name)
 
-        # TODO
         # Delete all run directories except for the best one
+        skip = "run_" + best_run
+        rm_prefixed_dirs(training_args.output_dir, "run_", skip=skip)
 
         # If this is just a prediction run, ignore this block
         if training_args.do_eval:

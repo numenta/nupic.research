@@ -21,11 +21,13 @@
 Auxiliary functions to run.py file
 """
 
+import glob
 import logging
 import math
 import multiprocessing
 import os
 import pickle
+import shutil
 from collections import Counter, defaultdict
 from functools import partial
 from hashlib import blake2b
@@ -94,7 +96,7 @@ TASK_TO_KEYS = {
 }
 
 
-def train(trainer, output_dir, last_checkpoint=None):
+def train(trainer, output_dir, rm_checkpoints, last_checkpoint=None):
     """Trainig function applicable to pretraining language models and finetuning."""
 
     logging.info("Before training: total params: {:,} non zero params: {:,}".format(
@@ -121,6 +123,9 @@ def train(trainer, output_dir, last_checkpoint=None):
     logging.info("After training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
+
+    if rm_checkpoints:
+        rm_prefixed_dirs(output_dir, "checkpoint-")
 
 
 def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
@@ -1400,3 +1405,21 @@ def link_best_predictions(training_args, task_results, task_name):
     os.symlink(best_run_predictions, link_file_path)
     logging.info(f"best run predictions for {task_name} saved to "
                  "{link_file_path}")
+
+    return best_run
+
+
+def rm_prefixed_subdirs(base_dir, prefix, skip=""):
+    """
+    Remove unnecessary directories at the end of training
+    """
+
+    logging.info(f"Removing {prefix}* dirctories in {base_dir}")
+    for subdir in os.listdir(base_dir):
+        if subdir.startswith(prefix):
+            subdir_path = os.path.join(base_dir, subdir)
+            if subdir == skip:
+                logging.info(f"Note deleting {subdir}")
+            else:
+                shutil.rmtree(subdir_path)
+
