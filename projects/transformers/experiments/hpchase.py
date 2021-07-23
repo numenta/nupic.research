@@ -20,8 +20,9 @@
 
 import os
 import pathlib
-import yaml
 from copy import deepcopy
+
+import yaml
 
 # use bert_100k for task-specific hp search prototyping
 from .finetuning import finetuning_bert100k_glue_get_info
@@ -82,8 +83,6 @@ debug_trifecta_90_hp_chase_mnli.update(
     task_names=["mnli"],
 )
 
-import pdb
-pdb.set_trace()
 
 CONFIGS = dict(
     bert_100k_hp_chase=bert_100k_hp_chase,
