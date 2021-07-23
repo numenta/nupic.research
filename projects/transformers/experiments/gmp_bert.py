@@ -32,6 +32,7 @@ from trainer_mixins import (
     ThreeStageLRMixin,
 )
 
+from .bert_replication import bert_1mi
 from .bertitos import tiny_bert_100k, tiny_bert_debug
 from .trifecta import KDLRRangeTestTrainer
 
@@ -222,7 +223,43 @@ tiny_bert_gmp_100k_maxlr_05["trainer_mixin_args"].update(
 )
 
 
+### bert_base
+
+bert_1mi_pretrained="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi_prunable"
+
+bert_1mi_pretrained_gmp_52k = deepcopy(bert_1mi)
+bert_1mi_pretrained_gmp_52k.update(
+    fp16=True,
+    # steps: 2000 warmup, 30000 pruning (every 1000), 20000 cooldown
+    max_steps=2000 + 30000 + 20000,  # longer may be better
+    model_type="fully_static_sparse_bert",
+    model_name_or_path=bert_1mi_pretrained,
+    # tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",  # noqa
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        PlotDensitiesCallback(plot_freq=10000),
+    ],
+    trainer_class=GMPPretrainedTrainer,
+    trainer_mixin_args=dict(
+        # GMP
+        start_sparsity=0,
+        end_sparsity=0.8,
+        warmup_steps=2000,
+        cooldown_steps=20000,
+        prune_period=1000,
+        max_lr=.00075,
+        verbose_gmp_logging=True,
+
+        # KD
+        teacher_model_names_or_paths=[
+            "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
+        ],
+    ),
+)
+
+
 CONFIGS = dict(
+    bert_1mi_pretrained_gmp_52k=bert_1mi_pretrained_gmp_52k,
     tiny_bert_gmp_debug=tiny_bert_gmp_debug,
     tiny_bert_pretrained_gmp_lr_range_test=tiny_bert_pretrained_gmp_lr_range_test,
     tiny_bert_pretrained_gmp_52k=tiny_bert_pretrained_gmp_52k,
