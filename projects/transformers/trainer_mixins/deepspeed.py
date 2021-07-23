@@ -47,6 +47,8 @@ def replace_sparse_transformer_layer(model, config=None, fp16=True, training=Tru
             # Assume same sparsity for all QKV layers
             key = bert_layer.attention.self.key
             value = bert_layer.attention.self.value
+            assert query.sparsity == key.sparsity == value.sparsity
+
             qkv_mask = torch.cat(
                 (query.zero_mask, key.zero_mask, value.zero_mask), dim=0
             )
@@ -115,6 +117,10 @@ class DeepspeedTransformerLayerMixin:
     """
     Mixin to HF Trainer class used to replace HF transform layers with deepspeed
     fused QKV transform layer.
+
+    .. note::
+        Assume same sparsity for all QKV layers
+
     See https://www.deepspeed.ai/news/2020/05/27/fastest-bert-training.html#bert-highly-optimized-transformer-kernels
     """  # noqa: E501
 
