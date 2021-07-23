@@ -125,7 +125,7 @@ def train(trainer, output_dir, rm_checkpoints, last_checkpoint=None):
     ))
 
     if rm_checkpoints:
-        rm_prefixed_dirs(output_dir, "checkpoint-")
+        rm_prefixed_subdirs(output_dir, "checkpoint-")
 
 
 def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
@@ -1400,26 +1400,28 @@ def link_best_predictions(training_args, task_results, task_name):
     best_run_predictions = os.path.join(best_run_path, pred_file)
 
     # link task_best.tsv
+    # If previous symlink exists, just delete and recreate
     link_file_name = GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"
     link_file_path = os.path.join(task_path, link_file_name)
+    if os.path.exists(link_file_path):
+        os.remove(link_file_path)
     os.symlink(best_run_predictions, link_file_path)
     logging.info(f"best run predictions for {task_name} saved to "
                  "{link_file_path}")
 
-    return best_run
+    return str(best_run)
 
 
 def rm_prefixed_subdirs(base_dir, prefix, skip=""):
     """
     Remove unnecessary directories at the end of training
     """
-
     logging.info(f"Removing {prefix}* dirctories in {base_dir}")
     for subdir in os.listdir(base_dir):
         if subdir.startswith(prefix):
             subdir_path = os.path.join(base_dir, subdir)
             if subdir == skip:
-                logging.info(f"Note deleting {subdir}")
+                logging.info(f"Not deleting {subdir}")
             else:
                 shutil.rmtree(subdir_path)
 

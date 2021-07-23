@@ -85,6 +85,7 @@ from run_utils import (
     link_best_predictions,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
+    rm_prefixed_subdirs,
     run_hyperparameter_search,
     test_tasks,
     train,
@@ -462,7 +463,7 @@ def run_finetuning_single_task_with_hp_search(
     # Delete all saved models and checkpoints to save space. All we need
     # are the params and scores. Currently this is a hack that is specific
     # to ray.
-    rm_prefixed_dirs(training_args.output_dir, "run-")
+    rm_prefixed_subdirs(training_args.output_dir, "run-")
 
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
     hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
@@ -648,9 +649,13 @@ def run_finetuning_multiple_tasks(
         best_run = link_best_predictions(
             training_args, task_results, task_name)
 
-        # Delete all run directories except for the best one
-        skip = "run_" + best_run
-        rm_prefixed_dirs(training_args.output_dir, "run_", skip=skip)
+        # Delete all finetuning run directories except for the best one
+        # Ignore if this is a hyperparameter run, since the excess
+        # is deleted within that function.
+        if model_args.hp_num_trials <= 1:
+            skip = "run_" + best_run
+            task_output_dir = os.path.dirname(training_args.output_dir)
+            rm_prefixed_subdirs(task_output_dir, "run_", skip=skip)
 
         # If this is just a prediction run, ignore this block
         if training_args.do_eval:
