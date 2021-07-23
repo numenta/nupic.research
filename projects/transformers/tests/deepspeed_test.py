@@ -34,6 +34,15 @@ import models  # noqa :F401
 from trainer_mixins.deepspeed import replace_sparse_transformer_layer  # noqa
 
 
+def _compute_sparsity(model):
+    """
+    Compute sparsity level of the given model
+    """
+    total_params = sum(p.numel() for p in model.parameters())
+    total_nonzero = sum(torch.count_nonzero(p) for p in model.parameters())
+    return 1.0 - (total_nonzero / total_params)
+
+
 class SparseBertModelTest(unittest.TestCase):
     def setUp(self):
         set_random_seed(42)
@@ -99,6 +108,12 @@ class SparseBertModelTest(unittest.TestCase):
 
         # Train for a few steps
         for i in range(training_steps):
+
+            # Make sure the model maintains the same sparsity as the original
+            expected_sparsity = _compute_sparsity(original_model)
+            actual_sparsity = _compute_sparsity(deepspeed_model)
+            self.assertAlmostEqual(actual_sparsity, expected_sparsity)
+
             actual_outputs = deepspeed_model(
                 attention_mask=attention_mask[i],
                 input_ids=input_ids[i],
