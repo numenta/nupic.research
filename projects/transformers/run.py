@@ -105,8 +105,6 @@ def pdict(dictionary):
 
 
 def main():
-    # ray.shutdown()
-    # ray.init()
 
     cmd_parser = argparse.ArgumentParser()
     cmd_parser.add_argument("experiments", nargs="+", choices=list(CONFIGS.keys()),
@@ -260,8 +258,6 @@ def run_pretraining(
 
     # Run hp search or regular training
     if model_args.hp_num_trials >= 1:
-        ray.shutdown()
-        ray.init()
         run_hyperparameter_search(
             model_args=model_args,
             config=config,
@@ -357,9 +353,6 @@ def run_finetuning_single_task_with_hp_search(
     model_args, data_args, training_args, last_checkpoint=None
 ):
     """On a single task train, evaluate, and save results"""
-
-    ray.shutdown()
-    ray.init()
 
     # Init dataset (same as without hp search)
     tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
