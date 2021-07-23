@@ -21,7 +21,6 @@
 Auxiliary functions to run.py file
 """
 
-import glob
 import logging
 import math
 import multiprocessing
@@ -1424,4 +1423,3 @@ def rm_prefixed_subdirs(base_dir, prefix, skip=""):
                 logging.info(f"Not deleting {subdir}")
             else:
                 shutil.rmtree(subdir_path)
-

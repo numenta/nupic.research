@@ -34,12 +34,12 @@ import numbers
 import os
 import pickle
 import warnings
-import yaml
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 from scipy import stats as ss
 
 from finetuning_constants import (
@@ -457,7 +457,8 @@ def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
 
 def handle_nan_factory(nan_preferance):
 
-    if nan_preferance is None:
+    lower_preferance = nan_preferance.lower()
+    if (nan_preferance is None) or (lower_preferance in ["0", "zero"]):
         def nan_handler(param):
             print(f"{param} is getting set to nan")
             return np.nan
@@ -467,12 +468,8 @@ def handle_nan_factory(nan_preferance):
             def nan_handler(param):
                 print(f"{param} is getting set to nan")
                 return np.nan
-        if lower_preferance in ["0", "zero"]:
-            def nan_handler(param):
-                print(f"{param} is getting set to 0")
-                return 0
         elif lower_preferance in ["usr", "user", "input"]:
-            def nan_handler():
+            def nan_handler(param):
                 value = input(f"Please enter a value for {param}")
                 value = float(value)
                 print(f"{param} is getting set to {value}")

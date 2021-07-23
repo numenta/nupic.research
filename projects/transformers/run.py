@@ -30,13 +30,11 @@ github.com/huggingface/transformers/blob/master/examples/text-classification/run
 """
 
 import argparse
-import glob
 import logging
 import os
 import pickle
 import random
 import sys
-import shutil
 from copy import deepcopy
 from functools import partial
 from pprint import pformat
@@ -94,18 +92,6 @@ from run_utils import (
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
-
-REPORTING_METRICS_PER_TASK = {
-    "cola": ["eval_matthews_correlation"],
-    "mnli": ["eval_accuracy", "mm_eval_accuracy"],
-    "mrpc": ["eval_f1", "eval_accuracy"],
-    "qnli": ["eval_accuracy"],
-    "qqp": ["eval_accuracy", "eval_f1"],
-    "rte": ["eval_accuracy"],
-    "sst2": ["eval_accuracy"],
-    "stsb": ["eval_pearson", "eval_spearmanr"],
-    "wnli": ["eval_accuracy"]
-}
 
 
 def bold(text):
@@ -297,8 +283,10 @@ def run_pretraining(
             trainer_callbacks=model_args.trainer_callbacks or None,
         )
         if training_args.do_train:
-            train(trainer, training_args.output_dir,
-            training_args.rm_checkpoints, last_checkpoint)
+            train(trainer,
+                  training_args.output_dir,
+                  training_args.rm_checkpoints,
+                  last_checkpoint)
 
     # Evaluate in full eval dataset.
     # if using hp search, load best model before running evaluate
@@ -524,8 +512,10 @@ def run_finetuning_single_task(
     )
 
     if training_args.do_train:
-        train(trainer, training_args.output_dir,
-        training_args.rm_checkpoints, last_checkpoint)
+        train(trainer,
+              training_args.output_dir,
+              training_args.rm_checkpoints,
+              last_checkpoint)
 
     if training_args.do_eval:
         eval_results = evaluate_tasks_handler(
@@ -547,8 +537,6 @@ def run_finetuning_single_task(
             trainer, training_args.output_dir, tasks, test_datasets,
             is_regression, label_list
         )
-
-    
 
     # TODO
     # Remove any unnecessary checkpoints to reduce space demands

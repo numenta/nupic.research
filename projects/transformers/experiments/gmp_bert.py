@@ -223,9 +223,11 @@ tiny_bert_gmp_100k_maxlr_05["trainer_mixin_args"].update(
 )
 
 
-### bert_base
+# ----------
+# BERT base
+# ----------
 
-bert_1mi_pretrained="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi_prunable"
+bert_1mi_pretrained = "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi_prunable"  # noqa
 
 bert_1mi_pretrained_gmp_52k = deepcopy(bert_1mi)
 bert_1mi_pretrained_gmp_52k.update(
