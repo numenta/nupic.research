@@ -633,7 +633,7 @@ def run_finetuning_multiple_tasks(
         # Delete all finetuning run directories except for the best one
         # Ignore if this is a hyperparameter run, since the excess
         # is deleted within that function.
-        if model_args.hp_num_trials <= 1:
+        if (model_args.hp_num_trials <= 1) and (best_run is not None):
             skip = "run_" + best_run
             task_output_dir = os.path.dirname(training_args.output_dir)
             rm_prefixed_subdirs(task_output_dir, "run_", skip=skip)

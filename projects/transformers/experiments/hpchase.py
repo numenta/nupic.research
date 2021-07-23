@@ -83,7 +83,6 @@ debug_trifecta_90_hp_chase_mnli.update(
     task_names=["mnli"],
 )
 
-
 CONFIGS = dict(
     bert_100k_hp_chase=bert_100k_hp_chase,
     trifecta_80_hp_chase=trifecta_80_hp_chase,

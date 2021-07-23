@@ -194,32 +194,32 @@ finetuning_bert100k_glue_get_info.update(
         cola=dict(eval_steps=50,
                   max_steps=steps_50k,
                   metric_for_best_model="eval_matthews_correlation",
-                  num_runs=5,
+                  num_runs=10,
                   ),  # 50k / 8500 ~ 6 epochs
 
         sst2=dict(eval_steps=100,
                   max_steps=10_000,
-                  num_runs=3),  # 67k training size > 50k, default 3 epochs
+                  num_runs=5),  # 67k training size > 50k, default 3 epochs
         mrpc=dict(max_steps=steps_50k,
-                  num_runs=3),
-
+                  num_runs=10,
+                  metric_for_best_model="eval_f1"),
         stsb=dict(max_steps=steps_50k * 2,
                   metric_for_best_model="eval_pearson",
-                  num_runs=3),  # 50k / 7000 ~ 8 epochs
-
+                  num_runs=10),  # 50k / 7000 ~ 8 epochs
         qqp=dict(eval_steps=1_000,
                  max_steps=50_000,
-                 num_runs=3),  # run for a long time
+                 num_runs=2,
+                 metric_for_best_model="eval_f1"),  # run for a long time
         mnli=dict(eval_steps=1_000,
                   max_steps=50_000,
-                  num_runs=3),  # run for a long time
+                  num_runs=2),  # run for a long time
         qnli=dict(eval_steps=500,
                   max_steps=25_000,
-                  num_runs=3),  # run for a long time
+                  num_runs=5),  # run for a long time
         rte=dict(max_steps=steps_50k,
-                 num_runs=3),  # ~ 20 epochs from paper
+                 num_runs=10),  # ~ 20 epochs from paper
         wnli=dict(max_steps=50,
-                  num_runs=3)  # run for a short time to avoid overfitting
+                  num_runs=10)  # run for a short time to avoid overfitting
     ),
     trainer_callbacks=[
         TrackEvalMetrics()],
