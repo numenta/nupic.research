@@ -383,14 +383,23 @@ SPARSE_VDROP_SMALL.update(
 # grid search using dense activations, sparse weights, nonzero params constant,
 # varying channels, using OneCycleLR
 # (num_channels, required weight density)
+# channels_density = [
+# (64, 1.0),
+# (90, 0.5069810763533928),
+# (117, 0.30042822545578884),
+# (143, 0.20129180763773824),
+# (203, 0.10000452594328949),
+# (287, 0.050073336993638744),
+# ]
+
 channels_density = [
-(64, 1.0),
-(90, 0.5069810763533928),
-(117, 0.30042822545578884),
-(143, 0.20129180763773824),
-(203, 0.10000452594328949),
-(287, 0.050073336993638744),
+(32, 1.0),
+(45, 0.503),
+(58, 0.301),
+(72, 0.194),
+(100, 0.0993),
 ]
+
 
 experiment_idx = 2
 exp_num_channels, exp_required_density = channels_density[experiment_idx]
@@ -560,17 +569,16 @@ class GreedyInfoMaxExperimentSparseLRRangeTest(
         config["classifier_config"]["model_args"].update(in_channels=num_channels)
         super().setup_experiment(config)
 
-
+#
 # channels_density = [
 # (64, 1.0),
-# (90, 0.5069810763533928),
-# (117, 0.30042822545578884),
-# (143, 0.20129180763773824),
-# (203, 0.10000452594328949),
-# (287, 0.050073336993638744),
+# (45, 0.503),
+# (58, 0.301),
+# (72, 0.194),
+# (100, 0.0993),
 # ]
 
-range_test_experiment_idx = 4
+range_test_experiment_idx = 0
 exp_num_channels, exp_required_density = channels_density[range_test_experiment_idx]
 exp_required_sparsity = 1.0 - exp_required_density
 lr_range_test_args = deepcopy(model_args)
@@ -619,16 +627,15 @@ LR_RANGE_TEST.update(dict(
     ),
 )
 
-
+#
 # channels_density = [
-# (64, 1.0),
-# (90, 0.5069810763533928),
-# (117, 0.30042822545578884),
-# (143, 0.20129180763773824),
-# (203, 0.10000452594328949),
-# (287, 0.050073336993638744),
+# (32, 1.0),
+# (45, 0.503),
+# (58, 0.301),
+# (72, 0.194),
+# (100, 0.0993),
 # ]
-max_lr_grid_search_experiment_idx = 3
+max_lr_grid_search_experiment_idx = 2
 exp_num_channels, exp_required_density = channels_density[max_lr_grid_search_experiment_idx]
 exp_required_sparsity = 1.0 - exp_required_density
 max_lr_grid_search_args = deepcopy(model_args)
@@ -658,7 +665,8 @@ MAX_LR_GRID_SEARCH.update(dict(
         optimizer_args=dict(lr=2e-4),
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
-                max_lr=tune.grid_search([0.15, 0.18, 0.21, 0.24, 0.27]),
+                # max_lr=tune.grid_search([0.15, 0.18, 0.21, 0.24, 0.27]),
+                max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
                 div_factor=100,  # initial_lr = 0.01
                 final_div_factor=1000,  # min_lr = 0.0000025
                 pct_start=1.0 / 10.0,
@@ -684,7 +692,7 @@ MAX_LR_GRID_SEARCH.update(dict(
 
 # Super Greedy Implementation (all blocks trained concurrently)
 
-experiment_idx = 5
+experiment_idx = 0
 exp_num_channels, exp_required_density = channels_density[experiment_idx]
 exp_required_sparsity = 1.0 - exp_required_density
 super_greedy_model_args = deepcopy(model_args)
