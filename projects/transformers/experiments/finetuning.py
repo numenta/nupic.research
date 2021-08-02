@@ -224,6 +224,7 @@ finetuning_bert100k_glue_get_info.update(
     trainer_callbacks=[
         TrackEvalMetrics()],
     warmup_ratio=0.1,
+    rm_checkpoints=True,
 )
 
 finetuning_bert1mi_glue_get_info = deepcopy(finetuning_bert100k_glue_get_info)
