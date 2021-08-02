@@ -80,7 +80,7 @@ from run_utils import (
     init_model,
     init_tokenizer,
     init_trainer,
-    link_best_predictions,
+    get_best_run_and_link_best_predictions,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
     rm_prefixed_subdirs,
@@ -505,6 +505,9 @@ def run_finetuning_single_task(
     )
 
     if training_args.do_train:
+        # Note, rm_checkpoints=True means one model will be saved
+        # in the output_dir, and all checkpoint subdirectories will be
+        # deleted when train() is called.
         train(trainer,
               training_args.output_dir,
               training_args.rm_checkpoints,
@@ -530,13 +533,6 @@ def run_finetuning_single_task(
             trainer, training_args.output_dir, tasks, test_datasets,
             is_regression, label_list
         )
-
-    # TODO
-    # Remove any unnecessary checkpoints to reduce space demands
-    if training_args.load_best_model_at_end:
-        pass
-        # find best model checkpoint
-        # delete the rest
 
     # There is an existing issue on training multiple models in sequence in this code
     # There is a memory leakage on the model, a small amount of GPU memory remains after
@@ -627,13 +623,13 @@ def run_finetuning_multiple_tasks(
         # Find the predictions of the best model and sym link to a file
         # labeled with "_best" at the end. Warning, assumes
         # load_best_model_at_end is on.
-        best_run = link_best_predictions(
+        best_run = get_best_run_and_link_best_predictions(
             training_args, task_results, task_name)
 
         # Delete all finetuning run directories except for the best one
         # Ignore if this is a hyperparameter run, since the excess
         # is deleted within that function.
-        if (model_args.hp_num_trials <= 1) and (best_run is not None):
+        if (model_args.hp_num_trials <= 1):
             skip = "run_" + best_run
             task_output_dir = os.path.dirname(training_args.output_dir)
             rm_prefixed_subdirs(task_output_dir, "run_", skip=skip)
