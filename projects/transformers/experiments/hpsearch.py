@@ -135,7 +135,7 @@ debug_finetuning_sparse_hp_search.update(
 hp_search_finetuning_small_bert_100k_small_tasks = deepcopy(
     debug_finetuning_hp_search)
 hp_search_finetuning_small_bert_100k_small_tasks.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_100k",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_100k",  # noqa: E501
     task_name=None,
     task_names=["cola", "mrpc", "rte", "stsb", "wnli"],
     hp_space=lambda trial: dict(
@@ -434,21 +434,21 @@ CONFIGS = dict(
     debug_finetuning_sparse_hp_search=debug_finetuning_sparse_hp_search,
 
     # small bert, small tasks
-    hp_search_finetuning_small_bert_100k_small_tasks=hp_search_finetuning_small_bert_100k_small_tasks,
-    hp_search_finetuning_small_bert_trifecta_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_100k_small_tasks,
-    hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks,
-    hp_search_finetuning_small_bert_trifecta_90_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks,
-    hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks,
-    hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks,
+    hp_search_finetuning_small_bert_100k_small_tasks=hp_search_finetuning_small_bert_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_90_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks,  # noqa: E501
 
     # small bert, big tasks
-    hp_search_finetuning_small_bert_100k_big_tasks=hp_search_finetuning_small_bert_100k_big_tasks,
-    hp_search_finetuning_small_bert_trifecta_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_100k_big_tasks,
-    hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks,
-    hp_search_finetuning_small_bert_trifecta_90_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks,
-    hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks,
-    hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks,
-    
+    hp_search_finetuning_small_bert_100k_big_tasks=hp_search_finetuning_small_bert_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_90_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks,  # noqa: E501
+
     # bert base, small tasks
     hp_search_finetuning_bert_100k_small_tasks=hp_search_finetuning_bert_100k_small_tasks,  # noqa
     hp_search_finetuning_trifecta_80_100k_small_tasks=hp_search_finetuning_trifecta_80_100k_small_tasks,  # noqa

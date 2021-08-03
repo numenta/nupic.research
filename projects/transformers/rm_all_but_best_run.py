@@ -23,17 +23,13 @@ the run that had the highest scores, this script will go through and remove
 run_* directories that should have been deleted previously, but weren't.
 """
 
-import logging
 import os
 import pickle
 import sys
 
 import wandb
 
-from run_utils import (
-    TaskResults,
-    rm_prefixed_subdirs,
-)
+from run_utils import rm_prefixed_subdirs
 
 
 def get_best_run_and_rm_others(exp_name):
@@ -69,7 +65,7 @@ if __name__ == "__main__":
     for d in directories:
         try:
             get_best_run_and_rm_others(d)
-        except:
+        except BaseException:
             # log that you were unable to rm runs for this one
             print(f"The following directory could not be cleaned: {d}")
             failed_directories.append(d)
@@ -79,6 +75,6 @@ if __name__ == "__main__":
         print("All directories were properly cleaned")
     else:
         print(f"Done cleaning up. The following directories could not be "
-            "cleaned: ")
+              "cleaned: ")
         for fd in failed_directories:
             print(fd)

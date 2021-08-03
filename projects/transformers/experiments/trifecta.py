@@ -417,28 +417,32 @@ finetuning_small_bert_trifecta_100k_glue.update(
 )
 
 
-finetuning_small_bert_sparse_85_trifecta_100k_glue = deepcopy(finetuning_small_bert_trifecta_100k_glue)
+finetuning_small_bert_sparse_85_trifecta_100k_glue = deepcopy(
+    finetuning_small_bert_trifecta_100k_glue)
 finetuning_small_bert_sparse_85_trifecta_100k_glue.update(
     # Model arguments
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_85%_trifecta_100k",  # noqa: E501
 )
 
 
-finetuning_small_bert_sparse_90_trifecta_100k_glue = deepcopy(finetuning_small_bert_trifecta_100k_glue)
+finetuning_small_bert_sparse_90_trifecta_100k_glue = deepcopy(
+    finetuning_small_bert_trifecta_100k_glue)
 finetuning_small_bert_sparse_90_trifecta_100k_glue.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_90%_trifecta_100k"
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_90%_trifecta_100k"  # noqa: E501
 )
 
 
-finetuning_small_bert_sparse_2x_trifecta_100k_glue = deepcopy(finetuning_small_bert_trifecta_100k_glue)
+finetuning_small_bert_sparse_2x_trifecta_100k_glue = deepcopy(
+    finetuning_small_bert_trifecta_100k_glue)
 finetuning_small_bert_sparse_2x_trifecta_100k_glue.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_2x_trifecta_100k"
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_2x_trifecta_100k"  # noqa: E501
 )
 
 
-finetuning_small_bert_sparse_4x_trifecta_100k_glue = deepcopy(finetuning_small_bert_trifecta_100k_glue)
+finetuning_small_bert_sparse_4x_trifecta_100k_glue = deepcopy(
+    finetuning_small_bert_trifecta_100k_glue)
 finetuning_small_bert_sparse_4x_trifecta_100k_glue.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_4x_trifecta_100k"
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_4x_trifecta_100k"  # noqa: E501
 )
 
 # ---------
@@ -722,19 +726,19 @@ CONFIGS = dict(
     #   85% sparse
     small_bert_trifecta_85_100k=small_bert_trifecta_85_100k,
     small_bert_trifecta_85_lr_range_test=small_bert_trifecta_85_lr_range_test,
-    finetuning_small_bert_sparse_85_trifecta_100k_glue=finetuning_small_bert_sparse_85_trifecta_100k_glue,  # noqa
+    finetuning_small_bert_sparse_85_trifecta_100k_glue=finetuning_small_bert_sparse_85_trifecta_100k_glue,  # noqa: E501
     #   90% sparse
     small_bert_trifecta_90_100k=small_bert_trifecta_90_100k,
     small_bert_trifecta_90_lr_range_test=small_bert_trifecta_90_lr_range_test,
-    finetuning_small_bert_sparse_90_trifecta_100k_glue=finetuning_small_bert_sparse_90_trifecta_100k_glue,  # noqa
+    finetuning_small_bert_sparse_90_trifecta_100k_glue=finetuning_small_bert_sparse_90_trifecta_100k_glue,  # noqa: E501
     #   2x wide
     small_bert_trifecta_2x_100k=small_bert_trifecta_2x_100k,
     small_bert_trifecta_2x_lr_range_test=small_bert_trifecta_2x_lr_range_test,
-    finetuning_small_bert_sparse_2x_trifecta_100k_glue=finetuning_small_bert_sparse_2x_trifecta_100k_glue,  # noqa
+    finetuning_small_bert_sparse_2x_trifecta_100k_glue=finetuning_small_bert_sparse_2x_trifecta_100k_glue,  # noqa: E501
     #   4x wide
     small_bert_trifecta_4x_100k=small_bert_trifecta_4x_100k,
     small_bert_trifecta_4x_lr_range_test=small_bert_trifecta_4x_lr_range_test,
-    finetuning_small_bert_sparse_4x_trifecta_100k_glue=finetuning_small_bert_sparse_4x_trifecta_100k_glue,
+    finetuning_small_bert_sparse_4x_trifecta_100k_glue=finetuning_small_bert_sparse_4x_trifecta_100k_glue,  # noqa: E501
 
     # BERT Base
     #   80% sparse

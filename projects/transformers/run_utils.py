@@ -868,7 +868,7 @@ def check_rm_checkpoints(training_args, model_args):
                 "experiment. That means a single model will be saved and all "
                 "checkpoint subdirectories will be deleted."
             )
-    
+
     else:
         if not training_args.rm_checkpoints:
             logging.warning(
@@ -1186,7 +1186,7 @@ class TaskResults():
 
         if not metric:
             metric = self.best_metric_key
-        
+
         if metric not in self.all_results[0]:
             metric = self.reporting_metrics[0]
 
@@ -1431,7 +1431,7 @@ def get_best_run_and_link_best_predictions(training_args,
             os.remove(link_file_path)
         os.symlink(best_run_predictions, link_file_path)
         logging.info(f"best run predictions for {task_name} saved to "
-                    "{link_file_path}")
+                     "{link_file_path}")
 
     return str(best_run)
 
