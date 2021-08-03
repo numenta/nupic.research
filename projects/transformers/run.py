@@ -69,6 +69,7 @@ from run_utils import (
     check_for_callback,
     check_hp_compute_objective,
     check_if_current_hp_best,
+    check_rm_checkpoints,
     check_sparsity_callback,
     compute_objective,
     evaluate_language_model,
@@ -192,6 +193,9 @@ def main():
         # Set seed before initializing model.
         set_seed(training_args.seed)
         logging.info(f"Seed to reproduce: {training_args.seed}")
+
+        # Issue warnings if rm_checkpoints is not in the usual configuration
+        check_rm_checkpoints(training_args, model_args)
 
         if model_args.finetuning:
             run_finetuning_multiple_tasks(
@@ -443,7 +447,8 @@ def run_finetuning_single_task_with_hp_search(
 
     # Delete all saved models and checkpoints to save space. All we need
     # are the params and scores. Currently this is a hack that is specific
-    # to ray.
+    # to ray. May need to modify so that it serves the same function for
+    # sigopt, once I integrate it.
     rm_prefixed_subdirs(training_args.output_dir, "run-")
 
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
