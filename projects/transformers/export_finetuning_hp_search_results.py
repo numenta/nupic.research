@@ -460,10 +460,9 @@ def handle_nan_factory(nan_preferance):
     lower_preferance = nan_preferance.lower()
     if (nan_preferance is None) or (lower_preferance in ["0", "zero"]):
         def nan_handler(param):
-            print(f"{param} is getting set to nan")
-            return np.nan
+            print(f"{param} is getting set to zero")
+            return 0
     elif isinstance(nan_preferance, str):
-        lower_preferance = nan_preferance.lower()
         if lower_preferance == "":
             def nan_handler(param):
                 print(f"{param} is getting set to nan")
