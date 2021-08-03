@@ -243,7 +243,7 @@ bert_1mi_pretrained_gmp_52k.update(
     max_steps=2000 + 30000 + 20000,  # longer may be better
     model_type="fully_static_sparse_bert",
     model_name_or_path=bert_1mi_pretrained,
-    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",  
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
     overwrite_output_dir=True,
     trainer_callbacks=[
         RezeroWeightsCallback(),
