@@ -38,8 +38,7 @@ from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 
 
 # ------ Experiment class
-class PermutedMNISTExperiment(mixins.RezeroWeights,
-                              ContinualLearningExperiment):
+class PermutedMNISTExperiment(mixins.RezeroWeights, ContinualLearningExperiment):
     pass
 
 
@@ -72,7 +71,7 @@ def evaluate_model(exp):
     exp.model.eval()
     total = 0
 
-    loss = torch.tensor(0., device=exp.device)
+    loss = torch.tensor(0.0, device=exp.device)
     correct = torch.tensor(0, device=exp.device)
 
     with torch.no_grad():
@@ -96,7 +95,7 @@ def evaluate_model(exp):
             correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
 
-    mean_acc = torch.true_divide(correct, total).item() if total > 0 else 0,
+    mean_acc = (torch.true_divide(correct, total).item() if total > 0 else 0,)
     return mean_acc
 
 
@@ -163,7 +162,6 @@ if __name__ == "__main__":
 
     config = dict(
         experiment_class=PermutedMNISTExperiment,
-
         dataset_class=ContextDependentPermutedMNIST,
         dataset_args=dict(
             num_tasks=num_tasks,
@@ -171,7 +169,6 @@ if __name__ == "__main__":
             seed=42,
             download=True,
         ),
-
         model_class=DendriticMLP,
         model_args=dict(
             input_size=784,
@@ -179,22 +176,20 @@ if __name__ == "__main__":
             hidden_sizes=[64, 64],
             num_segments=num_tasks,
             dim_context=1024,  # Note: with the Gaussian dataset, `dim_context` was
-                               # 2048, but this shouldn't effect results
+            # 2048, but this shouldn't effect results
             kw=True,
             # dendrite_sparsity=0.0,
         ),
-
         batch_size=256,
         val_batch_size=512,
         epochs=1,
         epochs_to_validate=(4, 9, 24, 49),  # Note: `epochs_to_validate` is treated as
-                                            # the set of task ids after which to
-                                            # evaluate the model on all seen tasks
+        # the set of task ids after which to
+        # evaluate the model on all seen tasks
         num_tasks=num_tasks,
         num_classes=10 * num_tasks,
         distributed=False,
         seed=42,
-
         loss_function=F.cross_entropy,
         optimizer_class=torch.optim.Adam,
         optimizer_args=dict(lr=0.001),

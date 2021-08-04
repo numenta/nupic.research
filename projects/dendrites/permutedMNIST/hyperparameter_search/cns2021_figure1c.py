@@ -16,17 +16,14 @@
 #  along with this program.  If not, see htt"://www.gnu.org/licenses.
 #
 #  http://numenta.org/licenses/
-#
-
-import pandas as pd
-import seaborn as sns
-import os
+# ----------------------------------------------------------------------
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import pandas as pd
+import ptitprince as pt
+import seaborn as sns
 
 sns.set(style="whitegrid", font_scale=1)
-import matplotlib.collections as clt
-import ptitprince as pt
-import matplotlib.gridspec as gridspec
 
 
 def cns_figure_1c():
@@ -45,11 +42,30 @@ def cns_figure_1c():
     df_path2 = f"{data_folder}kw_sparsity_search.csv"
     df2 = pd.read_csv(df_path2)
 
-    df1 = df1[["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]]
-    df1bis = df1bis[
-        ["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]
+    df1 = df1[
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
     ]
-    df2 = df2[["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]]
+    df1bis = df1bis[
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
+    ]
+    df2 = df2[
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
+    ]
 
     df1 = pd.concat([df1, df1bis])
 
@@ -111,7 +127,17 @@ def cns_figure_1c():
         ["0.99", "0.95", "0.9", "0.8", "0.6", "0.4", "0.2", "0.1"], fontsize=14
     )
     ax2.set_yticklabels(
-        ["0.60", "0.65", "0.70", "0.75", "0.80", "0.85", "0.90", "0.95", "1.0"],
+        [
+            "0.60",
+            "0.65",
+            "0.70",
+            "0.75",
+            "0.80",
+            "0.85",
+            "0.90",
+            "0.95",
+            "1.0",
+        ],
         fontsize=14,
     )
     ax2.set_xlabel("Activation sparsity", fontsize=16)

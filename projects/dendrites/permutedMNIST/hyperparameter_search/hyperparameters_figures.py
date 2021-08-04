@@ -16,18 +16,16 @@
 #  along with this program.  If not, see htt"://www.gnu.org/licenses.
 #
 #  http://numenta.org/licenses/
-#
-
-import pandas as pd
-import seaborn as sns
+# ----------------------------------------------------------------------
 import os
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import pandas as pd
+import ptitprince as pt
+import seaborn as sns
 
 sns.set(style="ticks", font_scale=1.3)
-import matplotlib.collections as clt
-import ptitprince as pt
-import matplotlib.gridspec as gridspec
-import matplotlib.ticker as ticker
 
 
 def hyperparameter_search_panel():
@@ -57,17 +55,53 @@ def hyperparameter_search_panel():
     df_path3_50 = f"{experiment_folder}w_sparsity_search_50_lasttask.csv"
     df3_50 = pd.read_csv(df_path3_50)
 
-    df1 = df1[["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]]
-    df2 = df2[["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]]
-    df3 = df3[["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]]
+    df1 = df1[
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
+    ]
+    df2 = df2[
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
+    ]
+    df3 = df3[
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
+    ]
     df1_50 = df1_50[
-        ["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
     ]
     df2_50 = df2_50[
-        ["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
     ]
     df3_50 = df3_50[
-        ["Activation sparsity", "FF weight sparsity", "Num segments", "Accuracy"]
+        [
+            "Activation sparsity",
+            "FF weight sparsity",
+            "Num segments",
+            "Accuracy",
+        ]
     ]
 
     # Figure 1 'Impact of the different hyperparameters on performance
@@ -90,7 +124,9 @@ def hyperparameter_search_panel():
     ort = "v"
     pal = sns.color_palette(n_colors=6)
     sigma = 0.2
-    fig.suptitle("Impact of the different hyperparameters on performance", fontsize=12)
+    fig.suptitle(
+        "Impact of the different hyperparameters on performance", fontsize=12
+    )
 
     pt.RainCloud(
         x=x1,
@@ -200,18 +236,21 @@ def hyperparameter_search_panel():
     plt.figtext(-0.02, 0.28, "50 TASKS", fontsize=16)
 
     fig.suptitle(
-        "Impact of different hyperparameters on \n 10-tasks and 50-tasks permuted MNIST performance",
+        """Impact of different hyperparameters on \n 10-tasks and 50-tasks
+        permuted MNIST performance""",
         fontsize=16,
     )
     if savefigs:
-        plt.savefig(f"{figs_dir}/hyperparameter_search_panel.png", bbox_inches="tight")
+        plt.savefig(
+            f"{figs_dir}/hyperparameter_search_panel.png", bbox_inches="tight"
+        )
 
 
 def performance_across_tasks():
     """
-    Similar representation as previous function (hyperparameter_search_panel) but
-    in this case, it represents the performance along the number of tasks and
-    we plot all the hyperparameters on the same figure for each figures.
+    Similar representation as previous function (hyperparameter_search_panel)
+    but in this case, it represents the performance along the number of tasks
+    and we plot all the hyperparameters on the same figure for each figures.
     """
 
     df_path1 = f"{experiment_folder}segment_search_all.csv"
@@ -251,7 +290,8 @@ def performance_across_tasks():
     pal = sns.color_palette(n_colors=10)
     sigma = 0.2
     fig.suptitle(
-        "Performance along number of tasks with different hyperpameter conditions",
+        """Performance along number of tasks with different
+        hyperpameter conditions""",
         fontsize=16,
     )
 
