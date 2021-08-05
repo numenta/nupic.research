@@ -25,9 +25,7 @@ import os
 import re
 from itertools import groupby
 from pathlib import Path
-
 import pandas as pd
-
 from experiments import CONFIGS
 from nupic.research.support import load_ray_tune_experiments
 

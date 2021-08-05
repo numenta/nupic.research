@@ -18,7 +18,6 @@
 #  http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import os
-
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker

@@ -33,14 +33,11 @@ import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
-from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
-    DendriteContinualLearningExperiment,
-)
 from nupic.research.frameworks.pytorch.datasets import (
     ContextDependentPermutedMNIST,
     PermutedMNIST,
 )
-from nupic.research.frameworks.vernon import mixins, ContinualLearningExperiment
+from nupic.research.frameworks.vernon import mixins
 
 """Permuted MNIST with DendriticMLP"""
 
@@ -78,7 +75,9 @@ BASE10 = dict(
             [0.01, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9, 0.99]
         ),
         dendrite_weight_sparsity=0.0,
-        weight_sparsity=tune.grid_search([0.01, 0.05, 0.1, 0.5, 0.7, 0.9, 0.95, 0.99]),
+        weight_sparsity=tune.grid_search(
+            [0.01, 0.05, 0.1, 0.5, 0.7, 0.9, 0.95, 0.99]
+        ),
         context_percent_on=0.1,
     ),
     batch_size=256,
@@ -108,7 +107,9 @@ W_SPARSITY_SEARCH = deepcopy(BASE10)
 W_SPARSITY_SEARCH["model_args"].update(num_segments=10, kw_percent_on=0.1)
 
 TEST = deepcopy(BASE10)
-TEST["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2)
+TEST["model_args"].update(
+    kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2
+)
 TEST["num_samples"] = 1
 
 # Idem on 50 tasks
@@ -123,14 +124,18 @@ SEGMENT_SEARCH_50["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5)
 
 # kw sparsity search
 KW_SPARSITY_SEARCH_50 = deepcopy(BASE50)
-KW_SPARSITY_SEARCH_50["model_args"].update(num_segments=50, weight_sparsity=0.5)
+KW_SPARSITY_SEARCH_50["model_args"].update(
+    num_segments=50, weight_sparsity=0.5
+)
 
 # weight sparsity search
 W_SPARSITY_SEARCH_50 = deepcopy(BASE50)
 W_SPARSITY_SEARCH_50["model_args"].update(num_segments=50, kw_percent_on=0.1)
 
 TEST50 = deepcopy(BASE50)
-TEST50["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2)
+TEST50["model_args"].update(
+    kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2
+)
 TEST50["num_samples"] = 1
 
 OPTIMAL_50 = deepcopy(BASE50)
