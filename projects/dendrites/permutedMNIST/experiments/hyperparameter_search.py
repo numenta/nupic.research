@@ -27,16 +27,17 @@ Bernstein Conference 2021 submission.
 
 import os
 from copy import deepcopy
+
 import numpy as np
 import ray.tune as tune
 import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
-from nupic.research.frameworks.pytorch.datasets import (
-    ContextDependentPermutedMNIST,
-    PermutedMNIST,
+from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
+    DendriteContinualLearningExperiment,
 )
+from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 
 """Permuted MNIST with DendriticMLP"""
