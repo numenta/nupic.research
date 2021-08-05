@@ -39,6 +39,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import yaml
 from scipy import stats as ss
 
@@ -170,21 +171,25 @@ def load(experiment_path):
 
     # run once per experiment state
     # columns might differ between experiments
-    dataframes = []
+    summaries = []
+    histories = {}
     all_hyperparams = set()
     for exp_state, exp_name in experiment_states:
         progress, params = _read_experiment(exp_state, experiment_path)
         local_hyperparams = params_to_set(params)
         if len(progress) != 0:
-            dataframes.append(
+            summaries.append(
                 _get_value(progress, params, exp_name)
             )
             all_hyperparams = all_hyperparams.union(local_hyperparams)
+            histories.update(progress)
 
     # concats all dataframes if there are any and return
-    if not dataframes:
-        return pd.DataFrame([]), all_hyperparams
-    return pd.concat(dataframes, axis=0, ignore_index=True, sort=False), all_hyperparams
+    if not summaries:
+        return pd.DataFrame([]), pd.DataFrame([]), all_hyperparams
+    
+    summary_df = pd.concat(summaries, axis=0, ignore_index=True, sort=False)
+    return summary_df, histories, all_hyperparams
 
 
 def get_all_subdirs(experiment_path):
@@ -252,17 +257,22 @@ def load_from_base(base_path):
         task_2_subdirs[task] = experiment_paths
 
     task_2_dfs = {}
+    task_2_hp_trials = {}
     task_2_hps = {}
     for task in task_2_subdirs.keys():
         task_2_dfs[task] = []
+        task_2_hp_trials[task] = {}
         task_2_hps[task] = set()
         for subdir in task_2_subdirs[task]:
-            df, task_hps_subdir = load(subdir)
-            task_2_dfs[task].append(df)
+            # histories is a dict with time series for each hp trial
+            summary_df, histories, task_hps_subdir = load(subdir)
+            task_2_dfs[task].append(summary_df)
+            task_2_hp_trials[task].update(histories)
             task_2_hps[task] = task_2_hps[task].union(task_hps_subdir)
-        task_2_dfs[task] = pd.concat(task_2_dfs[task])
+        task_2_dfs[task] = pd.concat(task_2_dfs[task], ignore_index=True)
+        # task_2_hp_trials[task] = pd.concat(task_2_hp_trials[task])
 
-    return task_2_dfs, task_2_hps
+    return task_2_dfs, task_2_hp_trials, task_2_hps
 
 
 def _read_experiment(experiment_state, experiment_path):
@@ -401,6 +411,66 @@ def save_agg_results(task_2_df, experiment_path):
         task_2_df[task].to_csv(save_file)
 
 
+def dir_name_2_model_name(dir_name):
+    """
+    Turn the name of a directory like
+        hp_search_finetuning_bert_100k_big_tasks
+        or
+        hp_search_finetuning_bert_100k_small_tasks
+    
+    Into a name like bert_100k
+
+    This naming convention is specific to the config names used for
+    hyperparameter search so far.
+    """
+
+    name = dir_name.split("hp_search_finetuning_")[1]
+    if "small_tasks" in name:
+        name = name.split("_small_tasks")[0]
+    else:
+        name = name.split("_big_tasks")[0]
+
+    return name
+
+
+
+def aggregate_all_data(base_path):
+
+    # all directories with names matching an hp search config
+    dirs = []
+    for d in os.listdir(base_path):
+        full_path = os.path.join(base_path, d)
+        if os.path.isdir(full_path):
+            if d.startswith("hp_search"):
+                dirs.append(full_path)
+
+    # name of pretrained model: list of paths to hp search results
+    names = [dir_name_2_model_name(d) for d in dirs]
+    name_2_path = {}
+    for i in range(len(names)):
+        if names[i] in name_2_path:
+            name_2_path[names[i]].append(dirs[i])
+        else:
+            name_2_path[names[i]] = [dirs[i]]
+
+    name_2_data = {}
+    # loop over models
+    for name in tqdm(name_2_path.keys()):
+        task_2_df = {}
+        task_2_hp_trials = {}
+        # loop over hp search directories for this model
+        for path in name_2_path[name]:
+            task_2_df_p, task_2_hp_trials_p, _ = load_from_base(path)
+            task_2_df.update(task_2_df_p)
+            task_2_hp_trials.update(task_2_hp_trials_p)
+
+        name_2_data[name] = [task_2_df, task_2_hp_trials]
+
+    outfile = os.path.join(base_path, "all_hp_results.p")
+    print(f"Saving all data to {outfile}")
+    with open(outfile, 'wb') as f:
+        pickle.dump(name_2_data, f)
+
 # ---------------------------
 # Analysis (plots, regression, etc.)
 # ---------------------------
@@ -457,7 +527,7 @@ def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
 
 def handle_nan_factory(nan_preferance):
 
-    lower_preferance = nan_preferance.lower()
+    lower_preferance = nan_preferance.lower() if nan_preferance else None
     if (nan_preferance is None) or (lower_preferance in ["0", "zero"]):
         def nan_handler(param):
             print(f"{param} is getting set to zero")
@@ -566,12 +636,27 @@ if __name__ == "__main__":
                              "fitting a success metric like eval_accuracy "
                              "to each hyperparameter individually")
     parser.add_argument("-n", "--nan", type=str, required=False,
+                        choices=["0", "zero", "user"],
                         help="How to handles NaNs. If 0, NaN parameters will "
                              "be set to 0. If user, user input will be "
                              "requested. If None, defaults to leaving NaN.")
+    parser.add_argument("-a", "--all", type=bool, required=False,
+                        help="If true, then instead of saving best "
+                             "hyperparameters per task per model in separate "
+                             "places, just go to --directory and get "
+                             "dataframes for every experiment, aggregate, and"
+                             " save everything together. Then you can load "
+                             "a single file to compare data accross models "
+                             "tasks, and individual hp trials."
+                        )
 
     args = parser.parse_args()
     experiment_path = args.directory
-    task_2_df, task_2_hps = load_from_base(experiment_path)
-    save_agg_results(task_2_df, experiment_path)
-    get_best_params(task_2_df, task_2_hps, args.config, args.nan)
+    if args.all:
+        # Every pretrained model, every task, every hp trial
+        aggregate_all_data(experiment_path)
+    else:
+        # One pretrained model, all tasks and hp trials
+        task_2_df, task_2_hp_trials, task_2_hps = load_from_base(experiment_path)
+        save_agg_results(task_2_df, experiment_path)
+        get_best_params(task_2_df, task_2_hps, args.config, args.nan)
