@@ -44,33 +44,38 @@ def replace_sparse_transformer_layer(model, config=None, fp16=True, training=Tru
         # Check if model has sparse bert layers
         query = bert_layer.attention.self.query
         if isinstance(query, SparseWeights):
-            # Assume same sparsity for all QKV layers
             key = bert_layer.attention.self.key
             value = bert_layer.attention.self.value
-            assert query.sparsity == key.sparsity == value.sparsity
+            intermediate = bert_layer.intermediate.dense
+            attn_out = bert_layer.attention.output.dense
+            output = bert_layer.output.dense
 
+            # Make sure all layers are sparse
+            assert isinstance(key, SparseWeights)
+            assert isinstance(value, SparseWeights)
+            assert isinstance(intermediate, SparseWeights)
+            assert isinstance(attn_out, SparseWeights)
+            assert isinstance(output, SparseWeights)
+
+            # Assume same sparsity for all layers
+            sparsity = query.sparsity
+            assert key.sparsity == sparsity
+            assert value.sparsity == sparsity
+            assert intermediate.sparsity == sparsity
+            assert attn_out.sparsity == sparsity
+            assert output.sparsity == sparsity
+
+            # Create combined QKV zero mask
             qkv_mask = torch.cat(
                 (query.zero_mask, key.zero_mask, value.zero_mask), dim=0
             )
-            sparsity_per_layer[i]["attn_qkv"] = (query.sparsity, qkv_mask)
-
-        attn_out = bert_layer.attention.output.dense
-        if isinstance(attn_out, SparseWeights):
-            sparsity_per_layer[i]["attn_out"] = (
-                attn_out.sparsity,
-                attn_out.zero_mask,
-            )
-
-        intermediate = bert_layer.intermediate.dense
-        if isinstance(intermediate, SparseWeights):
-            sparsity_per_layer[i]["inter"] = (
-                intermediate.sparsity,
-                intermediate.zero_mask,
-            )
-
-        output = bert_layer.output.dense
-        if isinstance(output, SparseWeights):
-            sparsity_per_layer[i]["output"] = (output.sparsity, output.zero_mask)
+            sparsity_per_layer[i] = {
+                "sparsity": sparsity,
+                "attn_qkv": qkv_mask,
+                "attn_out": attn_out.zero_mask,
+                "inter": intermediate.zero_mask,
+                "output": output.zero_mask,
+            }
 
     # Convert transform layers to deepspeed.
     ds_model = replace_transformer_layer(
@@ -92,16 +97,15 @@ def replace_sparse_transformer_layer(model, config=None, fp16=True, training=Tru
     for i, sparse_config in sparsity_per_layer.items():
         ds_layer = ds_model.encoder.layer[i]
 
-        attn_qkv_sparsity, attn_qkv_mask = sparse_config["attn_qkv"]
-        attn_out_sparsity, attn_out_mask = sparse_config["attn_out"]
-        inter_sparsity, inter_mask = sparse_config["inter"]
-        output_sparsity, output_mask = sparse_config["output"]
-
-        sparse_layer = SparseDeepSpeedTransformerLayer(
-            ds_layer, sparsity=attn_qkv_sparsity
-        )
+        sparsity = sparse_config["sparsity"]
+        sparse_layer = SparseDeepSpeedTransformerLayer(ds_layer, sparsity=sparsity)
 
         # Update masks based on original sparse layer
+        attn_qkv_mask = sparse_config["attn_qkv"]
+        attn_out_mask = sparse_config["attn_out"]
+        inter_mask = sparse_config["inter"]
+        output_mask = sparse_config["output"]
+
         sparse_layer.zero_mask_attn_qkv = attn_qkv_mask.bool()
         sparse_layer.zero_mask_attn_out = attn_out_mask.bool()
         sparse_layer.zero_mask_inter = inter_mask.bool()
@@ -119,7 +123,7 @@ class DeepspeedTransformerLayerMixin:
     fused QKV transform layer.
 
     .. note::
-        Assume same sparsity for all QKV layers
+        Assume same sparsity for all layers
 
     See https://www.deepspeed.ai/news/2020/05/27/fastest-bert-training.html#bert-highly-optimized-transformer-kernels
     """  # noqa: E501
