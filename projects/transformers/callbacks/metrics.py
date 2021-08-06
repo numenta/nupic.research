@@ -30,7 +30,7 @@ class TrackEvalMetrics(TrainerCallback):
     after trainer.evaluate() is called. It is designed to provide the same
     metrics for training and validation sets, at the same time points.
     """
-    def __init__(self, sparsity_tolerance=0.01):
+    def __init__(self, eval_sets=None, sparsity_tolerance=0.01):
         """
         Set up two dictionaries to track training and eval metrics, and a list
         to track steps.
@@ -50,6 +50,7 @@ class TrackEvalMetrics(TrainerCallback):
         """
 
         self.sparsity_tolerance = sparsity_tolerance
+        self.eval_sets = None if eval_sets is None else eval_sets
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
@@ -62,6 +63,11 @@ class TrackEvalMetrics(TrainerCallback):
     def on_evaluate(self, args, state, control, metrics, **kwargs):
         """Update steps counter, training metrics, & eval metrics"""
 
+        # TODO: refactor to accomodate multi_eval_set mixin
+        # that means only incrementing setp counter after cycling through
+        # all eval sets
+        import pdb
+        pdb.set_trace()
         is_mnli_mm = self.check_for_mnli(metrics)
         if not is_mnli_mm:
             self.step_counter += args.eval_steps

@@ -339,7 +339,7 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
     eval_datasets = []
     if (data_args.task_name == "mnli"):
         if "eval_sets" in training_args.trainer_mixin_args:
-            for eval_set in training_args.trainer_mixin_args.eval_sets:
+            for eval_set in training_args.trainer_mixin_args["eval_sets"]:
                 eval_datasets.append(tokenized_datasets[eval_set])
         else:
             eval_datasets.append(tokenized_datasets["validation_matched"])
@@ -523,6 +523,7 @@ def run_finetuning_single_task(
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_datasets if training_args.do_eval else None,
         model=model,
+        trainer_class=model_args.trainer_class,
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )

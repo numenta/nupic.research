@@ -21,6 +21,7 @@
 
 from .distillation import DistillationTrainerMixin
 from .lr_range_test import LRRangeTestMixin
+from .multi_eval_sets import MultiEvalSetsTrainerMixin
 from .gmp import GradualMagnitudePruningMixin, ThreeStageLRMixin
 from .one_cycle_lr import OneCycleLRMixin
 from .profiler import TorchProfilerMixin

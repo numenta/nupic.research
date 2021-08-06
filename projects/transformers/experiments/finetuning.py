@@ -24,7 +24,11 @@ Base Transformers Experiment configuration.
 
 from copy import deepcopy
 
+from transformers import Trainer
+
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
+
+from trainer_mixins import MultiEvalSetsTrainerMixin
 
 from .base import transformers_base
 
@@ -87,10 +91,15 @@ debug_finetuning.update(
 debug_finetuning_mnli = deepcopy(debug_finetuning)
 debug_finetuning_mnli.update(
     task_names=["mnli"],
-    trainer_class=DistillationTrainer,
+    trainer_class=MultiEvalSetTrainer,
     trainer_mixin_args = dict(
         eval_sets=["validation_matched", "validation_mismatched"]
-    )
+    ),
+    trainer_callbacks=[
+        TrackEvalMetrics(eval_sets=[
+            "validation_matched",
+            "validation_mismatched"])
+    ]
 )
 
 

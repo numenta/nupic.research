@@ -38,17 +38,13 @@ class MultiEvalSetsTrainerMixin:
 
         mixin_args = self.args.trainer_mixin_args
 
-        self.eval_set_list = mixin_args.get(eval_sets)
+        self.eval_set_list = mixin_args.get("eval_sets")
 
     def evaluate(self, *args, **kwargs):
 
-        import pdb
-        pdb.set_trace()
         output_metrics = []
-        eval_kwargs = kwargs
-        for eval_dataset in eval_datasets:
-            eval_kwargs.update(eval_dataset=eval_dataset)
-            output_metrics.append(super().evaluate(*args, **eval_kwargs))
+        for eval_dataset in self.eval_dataset:
+            output_metrics.append(super().evaluate(eval_dataset=eval_dataset))
 
         return output_metrics
 
