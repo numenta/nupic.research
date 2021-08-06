@@ -80,8 +80,13 @@ debug_finetuning.update(
     ],
 )
 
+debug_finetuning_mnli = deepcopy(debug_finetuning)
+debug_finetuning_mnli.update(
+    task_names=["mnli"]
+)
 
-# Test if checks in code will fix incorrect "metric_for_best_model"
+
+# This tests if checks in code will fix incorrect "metric_for_best_model"
 debug_finetuning_bert_sparse_80_trifecta_cola = deepcopy(debug_finetuning)
 debug_finetuning_bert_sparse_80_trifecta_cola.update(
     # Data arguments
@@ -305,6 +310,7 @@ finetuning_mini_sparse_bert_debug.update(
 # Export configurations in this file
 CONFIGS = dict(
     debug_finetuning=debug_finetuning,
+    debug_finetuning_mnli=debug_finetuning_mnli,
     debug_finetuning_bert100k=debug_finetuning_bert100k,
     debug_finetuning_bert_sparse_80_trifecta_cola=debug_finetuning_bert_sparse_80_trifecta_cola,  # noqa: E501
     debug_finetuning_predict=debug_finetuning_predict,
