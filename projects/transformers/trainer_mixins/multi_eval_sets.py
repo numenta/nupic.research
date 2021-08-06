@@ -39,12 +39,22 @@ class MultiEvalSetsTrainerMixin:
         mixin_args = self.args.trainer_mixin_args
 
         self.eval_set_list = mixin_args.get("eval_sets")
+        self.eval_set_prefixes = mixin_args.get("eval_prefixes")
+
+        assertion_message = "When using multiple eval sets, you must have "
+        "exactly one prefix to demarcate each eval set, and there must be "
+        "an equal number of eval set names and actual datasets "
+        assert len(self.eval_set_list) == len(self.eval_prefixes) == \
+            len(self.eval_dataset), assertion_message
 
     def evaluate(self, *args, **kwargs):
 
         output_metrics = []
-        for eval_dataset in self.eval_dataset:
-            output_metrics.append(super().evaluate(eval_dataset=eval_dataset))
+        for i in range(len(self.eval_dataset)):
+            output_metrics.append(super().evaluate(
+                eval_dataset=self.eval_dataset[i],
+                metric_key_prefix=self.eval_set_prefixes[i]
+            ))
 
         return output_metrics
 

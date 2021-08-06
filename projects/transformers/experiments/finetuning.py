@@ -93,12 +93,15 @@ debug_finetuning_mnli.update(
     task_names=["mnli"],
     trainer_class=MultiEvalSetTrainer,
     trainer_mixin_args = dict(
-        eval_sets=["validation_matched", "validation_mismatched"]
+        eval_sets=["validation_matched", "validation_mismatched"],
+        eval_prefixes=["m", "mm"],
     ),
     trainer_callbacks=[
-        TrackEvalMetrics(eval_sets=[
-            "validation_matched",
-            "validation_mismatched"])
+        TrackEvalMetrics(
+            eval_sets=[
+                "validation_matched",
+                "validation_mismatched"],
+        )
     ]
 )
 
