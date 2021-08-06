@@ -49,6 +49,10 @@ https://wandb.ai/numenta/huggingface/reports/Static-Sparse-Baselines--Vmlldzo1MT
 """
 
 
+class MultiEvalSetTrainer(MultiEvalSetsTrainerMixin, Trainer):
+    pass
+
+
 debug_finetuning = deepcopy(transformers_base)
 debug_finetuning.update(
     # Data arguments
@@ -82,7 +86,11 @@ debug_finetuning.update(
 
 debug_finetuning_mnli = deepcopy(debug_finetuning)
 debug_finetuning_mnli.update(
-    task_names=["mnli"]
+    task_names=["mnli"],
+    trainer_class=DistillationTrainer,
+    trainer_mixin_args = dict(
+        eval_sets=["validation_matched", "validation_mismatched"]
+    )
 )
 
 

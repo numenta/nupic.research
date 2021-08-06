@@ -28,4 +28,27 @@ class MultiEvalSetsTrainerMixin:
     """
 
     def __init__(self, *args, **kwargs):
-        
+        """
+        Add one single argument to 'trainer_mixin_args'
+
+        :param eval_sets: List of names of datasets to evaluate on
+        """
+
+        super().__init__(*args, **kwargs)
+
+        mixin_args = self.args.trainer_mixin_args
+
+        self.eval_set_list = mixin_args.get(eval_sets)
+
+    def evaluate(self, *args, **kwargs):
+
+        import pdb
+        pdb.set_trace()
+        output_metrics = []
+        eval_kwargs = kwargs
+        for eval_dataset in eval_datasets:
+            eval_kwargs.update(eval_dataset=eval_dataset)
+            output_metrics.append(super().evaluate(*args, **eval_kwargs))
+
+        return output_metrics
+

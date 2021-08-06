@@ -300,6 +300,13 @@ def run_pretraining(
 
 def init_dataset_for_finetuning(model_args, data_args, training_args,
                                 last_checkpoint=None):
+
+    # TODO: in order to make the multi_eval_sets mixin more general,
+    # you could modify init_datasets_task s it doesn't just rely on task
+    # name but can look at trainer_mixin_args to see what other eval sets
+    # you want. However, that's not mission critical right now since the 
+    # primary use case is evaluating on two eval sets from the same task, 
+    # namely mnli.
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
     logging.info(f"Training {data_args.task_name} with {num_labels} labels")
@@ -316,6 +323,8 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
 
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
+    # TODO: adapt so that you can acquire a list of tokenized datasets
+    # to provide maximum flexibility in conjunctio with multi_eval_sets mixin
     logging.info(f"Tokenizing datasets for finetuning ...")
     tokenized_datasets = preprocess_datasets_task(
         datasets, tokenizer, data_args,
@@ -324,9 +333,18 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
 
     # Separate into train, eval and test
     train_dataset = tokenized_datasets["train"]
-    eval_dataset = tokenized_datasets[
-        "validation_matched" if data_args.task_name == "mnli" else "validation"
-    ]
+
+    # TODO: look at trainer_mixin_args and if multi_eval_sets mixin, 
+    # get a list of eval datasets
+    eval_datasets = []
+    if (data_args.task_name == "mnli"):
+        if "eval_sets" in training_args.trainer_mixin_args:
+            for eval_set in training_args.trainer_mixin_args.eval_sets:
+                eval_datasets.append(tokenized_datasets[eval_set])
+        else:
+            eval_datasets.append(tokenized_datasets["validation_matched"])
+    else:
+        eval_datasets.append(tokenized_datasets["validation"])
 
     test_dataset = None
     if (data_args.task_name is not None or data_args.test_file is not None):
@@ -348,7 +366,7 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
         data_collator = None
 
     return (
-        tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model,
+        tokenizer, data_collator, train_dataset, eval_datasets, test_dataset, model,
         is_regression, tokenized_datasets, label_list, config
     )
 
@@ -359,7 +377,7 @@ def run_finetuning_single_task_with_hp_search(
     """On a single task train, evaluate, and save results"""
 
     # Init dataset (same as without hp search)
-    tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
+    tokenizer, data_collator, train_datasets, eval_dataset, test_dataset, model, \
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
             model_args, data_args, training_args, last_checkpoint,
@@ -484,7 +502,7 @@ def run_finetuning_single_task(
     # TODO
     # accept run# as an argument for finetuning with multiple runs on a single task
     # update the save directory to include run#
-    tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
+    tokenizer, data_collator, train_dataset, eval_datasets, test_dataset, model, \
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
             model_args, data_args, training_args, last_checkpoint
@@ -503,7 +521,7 @@ def run_finetuning_single_task(
         data_collator=data_collator,
         training_args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
+        eval_dataset=eval_datasets if training_args.do_eval else None,
         model=model,
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
