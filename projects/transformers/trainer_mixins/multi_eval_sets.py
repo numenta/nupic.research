@@ -44,14 +44,18 @@ class MultiEvalSetsTrainerMixin:
         assertion_message = "When using multiple eval sets, you must have "
         "exactly one prefix to demarcate each eval set, and there must be "
         "an equal number of eval set names and actual datasets "
-        assert len(self.eval_set_list) == len(self.eval_prefixes) == \
+        assert len(self.eval_set_list) == len(self.eval_set_prefixes) == \
             len(self.eval_dataset), assertion_message
+
+        assertion_message_2 = "All eval set prefixes must be distinct"
+        assert len(set(self.eval_set_prefixes)) == \
+            len(self.eval_set_prefixes), assertion_message_2
 
     def evaluate(self, *args, **kwargs):
 
-        output_metrics = []
+        output_metrics = {}
         for i in range(len(self.eval_dataset)):
-            output_metrics.append(super().evaluate(
+            output_metrics.update(super().evaluate(
                 eval_dataset=self.eval_dataset[i],
                 metric_key_prefix=self.eval_set_prefixes[i]
             ))

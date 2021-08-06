@@ -80,7 +80,7 @@ class TrackEvalMetrics(TrainerCallback):
             do_remaining_updates = True
 
         if do_remaining_updates:
-            self.update_auxillary_metrics(kwargs)
+            self.update_auxillary_metrics(**kwargs)
 
     def on_train_begin(self, args, state, control, **kwargs):
         """

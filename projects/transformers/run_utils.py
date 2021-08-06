@@ -785,7 +785,9 @@ def check_eval_and_max_steps(training_args, train_dataset):
     return training_args
 
 
-def check_hp_compute_objective(model_args, task_name):
+def check_hp_compute_objective(model_args,
+                               task_name,
+                               training_args):
     """
     When hyperparameter tuning, you need to specify an objective, like
     eval_accuracy, and also if it should be minimized or maximized. It is easy
@@ -798,7 +800,7 @@ def check_hp_compute_objective(model_args, task_name):
     hp_compute_objective = getattr(model_args, "hp_compute_objective", None)
     if hp_compute_objective is not None:
         direction, objective = model_args.hp_compute_objective
-        if objective == "eval_loss":
+        if "eval_loss" in objective:
             if direction != "minimize":
                 logging.warning(
                     "You are asking hp search to find parameters"
@@ -810,7 +812,8 @@ def check_hp_compute_objective(model_args, task_name):
                 hp_compute_objective[0] = "minimize"
                 model_args.hp_compute_objective = tuple(hp_compute_objective)
         else:
-            if objective not in REPORTING_METRICS_PER_TASK[task_name]:
+            allowed_metrics = get_allowed_metrics(training_args, task_name)
+            if objective not in allowed_metrics:
                 logging.warning(
                     "Warning, code will break when you try to tune"
                     "hyperparameters on this task because"
@@ -825,7 +828,58 @@ def check_hp_compute_objective(model_args, task_name):
     return model_args
 
 
-def check_best_metric(training_args, task_name):
+def get_allowed_metrics(training_args, task_name):
+
+    allowed_metrics = REPORTING_METRICS_PER_TASK[task_name]
+    allowed_metrics.append("eval_loss")
+    # In the special case of mnli, you have multiple validation sets
+    # A prefix (m, or mm) is used to distinguish them. In this case,
+    # overwrite allowed_metrics to use the prefixes
+    if training_args:
+        if "eval_prefixes" in training_args.trainer_mixin_args:
+            prefixes = training_args.trainer_mixin_args["eval_prefixes"]
+            updated_allowed_metrics = []
+            for prefix in prefixes:
+                for metric in allowed_metrics:
+                    updated_allowed_metrics.append(prefix + "_" + metric)
+
+            allowed_metrics = updated_allowed_metrics
+
+    return allowed_metrics
+
+
+def check_metric_direction(metric, greater_is_better):
+
+    if greater_is_better is None:
+        greater_is_better = False
+    if "loss" in metric:
+        if greater_is_better:
+            logging.warning(
+                    "Greater is better is set to True with eval_loss as "
+                    "metric_for_best_model. Flipping greater is better to"
+                    "False, since we want small loss"
+                )
+        return False
+    else:
+        if not greater_is_better:
+            logging.warning(
+                    "Greater is better is set to False with non-loss "
+                    f"metric {metric}. Setting greater is better to True"
+            )
+        return True
+
+
+def check_metric_is_allowed(metric, allowed_metrics):
+
+    if metric not in allowed_metrics:
+        logging.warning(
+            "Warning, code will break because the current metric for best model"
+            f" ({metric}) is not being tracked."
+            "Defaulting metric_for_best_model to first reporting metric"
+        )
+        return allowed_metrics[0], True
+
+def check_best_metric(training_args, task_name, metric):
     """
     Runs can easily break if load_best_model_at_end because you
     specified a metric for a diferent task. You can get all the way through
@@ -833,27 +887,15 @@ def check_best_metric(training_args, task_name):
     that case. It also checks to make sure greater_is_better is set properly.
     """
 
-    allowed_metrics = REPORTING_METRICS_PER_TASK[task_name]
-    if training_args.metric_for_best_model not in allowed_metrics:
-        if training_args.metric_for_best_model != "eval_loss":
-            logging.warning(
-                "Warning, code will break because the current metric for best model"
-                f" ({training_args.metric_for_best_model}) is not being tracked."
-                "Defaulting metric_for_best_model to first reporting metric"
-            )
-            training_args.metric_for_best_model = REPORTING_METRICS_PER_TASK[
-                task_name][0]
-            training_args.greater_is_better = False
+    allowed_metrics = get_allowed_metrics(training_args, task_name)
+    metric, greater_is_better = check_metric_is_allowed(metric,
+        allowed_metrics)
+    greater_is_better = training_args.greater_is_better
+    metric, greater_is_better = check_metric_direction(metric,
+        greater_is_better)
 
-    if training_args.metric_for_best_model == "eval_loss":
-        if hasattr(training_args, "greater_is_better"):
-            if training_args.greater_is_better:
-                logging.warning(
-                    "Greater is better is set to True with eval_loss as "
-                    "metric_for_best_model. Flipping greater is better to"
-                    "False, since we want small loss"
-                )
-        training_args.greater_is_better = False
+    training_args.greater_is_beter = greater_is_better
+    training_args.metric_for_best_model = metric
 
     return training_args
 
@@ -1066,7 +1108,7 @@ class TaskResults():
 
     def __init__(self, task_name, early_stopping, training_args=None):
         self.task_name = task_name
-        self.reporting_metrics = self.reporting_metrics_per_task[task_name]
+        self.reporting_metrics = get_allowed_metrics(training_args, task_name)
         self.all_results = []
         self._results = None
         self.training_args = training_args
@@ -1134,6 +1176,7 @@ class TaskResults():
         aggregated_results = defaultdict(list)
         # Loop over runs on the same task
         for results in self.all_results:
+            # replace with load_best_metric_at_end
             if self.early_stopping:
                 # Within a run, the step where best results were achieved
                 best_metric_best_idx = np.argmax(results[self.best_metric_key])

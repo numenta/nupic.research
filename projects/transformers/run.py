@@ -334,17 +334,20 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
     # Separate into train, eval and test
     train_dataset = tokenized_datasets["train"]
 
-    # TODO: look at trainer_mixin_args and if multi_eval_sets mixin, 
-    # get a list of eval datasets
-    eval_datasets = []
+    # Allow multiple eval sets. For now, assume mnli is the only case
+    eval_dataset = []
     if (data_args.task_name == "mnli"):
         if "eval_sets" in training_args.trainer_mixin_args:
             for eval_set in training_args.trainer_mixin_args["eval_sets"]:
-                eval_datasets.append(tokenized_datasets[eval_set])
+                eval_dataset.append(tokenized_datasets[eval_set])
         else:
-            eval_datasets.append(tokenized_datasets["validation_matched"])
+            eval_dataset.append(tokenized_datasets["validation_matched"])
     else:
-        eval_datasets.append(tokenized_datasets["validation"])
+        eval_dataset.append(tokenized_datasets["validation"])
+
+    # If only one eval set, no need for a list
+    if len(eval_dataset) == 1:
+        eval_datasets = eval_dataset[0]
 
     test_dataset = None
     if (data_args.task_name is not None or data_args.test_file is not None):
@@ -366,7 +369,7 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
         data_collator = None
 
     return (
-        tokenizer, data_collator, train_dataset, eval_datasets, test_dataset, model,
+        tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model,
         is_regression, tokenized_datasets, label_list, config
     )
 
@@ -377,7 +380,7 @@ def run_finetuning_single_task_with_hp_search(
     """On a single task train, evaluate, and save results"""
 
     # Init dataset (same as without hp search)
-    tokenizer, data_collator, train_datasets, eval_dataset, test_dataset, model, \
+    tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
             model_args, data_args, training_args, last_checkpoint,
@@ -393,16 +396,28 @@ def run_finetuning_single_task_with_hp_search(
     # Code safety run a second time due to training_args being changed above
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
-    model_args = check_hp_compute_objective(model_args, data_args.task_name)
+    model_args = check_hp_compute_objective(model_args,
+        data_args.task_name, training_args)
     check_sparsity_callback(model, model_args)
 
     # Get fraction of the validation dataset to use in hp search
-    if model_args.hp_validation_dataset_pct < 1:
-        hp_eval_dataset = eval_dataset.shard(
-            index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
-        )
+    if isinstance(eval_dataset, list):
+        hp_eval_dataset = []
+        for dataset in eval_datasets:
+            if model_args.hp_validation_dataset_pct < 1:
+                eval_set = dataset.shard(
+                    index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
+                )
+            else:
+                eval_set = dataset
+        hp_eval_dataset.append(eval_set)
     else:
-        hp_eval_dataset = eval_dataset
+        if model_args.hp_validation_dataset_pct < 1:
+            hp_eval_dataset = eval_dataset.shard(
+                index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
+            )
+        else:
+            hp_eval_dataset = eval_dataset
 
     # Specify how to re-init model each training run.
     def model_init():
