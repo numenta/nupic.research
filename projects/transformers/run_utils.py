@@ -50,7 +50,7 @@ from transformers import (
 )
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
-from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK
+from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK, RAW_REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
@@ -830,13 +830,15 @@ def check_hp_compute_objective(model_args,
 
 def get_allowed_metrics(training_args, task_name):
 
-    allowed_metrics = RAW_REPORTING_METRICS_PER_TASK[task_name]
+    allowed_metrics = REPORTING_METRICS_PER_TASK[task_name]
     allowed_metrics.append("eval_loss")
     # In the special case of mnli, you have multiple validation sets
     # A prefix (m, or mm) is used to distinguish them. In this case,
     # overwrite allowed_metrics to use the prefixes
     if training_args:
         if "eval_prefixes" in training_args.trainer_mixin_args:
+            allowed_metrics = RAW_REPORTING_METRICS_PER_TASK[task_name]
+            allowed_metrics.append("loss")
             if task_name != "mnli":
                 raise NotImplementedError
             else:
@@ -844,7 +846,8 @@ def get_allowed_metrics(training_args, task_name):
                 prefixes = training_args.trainer_mixin_args["eval_prefixes"]
                 for metric in allowed_metrics:
                     for prefix in prefixes:
-                        prefixed_allowed_metrics.append("_".join(prefix, metric))
+                        prefixed_allowed_metrics.append("_".join(
+                            [prefix, metric]))
 
                 allowed_metrics = prefixed_allowed_metrics
     

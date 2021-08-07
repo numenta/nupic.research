@@ -517,7 +517,7 @@ def run_finetuning_single_task(
     # TODO
     # accept run# as an argument for finetuning with multiple runs on a single task
     # update the save directory to include run#
-    tokenizer, data_collator, train_dataset, eval_datasets, test_dataset, model, \
+    tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
             model_args, data_args, training_args, last_checkpoint
@@ -536,7 +536,7 @@ def run_finetuning_single_task(
         data_collator=data_collator,
         training_args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_datasets if training_args.do_eval else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
         model=model,
         trainer_class=model_args.trainer_class,
         trainer_callbacks=model_args.trainer_callbacks or None,
