@@ -31,7 +31,26 @@ class MultiEvalSetsTrainerMixin:
         """
         Add one single argument to 'trainer_mixin_args'
 
-        :param eval_sets: List of names of datasets to evaluate on
+        :param eval_sets: List of str names of datasets to evaluate on. 
+                          During init_dataset_for_finetuning, each name
+                          should key into tokenized_datasets such that
+                          tokenized_datasets[eval_sets[idx]] returns a dataset
+
+        :param eval_prefixes: List of str that will be prepended to metrics.
+                              Prefixes distinguish metrics for different eval
+                              sets. Prefixes should begin with "eval",
+                              otherwise huggingface will prepend "eval" to
+                              your prefix. For the case of mnli which has two
+                              eval sets, prefixes are chosen for you to comply
+                              with the above requirements.
+
+                              Example: eval_prefixes = ['eval', 'eval_mm']
+
+                              Matched validation set
+                                accuracy -> eval_accuracy
+
+                              Mismatched validation set
+                                accuracy -> eval_mm_accuracy
         """
 
         super().__init__(*args, **kwargs)
@@ -40,6 +59,8 @@ class MultiEvalSetsTrainerMixin:
 
         self.eval_set_list = mixin_args.get("eval_sets")
         self.eval_set_prefixes = mixin_args.get("eval_prefixes")
+        if "mnli" in self.args.task_names:
+            self.eval_set_prefixes = ["eval", "eval_mm"]
 
         assertion_message = "When using multiple eval sets, you must have "
         "exactly one prefix to demarcate each eval set, and there must be "

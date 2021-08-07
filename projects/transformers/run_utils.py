@@ -876,18 +876,22 @@ def check_metric_direction(metric, greater_is_better):
         return True
 
 
-def check_metric_is_allowed(metric, allowed_metrics):
+def check_metric_is_allowed(metric, allowed_metrics, task_name=None):
 
     if metric not in allowed_metrics:
+        if task_name == "mnli":
+            # Use the mismatched val set for mnli to avoid overfitting
+            new_metric = allowed_metrics[1]
+        else:
+            new_metric = allowed_metrics[0]
         logging.warning(
             "Warning, code will break because the current metric for best model"
             f" ({metric}) is not being tracked."
-            "Defaulting metric_for_best_model to first reporting metric"
+            "Defaulting metric_for_best_model to {new_metric}"
         )
-        return allowed_metrics[0]
+        return new_metric
     else:
         return metric
-
 
 
 def check_best_metric(training_args, task_name, metric=None):
@@ -902,7 +906,7 @@ def check_best_metric(training_args, task_name, metric=None):
         metric = training_args.metric_for_best_model
     allowed_metrics = get_allowed_metrics(training_args, task_name)
     metric = check_metric_is_allowed(metric,
-        allowed_metrics)
+        allowed_metrics, task_name)
     greater_is_better = training_args.greater_is_better
     greater_is_better = check_metric_direction(metric,
         greater_is_better)
@@ -935,6 +939,8 @@ def check_rm_checkpoints(training_args, model_args):
             )
 
 
+# TODO:
+# clean this up since both mnli sets can be evaluated during training now
 def evaluate_tasks_handler(trainer,
                            data_args,
                            model_args,

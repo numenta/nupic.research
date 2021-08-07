@@ -25,32 +25,27 @@ from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 
 class TrackEvalMetrics(TrainerCallback):
-    """
-    This callback is used to store a time series of metrics (e.g. accuracy),
-    after trainer.evaluate() is called. It is designed to provide the same
-    metrics for training and validation sets, at the same time points.
-    """
-    def __init__(self, eval_sets=None, eval_prefixes=None, sparsity_tolerance=0.01):
+
+    def __init__(self, n_eval_sets=1, sparsity_tolerance=0.01):
         """
-        Set up two dictionaries to track training and eval metrics, and a list
-        to track steps.
+        Set up a dictionary that tracks evaluation metrics
 
         *_metrics dictionaries take metric names (e.g. 'loss') as keys
         and have a list that tracks that metric accross time
 
         Example:
-            self.eval_metrics['acc'] -> [acc1, acc2, ..., accn]
+            self.eval_metrics['acc'] -> [acc_1, acc_2, ..., acc_n]
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
 
-        This callback also keeps track of model sparsity, and breaks if
-        sparsity changes in absolute value by more than sparsity_tolerance.
-        If you are using a training approach that sparsifies the model, be sure
-        to set sparsity_tolerance to something like 1, so large changes in
-        sparsity are accepted.
+        :param n_eval_sets: int, how many evaluation sets you are evaluating
+                            on. Default is one, but could be 2 for mnli.
+        :param sparsity_tolerance: float, threshold for absolute value change
+                                   in sparsity. If sparsity changes by more
+                                   than tolerance, issue a warning.
         """
 
         self.sparsity_tolerance = sparsity_tolerance
-        self.eval_sets = None if eval_sets is None else eval_sets
+        self.n_eval_sets = n_eval_sets
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
@@ -62,7 +57,7 @@ class TrackEvalMetrics(TrainerCallback):
         self.call_counter = 0  # how many times on_evaluate is called
 
     def on_evaluate(self, args, state, control, metrics, **kwargs):
-        """Update steps counter, training metrics, & eval metrics"""
+        """Update eval metrics and possibly step counter, sparsity, and lr"""
 
         # track performance metrics
         for key in metrics.keys():
@@ -72,15 +67,27 @@ class TrackEvalMetrics(TrainerCallback):
                 self.eval_metrics[key].append(metrics[key])
 
         self.call_counter += 1
+        do_remaining_updates = self.maybe_update()
+
+        # Update steps, sparsity, learning rate
+        if do_remaining_updates:
+            self.update_auxillary_metrics(**kwargs)
+
+    def maybe_update(self):
+        """
+        If just one eval set
+            update step counter, sparsity, etc.
+        Else
+            update only if you finished cycling through all eval sets
+        """
         do_remaining_updates = False
-        if self.eval_sets:
-            if len(self.eval_sets) % self.call_counter == 0:
+        if self.n_eval_sets > 1:
+            if self.call_counter % self.n_eval_sets == 0:
                 do_remaining_updates = True
         else:
             do_remaining_updates = True
 
-        if do_remaining_updates:
-            self.update_auxillary_metrics(**kwargs)
+        return do_remaining_updates
 
     def on_train_begin(self, args, state, control, **kwargs):
         """
@@ -89,7 +96,11 @@ class TrackEvalMetrics(TrainerCallback):
         self.__init__()
 
     def update_auxillary_metrics(self, **kwargs):
-
+        """
+        Track sparsity, learning rate, and run checks to ensure sparsity
+        is not changing too much. Run only after updating metrics for all
+        eval sets.
+        """
         # track sparsity information
         num_total, num_nonzero = count_nonzero_params(kwargs["model"])
         model_sparsity = 1 - (num_nonzero / num_total)
@@ -97,8 +108,7 @@ class TrackEvalMetrics(TrainerCallback):
         self.eval_metrics["num_nonzero_params"].append(num_nonzero)
         self.eval_metrics["sparsity"].append(model_sparsity)
 
-        # guarantee that everything stayed sparse,
-        # up to specified tolerance
+        # guarantee that everything stayed sparse, up to specified tolerance
         if (self.sparsity_tolerance < 1) and len(self.eval_metrics["sparsity"]) > 1:
             sparse_diff = self.eval_metrics["sparsity"][0] - self.eval_metrics["sparsity"][-1]  # noqa
             if abs(sparse_diff) > self.sparsity_tolerance:

@@ -94,14 +94,14 @@ debug_finetuning_mnli.update(
     metric_for_best_model="mm_accuracy",
     trainer_class=MultiEvalSetTrainer,
     trainer_mixin_args = dict(
+        # eval_sets should correspond to keys: tokenized_datasets[key]
+        # returns a dataset
         eval_sets=["validation_matched", "validation_mismatched"],
         eval_prefixes=["eval", "eval_mm"],
     ),
     trainer_callbacks=[
         TrackEvalMetrics(
-            eval_sets=[
-                "validation_matched",
-                "validation_mismatched"],
+            n_eval_sets=2,
         )
     ]
 )

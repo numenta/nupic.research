@@ -301,12 +301,9 @@ def run_pretraining(
 def init_dataset_for_finetuning(model_args, data_args, training_args,
                                 last_checkpoint=None):
 
-    # TODO: in order to make the multi_eval_sets mixin more general,
-    # you could modify init_datasets_task s it doesn't just rely on task
-    # name but can look at trainer_mixin_args to see what other eval sets
-    # you want. However, that's not mission critical right now since the 
-    # primary use case is evaluating on two eval sets from the same task, 
-    # namely mnli.
+    # TODO
+    # edit multi_eval_sets so you can gather not just multiple eval sets
+    # for a single task, but eval sets from multiple tasks
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
     logging.info(f"Training {data_args.task_name} with {num_labels} labels")
@@ -323,8 +320,6 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
 
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
-    # TODO: adapt so that you can acquire a list of tokenized datasets
-    # to provide maximum flexibility in conjunctio with multi_eval_sets mixin
     logging.info(f"Tokenizing datasets for finetuning ...")
     tokenized_datasets = preprocess_datasets_task(
         datasets, tokenizer, data_args,
@@ -336,7 +331,7 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
 
     # Allow multiple eval sets. For now, assume mnli is the only case
     eval_dataset = []
-    if (data_args.task_name == "mnli"):
+    if data_args.task_name == "mnli":
         if "eval_sets" in training_args.trainer_mixin_args:
             for eval_set in training_args.trainer_mixin_args["eval_sets"]:
                 eval_dataset.append(tokenized_datasets[eval_set])
@@ -514,9 +509,6 @@ def run_finetuning_single_task(
 ):
     """On a single task train, evaluate, and save results"""
 
-    # TODO
-    # accept run# as an argument for finetuning with multiple runs on a single task
-    # update the save directory to include run#
     tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
