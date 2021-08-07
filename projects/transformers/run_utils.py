@@ -830,21 +830,25 @@ def check_hp_compute_objective(model_args,
 
 def get_allowed_metrics(training_args, task_name):
 
-    allowed_metrics = REPORTING_METRICS_PER_TASK[task_name]
+    allowed_metrics = RAW_REPORTING_METRICS_PER_TASK[task_name]
     allowed_metrics.append("eval_loss")
     # In the special case of mnli, you have multiple validation sets
     # A prefix (m, or mm) is used to distinguish them. In this case,
     # overwrite allowed_metrics to use the prefixes
     if training_args:
         if "eval_prefixes" in training_args.trainer_mixin_args:
-            prefixes = training_args.trainer_mixin_args["eval_prefixes"]
-            updated_allowed_metrics = []
-            for prefix in prefixes:
+            if task_name != "mnli":
+                raise NotImplementedError
+            else:
+                prefixed_allowed_metrics = []
+                prefixes = training_args.trainer_mixin_args["eval_prefixes"]
                 for metric in allowed_metrics:
-                    updated_allowed_metrics.append(prefix + "_" + metric)
+                    for prefix in prefixes:
+                        prefixed_allowed_metrics.append("_".join(prefix, metric))
 
-            allowed_metrics = updated_allowed_metrics
-
+                allowed_metrics = prefixed_allowed_metrics
+    
+    print(f"The following metrics are considered OK: {allowed_metrics}")
     return allowed_metrics
 
 
@@ -877,9 +881,13 @@ def check_metric_is_allowed(metric, allowed_metrics):
             f" ({metric}) is not being tracked."
             "Defaulting metric_for_best_model to first reporting metric"
         )
-        return allowed_metrics[0], True
+        return allowed_metrics[0]
+    else:
+        return metric
 
-def check_best_metric(training_args, task_name, metric):
+
+
+def check_best_metric(training_args, task_name, metric=None):
     """
     Runs can easily break if load_best_model_at_end because you
     specified a metric for a diferent task. You can get all the way through
@@ -887,13 +895,17 @@ def check_best_metric(training_args, task_name, metric):
     that case. It also checks to make sure greater_is_better is set properly.
     """
 
+    if metric is None:
+        metric = training_args.metric_for_best_model
     allowed_metrics = get_allowed_metrics(training_args, task_name)
-    metric, greater_is_better = check_metric_is_allowed(metric,
+    metric = check_metric_is_allowed(metric,
         allowed_metrics)
     greater_is_better = training_args.greater_is_better
-    metric, greater_is_better = check_metric_direction(metric,
+    greater_is_better = check_metric_direction(metric,
         greater_is_better)
 
+    print("metric configuration after checks: "
+        f"{metric}, {greater_is_better}")
     training_args.greater_is_beter = greater_is_better
     training_args.metric_for_best_model = metric
 

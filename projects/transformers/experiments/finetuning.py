@@ -91,10 +91,11 @@ debug_finetuning.update(
 debug_finetuning_mnli = deepcopy(debug_finetuning)
 debug_finetuning_mnli.update(
     task_names=["mnli"],
+    metric_for_best_model="mm_accuracy",
     trainer_class=MultiEvalSetTrainer,
     trainer_mixin_args = dict(
         eval_sets=["validation_matched", "validation_mismatched"],
-        eval_prefixes=["m", "mm"],
+        eval_prefixes=["eval", "eval_mm"],
     ),
     trainer_callbacks=[
         TrackEvalMetrics(
