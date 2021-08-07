@@ -342,7 +342,7 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
 
     # If only one eval set, no need for a list
     if len(eval_dataset) == 1:
-        eval_datasets = eval_dataset[0]
+        eval_dataset = eval_dataset[0]
 
     test_dataset = None
     if (data_args.task_name is not None or data_args.test_file is not None):
@@ -592,8 +592,6 @@ def run_finetuning_multiple_tasks(
     else:
         results = {}
 
-    # Different callbacks result in different control flow.
-    has_early_stopping, _ = check_for_callback(model_args, EarlyStoppingCallback)
     has_track_eval, _ = check_for_callback(model_args, TrackEvalMetrics)
     if not has_track_eval:
         logging.warn(
@@ -616,13 +614,10 @@ def run_finetuning_multiple_tasks(
                 if "hp_" in hp_key:
                     setattr(model_args, hp_key, hp_val)
                 else:
-                    # I forget why this is here
-                    # TODO: check when this happens
+                    print(f"hp stuff from training args: {hp_key}, and {hp_val}")
                     setattr(training_args, hp_key, hp_val)
 
-        task_results = TaskResults(task_name,
-                                   has_early_stopping,
-                                   training_args=training_args)
+        task_results = TaskResults(task_name, training_args)
 
         # Hack to ensure we don't do hp search num_runs times
         if model_args.hp_num_trials > 1:

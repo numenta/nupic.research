@@ -830,8 +830,9 @@ def check_hp_compute_objective(model_args,
 
 def get_allowed_metrics(training_args, task_name):
 
-    allowed_metrics = REPORTING_METRICS_PER_TASK[task_name]
+    allowed_metrics = list(REPORTING_METRICS_PER_TASK[task_name])
     allowed_metrics.append("eval_loss")
+
     # In the special case of mnli, you have multiple validation sets
     # A prefix (m, or mm) is used to distinguish them. In this case,
     # overwrite allowed_metrics to use the prefixes
@@ -851,7 +852,6 @@ def get_allowed_metrics(training_args, task_name):
 
                 allowed_metrics = prefixed_allowed_metrics
     
-    print(f"The following metrics are considered OK: {allowed_metrics}")
     return allowed_metrics
 
 
@@ -1127,13 +1127,14 @@ class TaskResults():
 
     reporting_metrics_per_task = REPORTING_METRICS_PER_TASK
 
-    def __init__(self, task_name, early_stopping, training_args=None):
+    def __init__(self, task_name, training_args):
         self.task_name = task_name
         self.reporting_metrics = get_allowed_metrics(training_args, task_name)
         self.all_results = []
         self._results = None
         self.training_args = training_args
-        self.early_stopping = early_stopping
+        self.load_best_model_at_end = \
+            self.training_args.load_best_model_at_end
         self.best_metric_key = self.training_args.metric_for_best_model
         # If early stopping, need to track which step best results were at
         # If not, -1 corresponds to end of training
@@ -1198,13 +1199,17 @@ class TaskResults():
         # Loop over runs on the same task
         for results in self.all_results:
             # replace with load_best_metric_at_end
-            if self.early_stopping:
+            if self.load_best_model_at_end:
                 # Within a run, the step where best results were achieved
                 best_metric_best_idx = np.argmax(results[self.best_metric_key])
             else:
                 # If not early stopping, grab results seen at end of training
                 best_metric_best_idx = -1
 
+            print(f"aggregated_results: {aggregated_results}")
+            print(f"len(aggregated_results): {len(aggregated_results)}")
+            print(f"best_metric_best_idx: {best_metric_best_idx}")
+            print(f"results: {results}")
             self.best_idx_per_run.append(best_metric_best_idx)
             for metric, values in results.items():
                 aggregated_results[metric].append(values[best_metric_best_idx])

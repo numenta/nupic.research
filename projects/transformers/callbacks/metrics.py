@@ -51,7 +51,6 @@ class TrackEvalMetrics(TrainerCallback):
         self.eval_metrics["num_total_params"] = []
         self.eval_metrics["num_nonzero_params"] = []
         self.eval_metrics["lr"] = []
-        self.train_metrics = {}
         self.steps = []
         self.step_counter = 0  # how many training steps
         self.call_counter = 0  # how many times on_evaluate is called
@@ -71,7 +70,7 @@ class TrackEvalMetrics(TrainerCallback):
 
         # Update steps, sparsity, learning rate
         if do_remaining_updates:
-            self.update_auxillary_metrics(**kwargs)
+            self.update_auxillary_metrics(args, **kwargs)
 
     def maybe_update(self):
         """
@@ -95,7 +94,7 @@ class TrackEvalMetrics(TrainerCallback):
         """
         self.__init__()
 
-    def update_auxillary_metrics(self, **kwargs):
+    def update_auxillary_metrics(self, args, **kwargs):
         """
         Track sparsity, learning rate, and run checks to ensure sparsity
         is not changing too much. Run only after updating metrics for all
@@ -124,4 +123,5 @@ class TrackEvalMetrics(TrainerCallback):
             last_lr = kwargs["lr_scheduler"].get_last_lr()
             self.eval_metrics["lr"].append(last_lr[0])
 
-        self.step_counter += 1
+        self.step_counter += args.eval_steps
+        self.steps.append(self.step_counter)

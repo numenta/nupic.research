@@ -59,7 +59,8 @@ class MultiEvalSetsTrainerMixin:
 
         self.eval_set_list = mixin_args.get("eval_sets")
         self.eval_set_prefixes = mixin_args.get("eval_prefixes")
-        if "mnli" in self.args.task_names:
+
+        if "mnli" in self.args.run_name:
             self.eval_set_prefixes = ["eval", "eval_mm"]
 
         assertion_message = "When using multiple eval sets, you must have "
