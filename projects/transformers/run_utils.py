@@ -127,28 +127,30 @@ def train(trainer, output_dir, rm_checkpoints, last_checkpoint=None):
         rm_prefixed_subdirs(output_dir, "checkpoint-")
 
 
-def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
+def evaluate_task(trainer, output_dir, tasks, eval_datasets):
     """
-    Evaluate tasks after finetuning.
+    Evaluate on one task after finetuning. If mnli or if MultiEvalSetTrainer,
+    mixin will handle evaluating on multiple sets for you.
     Returns evaluation dict with results.
     """
     eval_results = {}
 
-    for eval_dataset, task in zip(eval_datasets, tasks):
+    # if mnli, special trainer instance handles loop for you
+    if "MultiEvalSetTrainer" in str(type(trainer)):
+        eval_result = trainer.evaluate()
+    else:
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
-        if task == "mnli-mm":
-            eval_result = {f"mm_{k}": v for k, v in eval_result.items()}
-        eval_results.update(eval_result)
 
-        output_eval_file = os.path.join(
+    eval_results.update(eval_result)
+    output_eval_file = os.path.join(
             output_dir, f"eval_results_{task}.txt"
         )
-        if trainer.is_world_process_zero():
-            with open(output_eval_file, "w") as writer:
-                logging.info(f"***** Eval results {task} *****")
-                for key, value in sorted(eval_result.items()):
-                    logging.info(f"  {key} = {value}")
-                    writer.write(f"{key} = {value}\n")
+    if trainer.is_world_process_zero():
+        with open(output_eval_file, "w") as writer:
+            logging.info(f"***** Eval results {task} *****")
+            for key, value in sorted(eval_result.items()):
+                logging.info(f"  {key} = {value}")
+                writer.write(f"{key} = {value}\n")
 
     return eval_results
 
@@ -757,7 +759,7 @@ def check_sparsity_callback(model, model_args):
 
     if is_sparse:
         has_rezero = check_for_callback(model_args, RezeroWeightsCallback)
-        assert has_rezero, "Finetuning sparse models without rezeroing weights"
+        assert has_rezero[0], "Finetuning sparse models without rezeroing weights"
         " is prohibited"
 
 
@@ -919,8 +921,23 @@ def check_best_metric(training_args, task_name, metric=None):
     return training_args
 
 
-def check_rm_checkpoints(training_args, model_args):
+def check_mnli(model_args, task_name):
+    """
+    There are multiple way to handle mnli which has multiple eva;l sets
+    However, the recommended approach is to simply use multi_eval_sets
+    callback. This warns you if you are not doing that.
+    """
 
+    if task_name == "mnli":
+        if "MultiEvalSetTrainer" in str(model_args.trainer_class):
+            logging.info("Using recommended multi eval set approach for mnli")
+        else:
+            logging.warn(
+                "You are training on mnli without multi eval sets!"
+                "This is strongly discouraged and QA is not guaranteed!"
+            )
+
+def check_rm_checkpoints(training_args, model_args):
     # If pretraining, you usually want to save checkpoints.
     if not model_args.finetuning:
         if training_args.rm_checkpoints:
@@ -939,21 +956,24 @@ def check_rm_checkpoints(training_args, model_args):
             )
 
 
-# TODO:
-# clean this up since both mnli sets can be evaluated during training now
-def evaluate_tasks_handler(trainer,
+def evaluate_task_handler(trainer,
                            data_args,
                            model_args,
                            training_args,
                            eval_dataset,
                            tokenized_datasets):
+    """
+    Handle the last evaluation. If you've been evaluating throughout the
+    training process, evaluate again if steps % eval steps is jagged.
 
+    This determines if you should evaluate on a single task. If mnli, assume
+    multi_eval_sets mixin is in use which handles mismatched set for you.
+    """
     logging.info("*** Evaluate ***")
 
     eval_results = {}
     tracked_metrics, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
-    tasks = [data_args.task_name]
-    eval_datasets = [eval_dataset]
+    task = data_args.task_name
 
     if tracked_metrics:
 
@@ -966,39 +986,17 @@ def evaluate_tasks_handler(trainer,
 
             print(f"Evaluating again because offset was {offset}")
 
-            eval_results = evaluate_tasks(
-                trainer, training_args.output_dir, tasks, eval_datasets
+            eval_results = evaluate_task(
+                trainer, training_args.output_dir, task, eval_dataset
             )
             metric_callback.eval_metrics["steps"][-1] -= offset
-
-        # mnli has two eval sets. For now, assume load_best_model_at_end is on
-        # and just evaluate once on mnli-mm once at the end. TrackEvalMetrics
-        # callback handles metrics, and looks for the mm_ prefix. If present,
-        # it stores results on the mm set in a separate dictionary
-        if data_args.task_name == "mnli":
-            _ = trainer.evaluate(
-                eval_dataset=tokenized_datasets["validation_mismatched"],
-                metric_key_prefix="mm",
-            )
-            n_evals = len(tracked_eval_metrics["steps"])
-            mm_dict = metric_callback.mm_metrics
-            for key in mm_dict.keys():
-                key_name = "mm_eval_" + key
-                # Fill a list of same length as other metrics for consistency
-                tracked_eval_metrics[key_name] = [mm_dict[key] for i in range(n_evals)]
 
         eval_results = tracked_eval_metrics
 
     else:
 
-        # In this case, you need to do the usualy evaluation
-        # Regardless of load_best_model, you have the correct model loaded
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            eval_datasets.append(tokenized_datasets["validation_mismatched"])
-
-        eval_results = evaluate_tasks(
-            trainer, training_args.output_dir, tasks, eval_datasets
+        eval_results = evaluate_task(
+            trainer, training_args.output_dir, task, eval_dataset
         )
 
     return eval_results
@@ -1203,13 +1201,9 @@ class TaskResults():
                 # Within a run, the step where best results were achieved
                 best_metric_best_idx = np.argmax(results[self.best_metric_key])
             else:
-                # If not early stopping, grab results seen at end of training
+                # If not load best at end, just get the last step
                 best_metric_best_idx = -1
 
-            print(f"aggregated_results: {aggregated_results}")
-            print(f"len(aggregated_results): {len(aggregated_results)}")
-            print(f"best_metric_best_idx: {best_metric_best_idx}")
-            print(f"results: {results}")
             self.best_idx_per_run.append(best_metric_best_idx)
             for metric, values in results.items():
                 aggregated_results[metric].append(values[best_metric_best_idx])

@@ -23,10 +23,15 @@ Base Transformers Experiment configuration.
 """
 
 from copy import deepcopy
+from callbacks import RezeroWeightsCallback
+
+from transformers import Trainer
 
 from ray import tune
 
 from callbacks import TrackEvalMetrics
+
+from trainer_mixins import MultiEvalSetsTrainerMixin
 
 from .base import bert_base
 # use bert_100k for task-specific hp search prototyping
@@ -38,6 +43,10 @@ def hp_space(trial):
     return dict(
         learning_rate=tune.loguniform(1e-4, 1e-2)
     )
+
+
+class MultiEvalSetTrainer(MultiEvalSetsTrainerMixin, Trainer):
+    pass
 
 
 # ---------
@@ -126,6 +135,31 @@ debug_finetuning_sparse_hp_search.update(
             hp_compute_objective=("maximize", "eval_matthews_correlation")
         )
     ),
+)
+
+debug_finetuning_sparse_hp_mnli = deepcopy(debug_finetuning_sparse_hp_search)
+debug_finetuning_sparse_hp_mnli.update(
+    task_name="mnli",
+    metric_for_best_model="eval_mm_accuracy",
+    trainer_class=MultiEvalSetTrainer,
+    trainer_mixin_args = dict(
+        eval_sets=["validation_matched", "validation_mismatched"],
+        eval_prefixes=["eval", "eval_mm"],
+    ),
+    hp_num_trials=4,
+    trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2),
+                       RezeroWeightsCallback()],
+    task_hyperparams=dict(
+        mnli=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-6, 1e-3),
+                max_steps = tune.grid_search([50, 100, 150])
+            ),
+            hp_num_trials=4,
+            hp_compute_objective=("maximize", "eval_mm_accuracy"),
+            eval_steps=25,
+        )
+    )
 )
 
 # ---------
@@ -432,6 +466,7 @@ CONFIGS = dict(
     debug_hp_search=debug_hp_search,
     debug_finetuning_hp_search=debug_finetuning_hp_search,
     debug_finetuning_sparse_hp_search=debug_finetuning_sparse_hp_search,
+    debug_finetuning_sparse_hp_mnli=debug_finetuning_sparse_hp_mnli,
 
     # small bert, small tasks
     hp_search_finetuning_small_bert_100k_small_tasks=hp_search_finetuning_small_bert_100k_small_tasks,  # noqa: E501

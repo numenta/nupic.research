@@ -99,11 +99,7 @@ debug_finetuning_mnli.update(
         eval_sets=["validation_matched", "validation_mismatched"],
         eval_prefixes=["eval", "eval_mm"],
     ),
-    trainer_callbacks=[
-        TrackEvalMetrics(
-            n_eval_sets=2,
-        )
-    ]
+    trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2)]
 )
 
 

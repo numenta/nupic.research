@@ -69,11 +69,12 @@ from run_utils import (
     check_for_callback,
     check_hp_compute_objective,
     check_if_current_hp_best,
+    check_mnli,
     check_rm_checkpoints,
     check_sparsity_callback,
     compute_objective,
     evaluate_language_model,
-    evaluate_tasks_handler,
+    evaluate_task_handler,
     get_best_run_and_link_best_predictions,
     get_labels,
     init_config,
@@ -317,7 +318,7 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
     tokenizer = init_tokenizer(model_args)
     model = init_model(model_args, config, tokenizer, finetuning=True)
     check_sparsity_callback(model, model_args)
-
+    check_mnli(model_args, data_args.task_name)
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
     logging.info(f"Tokenizing datasets for finetuning ...")
@@ -398,14 +399,14 @@ def run_finetuning_single_task_with_hp_search(
     # Get fraction of the validation dataset to use in hp search
     if isinstance(eval_dataset, list):
         hp_eval_dataset = []
-        for dataset in eval_datasets:
+        for dataset in eval_dataset:
             if model_args.hp_validation_dataset_pct < 1:
                 eval_set = dataset.shard(
                     index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
                 )
             else:
                 eval_set = dataset
-        hp_eval_dataset.append(eval_set)
+            hp_eval_dataset.append(eval_set)
     else:
         if model_args.hp_validation_dataset_pct < 1:
             hp_eval_dataset = eval_dataset.shard(
@@ -518,7 +519,7 @@ def run_finetuning_single_task(
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
-
+    check_mnli(model_args, data_args.task_name)
     # Update where model is saved for each run
     training_args = update_run_number(training_args, run_idx)
 
@@ -545,7 +546,7 @@ def run_finetuning_single_task(
               last_checkpoint)
 
     if training_args.do_eval:
-        eval_results = evaluate_tasks_handler(
+        eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,
             eval_dataset, tokenized_datasets)
 
