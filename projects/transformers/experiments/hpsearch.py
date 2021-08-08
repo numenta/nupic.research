@@ -280,6 +280,11 @@ hp_search_finetuning_small_bert_100k_qqp = deepcopy(
 )
 hp_search_finetuning_small_bert_100k_qqp.update(
     task_names=["qqp"],
+    hp_space=lambda trial: dict(
+        learning_rate=tune.loguniform(1e-6, 1e-3),
+    ),
+    max_steps=80_000,
+    eval_steps=2_000,
 )
 
 # ---------
@@ -289,7 +294,7 @@ hp_search_finetuning_small_bert_100k_qqp.update(
 # Assume that learning rate is similar accross tasks within a model
 # for large datasets. Therefore, need one sweep per model for big tasks.
 hp_search_finetuning_small_bert_trifecta_100k_qqp = deepcopy(
-    hp_search_finetuning_small_bert_100k_big_tasks
+    hp_search_finetuning_small_bert_100k_qqp
 )
 hp_search_finetuning_small_bert_trifecta_100k_qqp.update(
     task_names=["qqp"],
@@ -326,9 +331,6 @@ hp_search_finetuning_small_bert_trifecta_4x_100k_qqp.update(
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_4x_trifecta_100k",  # noqa: E501
 )
-
-
-#
 
 hp_search_finetuning_small_bert_trifecta_100k_big_tasks = deepcopy(
     hp_search_finetuning_small_bert_100k_big_tasks)
