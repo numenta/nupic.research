@@ -26,8 +26,9 @@ from os.path import expanduser
 import torch
 from transformers import CONFIG_MAPPING, AutoModelForMaskedLM
 
+from nupic.research.frameworks.dynamic_sparse import global_prune_by_abs_weight
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
-from nupic.torch.modules import rezero_weights
+from nupic.torch.modules.sparse_weights import SparseWeightsBase, rezero_weights
 
 sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers"))  # noqa
 import models  # noqa :F401
@@ -40,7 +41,7 @@ def _compute_sparsity(model):
     """
     total_params = sum(p.numel() for p in model.parameters())
     total_nonzero = sum(torch.count_nonzero(p) for p in model.parameters())
-    return 1.0 - (total_nonzero / total_params)
+    return float(1.0 - (total_nonzero / total_params))
 
 
 class SparseBertModelTest(unittest.TestCase):
@@ -138,3 +139,45 @@ class SparseBertModelTest(unittest.TestCase):
 
             deepspeed_model.apply(rezero_weights)
             original_model.apply(rezero_weights)
+
+    def test_gmp(self):
+        original_model = copy.deepcopy(self.sparse_model).half()
+        deepspeed_model = copy.deepcopy(original_model)
+        deepspeed_model.to(self.device)
+        original_model.to(self.device)
+
+        replace_sparse_transformer_layer(
+            model=deepspeed_model.base_model,
+            config=self.config,
+            training=True,
+            fp16=True,
+        )
+
+        deepspeed_model.apply(rezero_weights)
+        original_model.apply(rezero_weights)
+
+        # Make sure the model maintains the same sparsity as the original
+        expected_sparsity = _compute_sparsity(original_model)
+        actual_sparsity = _compute_sparsity(deepspeed_model)
+        self.assertAlmostEqual(actual_sparsity, expected_sparsity)
+
+        # Prune weights
+        original_modules = [
+            m for m in original_model.modules() if isinstance(m, SparseWeightsBase)
+        ]
+        deepspeed_modules = [
+            m for m in deepspeed_model.modules() if isinstance(m, SparseWeightsBase)
+        ]
+        actual_removed = global_prune_by_abs_weight(original_modules, 0.3)
+        expected_removed = global_prune_by_abs_weight(deepspeed_modules, 0.3)
+
+        # Make sure pruned the same number of weights
+        self.assertAlmostEqual(actual_removed, expected_removed)
+
+        # Make sure the model maintains the same sparsity as the original after
+        # prunnning
+        deepspeed_model.apply(rezero_weights)
+        original_model.apply(rezero_weights)
+        expected_sparsity = _compute_sparsity(original_model)
+        actual_sparsity = _compute_sparsity(deepspeed_model)
+        self.assertAlmostEqual(actual_sparsity, expected_sparsity)

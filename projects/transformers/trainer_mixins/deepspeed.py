@@ -65,16 +65,19 @@ def replace_sparse_transformer_layer(model, config=None, fp16=True, training=Tru
             assert attn_out.sparsity == sparsity
             assert output.sparsity == sparsity
 
-            # Create combined QKV zero mask
-            qkv_mask = torch.cat(
-                (query.zero_mask, key.zero_mask, value.zero_mask), dim=0
+            # Create flatten zero mask
+            zero_mask = torch.cat(
+                (query.zero_mask.flatten(),
+                 key.zero_mask.flatten(),
+                 value.zero_mask.flatten(),
+                 attn_out.zero_mask.flatten(),
+                 intermediate.zero_mask.flatten(),
+                 output.zero_mask.flatten(),
+                 )
             )
             sparsity_per_layer[i] = {
                 "sparsity": sparsity,
-                "attn_qkv": qkv_mask,
-                "attn_out": attn_out.zero_mask,
-                "inter": intermediate.zero_mask,
-                "output": output.zero_mask,
+                "zero_mask": zero_mask,
             }
 
     # Convert transform layers to deepspeed.
@@ -101,15 +104,8 @@ def replace_sparse_transformer_layer(model, config=None, fp16=True, training=Tru
         sparse_layer = SparseDeepSpeedTransformerLayer(ds_layer, sparsity=sparsity)
 
         # Update masks based on original sparse layer
-        attn_qkv_mask = sparse_config["attn_qkv"]
-        attn_out_mask = sparse_config["attn_out"]
-        inter_mask = sparse_config["inter"]
-        output_mask = sparse_config["output"]
-
-        sparse_layer.zero_mask_attn_qkv = attn_qkv_mask.bool()
-        sparse_layer.zero_mask_attn_out = attn_out_mask.bool()
-        sparse_layer.zero_mask_inter = inter_mask.bool()
-        sparse_layer.zero_mask_output = output_mask.bool()
+        zero_mask = sparse_config["zero_mask"]
+        sparse_layer.zero_mask = zero_mask.bool()
         sparse_layer.rezero_weights()
 
         ds_model.encoder.layer[i] = sparse_layer

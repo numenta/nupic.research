@@ -43,30 +43,41 @@ class SparseDeepSpeedTransformerLayer(SparseWeightsBase):
         assert isinstance(module, DeepSpeedTransformerLayer)
         super().__init__(module=module, sparsity=sparsity)
 
-        # Sparsify fused attention layer
+        # Sparsify fused attention layer, applying local sparsity to each QKV layer
         device = module.attn_qkvw.device
         out_features = module.attn_qkvw.shape[0] // 3
         in_features = module.attn_qkvw.shape[1]
         mask_qw = _compute_zero_mask(out_features, in_features, self.sparsity, device)
         mask_kw = _compute_zero_mask(out_features, in_features, self.sparsity, device)
         mask_vw = _compute_zero_mask(out_features, in_features, self.sparsity, device)
-        zero_mask_attn_qkv = torch.cat((mask_qw, mask_kw, mask_vw), dim=0)
-        self.register_buffer("zero_mask_attn_qkv", zero_mask_attn_qkv)
+        zero_mask_attn_qkvw = torch.cat((mask_qw, mask_kw, mask_vw), dim=0)
 
         # Sparsify attention output layer
-        zero_mask_attn_out = _compute_zero_mask(
+        zero_mask_attn_ow = _compute_zero_mask(
             *module.attn_ow.shape, sparsity=self.sparsity, device=device)
-        self.register_buffer("zero_mask_attn_out", zero_mask_attn_out)
 
         # Sparsify intermediate layer
-        zero_mask_inter = _compute_zero_mask(
+        zero_mask_inter_w = _compute_zero_mask(
             *module.inter_w.shape, sparsity=self.sparsity, device=device)
-        self.register_buffer("zero_mask_inter", zero_mask_inter)
 
         # Sparsify output layer
-        zero_mask_output = _compute_zero_mask(
+        zero_mask_output_w = _compute_zero_mask(
             *module.output_w.shape, sparsity=self.sparsity, device=device)
-        self.register_buffer("zero_mask_output", zero_mask_output)
+
+        # Compute contiguous weight tensor and mask
+        weights = [module.attn_qkvw, module.attn_ow, module.inter_w, module.output_w]
+        flat_weights = torch.cat([w.flatten() for w in weights], dim=0).contiguous()
+        start = end = 0
+        for w in weights:
+            end += w.numel()
+            w.data = flat_weights[start:end].view(w.shape)
+            start = end
+
+        zero_mask = torch.cat((zero_mask_attn_qkvw.flatten(),
+                               zero_mask_attn_ow.flatten(),
+                               zero_mask_inter_w.flatten(),
+                               zero_mask_output_w.flatten())).contiguous()
+        self.register_buffer("zero_mask", zero_mask)
 
     def forward(self, *inputs, **kwargs):
         return self.module.forward(*inputs, **kwargs)
@@ -75,7 +86,24 @@ class SparseDeepSpeedTransformerLayer(SparseWeightsBase):
         return self.module.init_transformer_weights(*args, **kwargs)
 
     def rezero_weights(self):
-        self.module.attn_qkvw.data[self.zero_mask_attn_qkv] = 0
-        self.module.attn_ow.data[self.zero_mask_attn_out] = 0
-        self.module.inter_w.data[self.zero_mask_inter] = 0
-        self.module.output_w.data[self.zero_mask_output] = 0
+        # Unflatten zero_mask
+        weights = [self.module.attn_qkvw, self.module.attn_ow,
+                   self.module.inter_w, self.module.output_w]
+
+        start = end = 0
+        for w in weights:
+            end += w.numel()
+            w.data[self.zero_mask[start:end].view(w.shape)] = 0
+            start = end
+
+    @property
+    def weight(self):
+        # Return flattened weights
+        return torch.cat((self.module.attn_qkvw.data.flatten(),
+                          self.module.attn_ow.data.flatten(),
+                          self.module.inter_w.data.flatten(),
+                          self.module.output_w.data.flatten()))
+
+    @property
+    def bias(self):
+        return self.module.bias
