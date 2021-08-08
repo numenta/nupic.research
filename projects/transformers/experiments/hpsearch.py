@@ -275,10 +275,60 @@ hp_search_finetuning_small_bert_100k_big_tasks.update(
     )
 )
 
+hp_search_finetuning_small_bert_100k_qqp = deepcopy(
+    hp_search_finetuning_small_bert_100k_big_tasks
+)
+hp_search_finetuning_small_bert_100k_qqp.update(
+    task_names=["qqp"],
+)
 
 # ---------
 # BERT small trifecta, big tasks
 # ---------
+
+# Assume that learning rate is similar accross tasks within a model
+# for large datasets. Therefore, need one sweep per model for big tasks.
+hp_search_finetuning_small_bert_trifecta_100k_qqp = deepcopy(
+    hp_search_finetuning_small_bert_100k_big_tasks
+)
+hp_search_finetuning_small_bert_trifecta_100k_qqp.update(
+    task_names=["qqp"],
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_80%_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_85_100k_qqp = deepcopy(
+    hp_search_finetuning_small_bert_trifecta_100k_qqp
+)
+hp_search_finetuning_small_bert_trifecta_85_100k_qqp.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_85%_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_90_100k_qqp = deepcopy(
+    hp_search_finetuning_small_bert_trifecta_100k_qqp
+)
+hp_search_finetuning_small_bert_trifecta_90_100k_qqp.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_90%_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_2x_100k_qqp = deepcopy(
+    hp_search_finetuning_small_bert_trifecta_100k_qqp)
+hp_search_finetuning_small_bert_trifecta_2x_100k_qqp.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_2x_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_4x_100k_qqp = deepcopy(
+    hp_search_finetuning_small_bert_trifecta_100k_qqp)
+hp_search_finetuning_small_bert_trifecta_4x_100k_qqp.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_4x_trifecta_100k",  # noqa: E501
+)
+
+
+#
 
 hp_search_finetuning_small_bert_trifecta_100k_big_tasks = deepcopy(
     hp_search_finetuning_small_bert_100k_big_tasks)
@@ -484,6 +534,14 @@ CONFIGS = dict(
     hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks,  # noqa: E501
     hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks,  # noqa: E501
 
+    # small bert, just qqp (instead of all big tasks)
+    hp_search_finetuning_small_bert_100k_qqp=hp_search_finetuning_small_bert_100k_qqp, # noqa
+    hp_search_finetuning_small_bert_trifecta_100k_qqp=hp_search_finetuning_small_bert_trifecta_100k_qqp, # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_85_100k_qqp=hp_search_finetuning_small_bert_trifecta_85_100k_qqp, # noqa
+    hp_search_finetuning_small_bert_trifecta_90_100k_qqp=hp_search_finetuning_small_bert_trifecta_90_100k_qqp, # noqa
+    hp_search_finetuning_small_bert_trifecta_2x_100k_qqp=hp_search_finetuning_small_bert_trifecta_2x_100k_qqp, # noqa
+    hp_search_finetuning_small_bert_trifecta_4x_100k_qqp=hp_search_finetuning_small_bert_trifecta_4x_100k_qqp, # noqa
+
     # bert base, small tasks
     hp_search_finetuning_bert_100k_small_tasks=hp_search_finetuning_bert_100k_small_tasks,  # noqa
     hp_search_finetuning_trifecta_80_100k_small_tasks=hp_search_finetuning_trifecta_80_100k_small_tasks,  # noqa
@@ -498,3 +556,18 @@ CONFIGS = dict(
     hp_search_finetuning_trifecta_90_100k_big_tasks=hp_search_finetuning_trifecta_90_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_2x_big_tasks=hp_search_finetuning_trifecta_2x_big_tasks,  # noqa
 )
+
+# run.py knows to do hyperparameter search instead of finetuning based on
+# hp_num_trials. This checks to make sure it is specified in each config.
+
+msg_1 = "hp_num_trials must be specified for hyperparameter search"
+msg_2 = "hp_num_trials must be > 1 for hyperparameter search"
+
+for experiment, config in CONFIGS.items():
+
+    # TODO: this should be OK as long as it is specified in task_hyperparams
+    # but it didn't work one time for me, so need to double check.
+    assert "hp_num_trials" in config, msg_1
+    n_trials= config["hp_num_trials"]
+    assert n_trials > 1, msg_2
+        
