@@ -223,12 +223,19 @@ tiny_bert_gmp_100k_maxlr_05["trainer_mixin_args"].update(
 )
 
 
-# ----------
-# BERT base
-# ----------
+# ---------
+# BERT Base
+# ---------
 
-bert_1mi_pretrained = "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi_prunable"  # noqa
 
+bert_1mi_pretrained = "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi_prunable"  # noqa E501
+
+
+# The max_lr for this run is chosen based off this lr-range test
+# https://wandb.ai/nupic-research/huggingface/runs/26eavts5 This is for an untrained
+# BERT Base, while the config below starts with a pre-trained BERT Base. Nonetheless,
+# previous experiments suggest this is a good starting point. Thus, we use a max_lr
+# slightly lower than what the test suggests.
 bert_1mi_pretrained_gmp_52k = deepcopy(bert_1mi)
 bert_1mi_pretrained_gmp_52k.update(
     fp16=True,
@@ -236,7 +243,8 @@ bert_1mi_pretrained_gmp_52k.update(
     max_steps=2000 + 30000 + 20000,  # longer may be better
     model_type="fully_static_sparse_bert",
     model_name_or_path=bert_1mi_pretrained,
-    # tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",  # noqa
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    overwrite_output_dir=True,
     trainer_callbacks=[
         RezeroWeightsCallback(),
         PlotDensitiesCallback(plot_freq=10000),
@@ -249,9 +257,8 @@ bert_1mi_pretrained_gmp_52k.update(
         warmup_steps=2000,
         cooldown_steps=20000,
         prune_period=1000,
-        max_lr=.00075,
+        max_lr=0.0003,
         verbose_gmp_logging=True,
-
         # KD
         teacher_model_names_or_paths=[
             "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
@@ -261,7 +268,7 @@ bert_1mi_pretrained_gmp_52k.update(
 
 
 CONFIGS = dict(
-    bert_1mi_pretrained_gmp_52k=bert_1mi_pretrained_gmp_52k,
+    # Tiny BERT
     tiny_bert_gmp_debug=tiny_bert_gmp_debug,
     tiny_bert_pretrained_gmp_lr_range_test=tiny_bert_pretrained_gmp_lr_range_test,
     tiny_bert_pretrained_gmp_52k=tiny_bert_pretrained_gmp_52k,
@@ -271,4 +278,7 @@ CONFIGS = dict(
     tiny_bert_gmp_100k=tiny_bert_gmp_100k,
     tiny_bert_gmp_100k_maxlr_01=tiny_bert_gmp_100k_maxlr_01,
     tiny_bert_gmp_100k_maxlr_05=tiny_bert_gmp_100k_maxlr_05,
+
+    # BERT Base
+    bert_1mi_pretrained_gmp_52k=bert_1mi_pretrained_gmp_52k,
 )

@@ -20,7 +20,6 @@
 # ----------------------------------------------------------------------
 from copy import deepcopy
 
-from ray import tune
 from transformers import Trainer
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
@@ -235,47 +234,6 @@ small_bert_trifecta_100k["config_kwargs"].update(
     sparsity=0.8027,
 )
 
-
-# Search for the best max_lr parameters for tiny BERT trained with KD and OneCycle LR
-def max_lr_hp_space(trial):
-    return dict(
-        trainer_mixin_args=dict(
-            max_lr=tune.grid_search([
-                0.004, 0.0045, 0.005, 0.0055, 0.006, 0.0065, 0.007, 0.0075, 0.008,
-                0.0085, 0.009,
-            ]),
-        )
-    )
-
-
-small_bert_trifecta_100k_maxlr_0005 = deepcopy(small_bert_trifecta_100k)
-small_bert_trifecta_100k_maxlr_0005["trainer_mixin_args"].update(
-    max_lr=0.0005,
-)
-small_bert_trifecta_100k_maxlr_001 = deepcopy(small_bert_trifecta_100k)
-small_bert_trifecta_100k_maxlr_001["trainer_mixin_args"].update(
-    max_lr=0.001,
-)
-small_bert_trifecta_100k_maxlr_0015 = deepcopy(small_bert_trifecta_100k)
-small_bert_trifecta_100k_maxlr_0015["trainer_mixin_args"].update(
-    max_lr=0.0015,
-)
-small_bert_trifecta_100k_maxlr_002 = deepcopy(small_bert_trifecta_100k)
-small_bert_trifecta_100k_maxlr_002["trainer_mixin_args"].update(
-    max_lr=0.002,
-)
-small_bert_trifecta_100k_maxlr_0025 = deepcopy(small_bert_trifecta_100k)
-small_bert_trifecta_100k_maxlr_0025["trainer_mixin_args"].update(
-    max_lr=0.0025,
-)
-small_bert_trifecta_100k_maxlr_003 = deepcopy(small_bert_trifecta_100k)
-small_bert_trifecta_100k_maxlr_003["trainer_mixin_args"].update(
-    max_lr=0.003,
-)
-small_bert_trifecta_100k_maxlr_0035 = deepcopy(small_bert_trifecta_100k)
-small_bert_trifecta_100k_maxlr_0035["trainer_mixin_args"].update(
-    max_lr=0.0035,
-)
 
 # LR Range test for `small_bert_trifecta_100k`
 # Results here: https://wandb.ai/numenta/huggingface/runs/3ocz9yac
@@ -714,15 +672,6 @@ CONFIGS = dict(
     small_bert_trifecta_100k=small_bert_trifecta_100k,
     small_bert_trifecta_300k=small_bert_trifecta_300k,
     small_bert_trifecta_lr_range_test=small_bert_trifecta_lr_range_test,
-    finetuning_small_bert_trifecta_100k_glue=finetuning_small_bert_trifecta_100k_glue,
-    small_bert_trifecta_100k_maxlr_0005=small_bert_trifecta_100k_maxlr_0005,
-    small_bert_trifecta_100k_maxlr_001=small_bert_trifecta_100k_maxlr_001,
-    small_bert_trifecta_100k_maxlr_0015=small_bert_trifecta_100k_maxlr_0015,
-    small_bert_trifecta_100k_maxlr_002=small_bert_trifecta_100k_maxlr_002,
-    small_bert_trifecta_100k_maxlr_0025=small_bert_trifecta_100k_maxlr_0025,
-    small_bert_trifecta_100k_maxlr_003=small_bert_trifecta_100k_maxlr_003,
-    small_bert_trifecta_100k_maxlr_0035=small_bert_trifecta_100k_maxlr_0035,
-
     #   85% sparse
     small_bert_trifecta_85_100k=small_bert_trifecta_85_100k,
     small_bert_trifecta_85_lr_range_test=small_bert_trifecta_85_lr_range_test,
