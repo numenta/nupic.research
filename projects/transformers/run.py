@@ -516,8 +516,6 @@ def run_finetuning_single_task(
             model_args, data_args, training_args, last_checkpoint
         )
 
-    print(f"type of eval dataset: {type(eval_dataset)} for task {data_args.task_name}")
-
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
@@ -537,8 +535,6 @@ def run_finetuning_single_task(
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
-
-    print(f"type of trainer for task {data_args.task_name}: {type(trainer)}")
 
     if training_args.do_train:
         # Note, rm_checkpoints=True means one model will be saved
