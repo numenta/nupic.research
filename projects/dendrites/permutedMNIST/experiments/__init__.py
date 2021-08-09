@@ -20,12 +20,14 @@
 # ----------------------------------------------------------------------
 
 from .base import CONFIGS as BASE
-from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
 from .batch import CONFIGS as BATCH
 from .batch_mnist import CONFIGS as BATCH_MNIST
 from .centroid import CONFIGS as CENTROID
+from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
 from .no_dendrites import CONFIGS as NO_DENDRITES
 from .si_centroid import CONFIGS as SI_CENTROID
+from .sp_context import CONFIGS as SP_CONTEXT
+from .sp_context_search import CONFIGS as SP_PROTO
 
 """
 Import and collect all experiment configurations into one CONFIG
