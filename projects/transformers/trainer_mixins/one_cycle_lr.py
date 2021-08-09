@@ -40,7 +40,7 @@ class OneCycleLRMixin:
         if args.deepspeed is not None:
             self._configure_deepspeed(args)
 
-        super().__init__(model, args, **kwargs)
+        super().__init__(model=model, args=args, **kwargs)
 
     def _configure_deepspeed(self, training_args):
         """
@@ -80,7 +80,8 @@ class OneCycleLRMixin:
         decay_lr_rate = 1
 
         # Update deepspeed LR scheduler configuration
-        config = training_args.deepspeed_config_hf.config
+        hf_deepspeed_config = training_args.hf_deepspeed_config
+        config = hf_deepspeed_config.config
         scheduler = config.setdefault("scheduler", {})
         scheduler_type = scheduler.setdefault("type", "OneCycle")
         assert scheduler_type == "OneCycle"

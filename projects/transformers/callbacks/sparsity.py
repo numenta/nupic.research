@@ -233,7 +233,7 @@ def get_density_by_layer(sparse_modules):
         subname = ".".join(n.split(".")[3:])
         layer_name = f"{subname} {tuple(m.weight.shape)}"
         density = 1 - calc_sparsity(m.weight)
-        df.loc[len(df.index)] = (layer_name, density)
+        df.loc[len(df.index)] = (layer_name, density.item())
 
     return df
 
@@ -254,6 +254,6 @@ def get_delta_on_params(sparse_modules, initial_on_params):
         zero_mask = m.zero_mask.bool()
         on_params = zero_mask.numel() - count_nonzero(zero_mask)
         delta = on_params - initial_on_params[n]
-        df.loc[len(df.index)] = (layer_name, delta)
+        df.loc[len(df.index)] = (layer_name, delta.item())
 
     return df
