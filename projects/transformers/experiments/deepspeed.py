@@ -26,8 +26,7 @@ from trainer_mixins import DeepspeedTransformerLayerMixin
 
 from .ablations import tiny_bert_sparse_100k_onecycle_lr_kd
 from .distillation import DistillationTrainer
-from .gmp_bert import tiny_bert_gmp_100k
-# from .trifecta import tiny_bert_trifecta_100k
+from .gmp_bert import bert_1mi_pretrained_gmp_52k, tiny_bert_gmp_100k
 
 __all__ = ["CONFIGS"]
 
@@ -102,6 +101,17 @@ _inject_trainer_mixin(
     mixin=DeepspeedTransformerLayerMixin
 )
 
+# Deepspeed version of bert_1mi_pretrained_gmp_52k
+bert_1mi_pretrained_gmp_52k_deepspeed = deepcopy(bert_1mi_pretrained_gmp_52k)
+bert_1mi_pretrained_gmp_52k_deepspeed.update(DEEPSPEED_STAGE2_ARGS)
+
+bert_1mi_pretrained_gmp_52k_fused_transformer_deepspeed = deepcopy(bert_1mi_pretrained_gmp_52k_deepspeed)  # noqa: E501
+# Replace HF Transformer Layer with Deepspeed transformetn
+_inject_trainer_mixin(
+    config=bert_1mi_pretrained_gmp_52k_fused_transformer_deepspeed,
+    mixin=DeepspeedTransformerLayerMixin
+)
+
 # LR Range Test for tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed
 tiny_bert_sparse_100k_kd_lr_range_test_deepspeed = deepcopy(tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed)  # noqa: E501
 tiny_bert_sparse_100k_kd_lr_range_test_deepspeed.update(
@@ -144,10 +154,14 @@ tiny_bert_sparse_100k_kd_lr_range_test_deepspeed["deepspeed"].update(
 )
 
 CONFIGS = dict(
-    # tiny_bert_trifecta_100k_deepspeed=tiny_bert_trifecta_100k_deepspeed,
+    # Tiny BERT
     tiny_bert_gmp_100k_deepspeed=tiny_bert_gmp_100k_deepspeed,
     tiny_bert_gmp_100k_fused_transformer_deepspeed=tiny_bert_gmp_100k_fused_transformer_deepspeed,  # noqa
     tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed=tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed,  # noqa: E501
     tiny_bert_sparse_100k_onecycle_lr_kd_fused_transformer_deepspeed=tiny_bert_sparse_100k_onecycle_lr_kd_fused_transformer_deepspeed,  # noqa: E501
     tiny_bert_sparse_100k_kd_lr_range_test_deepspeed=tiny_bert_sparse_100k_kd_lr_range_test_deepspeed,  # noqa: E501
+
+    # BERT Base
+    bert_1mi_pretrained_gmp_52k_deepspeed=bert_1mi_pretrained_gmp_52k_deepspeed,  # noqa: E501
+    bert_1mi_pretrained_gmp_52k_fused_transformer_deepspeed=bert_1mi_pretrained_gmp_52k_fused_transformer_deepspeed,  # noqa: E501
 )
