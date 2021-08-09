@@ -26,7 +26,7 @@ from trainer_mixins import DeepspeedTransformerLayerMixin
 
 from .ablations import tiny_bert_sparse_100k_onecycle_lr_kd
 from .distillation import DistillationTrainer
-
+from .gmp_bert import tiny_bert_gmp_100k
 # from .trifecta import tiny_bert_trifecta_100k
 
 __all__ = ["CONFIGS"]
@@ -78,6 +78,17 @@ DEEPSPEED_STAGE2_ARGS = {
 # FIXME: This configuration fails because RigL needs to access the gradients
 # tiny_bert_trifecta_100k_deepspeed = deepcopy(tiny_bert_trifecta_100k)
 # tiny_bert_trifecta_100k_deepspeed.update(DEEPSPEED_STAGE2_ARGS)
+
+# Deepspeed version of tiny_bert_gmp_100k
+tiny_bert_gmp_100k_deepspeed = deepcopy(tiny_bert_gmp_100k)
+tiny_bert_gmp_100k_deepspeed.update(DEEPSPEED_STAGE2_ARGS)
+
+tiny_bert_gmp_100k_fused_transformer_deepspeed = deepcopy(tiny_bert_gmp_100k_deepspeed)
+# Replace HF Transformer Layer with Deepspeed transformetn
+_inject_trainer_mixin(
+    config=tiny_bert_gmp_100k_fused_transformer_deepspeed,
+    mixin=DeepspeedTransformerLayerMixin
+)
 
 # tiny_bert_100k with KD, OneCycleLR and deepspeed
 tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed = deepcopy(tiny_bert_sparse_100k_onecycle_lr_kd)  # noqa: E501
@@ -134,6 +145,8 @@ tiny_bert_sparse_100k_kd_lr_range_test_deepspeed["deepspeed"].update(
 
 CONFIGS = dict(
     # tiny_bert_trifecta_100k_deepspeed=tiny_bert_trifecta_100k_deepspeed,
+    tiny_bert_gmp_100k_deepspeed=tiny_bert_gmp_100k_deepspeed,
+    tiny_bert_gmp_100k_fused_transformer_deepspeed=tiny_bert_gmp_100k_fused_transformer_deepspeed,  # noqa
     tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed=tiny_bert_sparse_100k_onecycle_lr_kd_deepspeed,  # noqa: E501
     tiny_bert_sparse_100k_onecycle_lr_kd_fused_transformer_deepspeed=tiny_bert_sparse_100k_onecycle_lr_kd_fused_transformer_deepspeed,  # noqa: E501
     tiny_bert_sparse_100k_kd_lr_range_test_deepspeed=tiny_bert_sparse_100k_kd_lr_range_test_deepspeed,  # noqa: E501
