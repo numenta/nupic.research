@@ -516,6 +516,8 @@ def run_finetuning_single_task(
             model_args, data_args, training_args, last_checkpoint
         )
 
+    print(f"type of eval dataset: {type(eval_dataset)} for task {data_args.task_name}")
+
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
@@ -535,6 +537,8 @@ def run_finetuning_single_task(
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
+
+    print(f"type of trainer for task {data_args.task_name}: {type(trainer)}")
 
     if training_args.do_train:
         # Note, rm_checkpoints=True means one model will be saved
@@ -601,9 +605,11 @@ def run_finetuning_multiple_tasks(
         )
 
     base_training_args = deepcopy(training_args)
+    base_model_args = deepcopy(model_args)
     for task_name in data_args.task_names:
         data_args.task_name = task_name
         training_args = deepcopy(base_training_args)
+        model_args = deepcopy(base_model_args)
         # For each task, save to a subfolder within run's root folder
         training_args.run_name = f"{base_training_args.run_name}_{task_name}"
         training_args.output_dir = os.path.join(
@@ -612,12 +618,16 @@ def run_finetuning_multiple_tasks(
 
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
-                if "hp_" in hp_key:
+                if ("hp_" in hp_key) or (hp_key == "trainer_class"):
                     setattr(model_args, hp_key, hp_val)
                 else:
                     print(f"hp stuff from training args: {hp_key}, and {hp_val}")
                     setattr(training_args, hp_key, hp_val)
 
+        # These checks can change training args, which can affect TaskResults
+        # attributes like metric_for_best_model
+        training_args = check_best_metric(training_args, data_args.task_name)
+        check_mnli(model_args, data_args.task_name)
         task_results = TaskResults(task_name, training_args)
 
         # Hack to ensure we don't do hp search num_runs times
@@ -647,16 +657,12 @@ def run_finetuning_multiple_tasks(
 
             task_results.append(eval_results)
 
-        # Find the predictions of the best model and sym link to a file
-        # labeled with "_best" at the end. Warning, assumes
-        # load_best_model_at_end is on.
-        best_run = get_best_run_and_link_best_predictions(
-            training_args, task_results, task_name)
-
         # Delete all finetuning run directories except for the best one
         # Ignore if this is a hyperparameter run, since the excess
         # is deleted within that function.
         if (model_args.hp_num_trials <= 1):
+            best_run = get_best_run_and_link_best_predictions(
+                training_args, task_results, task_name)
             skip = "run_" + best_run
             task_output_dir = os.path.dirname(training_args.output_dir)
             rm_prefixed_subdirs(task_output_dir, "run_", skip=skip)

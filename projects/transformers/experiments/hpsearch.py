@@ -146,18 +146,19 @@ debug_finetuning_sparse_hp_mnli.update(
         eval_sets=["validation_matched", "validation_mismatched"],
         eval_prefixes=["eval", "eval_mm"],
     ),
-    hp_num_trials=4,
+    hp_num_trials=2,
     trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2),
                        RezeroWeightsCallback()],
     task_hyperparams=dict(
         mnli=dict(
             hp_space=lambda trial: dict(
                 learning_rate=tune.loguniform(1e-6, 1e-3),
-                max_steps = tune.grid_search([50, 100, 150])
+                # max_steps = tune.grid_search([100, 200]),
             ),
-            hp_num_trials=4,
+            hp_num_trials=2,
             hp_compute_objective=("maximize", "eval_mm_accuracy"),
-            eval_steps=25,
+            eval_steps=15,
+            max_steps=45,
         )
     )
 )
@@ -565,11 +566,12 @@ CONFIGS = dict(
 msg_1 = "hp_num_trials must be specified for hyperparameter search"
 msg_2 = "hp_num_trials must be > 1 for hyperparameter search"
 
-for experiment, config in CONFIGS.items():
+# for experiment, config in CONFIGS.items():
 
-    # TODO: this should be OK as long as it is specified in task_hyperparams
-    # but it didn't work one time for me, so need to double check.
-    assert "hp_num_trials" in config, msg_1
-    n_trials= config["hp_num_trials"]
-    assert n_trials > 1, msg_2
+#     print(config)
+#     # TODO: this should be OK as long as it is specified in task_hyperparams
+#     # but it didn't work one time for me, so need to double check.
+#     assert "hp_num_trials" in config, msg_1 + f": {experiment}"
+#     n_trials= config["hp_num_trials"]
+#     assert n_trials > 1, msg_2 + f": {experiment}"
         

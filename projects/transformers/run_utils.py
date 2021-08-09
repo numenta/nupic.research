@@ -1134,6 +1134,7 @@ class TaskResults():
         self.load_best_model_at_end = \
             self.training_args.load_best_model_at_end
         self.best_metric_key = self.training_args.metric_for_best_model
+        print(f"TaskResults best_metric_key: {self.best_metric_key}")
         # If early stopping, need to track which step best results were at
         # If not, -1 corresponds to end of training
         self.best_idx_per_run = []  # One index for each run
@@ -1197,6 +1198,7 @@ class TaskResults():
         # Loop over runs on the same task
         for results in self.all_results:
             # replace with load_best_metric_at_end
+            print(results)
             if self.load_best_model_at_end:
                 # Within a run, the step where best results were achieved
                 best_metric_best_idx = np.argmax(results[self.best_metric_key])
@@ -1494,7 +1496,7 @@ def get_best_run_and_link_best_predictions(training_args,
             os.remove(link_file_path)
         os.symlink(best_run_predictions, link_file_path)
         logging.info(f"best run predictions for {task_name} saved to "
-                     "{link_file_path}")
+                     f"{link_file_path}")
 
     return str(best_run)
 

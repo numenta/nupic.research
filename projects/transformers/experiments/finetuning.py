@@ -90,16 +90,21 @@ debug_finetuning.update(
 
 debug_finetuning_mnli = deepcopy(debug_finetuning)
 debug_finetuning_mnli.update(
-    task_names=["mnli"],
-    metric_for_best_model="mm_accuracy",
-    trainer_class=MultiEvalSetTrainer,
-    trainer_mixin_args = dict(
-        # eval_sets should correspond to keys: tokenized_datasets[key]
-        # returns a dataset
-        eval_sets=["validation_matched", "validation_mismatched"],
-        eval_prefixes=["eval", "eval_mm"],
-    ),
-    trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2)]
+    task_names=["mnli", "wnli", "rte"],
+    trainer_callbacks=[TrackEvalMetrics()],
+    num_runs=2,
+    task_hyperparams=dict(
+        mnli=dict(
+            trainer_class=MultiEvalSetTrainer,
+            # deliberately incorrect metric - could should fix for you.
+            metric_for_best_model="mm_accuracy",
+            trainer_mixin_args=dict(
+                eval_sets=["validation_matched", "validation_mismatched"],
+                eval_prefixes=["eval", "eval_mm"],
+            ),
+            trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2)],
+        ),
+    )
 )
 
 
