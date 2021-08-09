@@ -39,9 +39,9 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 import yaml
 from scipy import stats as ss
+from tqdm import tqdm
 
 from finetuning_constants import (
     ALL_REPORTING_METRICS,
@@ -187,7 +187,7 @@ def load(experiment_path):
     # concats all dataframes if there are any and return
     if not summaries:
         return pd.DataFrame([]), pd.DataFrame([]), all_hyperparams
-    
+
     summary_df = pd.concat(summaries, axis=0, ignore_index=True, sort=False)
     return summary_df, histories, all_hyperparams
 
@@ -417,7 +417,7 @@ def dir_name_2_model_name(dir_name):
         hp_search_finetuning_bert_100k_big_tasks
         or
         hp_search_finetuning_bert_100k_small_tasks
-    
+
     Into a name like bert_100k
 
     This naming convention is specific to the config names used for
@@ -431,7 +431,6 @@ def dir_name_2_model_name(dir_name):
         name = name.split("_big_tasks")[0]
 
     return name
-
 
 
 def aggregate_all_data(base_path):
@@ -468,7 +467,7 @@ def aggregate_all_data(base_path):
 
     outfile = os.path.join(base_path, "all_hp_results.p")
     print(f"Saving all data to {outfile}")
-    with open(outfile, 'wb') as f:
+    with open(outfile, "wb") as f:
         pickle.dump(name_2_data, f)
 
 # ---------------------------
