@@ -46,6 +46,7 @@ logger = logging.get_logger(__name__)
 __all__ = [
     "StaticSparseEncoderBertModel",
     "StaticSparseNonAttentionBertModel",
+    "FullyStaticSparseBertModel",
 ]
 
 
