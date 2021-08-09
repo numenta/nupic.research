@@ -34,7 +34,9 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
+from nupic.research.frameworks.pytorch.datasets import (
+    ContextDependentPermutedMNIST,
+)
 from nupic.research.frameworks.vernon import mixins
 
 
