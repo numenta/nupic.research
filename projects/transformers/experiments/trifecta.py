@@ -415,7 +415,10 @@ finetuning_small_bert_trifecta_100k_glue.update(
         RezeroWeightsCallback()],
     rm_checkpoints=True,
 )
-
+finetuning_small_bert_trifecta_100k_glue['task_hyperparams']['mnli'].update(
+    trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2),
+                       RezeroWeightsCallback()],
+)
 
 finetuning_small_bert_sparse_85_trifecta_100k_glue = deepcopy(
     finetuning_small_bert_trifecta_100k_glue)
@@ -540,6 +543,10 @@ finetuning_bert_sparse_trifecta_100k_glue_get_info.update(
     warmup_ratio=0.1,
     rm_checkpoints=True,
 )
+finetuning_bert_sparse_trifecta_100k_glue_get_info['task_hyperparams']['mnli'].update(
+    trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2),
+                       RezeroWeightsCallback()],
+)
 
 # As above, but 85% sparse
 finetuning_bert_sparse_85_trifecta_100k_glue_get_info = deepcopy(
@@ -557,38 +564,11 @@ finetuning_bert_sparse_90_trifecta_100k_glue_get_info.update(
 
 # As above, trifecta_2x
 finetuning_bert_sparse_trifecta_2x_get_info = deepcopy(
-    finetuning_bert100k_glue_get_info)
+    finetuning_bert_sparse_trifecta_100k_glue_get_info)
 finetuning_bert_sparse_trifecta_2x_get_info.update(
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k",  # noqa: E501
-    trainer_callbacks=[
-        RezeroWeightsCallback(),
-        TrackEvalMetrics()],
-    warmup_ratio=0.1,
-    rm_checkpoints=True,
 )
-
-# This fine-tunes a pretrained model from `bert_sparse_85_trifecta_100k`.
-finetuning_bert_sparse_85_trifecta_100k_glue = deepcopy(
-    finetuning_bert_sparse_trifecta_100k_glue)
-finetuning_bert_sparse_85_trifecta_100k_glue.update(
-    # Model arguments
-    model_type="fully_static_sparse_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k",  # noqa: E501
-)
-finetuning_bert_sparse_85_trifecta_100k_glue["task_hyperparams"].update(
-    mnli=dict(eval_steps=123, save_steps=123)
-)
-
-# This fine-tunes a pretrained model from `bert_sparse_90_trifecta_100k`.
-finetuning_bert_sparse_90_trifecta_100k_glue = deepcopy(
-    finetuning_bert_sparse_trifecta_100k_glue)
-finetuning_bert_sparse_90_trifecta_100k_glue.update(
-    # Model arguments
-    model_type="fully_static_sparse_bert",
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k",  # noqa: E501
-)
-
 
 # BERT Base 2x Wide
 # This is ran with four p4d.24xlarge instances with 8 GPUs each for an effective batch
