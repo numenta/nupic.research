@@ -553,6 +553,8 @@ def sanitize_best_params(best_params, nan_handler):
     """
     clean_best = copy.deepcopy(best_params)
     for key, val in clean_best.items():
+        if isinstance(val, str):
+            continue
         if np.isnan(val):
             print(
                 f"Warning, parameter {key} is set to NaN. This can happen because of"
@@ -575,10 +577,12 @@ def sanitize_best_params(best_params, nan_handler):
     return clean_best
 
 
-def get_best_params(task_2_df, task_2_hps, config_path, nan_preferance):
+def get_best_params(task_2_df, task_2_hps, config_path,
+                    nan_preferance, proxy_dict=None):
 
     best_idx_per_task = {}
     best_params_per_task = {}
+    # Get best params for all tasks in this dataframe
     for task in task_2_df.keys():
         hps = list(task_2_hps[task])
         metric = REPORTING_METRICS_PER_TASK[task][0] + "_max"
@@ -590,6 +594,28 @@ def get_best_params(task_2_df, task_2_hps, config_path, nan_preferance):
         print(f"{task}: \n best score: {scores[best_idx]}")
         print(f"best params: {task_2_df[task].iloc[best_idx][hps]}")
         print("\n")
+
+    # If data for a task is missing, you can replace params on that task
+    # with a proxy task
+    if proxy_dict:
+        for source_task in proxy_dict.keys():
+            if source_task not in best_params_per_task:
+                hps = list(task_2_hps[source_task])
+                metric = REPORTING_METRICS_PER_TASK[source_task][0] + "_max"
+                scores = task_2_df[source_task][metric].values
+                best_idx = np.nanargmax(scores)
+                best_params = task_2_df[source_task].iloc[best_idx][hps]
+                best_idx_per_task[source_task] = best_idx
+            else:
+                best_params = best_params_per_task[source_task]
+            for dest_task in proxy_dict[source_task]:
+                best_params_per_task[dest_task] = best_params
+                best_params_per_task[dest_task]["task_hyperparams_proxy"] = \
+                    source_task
+                print(f"Using {source_task} hyperparams as a proxy for {dest_task}")
+                print(f"{source_task}: \n best score: {scores[best_idx]}")
+                print(f"best params: {task_2_df[source_task].iloc[best_idx][hps]}")
+                print("\n")
 
     nan_handler = handle_nan_factory(nan_preferance)
 
@@ -631,10 +657,18 @@ if __name__ == "__main__":
                         help="Find the best hyperparameters for each task "
                              "and save each set of parameters as a dictionary"
                              " that can be accessed for subsequent finetuning")
-    parser.add_argument("-p", "--plots", type=bool, required=False,
+    parser.add_argument("-f", "--figures", type=bool, required=False,
                         help="Make simple 1d plots with a regression line "
                              "fitting a success metric like eval_accuracy "
                              "to each hyperparameter individually")
+    parser.add_argument("-p", "--proxy_dict", type=str, required=False,
+                        default=None,
+                        help="If data for one task is missing, proxy_task "
+                             "tells it to set hyperparams for the missing "
+                             "task, to hyperparams from proxy_task. The "
+                             "task used as a proxy will be saved in the "
+                             "hyperparam yaml file."
+                        )
     parser.add_argument("-n", "--nan", type=str, required=False,
                         choices=["0", "zero", "user"],
                         help="How to handles NaNs. If 0, NaN parameters will "
@@ -652,6 +686,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     experiment_path = args.directory
+    if args.proxy_dict:
+        proxy_task_dict = json.loads(args.proxy_dict)
+    else:
+        proxy_task_dict = None
     if args.all:
         # Every pretrained model, every task, every hp trial
         aggregate_all_data(experiment_path)
@@ -659,4 +697,5 @@ if __name__ == "__main__":
         # One pretrained model, all tasks and hp trials
         task_2_df, task_2_hp_trials, task_2_hps = load_from_base(experiment_path)
         save_agg_results(task_2_df, experiment_path)
-        get_best_params(task_2_df, task_2_hps, args.config, args.nan)
+        get_best_params(task_2_df, task_2_hps, args.config,
+            args.nan, proxy_task_dict)

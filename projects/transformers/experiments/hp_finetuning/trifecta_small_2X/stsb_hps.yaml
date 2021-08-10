@@ -1,3 +1,2 @@
-learning_rate: 8.02157118723268e-05
-max_steps: 4511
-warmup_ratio: 0.1
+learning_rate: 0.00034976750846555597
+task_hyperparams_proxy: qqp

@@ -301,6 +301,9 @@ hp_search_finetuning_small_bert_trifecta_100k_qqp.update(
     task_names=["qqp"],
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_80%_trifecta_100k",  # noqa: E501
+    trainer_callbacks=[
+        TrackEvalMetrics(),
+        RezeroWeightsCallback()]
 )
 
 hp_search_finetuning_small_bert_trifecta_85_100k_qqp = deepcopy(

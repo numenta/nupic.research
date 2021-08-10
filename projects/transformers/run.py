@@ -612,10 +612,12 @@ def run_finetuning_multiple_tasks(
             base_training_args.output_dir, task_name
         )
 
+        model_arg_keys = ["trainer_class", "task_hyperparams_proxy"]
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
-                if ("hp_" in hp_key) or (hp_key == "trainer_class"):
-                    setattr(model_args, hp_key, hp_val)
+                # maybe handle proxy task here
+                if ("hp_" in hp_key) or hp_key in model_arg_keys:
+                   setattr(model_args, hp_key, hp_val)
                 else:
                     print(f"hp stuff from training args: {hp_key}, and {hp_val}")
                     setattr(training_args, hp_key, hp_val)
