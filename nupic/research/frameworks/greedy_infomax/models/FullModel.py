@@ -1,4 +1,5 @@
 # ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
 # Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
@@ -836,6 +837,52 @@ class WrappedSuperGreedySmallSparseVisionModel(SuperGreedySparseSmallVisionModel
                 ),
             )
         )
+
+
+class BlockModel(nn.Module):
+    def __init__(self, modules,
+        patch_size=16,
+        overlap=2):
+        super(BlockModel, self).__init__()
+        self.modules = modules
+        self.patch_size = patch_size
+        self.overlap = overlap
+
+    def forward(self, x):
+        # Patchify inputs
+        x, n_patches_x, n_patches_y = model_utils.patchify_inputs(
+            x, self.patch_size, self.overlap
+        )
+
+        x = self.encoder[0](x)
+        # Save positive/contrastive samples for each encoder block
+        log_f_module_list, true_f_module_list = [], []
+        for module in self.encoder[1:]:
+            # log_f_list and true_f_list each have k_predictions elements
+            log_f_list, true_f_list, z = module(x, n_patches_x, n_patches_y)
+            log_f_module_list.append(log_f_list)
+            true_f_module_list.append(true_f_list)
+            # Detach x to make sure no gradients are flowing in between modules
+            x = z.detach()
+        # Lists of lists: each list has num_modules internal lists, with each
+        # internal list containing k_predictions elements
+        return log_f_module_list, true_f_module_list
+
+    def encode(self, x):
+        # Patchify inputs
+        x, n_patches_x, n_patches_y = model_utils.patchify_inputs(
+            x, self.patch_size, self.overlap
+        )
+        x = self.encoder[0](x)
+        # Compute encoded patch-level representation for each encoder block
+        for module in self.encoder[1:]:
+            # no need to detach between modules as .encode() will only be called
+            # under a torch.no_grad() scope
+            x, out = module.encode(x, n_patches_x, n_patches_y)
+        # Return patch-level representation from the last block
+        return out
+
+
 
 class VDropSparseSmallVisionModel(SmallVisionModel):
     """

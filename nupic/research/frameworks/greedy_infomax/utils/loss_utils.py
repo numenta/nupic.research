@@ -42,6 +42,25 @@ def multiple_cross_entropy(data_lists, targets, reduction="mean"):
     return total_loss
 
 
+def multiple_cross_entropy_0(log_f_module_list, targets, reduction="mean"):
+    device = log_f_module_list[0][0].device
+    total_loss = torch.tensor(0.0, requires_grad=True, device=device)
+    # Sum losses from each module
+    for log_f_list in log_f_module_list:
+        # Sum losses for each k prediction
+        for log_fk in log_f_list:
+            # Positive samples are at index 0
+            true_fk = torch.zeros(
+                (log_fk.shape[0], log_fk.shape[-2], log_fk.shape[-1]),
+                dtype=torch.long,
+                device=log_fk.device,
+            )  # b, y, x
+            total_loss = total_loss + F.cross_entropy(
+                log_fk, true_fk, reduction=reduction
+            )
+    return total_loss
+
+
 def multiple_log_softmax_nll_loss(data_lists, targets, reduction="mean"):
     return module_specific_log_softmax_nll_loss(data_lists, targets).sum()
 
