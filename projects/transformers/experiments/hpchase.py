@@ -34,6 +34,7 @@ from .trifecta import (
     finetuning_small_bert_sparse_85_trifecta_100k_glue,
     finetuning_small_bert_sparse_90_trifecta_100k_glue,
     finetuning_small_bert_sparse_2x_trifecta_100k_glue,
+    finetuning_small_bert_sparse_4x_trifecta_100k_glue,
 )
 
 # Get all experiments where hyperparameters have been extracted
@@ -97,7 +98,7 @@ trifecta_90_hp_chase_mnli.update(
 
 # 80%
 trifecta_80_small_hp_chase = deepcopy(finetuning_small_bert_trifecta_100k_glue)
-trifecta_80_small_hp_chase = update_task_hyperparams(trifecta_80_small_hp_chase, "trifecta_80")
+trifecta_80_small_hp_chase = update_task_hyperparams(trifecta_80_small_hp_chase, "trifecta_small_80")
 
 # Temporarily updated to just finetune the remaining tasks, since a typo
 # caused these runs to break starting at mrpc
@@ -108,7 +109,7 @@ trifecta_80_small_hp_chase.update(
 
 # 85%
 trifecta_85_small_hp_chase = deepcopy(finetuning_small_bert_sparse_85_trifecta_100k_glue)
-trifecta_85_small_hp_chase = update_task_hyperparams(trifecta_85_small_hp_chase, "trifecta_85")
+trifecta_85_small_hp_chase = update_task_hyperparams(trifecta_85_small_hp_chase, "trifecta_small_85")
 trifecta_85_small_hp_chase.update(
     task_name=None,
     task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
@@ -116,15 +117,22 @@ trifecta_85_small_hp_chase.update(
 
 # 90%
 trifecta_90_small_hp_chase = deepcopy(finetuning_small_bert_sparse_90_trifecta_100k_glue)
-trifecta_90_small_hp_chase = update_task_hyperparams(trifecta_90_small_hp_chase, "trifecta_90")
+trifecta_90_small_hp_chase = update_task_hyperparams(trifecta_90_small_hp_chase, "trifecta_small_90")
 trifecta_90_small_hp_chase.update(
     task_name=None,
     task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
 )
 # 2x
 trifecta_2x_small_hp_chase = deepcopy(finetuning_small_bert_sparse_2x_trifecta_100k_glue)
-trifecta_2x_small_hp_chase = update_task_hyperparams(trifecta_2x_small_hp_chase, "trifecta_90")
+trifecta_2x_small_hp_chase = update_task_hyperparams(trifecta_2x_small_hp_chase, "trifecta_small_2x")
 trifecta_2x_small_hp_chase.update(
+    task_name=None,
+    task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
+)
+# 4x
+trifecta_4x_small_hp_chase = deepcopy(finetuning_small_bert_sparse_4x_trifecta_100k_glue)
+trifecta_4x_small_hp_chase = update_task_hyperparams(trifecta_2x_small_hp_chase, "trifecta_small_4x")
+trifecta_4x_small_hp_chase.update(
     task_name=None,
     task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
 )
@@ -142,4 +150,5 @@ CONFIGS = dict(
     trifecta_85_small_hp_chase=trifecta_85_small_hp_chase,
     trifecta_90_small_hp_chase=trifecta_90_small_hp_chase,
     trifecta_2x_small_hp_chase=trifecta_2x_small_hp_chase,
+    trifecta_4x_small_hp_chase=trifecta_4x_small_hp_chase,
 )
