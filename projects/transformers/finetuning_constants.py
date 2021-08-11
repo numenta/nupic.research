@@ -38,7 +38,7 @@ TASK_NAMES = [
 GLUE_NAMES_PER_TASK = {
     "cola": "CoLA",
     "sst2": "SST-2",
-    "mrcp": "MRPC",
+    "mrpc": "MRPC",
     "stsb": "STS-B",
     "qqp": "QQP",
     "mnli": "MNLI-M",
