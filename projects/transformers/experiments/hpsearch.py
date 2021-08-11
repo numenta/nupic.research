@@ -244,6 +244,7 @@ hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks.update(
 hp_search_finetuning_small_bert_100k_big_tasks = deepcopy(
     debug_finetuning_hp_search)
 hp_search_finetuning_small_bert_100k_big_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",
     task_name=None,
     task_names=["mnli", "qnli", "qqp", "sst2"],
     eval_steps=2_000,
