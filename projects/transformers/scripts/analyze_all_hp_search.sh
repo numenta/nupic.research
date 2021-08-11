@@ -102,7 +102,7 @@ python ${PYTHON_SCRIPT_DIR}/export_finetuning_hp_search_results.py \
 # BERT_SMALL_TRIFECTA_2X
 python ${PYTHON_SCRIPT_DIR}/export_finetuning_hp_search_results.py \
             -d ${HP_RESULTS_DIR}/hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks \
-            -c ${HP_CONFIG_DIR}/trifecta_small_2X \
+            -c ${HP_CONFIG_DIR}/trifecta_small_2x \
             -n 0
 python ${PYTHON_SCRIPT_DIR}/export_finetuning_hp_search_results.py \
             -d ${HP_RESULTS_DIR}/hp_search_finetuning_small_bert_trifecta_2x_100k_qqp \
