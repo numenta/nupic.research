@@ -170,7 +170,7 @@ debug_finetuning_sparse_hp_mnli.update(
 hp_search_finetuning_small_bert_100k_small_tasks = deepcopy(
     debug_finetuning_hp_search)
 hp_search_finetuning_small_bert_100k_small_tasks.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_100k",  # noqa: E501
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",  # noqa: E501
     task_name=None,
     task_names=["cola", "mrpc", "rte", "stsb", "wnli"],
     hp_space=lambda trial: dict(
