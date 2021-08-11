@@ -30,7 +30,7 @@ import os
 from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
     ClassificationModel,
 )
-from nupic.research.frameworks.greedy_infomax.models.GradientBlock import (
+from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
     GradientBlock,
 )
 from nupic.research.frameworks.greedy_infomax.mixins.blockwise_model import BlockWiseModel

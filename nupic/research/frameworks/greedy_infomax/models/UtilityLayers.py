@@ -26,10 +26,14 @@
 
 import torch.nn as nn
 
-
+# used to block gradients between layers
 class GradientBlock(nn.Module):
     def __init__(self):
         super(GradientBlock, self).__init__()
 
     def forward(self, x):
        return x.detach()
+
+# used to emit encodings at various points in the model's computation graph
+class EmitEncoding(nn.Identity):
+    pass
