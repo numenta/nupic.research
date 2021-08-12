@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from nupic.research.frameworks.backprop_structure.modules import VDropConv2d
 
 from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import (
-    BilinearInfo,
+    BilinearInfoLegacy,
     SparseBilinearInfo,
     VDropSparseBilinearInfo
 )
@@ -383,7 +383,7 @@ class ResNetEncoder(nn.Module):
             )
             self.first_stride = 2
 
-        self.bilinear_model = BilinearInfo(
+        self.bilinear_model = BilinearInfoLegacy(
             in_channels=self.in_planes,
             out_channels=self.in_planes,
             negative_samples=negative_samples,

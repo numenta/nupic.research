@@ -19,14 +19,18 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 from nupic.research.frameworks.vernon.network_utils import create_model
+import torch
+
 
 class BlockWiseModel:
+
+
     @classmethod
     def create_model(cls, config, device):
         model_args = config.get("model_args", {})
-        if "model_blocks" in config.keys():
+        if "model_blocks" in model_args.keys():
             model_blocks = []
-            for module_dict in config["model_blocks"]:
+            for module_dict in model_args["model_blocks"]:
                 model_blocks.append(create_model(
                     model_class=module_dict["model_class"],
                     model_args=module_dict.get("model_args", {}),
@@ -44,3 +48,23 @@ class BlockWiseModel:
             checkpoint_file=config.get("checkpoint_file", None),
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
         )
+
+    @classmethod
+    def create_optimizer(cls, config, model):
+        """
+        Create optimizer from an experiment config.
+
+        :param optimizer_class: Callable or class to instantiate optimizer. Must return
+                                object inherited from "torch.optim.Optimizer"
+        :param optimizer_args: Arguments to pass to the optimizer.
+        """
+        if "model_blocks" in config.keys():
+            parameters_to_train = []
+            for module, module_args in zip(model.modules, config["model_blocks"]):
+                if module_args["train"]:
+                    parameters_to_train.append(module.parameters())
+        else:
+            parameters_to_train = model.parameters()
+        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+        optimizer_args = config.get("optimizer_args", {})
+        return optimizer_class(parameters_to_train, **optimizer_args)

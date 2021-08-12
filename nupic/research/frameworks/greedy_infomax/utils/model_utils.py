@@ -24,307 +24,77 @@
 # https://arxiv.org/abs/1905.11786
 # ----------------------------------------------------------------------
 
-import sys
-import time
 import torch
-import torch.nn.functional as F
-from tqdm import tqdm
+import torch.nn as nn
+from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import \
+    PreActBlockNoBN, PreActBottleneckNoBN, SparsePreActBlockNoBN, \
+    SparsePreActBottleneckNoBN, ResNetEncoder, SparseResNetEncoder
+from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import \
+    BilinearInfo, SparseBilinearInfo
 
 
-def gen_orthgonal(dim):
-    a = torch.zeros((dim, dim)).normal_(0, 1)
-    q, r = torch.qr(a)
-    d = torch.diag(r, 0).sign()
-    diag_size = d.size(0)
-    d_exp = d.view(1, diag_size).expand(diag_size, diag_size)
-    q.mul_(d_exp)
-    return q
-
-
-def make_delta_orthogonal(weights, gain):
-    rows = weights.size(0)
-    cols = weights.size(1)
-    if rows > cols:
-        print("In_filters should not be greater than out_filters.")
-    weights.data.fill_(0)
-    dim = max(rows, cols)
-    q = gen_orthgonal(dim)
-    mid1 = weights.size(2) // 2
-    mid2 = weights.size(3) // 2
-    with torch.no_grad():
-        weights[:, :, mid1, mid2] = q[: weights.size(0), : weights.size(1)]
-        weights.mul_(gain)
-
-def patchify_inputs(x, patch_size, overlap):
-    x = (
-        x.unfold(2, patch_size, patch_size // overlap)
-        .unfold(3, patch_size, patch_size // overlap)
-        .permute(0, 2, 3, 1, 4, 5)  # b, p_x, p_y, c, x, y
-    )
-    n_patches_x = x.shape[1]
-    n_patches_y = x.shape[2]
-    x = x.reshape(
-        x.shape[0] * x.shape[1] * x.shape[2], x.shape[3], x.shape[4], x.shape[5]
-    )
-    return x, n_patches_x, n_patches_y
-
-
-
-def train_model_gim(
-    model,
-    loader,
-    optimizer,
-    device,
-    criterion=F.nll_loss,
-    complexity_loss_fn=None,
-    batches_in_epoch=sys.maxsize,
-    active_classes=None,
-    pre_batch_callback=None,
-    post_batch_callback=None,
-    transform_to_device_fn=None,
-    progress_bar=None,
+def full_model_blockwise_config(
+        negative_samples=16,
+        k_predictions=5,
+        resnet_50=False,
+        grayscale=True,
+        patch_size=16,
+        overlap=2,
+        num_channels=None,
+        block_dims=None,
 ):
-    """Train the given model by iterating through mini batches. An epoch ends
-    after one pass through the training set, or if the number of mini batches
-    exceeds the parameter "batches_in_epoch".
+    if block_dims is None:
+        block_dims = [3, 4, 6]
+    if num_channels is None:
+        num_channels = [64, 128, 256]
 
-    :param model: pytorch model to be trained
-    :type model: torch.nn.Module
-    :param loader: train dataset loader
-    :type loader: :class:`torch.utils.data.DataLoader`
-    :param optimizer: Optimizer object used to train the model.
-           This function will train the model on every batch using this optimizer
-           and the :func:`torch.nn.functional.nll_loss` function
-    :param device: device to use ('cpu' or 'cuda')
-    :type device: :class:`torch.device
-    :param criterion: loss function to use
-    :type criterion: function
-    :param complexity_loss_fn: a regularization term for the loss function
-    :type complexity_loss_fn: function
-    :param batches_in_epoch: Max number of mini batches to test on
-    :type batches_in_epoch: int
-    :param active_classes: a list of indices of the heads that are active for a given
-                           task; only relevant if this function is being used in a
-                           continual learning scenario
-    :type active_classes: list of int or None
-    :param pre_batch_callback: Callback function to be called before every batch
-                               with the following parameters: model, batch_idx
-    :type pre_batch_callback: function
-    :param post_batch_callback: Callback function to be called after every batch
-                                with the following parameters: model, batch_idx
-    :type post_batch_callback: function
-    :param transform_to_device_fn: Function for sending data and labels to the
-                                   device. This provides an extensibility point
-                                   for performing any final transformations on
-                                   the data or targets, and determining what
-                                   actually needs to get sent to the device.
-    :type transform_to_device_fn: function
-    :param progress_bar: Optional :class:`tqdm` progress bar args.
-                         None for no progress bar
-    :type progress_bar: dict or None
+    if resnet_50:
+        block = PreActBottleneckNoBN
+    else:
+        block = PreActBlockNoBN
 
-    :return: mean loss for epoch
-    :rtype: float
-    """
-    model.train()
-    # Use asynchronous GPU copies when the memory is pinned
-    # See https://pytorch.org/docs/master/notes/cuda.html
-    async_gpu = loader.pin_memory
-    if progress_bar is not None:
-        loader = tqdm(loader, **progress_bar)
-        # update progress bar total based on batches_in_epoch
-        if batches_in_epoch < len(loader):
-            loader.total = batches_in_epoch
+    if grayscale:
+        input_dims = 1
+    else:
+        input_dims = 3
+    encoder = []
 
-    # Check if training with Apex Mixed Precision
-    # FIXME: There should be another way to check if 'amp' is enabled
-    use_amp = hasattr(optimizer, "_amp_stash")
-    try:
-        from apex import amp
-    except ImportError:
-        if use_amp:
-            raise ImportError(
-                "Mixed precision requires NVIDA APEX."
-                "Please install apex from https://www.github.com/nvidia/apex")
+    encoder.append(
+        nn.Conv2d(input_dims, num_channels[0], kernel_size=5, stride=1, padding=2)
+    )
 
-    t0 = time.time()
-    for batch_idx, (data, target) in enumerate(loader):
-        if batch_idx >= batches_in_epoch:
-            break
+    for idx in range(len(block_dims)):
+        encoder.append(
+            ResNetEncoder(
+                self.block,
+                [block_dims[idx]],
+                [num_channels[idx]],
+                idx,
+                input_dims=input_dims,
+                k_predictions=self.k_predictions,
+                negative_samples=self.negative_samples,
+                previous_input_dim=num_channels[0]
+                if idx == 0
+                else num_channels[idx - 1],
+                first_stride=1 if idx == 0 else 2,
+            )
 
-        num_images = len(target)
-        if transform_to_device_fn is None:
-            data = data.to(device, non_blocking=async_gpu)
-            target = target.to(device, non_blocking=async_gpu)
-        else:
-            data, target = transform_to_device_fn(data, target, device,
-                                                  non_blocking=async_gpu)
-        t1 = time.time()
+small_resnet = [
+    dict(
+        model_class=nn.Conv2d,
+        model_args=dict(in_channels=input_dims,
+                        out_channels=num_channels,
+                        kernel_size=5,
+                        stride=1,
+                        padding=2),
+        init_batch_norm=None,
+        checkpoint_file=None,
+        load_checkpoint_args=None,
+        train=True,
+        save_checkpoint_file=None,
+    ),
+    dict(
 
-        if pre_batch_callback is not None:
-            pre_batch_callback(model=model, batch_idx=batch_idx)
+    )
 
-        optimizer.zero_grad()
-        # Output will be a list of list of tensors:
-        # output[x][k] = bilinear_module_x, prediction_step_k: tensor
-        output = model(data)
-
-        # Module specific losses will be a tensor of dimension num modules
-        # module_specific_losses[x] = loss from bilinear_module_x
-        module_specific_losses = criterion(output, target)
-        error_loss = module_specific_losses.sum()
-
-        del data, target, output
-
-        t2 = time.time()
-        if use_amp:
-            with amp.scale_loss(error_loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            error_loss.backward()
-
-        t3 = time.time()
-
-        # Compute and backpropagate the complexity loss. This happens after
-        # error loss has backpropagated, freeing its computation graph, so the
-        # two loss functions don't compete for memory.
-        complexity_loss = (complexity_loss_fn(model)
-                           if complexity_loss_fn is not None
-                           else None)
-        if complexity_loss is not None:
-            if use_amp:
-                with amp.scale_loss(complexity_loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                complexity_loss.backward()
-
-        t4 = time.time()
-        optimizer.step()
-        t5 = time.time()
-
-        if post_batch_callback is not None:
-            time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
-                           "complexity loss forward/backward: {:.3f}s,"
-                           + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                              t4 - t3, t5 - t4)
-            post_batch_callback(model=model,
-                                error_loss=error_loss.detach(),
-                                complexity_loss=(complexity_loss.detach()
-                                                 if complexity_loss is not None
-                                                 else None),
-                                batch_idx=batch_idx,
-                                num_images=num_images,
-                                time_string=time_string)
-        del error_loss, complexity_loss, module_specific_losses
-        t0 = time.time()
-
-    if progress_bar is not None:
-        loader.n = loader.total
-        loader.close()
-
-
-def evaluate_model_gim(
-    model,
-    loader,
-    device,
-    batches_in_epoch=sys.maxsize,
-    criterion=F.nll_loss,
-    complexity_loss_fn=None,
-    active_classes=None,
-    progress=None,
-    post_batch_callback=None,
-    transform_to_device_fn=None,
-):
-    """Evaluate pre-trained model using given test dataset loader.
-
-    :param model: Pretrained pytorch model
-    :type model: torch.nn.Module
-    :param loader: test dataset loader
-    :type loader: :class:`torch.utils.data.DataLoader`
-    :param device: device to use ('cpu' or 'cuda')
-    :type device: :class:`torch.device`
-    :param batches_in_epoch: Max number of mini batches to test on
-    :type batches_in_epoch: int
-    :param criterion: loss function to use
-    :type criterion: function
-    :param complexity_loss_fn: a regularization term for the loss function
-    :type complexity_loss_fn: function
-    :param active_classes: a list of indices of the heads that are active for a given
-                           task; only relevant if this function is being used in a
-                           continual learning scenario
-    :type active_classes: list of int or None
-    :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
-    :type progress: dict or None
-    :param post_batch_callback: Callback function to be called after every batch
-                                with the following parameters:
-                                batch_idx, target, output, pred
-    :type post_batch_callback: function
-    :param transform_to_device_fn: Function for sending data and labels to the
-                                   device. This provides an extensibility point
-                                   for performing any final transformations on
-                                   the data or targets, and determining what
-                                   actually needs to get sent to the device.
-    :type transform_to_device_fn: function
-
-    :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
-    :rtype: dict
-    """
-    model.eval()
-    total = 0
-
-    # Perform accumulation on device, avoid paying performance cost of .item()
-    loss = torch.tensor(0., device=device)
-    correct = torch.tensor(0, device=device)
-
-    async_gpu = loader.pin_memory
-
-    if progress is not None:
-        loader = tqdm(loader, total=min(len(loader), batches_in_epoch),
-                      **progress)
-
-    with torch.no_grad():
-        for batch_idx, (data, target) in enumerate(loader):
-            if batch_idx >= batches_in_epoch:
-                break
-
-            if transform_to_device_fn is None:
-                data = data.to(device, non_blocking=async_gpu)
-                target = target.to(device, non_blocking=async_gpu)
-            else:
-                data, target = transform_to_device_fn(data, target, device,
-                                                      non_blocking=async_gpu)
-
-            output = model(data)
-            if active_classes is not None:
-                output = output[:, active_classes]
-            loss += criterion(output, target, reduction="sum")
-            pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum()
-            total += len(data)
-
-            if post_batch_callback is not None:
-                post_batch_callback(batch_idx=batch_idx, target=target, output=output,
-                                    pred=pred)
-
-        complexity_loss = (complexity_loss_fn(model)
-                           if complexity_loss_fn is not None
-                           else None)
-
-    if progress is not None:
-        loader.close()
-
-    correct = correct.item()
-    loss = loss.item()
-
-    result = {
-        "total_correct": correct,
-        "total_tested": total,
-        "mean_loss": loss / total if total > 0 else 0,
-        "mean_accuracy": correct / total if total > 0 else 0,
-    }
-
-    if complexity_loss is not None:
-        result["complexity_loss"] = complexity_loss.item()
-
-    return result
-
+]

@@ -36,7 +36,7 @@ from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
 from nupic.research.frameworks.greedy_infomax.mixins.blockwise_model import BlockWiseModel
 
 from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
-    PreActBlockNoBN, SparsePreActBlockNoBN, BilinearInfo,
+    PreActBlockNoBN, SparsePreActBlockNoBN, BilinearInfoLegacy,
 )
 
 from nupic.research.frameworks.greedy_infomax.models.FullModel import (
@@ -55,7 +55,7 @@ from nupic.research.frameworks.greedy_infomax.utils.model_utils import \
 from nupic.research.frameworks.vernon.distributed import mixins, experiments
 from nupic.torch.modules import SparseWeights2d
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
-from nupic.research.frameworks.greedy_infomax.models.FullModel import BlockModel
+from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockModel
 
 
 
@@ -86,6 +86,7 @@ Block wise model example:
 model_structure:
 [ (nn.Conv2d, {args}, previous_checkpoint=None, train=True)
 (BilinearInfo, {args})
+(EmitEncoding)
 (GradientBlock)
 (PreActBlockNoBN, {args}, previous_checkpoint="checkpoint_file.ckpt", save_checkpoint=None),
 (PreActBlockNoBN, {args}, previous_checkpoint="checkpoint_file.ckpt"),
@@ -95,26 +96,22 @@ save_checkpoint="save_here.ckpt")
 ResNetEncoder, {args}, previous_checkpoint=None, save_checkpoint="save_there.ckpt")
 ]
 
-
 """
-block_wise_model_args=dict(
-        grayscale=True,
+
+
+
+# model hyperparameters
+grayscale=True
+num_channels = 64
+input_dims = 1
+if not grayscale:
+    input_dims = 3
+
+
+block_wise_small_resnet=dict(
         patch_size=16,
         overlap=2,
-        model_blocks=[
-            dict(
-                model_class=None,
-                model_args=None,
-                init_batch_norm=None,
-                checkpoint_file=None,
-                load_checkpoint_args=None,
-                train=True,
-                save_checkpoint_file=None,
-            ),
-
-
-
-        ]
+        model_blocks=None
     ),
 
 

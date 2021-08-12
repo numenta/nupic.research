@@ -25,6 +25,7 @@
 # ----------------------------------------------------------------------
 
 import torch.nn as nn
+import torch.nn.functional as F
 
 # used to block gradients between layers
 class GradientBlock(nn.Module):
@@ -36,4 +37,11 @@ class GradientBlock(nn.Module):
 
 # used to emit encodings at various points in the model's computation graph
 class EmitEncoding(nn.Identity):
-    pass
+    def __init__(self):
+        super(EmitEncoding, self).__init__()
+
+    def encode(self, x, n_patches_x, n_patches_y):
+        out = F.adaptive_avg_pool2d(x, 1)
+        out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
+        out = out.permute(0, 3, 1, 2).contiguous()
+        return out
