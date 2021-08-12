@@ -49,6 +49,14 @@ class CustomTrainingArguments(TrainingArguments):
                     "for addition arguments when trainer mixins are used."
         }
     )
+    rm_checkpoints: bool = field(
+        default=False,
+        metadata={
+            "help": "Remove all checkpoint directories at the end of training"
+                    ". The model that is output at the end of training will "
+                    "still be saved."
+        }
+    )
 
 
 @dataclass
