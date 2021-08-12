@@ -31,7 +31,7 @@ from trainer_mixins import (
     RigLMixin,
 )
 
-from .finetuning import finetuning_bert100k_glue_get_info, finetuning_bert700k_glue
+from .finetuning import finetuning_bert_100k_glue_get_info, finetuning_bert700k_glue, finetuning_small_bert_100k_glue
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
 
@@ -391,19 +391,8 @@ small_bert_trifecta_4x_lr_range_test.update(
 )
 
 # ---------
-# Finetuning small BERT
+# Small BERT finetuning
 # ---------
-
-
-# This fine-tunes a small pretrained model from `small_bert_100k` above.
-finetuning_small_bert_100k_glue = deepcopy(finetuning_bert100k_glue_get_info)
-finetuning_small_bert_100k_glue.update(
-    # Model arguments
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_100k",  # noqa: E501
-    trainer_callbacks=[TrackEvalMetrics()],
-    rm_checkpoints=True,
-)
-
 
 finetuning_small_bert_trifecta_100k_glue = deepcopy(finetuning_small_bert_100k_glue)
 finetuning_small_bert_trifecta_100k_glue.update(
@@ -516,6 +505,10 @@ verify_bert_sparse_trifecta_100k.update(
     tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",  # noqa: E501
 )
 
+# ---------
+# BERT Base finetuning
+# ---------
+
 
 # This fine-tunes a pretrained model from `bert_sparse_trifecta_100k` above.
 finetuning_bert_sparse_trifecta_100k_glue = deepcopy(finetuning_bert700k_glue)
@@ -533,7 +526,7 @@ finetuning_bert_sparse_trifecta_100k_glue.update(
 
 # 80% sparse, warmup, long runs
 finetuning_bert_sparse_trifecta_100k_glue_get_info = deepcopy(
-    finetuning_bert100k_glue_get_info)
+    finetuning_bert_100k_glue_get_info)
 finetuning_bert_sparse_trifecta_100k_glue_get_info.update(
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
@@ -688,8 +681,6 @@ CONFIGS = dict(
     tiny_bert_trifecta_lr_range_test=tiny_bert_trifecta_lr_range_test,
     finetuning_tiny_bert_trifecta_100k=finetuning_tiny_bert_trifecta_100k,
 
-    # Small BERT
-    finetuning_small_bert_100k_glue=finetuning_small_bert_100k_glue,
     #   80% sparse
     small_bert_trifecta_100k=small_bert_trifecta_100k,
     small_bert_trifecta_300k=small_bert_trifecta_300k,

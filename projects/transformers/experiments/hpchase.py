@@ -25,7 +25,7 @@ from copy import deepcopy
 import yaml
 
 # use bert_100k for task-specific hp search prototyping
-from .finetuning import finetuning_bert100k_glue_get_info
+from .finetuning import finetuning_bert_100k_glue_get_info
 from .trifecta import (
     finetuning_bert_sparse_85_trifecta_100k_glue_get_info,
     finetuning_bert_sparse_90_trifecta_100k_glue_get_info,
@@ -72,7 +72,7 @@ def update_task_hyperparams(local_config, model_name):
 # ---------
 
 # bert_100k
-bert_100k_hp_chase = deepcopy(finetuning_bert100k_glue_get_info)
+bert_100k_hp_chase = deepcopy(finetuning_bert_100k_glue_get_info)
 bert_100k_hp_chase = update_task_hyperparams(bert_100k_hp_chase, "bert_100k")
 
 # 80%
@@ -96,6 +96,12 @@ trifecta_90_hp_chase_mnli.update(
 # BERT small variations
 # ---------
 
+small_bert_big_dataset = deepcopy(finetuning_bert_100k_glue_get_info)
+small_bert_big_dataset.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",
+
+)
+
 # 80%
 trifecta_80_small_hp_chase = deepcopy(finetuning_small_bert_trifecta_100k_glue)
 trifecta_80_small_hp_chase = update_task_hyperparams(trifecta_80_small_hp_chase, "trifecta_small_80")
@@ -106,6 +112,10 @@ trifecta_80_small_hp_chase.update(
     task_name=None,
     task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
 )
+trifecta_80_small_hp_chase_first_two = deepcopy(trifecta_80_small_hp_chase)
+trifecta_80_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
 
 # 85%
 trifecta_85_small_hp_chase = deepcopy(finetuning_small_bert_sparse_85_trifecta_100k_glue)
@@ -115,6 +125,11 @@ trifecta_85_small_hp_chase.update(
     task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
 )
 
+trifecta_85_small_hp_chase_first_two = deepcopy(trifecta_85_small_hp_chase)
+trifecta_85_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
+
 # 90%
 trifecta_90_small_hp_chase = deepcopy(finetuning_small_bert_sparse_90_trifecta_100k_glue)
 trifecta_90_small_hp_chase = update_task_hyperparams(trifecta_90_small_hp_chase, "trifecta_small_90")
@@ -122,6 +137,12 @@ trifecta_90_small_hp_chase.update(
     task_name=None,
     task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
 )
+
+trifecta_90_small_hp_chase_first_two = deepcopy(trifecta_90_small_hp_chase)
+trifecta_90_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
+
 # 2x
 trifecta_2x_small_hp_chase = deepcopy(finetuning_small_bert_sparse_2x_trifecta_100k_glue)
 trifecta_2x_small_hp_chase = update_task_hyperparams(trifecta_2x_small_hp_chase, "trifecta_small_2x")
@@ -129,12 +150,23 @@ trifecta_2x_small_hp_chase.update(
     task_name=None,
     task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
 )
+
+trifecta_2x_small_hp_chase_first_two = deepcopy(trifecta_2x_small_hp_chase)
+trifecta_2x_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
+
 # 4x
 trifecta_4x_small_hp_chase = deepcopy(finetuning_small_bert_sparse_4x_trifecta_100k_glue)
 trifecta_4x_small_hp_chase = update_task_hyperparams(trifecta_2x_small_hp_chase, "trifecta_small_4x")
 trifecta_4x_small_hp_chase.update(
     task_name=None,
     task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
+)
+
+trifecta_4x_small_hp_chase_first_two = deepcopy(trifecta_4x_small_hp_chase)
+trifecta_4x_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
 )
 
 CONFIGS = dict(
@@ -151,4 +183,11 @@ CONFIGS = dict(
     trifecta_90_small_hp_chase=trifecta_90_small_hp_chase,
     trifecta_2x_small_hp_chase=trifecta_2x_small_hp_chase,
     trifecta_4x_small_hp_chase=trifecta_4x_small_hp_chase,
+
+    # BERT small follow ups
+    trifecta_80_small_hp_chase_first_two=trifecta_80_small_hp_chase_first_two,
+    trifecta_85_small_hp_chase_first_two=trifecta_85_small_hp_chase_first_two,
+    trifecta_90_small_hp_chase_first_two=trifecta_90_small_hp_chase_first_two,
+    trifecta_2x_small_hp_chase_first_two=trifecta_2x_small_hp_chase_first_two,
+    trifecta_4x_small_hp_chase_first_two=trifecta_4x_small_hp_chase_first_two,
 )

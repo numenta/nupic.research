@@ -214,8 +214,8 @@ steps_50k = 50_000 // 32
 # similar to the "simple but hard to beat" baseline from
 #           https://openreview.net/pdf?id=nzpLWnVAyah
 # including warmup, small learning rate, and long training times
-finetuning_bert100k_glue_get_info = deepcopy(finetuning_bert100k_glue)
-finetuning_bert100k_glue_get_info.update(
+finetuning_bert_100k_glue_get_info = deepcopy(finetuning_bert100k_glue)
+finetuning_bert_100k_glue_get_info.update(
     task_hyperparams=dict(
 
         cola=dict(eval_steps=50,
@@ -262,7 +262,15 @@ finetuning_bert100k_glue_get_info.update(
     rm_checkpoints=True,
 )
 
-finetuning_bert1mi_glue_get_info = deepcopy(finetuning_bert100k_glue_get_info)
+finetuning_small_bert_100k_glue = deepcopy(finetuning_bert_100k_glue_get_info)
+finetuning_small_bert_100k_glue.update(
+    # Model arguments
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",  # noqa: E501
+    trainer_callbacks=[TrackEvalMetrics()],
+    rm_checkpoints=True,
+)
+
+finetuning_bert1mi_glue_get_info = deepcopy(finetuning_bert_100k_glue_get_info)
 finetuning_bert1mi_glue_get_info.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
 )
@@ -345,7 +353,8 @@ CONFIGS = dict(
     debug_finetuning_bert_sparse_80_trifecta_cola=debug_finetuning_bert_sparse_80_trifecta_cola,  # noqa: E501
     debug_finetuning_predict=debug_finetuning_predict,
     finetuning_bert100k_glue=finetuning_bert100k_glue,
-    finetuning_bert100k_glue_get_info=finetuning_bert100k_glue_get_info,
+    finetuning_bert100k_glue_get_info=finetuning_bert_100k_glue_get_info,
+    finetuning_small_bert_100k_glue=finetuning_small_bert_100k_glue,
     finetuning_bert100k_single_task=finetuning_bert100k_single_task,
     finetuning_tiny_bert50k_glue=finetuning_tiny_bert50k_glue,
     finetuning_bert700k_glue=finetuning_bert700k_glue,
