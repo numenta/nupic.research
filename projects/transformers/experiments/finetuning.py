@@ -56,6 +56,9 @@ https://wandb.ai/numenta/huggingface/reports/Static-Sparse-Baselines--Vmlldzo1MT
 class MultiEvalSetTrainer(MultiEvalSetsTrainerMixin, Trainer):
     pass
 
+# ---------
+# Debugging
+# ---------
 
 debug_finetuning = deepcopy(transformers_base)
 debug_finetuning.update(
@@ -155,6 +158,9 @@ debug_finetuning_bert100k.update(
     run_name="debug_finetuning_bert100k",
 )
 
+# ---------
+# BERT base
+# ---------
 
 finetuning_bert700k_glue = deepcopy(transformers_base)
 finetuning_bert700k_glue.update(
@@ -262,14 +268,6 @@ finetuning_bert_100k_glue_get_info.update(
     rm_checkpoints=True,
 )
 
-finetuning_small_bert_100k_glue = deepcopy(finetuning_bert_100k_glue_get_info)
-finetuning_small_bert_100k_glue.update(
-    # Model arguments
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",  # noqa: E501
-    trainer_callbacks=[TrackEvalMetrics()],
-    rm_checkpoints=True,
-)
-
 finetuning_bert1mi_glue_get_info = deepcopy(finetuning_bert_100k_glue_get_info)
 finetuning_bert1mi_glue_get_info.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
@@ -282,37 +280,9 @@ finetuning_bert1mi_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
 )
 
-finetuning_bert100k_single_task = deepcopy(finetuning_bert100k_glue)
-finetuning_bert100k_single_task.update(
-    # logging
-    task_name=None,
-    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
-)
-
-
-finetuning_tiny_bert50k_glue = deepcopy(finetuning_bert700k_glue)
-finetuning_tiny_bert50k_glue.update(
-    model_name_or_path="/home/ec2-user"
-                       "/nta/results/experiments/transformers/tiny_bert_50k"
-)
-
-
-finetuning_bert700k_single_task = deepcopy(finetuning_bert700k_glue)
-finetuning_bert700k_single_task.update(
-    # logging
-    task_name=None,
-    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
-)
-
-finetuning_bert1mi_single_task = deepcopy(finetuning_bert1mi_glue)
-finetuning_bert1mi_single_task.update(
-    # logging
-    task_name=None,
-    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
-    overwrite_output_dir=True,
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
-)
-
+# ---------
+# BERT base, sparse
+# ---------
 
 finetuning_sparse_bert_100k_glue = deepcopy(finetuning_bert700k_glue)
 finetuning_sparse_bert_100k_glue.update(
@@ -337,11 +307,49 @@ finetuning_fully_sparse_bert_100k_glue.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_100k",  # noqa: E501
 )
 
+# ---------
+# BERT base, small tasks
+# ---------
 
-finetuning_mini_sparse_bert_debug = deepcopy(finetuning_bert700k_glue)
-finetuning_mini_sparse_bert_debug.update(
-    model_type="static_sparse_encoder_bert",
-    model_name_or_path="/home/ec2-user/nta/results/experiments/transformers/mini_sparse_bert_debug",  # noqa: E501
+finetuning_bert100k_small_tasks = deepcopy(finetuning_bert100k_glue)
+finetuning_bert100k_small_tasks.update(
+    # logging
+    task_name=None,
+    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
+)
+
+finetuning_bert700k_small_tasks = deepcopy(finetuning_bert700k_glue)
+finetuning_bert700k_small_tasks.update(
+    # logging
+    task_name=None,
+    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
+)
+
+finetuning_bert1mi_small_tasks = deepcopy(finetuning_bert1mi_glue)
+finetuning_bert1mi_small_tasks.update(
+    # logging
+    task_name=None,
+    task_names=["rte", "wnli", "stsb", "mrpc", "cola"],
+    overwrite_output_dir=True,
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_1mi",
+)
+
+# ---------
+# Bertitos
+# ---------
+
+finetuning_small_bert_100k_glue = deepcopy(finetuning_bert_100k_glue_get_info)
+finetuning_small_bert_100k_glue.update(
+    # Model arguments
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",  # noqa: E501
+    trainer_callbacks=[TrackEvalMetrics()],
+    rm_checkpoints=True,
+)
+
+finetuning_tiny_bert50k_glue = deepcopy(finetuning_bert700k_glue)
+finetuning_tiny_bert50k_glue.update(
+    model_name_or_path="/home/ec2-user"
+                       "/nta/results/experiments/transformers/tiny_bert_50k"
 )
 
 
@@ -355,15 +363,14 @@ CONFIGS = dict(
     finetuning_bert100k_glue=finetuning_bert100k_glue,
     finetuning_bert100k_glue_get_info=finetuning_bert_100k_glue_get_info,
     finetuning_small_bert_100k_glue=finetuning_small_bert_100k_glue,
-    finetuning_bert100k_single_task=finetuning_bert100k_single_task,
+    finetuning_bert100k_small_tasks=finetuning_bert100k_small_tasks,
     finetuning_tiny_bert50k_glue=finetuning_tiny_bert50k_glue,
     finetuning_bert700k_glue=finetuning_bert700k_glue,
-    finetuning_bert700k_single_task=finetuning_bert700k_single_task,
+    finetuning_bert700k_small_tasks=finetuning_bert700k_small_tasks,
     finetuning_bert1mi_glue=finetuning_bert1mi_glue,
     finetuning_bert1mi_glue_get_info=finetuning_bert1mi_glue_get_info,
-    finetuning_bert1mi_single_task=finetuning_bert1mi_single_task,
+    finetuning_bert1mi_small_tasks=finetuning_bert1mi_small_tasks,
     finetuning_sparse_bert_100k_glue=finetuning_sparse_bert_100k_glue,
     finetuning_sparse_encoder_bert_100k_glue=finetuning_sparse_encoder_bert_100k_glue,
-    finetuning_mini_sparse_bert_debug=finetuning_mini_sparse_bert_debug,
     finetuning_fully_sparse_bert_100k_glue=finetuning_fully_sparse_bert_100k_glue,
 )
