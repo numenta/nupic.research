@@ -96,11 +96,12 @@ trifecta_90_hp_chase_mnli.update(
 # BERT small variations
 # ---------
 
-small_bert_big_dataset = deepcopy(finetuning_bert_100k_glue_get_info)
-small_bert_big_dataset.update(
+small_bert_big_dataset_hp_chase = deepcopy(finetuning_bert_100k_glue_get_info)
+small_bert_big_dataset_hp_chase.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",
-
 )
+small_bert_big_dataset_hp_chase = update_task_hyperparams(
+    small_bert_big_dataset_hp_chase, "small_100k")
 
 # 80%
 trifecta_80_small_hp_chase = deepcopy(finetuning_small_bert_trifecta_100k_glue)
@@ -178,6 +179,7 @@ CONFIGS = dict(
     trifecta_90_hp_chase_mnli=trifecta_90_hp_chase_mnli,
 
     # BERT small
+    small_bert_big_dataset_hp_chase=small_bert_big_dataset_hp_chase,
     trifecta_80_small_hp_chase=trifecta_80_small_hp_chase,
     trifecta_85_small_hp_chase=trifecta_85_small_hp_chase,
     trifecta_90_small_hp_chase=trifecta_90_small_hp_chase,
