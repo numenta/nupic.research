@@ -69,10 +69,12 @@ from run_utils import (
     check_for_callback,
     check_hp_compute_objective,
     check_if_current_hp_best,
+    check_rm_checkpoints,
     check_sparsity_callback,
     compute_objective,
     evaluate_language_model,
     evaluate_tasks_handler,
+    get_best_run_and_link_best_predictions,
     get_labels,
     init_config,
     init_datasets_mlm,
@@ -80,9 +82,9 @@ from run_utils import (
     init_model,
     init_tokenizer,
     init_trainer,
-    link_best_predictions,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
+    rm_prefixed_subdirs,
     run_hyperparameter_search,
     test_tasks,
     train,
@@ -91,18 +93,6 @@ from run_utils import (
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
-
-REPORTING_METRICS_PER_TASK = {
-    "cola": ["eval_matthews_correlation"],
-    "mnli": ["eval_accuracy", "mm_eval_accuracy"],
-    "mrpc": ["eval_f1", "eval_accuracy"],
-    "qnli": ["eval_accuracy"],
-    "qqp": ["eval_accuracy", "eval_f1"],
-    "rte": ["eval_accuracy"],
-    "sst2": ["eval_accuracy"],
-    "stsb": ["eval_pearson", "eval_spearmanr"],
-    "wnli": ["eval_accuracy"]
-}
 
 
 def bold(text):
@@ -116,8 +106,6 @@ def pdict(dictionary):
 
 
 def main():
-    ray.shutdown()
-    ray.init()
 
     cmd_parser = argparse.ArgumentParser()
     cmd_parser.add_argument("experiments", nargs="+", choices=list(CONFIGS.keys()),
@@ -206,6 +194,9 @@ def main():
         set_seed(training_args.seed)
         logging.info(f"Seed to reproduce: {training_args.seed}")
 
+        # Issue warnings if rm_checkpoints is not in the usual configuration
+        check_rm_checkpoints(training_args, model_args)
+
         if model_args.finetuning:
             run_finetuning_multiple_tasks(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
@@ -292,7 +283,10 @@ def run_pretraining(
             trainer_callbacks=model_args.trainer_callbacks or None,
         )
         if training_args.do_train:
-            train(trainer, training_args.output_dir, last_checkpoint)
+            train(trainer,
+                  training_args.output_dir,
+                  training_args.rm_checkpoints,
+                  last_checkpoint)
 
     # Evaluate in full eval dataset.
     # if using hp search, load best model before running evaluate
@@ -451,6 +445,12 @@ def run_finetuning_single_task_with_hp_search(
     best_run = trainer.hyperparameter_search(**hp_search_kwargs)
     logging.info(f"Best run: {best_run}")
 
+    # Delete all saved models and checkpoints to save space. All we need
+    # are the params and scores. Currently this is a hack that is specific
+    # to ray. May need to modify so that it serves the same function for
+    # sigopt, once I integrate it.
+    rm_prefixed_subdirs(training_args.output_dir, "run-")
+
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
     hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
     write_new = check_if_current_hp_best(hp_res_file, model_args, best_run)
@@ -510,7 +510,13 @@ def run_finetuning_single_task(
     )
 
     if training_args.do_train:
-        train(trainer, training_args.output_dir, last_checkpoint)
+        # Note, rm_checkpoints=True means one model will be saved
+        # in the output_dir, and all checkpoint subdirectories will be
+        # deleted when train() is called.
+        train(trainer,
+              training_args.output_dir,
+              training_args.rm_checkpoints,
+              last_checkpoint)
 
     if training_args.do_eval:
         eval_results = evaluate_tasks_handler(
@@ -601,21 +607,37 @@ def run_finetuning_multiple_tasks(
             training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
 
-            training_fn = (
-                run_finetuning_single_task_with_hp_search if
-                model_args.hp_num_trials > 1 else run_finetuning_single_task
-            )
-            # TODO: pass run # into run_finetuning_single_task
-            eval_results = training_fn(
-                model_args, data_args, training_args, last_checkpoint=last_checkpoint,
-                run_idx=run_idx
-            )
+            if model_args.hp_num_trials > 1:
+                eval_results = run_finetuning_single_task_with_hp_search(
+                    model_args,
+                    data_args,
+                    training_args,
+                    last_checkpoint=last_checkpoint
+                )
+            else:
+                eval_results = run_finetuning_single_task(
+                    model_args,
+                    data_args,
+                    training_args,
+                    last_checkpoint=last_checkpoint,
+                    run_idx=run_idx
+                )
+
             task_results.append(eval_results)
 
         # Find the predictions of the best model and sym link to a file
         # labeled with "_best" at the end. Warning, assumes
         # load_best_model_at_end is on.
-        link_best_predictions(training_args, task_results, task_name)
+        best_run = get_best_run_and_link_best_predictions(
+            training_args, task_results, task_name)
+
+        # Delete all finetuning run directories except for the best one
+        # Ignore if this is a hyperparameter run, since the excess
+        # is deleted within that function.
+        if (model_args.hp_num_trials <= 1):
+            skip = "run_" + best_run
+            task_output_dir = os.path.dirname(training_args.output_dir)
+            rm_prefixed_subdirs(task_output_dir, "run_", skip=skip)
 
         # If this is just a prediction run, ignore this block
         if training_args.do_eval:

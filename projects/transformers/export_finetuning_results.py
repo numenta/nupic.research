@@ -336,7 +336,35 @@ def load_results(results_files):
     return results
 
 
-def results_to_df(results, reduction, model_name):
+def load_milestone_info(pretrained_model):
+    """
+    Look for the milestones table so you can include the eval loss
+    during pretraining for the pretrained model that the current experiment
+    derives from. If you can't find the pretrained model in the table, just
+    leave it as NaN.
+    """
+    # If pretrained_model wasn't specified as a command line arg
+    if not pretrained_model:
+        return np.nan
+
+    # Load the milestones dataframe
+    milestones_path = os.path.abspath("../results/milestone1.csv")
+    milestones_df = pd.read_csv(milestones_path)
+
+    # Look for eval loss for this model and set to NaN if you can't find it
+    row_matches = pretrained_model == milestones_df["Model Name"]
+    if sum(row_matches) > 0:
+        idx = np.argmax(row_matches)
+        eval_loss = milestones_df["Eval Loss"].iloc[idx]
+    else:
+        print(f"Pretrained model name {pretrained_model} not found in "
+              "milestones dataframe. Setting eval_loss to NaN.")
+        eval_loss = np.nan
+
+    return eval_loss
+
+
+def results_to_df(results, reduction, model_name, eval_loss):
 
     # Aggregate using chosen reduction method
     for _, task_results in results.items():
@@ -365,13 +393,14 @@ def results_to_df(results, reduction, model_name):
     cols = cols[-1:] + cols[:-1]  # Reorder so model_name is first column
     df = df[cols]
 
-    # Add timing information for added context
-    df["date_added"] = pd.to_datetime("today")
+    # Plug in eval loss for pretrained model or set to NaN if N/A
+    df["MLM Eval Loss"] = eval_loss
 
     return df
 
 
-def process_results(results_files, model_name, reduction, csv, md):
+def process_results(results_files, model_name, pretrained_model,
+                    reduction, csv, md):
 
     results = load_results(results_files)
 
@@ -382,8 +411,10 @@ def process_results(results_files, model_name, reduction, csv, md):
             print(f"...loading data from {csv}")
             csv_df = pd.read_csv(csv)
 
+    eval_loss = load_milestone_info(pretrained_model)
+
     # Aggregate using chosen reduction method
-    df = results_to_df(results, reduction, model_name)
+    df = results_to_df(results, reduction, model_name, eval_loss)
 
     # print markdown
     print(df.to_markdown(index=False))
@@ -391,7 +422,7 @@ def process_results(results_files, model_name, reduction, csv, md):
     # create a new csv file to store results
     if csv_df is None:
         print(f"saving results to a new file: {csv}")
-        df.to_csv(csv, index=False)
+        df.to_csv(os.path.abspath(csv), index=False)
     # merge csv file with current results
     else:
         df = pd.concat([csv_df, df], ignore_index=True)
@@ -399,7 +430,7 @@ def process_results(results_files, model_name, reduction, csv, md):
 
     # save a markdown file
     if len(md) > 0:
-        df.to_markdown(md, index=False)
+        df.to_markdown(os.path.abspath(md), index=False)
 
 
 if __name__ == "__main__":
@@ -409,6 +440,9 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model_name", type=str,
                         default="model",
                         help="Name of the model to save")
+    parser.add_argument("-p", "--pretrained_model", type=str,
+                        default="None", help="Name of pretrained model to "
+                        "look for in milestones table")
     parser.add_argument("-r", "--reduction", type=str,
                         default="max", choices=["mean", "max"],
                         help="Reduction method to use to aggregate results"
