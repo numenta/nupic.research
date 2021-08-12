@@ -441,7 +441,7 @@ hp_search_finetuning_trifecta_2x_small_tasks.update(
 )
 
 # ---------
-# BERT base, small tasks
+# BERT base, big tasks
 # ---------
 
 # bigger datasets, small number of trials
@@ -567,15 +567,20 @@ CONFIGS = dict(
 # run.py knows to do hyperparameter search instead of finetuning based on
 # hp_num_trials. This checks to make sure it is specified in each config.
 
-msg_1 = "hp_num_trials must be specified for hyperparameter search"
-msg_2 = "hp_num_trials must be > 1 for hyperparameter search"
+msg_1 = "hp_num_trials must be > 1 for hyperparameter search"
+msg_2 = "hp_num_trials must be specified for hyperparameter search"
 
-# for experiment, config in CONFIGS.items():
+for experiment, config in CONFIGS.items():
 
-#     print(config)
-#     # TODO: this should be OK as long as it is specified in task_hyperparams
-#     # but it didn't work one time for me, so need to double check.
-#     assert "hp_num_trials" in config, msg_1 + f": {experiment}"
-#     n_trials= config["hp_num_trials"]
-#     assert n_trials > 1, msg_2 + f": {experiment}"
+    if "task_hyperparams" in config:
+        hp_config = config["task_hyperparams"]
+        for task, task_config in hp_config.items():
+            if "hp_num_trials" in task_config:
+                n_trials = task_config["hp_num_trials"]
+                assert n_trials > 1, msg_1 + f": {experiment}"
+            else:
+                assert config["hp_num_trials"] > 1, msg_2 + f": {experiment}"
+
+    else:
+        assert config["hp_num_trials"] > 1, msg_2 + f": {experiment}"
         
