@@ -23,14 +23,11 @@ Base Transformers Experiment configuration.
 """
 
 from copy import deepcopy
-from callbacks import RezeroWeightsCallback
-
-from transformers import Trainer
 
 from ray import tune
+from transformers import Trainer
 
-from callbacks import TrackEvalMetrics
-
+from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from trainer_mixins import MultiEvalSetsTrainerMixin
 
 from .base import bert_base
@@ -142,7 +139,7 @@ debug_finetuning_sparse_hp_mnli.update(
     task_name="mnli",
     metric_for_best_model="eval_mm_accuracy",
     trainer_class=MultiEvalSetTrainer,
-    trainer_mixin_args = dict(
+    trainer_mixin_args=dict(
         eval_sets=["validation_matched", "validation_mismatched"],
         eval_prefixes=["eval", "eval_mm"],
     ),
@@ -244,7 +241,7 @@ hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks.update(
 hp_search_finetuning_small_bert_100k_big_tasks = deepcopy(
     debug_finetuning_hp_search)
 hp_search_finetuning_small_bert_100k_big_tasks.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",  # noqa: E501
     task_name=None,
     task_names=["mnli", "qnli", "qqp", "sst2"],
     eval_steps=2_000,
@@ -542,12 +539,12 @@ CONFIGS = dict(
     hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks,  # noqa: E501
 
     # small bert, just qqp (instead of all big tasks)
-    hp_search_finetuning_small_bert_100k_qqp=hp_search_finetuning_small_bert_100k_qqp, # noqa
-    hp_search_finetuning_small_bert_trifecta_100k_qqp=hp_search_finetuning_small_bert_trifecta_100k_qqp, # noqa: E501
-    hp_search_finetuning_small_bert_trifecta_85_100k_qqp=hp_search_finetuning_small_bert_trifecta_85_100k_qqp, # noqa
-    hp_search_finetuning_small_bert_trifecta_90_100k_qqp=hp_search_finetuning_small_bert_trifecta_90_100k_qqp, # noqa
-    hp_search_finetuning_small_bert_trifecta_2x_100k_qqp=hp_search_finetuning_small_bert_trifecta_2x_100k_qqp, # noqa
-    hp_search_finetuning_small_bert_trifecta_4x_100k_qqp=hp_search_finetuning_small_bert_trifecta_4x_100k_qqp, # noqa
+    hp_search_finetuning_small_bert_100k_qqp=hp_search_finetuning_small_bert_100k_qqp,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_100k_qqp=hp_search_finetuning_small_bert_trifecta_100k_qqp,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_85_100k_qqp=hp_search_finetuning_small_bert_trifecta_85_100k_qqp,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_90_100k_qqp=hp_search_finetuning_small_bert_trifecta_90_100k_qqp,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_2x_100k_qqp=hp_search_finetuning_small_bert_trifecta_2x_100k_qqp,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_4x_100k_qqp=hp_search_finetuning_small_bert_trifecta_4x_100k_qqp,  # noqa: E501
 
     # bert base, small tasks
     hp_search_finetuning_bert_100k_small_tasks=hp_search_finetuning_bert_100k_small_tasks,  # noqa
@@ -577,10 +574,10 @@ for experiment, config in CONFIGS.items():
         for task, task_config in hp_config.items():
             if "hp_num_trials" in task_config:
                 n_trials = task_config["hp_num_trials"]
-                assert n_trials > 1, msg_1 + f": {experiment}"
+                assert n_trials > 1, msg_1 + f": {experiment}: {task}"
             else:
-                assert config["hp_num_trials"] > 1, msg_2 + f": {experiment}"
+                full_msg_2 = msg_2 + f": {experiment}: {task}"
+                assert config["hp_num_trials"] > 1, full_msg_2
 
     else:
         assert config["hp_num_trials"] > 1, msg_2 + f": {experiment}"
-        

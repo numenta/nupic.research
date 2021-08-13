@@ -41,14 +41,13 @@ from pprint import pformat
 
 # FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
 import ray  # noqa: F401, I001
-from ray.tune.error import TuneError as TuneError
 import torch.distributed
 import transformers
+from ray.tune.error import TuneError as TuneError
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     AutoModelForSequenceClassification,
     DataCollatorWithPadding,
-    EarlyStoppingCallback,
     HfArgumentParser,
     default_data_collator,
     set_seed,
@@ -394,7 +393,8 @@ def run_finetuning_single_task_with_hp_search(
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
     model_args = check_hp_compute_objective(model_args,
-        data_args.task_name, training_args)
+                                            data_args.task_name,
+                                            training_args)
     check_sparsity_callback(model, model_args)
 
     # Get fraction of the validation dataset to use in hp search
@@ -630,7 +630,7 @@ def run_finetuning_multiple_tasks(
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
                 # maybe handle proxy task here
                 if ("hp_" in hp_key) or hp_key in model_arg_keys:
-                   setattr(model_args, hp_key, hp_val)
+                    setattr(model_args, hp_key, hp_val)
                 else:
                     setattr(training_args, hp_key, hp_val)
 

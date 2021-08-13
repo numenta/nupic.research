@@ -50,13 +50,17 @@ from transformers import (
 )
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
-from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK, RAW_REPORTING_METRICS_PER_TASK
+from finetuning_constants import (
+    GLUE_NAMES_PER_TASK,
+    RAW_REPORTING_METRICS_PER_TASK,
+    REPORTING_METRICS_PER_TASK,
+)
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
 __all__ = [
     "evaluate_language_model",
-    "evaluate_tasks",
+    "evaluate_task",
     "get_labels",
     "init_config",
     "init_datasets_mlm",
@@ -127,7 +131,7 @@ def train(trainer, output_dir, rm_checkpoints, last_checkpoint=None):
         rm_prefixed_subdirs(output_dir, "checkpoint-")
 
 
-def evaluate_task(trainer, output_dir, tasks, eval_datasets):
+def evaluate_task(trainer, output_dir, task, eval_dataset):
     """
     Evaluate on one task after finetuning. If mnli or if MultiEvalSetTrainer,
     mixin will handle evaluating on multiple sets for you.
@@ -143,8 +147,8 @@ def evaluate_task(trainer, output_dir, tasks, eval_datasets):
 
     eval_results.update(eval_result)
     output_eval_file = os.path.join(
-            output_dir, f"eval_results_{task}.txt"
-        )
+        output_dir, f"eval_results_{task}.txt"
+    )
     if trainer.is_world_process_zero():
         with open(output_eval_file, "w") as writer:
             logging.info(f"***** Eval results {task} *****")
@@ -853,7 +857,7 @@ def get_allowed_metrics(training_args, task_name):
                             [prefix, metric]))
 
                 allowed_metrics = prefixed_allowed_metrics
-    
+
     return allowed_metrics
 
 
@@ -864,16 +868,16 @@ def check_metric_direction(metric, greater_is_better):
     if "loss" in metric:
         if greater_is_better:
             logging.warning(
-                    "Greater is better is set to True with eval_loss as "
-                    "metric_for_best_model. Flipping greater is better to"
-                    "False, since we want small loss"
-                )
+                "Greater is better is set to True with eval_loss as "
+                "metric_for_best_model. Flipping greater is better to"
+                "False, since we want small loss"
+            )
         return False
     else:
         if not greater_is_better:
             logging.warning(
-                    "Greater is better is set to False with non-loss "
-                    f"metric {metric}. Setting greater is better to True"
+                "Greater is better is set to False with non-loss "
+                f"metric {metric}. Setting greater is better to True"
             )
         return True
 
@@ -908,13 +912,15 @@ def check_best_metric(training_args, task_name, metric=None):
         metric = training_args.metric_for_best_model
     allowed_metrics = get_allowed_metrics(training_args, task_name)
     metric = check_metric_is_allowed(metric,
-        allowed_metrics, task_name)
+                                     allowed_metrics,
+                                     task_name)
     greater_is_better = training_args.greater_is_better
-    greater_is_better = check_metric_direction(metric,
-        greater_is_better)
+    greater_is_better = check_metric_direction(
+        metric, greater_is_better
+    )
 
     print("metric configuration after checks: "
-        f"{metric}, {greater_is_better}")
+          f"{metric}, {greater_is_better}")
     training_args.greater_is_beter = greater_is_better
     training_args.metric_for_best_model = metric
 
@@ -937,6 +943,7 @@ def check_mnli(model_args, task_name):
                 "This is strongly discouraged and QA is not guaranteed!"
             )
 
+
 def check_rm_checkpoints(training_args, model_args):
     # If pretraining, you usually want to save checkpoints.
     if not model_args.finetuning:
@@ -957,11 +964,11 @@ def check_rm_checkpoints(training_args, model_args):
 
 
 def evaluate_task_handler(trainer,
-                           data_args,
-                           model_args,
-                           training_args,
-                           eval_dataset,
-                           tokenized_datasets):
+                          data_args,
+                          model_args,
+                          training_args,
+                          eval_dataset,
+                          tokenized_datasets):
     """
     Handle the last evaluation. If you've been evaluating throughout the
     training process, evaluate again if steps % eval steps is jagged.
@@ -1485,7 +1492,7 @@ def get_best_run_and_link_best_predictions(training_args,
         pred_files.append(GLUE_NAMES_PER_TASK[task_name + "-mm"] + ".tsv")
 
     best_run_predictions = [os.path.join(best_run_path, pred_file)
-                                for pred_file in pred_files]
+                            for pred_file in pred_files]
 
     # You want to find best_run in all cases. You want to link
     # to a set of predictions only when do_predict is on.
@@ -1504,7 +1511,7 @@ def get_best_run_and_link_best_predictions(training_args,
                 os.remove(link_file_path)
             os.symlink(best_run_predictions[idx], link_file_path)
             logging.info(f"best run predictions for {task_name} saved to "
-                        f"{link_file_path}")
+                         f"{link_file_path}")
 
     return str(best_run)
 

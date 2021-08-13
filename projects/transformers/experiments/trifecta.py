@@ -30,7 +30,11 @@ from trainer_mixins import (
     RigLMixin,
 )
 
-from .finetuning import finetuning_bert_100k_glue_get_info, finetuning_bert700k_glue, finetuning_small_bert_100k_glue
+from .finetuning import (
+    finetuning_bert700k_glue,
+    finetuning_bert_100k_glue_get_info,
+    finetuning_small_bert_100k_glue,
+)
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
 
@@ -362,7 +366,7 @@ finetuning_small_bert_trifecta_100k_glue.update(
         RezeroWeightsCallback()],
     rm_checkpoints=True,
 )
-finetuning_small_bert_trifecta_100k_glue['task_hyperparams']['mnli'].update(
+finetuning_small_bert_trifecta_100k_glue["task_hyperparams"]["mnli"].update(
     trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2),
                        RezeroWeightsCallback()],
 )
@@ -494,7 +498,7 @@ finetuning_bert_sparse_trifecta_100k_glue_get_info.update(
     warmup_ratio=0.1,
     rm_checkpoints=True,
 )
-finetuning_bert_sparse_trifecta_100k_glue_get_info['task_hyperparams']['mnli'].update(
+finetuning_bert_sparse_trifecta_100k_glue_get_info["task_hyperparams"]["mnli"].update(
     trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2),
                        RezeroWeightsCallback()],
 )

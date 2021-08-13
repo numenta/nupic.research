@@ -31,7 +31,7 @@ class MultiEvalSetsTrainerMixin:
         """
         Add one single argument to 'trainer_mixin_args'
 
-        :param eval_sets: List of str names of datasets to evaluate on. 
+        :param eval_sets: List of str names of datasets to evaluate on.
                           During init_dataset_for_finetuning, each name
                           should key into tokenized_datasets such that
                           tokenized_datasets[eval_sets[idx]] returns a dataset
@@ -83,4 +83,3 @@ class MultiEvalSetsTrainerMixin:
             ))
 
         return output_metrics
-

@@ -27,7 +27,6 @@ from copy import deepcopy
 from transformers import Trainer
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
-
 from trainer_mixins import MultiEvalSetsTrainerMixin
 
 from .base import transformers_base
@@ -59,6 +58,7 @@ class MultiEvalSetTrainer(MultiEvalSetsTrainerMixin, Trainer):
 # ---------
 # Debugging
 # ---------
+
 
 debug_finetuning = deepcopy(transformers_base)
 debug_finetuning.update(
@@ -247,10 +247,10 @@ finetuning_bert_100k_glue_get_info.update(
         mnli=dict(trainer_class=MultiEvalSetTrainer,
                   metric_for_best_model="eval_mm_accuracy",
                   trainer_mixin_args=dict(
-                  eval_sets=[
-                      "validation_matched",
-                      "validation_mismatched"],
-                  eval_prefixes=["eval", "eval_mm"],
+                      eval_sets=[
+                          "validation_matched",
+                          "validation_mismatched"],
+                      eval_prefixes=["eval", "eval_mm"],
                   ),
                   trainer_callbacks=[TrackEvalMetrics(n_eval_sets=2)],
                   eval_steps=2_500,
