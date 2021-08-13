@@ -25,11 +25,16 @@ from copy import deepcopy
 import yaml
 
 # use bert_100k for task-specific hp search prototyping
-from .finetuning import finetuning_bert100k_glue_get_info
+from .finetuning import finetuning_bert_100k_glue_get_info
 from .trifecta import (
     finetuning_bert_sparse_85_trifecta_100k_glue_get_info,
     finetuning_bert_sparse_90_trifecta_100k_glue_get_info,
     finetuning_bert_sparse_trifecta_100k_glue_get_info,
+    finetuning_small_bert_trifecta_100k_glue,
+    finetuning_small_bert_sparse_85_trifecta_100k_glue,
+    finetuning_small_bert_sparse_90_trifecta_100k_glue,
+    finetuning_small_bert_sparse_2x_trifecta_100k_glue,
+    finetuning_small_bert_sparse_4x_trifecta_100k_glue,
 )
 
 # Get all experiments where hyperparameters have been extracted
@@ -62,8 +67,12 @@ def update_task_hyperparams(local_config, model_name):
     return local_config
 
 
-# bet_100k
-bert_100k_hp_chase = deepcopy(finetuning_bert100k_glue_get_info)
+# ---------
+# BERT base variations
+# ---------
+
+# bert_100k
+bert_100k_hp_chase = deepcopy(finetuning_bert_100k_glue_get_info)
 bert_100k_hp_chase = update_task_hyperparams(bert_100k_hp_chase, "bert_100k")
 
 # 80%
@@ -83,10 +92,117 @@ trifecta_90_hp_chase_mnli.update(
     task_names=["mnli"],
 )
 
+# ---------
+# BERT small variations
+# ---------
+
+small_bert_big_dataset_hp_chase = deepcopy(finetuning_bert_100k_glue_get_info)
+small_bert_big_dataset_hp_chase.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",
+)
+small_bert_big_dataset_hp_chase = update_task_hyperparams(
+    small_bert_big_dataset_hp_chase, "small_100k")
+
+# 80%
+trifecta_80_small_hp_chase = deepcopy(finetuning_small_bert_trifecta_100k_glue)
+trifecta_80_small_hp_chase = update_task_hyperparams(trifecta_80_small_hp_chase, "trifecta_small_80")
+
+# Temporarily updated to just finetune the remaining tasks, since a typo
+# caused these runs to break starting at mrpc
+trifecta_80_small_hp_chase.update(
+    task_name=None,
+    task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
+)
+trifecta_80_small_hp_chase_first_two = deepcopy(trifecta_80_small_hp_chase)
+trifecta_80_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
+
+# 85%
+trifecta_85_small_hp_chase = deepcopy(finetuning_small_bert_sparse_85_trifecta_100k_glue)
+trifecta_85_small_hp_chase = update_task_hyperparams(trifecta_85_small_hp_chase, "trifecta_small_85")
+trifecta_85_small_hp_chase.update(
+    task_name=None,
+    task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
+)
+
+trifecta_85_small_hp_chase_first_two = deepcopy(trifecta_85_small_hp_chase)
+trifecta_85_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
+
+# 90%
+trifecta_90_small_hp_chase = deepcopy(finetuning_small_bert_sparse_90_trifecta_100k_glue)
+trifecta_90_small_hp_chase = update_task_hyperparams(trifecta_90_small_hp_chase, "trifecta_small_90")
+trifecta_90_small_hp_chase.update(
+    task_name=None,
+    task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
+)
+
+trifecta_90_small_hp_chase_first_two = deepcopy(trifecta_90_small_hp_chase)
+trifecta_90_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
+
+trifecta_90_small_hp_chase_debug_first_two = deepcopy(trifecta_90_small_hp_chase_first_two)
+trifecta_90_small_hp_chase_debug_first_two['task_hyperparams']['cola'].update(
+    max_steps=100,
+    num_runs=3,
+)
+trifecta_90_small_hp_chase_debug_first_two['task_hyperparams']['mnli'].update(
+    max_steps=100,
+    num_runs=3,
+)
+
+# 2x
+trifecta_2x_small_hp_chase = deepcopy(finetuning_small_bert_sparse_2x_trifecta_100k_glue)
+trifecta_2x_small_hp_chase = update_task_hyperparams(trifecta_2x_small_hp_chase, "trifecta_small_2x")
+trifecta_2x_small_hp_chase.update(
+    task_name=None,
+    task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
+)
+
+trifecta_2x_small_hp_chase_first_two = deepcopy(trifecta_2x_small_hp_chase)
+trifecta_2x_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
+
+# 4x
+trifecta_4x_small_hp_chase = deepcopy(finetuning_small_bert_sparse_4x_trifecta_100k_glue)
+trifecta_4x_small_hp_chase = update_task_hyperparams(trifecta_2x_small_hp_chase, "trifecta_small_4x")
+trifecta_4x_small_hp_chase.update(
+    task_name=None,
+    task_names=["mrpc", "qnli", "qqp", "rte", "sst2", "stsb", "wnli"],
+)
+
+trifecta_4x_small_hp_chase_first_two = deepcopy(trifecta_4x_small_hp_chase)
+trifecta_4x_small_hp_chase_first_two.update(
+    task_names=["cola", "mnli"]
+)
+
 CONFIGS = dict(
+    # BERT base
     bert_100k_hp_chase=bert_100k_hp_chase,
     trifecta_80_hp_chase=trifecta_80_hp_chase,
     trifecta_85_hp_chase=trifecta_85_hp_chase,
     trifecta_90_hp_chase=trifecta_90_hp_chase,
     trifecta_90_hp_chase_mnli=trifecta_90_hp_chase_mnli,
+
+    # BERT small
+    small_bert_big_dataset_hp_chase=small_bert_big_dataset_hp_chase,
+    trifecta_80_small_hp_chase=trifecta_80_small_hp_chase,
+    trifecta_85_small_hp_chase=trifecta_85_small_hp_chase,
+    trifecta_90_small_hp_chase=trifecta_90_small_hp_chase,
+    trifecta_2x_small_hp_chase=trifecta_2x_small_hp_chase,
+    trifecta_4x_small_hp_chase=trifecta_4x_small_hp_chase,
+
+    # BERT small follow ups
+    trifecta_80_small_hp_chase_first_two=trifecta_80_small_hp_chase_first_two,
+    trifecta_85_small_hp_chase_first_two=trifecta_85_small_hp_chase_first_two,
+    trifecta_90_small_hp_chase_first_two=trifecta_90_small_hp_chase_first_two,
+    trifecta_2x_small_hp_chase_first_two=trifecta_2x_small_hp_chase_first_two,
+    trifecta_4x_small_hp_chase_first_two=trifecta_4x_small_hp_chase_first_two,
+
+    # BERT small follow up debugging
+    trifecta_90_small_hp_chase_debug_first_two=trifecta_90_small_hp_chase_debug_first_two,
 )

@@ -50,7 +50,7 @@ from transformers import (
 )
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
-from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK
+from finetuning_constants import GLUE_NAMES_PER_TASK, REPORTING_METRICS_PER_TASK, RAW_REPORTING_METRICS_PER_TASK
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
@@ -127,28 +127,30 @@ def train(trainer, output_dir, rm_checkpoints, last_checkpoint=None):
         rm_prefixed_subdirs(output_dir, "checkpoint-")
 
 
-def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
+def evaluate_task(trainer, output_dir, tasks, eval_datasets):
     """
-    Evaluate tasks after finetuning.
+    Evaluate on one task after finetuning. If mnli or if MultiEvalSetTrainer,
+    mixin will handle evaluating on multiple sets for you.
     Returns evaluation dict with results.
     """
     eval_results = {}
 
-    for eval_dataset, task in zip(eval_datasets, tasks):
+    # if mnli, special trainer instance handles loop for you
+    if "MultiEvalSetTrainer" in str(type(trainer)):
+        eval_result = trainer.evaluate()
+    else:
         eval_result = trainer.evaluate(eval_dataset=eval_dataset)
-        if task == "mnli-mm":
-            eval_result = {f"mm_{k}": v for k, v in eval_result.items()}
-        eval_results.update(eval_result)
 
-        output_eval_file = os.path.join(
+    eval_results.update(eval_result)
+    output_eval_file = os.path.join(
             output_dir, f"eval_results_{task}.txt"
         )
-        if trainer.is_world_process_zero():
-            with open(output_eval_file, "w") as writer:
-                logging.info(f"***** Eval results {task} *****")
-                for key, value in sorted(eval_result.items()):
-                    logging.info(f"  {key} = {value}")
-                    writer.write(f"{key} = {value}\n")
+    if trainer.is_world_process_zero():
+        with open(output_eval_file, "w") as writer:
+            logging.info(f"***** Eval results {task} *****")
+            for key, value in sorted(eval_result.items()):
+                logging.info(f"  {key} = {value}")
+                writer.write(f"{key} = {value}\n")
 
     return eval_results
 
@@ -757,7 +759,7 @@ def check_sparsity_callback(model, model_args):
 
     if is_sparse:
         has_rezero = check_for_callback(model_args, RezeroWeightsCallback)
-        assert has_rezero, "Finetuning sparse models without rezeroing weights"
+        assert has_rezero[0], "Finetuning sparse models without rezeroing weights"
         " is prohibited"
 
 
@@ -785,7 +787,9 @@ def check_eval_and_max_steps(training_args, train_dataset):
     return training_args
 
 
-def check_hp_compute_objective(model_args, task_name):
+def check_hp_compute_objective(model_args,
+                               task_name,
+                               training_args):
     """
     When hyperparameter tuning, you need to specify an objective, like
     eval_accuracy, and also if it should be minimized or maximized. It is easy
@@ -798,7 +802,7 @@ def check_hp_compute_objective(model_args, task_name):
     hp_compute_objective = getattr(model_args, "hp_compute_objective", None)
     if hp_compute_objective is not None:
         direction, objective = model_args.hp_compute_objective
-        if objective == "eval_loss":
+        if "eval_loss" in objective:
             if direction != "minimize":
                 logging.warning(
                     "You are asking hp search to find parameters"
@@ -810,7 +814,8 @@ def check_hp_compute_objective(model_args, task_name):
                 hp_compute_objective[0] = "minimize"
                 model_args.hp_compute_objective = tuple(hp_compute_objective)
         else:
-            if objective not in REPORTING_METRICS_PER_TASK[task_name]:
+            allowed_metrics = get_allowed_metrics(training_args, task_name)
+            if objective not in allowed_metrics:
                 logging.warning(
                     "Warning, code will break when you try to tune"
                     "hyperparameters on this task because"
@@ -825,7 +830,73 @@ def check_hp_compute_objective(model_args, task_name):
     return model_args
 
 
-def check_best_metric(training_args, task_name):
+def get_allowed_metrics(training_args, task_name):
+
+    allowed_metrics = list(REPORTING_METRICS_PER_TASK[task_name])
+    allowed_metrics.append("eval_loss")
+
+    # In the special case of mnli, you have multiple validation sets
+    # A prefix (m, or mm) is used to distinguish them. In this case,
+    # overwrite allowed_metrics to use the prefixes
+    if training_args:
+        if "eval_prefixes" in training_args.trainer_mixin_args:
+            allowed_metrics = RAW_REPORTING_METRICS_PER_TASK[task_name]
+            allowed_metrics.append("loss")
+            if task_name != "mnli":
+                raise NotImplementedError
+            else:
+                prefixed_allowed_metrics = []
+                prefixes = training_args.trainer_mixin_args["eval_prefixes"]
+                for metric in allowed_metrics:
+                    for prefix in prefixes:
+                        prefixed_allowed_metrics.append("_".join(
+                            [prefix, metric]))
+
+                allowed_metrics = prefixed_allowed_metrics
+    
+    return allowed_metrics
+
+
+def check_metric_direction(metric, greater_is_better):
+
+    if greater_is_better is None:
+        greater_is_better = False
+    if "loss" in metric:
+        if greater_is_better:
+            logging.warning(
+                    "Greater is better is set to True with eval_loss as "
+                    "metric_for_best_model. Flipping greater is better to"
+                    "False, since we want small loss"
+                )
+        return False
+    else:
+        if not greater_is_better:
+            logging.warning(
+                    "Greater is better is set to False with non-loss "
+                    f"metric {metric}. Setting greater is better to True"
+            )
+        return True
+
+
+def check_metric_is_allowed(metric, allowed_metrics, task_name=None):
+
+    if metric not in allowed_metrics:
+        if task_name == "mnli":
+            # Use the mismatched val set for mnli to avoid overfitting
+            new_metric = allowed_metrics[1]
+        else:
+            new_metric = allowed_metrics[0]
+        logging.warning(
+            "Warning, code will break because the current metric for best model"
+            f" ({metric}) is not being tracked."
+            "Defaulting metric_for_best_model to {new_metric}"
+        )
+        return new_metric
+    else:
+        return metric
+
+
+def check_best_metric(training_args, task_name, metric=None):
     """
     Runs can easily break if load_best_model_at_end because you
     specified a metric for a diferent task. You can get all the way through
@@ -833,33 +904,40 @@ def check_best_metric(training_args, task_name):
     that case. It also checks to make sure greater_is_better is set properly.
     """
 
-    allowed_metrics = REPORTING_METRICS_PER_TASK[task_name]
-    if training_args.metric_for_best_model not in allowed_metrics:
-        if training_args.metric_for_best_model != "eval_loss":
-            logging.warning(
-                "Warning, code will break because the current metric for best model"
-                f" ({training_args.metric_for_best_model}) is not being tracked."
-                "Defaulting metric_for_best_model to first reporting metric"
-            )
-            training_args.metric_for_best_model = REPORTING_METRICS_PER_TASK[
-                task_name][0]
-            training_args.greater_is_better = False
+    if metric is None:
+        metric = training_args.metric_for_best_model
+    allowed_metrics = get_allowed_metrics(training_args, task_name)
+    metric = check_metric_is_allowed(metric,
+        allowed_metrics, task_name)
+    greater_is_better = training_args.greater_is_better
+    greater_is_better = check_metric_direction(metric,
+        greater_is_better)
 
-    if training_args.metric_for_best_model == "eval_loss":
-        if hasattr(training_args, "greater_is_better"):
-            if training_args.greater_is_better:
-                logging.warning(
-                    "Greater is better is set to True with eval_loss as "
-                    "metric_for_best_model. Flipping greater is better to"
-                    "False, since we want small loss"
-                )
-        training_args.greater_is_better = False
+    print("metric configuration after checks: "
+        f"{metric}, {greater_is_better}")
+    training_args.greater_is_beter = greater_is_better
+    training_args.metric_for_best_model = metric
 
     return training_args
 
 
-def check_rm_checkpoints(training_args, model_args):
+def check_mnli(model_args, task_name):
+    """
+    There are multiple way to handle mnli which has multiple eva;l sets
+    However, the recommended approach is to simply use multi_eval_sets
+    callback. This warns you if you are not doing that.
+    """
 
+    if task_name == "mnli":
+        if "MultiEvalSetTrainer" in str(model_args.trainer_class):
+            logging.info("Using recommended multi eval set approach for mnli")
+        else:
+            logging.warn(
+                "You are training on mnli without multi eval sets!"
+                "This is strongly discouraged and QA is not guaranteed!"
+            )
+
+def check_rm_checkpoints(training_args, model_args):
     # If pretraining, you usually want to save checkpoints.
     if not model_args.finetuning:
         if training_args.rm_checkpoints:
@@ -878,19 +956,24 @@ def check_rm_checkpoints(training_args, model_args):
             )
 
 
-def evaluate_tasks_handler(trainer,
+def evaluate_task_handler(trainer,
                            data_args,
                            model_args,
                            training_args,
                            eval_dataset,
                            tokenized_datasets):
+    """
+    Handle the last evaluation. If you've been evaluating throughout the
+    training process, evaluate again if steps % eval steps is jagged.
 
+    This determines if you should evaluate on a single task. If mnli, assume
+    multi_eval_sets mixin is in use which handles mismatched set for you.
+    """
     logging.info("*** Evaluate ***")
 
     eval_results = {}
     tracked_metrics, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
-    tasks = [data_args.task_name]
-    eval_datasets = [eval_dataset]
+    task = data_args.task_name
 
     if tracked_metrics:
 
@@ -903,39 +986,17 @@ def evaluate_tasks_handler(trainer,
 
             print(f"Evaluating again because offset was {offset}")
 
-            eval_results = evaluate_tasks(
-                trainer, training_args.output_dir, tasks, eval_datasets
+            eval_results = evaluate_task(
+                trainer, training_args.output_dir, task, eval_dataset
             )
             metric_callback.eval_metrics["steps"][-1] -= offset
-
-        # mnli has two eval sets. For now, assume load_best_model_at_end is on
-        # and just evaluate once on mnli-mm once at the end. TrackEvalMetrics
-        # callback handles metrics, and looks for the mm_ prefix. If present,
-        # it stores results on the mm set in a separate dictionary
-        if data_args.task_name == "mnli":
-            _ = trainer.evaluate(
-                eval_dataset=tokenized_datasets["validation_mismatched"],
-                metric_key_prefix="mm",
-            )
-            n_evals = len(tracked_eval_metrics["steps"])
-            mm_dict = metric_callback.mm_metrics
-            for key in mm_dict.keys():
-                key_name = "mm_eval_" + key
-                # Fill a list of same length as other metrics for consistency
-                tracked_eval_metrics[key_name] = [mm_dict[key] for i in range(n_evals)]
 
         eval_results = tracked_eval_metrics
 
     else:
 
-        # In this case, you need to do the usualy evaluation
-        # Regardless of load_best_model, you have the correct model loaded
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            eval_datasets.append(tokenized_datasets["validation_mismatched"])
-
-        eval_results = evaluate_tasks(
-            trainer, training_args.output_dir, tasks, eval_datasets
+        eval_results = evaluate_task(
+            trainer, training_args.output_dir, task, eval_dataset
         )
 
     return eval_results
@@ -1064,13 +1125,14 @@ class TaskResults():
 
     reporting_metrics_per_task = REPORTING_METRICS_PER_TASK
 
-    def __init__(self, task_name, early_stopping, training_args=None):
+    def __init__(self, task_name, training_args):
         self.task_name = task_name
-        self.reporting_metrics = self.reporting_metrics_per_task[task_name]
+        self.reporting_metrics = get_allowed_metrics(training_args, task_name)
         self.all_results = []
         self._results = None
         self.training_args = training_args
-        self.early_stopping = early_stopping
+        self.load_best_model_at_end = \
+            self.training_args.load_best_model_at_end
         self.best_metric_key = self.training_args.metric_for_best_model
         # If early stopping, need to track which step best results were at
         # If not, -1 corresponds to end of training
@@ -1134,11 +1196,12 @@ class TaskResults():
         aggregated_results = defaultdict(list)
         # Loop over runs on the same task
         for results in self.all_results:
-            if self.early_stopping:
+            # replace with load_best_metric_at_end
+            if self.load_best_model_at_end:
                 # Within a run, the step where best results were achieved
                 best_metric_best_idx = np.argmax(results[self.best_metric_key])
             else:
-                # If not early stopping, grab results seen at end of training
+                # If not load best at end, just get the last step
                 best_metric_best_idx = -1
 
             self.best_idx_per_run.append(best_metric_best_idx)
@@ -1416,8 +1479,13 @@ def get_best_run_and_link_best_predictions(training_args,
     best_run = task_results.get_model_with_best_max()
     task_path = os.path.dirname(training_args.output_dir)
     best_run_path = os.path.join(task_path, f"run_{best_run}")
-    pred_file = GLUE_NAMES_PER_TASK[task_name] + ".tsv"
-    best_run_predictions = os.path.join(best_run_path, pred_file)
+
+    pred_files = [GLUE_NAMES_PER_TASK[task_name] + ".tsv"]
+    if task_name == "mnli":
+        pred_files.append(GLUE_NAMES_PER_TASK[task_name + "-mm"] + ".tsv")
+
+    best_run_predictions = [os.path.join(best_run_path, pred_file)
+                                for pred_file in pred_files]
 
     # You want to find best_run in all cases. You want to link
     # to a set of predictions only when do_predict is on.
@@ -1425,13 +1493,18 @@ def get_best_run_and_link_best_predictions(training_args,
 
         # link task_best.tsv
         # If previous symlink exists, just delete and recreate
-        link_file_name = GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"
-        link_file_path = os.path.join(task_path, link_file_name)
-        if os.path.exists(link_file_path):
-            os.remove(link_file_path)
-        os.symlink(best_run_predictions, link_file_path)
-        logging.info(f"best run predictions for {task_name} saved to "
-                     "{link_file_path}")
+        link_file_names = [GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"]
+        if task_name == "mnli":
+            link_file_names.append(
+                GLUE_NAMES_PER_TASK[task_name + "-mm"] + "_best.tsv")
+
+        for idx, link_file_name in enumerate(link_file_names):
+            link_file_path = os.path.join(task_path, link_file_name)
+            if os.path.exists(link_file_path):
+                os.remove(link_file_path)
+            os.symlink(best_run_predictions[idx], link_file_path)
+            logging.info(f"best run predictions for {task_name} saved to "
+                        f"{link_file_path}")
 
     return str(best_run)
 
