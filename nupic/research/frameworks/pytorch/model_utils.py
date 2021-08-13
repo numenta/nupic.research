@@ -357,6 +357,11 @@ def count_nonzero_params(model):
     return total_params, total_nonzero_params
 
 
+def calc_model_sparsity(model):
+    total_params, nonzero_params = count_nonzero_params(model)
+    return 1 - nonzero_params / total_params
+
+
 def serialize_state_dict(fileobj, state_dict, **kwargs):
     """
     Serialize the state dict to file object

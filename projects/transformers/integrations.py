@@ -24,6 +24,7 @@ import os
 from collections import MutableMapping
 
 import wandb
+from ray.tune.integration.wandb import WandbLoggerCallback
 from transformers.integrations import (
     INTEGRATION_TO_CALLBACK,
     WandbCallback,
@@ -157,3 +158,23 @@ def flatten_dict(d, parent_key="", seperator="."):
             items.append((new_key, v))
 
     return dict(items)
+
+
+def init_ray_wandb_logger_callback(training_args):
+    """
+    Initialize the ray wandb integration, used specifically for hyperparameter
+    tuning. Returns either None or a list containing the initialized callback,
+    so the output can be passed directly to hp_search_kwargs.
+    """
+    has_wandb = is_wandb_available()
+    if not has_wandb:
+        return None
+
+    project = os.getenv("WANDB_PROJECT", "huggingface")
+    group = training_args.run_name
+    callbacks = [WandbLoggerCallback(
+        project=project,
+        group=group,
+    )]
+
+    return callbacks

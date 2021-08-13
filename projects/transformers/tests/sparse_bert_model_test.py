@@ -22,7 +22,7 @@
 import sys
 import tempfile
 import unittest
-from os.path import expanduser
+from os.path import abspath
 
 from transformers import (
     CONFIG_MAPPING,
@@ -32,7 +32,6 @@ from transformers import (
     AutoModelForSequenceClassification,
 )
 
-sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers")) # noqa
 from models import (
     SparseEmbeddings,
     StaticSparseEncoderBertConfig,
@@ -40,7 +39,8 @@ from models import (
     StaticSparseEncoderBertForSequenceClassification,
 )
 from nupic.torch.modules import SparseWeights
-# noqa
+
+sys.path.insert(0, abspath("../"))
 
 
 class SparseBertModelTest(unittest.TestCase):

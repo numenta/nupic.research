@@ -26,6 +26,7 @@ from transformers import Trainer
 from callbacks import PlotDensitiesCallback, RezeroWeightsCallback
 from trainer_mixins import DistillationTrainerMixin, OneCycleLRMixin, RigLMixin
 
+from .bertitos import tiny_bert_100k
 from .finetuning import finetuning_bert700k_glue
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
@@ -128,6 +129,40 @@ tiny_bert_sparse_300k_onecycle_lr_kd.update(
     ),
     overwrite_output_dir=True,
     fp16=True,
+)
+
+
+# Dense KD + OneCyle LR
+tiny_bert_100k_onecycle_lr_kd = deepcopy(tiny_bert_100k)
+tiny_bert_100k_onecycle_lr_kd.update(
+    max_steps=100000,
+    trainer_class=KDOneCycleLRTrainer,
+    trainer_mixin_args=dict(
+        max_lr=0.015,
+        **kd_args,
+        **onecycle_args,
+    ),
+    overwrite_output_dir=True,
+    fp16=True,
+)
+
+
+tiny_bert_kd_onecycle_lr_range_test = deepcopy(tiny_bert_100k)
+tiny_bert_kd_onecycle_lr_range_test.update(
+    max_steps=100,
+    trainer_class=KDLRRangeTestTrainer,
+    trainer_mixin_args=dict(
+        # LR Range Test
+        min_lr=0.0001,
+        max_lr=0.005,
+        test_mode="linear",
+
+        # KD
+        teacher_model_names_or_paths=[
+            "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi"
+        ],
+    ),
+    overwrite_output_dir=True,
 )
 
 
@@ -320,6 +355,8 @@ CONFIGS = dict(
     tiny_bert_rigl_100k_kd=tiny_bert_rigl_100k_kd,
     tiny_bert_sparse_100k_onecycle_lr_kd=tiny_bert_sparse_100k_onecycle_lr_kd,
     tiny_bert_sparse_300k_onecycle_lr_kd=tiny_bert_sparse_300k_onecycle_lr_kd,
+    tiny_bert_100k_onecycle_lr_kd=tiny_bert_100k_onecycle_lr_kd,
+    tiny_bert_kd_onecycle_lr_range_test=tiny_bert_kd_onecycle_lr_range_test,
     tiny_bert_kd_onecycle_50k_maxlr_search=tiny_bert_kd_onecycle_50k_maxlr_search,
     tiny_bert_kd_onecycle_100k_pct_start_search=tiny_bert_kd_onecycle_100k_pct_start_search,  # noqa: E501
     tiny_bert_kd_onecycle_300k_pct_start_search=tiny_bert_kd_onecycle_300k_pct_start_search,  # noqa: E501

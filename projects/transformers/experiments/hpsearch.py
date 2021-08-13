@@ -26,7 +26,12 @@ from copy import deepcopy
 
 from ray import tune
 
+from callbacks import TrackEvalMetrics
+
 from .base import bert_base
+# use bert_100k for task-specific hp search prototyping
+from .finetuning import finetuning_bert100k_glue
+from .trifecta import finetuning_bert_sparse_85_trifecta_100k_glue_get_info
 
 
 def hp_space(trial):
@@ -34,6 +39,10 @@ def hp_space(trial):
         learning_rate=tune.loguniform(1e-4, 1e-2)
     )
 
+
+# ---------
+# Debugging
+# ---------
 
 debug_hp_search = deepcopy(bert_base)
 debug_hp_search.update(
@@ -64,7 +73,393 @@ debug_hp_search.update(
 
 )
 
+# TODO fully specify hyperparam configs
+# validation percent
+# compute_objective for each task
+# for each task
+#  num_trials, hp_space, hp_compute_objective, hp_validation_pct
+#  resources per trial (kp_search_kwargs)
+
+debug_finetuning_hp_search = deepcopy(finetuning_bert100k_glue)
+debug_finetuning_hp_search.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
+    task_name=None,
+    task_names=["cola", "rte"],
+    num_runs=1,
+    max_steps=200,
+    save_steps=1,
+    warmup_ratio=0.1,
+    hp_validation_dataset_pct=1.0,
+    report_to="none",
+    task_hyperparams=dict(
+        cola=dict(
+            hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-5, 1e-2)),
+            hp_num_trials=3,
+            hp_compute_objective=("maximize", "eval_matthews_correlation")
+        ),
+        rte=dict(
+            hp_space=lambda trial: dict(learning_rate=tune.loguniform(1e-5, 1e-2)),
+            hp_num_trials=3,
+            hp_compute_objective=("maximize", "eval_accuracy")
+        ),
+    ),
+)
+
+debug_finetuning_sparse_hp_search = deepcopy(
+    finetuning_bert_sparse_85_trifecta_100k_glue_get_info)
+debug_finetuning_sparse_hp_search.update(
+    task_name="cola",
+    task_names=None,
+    num_runs=1,
+    max_steps=200,
+    save_steps=1,
+    warmup_ratio=0.1,
+    hp_validation_dataset_pct=1.0,
+    report_to="wandb",
+    task_hyperparams=dict(
+        cola=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-5, 1e-2),
+                max_steps=tune.randint(10, 1000),
+                warmup_ratio=tune.choice([0., 0.05, 0.1, 0.2, 0.4])),
+            hp_num_trials=3,
+            hp_compute_objective=("maximize", "eval_matthews_correlation")
+        )
+    ),
+)
+
+# ---------
+# BERT small, small tasks
+# ---------
+
+hp_search_finetuning_small_bert_100k_small_tasks = deepcopy(
+    debug_finetuning_hp_search)
+hp_search_finetuning_small_bert_100k_small_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_100k",  # noqa: E501
+    task_name=None,
+    task_names=["cola", "mrpc", "rte", "stsb", "wnli"],
+    hp_space=lambda trial: dict(
+        learning_rate=tune.loguniform(1e-6, 1e-2),
+        max_steps=tune.randint(100, 5000),
+        # if warmup 0, no learning rate scheduler
+        warmup_ratio=tune.choice([0., 0.1]),
+    ),
+    hp_num_trials=30,
+    task_hyperparams=dict(
+        cola=dict(hp_compute_objective=("maximize", "eval_matthews_correlation")),
+        mrpc=dict(hp_compute_objective=("maximize", "eval_f1")),
+        rte=dict(hp_compute_objective=("maximize", "eval_accuracy")),
+        stsb=dict(hp_compute_objective=("maximize", "eval_pearson")),
+        wnli=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-5, 1e-2),
+                max_steps=tune.randint(1, 120),
+                warmup_ratio=tune.choice([0., 0.1])),
+            hp_num_trials=35,
+            hp_compute_objective=("maximize", "eval_accuracy")
+        )
+    )
+)
+
+# ---------
+# BERT small trifecta, small tasks
+# ---------
+
+hp_search_finetuning_small_bert_trifecta_100k_small_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_small_tasks)
+hp_search_finetuning_small_bert_trifecta_100k_small_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_80%_trifecta_100k",  # noqa: E501
+)
+
+
+hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_small_tasks)
+hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_85%_trifecta_100k",  # noqa: E501
+)
+
+
+hp_search_finetuning_small_bert_trifecta_90_100k_small_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_small_tasks)
+hp_search_finetuning_small_bert_trifecta_90_100k_small_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_90%_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_small_tasks)
+hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_2x_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_small_tasks)
+hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_4x_trifecta_100k",  # noqa: E501
+)
+
+# ---------
+# BERT small, big tasks
+# ---------
+
+hp_search_finetuning_small_bert_100k_big_tasks = deepcopy(
+    debug_finetuning_hp_search)
+hp_search_finetuning_small_bert_100k_big_tasks.update(
+    task_name=None,
+    task_names=["mnli", "qnli", "qqp", "sst2"],
+    eval_steps=2_000,
+    hp_space=lambda trial: dict(
+        learning_rate=tune.loguniform(1e-6, 1e-3),
+        max_steps=tune.randint(20_000, 100_000),
+    ),
+    hp_num_trials=8,
+    task_hyperparams=dict(
+        mnli=dict(
+            hp_num_trials=5,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
+        ),
+        qnli=dict(
+            hp_num_trials=5,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
+        ),
+        qqp=dict(
+            hp_num_trials=5,
+            hp_compute_objective=("maximize", "eval_f1"),
+            eval_steps=4_000,
+        ),
+        sst2=dict(
+            hp_num_trials=12,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
+        ),
+    )
+)
+
+
+# ---------
+# BERT small trifecta, big tasks
+# ---------
+
+hp_search_finetuning_small_bert_trifecta_100k_big_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_big_tasks)
+hp_search_finetuning_small_bert_trifecta_100k_big_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_80%_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_big_tasks)
+hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_85%_trifecta_100k",  # noqa: E501
+)
+
+
+hp_search_finetuning_small_bert_trifecta_90_100k_big_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_big_tasks)
+hp_search_finetuning_small_bert_trifecta_90_100k_big_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_90%_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_big_tasks)
+hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_2x_trifecta_100k",  # noqa: E501
+)
+
+hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks = deepcopy(
+    hp_search_finetuning_small_bert_100k_big_tasks)
+hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_4x_trifecta_100k",  # noqa: E501
+)
+
+
+# ---------
+# BERT Base, small tasks
+# ---------
+
+
+# small tasks refers to tasks with smaller datasets that can be
+# run with a larger number of trials
+hp_search_finetuning_trifecta_85_100k_small_tasks = deepcopy(
+    debug_finetuning_sparse_hp_search)
+hp_search_finetuning_trifecta_85_100k_small_tasks.update(
+    task_name=None,
+    task_names=["cola", "mrpc", "rte", "stsb", "wnli"],
+    hp_space=lambda trial: dict(
+        learning_rate=tune.loguniform(1e-5, 1e-2),
+        max_steps=tune.randint(100, 5000),
+        # if warmup 0, no learning rate scheduler
+        warmup_ratio=tune.choice([0., 0.1]),
+    ),
+    hp_num_trials=25,
+    task_hyperparams=dict(
+        cola=dict(hp_compute_objective=("maximize", "eval_matthews_correlation")),
+        mrpc=dict(hp_compute_objective=("maximize", "eval_f1")),
+        rte=dict(hp_compute_objective=("maximize", "eval_accuracy")),
+        stsb=dict(hp_compute_objective=("maximize", "eval_pearson")),
+        wnli=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-5, 1e-2),
+                max_steps=tune.randint(1, 120),
+                warmup_ratio=tune.choice([0., 0.1])),
+            hp_num_trials=35,
+            hp_compute_objective=("maximize", "eval_accuracy")
+        )
+    )
+)
+
+# ---------
+# BERT base trifecta, small tasks
+# ---------
+
+hp_search_finetuning_trifecta_80_100k_small_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_small_tasks)
+hp_search_finetuning_trifecta_80_100k_small_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k"  # noqa
+)
+
+hp_search_finetuning_trifecta_90_100k_small_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_small_tasks)
+hp_search_finetuning_trifecta_90_100k_small_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa
+)
+
+hp_search_finetuning_bert_100k_small_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_small_tasks
+)
+hp_search_finetuning_bert_100k_small_tasks.update(
+    model_type="bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa
+    trainer_callbacks=[TrackEvalMetrics()],
+)
+
+hp_search_finetuning_trifecta_2x_small_tasks = deepcopy(
+    hp_search_finetuning_trifecta_80_100k_small_tasks)
+hp_search_finetuning_trifecta_2x_small_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k"  # noqa
+)
+
+# ---------
+# BERT base, small tasks
+# ---------
+
+# bigger datasets, small number of trials
+hp_search_finetuning_trifecta_85_100k_big_tasks = deepcopy(
+    debug_finetuning_sparse_hp_search)
+hp_search_finetuning_trifecta_85_100k_big_tasks.update(
+    task_name=None,
+    task_names=["mnli", "qnli", "qqp", "sst2"],
+    eval_steps=2_000,
+    hp_space=lambda trial: dict(
+        learning_rate=tune.loguniform(1e-6, 1e-3),
+        max_steps=tune.randint(20_000, 100_000),
+    ),
+    hp_num_trials=8,
+    task_hyperparams=dict(
+        mnli=dict(
+            hp_num_trials=5,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
+        ),
+        qnli=dict(
+            hp_num_trials=5,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
+        ),
+        qqp=dict(
+            hp_num_trials=5,
+            hp_compute_objective=("maximize", "eval_f1"),
+            eval_steps=4_000,
+        ),
+        sst2=dict(
+            hp_num_trials=12,
+            hp_compute_objective=("maximize", "eval_accuracy"),
+            eval_steps=4_000,
+        ),
+    )
+)
+
+# ---------
+# BERT base trifecta, big tasks
+# ---------
+
+hp_search_finetuning_bert_100k_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_big_tasks
+)
+hp_search_finetuning_bert_100k_big_tasks.update(
+    model_type="bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa
+    trainer_callbacks=[TrackEvalMetrics()],
+)
+
+hp_search_finetuning_trifecta_80_100k_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_big_tasks)
+hp_search_finetuning_trifecta_80_100k_big_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k"  # noqa
+)
+
+hp_search_finetuning_trifecta_85_100k_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_big_tasks)
+hp_search_finetuning_trifecta_85_100k_big_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_8%_trifecta_100k"  # noqa
+)
+
+hp_search_finetuning_trifecta_90_100k_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_85_100k_big_tasks)
+hp_search_finetuning_trifecta_90_100k_big_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa
+)
+
+hp_search_finetuning_trifecta_2x_big_tasks = deepcopy(
+    hp_search_finetuning_trifecta_80_100k_big_tasks)
+hp_search_finetuning_trifecta_2x_big_tasks.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k"  # noqa
+)
+
+
 # Export configurations in this file
 CONFIGS = dict(
-    debug_hp_search=debug_hp_search
+    debug_hp_search=debug_hp_search,
+    debug_finetuning_hp_search=debug_finetuning_hp_search,
+    debug_finetuning_sparse_hp_search=debug_finetuning_sparse_hp_search,
+
+    # small bert, small tasks
+    hp_search_finetuning_small_bert_100k_small_tasks=hp_search_finetuning_small_bert_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_90_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_2x_100k_small_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks=hp_search_finetuning_small_bert_trifecta_4x_100k_small_tasks,  # noqa: E501
+
+    # small bert, big tasks
+    hp_search_finetuning_small_bert_100k_big_tasks=hp_search_finetuning_small_bert_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_90_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_85_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_2x_100k_big_tasks,  # noqa: E501
+    hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks=hp_search_finetuning_small_bert_trifecta_4x_100k_big_tasks,  # noqa: E501
+
+    # bert base, small tasks
+    hp_search_finetuning_bert_100k_small_tasks=hp_search_finetuning_bert_100k_small_tasks,  # noqa
+    hp_search_finetuning_trifecta_80_100k_small_tasks=hp_search_finetuning_trifecta_80_100k_small_tasks,  # noqa
+    hp_search_finetuning_trifecta_85_100k_small_tasks=hp_search_finetuning_trifecta_85_100k_small_tasks,  # noqa
+    hp_search_finetuning_trifecta_90_100k_small_tasks=hp_search_finetuning_trifecta_90_100k_small_tasks,  # noqa
+    hp_search_finetuning_trifecta_2x_small_tasks=hp_search_finetuning_trifecta_2x_small_tasks,  # noqa
+
+    # bert base, big tasks
+    hp_search_finetuning_bert_100k_big_tasks=hp_search_finetuning_bert_100k_big_tasks,
+    hp_search_finetuning_trifecta_80_100k_big_tasks=hp_search_finetuning_trifecta_80_100k_big_tasks,  # noqa
+    hp_search_finetuning_trifecta_85_100k_big_tasks=hp_search_finetuning_trifecta_85_100k_big_tasks,  # noqa
+    hp_search_finetuning_trifecta_90_100k_big_tasks=hp_search_finetuning_trifecta_90_100k_big_tasks,  # noqa
+    hp_search_finetuning_trifecta_2x_big_tasks=hp_search_finetuning_trifecta_2x_big_tasks,  # noqa
 )

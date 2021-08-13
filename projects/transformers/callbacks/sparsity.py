@@ -36,7 +36,12 @@ from nupic.torch.modules.sparse_weights import SparseWeightsBase, rezero_weights
 
 __all__ = [
     "RezeroWeightsCallback",
-    "PlotDensitiesCallback"
+    "PlotDensitiesCallback",
+    "plot_density_per_layer",
+    "plot_density_delta",
+    "calc_sparsity",
+    "calc_model_sparsity",
+    "get_density_by_layer"
 ]
 
 
@@ -44,7 +49,12 @@ class RezeroWeightsCallback(TrainerCallback):
     """
     This rezeros the weights of a sparse model after each iteration and logs the
     sparsity of the BERT model and its encoder.
+
+    :param log_steps: how often to log the sparsity of the model
     """
+
+    def __init__(self, log_steps=1000):
+        self.log_steps = log_steps
 
     def on_init_end(self, args, state, control, model, **kwargs):
         """Log sparsity of the model and the sparsity of just the encoder."""
@@ -88,7 +98,7 @@ class RezeroWeightsCallback(TrainerCallback):
         model.apply(rezero_weights)
 
         # Log sparsity to wandb
-        if wandb.run is not None:
+        if wandb.run is not None and state.global_step % self.log_steps == 0:
             num_total, num_nonzero = count_nonzero_params(model)
             model_sparsity = 1 - (num_nonzero / num_total)
 
@@ -105,6 +115,9 @@ class RezeroWeightsCallback(TrainerCallback):
             )
 
             wandb.log(logs, commit=False)
+            control.should_log = True
+
+        return control
 
 
 class PlotDensitiesCallback(TrainerCallback):
@@ -145,16 +158,41 @@ class PlotDensitiesCallback(TrainerCallback):
 
         # Plot densities for each layer.
         df_density_by_layer = get_density_by_layer(self.sparse_modules)
-        fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-        sns.stripplot(
-            data=df_density_by_layer,
-            y="density",
-            x="layer",
-            hue=None,
-            color="firebrick",
-            ax=ax,
+        density_per_layer = plot_density_per_layer(
+            df_density_by_layer,
+            self.initial_density
         )
-        ax.axhline(self.initial_density, label="Initial Density")
+        wandb.log({"density_per_layer": wandb.Image(density_per_layer)}, commit=False)
+
+        # Plot plot change in on params for each layer.
+        df_delta_on_params = get_delta_on_params(
+            self.sparse_modules,
+            self.initial_on_params
+        )
+        density_delta = plot_density_delta(df_delta_on_params)
+        wandb.log({"delta_on_params": wandb.Image(density_delta)}, commit=False)
+
+        control.should_log = True
+        return control
+
+
+# -------------
+# Utilities
+# -------------
+
+def plot_density_per_layer(df_density_by_layer, initial_density=None):
+
+    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    sns.stripplot(
+        data=df_density_by_layer,
+        y="density",
+        x="layer",
+        hue=None,
+        color="firebrick",
+        ax=ax,
+    )
+    if initial_density is not None:
+        ax.axhline(initial_density, label="Initial Density")
         ax.legend(loc="lower center", bbox_to_anchor=(0.2, 0), ncol=2)
         ax.set_title("Density Per Layer")
         ax.set_ylim(0, 1)
@@ -164,39 +202,30 @@ class PlotDensitiesCallback(TrainerCallback):
             ha="left",
             rotation_mode="anchor"
         )
-        plot = wandb.Image(ax)
-        wandb.log({"density_per_layer": plot}, commit=False)
 
-        # Plot plot change in on params for each layer.
-        df_delta_on_params = get_delta_on_params(
-            self.sparse_modules,
-            self.initial_on_params
-        )
-        fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-        sns.stripplot(
-            data=df_delta_on_params,
-            y="delta_on_params",
-            x="layer",
-            hue=None,
-            color="firebrick",
-            ax=ax,
-        )
-        ax.axhline(0)
-        ax.set_title("Change in On-Params Per Layer")
-        ax.set_ylabel("delta on-params")
-        ax.set_xticklabels(
-            ax.get_xticklabels(),
-            rotation=-45,
-            ha="left",
-            rotation_mode="anchor",
-        )
-        plot = wandb.Image(ax)
-        wandb.log({"delta_on_params": plot}, commit=False)
+    return ax
 
 
-# -------------
-# Utilities
-# -------------
+def plot_density_delta(df_delta_on_params):
+    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    sns.stripplot(
+        data=df_delta_on_params,
+        y="delta_on_params",
+        x="layer",
+        hue=None,
+        color="firebrick",
+        ax=ax,
+    )
+    ax.axhline(0)
+    ax.set_title("Change in On-Params Per Layer")
+    ax.set_ylabel("delta on-params")
+    ax.set_xticklabels(
+        ax.get_xticklabels(),
+        rotation=-45,
+        ha="left",
+        rotation_mode="anchor",
+    )
+    return ax
 
 
 def calc_sparsity(tensor):
@@ -223,7 +252,7 @@ def get_density_by_layer(sparse_modules):
         subname = ".".join(n.split(".")[3:])
         layer_name = f"{subname} {tuple(m.weight.shape)}"
         density = 1 - calc_sparsity(m.weight)
-        df.loc[len(df.index)] = (layer_name, density)
+        df.loc[len(df.index)] = (layer_name, density.item())
 
     return df
 
@@ -244,6 +273,6 @@ def get_delta_on_params(sparse_modules, initial_on_params):
         zero_mask = m.zero_mask.bool()
         on_params = zero_mask.numel() - count_nonzero(zero_mask)
         delta = on_params - initial_on_params[n]
-        df.loc[len(df.index)] = (layer_name, delta)
+        df.loc[len(df.index)] = (layer_name, delta.item())
 
     return df

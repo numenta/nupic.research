@@ -23,7 +23,12 @@ Base Transformers Experiment configuration.
 """
 from copy import deepcopy
 
+from transformers import Trainer
+
+from trainer_mixins import LRRangeTestMixin
+
 from .base import transformers_base
+
 
 """
 Version of BERT that mimics hyperparams in the original paper
@@ -71,6 +76,29 @@ per_device_train_batch_size=8 it should be trained on 32 GPUs to replicate bs
 default values: max_seq_length=None, line_by_line=False, pad_to_max_length=False,
 """
 
+
+class LRRangeTestTrainer(LRRangeTestMixin,
+                         Trainer):
+    pass
+
+
+lr_range_test_args = dict(
+    max_steps=100,
+    trainer_class=LRRangeTestTrainer,
+    trainer_mixin_args=dict(
+        # LR Range Test
+        min_lr=0.0001,
+        max_lr=0.005,
+        test_mode="linear",
+
+        # KD
+        teacher_model_names_or_paths=[
+            "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi"
+        ],
+    ),
+    overwrite_output_dir=True,
+)
+
 bert_100k = deepcopy(transformers_base)
 bert_100k.update(
 
@@ -114,6 +142,27 @@ bert_100k.update(
 
 )
 
+
+# This is an lr-range test for bert_100k
+# Results here: https://wandb.ai/nupic-research/huggingface/runs/1gtfjmw5
+# Suggested max_lr=0.00084
+bert_lr_range_test = deepcopy(bert_100k)
+bert_lr_range_test.update(
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    **lr_range_test_args
+)
+
+
+# This is an lr-range test for bert_100k trained with fp16
+# Results here: https://wandb.ai/nupic-research/huggingface/runs/2f9sga1a
+# Suggested max_lr=0.00079
+bert_fp16_lr_range_test = deepcopy(bert_100k)
+bert_fp16_lr_range_test.update(
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",
+    **lr_range_test_args
+)
+
+
 # Equivalent to bert 100k but trained with 2K batch size for 12.5K steps using
 # deepspeed on 4 x p3dn.24xlarge, for a total of 32 GPUs with 32Gb each GPU.
 # It takes 7h with the final eval_loss of 2.225.
@@ -155,6 +204,8 @@ bert_1mi.update(
 
 # Export configurations in this file
 CONFIGS = dict(
+    bert_lr_range_test=bert_lr_range_test,
+    bert_fp16_lr_range_test=bert_fp16_lr_range_test,
     bert_100k_deepspeed_bsz_2k=bert_100k_deepspeed_bsz_2k,
     bert_100k=bert_100k,
     bert_1mi=bert_1mi

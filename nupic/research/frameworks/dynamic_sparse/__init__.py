@@ -20,4 +20,5 @@
 # ----------------------------------------------------------------------
 
 from .global_pruning import *
+from .gmp_lr_scheduler import *
 from .prune_scheduler import *

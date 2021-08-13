@@ -1,44 +1,8 @@
 # Transformers
 
-## Results Bert
+## Overview
 
-In progress, current results:
-
-|            | average_bert     | average_glue      | cola           | mnli                         | mrpc        | qnli     | qqp         | rte      | sst2     | stsb                  | wnli     | perplexity | eval loss |
-|:-----------|:-----------------|:------------------|:---------------|:-----------------------------|:------------|:---------|:------------|:---------|:---------|:----------------------|:---------|:-----------|:----------|
-|            | Average w/o wnli | Average all tasks | Matthew's corr | Matched acc./Mismatched acc. | F1/Accuracy | Accuracy | Accuracy/F1 | Accuracy | Accuracy | Person/Spearman corr. | Accuracy |            | log(perplexity) |
-| bert_HF    | 81.67            | 78.85             | 56.53          | 83.91/84.10                  | 88.85/84.07 | 90.66    | 90.71/87.49 | 65.70    | 92.32    | 88.64/88.48           | 56.34    |            | |
-| bert_paper|          79.60 |             -  |  52.10 | 84.60/83.40          | 88.90/- | 90.50     | 71.20/-     | 66.40     | 93.50     | 85.80        |      - | 3.99 (RoBERTa) | 1.384 |
-| bert_1mi |          80.13 |          77.17 |  45.81 | 84.27/84.63 | 88.26/83.82 |  91.21 | 90.54/87.20 | 65.34 |  91.86 | 87.41/87.43 |  53.52 | 5.013 | 1.612 |
-| bert_100k |          75.36 |          71.68 |  39.56 | 78.88/79.08 | 82.71/76.23 |  87.77 | 89.31/85.57 |  58.12 |  87.61 | 83.95/83.84 |  42.25 | 8.619 | 2.154 |
-| sparse_80%_kd_onecycle_lr_rigl |            75.3 |          72.57 |  36.49 | 79.23/79.66 | 86.55/81.86 |  88.23 | 89.39/85.64 |  54.51 |  90.6 | 81.31/81.24 |  50.7 | 8.482 | 2.138 |
-| sparse_80%_kd_onecycle_lr |       74.17 |          72.18 |   27.2 | 78.34/79.97 | 87.29/82.55 |  88.57 | 88.91/84.97 | 58.59 |  88.77 | 79.11/79.33 |  56.25 | 9.78  | 2.28 |
-
-<br/><br/>
-
-[More results related to finetuning can be found here](./finetuning_results.md)
-
-**Note:** `sparse_80%_kd_onecycle_lr_rigl` is not actually 80% sparse. It's just under at 79.58%. This is because the token embeddings are fully dense. Future work will either sparsify these, or make the other layers more sparse to achieve the full 80%.
-
-
-</br>
-</br>
-
-Model description:
-* bert_HF: reported by HuggingFace, see https://github.com/huggingface/transformers/tree/master/examples/text-classification. No inner loop of hyperparameter optimization for each finetuning task. Pretrained for 1mi steps of batch size 256.
-* bert_paper: reported in BERT paper, see https://arxiv.org/abs/1810.04805. Hyperparameters for each task are chosen in a grid search with 18 different variations per task, and best results reported. Pretrained for 1mi steps of batch size 256.
-* bert_Nk: where N is the number of steps in pretraining. These refer to models trained by ourselves for less than or more than 1mi steps. They might be intermediate checkpoints of longer runs or a shorter run executed to completion. Batch size is 256 unless specified otherwise in the model name. No inner loop of hyperparameter optimization for each finetuning task, follows same finetuning hyperparameters defined by bert_HF. Results for {cola, rte, wnli} are a max over 10 runs, {sstb, mrpc} are a max over 3 runs, and the remaining tasks are single runs.
-
-Known issues, to be investigated/fixed:
-* A lot of variance in finetuning, specially in small datasets, like rte and wnli, and highly unbalanced datasets such as cola. In cola for example, same model will output results from 14 to 47 using exact similar finetuning regimes. Maxing over several runs helps in stabilizing finetuning results, making it easier to compare across different models.
-* We don't have 100% coverage of validation set. Some samples of the validation set are given the label "-100", most likely for the tokenizer not being able to process them. These samples are excluded for validation. That coverage varies from 95-100%, with most tasks being close to 100%, but cola and mnli specifically have ~95% coverage. Not clear whether the coverage for bert_paper and bert_hf is 100%.
-* Only GLUE tasks included in the table. GLUE covers sequence classification or other tasks such as Q&A or multiple choice reframed as sequence classification. BERT also reports results on SQuaD (question answering), SWAG (multiple choice) and CoNLL (named entity recognition).
-* To add to the table perplexity of the original pretrained models.
-
-> Finetuning is important to evaluate a language model effectiveness when being used for transfer learning in downstream tasks. However, it is not a reliable metric to use for optimization. These numbers will vary with a significant margin of error between two different runs. Use perplexity instead to guide hyperparameter search and development of language models.
-
-Known Bugs
-* Finetuning occasionally stalls and needs restarting. This may be related to [this](https://github.com/huggingface/transformers/issues/5486) documented issue. Although this deadlock doesn't happen every time, the only way found to entirely avoid this is to disable wandb logging.
+This project is primarily concerned with exploring sparse pretrained BERT models and evaluating them using GLUE scores. Please see the results direcotry for detailed documentation on our ongoing experiments.
 
 ## How to run - single node
 
