@@ -41,6 +41,7 @@ from pprint import pformat
 
 # FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
 import ray  # noqa: F401, I001
+from ray.tune.error import TuneError as TuneError
 import torch.distributed
 import transformers
 from transformers import (
@@ -470,15 +471,27 @@ def run_finetuning_single_task_with_hp_search(
     # Update any extra kwargs defined in config
     hp_search_kwargs.update(**model_args.hp_extra_kwargs)
 
-    # Run hp search and save results
-    best_run = trainer.hyperparameter_search(**hp_search_kwargs)
-    logging.info(f"Best run: {best_run}")
+    # Run hp search and save results. Code to remove checkpoints won't get
+    # called if ANY of the trials error out, so wrap with try/except.
+
+    success = False
+    try:
+        best_run = trainer.hyperparameter_search(**hp_search_kwargs)
+        logging.info(f"Best run: {best_run}")
+        success = True
+    except TuneError:
+        logging.info(f"One or more trials errored out")
+    finally:
+        logging.info("An unknown error occured during hp search.")
 
     # Delete all saved models and checkpoints to save space. All we need
     # are the params and scores. Currently this is a hack that is specific
     # to ray. May need to modify so that it serves the same function for
     # sigopt, once I integrate it.
     rm_prefixed_subdirs(training_args.output_dir, "run-")
+
+    if not success:
+        return {}
 
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
     hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
