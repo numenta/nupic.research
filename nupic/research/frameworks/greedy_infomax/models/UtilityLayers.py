@@ -26,6 +26,7 @@
 
 import torch.nn as nn
 import torch.nn.functional as F
+import nupic.research.frameworks.greedy_infomax.utils.data_utils as data_utils
 
 # used to block gradients between layers
 class GradientBlock(nn.Module):
@@ -45,3 +46,13 @@ class EmitEncoding(nn.Identity):
         out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
         out = out.permute(0, 3, 1, 2).contiguous()
         return out
+
+class PatchifyInputs(nn.Module):
+    def __init__(self, patch_size=16, overlap=2):
+        super(PatchifyInputs, self).__init__()
+        self.patch_size = patch_size
+        self.overlap = overlap
+
+    def forward(self, x):
+        x, n_patches_x, n_patches_y = data_utils.patchify_inputs(x)
+        return x, n_patches_x, n_patches_y

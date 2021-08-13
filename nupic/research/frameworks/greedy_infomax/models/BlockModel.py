@@ -30,34 +30,32 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import BilinearInfo
-from nupic.research.frameworks.greedy_infomax.utils import model_utils
-from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import EmitEncoding
+from nupic.research.frameworks.greedy_infomax.utils import data_utils
+from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import \
+    EmitEncoding, PatchifyInputs
 
 
 
 class BlockModel(nn.Module):
     def __init__(self,
-                 modules,
-                 patch_size=16,
-                 overlap=2):
+                 modules,):
         super(BlockModel, self).__init__()
-        self.modules = modules
-        self.patch_size = patch_size
-        self.overlap = overlap
+        self.modules = nn.ModuleList(modules)
 
-    # the forward method only emits BilinearInfo estimations
-    # notice how there are no detach() calls in this forward pass: the detaching is
+    # The forward method only emits BilinearInfo estimations.
+    # Notice how there are no detach() calls in this forward pass: the detaching is
     # done by the GradientBlock layers, which gives users more flexibility to
     # place them as desired. Maybe you want each layer to receive gradients from
     # multiple BilinearInfoLegacy estimators, for example.
+    # The EmitEncoding layers inherit from nn.Identity, so they just pass the input
+    # along without modifying it
     def forward(self, x):
-        # Patchify inputs
-        x, n_patches_x, n_patches_y = model_utils.patchify_inputs(
-            x, self.patch_size, self.overlap
-        )
+        n_patches_x, n_patches_y = None, None
         log_f_module_list = []
         for module in self.modules:
-            if isinstance(module, BilinearInfo):
+            if isinstance(module, PatchifyInputs):
+                x, n_patches_x, n_patches_y = module(x)
+            elif isinstance(module, BilinearInfo):
                 out = F.adaptive_avg_pool2d(x, 1)
                 out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
                 out = out.permute(0, 3, 1, 2).contiguous()
@@ -67,14 +65,16 @@ class BlockModel(nn.Module):
                 x = module(x)
         return log_f_module_list
 
+    # The BilinearInfo layers inherit from nn.Identity, so they will just pass along
+    # their input without modifying it during the encode() pass. This will be called
+    # under a torch.no_grad() scope
     def encode(self, x):
-        # Patchify inputs
-        x, n_patches_x, n_patches_y = model_utils.patchify_inputs(
-            x, self.patch_size, self.overlap
-        )
+        n_patches_x, n_patches_y = None, None
         all_outputs = []
         for module in self.modules:
-            if isinstance(module, EmitEncoding):
+            if isinstance(module, PatchifyInputs):
+                x, n_patches_x, n_patches_y = module(x)
+            elif isinstance(module, EmitEncoding):
                 out = module.encode(x, n_patches_x, n_patches_y)
                 all_outputs.append(out)
             else:

@@ -29,7 +29,7 @@ import time
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-def train_model_gim(
+def train_block_model(
     model,
     loader,
     optimizer,
@@ -182,7 +182,7 @@ def train_model_gim(
         loader.close()
 
 
-def evaluate_model_gim(
+def evaluate_block_model(
     model,
     loader,
     device,

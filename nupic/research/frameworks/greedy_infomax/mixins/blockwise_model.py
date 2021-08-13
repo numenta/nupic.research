@@ -24,22 +24,57 @@ import torch
 
 class BlockWiseModel:
 
+    """
+    This method recursively instantiates models, allowing users to use hierarchical
+    model configs and pass nn.Module instances as arguments. This is used whenever
+    you might need to load modules independently from different checkpoint files.
 
+    Example model config:
+
+    model_class = SomeSequentialModel
+    model_args = dict(
+            modules=[
+                dict(
+                    model_class=SparseWeights2D,
+                    model_args=dict(
+                            instantia
+                        )
+                ),
+                dict(
+                    model_class=nn.Conv2d,
+                    model_args=dict(
+                            in_channels=10,
+                            out_channels=20
+                        )
+                ),
+            ]
+        other_arg=True
+        another_arg=1.0
+    )
+
+    """
     @classmethod
     def create_model(cls, config, device):
         model_args = config.get("model_args", {})
-        if "model_blocks" in model_args.keys():
-            model_blocks = []
-            for module_dict in model_args["model_blocks"]:
-                model_blocks.append(create_model(
-                    model_class=module_dict["model_class"],
-                    model_args=module_dict.get("model_args", {}),
-                    init_batch_norm=module_dict.get("init_batch_norm", False),
-                    device=device,
-                    checkpoint_file=module_dict.get("checkpoint_file", None),
-                    load_checkpoint_args=module_dict.get("load_checkpoint_args", {}),
-                ))
-            model_args.update(model_blocks=model_blocks)
+        for k, v in model_args.items():
+            if isinstance(v, dict) and "model_class" in v:
+                # this is a model that needs to be created
+
+
+
+
+        # if "instantiate_modules" in model_args.keys():
+        #     instantiated_modules = []
+        #     for module_dict in model_args["instantiate_modules"]:
+        #         module = create_model(
+        #             model_class=module_dict["model_class"],
+        #             model_args=module_dict.get("model_args", {}),
+        #             init_batch_norm=module_dict.get("init_batch_norm", False),
+        #             device=device,
+        #             checkpoint_file=module_dict.get("checkpoint_file", None),
+        #             load_checkpoint_args=module_dict.get("load_checkpoint_args", {}),
+        #         )
+        #     model_args.update(model_blocks=model_blocks)
         return create_model(
             model_class=config["model_class"],
             model_args=model_args,

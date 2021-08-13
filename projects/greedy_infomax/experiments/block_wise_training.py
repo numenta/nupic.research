@@ -84,7 +84,8 @@ Block wise model example:
 
 
 model_structure:
-[ (nn.Conv2d, {args}, previous_checkpoint=None, train=True)
+[ (model_class=nn.Conv2d, model_args={args}, previous_checkpoint=None, 
+save_checkpoint=None, train=True)
 (BilinearInfo, {args})
 (EmitEncoding)
 (GradientBlock)
