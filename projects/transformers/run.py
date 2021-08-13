@@ -46,6 +46,7 @@ import transformers
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     AutoModelForSequenceClassification,
+    AutoModelForTableQuestionAnswering,
     DataCollatorWithPadding,
     EarlyStoppingCallback,
     HfArgumentParser,
@@ -90,6 +91,7 @@ from run_utils import (
     train,
     update_run_number,
 )
+
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -477,6 +479,80 @@ def run_finetuning_single_task_with_hp_search(
 
 
 def run_finetuning_single_task(
+    model_args, data_args, training_args, last_checkpoint=None, run_idx=None,
+):
+    """On a single task train, evaluate, and save results"""
+
+    # TODO
+    # accept run# as an argument for finetuning with multiple runs on a single task
+    # update the save directory to include run#
+    tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
+        is_regression, tokenized_datasets, label_list, config = \
+        init_dataset_for_finetuning(
+            model_args, data_args, training_args, last_checkpoint
+        )
+
+    # Code safety
+    check_eval_and_max_steps(training_args, train_dataset)
+    training_args = check_best_metric(training_args, data_args.task_name)
+
+    # Update where model is saved for each run
+    training_args = update_run_number(training_args, run_idx)
+
+    # Train
+    trainer = init_trainer(
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        training_args=training_args,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
+        model=model,
+        trainer_callbacks=model_args.trainer_callbacks or None,
+        finetuning=True, task_name=data_args.task_name, is_regression=is_regression
+    )
+
+    if training_args.do_train:
+        # Note, rm_checkpoints=True means one model will be saved
+        # in the output_dir, and all checkpoint subdirectories will be
+        # deleted when train() is called.
+        train(trainer,
+              training_args.output_dir,
+              training_args.rm_checkpoints,
+              last_checkpoint)
+
+    if training_args.do_eval:
+        eval_results = evaluate_tasks_handler(
+            trainer, data_args, model_args, training_args,
+            eval_dataset, tokenized_datasets)
+
+    # Test/Predict
+    if training_args.do_predict:
+        logging.info("*** Test ***")
+
+        # Handle special case of extra test dataset for MNLI
+        tasks = [data_args.task_name]
+        test_datasets = [test_dataset]
+        if data_args.task_name == "mnli":
+            tasks.append("mnli-mm")
+            test_datasets.append(tokenized_datasets["test_mismatched"])
+
+        test_tasks(
+            trainer, training_args.output_dir, tasks, test_datasets,
+            is_regression, label_list
+        )
+
+    # There is an existing issue on training multiple models in sequence in this code
+    # There is a memory leakage on the model, a small amount of GPU memory remains after
+    # the run and accumulates over several runs. It fails with OOM after about 20 runs,
+    # even when all tensors on GPU are explicitly deleted, garbage is collected and
+    # cache is cleared. Tried multiple solutions but this weird little hack is the only
+    # thing that worked.
+    model.to("cpu")
+
+    return eval_results
+
+
+def run_finetuning_squad(
     model_args, data_args, training_args, last_checkpoint=None, run_idx=None,
 ):
     """On a single task train, evaluate, and save results"""
