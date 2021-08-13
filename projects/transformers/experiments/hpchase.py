@@ -144,6 +144,16 @@ trifecta_90_small_hp_chase_first_two.update(
     task_names=["cola", "mnli"]
 )
 
+trifecta_90_small_hp_chase_debug_first_two = deepcopy(trifecta_90_small_hp_chase_first_two)
+trifecta_90_small_hp_chase_debug_first_two['task_hyperparams']['cola'].update(
+    max_steps=100,
+    num_runs=3,
+)
+trifecta_90_small_hp_chase_debug_first_two['task_hyperparams']['mnli'].update(
+    max_steps=100,
+    num_runs=3,
+)
+
 # 2x
 trifecta_2x_small_hp_chase = deepcopy(finetuning_small_bert_sparse_2x_trifecta_100k_glue)
 trifecta_2x_small_hp_chase = update_task_hyperparams(trifecta_2x_small_hp_chase, "trifecta_small_2x")
@@ -192,4 +202,7 @@ CONFIGS = dict(
     trifecta_90_small_hp_chase_first_two=trifecta_90_small_hp_chase_first_two,
     trifecta_2x_small_hp_chase_first_two=trifecta_2x_small_hp_chase_first_two,
     trifecta_4x_small_hp_chase_first_two=trifecta_4x_small_hp_chase_first_two,
+
+    # BERT small follow up debugging
+    trifecta_90_small_hp_chase_debug_first_two=trifecta_90_small_hp_chase_debug_first_two,
 )

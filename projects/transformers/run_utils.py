@@ -1479,8 +1479,13 @@ def get_best_run_and_link_best_predictions(training_args,
     best_run = task_results.get_model_with_best_max()
     task_path = os.path.dirname(training_args.output_dir)
     best_run_path = os.path.join(task_path, f"run_{best_run}")
-    pred_file = GLUE_NAMES_PER_TASK[task_name] + ".tsv"
-    best_run_predictions = os.path.join(best_run_path, pred_file)
+
+    pred_files = [GLUE_NAMES_PER_TASK[task_name] + ".tsv"]
+    if task_name == "mnli":
+        pred_files.append(GLUE_NAMES_PER_TASK[task_name + "-mm"])
+
+    best_run_predictions = [os.path.join(best_run_path, pred_file)
+                                for pred_file in pred_files]
 
     # You want to find best_run in all cases. You want to link
     # to a set of predictions only when do_predict is on.
@@ -1488,13 +1493,18 @@ def get_best_run_and_link_best_predictions(training_args,
 
         # link task_best.tsv
         # If previous symlink exists, just delete and recreate
-        link_file_name = GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"
-        link_file_path = os.path.join(task_path, link_file_name)
-        if os.path.exists(link_file_path):
-            os.remove(link_file_path)
-        os.symlink(best_run_predictions, link_file_path)
-        logging.info(f"best run predictions for {task_name} saved to "
-                     f"{link_file_path}")
+        link_file_names = [GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"]
+        if task_name == "mnli":
+            link_file_names.append(
+                GLUE_NAMES_PER_TASK[task_name + "-mm"] + "_best.tsv")
+
+        for idx, link_file_name in enumerate(link_file_names):
+            link_file_path = os.path.join(task_path, link_file_name)
+            if os.path.exists(link_file_path):
+                os.remove(link_file_path)
+            os.symlink(best_run_predictions[idx], link_file_path)
+            logging.info(f"best run predictions for {task_name} saved to "
+                        f"{link_file_path}")
 
     return str(best_run)
 

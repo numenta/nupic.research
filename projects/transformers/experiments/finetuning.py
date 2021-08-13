@@ -262,6 +262,7 @@ finetuning_bert_100k_glue_get_info.update(
         wnli=dict(max_steps=50,
                   num_runs=10),  # run for a short time to avoid overfitting
     ),
+    do_predict=True,
     trainer_callbacks=[
         TrackEvalMetrics()],
     warmup_ratio=0.1,

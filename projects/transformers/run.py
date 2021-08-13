@@ -632,7 +632,6 @@ def run_finetuning_multiple_tasks(
                 if ("hp_" in hp_key) or hp_key in model_arg_keys:
                    setattr(model_args, hp_key, hp_val)
                 else:
-                    print(f"hp stuff from training args: {hp_key}, and {hp_val}")
                     setattr(training_args, hp_key, hp_val)
 
         # These checks can change training args, which can affect TaskResults
