@@ -65,6 +65,12 @@ python ${PYTHON_SCRIPT_DIR}/export_finetuning_hp_search_results.py \
             -d ${HP_RESULTS_DIR}/hp_search_finetuning_small_bert_100k_small_tasks \
             -c ${HP_CONFIG_DIR}/small_100k \
             -n 0
+python ${PYTHON_SCRIPT_DIR}/export_finetuning_hp_search_results.py \
+            -d ${HP_RESULTS_DIR}/hp_search_finetuning_small_bert_100k_qqp \
+            -c ${HP_CONFIG_DIR}/small_100k \
+            -n 0 \
+            -p ${PROXY_DICT}
+
 
 # BERT_SMALL_TRIFECTA_80
 python ${PYTHON_SCRIPT_DIR}/export_finetuning_hp_search_results.py \
