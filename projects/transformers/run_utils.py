@@ -1482,7 +1482,7 @@ def get_best_run_and_link_best_predictions(training_args,
 
     pred_files = [GLUE_NAMES_PER_TASK[task_name] + ".tsv"]
     if task_name == "mnli":
-        pred_files.append(GLUE_NAMES_PER_TASK[task_name + "-mm"])
+        pred_files.append(GLUE_NAMES_PER_TASK[task_name + "-mm"] + ".tsv")
 
     best_run_predictions = [os.path.join(best_run_path, pred_file)
                                 for pred_file in pred_files]
