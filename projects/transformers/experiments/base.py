@@ -30,7 +30,8 @@ transformers_base = dict(
 
     # Model arguments
     cache_dir="/mnt/efs/results/pretrained-models/huggingface",
-    tokenized_data_cache_dir="/mnt/efs/results/preprocessed-datasets/text",
+    # tokenized_data_cache_dir="/mnt/efs/results/preprocessed-datasets/text",
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",  # noqa: E501
     reuse_tokenized_data=True,
     save_tokenized_data=True,
     use_fast_tokenizer=True,
@@ -46,7 +47,8 @@ transformers_base = dict(
     do_train=True,
     do_eval=True,
     dataloader_drop_last=True,  # keeps consistent batch size
-    num_train_epochs=3  # is overriden if max_steps is defined
+    num_train_epochs=3,  # is overridden if max_steps is defined
+    ddp_find_unused_parameters=False,  # Should not have any unused parameters
 )
 
 bert_base = deepcopy(transformers_base)

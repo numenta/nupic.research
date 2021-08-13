@@ -42,12 +42,13 @@ from .log_every_loss import LogEveryLoss
 from .lr_range_test import LRRangeTest, create_lr_test_experiment
 from .maxup import MaxupPerSample, MaxupStandard
 from .multi_cycle_lr import MultiCycleLR
+from .noise_robustness_test import NoiseRobustnessTest
 from .oml import OnlineMetaLearning
 from .permuted_mnist_task_indices import *
 from .profile import Profile
 from .profile_autograd import ProfileAutograd
 from .prune_low_magnitude import PruneLowMagnitude
-from .prune_low_snr import PruneLowSNR
+from .prune_low_snr import PruneLowSNRGlobal, PruneLowSNRLayers
 from .quantization_aware import QuantizationAware
 from .reduce_lr_after_task import ReduceLRAfterTask
 from .regularize_loss import RegularizeLoss
@@ -55,6 +56,7 @@ from .report_max_accuracy import ReportMaxAccuracy
 from .representation_overlap import *
 from .rezero_weights import RezeroWeights
 from .save_final_checkpoint import SaveFinalCheckpoint
+from .si import *
 from .step_based_logging import *
 from .track_representation_sparsity import *
 from .update_boost_strength import UpdateBoostStrength

@@ -37,12 +37,12 @@ class PermutedMNIST(MNIST):
     """
 
     def __init__(self, num_tasks, seed, train, root=".", target_transform=None,
-                 download=False):
+                 download=False, normalize=True):
 
-        data_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.13062755,), (0.30810780,)),
-        ])
+        t = [transforms.ToTensor()]
+        if normalize:
+            t.append(transforms.Normalize((0.13062755,), (0.30810780,)))
+        data_transform = transforms.Compose(t)
         super().__init__(root=root, train=train, transform=data_transform,
                          target_transform=target_transform, download=download)
 

@@ -18,7 +18,6 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
 from copy import deepcopy
 
 from ray import tune
@@ -27,6 +26,7 @@ from transformers import Trainer
 from callbacks import PlotDensitiesCallback, RezeroWeightsCallback
 from trainer_mixins import DistillationTrainerMixin, OneCycleLRMixin, RigLMixin
 
+from .bertitos import tiny_bert_100k
 from .finetuning import finetuning_bert700k_glue
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
@@ -129,6 +129,40 @@ tiny_bert_sparse_300k_onecycle_lr_kd.update(
     ),
     overwrite_output_dir=True,
     fp16=True,
+)
+
+
+# Dense KD + OneCyle LR
+tiny_bert_100k_onecycle_lr_kd = deepcopy(tiny_bert_100k)
+tiny_bert_100k_onecycle_lr_kd.update(
+    max_steps=100000,
+    trainer_class=KDOneCycleLRTrainer,
+    trainer_mixin_args=dict(
+        max_lr=0.015,
+        **kd_args,
+        **onecycle_args,
+    ),
+    overwrite_output_dir=True,
+    fp16=True,
+)
+
+
+tiny_bert_kd_onecycle_lr_range_test = deepcopy(tiny_bert_100k)
+tiny_bert_kd_onecycle_lr_range_test.update(
+    max_steps=100,
+    trainer_class=KDLRRangeTestTrainer,
+    trainer_mixin_args=dict(
+        # LR Range Test
+        min_lr=0.0001,
+        max_lr=0.005,
+        test_mode="linear",
+
+        # KD
+        teacher_model_names_or_paths=[
+            "/mnt/efs/results/pretrained-models/transformers-local/bert_1mi"
+        ],
+    ),
+    overwrite_output_dir=True,
 )
 
 
@@ -265,7 +299,7 @@ bert_sparse_100k_kd_oncycle_lr.update(
 # This took 20m to run on four ps.16xlarges
 bert_sparse_100k_kd_lr_range_test = deepcopy(fully_static_sparse_bert_100k_fp16)
 bert_sparse_100k_kd_lr_range_test.update(
-    max_steps=100000,
+    max_steps=100,
     trainer_class=KDLRRangeTestTrainer,
     trainer_mixin_args=dict(
         # LR Range Test
@@ -292,12 +326,37 @@ finetuning_bert_sparse_kd_oncycle_lr_100k_glue.update(
 )
 
 
+# This is like the one above, but for 85% sparsity.
+bert_sparse_85_kd_lr_range_test = deepcopy(bert_sparse_100k_kd_lr_range_test)
+bert_sparse_85_kd_lr_range_test["config_kwargs"].update(
+    sparsity=0.85,
+)
+
+
+# This is like the one above, but for 90% sparsity.
+bert_sparse_90_kd_lr_range_test = deepcopy(bert_sparse_100k_kd_lr_range_test)
+bert_sparse_90_kd_lr_range_test["config_kwargs"].update(
+    sparsity=0.90,
+    # logging
+    overwrite_output_dir=False,
+    override_finetuning_results=False,
+    task_name=None,
+    task_names=["rte", "wnli", "cola"],
+    task_hyperparams=dict(
+        wnli=dict(num_train_epochs=5, num_runs=20),
+        cola=dict(num_train_epochs=5, num_runs=20),
+        rte=dict(num_runs=20),
+    ),
+)
+
 CONFIGS = dict(
     # Tiny BERT
     tiny_bert_rigl_100k_onecycle_lr=tiny_bert_rigl_100k_onecycle_lr,
     tiny_bert_rigl_100k_kd=tiny_bert_rigl_100k_kd,
     tiny_bert_sparse_100k_onecycle_lr_kd=tiny_bert_sparse_100k_onecycle_lr_kd,
     tiny_bert_sparse_300k_onecycle_lr_kd=tiny_bert_sparse_300k_onecycle_lr_kd,
+    tiny_bert_100k_onecycle_lr_kd=tiny_bert_100k_onecycle_lr_kd,
+    tiny_bert_kd_onecycle_lr_range_test=tiny_bert_kd_onecycle_lr_range_test,
     tiny_bert_kd_onecycle_50k_maxlr_search=tiny_bert_kd_onecycle_50k_maxlr_search,
     tiny_bert_kd_onecycle_100k_pct_start_search=tiny_bert_kd_onecycle_100k_pct_start_search,  # noqa: E501
     tiny_bert_kd_onecycle_300k_pct_start_search=tiny_bert_kd_onecycle_300k_pct_start_search,  # noqa: E501
@@ -306,7 +365,12 @@ CONFIGS = dict(
     small_bert_rigl_100k_onecycle_lr=small_bert_rigl_100k_onecycle_lr,
 
     # BERT Base
+    #   80% sparse
     bert_sparse_100k_kd_oncycle_lr=bert_sparse_100k_kd_oncycle_lr,
     bert_sparse_100k_kd_lr_range_test=bert_sparse_100k_kd_lr_range_test,
     finetuning_bert_sparse_kd_oncycle_lr_100k_glue=finetuning_bert_sparse_kd_oncycle_lr_100k_glue,  # noqa: E501
+    #   85% sparse
+    bert_sparse_85_kd_lr_range_test=bert_sparse_85_kd_lr_range_test,
+    #   90% sparse
+    bert_sparse_90_kd_lr_range_test=bert_sparse_90_kd_lr_range_test,
 )
