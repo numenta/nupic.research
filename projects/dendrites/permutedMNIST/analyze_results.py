@@ -215,9 +215,7 @@ def collect_results(configs, basefilename, outmethod):
             )
 
         except RuntimeError:
-            print(
-                "Could not locate experiment state for " + exp + " ...skipping"
-            )
+            print("Could not locate experiment state for " + exp + " ...skipping")
             continue
 
         df = parse_one_experiment(exp, states, df, outmethod)
@@ -262,10 +260,7 @@ def analyze_experiment_data(filename_df, output_filename):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "experiments",
-        nargs="+",
-        help="Experiments to run",
-        choices=CONFIGS.keys(),
+        "experiments", nargs="+", help="Experiments to run", choices=CONFIGS.keys()
     )
     parser.add_argument(
         "-f",
@@ -274,9 +269,7 @@ if __name__ == "__main__":
         help="Table format",
         choices=["grid", "latex_raw"],
     )
-    parser.add_argument(
-        "-n", dest="name", default="temp", help="Base filename"
-    )
+    parser.add_argument("-n", dest="name", default="temp", help="Base filename")
     parser.add_argument(
         "-o",
         dest="outmethod",
