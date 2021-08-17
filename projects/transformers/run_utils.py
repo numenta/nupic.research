@@ -26,6 +26,7 @@ import math
 import multiprocessing
 import os
 import pickle
+import shutil
 from collections import Counter, defaultdict
 from functools import partial
 from hashlib import blake2b
@@ -94,7 +95,7 @@ TASK_TO_KEYS = {
 }
 
 
-def train(trainer, output_dir, last_checkpoint=None):
+def train(trainer, output_dir, rm_checkpoints, last_checkpoint=None):
     """Trainig function applicable to pretraining language models and finetuning."""
 
     logging.info("Before training: total params: {:,} non zero params: {:,}".format(
@@ -121,6 +122,9 @@ def train(trainer, output_dir, last_checkpoint=None):
     logging.info("After training: total params: {:,} non zero params: {:,}".format(
         *count_nonzero_params(trainer.model)
     ))
+
+    if rm_checkpoints:
+        rm_prefixed_subdirs(output_dir, "checkpoint-")
 
 
 def evaluate_tasks(trainer, output_dir, tasks, eval_datasets):
@@ -854,6 +858,26 @@ def check_best_metric(training_args, task_name):
     return training_args
 
 
+def check_rm_checkpoints(training_args, model_args):
+
+    # If pretraining, you usually want to save checkpoints.
+    if not model_args.finetuning:
+        if training_args.rm_checkpoints:
+            logging.warning(
+                "Warning, rm_checkpoints is set to true for this pretraining"
+                "experiment. That means a single model will be saved and all "
+                "checkpoint subdirectories will be deleted."
+            )
+
+    else:
+        if not training_args.rm_checkpoints:
+            logging.warning(
+                "Warning, rm_checkpoints is set to false for this finetuning"
+                "experiment. That means all model checkpoints will be saved, "
+                "which takes up a lot of space"
+            )
+
+
 def evaluate_tasks_handler(trainer,
                            data_args,
                            model_args,
@@ -1153,21 +1177,28 @@ class TaskResults():
         ]
         return "/".join(results_to_string)
 
-    def get_model_with_best_max(self):
+    def get_model_with_best_max(self, metric=None):
         """
         Utility added to get predictions of the best model at the end of
         run_finetuning_multiple_tasks. For now this is assuming
         load_best_model_at_end is True
         """
 
+        if not metric:
+            metric = self.best_metric_key
+
+        if metric not in self.all_results[0]:
+            metric = self.reporting_metrics[0]
+
+        print(f"Selecting best model based on {metric}")
         greater_is_better = True
         op = max
-        if "loss" in self.best_metric_key:
+        if "loss" in metric:
             greater_is_better = False
             op = min
 
         bests = [
-            op(self.all_results[i][self.best_metric_key])
+            op(self.all_results[i][metric])
             for i in range(len(self.all_results))
         ]
 
@@ -1371,21 +1402,15 @@ def update_run_number(training_args, run_idx):
     return training_args
 
 
-def link_best_predictions(training_args, task_results, task_name):
+def get_best_run_and_link_best_predictions(training_args,
+                                           task_results,
+                                           task_name):
     """
-    Create a symlink between {task_name}_best.tsv ad the test set
-    predictions of the run with the best eval scores.
-
-    This util is for helping upload predictions to glue leaderboard. When
-    finetuning a model on the same task for multiple runs, you want to pick
-    the best run and save those predictions. This approach assumes that on
-    every run, you predict on the test set at the end of training. Then it
-    finds the run with the best eval scores, and links the test set
-    predictionand for this model to a file called {task_name}_best.tsv
-    (e.g. CoLA_best.tsv).
+    When training for multiple runs on one task, find the best run so that
+    you can delete the other directories. If you are predicting on the test
+    set, then create a symlink between {task_name}_best.tsv and the test set
+    predictions of the run with the best eval scores. (e.g. CoLA_best.tsv).
     """
-    if not training_args.do_predict:
-        return
 
     # get the filename with predictions from the best model
     best_run = task_results.get_model_with_best_max()
@@ -1394,9 +1419,32 @@ def link_best_predictions(training_args, task_results, task_name):
     pred_file = GLUE_NAMES_PER_TASK[task_name] + ".tsv"
     best_run_predictions = os.path.join(best_run_path, pred_file)
 
-    # link task_best.tsv
-    link_file_name = GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"
-    link_file_path = os.path.join(task_path, link_file_name)
-    os.symlink(best_run_predictions, link_file_path)
-    logging.info(f"best run predictions for {task_name} saved to "
-                 "{link_file_path}")
+    # You want to find best_run in all cases. You want to link
+    # to a set of predictions only when do_predict is on.
+    if training_args.do_predict:
+
+        # link task_best.tsv
+        # If previous symlink exists, just delete and recreate
+        link_file_name = GLUE_NAMES_PER_TASK[task_name] + "_best.tsv"
+        link_file_path = os.path.join(task_path, link_file_name)
+        if os.path.exists(link_file_path):
+            os.remove(link_file_path)
+        os.symlink(best_run_predictions, link_file_path)
+        logging.info(f"best run predictions for {task_name} saved to "
+                     "{link_file_path}")
+
+    return str(best_run)
+
+
+def rm_prefixed_subdirs(base_dir, prefix, skip=""):
+    """
+    Remove unnecessary directories at the end of training
+    """
+    logging.info(f"Removing {prefix}* dirctories in {base_dir}")
+    for subdir in os.listdir(base_dir):
+        if subdir.startswith(prefix):
+            subdir_path = os.path.join(base_dir, subdir)
+            if subdir == skip:
+                logging.info(f"Not deleting {subdir}")
+            else:
+                shutil.rmtree(subdir_path)
