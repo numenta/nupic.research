@@ -45,7 +45,13 @@ Otherwise you need can install using setup.py like any python project. Since the
 You can test your installation by running the test script from the repository root:
 
     python setup.py test
-  
+
+Active Projects
+=======
+
+Some of our active research code and experiments are contained in the following repositories:
+
+* https://github.com/numenta/nupic.embodied
 
 Archive
 =======
