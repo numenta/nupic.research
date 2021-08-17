@@ -17,6 +17,8 @@
 #
 #  http://numenta.org/licenses/
 #
+import logging
+
 from transformers import TrainerCallback
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
@@ -47,6 +49,7 @@ class TrackEvalMetrics(TrainerCallback):
         sparsity are accepted.
         """
 
+        self.sparsity_tolerance = sparsity_tolerance
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
@@ -82,8 +85,11 @@ class TrackEvalMetrics(TrainerCallback):
             # up to specified tolerance
             if (self.sparsity_tolerance < 1) and len(self.eval_metrics["sparsity"]) > 1:
                 sparse_diff = self.eval_metrics["sparsity"][0] - self.eval_metrics["sparsity"][-1]  # noqa
-                assert abs(sparse_diff) < self.sparsity_tolerance, "Model sparsity"
-                f"fluctuated beyond acceptable range. {self.eval_metrics['sparsity']}"
+                if abs(sparse_diff) > self.sparsity_tolerance:
+                    logging.warn(
+                        "Model sparsity fluctuated beyond acceptable range."
+                        f"Current sparsity level: {self.eval_metrics['sparsity'][-1]}"
+                    )
 
             # track learning rate
             # get_last_lr() returns lr for each parameter group. For now,

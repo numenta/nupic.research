@@ -20,8 +20,9 @@
 
 import os
 import pathlib
-import pickle
 from copy import deepcopy
+
+import yaml
 
 # use bert_100k for task-specific hp search prototyping
 from .finetuning import finetuning_bert100k_glue_get_info
@@ -41,13 +42,13 @@ HP_SETS = {i: None for i in hp_files if os.path.isdir(os.path.join(hp_dir, i))}
 for model in HP_SETS.keys():
     hp_path = os.path.join(hp_dir, model)
     tasks = os.listdir(hp_path)
-    tasks = [i for i in tasks if i.split("_")[-1] == "hps.p"]
+    tasks = [i for i in tasks if i.split("_")[-1] == "hps.yaml"]
     task_hps = {}
     for task in tasks:
         task_name = os.path.basename(task).split("_")[0]
         task_file = os.path.join(hp_path, task)
-        with open(task_file, "rb") as f:
-            task_hps[task_name] = pickle.load(f)
+        with open(task_file, "r") as f:
+            task_hps[task_name] = yaml.safe_load(f)
 
     HP_SETS[model] = task_hps
 
@@ -76,10 +77,16 @@ trifecta_85_hp_chase = update_task_hyperparams(trifecta_85_hp_chase, "trifecta_8
 # 90%
 trifecta_90_hp_chase = deepcopy(finetuning_bert_sparse_90_trifecta_100k_glue_get_info)
 trifecta_90_hp_chase = update_task_hyperparams(trifecta_90_hp_chase, "trifecta_90")
+trifecta_90_hp_chase_mnli = deepcopy(trifecta_90_hp_chase)
+trifecta_90_hp_chase_mnli.update(
+    task_name=None,
+    task_names=["mnli"],
+)
 
 CONFIGS = dict(
     bert_100k_hp_chase=bert_100k_hp_chase,
     trifecta_80_hp_chase=trifecta_80_hp_chase,
     trifecta_85_hp_chase=trifecta_85_hp_chase,
     trifecta_90_hp_chase=trifecta_90_hp_chase,
+    trifecta_90_hp_chase_mnli=trifecta_90_hp_chase_mnli,
 )

@@ -1,0 +1,3 @@
+learning_rate: 0.00016576890201942405
+max_steps: 4688
+warmup_ratio: 0.1
