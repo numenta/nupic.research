@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -18,8 +18,22 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+import torch.nn as nn
 
-from .cl_experiment import *
-from .meta_cl_experiment import *
-from .supervised_experiment import *
-from .self_supervised_experiment import *
+
+class SyncBatchNorm:
+    def create_model(self, config, device):
+        model = super().create_model(config, device)
+        use_synch_batchnorm = config.get("use_synch_batchnorm", True)
+        distributed = config.get("distributed", False)
+        if use_synch_batchnorm and distributed and next(model.parameters()).is_cuda:
+            # Convert batch norm to sync batch norms
+            model = nn.modules.SyncBatchNorm.convert_sync_batchnorm(module=model)
+        return model
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].insert(0, "Sync Batchnorm begin")
+        eo["setup_experiment"].append("Sync Batchnorm end")
+        return eo
