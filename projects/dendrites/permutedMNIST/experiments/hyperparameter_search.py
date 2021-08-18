@@ -179,4 +179,5 @@ CONFIGS = dict(
     test50=TEST50,
     optimal_50=OPTIMAL_50,
     cross_search=CROSS_SEARCH,
+    cross_search_50=CROSS_SEARCH_50,
 )
