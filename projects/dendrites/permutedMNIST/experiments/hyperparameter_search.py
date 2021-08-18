@@ -113,6 +113,16 @@ TEST["model_args"].update(
 )
 TEST["num_samples"] = 1
 
+# cross hyperparameter search
+CROSS_SEARCH = deepcopy(BASE10)
+CROSS_SEARCH["model_args"].update(
+    num_segments=tune.grid_search([5, 10, 50, 100]),
+    kw_percent_on=tune.grid_search([0.05, 0.2, 0.6, 0.9, 0.99]),
+    weight_sparsity=tune.grid_search([0.05, 0.5, 0.9]),
+)
+CROSS_SEARCH["optimizer_args"] = dict(lr=tune.grid_search([5e-4, 5e-3, 5e-2]))
+CROSS_SEARCH["num_samples"] = 5
+
 # Idem on 50 tasks
 BASE50 = deepcopy(BASE10)
 BASE50["dataset_args"].update(num_tasks=50)
@@ -139,10 +149,23 @@ TEST50["model_args"].update(
 )
 TEST50["num_samples"] = 1
 
+# optimal model
 OPTIMAL_50 = deepcopy(BASE50)
 OPTIMAL_50["model_args"].update(
     kw_percent_on=0.05, weight_sparsity=0.5, num_segments=100
 )
+
+# cross hyperparameter search for 50 tasks
+CROSS_SEARCH_50 = deepcopy(BASE50)
+CROSS_SEARCH_50["model_args"].update(
+    num_segments=tune.grid_search([5, 10, 50, 100]),
+    kw_percent_on=tune.grid_search([0.05, 0.2, 0.6, 0.9, 0.99]),
+    weight_sparsity=tune.grid_search([0.05, 0.5, 0.9]),
+)
+CROSS_SEARCH_50["optimizer_args"] = dict(
+    lr=tune.grid_search([5e-4, 5e-3, 5e-2])
+)
+CROSS_SEARCH_50["num_samples"] = 5
 
 # Export configurations in this file
 CONFIGS = dict(
@@ -155,4 +178,5 @@ CONFIGS = dict(
     test=TEST,
     test50=TEST50,
     optimal_50=OPTIMAL_50,
+    cross_search=CROSS_SEARCH,
 )
