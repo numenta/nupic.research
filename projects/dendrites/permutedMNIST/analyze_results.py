@@ -57,22 +57,9 @@ def parse(best_result, results, trial_checkpoint, df_entries, exp, tag):
 
     # This list must match the column headers in collect_results
     df_entries.append(
-        [
-            exp,
-            kw_percent_on,
-            weight_sparsity,
-            dendrite_weight_sparsity,
-            num_segments,
-            dim_context,
-            epochs,
-            num_tasks,
-            lr,
-            momentum,
-            config["seed"],
-            best_result,
-            iteration,
-            "{} {}".format(exp, tag),
-        ]
+        [exp, kw_percent_on, weight_sparsity, dendrite_weight_sparsity, num_segments,
+         dim_context, epochs, num_tasks, lr, momentum, config["seed"], best_result,
+         iteration, "{} {}".format(exp, tag)]
     )
 
 
@@ -116,50 +103,26 @@ def parse_one_experiment(exp, state, df, outmethod):
                         )
                         best_result = best_results["mean_accuracy"]
                         if best_result > 0.0:
-                            parse(
-                                best_result,
-                                results,
-                                trial_checkpoint,
-                                df_entries,
-                                exp,
-                                tag,
-                            )
+                            parse(best_result, results, trial_checkpoint, df_entries,
+                                  exp, tag)
                     elif outmethod == "lasttask":
                         print("using parsing method : lasttask")
                         last_results = results[-1]
                         last_result = last_results["mean_accuracy"]
                         if last_result > 0.0:
-                            parse(
-                                last_result,
-                                last_results,
-                                trial_checkpoint,
-                                df_entries,
-                                exp,
-                                tag,
-                            )
+                            parse(last_result, last_results, trial_checkpoint,
+                                  df_entries, exp, tag)
                     elif outmethod == "all":
                         print("using parsing method : all")
                         for i, _ in enumerate(results):
                             i_results = results[i]
                             i_result = i_results["mean_accuracy"]
                             if i_result > 0.0:
-                                parse(
-                                    i_result,
-                                    i_results,
-                                    trial_checkpoint,
-                                    df_entries,
-                                    exp,
-                                    tag,
-                                )
+                                parse(i_result, i_results, trial_checkpoint,
+                                      df_entries, exp, tag)
 
             except Exception:
-                print(
-                    "Problem with checkpoint group"
-                    + tag
-                    + " in "
-                    + exp
-                    + " ...skipping"
-                )
+                print(f"Problem with checkpoint group {tag} in {exp} ...skipping")
                 continue
 
     # Create new dataframe from the entries with same dimensions as df
@@ -181,22 +144,9 @@ def collect_results(configs, basefilename, outmethod):
     """
 
     # The results table
-    columns = [
-        "Experiment name",
-        "Activation sparsity",
-        "FF weight sparsity",
-        "Dendrite weight sparsity",
-        "Num segments",
-        "Dim context",
-        "Epochs",
-        "Num tasks",
-        "LR",
-        "Momentum",
-        "Seed",
-        "Accuracy",
-        "Iteration",
-        "ID",
-    ]
+    columns = ["Experiment name", "Activation sparsity", "FF weight sparsity",
+               "Dendrite weight sparsity", "Num segments", "Dim context", "Epochs",
+               "Num tasks", "LR", "Momentum", "Seed", "Accuracy", "Iteration", "ID"]
     df = pd.DataFrame(columns=columns)
 
     for exp in configs:
@@ -259,23 +209,13 @@ def analyze_experiment_data(filename_df, output_filename):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "experiments", nargs="+", help="Experiments to run", choices=CONFIGS.keys()
-    )
-    parser.add_argument(
-        "-f",
-        dest="format",
-        default="grid",
-        help="Table format",
-        choices=["grid", "latex_raw"],
-    )
+    parser.add_argument("experiments", nargs="+",
+                        help="Experiments to run", choices=CONFIGS.keys())
+    parser.add_argument("-f", dest="format", default="grid",
+                        help="Table format", choices=["grid", "latex_raw"])
     parser.add_argument("-n", dest="name", default="temp", help="Base filename")
-    parser.add_argument(
-        "-o",
-        dest="outmethod",
-        default="best",
-        help="keep only the considered task/run. choose between best, lasttask or all",
-    )
+    parser.add_argument("-o", dest="outmethod", default="best",
+                        help="Keep only considered task/run: best, last, or all")
     args = parser.parse_args()
 
     # Get configuration values
