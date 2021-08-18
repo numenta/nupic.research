@@ -96,7 +96,7 @@ def evaluate_model(exp):
             correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
 
-    mean_acc = torch.true_divide(correct, total).item() if total > 0 else 0,
+    mean_acc = torch.true_divide(correct, total).item() if total > 0 else 0
     return mean_acc
 
 
