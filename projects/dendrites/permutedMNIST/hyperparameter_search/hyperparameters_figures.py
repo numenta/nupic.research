@@ -24,9 +24,8 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import pandas as pd
-import seaborn as sns
-
 import ptitprince as pt
+import seaborn as sns
 
 sns.set(style="ticks", font_scale=1.3)
 
