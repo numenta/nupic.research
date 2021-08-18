@@ -36,6 +36,7 @@ import pickle
 import random
 import sys
 from copy import deepcopy
+from functools import partial
 from pprint import pformat
 
 # FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
@@ -44,6 +45,7 @@ import torch.distributed
 import transformers
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
+    AutoModelForSequenceClassification,
     DataCollatorWithPadding,
     EarlyStoppingCallback,
     HfArgumentParser,
@@ -53,15 +55,26 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from callbacks import RezeroWeightsCallback, TrackEvalMetrics
+from callbacks import TrackEvalMetrics
 from experiments import CONFIGS
-from integrations import CustomWandbCallback  # noqa I001
+from integrations import (  # noqa I001
+    CustomWandbCallback,
+    init_ray_wandb_logger_callback,
+)
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,
+    check_best_metric,
+    check_eval_and_max_steps,
     check_for_callback,
+    check_hp_compute_objective,
+    check_if_current_hp_best,
+    check_rm_checkpoints,
+    check_sparsity_callback,
+    compute_objective,
     evaluate_language_model,
     evaluate_tasks_handler,
+    get_best_run_and_link_best_predictions,
     get_labels,
     init_config,
     init_datasets_mlm,
@@ -71,25 +84,15 @@ from run_utils import (
     init_trainer,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
+    rm_prefixed_subdirs,
     run_hyperparameter_search,
     test_tasks,
     train,
+    update_run_number,
 )
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
-
-REPORTING_METRICS_PER_TASK = {
-    "cola": ["eval_matthews_correlation"],
-    "mnli": ["eval_accuracy", "mm_eval_accuracy"],
-    "mrpc": ["eval_f1", "eval_accuracy"],
-    "qnli": ["eval_accuracy"],
-    "qqp": ["eval_accuracy", "eval_f1"],
-    "rte": ["eval_accuracy"],
-    "sst2": ["eval_accuracy"],
-    "stsb": ["eval_pearson", "eval_spearmanr"],
-    "wnli": ["eval_accuracy"]
-}
 
 
 def bold(text):
@@ -103,6 +106,7 @@ def pdict(dictionary):
 
 
 def main():
+
     cmd_parser = argparse.ArgumentParser()
     cmd_parser.add_argument("experiments", nargs="+", choices=list(CONFIGS.keys()),
                             help="Available experiments")
@@ -190,6 +194,9 @@ def main():
         set_seed(training_args.seed)
         logging.info(f"Seed to reproduce: {training_args.seed}")
 
+        # Issue warnings if rm_checkpoints is not in the usual configuration
+        check_rm_checkpoints(training_args, model_args)
+
         if model_args.finetuning:
             run_finetuning_multiple_tasks(
                 model_args, data_args, training_args, last_checkpoint=last_checkpoint
@@ -251,6 +258,8 @@ def run_pretraining(
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
+    has_track_eval, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
+
     # Run hp search or regular training
     if model_args.hp_num_trials >= 1:
         run_hyperparameter_search(
@@ -274,20 +283,23 @@ def run_pretraining(
             trainer_callbacks=model_args.trainer_callbacks or None,
         )
         if training_args.do_train:
-            train(trainer, training_args.output_dir, last_checkpoint)
+            train(trainer,
+                  training_args.output_dir,
+                  training_args.rm_checkpoints,
+                  last_checkpoint)
 
     # Evaluate in full eval dataset.
     # if using hp search, load best model before running evaluate
     if training_args.do_eval:
         logging.info("*** Evaluate ***")
-        evaluate_language_model(trainer, eval_dataset, training_args.output_dir)
+        evaluate_language_model(trainer,
+                                eval_dataset,
+                                training_args.output_dir,
+                                metric_callback)
 
 
-def run_finetuning_single_task(
-    model_args, data_args, training_args, last_checkpoint=None
-):
-    """On a single task train, evaluate, and save results"""
-
+def init_dataset_for_finetuning(model_args, data_args, training_args,
+                                last_checkpoint=None):
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
     logging.info(f"Training {data_args.task_name} with {num_labels} labels")
@@ -300,6 +312,7 @@ def run_finetuning_single_task(
     config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
     tokenizer = init_tokenizer(model_args)
     model = init_model(model_args, config, tokenizer, finetuning=True)
+    check_sparsity_callback(model, model_args)
 
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
@@ -334,37 +347,155 @@ def run_finetuning_single_task(
     else:
         data_collator = None
 
-    # If you're supposed to load best model at end, but evaluate() never gets
-    # called because eval_steps > number of training steps taken, you'll get
-    # an error at the end of training. If this is the case, set eval_steps
-    # equal to max_steps so it gets called at least once.
-    if training_args.load_best_model_at_end:
-        if training_args.max_steps == -1:
-            num_examples = training_args.num_train_epochs * len(train_dataset)
-            max_steps = num_examples // training_args.per_device_train_batch_size
-        else:
-            max_steps = training_args.max_steps
-        if max_steps < training_args.eval_steps:
-            logging.warning(
-                f"max_steps({max_steps}) < "
-                f"eval_steps({training_args.eval_steps}) "
-                "To avoid issues, setting eval steps equal to max_steps"
-            )
-            training_args.eval_steps = max_steps
+    return (
+        tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model,
+        is_regression, tokenized_datasets, label_list, config
+    )
 
-        # Runs can easily break if load_best_model_at_end because you specified a metric
-        # for a diferent task. You can get all the way through training and have it
-        # break. This will at least break earlier on / help you readjust.
 
-        allowed_metrics = REPORTING_METRICS_PER_TASK[data_args.task_name]
-        if training_args.metric_for_best_model not in allowed_metrics:
-            if training_args.metric_for_best_model != "eval_loss":
-                logging.warning(
-                    "Warning, code will break because the current metric for best model"
-                    f" (training_args.metric_for_best_model) is not being tracked."
-                    "Defaulting metric_for_best_model to eval_loss"
-                )
-                training_args.metric_for_best_model = "eval_loss"
+def run_finetuning_single_task_with_hp_search(
+    model_args, data_args, training_args, last_checkpoint=None
+):
+    """On a single task train, evaluate, and save results"""
+
+    # Init dataset (same as without hp search)
+    tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
+        is_regression, tokenized_datasets, label_list, config = \
+        init_dataset_for_finetuning(
+            model_args, data_args, training_args, last_checkpoint,
+        )
+
+    # Defines defaults required for hp search
+    training_args.load_best_model_at_end = True
+    training_args.disable_tqdm = True  # competes with ray output
+    training_args.metric_for_best_model = model_args.hp_compute_objective[1]
+    training_args.do_eval = False
+    training_args.do_predict = False
+
+    # Code safety run a second time due to training_args being changed above
+    check_eval_and_max_steps(training_args, train_dataset)
+    training_args = check_best_metric(training_args, data_args.task_name)
+    model_args = check_hp_compute_objective(model_args, data_args.task_name)
+    check_sparsity_callback(model, model_args)
+
+    # Get fraction of the validation dataset to use in hp search
+    if model_args.hp_validation_dataset_pct < 1:
+        hp_eval_dataset = eval_dataset.shard(
+            index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
+        )
+    else:
+        hp_eval_dataset = eval_dataset
+
+    # Specify how to re-init model each training run.
+    def model_init():
+        model_kwargs = dict(
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_args.model_name_or_path, **model_kwargs
+        )
+
+        check_sparsity_callback(model, model_args)
+        return model
+
+    # Train
+    trainer = init_trainer(
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        training_args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=hp_eval_dataset,
+        trainer_class=model_args.trainer_class,  # changed
+        trainer_callbacks=model_args.trainer_callbacks or None,
+        model_init=model_init,  # changed
+        task_name=data_args.task_name,  # does it matter?
+        is_regression=is_regression,  # does it matter?
+        finetuning=True  # see if it fixes key error issue
+    )
+
+    hp_search_kwargs = dict(
+        direction=model_args.hp_compute_objective[0],
+        backend="ray",
+        n_trials=model_args.hp_num_trials,
+        hp_space=model_args.hp_space,
+        compute_objective=partial(
+            compute_objective, objective=model_args.hp_compute_objective[1]
+        ),
+        local_dir=training_args.output_dir,
+        resources_per_trial=model_args.hp_resources_per_trial,
+        checkpoint_freq=0,
+        keep_checkpoints_num=0,
+        checkpoint_at_end=False,
+    )
+
+    # TODO
+    # Get wandb to log properly
+    # trainer.hyperparameter_search calls ray.tune()
+    # you can set config or callbacks as a kwarg to trainer.hyperparameter_search
+    # which gets passed to ray.tune
+
+    # Update any extra kwargs defined in config
+    hp_search_kwargs.update(**model_args.hp_extra_kwargs)
+
+    # Run hp search and save results
+    best_run = trainer.hyperparameter_search(**hp_search_kwargs)
+    logging.info(f"Best run: {best_run}")
+
+    # Delete all saved models and checkpoints to save space. All we need
+    # are the params and scores. Currently this is a hack that is specific
+    # to ray. May need to modify so that it serves the same function for
+    # sigopt, once I integrate it.
+    rm_prefixed_subdirs(training_args.output_dir, "run-")
+
+    hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
+    hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
+    write_new = check_if_current_hp_best(hp_res_file, model_args, best_run)
+
+    if trainer.is_world_process_zero() and write_new:
+        with open(hp_res_file, "w") as writer:
+            writer.write("Hyperparameter search best run:\n")
+            writer.write(f"run_id = {best_run.run_id}\n")
+            writer.write(f"{training_args.metric_for_best_model}")
+            writer.write(f"= {best_run.objective}\n")
+            writer.write(f"\nHyperparameters:\n")
+            for key, value in sorted(best_run.hyperparameters.items()):
+                writer.write(f"{key} = {value}\n")
+
+    # There is an existing issue on training multiple models in sequence in this code
+    # There is a memory leakage on the model, a small amount of GPU memory remains after
+    # the run and accumulates over several runs. It fails with OOM after about 20 runs,
+    # even when all tensors on GPU are explicitly deleted, garbage is collected and
+    # cache is cleared. Tried multiple solutions but this weird little hack is the only
+    # thing that worked.
+    model.to("cpu")
+
+    return {}
+
+
+def run_finetuning_single_task(
+    model_args, data_args, training_args, last_checkpoint=None, run_idx=None,
+):
+    """On a single task train, evaluate, and save results"""
+
+    # TODO
+    # accept run# as an argument for finetuning with multiple runs on a single task
+    # update the save directory to include run#
+    tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
+        is_regression, tokenized_datasets, label_list, config = \
+        init_dataset_for_finetuning(
+            model_args, data_args, training_args, last_checkpoint
+        )
+
+    # Code safety
+    check_eval_and_max_steps(training_args, train_dataset)
+    training_args = check_best_metric(training_args, data_args.task_name)
+
+    # Update where model is saved for each run
+    training_args = update_run_number(training_args, run_idx)
 
     # Train
     trainer = init_trainer(
@@ -379,7 +510,13 @@ def run_finetuning_single_task(
     )
 
     if training_args.do_train:
-        train(trainer, training_args.output_dir, last_checkpoint)
+        # Note, rm_checkpoints=True means one model will be saved
+        # in the output_dir, and all checkpoint subdirectories will be
+        # deleted when train() is called.
+        train(trainer,
+              training_args.output_dir,
+              training_args.rm_checkpoints,
+              last_checkpoint)
 
     if training_args.do_eval:
         eval_results = evaluate_tasks_handler(
@@ -438,13 +575,6 @@ def run_finetuning_multiple_tasks(
             "This is strongly discouraged."
         )
 
-    # Do not finetune sparse models without RezeroWeightsCallback. Otherwise,
-    # you will be "unsparsifying" or "depruning" as you train.
-    if "sparse" in model_args.model_type.lower():
-        has_rezero, _ = check_for_callback(model_args, RezeroWeightsCallback)
-        assert has_rezero, "Finetuning sparse models without rezeroing weights"
-        " is prohibited"
-
     base_training_args = deepcopy(training_args)
     for task_name in data_args.task_names:
         data_args.task_name = task_name
@@ -455,39 +585,72 @@ def run_finetuning_multiple_tasks(
             base_training_args.output_dir, task_name
         )
 
-        # Update any custom training hyperparameter
-        # TODO: allow hyperparameter search for each task
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
-                setattr(training_args, hp_key, hp_val)
+                if "hp_" in hp_key:
+                    setattr(model_args, hp_key, hp_val)
+                else:
+                    # I forget why this is here
+                    # TODO: check when this happens
+                    setattr(training_args, hp_key, hp_val)
 
         task_results = TaskResults(task_name,
                                    has_early_stopping,
                                    training_args=training_args)
 
+        # Hack to ensure we don't do hp search num_runs times
+        if model_args.hp_num_trials > 1:
+            training_args.num_runs = 1
+
         # Run finetuning and save results
-        for _ in range(training_args.num_runs):
-            # reset seed per run
+        for run_idx in range(training_args.num_runs):
             training_args.seed = random.randint(0, 1_000_000_000)
             set_seed(training_args.seed)
-            # eval_results contains either a number for each metric
-            # or a list for each metric, depending on if TrackEvalMetrics
-            # callback is in use.
-            eval_results = run_finetuning_single_task(
-                model_args, data_args, training_args, last_checkpoint=last_checkpoint
-            )
+
+            if model_args.hp_num_trials > 1:
+                eval_results = run_finetuning_single_task_with_hp_search(
+                    model_args,
+                    data_args,
+                    training_args,
+                    last_checkpoint=last_checkpoint
+                )
+            else:
+                eval_results = run_finetuning_single_task(
+                    model_args,
+                    data_args,
+                    training_args,
+                    last_checkpoint=last_checkpoint,
+                    run_idx=run_idx
+                )
+
             task_results.append(eval_results)
 
-        task_results.reduce_metrics(reduction="mean")
-        logging.info(f"{task_name} results: {task_results.to_string()}")
-        logging.info(f"{task_name} consolidated: {task_results.consolidate()}")
-        results[task_name] = task_results
+        # Find the predictions of the best model and sym link to a file
+        # labeled with "_best" at the end. Warning, assumes
+        # load_best_model_at_end is on.
+        best_run = get_best_run_and_link_best_predictions(
+            training_args, task_results, task_name)
 
-        # Pickle and save results
-        if is_main_process(base_training_args.local_rank):
-            logging.info(f"Saving task_results to {results_path}")
-            with open(results_path, "wb") as file:
-                pickle.dump(results, file)
+        # Delete all finetuning run directories except for the best one
+        # Ignore if this is a hyperparameter run, since the excess
+        # is deleted within that function.
+        if (model_args.hp_num_trials <= 1):
+            skip = "run_" + best_run
+            task_output_dir = os.path.dirname(training_args.output_dir)
+            rm_prefixed_subdirs(task_output_dir, "run_", skip=skip)
+
+        # If this is just a prediction run, ignore this block
+        if training_args.do_eval:
+            task_results.reduce_metrics(reduction="mean")
+            logging.info(f"{task_name} results: {task_results.to_string()}")
+            logging.info(f"{task_name} consolidated: {task_results.consolidate()}")
+            results[task_name] = task_results
+
+            # Pickle and save results
+            if is_main_process(base_training_args.local_rank):
+                logging.info(f"Saving task_results to {results_path}")
+                with open(results_path, "wb") as file:
+                    pickle.dump(results, file)
 
 
 def _mp_fn(index):

@@ -59,8 +59,9 @@ class RigLMixin:
         self.prune_fraction = mixin_args.get("prune_fraction", 0.3)
         self.prune_freq = mixin_args.get("prune_freq", 100)
         self.warmup_steps = mixin_args.get("warmup_steps", self.prune_freq)
+        total_steps = self.args.max_steps * self.args.gradient_accumulation_steps
         self.prune_scheduler = CosineDecayPruneScheduler(
-            total_steps=self.args.max_steps,
+            total_steps=total_steps,
             prune_fraction=self.prune_fraction,
             warmup_steps=self.warmup_steps
         )
@@ -85,12 +86,17 @@ class RigLMixin:
         sparse_modules = self.sparse_modules
 
         # Pre-prune sparsities (for verbose logging).
+        model.apply(rezero_weights)
         if self.verbose_rigl_logging:
             param_sparsity0, mask_sparsity0 = calc_cumulative_sparsity(sparse_modules)
 
-        # Prune weights.
-        model.apply(rezero_weights)
+        # If prune fraction is 0, say for a warmup step, return and don't prune.
         prune_fraction = self.prune_scheduler.get_prune_fraction()
+        if prune_fraction == 0:
+            self.prune_scheduler.step()
+            return train_loss
+
+        # Prune weights.
         num_removed = global_prune_by_abs_weight(self.sparse_modules, prune_fraction)
         model.apply(rezero_weights)
 
@@ -163,7 +169,7 @@ def inputs_to_device(inputs, device):
 def calc_cumulative_sparsity(sparse_modules):
     """
     Calculate the sparsities across a list of sparse modules. Both the weight sparsity
-    and the zero mask sparsity is calculated.
+    and the zero mask sparsity are calculated.
     """
     total_off = 0
     total_zero = 0

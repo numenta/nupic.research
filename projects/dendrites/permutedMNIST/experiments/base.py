@@ -38,9 +38,11 @@ from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedM
 from nupic.research.frameworks.vernon import mixins
 
 
-class PermutedMNISTExperiment(mixins.RezeroWeights,
-                              mixins.PermutedMNISTTaskIndices,
-                              DendriteContinualLearningExperiment):
+class PermutedMNISTExperiment(
+    mixins.RezeroWeights,
+    mixins.PermutedMNISTTaskIndices,
+    DendriteContinualLearningExperiment,
+):
     pass
 
 
@@ -99,7 +101,7 @@ BASE2.update(
 BASE_10_TASKS = deepcopy(DEFAULT_BASE)
 BASE_10_TASKS.update(
     dataset_args=dict(
-        num_tasks=10,        # NUM_TASKS
+        num_tasks=10,  # NUM_TASKS
         root=os.path.expanduser("~/nta/results/data/"),
         dim_context=1024,
         seed=42,
@@ -113,23 +115,25 @@ BASE_10_TASKS.update(
         input_size=784,
         output_size=10,
         hidden_sizes=[2048, 2048],
-        num_segments=10,    # NUM_TASKS
+        num_segments=10,  # NUM_TASKS
         dim_context=1024,
         kw=True,
         dendrite_weight_sparsity=0.0,
         weight_sparsity=tune.sample_from(
-            lambda spec: np.random.choice([0.95, 0.90, 0.8])),
+            lambda spec: np.random.choice([0.95, 0.90, 0.8])
+        ),
     ),
 
-    num_tasks=10,            # NUM_TASKS
-    num_classes=100,         # 10 * NUM_TASKS
+    num_tasks=10,  # NUM_TASKS
+    num_classes=100,  # 10 * NUM_TASKS
     seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
     num_samples=20,
 
     optimizer_class=tune.grid_search([torch.optim.Adam, torch.optim.SGD]),
     optimizer_args=dict(
         lr=tune.sample_from(
-            lambda spec: np.random.choice([0.01, 0.005, 0.001, 0.0005])),
+            lambda spec: np.random.choice([0.01, 0.005, 0.001, 0.0005])
+        ),
     ),
 )
 
@@ -140,14 +144,16 @@ BASE_10_SPARSITY_SEARCH.update(
         input_size=784,
         output_size=10,
         hidden_sizes=[2048, 2048],
-        num_segments=10,    # NUM_TASKS
+        num_segments=10,  # NUM_TASKS
         dim_context=1024,
         kw=True,
         kw_percent_on=tune.sample_from(
-            lambda spec: np.random.choice([0.05, 0.1, 0.2, 0.0])),
+            lambda spec: np.random.choice([0.05, 0.1, 0.2, 0.0])
+        ),
         dendrite_weight_sparsity=0.0,
         weight_sparsity=tune.sample_from(
-            lambda spec: np.random.choice([0.90, 0.8, 0.7, 0.5, 0.25, 0.0])),
+            lambda spec: np.random.choice([0.90, 0.8, 0.7, 0.5, 0.25, 0.0])
+        ),
     ),
 
     epochs=tune.sample_from(lambda spec: np.random.randint(1, 3)),
@@ -163,7 +169,7 @@ BASE_10_SPARSITY_SEARCH.update(
 BASE_50_SPARSITY_SEARCH = deepcopy(BASE_10_SPARSITY_SEARCH)
 BASE_50_SPARSITY_SEARCH.update(
     dataset_args=dict(
-        num_tasks=50,        # NUM_TASKS
+        num_tasks=50,  # NUM_TASKS
         root=os.path.expanduser("~/nta/results/data/"),
         dim_context=1024,
         seed=42,
@@ -174,14 +180,16 @@ BASE_50_SPARSITY_SEARCH.update(
         input_size=784,
         output_size=10,
         hidden_sizes=[2048, 2048],
-        num_segments=50,    # NUM_TASKS
+        num_segments=50,  # NUM_TASKS
         dim_context=1024,
         kw=True,
         kw_percent_on=tune.sample_from(
-            lambda spec: np.random.choice([0.05, 0.1, 0.2, 0.0])),
+            lambda spec: np.random.choice([0.05, 0.1, 0.2, 0.0])
+        ),
         dendrite_weight_sparsity=0.0,
         weight_sparsity=tune.sample_from(
-            lambda spec: np.random.choice([0.90, 0.8, 0.5, 0.0])),
+            lambda spec: np.random.choice([0.90, 0.8, 0.5, 0.0])
+        ),
     ),
 
     tasks_to_validate=(0, 1, 40, 49, 50),  # Tasks on which to run validate

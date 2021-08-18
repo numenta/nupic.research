@@ -40,7 +40,7 @@ from scipy import stats
 
 class TaskResultsAnalysis:
 
-    def __init__(self, task_results_dict):
+    def __init__(self, task_results_dict, run_name=None):
         """
         run_utils.TaskResults contains data for a single task, but spans multiple
         runs. TaskResultsAnalysis takes a list of TaskResults objects, so you can
@@ -54,6 +54,10 @@ class TaskResultsAnalysis:
         """
 
         self.task_results_dict = task_results_dict
+        if run_name is not None:
+            self.run_name = run_name
+        else:
+            self.run_name = None
 
         # Do not run an analysis without checking sparsity first
         for task in task_results_dict.keys():
@@ -90,7 +94,7 @@ class TaskResultsAnalysis:
 
         y = self[task].all_results[run_idx][metric]
         x, xlabel = self._get_time_and_label(task, run_idx)
-        ax.plot(x, y, ".", ms=10, linestyle="dashed")
+        ax.plot(x, y, ".", ms=10, linestyle="dashed", alpha=.7)
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(metric)
@@ -113,7 +117,7 @@ class TaskResultsAnalysis:
             x, xlabel = self._get_time_and_label(task, run_idx)
             y = self[task].all_results[run_idx][metric]
 
-            ax.plot(x, y, ".", linestyle="dashed", label=f"run: {run_idx}")
+            ax.plot(x, y, ".", linestyle="dashed", label=f"run: {run_idx}", alpha=0.7)
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(metric)
@@ -175,7 +179,7 @@ class TaskResultsAnalysis:
         # TODO
         pass
 
-    def get_metric_from_runs(self, task, metric):
+    def get_metrics_from_runs(self, task):
         """
         Create a 2d numpy array where each row represents a run. The
         row contains a trajectory for a given metric.
@@ -184,19 +188,92 @@ class TaskResultsAnalysis:
             metric_all_runs[2] could return eval_loss at every time step
             on the 3rd run for a given task.
         """
+        metrics = [m for m in self[task].reporting_metrics]
+
+        if hasattr(self[task], "score_matrix"):
+            return self[task].score_matrix
+
         n_steps = len(self[task].all_results[0]["steps"])
         n_runs = len(self[task].all_results)
 
-        metric_all_runs = np.zeros((n_runs, n_steps))
-        for run_idx in range(n_runs):
-            metric_all_runs = np.array(
-                self[task].all_results[run_idx][metric])
+        metrics_all_runs = []
+        for _ in range(len(self[task].reporting_metrics)):
+            metrics_all_runs.append(np.zeros((n_runs, n_steps)))
 
-        return metric_all_runs
+        for m in range(len(metrics)):
+            for run_idx in range(n_runs):
+                metrics_all_runs[m][run_idx, :] = np.array(
+                    self[task].all_results[run_idx][metrics[m]])
+
+        self[task].score_matrix = metrics_all_runs
+
+        return metrics_all_runs
+
+    def get_best_scores_per_run(self, task):
+        metrics = self[task].reporting_metrics
+        metrics_all_runs = self.get_metrics_from_runs(task)
+        if len(metrics) > 1:
+            metric_all_runs = np.zeros_like(metrics_all_runs[0])
+            for m in range(len(metrics)):
+                metric_all_runs += metrics_all_runs[m]
+            metric_all_runs /= len(metrics)
+        else:
+            metric_all_runs = metrics_all_runs[0]
+        best_idx_per_run = np.argmax(metric_all_runs, axis=1)
+        best_avg_metric_scores = metric_all_runs[np.arange(len(self[task])),
+                                                 best_idx_per_run]
+
+        best_metric_scores = []
+        for m in range(len(metrics)):
+            data = metrics_all_runs[m][np.arange(len(self[task])), best_idx_per_run]
+            best_metric_scores.append(data)
+        return best_avg_metric_scores, best_metric_scores
+
+    def get_best_scores_best_run(self, task):
+        best_avg_metric_scores, best_scores = self.get_best_scores_per_run(task)
+        best_idx = np.argmax(best_avg_metric_scores)
+        best_score = best_avg_metric_scores[best_idx]
+        best_metric_scores = [best_score[best_idx] for best_score in best_scores]
+        return best_score, best_metric_scores
+
+    def max_scores(self):
+
+        maxes = {}
+        for task in self.task_results_dict.keys():
+            maxes[task] = self.get_best_scores_best_run(task)
+
+        _max_scores = {task: maxes[task][0] for task in maxes.keys()}
+        str_scores = dict()  # f"{self.results[m]*100:.2f}"
+        for task in maxes.keys():
+            metrics = maxes[task][1]
+            str_list_score = [f"{metrics[i]*100:.2f}" for i in range(len(metrics))]
+            str_score = "/".join(str_list_score)
+            str_scores[task] = str_score
+            print(str_score)
+
+        # Calculate totals for bert and glue
+        num_tasks_bert = len(maxes) - 1 if "wnli" in maxes else len(maxes)
+        average_bert = sum(
+            [value for task, value in _max_scores.items() if task != "wnli"]
+        ) / num_tasks_bert
+        average_glue = sum(_max_scores.values()) / len(_max_scores)
+
+        return average_bert, average_glue, str_scores
 
     def verify_sparsity(self, task):
 
-        self.plot_metric(task, "sparsity")
+        if "sparsity" in self[task].all_results[0].keys():
+            self.plot_metric(task, "sparsity")
+        else:
+            print(f"sparsity was not tracked for this model: {self.run_name}")
+
+    def glue_load_best_model_at_end(self, reduction="max"):
+        """
+        Compute the glue score as though load_best_model_at_end were true.
+        Just rely on existing code in TaskResults to do this by flipping
+        class attributes.
+        """
+        pass
 
 
 def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
@@ -259,7 +336,35 @@ def load_results(results_files):
     return results
 
 
-def results_to_df(results, reduction, model_name):
+def load_milestone_info(pretrained_model):
+    """
+    Look for the milestones table so you can include the eval loss
+    during pretraining for the pretrained model that the current experiment
+    derives from. If you can't find the pretrained model in the table, just
+    leave it as NaN.
+    """
+    # If pretrained_model wasn't specified as a command line arg
+    if not pretrained_model:
+        return np.nan
+
+    # Load the milestones dataframe
+    milestones_path = os.path.abspath("../results/milestone1.csv")
+    milestones_df = pd.read_csv(milestones_path)
+
+    # Look for eval loss for this model and set to NaN if you can't find it
+    row_matches = pretrained_model == milestones_df["Model Name"]
+    if sum(row_matches) > 0:
+        idx = np.argmax(row_matches)
+        eval_loss = milestones_df["Eval Loss"].iloc[idx]
+    else:
+        print(f"Pretrained model name {pretrained_model} not found in "
+              "milestones dataframe. Setting eval_loss to NaN.")
+        eval_loss = np.nan
+
+    return eval_loss
+
+
+def results_to_df(results, reduction, model_name, eval_loss):
 
     # Aggregate using chosen reduction method
     for _, task_results in results.items():
@@ -288,26 +393,28 @@ def results_to_df(results, reduction, model_name):
     cols = cols[-1:] + cols[:-1]  # Reorder so model_name is first column
     df = df[cols]
 
-    # Add timing information for added context
-    df["date_added"] = pd.to_datetime("today")
+    # Plug in eval loss for pretrained model or set to NaN if N/A
+    df["MLM Eval Loss"] = eval_loss
 
     return df
 
 
-def process_results(results_files, model_name, reduction, csv, md):
+def process_results(results_files, model_name, pretrained_model,
+                    reduction, csv, md):
 
     results = load_results(results_files)
 
     # load a csv file if specified
+    csv_df = None
     if len(csv) > 0:
         if os.path.exists(csv):
             print(f"...loading data from {csv}")
             csv_df = pd.read_csv(csv)
-        else:
-            csv_df = None
+
+    eval_loss = load_milestone_info(pretrained_model)
 
     # Aggregate using chosen reduction method
-    df = results_to_df(results, reduction, model_name)
+    df = results_to_df(results, reduction, model_name, eval_loss)
 
     # print markdown
     print(df.to_markdown(index=False))
@@ -315,7 +422,7 @@ def process_results(results_files, model_name, reduction, csv, md):
     # create a new csv file to store results
     if csv_df is None:
         print(f"saving results to a new file: {csv}")
-        df.to_csv(csv, index=False)
+        df.to_csv(os.path.abspath(csv), index=False)
     # merge csv file with current results
     else:
         df = pd.concat([csv_df, df], ignore_index=True)
@@ -323,7 +430,7 @@ def process_results(results_files, model_name, reduction, csv, md):
 
     # save a markdown file
     if len(md) > 0:
-        df.to_markdown(md, index=False)
+        df.to_markdown(os.path.abspath(md), index=False)
 
 
 if __name__ == "__main__":
@@ -333,6 +440,9 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model_name", type=str,
                         default="model",
                         help="Name of the model to save")
+    parser.add_argument("-p", "--pretrained_model", type=str,
+                        default="None", help="Name of pretrained model to "
+                        "look for in milestones table")
     parser.add_argument("-r", "--reduction", type=str,
                         default="max", choices=["mean", "max"],
                         help="Reduction method to use to aggregate results"

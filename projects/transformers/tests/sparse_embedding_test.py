@@ -26,8 +26,9 @@ from os.path import expanduser
 
 import torch
 
+from models import SparseEmbeddings  # noqa
+
 sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers")) # noqa
-from models import SparseEmbeddings # noqa
 
 
 def create_simple_model():

@@ -51,9 +51,12 @@ torchvision==0.7.0
 tqdm
 h5py
 pretrainedmodels==0.7.4
-wandb>=0.9.4
+wandb>=0.10.23
 # FIXME: this is needed because the pip install isn't properly choosing a version
 # of colorama or urllib3 compatible with awscli
 colorama==0.4.3
 urllib3==1.25.11
 pytorch-lightning==1.2.9
+# for graphs
+ptitprince==0.2.5
+seaborn==0.11.1

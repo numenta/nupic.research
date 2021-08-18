@@ -201,6 +201,20 @@ small_bert_50k.update(
 small_bert_100k_fp16 = dict(**small_bert_100k, fp16=True)
 small_bert_50k_fp16 = dict(**small_bert_50k, fp16=True)
 
+
+small_bert_large_dataset_100k = deepcopy(small_bert_100k)
+small_bert_large_dataset_100k.update(
+    max_steps=100000,
+    max_seq_length=128,
+    dataset_name=("wikipedia", "bookcorpus"),
+    dataset_config_name=("20200501.en", None),
+    tokenized_data_cache_dir="/mnt/datasets/huggingface/preprocessed-datasets/text",  # noqa: E501
+    # added in 8/7 to fix discrepancies between dense and sparse
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16
+)
+
+
 # samples/second = 6.686 (on one p3.2xlarge)
 mini_bert_100k = deepcopy(bert_100k)
 mini_bert_100k.update(
@@ -276,4 +290,5 @@ CONFIGS = dict(
 
     small_bert_100k_fp16=small_bert_100k_fp16,
     small_bert_50k_fp16=small_bert_50k_fp16,
+    small_bert_large_dataset_100k=small_bert_large_dataset_100k,
 )

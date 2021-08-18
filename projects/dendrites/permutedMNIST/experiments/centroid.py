@@ -149,10 +149,21 @@ FIGURE_1B.update(
     ),
 )
 
+CENTROID_100 = deepcopy(CENTROID_10)
+CENTROID_100["dataset_args"].update(num_tasks=100)
+CENTROID_100["model_args"].update(num_segments=100)
+CENTROID_100.update(
+    num_samples=8,
+    num_tasks=100,
+    num_classes=10 * 100,
+    optimizer_args=dict(lr=1e-4),
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     centroid_2=CENTROID_2,
     centroid_10=CENTROID_10,
     centroid_50=CENTROID_50,
+    centroid_100=CENTROID_100,
     figure_1b=FIGURE_1B,
 )
