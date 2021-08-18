@@ -33,7 +33,7 @@ from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import 
 from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
     GradientBlock,
 )
-from nupic.research.frameworks.greedy_infomax.mixins.blockwise_model import BlockWiseModel
+from nupic.research.frameworks.greedy_infomax.mixins.create_block_model import BlockWiseModel
 
 from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
     PreActBlockNoBN, SparsePreActBlockNoBN, BilinearInfoLegacy,
