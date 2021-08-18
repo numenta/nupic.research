@@ -46,6 +46,7 @@ logger = logging.get_logger(__name__)
 __all__ = [
     "StaticSparseEncoderBertModel",
     "StaticSparseNonAttentionBertModel",
+    "FullyStaticSparseBertModel",
 ]
 
 
@@ -196,7 +197,11 @@ class FullyStaticSparseBertModel(BertModel):
         linear_modules = filter_modules(encoder, include_modules=[torch.nn.Linear])
         for name, module in linear_modules.items():
             layer_sparsity = get_sparsity("bert.encoder." + name)
-            sparse_module = SparseWeights(module, sparsity=layer_sparsity)
+            sparse_module = SparseWeights(
+                module,
+                sparsity=layer_sparsity,
+                allow_extremes=True  # this allows the model to start fully dense
+            )
             set_module_attr(self.encoder, name, sparse_module.to(device))
 
         # Replace the embedding layers in a similar fashion.

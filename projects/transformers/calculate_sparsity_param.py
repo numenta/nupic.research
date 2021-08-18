@@ -97,6 +97,7 @@ def calculate_sparsity_param(
     print(f"   sparsity_desired: {sparsity_desired}")
     print(f"   parameters_desired: {parameters_desired}")
     print(f"   sparsifiable_params: {sparsifiable_params}")
+    print(f"   total_params: {total_params}")
     print(f"   target_sparsity: {target_sparsity} (set your sparsity to this)")
     print()
 

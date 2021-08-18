@@ -103,21 +103,24 @@ class DistillationTrainerMixin:
             isinstance(teacher_names_or_paths, list) and len(teacher_names_or_paths) > 0
         ), "When using KD mixin, teacher_model_names_or_paths must be defined"
 
+        seq_length = get_model_seq_length(self.model)
         teacher_models = []
         for model_name_or_path in teacher_names_or_paths:
             teacher_model = AutoModelForMaskedLM.from_pretrained(
                 model_name_or_path,
                 cache_dir=teacher_models_cache_dir
             )
+            if self.args.fp16:
+                teacher_model.half()
             teacher_model.resize_token_embeddings(len(self.tokenizer))
+            teacher_model = resize_position_embeddings(teacher_model, seq_length)
+            teacher_model = teacher_model.eval().to(self.args.device)
 
             # Use deepspeed inference mode on teacher models
             if self.args.deepspeed:
                 ds_engine = deepspeed.init_inference(
                     teacher_model, dtype=torch.half, replace_method="auto")
                 teacher_model = ds_engine.module
-            elif self.args.fp16:
-                teacher_model.half()
 
             teacher_models.append(teacher_model)
 
@@ -126,11 +129,7 @@ class DistillationTrainerMixin:
         else:
             logging.info(f"KD teacher is ensemble of {len(teacher_models)} models")
 
-        seq_length = get_model_seq_length(self.model)
-        self.teacher_models = [
-            resize_position_embeddings(model, seq_length).eval().to(self.args.device)
-            for model in teacher_models
-        ]
+        self.teacher_models = teacher_models
 
         # Validate knowledge Distillation factor
         assert 0 <= kd_factor_init <= 1, "kd_factor_init should be >= 0 and <= 1"

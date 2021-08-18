@@ -28,7 +28,7 @@ Regression tests configs: As the Transformers project is updated the results fro
 these configs should be reproducible.
 """
 
-
+# run it on p3.2xlarge - results available on nupic-research in wandb
 tiny_bert_trifecta_50k = deepcopy(tiny_bert_trifecta_300k)
 tiny_bert_trifecta_50k.update(
     max_steps=50000,
