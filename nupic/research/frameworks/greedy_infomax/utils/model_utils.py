@@ -26,6 +26,7 @@
 
 import sys
 import time
+
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -55,6 +56,7 @@ def make_delta_orthogonal(weights, gain):
         weights[:, :, mid1, mid2] = q[: weights.size(0), : weights.size(1)]
         weights.mul_(gain)
 
+
 def patchify_inputs(x, patch_size, overlap):
     x = (
         x.unfold(2, patch_size, patch_size // overlap)
@@ -67,7 +69,6 @@ def patchify_inputs(x, patch_size, overlap):
         x.shape[0] * x.shape[1] * x.shape[2], x.shape[3], x.shape[4], x.shape[5]
     )
     return x, n_patches_x, n_patches_y
-
 
 
 def train_model_gim(
@@ -145,7 +146,8 @@ def train_model_gim(
         if use_amp:
             raise ImportError(
                 "Mixed precision requires NVIDA APEX."
-                "Please install apex from https://www.github.com/nvidia/apex")
+                "Please install apex from https://www.github.com/nvidia/apex"
+            )
 
     t0 = time.time()
     for batch_idx, (data, target) in enumerate(loader):
@@ -157,8 +159,9 @@ def train_model_gim(
             data = data.to(device, non_blocking=async_gpu)
             target = target.to(device, non_blocking=async_gpu)
         else:
-            data, target = transform_to_device_fn(data, target, device,
-                                                  non_blocking=async_gpu)
+            data, target = transform_to_device_fn(
+                data, target, device, non_blocking=async_gpu
+            )
         t1 = time.time()
 
         if pre_batch_callback is not None:
@@ -188,9 +191,9 @@ def train_model_gim(
         # Compute and backpropagate the complexity loss. This happens after
         # error loss has backpropagated, freeing its computation graph, so the
         # two loss functions don't compete for memory.
-        complexity_loss = (complexity_loss_fn(model)
-                           if complexity_loss_fn is not None
-                           else None)
+        complexity_loss = (
+            complexity_loss_fn(model) if complexity_loss_fn is not None else None
+        )
         if complexity_loss is not None:
             if use_amp:
                 with amp.scale_loss(complexity_loss, optimizer) as scaled_loss:
@@ -203,18 +206,20 @@ def train_model_gim(
         t5 = time.time()
 
         if post_batch_callback is not None:
-            time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
-                           "complexity loss forward/backward: {:.3f}s,"
-                           + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                              t4 - t3, t5 - t4)
-            post_batch_callback(model=model,
-                                error_loss=error_loss.detach(),
-                                complexity_loss=(complexity_loss.detach()
-                                                 if complexity_loss is not None
-                                                 else None),
-                                batch_idx=batch_idx,
-                                num_images=num_images,
-                                time_string=time_string)
+            time_string = (
+                "Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
+                "complexity loss forward/backward: {:.3f}s," + "weight update: {:.3f}s"
+            ).format(t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4)
+            post_batch_callback(
+                model=model,
+                error_loss=error_loss.detach(),
+                complexity_loss=(
+                    complexity_loss.detach() if complexity_loss is not None else None
+                ),
+                batch_idx=batch_idx,
+                num_images=num_images,
+                time_string=time_string,
+            )
         del error_loss, complexity_loss, module_specific_losses
         t0 = time.time()
 
@@ -273,14 +278,13 @@ def evaluate_model_gim(
     total = 0
 
     # Perform accumulation on device, avoid paying performance cost of .item()
-    loss = torch.tensor(0., device=device)
+    loss = torch.tensor(0.0, device=device)
     correct = torch.tensor(0, device=device)
 
     async_gpu = loader.pin_memory
 
     if progress is not None:
-        loader = tqdm(loader, total=min(len(loader), batches_in_epoch),
-                      **progress)
+        loader = tqdm(loader, total=min(len(loader), batches_in_epoch), **progress)
 
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(loader):
@@ -291,8 +295,9 @@ def evaluate_model_gim(
                 data = data.to(device, non_blocking=async_gpu)
                 target = target.to(device, non_blocking=async_gpu)
             else:
-                data, target = transform_to_device_fn(data, target, device,
-                                                      non_blocking=async_gpu)
+                data, target = transform_to_device_fn(
+                    data, target, device, non_blocking=async_gpu
+                )
 
             output = model(data)
             if active_classes is not None:
@@ -303,12 +308,13 @@ def evaluate_model_gim(
             total += len(data)
 
             if post_batch_callback is not None:
-                post_batch_callback(batch_idx=batch_idx, target=target, output=output,
-                                    pred=pred)
+                post_batch_callback(
+                    batch_idx=batch_idx, target=target, output=output, pred=pred
+                )
 
-        complexity_loss = (complexity_loss_fn(model)
-                           if complexity_loss_fn is not None
-                           else None)
+        complexity_loss = (
+            complexity_loss_fn(model) if complexity_loss_fn is not None else None
+        )
 
     if progress is not None:
         loader.close()
@@ -327,4 +333,3 @@ def evaluate_model_gim(
         result["complexity_loss"] = complexity_loss.item()
 
     return result
-
