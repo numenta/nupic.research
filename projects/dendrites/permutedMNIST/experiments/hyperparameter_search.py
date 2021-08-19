@@ -159,16 +159,11 @@ CROSS_SEARCH["num_samples"] = 5
 
 
 # cross hyperparameter search for 50 tasks
-CROSS_SEARCH_50 = deepcopy(BASE50)
-CROSS_SEARCH_50["model_args"].update(
-    num_segments=tune.grid_search([5, 10, 50, 100]),
-    kw_percent_on=tune.grid_search([0.05, 0.2, 0.6, 0.9, 0.99]),
-    weight_sparsity=tune.grid_search([0.05, 0.5, 0.9]),
-)
-CROSS_SEARCH_50["optimizer_args"] = dict(
-    lr=tune.grid_search([5e-4, 5e-3, 5e-2])
-)
-CROSS_SEARCH_50["num_samples"] = 5
+CROSS_SEARCH_50 = deepcopy(CROSS_SEARCH)
+CROSS_SEARCH_50["dataset_args"].update(num_tasks=50)
+CROSS_SEARCH_50["tasks_to_validate"] = range(50)
+CROSS_SEARCH_50["num_classes"] = 10 * 50
+
 
 # HYPERPARAMETERS SEARCH WITH SI #
 SEGMENT_SEARCH_WITH_SI = deepcopy(SEGMENT_SEARCH)
