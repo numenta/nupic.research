@@ -22,7 +22,6 @@
 import os
 from copy import deepcopy
 
-
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
@@ -72,9 +71,7 @@ class DenseGIMSigOpt(SigOptExperiment):
         lr = assignments.get("lr", 2e-4)
         config["optimizer_args"] = dict(lr=lr)
         model_args = config["model_args"]
-        model_args.update(
-            dict(negative_samples=negative_samples)
-        )
+        model_args.update(dict(negative_samples=negative_samples))
         config["model_args"] = model_args
 
     @classmethod
@@ -111,10 +108,7 @@ class SparseGIMSigOpt(SigOptExperiment):
         percent_on = assignments.get("percent_on", 0.2)
         model_args = config["model_args"]
         model_args.update(
-            dict(
-                sparsity=[1 - weight_density] * 3,
-                percent_on=[percent_on] * 3,
-            )
+            dict(sparsity=[1 - weight_density] * 3, percent_on=[percent_on] * 3)
         )
         config["model_args"] = model_args
 
@@ -135,12 +129,11 @@ NUM_EPOCHS = 6
 SIGOPT_DENSE_BASE = deepcopy(DEFAULT_BASE)
 SIGOPT_DENSE_BASE.update(
     dict(
-        #wandb
+        # wandb
         wandb_args=dict(
-            project="greedy_infomax-sparsity",
-            name="dense_resnet_base_val_acc"
+            project="greedy_infomax-sparsity", name="dense_resnet_base_val_acc"
         ),
-        #sigopt
+        # sigopt
         sigopt_experiment_class=DenseGIMSigOpt,
         sigopt_config=dict(
             name="sigopt_GIM_dense_val_acc",
@@ -160,10 +153,10 @@ SIGOPT_DENSE_BASE.update(
         ),
         sigopt_experiment_id=397541,
         api_key=os.environ.get("SIGOPT_KEY", None),
-        #experiment args
+        # experiment args
         epochs=NUM_EPOCHS,
         # batches_in_epoch=2,
-        epochs_to_validate=[NUM_EPOCHS-1],
+        epochs_to_validate=[NUM_EPOCHS - 1],
         supervised_training_epochs_per_validation=20,
     )
 )
@@ -173,10 +166,7 @@ SIGOPT_SPARSE_BASE = deepcopy(SPARSE_BASE)
 SIGOPT_SPARSE_BASE.update(
     dict(
         # wandb
-        wandb_args=dict(
-            project="greedy_infomax-sparsity",
-            name="sparse_resnet_base"
-        ),
+        wandb_args=dict(project="greedy_infomax-sparsity", name="sparse_resnet_base"),
         # sigopt
         sigopt_experiment_class=SparseGIMSigOpt,
         sigopt_config=dict(
@@ -203,14 +193,13 @@ SIGOPT_SPARSE_BASE.update(
         ),
         sigopt_experiment_id=398138,
         api_key=os.environ.get("SIGOPT_KEY", None),
-        #experiment args
+        # experiment args
         epochs=NUM_EPOCHS,
-        epochs_to_validate=[NUM_EPOCHS-1],
+        epochs_to_validate=[NUM_EPOCHS - 1],
         supervised_training_epochs_per_validation=20,
     )
 )
 
 CONFIGS = dict(
-    sigopt_dense_base=SIGOPT_DENSE_BASE,
-    sigopt_sparse_base=SIGOPT_SPARSE_BASE
+    sigopt_dense_base=SIGOPT_DENSE_BASE, sigopt_sparse_base=SIGOPT_SPARSE_BASE
 )

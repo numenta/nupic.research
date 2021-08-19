@@ -21,23 +21,16 @@
 
 from copy import deepcopy
 
-import numpy as np
 import ray.tune as tune
 import torch
-from torch.optim.lr_scheduler import OneCycleLR
 
 from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
     ClassificationModel,
 )
 from nupic.research.frameworks.greedy_infomax.models.FullModel import (
     SparseFullVisionModel,
-    VDropSparseFullVisionModel,
-    FullVisionModel,
-    SmallVisionModel,
-    SparseSmallVisionModel,
-    VDropSparseSmallVisionModel,
 )
-from nupic.research.frameworks.vernon.distributed import mixins, experiments
+from nupic.research.frameworks.vernon.distributed import experiments, mixins
 from nupic.torch.modules import SparseWeights2d
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
@@ -63,140 +56,60 @@ NUM_EPOCHS = 10
 SPARSE_BASE = deepcopy(DEFAULT_BASE)
 model_args = DEFAULT_BASE["model_args"]
 static_sparse_weights = dict(
-        # weight sparsity
-        sparsity=dict(
-            conv1=0.01, # dense
-            encoder1=dict(
-                block1=dict(
-                    conv1=0.7,
-                    conv2=0.7,
-                ),
-                block2=dict(
-                    conv1=0.7,
-                    conv2=0.7,
-                ),
-                block3=dict(
-                    conv1=0.7,
-                    conv2=0.7,
-                ),
-                bilinear_info=0.1, #dense weights
-            ),
-            encoder2=dict(
-                block1=dict(
-                    conv1=0.7,
-                    conv2=0.7,
-                    shortcut=0.01
-                ),
-                block2=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                ),
-                block3=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                ),
-                block4=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                ),
-                bilinear_info=0.01,
-            ),
-            encoder3=dict(
-                block1=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                    shortcut=0.01, #dense
-                ),
-                block2=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                ),
-                block3=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                ),
-                block4=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                ),
-                block5=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                ),
-                block6=dict(
-                    conv1=0.8,
-                    conv2=0.8,
-                ),
-                bilinear_info=0.01, #dense
-            )
+    # weight sparsity
+    sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.7, conv2=0.7),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.1,  # dense weights
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            block4=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),  # dense
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            block4=dict(conv1=0.8, conv2=0.8),
+            block5=dict(conv1=0.8, conv2=0.8),
+            block6=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.01,  # dense
         ),
     )
+)
 static_sparse_activations = dict(
-        percent_on=dict(
-            encoder1=dict(
-                block1=dict(
-                    nonlinearity1=1., #dense, num_channels = 64
-                    nonlinearity2=1.,
-                ),
-                block2=dict(
-                    nonlinearity1=1.,
-                    nonlinearity2=1.,
-                ),
-                block3=dict(
-                    nonlinearity1=1.,
-                    nonlinearity2=1.,
-                ),
+    percent_on=dict(
+        encoder1=dict(
+            block1=dict(
+                nonlinearity1=1.0, nonlinearity2=1.0  # dense, num_channels = 64
             ),
-            encoder2=dict(
-                block1=dict(
-                    nonlinearity1=1.,
-                    nonlinearity2=1.,
-                ),
-                block2=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-                block3=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-                block4=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-            ),
-            encoder3=dict(
-                block1=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-                block2=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-                block3=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-                block4=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-                block5=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-                block6=dict(
-                    nonlinearity1=0.3,
-                    nonlinearity2=0.3,
-                ),
-            )
+            block2=dict(nonlinearity1=1.0, nonlinearity2=1.0),
+            block3=dict(nonlinearity1=1.0, nonlinearity2=1.0),
+        ),
+        encoder2=dict(
+            block1=dict(nonlinearity1=1.0, nonlinearity2=1.0),
+            block2=dict(nonlinearity1=0.3, nonlinearity2=0.3),
+            block3=dict(nonlinearity1=0.3, nonlinearity2=0.3),
+            block4=dict(nonlinearity1=0.3, nonlinearity2=0.3),
+        ),
+        encoder3=dict(
+            block1=dict(nonlinearity1=0.3, nonlinearity2=0.3),
+            block2=dict(nonlinearity1=0.3, nonlinearity2=0.3),
+            block3=dict(nonlinearity1=0.3, nonlinearity2=0.3),
+            block4=dict(nonlinearity1=0.3, nonlinearity2=0.3),
+            block5=dict(nonlinearity1=0.3, nonlinearity2=0.3),
+            block6=dict(nonlinearity1=0.3, nonlinearity2=0.3),
         ),
     )
+)
 
-model_args.update(dict(
-    sparse_weights_class=SparseWeights2d,
-))
+model_args.update(dict(sparse_weights_class=SparseWeights2d))
 sparse_weights_only_args = deepcopy(model_args)
 sparse_weights_only_args.update(static_sparse_weights)
 sparse_activations_only_args = deepcopy(model_args)
@@ -215,67 +128,70 @@ SPARSE_BASE.update(
         supervised_training_epochs_per_validation=10,
         batch_size=BATCH_SIZE,
         model_class=SparseFullVisionModel,
-        model_args=model_args
-        ),
+        model_args=model_args,
     )
+)
 STATIC_SPARSE_WEIGHTS_ONLY = deepcopy(SPARSE_BASE)
-STATIC_SPARSE_WEIGHTS_ONLY.update(dict(
+STATIC_SPARSE_WEIGHTS_ONLY.update(
+    dict(
         wandb_args=dict(
             project="greedy_infomax-static-sparsity", name="sparse_weights_only"
         ),
-        model_args=sparse_weights_only_args
-        ),
+        model_args=sparse_weights_only_args,
+    )
 )
 STATIC_SPARSE_ACTIVATIONS_ONLY = deepcopy(SPARSE_BASE)
-STATIC_SPARSE_ACTIVATIONS_ONLY.update(dict(
+STATIC_SPARSE_ACTIVATIONS_ONLY.update(
+    dict(
         wandb_args=dict(
             project="greedy_infomax-static-sparsity", name="sparse_activations_only"
         ),
-        model_args=sparse_activations_only_args
-        ),
+        model_args=sparse_activations_only_args,
+    )
 )
 STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS = deepcopy(SPARSE_BASE)
-STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS.update(dict(
+STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS.update(
+    dict(
         wandb_args=dict(
             project="greedy_infomax-static-sparsity",
-            name="sparse_weights_and_activations"
+            name="sparse_weights_and_activations",
         ),
-        model_args=sparse_weights_and_activations_args
-        ),
+        model_args=sparse_weights_and_activations_args,
+    )
 )
-
 
 
 static_sparse_first_layer_grid_search = deepcopy(static_sparse_weights)
-static_sparse_first_layer_grid_search["sparsity"]["conv1"] = \
-    tune.grid_search([0.0, 0.25, 0.5, 0.75, 0.85, 0.95])
+static_sparse_first_layer_grid_search["sparsity"]["conv1"] = tune.grid_search(
+    [0.0, 0.25, 0.5, 0.75, 0.85, 0.95]
+)
 STATIC_SPARSE_FIRST_LAYER_GRID_SEARCH = deepcopy(SPARSE_BASE)
-STATIC_SPARSE_FIRST_LAYER_GRID_SEARCH.update(dict(
+STATIC_SPARSE_FIRST_LAYER_GRID_SEARCH.update(
+    dict(
         wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="sparse_weights_grid_search"
+            project="greedy_infomax-static-sparsity", name="sparse_weights_grid_search"
         ),
         model_args=static_sparse_first_layer_grid_search,
         epochs=5,
-    ),
+    )
 )
 full_weight_sparsity = deepcopy(static_sparse_weights)
 full_weight_sparsity["sparsity"]["conv1"] = 1.0
 STATIC_SPARSE_FIRST_LAYER_FULL_SPARSITY = deepcopy(SPARSE_BASE)
-STATIC_SPARSE_FIRST_LAYER_FULL_SPARSITY.update(dict(
+STATIC_SPARSE_FIRST_LAYER_FULL_SPARSITY.update(
+    dict(
         wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="full_sparse_conv1"
+            project="greedy_infomax-static-sparsity", name="full_sparse_conv1"
         ),
         model_args=full_weight_sparsity,
         epochs=5,
-    ),
+    )
 )
 
 
-LARGE_STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS = deepcopy(SPARSE_BASE)
+LARGE_SPARSE_WEIGHTS_ACTIVATIONS = deepcopy(SPARSE_BASE)
 NUM_CLASSES = 10
-LARGE_STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS.update(
+LARGE_SPARSE_WEIGHTS_ACTIVATIONS.update(
     dict(
         wandb_args=dict(project="greedy_infomax-sparsity-tests", name="large_sparse"),
         experiment_class=GreedyInfoMaxExperimentSparse,
@@ -295,7 +211,7 @@ LARGE_STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS.update(
             num_channels=[512, 512, 512],
             sparse_weights_class=SparseWeights2d,
             sparsity=sparse_weights_only_args["sparsity"],
-            percent_on=sparse_activations_only_args["percent_on"]
+            percent_on=sparse_activations_only_args["percent_on"],
         ),
         classifier_config=dict(
             model_class=ClassificationModel,
@@ -358,8 +274,8 @@ CONFIGS = dict(
     static_sparse_weights_only=STATIC_SPARSE_WEIGHTS_ONLY,
     static_sparse_activations_only=STATIC_SPARSE_ACTIVATIONS_ONLY,
     static_sparse_weights_and_activations=STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS,
-    large_static_sparse_weights_and_activations=LARGE_STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS,
+    large_static_sparse_weights_and_activations=LARGE_SPARSE_WEIGHTS_ACTIVATIONS,
     static_sparse_first_layer_grid_search=STATIC_SPARSE_FIRST_LAYER_GRID_SEARCH,
-    static_sparse_first_layer_full_sparsity = STATIC_SPARSE_FIRST_LAYER_FULL_SPARSITY,
+    static_sparse_first_layer_full_sparsity=STATIC_SPARSE_FIRST_LAYER_FULL_SPARSITY,
     # large_sparse_grid_search=LARGE_SPARSE_GRID_SEARCH,
 )
