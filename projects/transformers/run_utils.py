@@ -1134,7 +1134,8 @@ class TaskResults():
 
     def __init__(self, task_name, training_args):
         self.task_name = task_name
-        self.reporting_metrics = get_allowed_metrics(training_args, task_name)
+        self.reporting_metrics = reporting_metrics_per_task[self.task_name]
+        self.allowed_metrics = get_allowed_metrics(training_args, task_name)
         self.all_results = []
         self._results = None
         self.training_args = training_args
@@ -1171,15 +1172,6 @@ class TaskResults():
             else:
                 self.all_results[-1][key] = results[key]
 
-    def get_best_idx_per_run(self, metric=None):
-
-        if not metric:
-            metric = self.best_metric_key
-
-        best_idx_per_run = [np.argmax(run[metric]) for run in self.all_results]
-
-        return best_idx_per_run
-
     def reduce_metrics(self, reduction="mean"):
         """
         Get average or max over runs. Handles two cases:
@@ -1192,20 +1184,20 @@ class TaskResults():
         are formatted so the values are lists fo length 1. Cases (1) and (2) above
         result in the same behavior in this case, since there is a single entry to
         reduce over in each run.
-
-        Known bug: looking for max is incorrect if metric for zucess is eval loss.
-        Fortunately reduce_metrics is being used for printing purposes, not for a
-        final analysis.
         """
         # all_results[run_idx][metric] is a number if not tracking eval metrics,
         # or a list with a number for each time evaluate() is called.
         # aggregated_results[metric] is a list of metric values, one for each run
         aggregated_results = defaultdict(list)
+        load_best = getattr(self, "load_best_model_at_end", None)
+        stop_early = getattr(self, "early_stopping", None)
+        load_best_or_stop_early = load_best or stop_early
         # Loop over runs on the same task
         for results in self.all_results:
-            # replace with load_best_metric_at_end
-            if self.load_best_model_at_end:
+            if load_best_or_stop_early:
                 # Within a run, the step where best results were achieved
+                # Note, metrics defined in finetuning_constants are all better
+                # when higher, so no need to worry about argmin.
                 best_metric_best_idx = np.argmax(results[self.best_metric_key])
             else:
                 # If not load best at end, just get the last step
@@ -1222,7 +1214,8 @@ class TaskResults():
         # Max across runs
         elif reduction == "max":
             # Which run has the best results
-            argmax_run = np.argmax(aggregated_results[self.reporting_metrics[0]])
+            # argmax_run = np.argmax(aggregated_results[self.reporting_metrics[-1]])
+            argmax_run = np.argmax(aggregated_results[self.best_metric_key])
             # Which step in the run has best results
             argmax_step = self.best_idx_per_run[argmax_run]
             self._results = {}
@@ -1267,11 +1260,13 @@ class TaskResults():
             greater_is_better = False
             op = min
 
+        # Best index in each run
         bests = [
             op(self.all_results[i][metric])
             for i in range(len(self.all_results))
         ]
 
+        # Run with the best, best idx
         if greater_is_better:
             best_model_idx = np.argmax(bests)
         else:
