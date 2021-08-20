@@ -114,7 +114,12 @@ def train_dendrite_model(
         if context is not None:
             context = context.to(device, non_blocking=async_gpu)
 
-        optimizer.zero_grad()
+        # FIXME: Pytorch 1.7: Replace with optimizer.zero_grad(set_to_none=True)
+        # optimizer.zero_grad(set_to_none=True)
+        for group in optimizer.param_groups:
+            for p in group["params"]:
+                p.grad = None
+
         forward_args = [data] if context is None else [data, context]
         output = model(*forward_args)
         if active_classes is not None:
