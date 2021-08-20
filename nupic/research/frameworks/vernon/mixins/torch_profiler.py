@@ -32,7 +32,7 @@ __all__ = ["TorchProfilerMixin", "inject_torch_profiler_mixin"]
 class TorchProfilerMixin:
     """
     Mixin class enabling profiling via pytorch's native profiler.
-    See ahttps://pytorch.org/docs/stable/profiler.html
+    See https://pytorch.org/docs/stable/profiler.html
 
     .. note::
         Requires pytorch 1.8.1 or higher

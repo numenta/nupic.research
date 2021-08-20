@@ -19,7 +19,7 @@
 #
 
 """
-Experiment file tha profiles dendrites experiments
+Experiments profiling dendrites experiments
 """
 from copy import deepcopy
 
