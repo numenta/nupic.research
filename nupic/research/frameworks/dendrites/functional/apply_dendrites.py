@@ -177,5 +177,3 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
     """
     indices = dendrite_activations.abs().max(dim=2).indices
     return dendritic_gate_2d(y, dendrite_activations, indices=indices)
-
-

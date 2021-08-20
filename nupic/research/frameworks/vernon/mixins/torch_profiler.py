@@ -22,7 +22,6 @@
 import os
 
 import pkg_resources
-
 import torch
 
 from nupic.research.frameworks.vernon.experiments import SupervisedExperiment
