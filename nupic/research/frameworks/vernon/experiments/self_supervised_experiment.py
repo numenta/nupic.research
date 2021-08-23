@@ -429,8 +429,9 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             create_supervised_sampler=[exp + ".create_supervised_sampler"],
             unsupervised_loss=[exp + ".unsupervised_loss"],
             supervised_loss=[exp + ".supervised_loss"],
-            encoder_classifier_complexity_loss=[exp +
-                                                ".encoder_classifier_complexity_loss"],
+            encoder_classifier_complexity_loss=[
+                exp + ".encoder_classifier_complexity_loss"
+            ],
             pre_batch_supervised=[exp + ".pre_batch_supervised"],
             post_batch_supervised=[exp + ".post_batch_supervised"],
             post_optimizer_step_supervised=[exp + ".post_optimizer_step_supervised"],

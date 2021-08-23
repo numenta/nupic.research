@@ -57,3 +57,6 @@ wandb>=0.10.23
 colorama==0.4.3
 urllib3==1.25.11
 pytorch-lightning==1.2.9
+# for graphs
+ptitprince==0.2.5
+seaborn==0.11.1

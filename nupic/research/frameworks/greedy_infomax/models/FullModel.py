@@ -38,10 +38,10 @@ from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
     SparsePreActBlockNoBN,
     SparsePreActBottleneckNoBN,
     SparseResNetEncoder,
+    SuperGreedySparseResNetEncoder,
     VDropSparsePreActBlockNoBN,
     VDropSparsePreActBottleneckNoBN,
     VDropSparseResNetEncoder,
-    SuperGreedySparseResNetEncoder,
 )
 from nupic.research.frameworks.greedy_infomax.utils import model_utils
 from nupic.torch.modules import SparseWeights2d
@@ -203,15 +203,15 @@ class SparseFullVisionModel(FullVisionModel):
         )
         if sparsity is None:
             # reverts to dense weights
-            sparsity = {"conv1": 0.01,
-                        "encoder1": None,
-                        "encoder2": None,
-                        "encoder3": None}
+            sparsity = {
+                "conv1": 0.01,
+                "encoder1": None,
+                "encoder2": None,
+                "encoder3": None,
+            }
         if percent_on is None:
             # reverts to relu
-            percent_on = {"encoder1": None,
-                          "encoder2": None,
-                          "encoder3": None,}
+            percent_on = {"encoder1": None, "encoder2": None, "encoder3": None}
         if block_dims is None:
             block_dims = [3, 4, 6]
         if num_channels is None:
@@ -316,9 +316,7 @@ class VDropSparseFullVisionModel(FullVisionModel):
         )
         if percent_on is None:
             # reverts to relu
-            percent_on = {"encoder1": None,
-                          "encoder2": None,
-                          "encoder3": None,}
+            percent_on = {"encoder1": None, "encoder2": None, "encoder3": None}
         if block_dims is None:
             block_dims = [3, 4, 6]
         if num_channels is None:
@@ -390,6 +388,7 @@ class VDropSparseFullVisionModel(FullVisionModel):
         self.vdrop_central_data = self.vdrop_central_data.to(*args, **kwargs)
         return ret
 
+
 class SmallVisionModel(torch.nn.Module):
     """
     A smaller version of the above FullVisionModel which only uses the first
@@ -427,7 +426,6 @@ class SmallVisionModel(torch.nn.Module):
         self.overlap = overlap
         print("Contrasting against ", self.negative_samples, " negative samples")
 
-
         self.encoder = nn.ModuleList([])
 
         if resnet_50:
@@ -456,7 +454,6 @@ class SmallVisionModel(torch.nn.Module):
                 first_stride=1,
             )
         )
-
 
     def forward(self, x):
         # Patchify inputs
@@ -490,6 +487,7 @@ class SmallVisionModel(torch.nn.Module):
             x, out = module.encode(x, n_patches_x, n_patches_y)
         # Return patch-level representation from the last block
         return out
+
 
 class SparseSmallVisionModel(SmallVisionModel):
     """
@@ -535,11 +533,10 @@ class SparseSmallVisionModel(SmallVisionModel):
         )
         if sparsity is None:
             # reverts to dense weights
-            sparsity = {"conv1": 0.01,
-                        "encoder1": None,}
+            sparsity = {"conv1": 0.01, "encoder1": None}
         if percent_on is None:
             # reverts to relu
-            percent_on = {"encoder1": None,}
+            percent_on = {"encoder1": None}
         if block_dims is None:
             block_dims = 3
         if num_channels is None:
@@ -563,9 +560,7 @@ class SparseSmallVisionModel(SmallVisionModel):
             )
         else:
             self.encoder.append(
-                nn.Conv2d(
-                    input_dims, num_channels, kernel_size=5, stride=1, padding=2
-                )
+                nn.Conv2d(input_dims, num_channels, kernel_size=5, stride=1, padding=2)
             )
 
         if resnet_50:
@@ -598,18 +593,18 @@ class SparseSmallVisionModel(SmallVisionModel):
 
 class WrappedSparseSmallVisionModel(SparseSmallVisionModel):
     def __init__(
-            self,
-            negative_samples=16,
-            k_predictions=5,
-            resnet_50=False,
-            block_dims=None,
-            num_channels=None,
-            grayscale=True,
-            patch_size=16,
-            overlap=2,
-            sparse_weights_class=SparseWeights2d,
-            sparsity=None,
-            percent_on=None,
+        self,
+        negative_samples=16,
+        k_predictions=5,
+        resnet_50=False,
+        block_dims=None,
+        num_channels=None,
+        grayscale=True,
+        patch_size=16,
+        overlap=2,
+        sparse_weights_class=SparseWeights2d,
+        sparsity=None,
+        percent_on=None,
     ):
         super(WrappedSparseSmallVisionModel, self).__init__(
             negative_samples=negative_samples,
@@ -624,37 +619,19 @@ class WrappedSparseSmallVisionModel(SparseSmallVisionModel):
             sparsity=dict(
                 conv1=0.01,  # dense
                 encoder1=dict(
-                    block1=dict(
-                        conv1=sparsity,
-                        conv2=sparsity,
-                    ),
-                    block2=dict(
-                        conv1=sparsity,
-                        conv2=sparsity,
-                    ),
-                    block3=dict(
-                        conv1=sparsity,
-                        conv2=sparsity,
-                    ),
+                    block1=dict(conv1=sparsity, conv2=sparsity),
+                    block2=dict(conv1=sparsity, conv2=sparsity),
+                    block3=dict(conv1=sparsity, conv2=sparsity),
                     bilinear_info=0.01,  # dense weights
                 ),
             ),
             percent_on=dict(
                 encoder1=dict(
-                    block1=dict(
-                        nonlinearity1=percent_on,
-                        nonlinearity2=percent_on,
-                    ),
-                    block2=dict(
-                        nonlinearity1=percent_on,
-                        nonlinearity2=percent_on,
-                    ),
-                    block3=dict(
-                        nonlinearity1=percent_on,
-                        nonlinearity2=percent_on,
-                    ),
-                ),
-            )
+                    block1=dict(nonlinearity1=percent_on, nonlinearity2=percent_on),
+                    block2=dict(nonlinearity1=percent_on, nonlinearity2=percent_on),
+                    block3=dict(nonlinearity1=percent_on, nonlinearity2=percent_on),
+                )
+            ),
         )
 
 
@@ -703,11 +680,10 @@ class SuperGreedySparseSmallVisionModel(SparseSmallVisionModel):
         )
         if sparsity is None:
             # reverts to dense weights
-            sparsity = {"conv1": 0.01,
-                        "encoder1": None,}
+            sparsity = {"conv1": 0.01, "encoder1": None}
         if percent_on is None:
             # reverts to relu
-            percent_on = {"encoder1": None,}
+            percent_on = {"encoder1": None}
         if block_dims is None:
             block_dims = 3
         if num_channels is None:
@@ -731,9 +707,7 @@ class SuperGreedySparseSmallVisionModel(SparseSmallVisionModel):
             )
         else:
             self.encoder.append(
-                nn.Conv2d(
-                    input_dims, num_channels, kernel_size=5, stride=1, padding=2
-                )
+                nn.Conv2d(input_dims, num_channels, kernel_size=5, stride=1, padding=2)
             )
 
         if resnet_50:
@@ -770,7 +744,9 @@ class SuperGreedySparseSmallVisionModel(SparseSmallVisionModel):
         )
         x = self.encoder[0](x)
         # Save positive/contrastive samples for each encoder block
-        log_f_module_list, true_f_module_list, z = self.encoder[1](x, n_patches_x, n_patches_y)
+        log_f_module_list, true_f_module_list, z = self.encoder[1](
+            x, n_patches_x, n_patches_y
+        )
         # Lists of lists: each list has num_modules internal lists, with each
         # internal list containing k_predictions elements
         return log_f_module_list, true_f_module_list
@@ -778,18 +754,18 @@ class SuperGreedySparseSmallVisionModel(SparseSmallVisionModel):
 
 class WrappedSuperGreedySmallSparseVisionModel(SuperGreedySparseSmallVisionModel):
     def __init__(
-            self,
-            negative_samples=16,
-            k_predictions=5,
-            resnet_50=False,
-            block_dims=None,
-            num_channels=None,
-            grayscale=True,
-            patch_size=16,
-            overlap=2,
-            sparse_weights_class=SparseWeights2d,
-            sparsity=None,
-            percent_on=None,
+        self,
+        negative_samples=16,
+        k_predictions=5,
+        resnet_50=False,
+        block_dims=None,
+        num_channels=None,
+        grayscale=True,
+        patch_size=16,
+        overlap=2,
+        sparse_weights_class=SparseWeights2d,
+        sparsity=None,
+        percent_on=None,
     ):
         super(WrappedSuperGreedySmallSparseVisionModel, self).__init__(
             negative_samples=negative_samples,
@@ -804,37 +780,19 @@ class WrappedSuperGreedySmallSparseVisionModel(SuperGreedySparseSmallVisionModel
             sparsity=dict(
                 conv1=0.01,  # dense
                 encoder1=dict(
-                    block1=dict(
-                        conv1=sparsity,
-                        conv2=sparsity,
-                    ),
-                    block2=dict(
-                        conv1=sparsity,
-                        conv2=sparsity,
-                    ),
-                    block3=dict(
-                        conv1=sparsity,
-                        conv2=sparsity,
-                    ),
+                    block1=dict(conv1=sparsity, conv2=sparsity),
+                    block2=dict(conv1=sparsity, conv2=sparsity),
+                    block3=dict(conv1=sparsity, conv2=sparsity),
                     bilinear_info=0.01,  # dense weights
                 ),
             ),
             percent_on=dict(
                 encoder1=dict(
-                    block1=dict(
-                        nonlinearity1=percent_on,
-                        nonlinearity2=percent_on,
-                    ),
-                    block2=dict(
-                        nonlinearity1=percent_on,
-                        nonlinearity2=percent_on,
-                    ),
-                    block3=dict(
-                        nonlinearity1=percent_on,
-                        nonlinearity2=percent_on,
-                    ),
-                ),
-            )
+                    block1=dict(nonlinearity1=percent_on, nonlinearity2=percent_on),
+                    block2=dict(nonlinearity1=percent_on, nonlinearity2=percent_on),
+                    block3=dict(nonlinearity1=percent_on, nonlinearity2=percent_on),
+                )
+            ),
         )
 
 
@@ -883,7 +841,7 @@ class VDropSparseSmallVisionModel(SmallVisionModel):
         )
         if percent_on is None:
             # reverts to relu
-            percent_on = {"encoder1": None,}
+            percent_on = {"encoder1": None}
         if block_dims is None:
             block_dims = 3
         if num_channels is None:

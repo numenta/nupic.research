@@ -22,7 +22,6 @@
 from copy import deepcopy
 
 import numpy as np
-import ray.tune as tune
 import torch
 from torch.utils.data.dataset import Subset
 from torchvision.datasets import STL10
@@ -41,7 +40,7 @@ from nupic.research.frameworks.vernon.distributed import experiments, mixins
 class GreedyInfoMaxExperiment(
     mixins.LogEveryLoss,
     mixins.NoiseRobustnessTest,
-    experiments.SelfSupervisedExperiment
+    experiments.SelfSupervisedExperiment,
 ):
     def transform_data_to_device_unsupervised(self, data, target, device, non_blocking):
         data = data.to(self.device, non_blocking=non_blocking)
@@ -167,7 +166,7 @@ DEFAULT_BASE = dict(
     optimizer_args=dict(lr=2e-4),
     # # Learning rate scheduler class. Must inherit from "_LRScheduler"
     # lr_scheduler_class=torch.optim.lr_scheduler.StepLR,
-    #Noise Robustness Test Parameters
+    # Noise Robustness Test Parameters
     noise_levels=[0.1, 0.5, 0.9],
     # noise_mean=0,
     # noise_std=1,

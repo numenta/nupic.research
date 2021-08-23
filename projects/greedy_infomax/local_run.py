@@ -1,5 +1,5 @@
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions apply:
 #
@@ -81,6 +81,7 @@ def save_checkpoint(config, epoch, checkpoint):
     It will store the checkpoint in the same location as ray.tune
     """
     import pickle
+
     logdir = config["logdir"]
     checkpoint_dir = os.path.join(logdir, f"checkpoint_{epoch}")
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -99,9 +100,10 @@ def log_background_task(_, config, queue):
     """
     # Configure ray.tune loggers
     from ray.tune.logger import UnifiedLogger
-    logger = UnifiedLogger(config=config,
-                           logdir=config["logdir"],
-                           loggers=config.get("loggers", None))
+
+    logger = UnifiedLogger(
+        config=config, logdir=config["logdir"], loggers=config.get("loggers", None)
+    )
     logger.last_timestamp = logger.start_timestamp = time.time()
 
     # Wait for results
@@ -173,12 +175,15 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        parents=[MAIN_PARSER],
-        argument_default=argparse.SUPPRESS,
-        description=__doc__
+        parents=[MAIN_PARSER], argument_default=argparse.SUPPRESS, description=__doc__
     )
-    parser.add_argument("-e", "--experiment", dest="name",
-                        help="Experiment to run", choices=CONFIGS.keys())
+    parser.add_argument(
+        "-e",
+        "--experiment",
+        dest="name",
+        help="Experiment to run",
+        choices=CONFIGS.keys(),
+    )
 
     args = parser.parse_args()
     if "name" not in args:

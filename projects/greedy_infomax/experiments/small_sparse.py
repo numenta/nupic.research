@@ -19,36 +19,32 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import os
 from copy import deepcopy
 
-import numpy as np
 import ray.tune as tune
 import torch
-import os
 
 from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
     ClassificationModel,
 )
 from nupic.research.frameworks.greedy_infomax.models.FullModel import (
-    SparseFullVisionModel,
-    VDropSparseFullVisionModel,
-    FullVisionModel,
-    SmallVisionModel,
     SparseSmallVisionModel,
     VDropSparseSmallVisionModel,
     WrappedSparseSmallVisionModel,
-    SuperGreedySparseSmallVisionModel,
     WrappedSuperGreedySmallSparseVisionModel,
 )
-from nupic.research.frameworks.greedy_infomax.utils.model_utils import \
-    train_model_gim, evaluate_model_gim
-from nupic.research.frameworks.vernon.distributed import mixins, experiments
-from nupic.torch.modules import SparseWeights2d
+from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
+    evaluate_model_gim,
+    train_model_gim,
+)
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
-
-
+from nupic.research.frameworks.vernon.distributed import experiments, mixins
+from nupic.torch.modules import SparseWeights2d
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
+
+
 class GreedyInfoMaxExperimentSparse(
     mixins.LogEveryLoss,
     mixins.RezeroWeights,
@@ -68,48 +64,28 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 10
 model_args = DEFAULT_BASE["model_args"]
 static_sparse_weights = dict(
-        # weight sparsity
-        sparsity=dict(
-            conv1=0.01, # dense
-            encoder1=dict(
-                block1=dict(
-                    conv1=0.7,
-                    conv2=0.7,
-                ),
-                block2=dict(
-                    conv1=0.7,
-                    conv2=0.7,
-                ),
-                block3=dict(
-                    conv1=0.7,
-                    conv2=0.7,
-                ),
-                bilinear_info=0.1, #dense weights
-            ),
+    # weight sparsity
+    sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.7, conv2=0.7),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.1,  # dense weights
         ),
     )
+)
 static_sparse_activations = dict(
-        percent_on=dict(
-            encoder1=dict(
-                block1=dict(
-                    nonlinearity1=0.2,
-                    nonlinearity2=0.2,
-                ),
-                block2=dict(
-                    nonlinearity1=0.2,
-                    nonlinearity2=0.2,
-                ),
-                block3=dict(
-                    nonlinearity1=0.2,
-                    nonlinearity2=0.2,
-                ),
-            ),
-        ),
+    percent_on=dict(
+        encoder1=dict(
+            block1=dict(nonlinearity1=0.2, nonlinearity2=0.2),
+            block2=dict(nonlinearity1=0.2, nonlinearity2=0.2),
+            block3=dict(nonlinearity1=0.2, nonlinearity2=0.2),
+        )
     )
+)
 
-model_args.update(dict(
-    sparse_weights_class=SparseWeights2d,
-))
+model_args.update(dict(sparse_weights_class=SparseWeights2d))
 sparse_weights_only_args = deepcopy(model_args)
 sparse_weights_only_args.update(static_sparse_weights)
 sparse_activations_only_args = deepcopy(model_args)
@@ -132,68 +108,69 @@ SMALL_SPARSE_BASE.update(
         noise_levels=[0.1, 0.5, 0.9],
         model_args=model_args,
         classifier_config=dict(
-                    model_class=ClassificationModel,
-                    model_args=dict(in_channels=64, num_classes=10),
-                    loss_function=torch.nn.functional.cross_entropy,
-                    # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
-                    optimizer_class=torch.optim.Adam,
-                    # Optimizer class class arguments passed to the constructor
-                    optimizer_args=dict(lr=2e-4),
-        ),
-        ),
-    )
-
-STATIC_SPARSE_WEIGHTS_SMALL = deepcopy(SMALL_SPARSE_BASE)
-STATIC_SPARSE_WEIGHTS_SMALL.update(dict(
-        wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="small_static_sparse_weights"
-        ),
-        model_args = sparse_weights_only_args,
-    ),
-)
-
-
-STATIC_SPARSE_ACTIVATIONS_SMALL = deepcopy(SMALL_SPARSE_BASE)
-STATIC_SPARSE_ACTIVATIONS_SMALL.update(dict(
-        wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="small_static_sparse_activations"
-        ),
-        model_args = sparse_activations_only_args,
-    ),
-)
-
-STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS_SMALL = deepcopy(
-    STATIC_SPARSE_ACTIVATIONS_SMALL)
-STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS_SMALL.update(dict(
-        wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="small_static_sparse_weights_activations"
-        ),
-        model_args = sparse_weights_and_activations_args,
-    ),
-)
-
-#only used to determine largest layer size that can still fit on a p2.8xlarge
-dimension_search_model_args = deepcopy(model_args)
-dimension_search_model_args.update(num_channels=350)
-SMALL_SPARSE_LARGEST_DIMENSION = deepcopy(SMALL_SPARSE_BASE)
-SMALL_SPARSE_LARGEST_DIMENSION.update(
-        wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="small_static_sparse_largest_dimension"
-        ),
-        model_args=dimension_search_model_args,
-        classifier_config=dict(
             model_class=ClassificationModel,
-            model_args=dict(num_classes=dimension_search_model_args["num_channels"]),
+            model_args=dict(in_channels=64, num_classes=10),
             loss_function=torch.nn.functional.cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
             optimizer_class=torch.optim.Adam,
             # Optimizer class class arguments passed to the constructor
             optimizer_args=dict(lr=2e-4),
         ),
+    )
+)
+
+STATIC_SPARSE_WEIGHTS_SMALL = deepcopy(SMALL_SPARSE_BASE)
+STATIC_SPARSE_WEIGHTS_SMALL.update(
+    dict(
+        wandb_args=dict(
+            project="greedy_infomax-static-sparsity", name="small_static_sparse_weights"
+        ),
+        model_args=sparse_weights_only_args,
+    )
+)
+
+
+STATIC_SPARSE_ACTIVATIONS_SMALL = deepcopy(SMALL_SPARSE_BASE)
+STATIC_SPARSE_ACTIVATIONS_SMALL.update(
+    dict(
+        wandb_args=dict(
+            project="greedy_infomax-static-sparsity",
+            name="small_static_sparse_activations",
+        ),
+        model_args=sparse_activations_only_args,
+    )
+)
+
+SPARSE_WEIGHTS_ACTIVATIONS_SMALL = deepcopy(STATIC_SPARSE_ACTIVATIONS_SMALL)
+SPARSE_WEIGHTS_ACTIVATIONS_SMALL.update(
+    dict(
+        wandb_args=dict(
+            project="greedy_infomax-static-sparsity",
+            name="small_static_sparse_weights_activations",
+        ),
+        model_args=sparse_weights_and_activations_args,
+    )
+)
+
+# only used to determine largest layer size that can still fit on a p2.8xlarge
+dimension_search_model_args = deepcopy(model_args)
+dimension_search_model_args.update(num_channels=350)
+SMALL_SPARSE_LARGEST_DIMENSION = deepcopy(SMALL_SPARSE_BASE)
+SMALL_SPARSE_LARGEST_DIMENSION.update(
+    wandb_args=dict(
+        project="greedy_infomax-static-sparsity",
+        name="small_static_sparse_largest_dimension",
+    ),
+    model_args=dimension_search_model_args,
+    classifier_config=dict(
+        model_class=ClassificationModel,
+        model_args=dict(num_classes=dimension_search_model_args["num_channels"]),
+        loss_function=torch.nn.functional.cross_entropy,
+        # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
+        optimizer_class=torch.optim.Adam,
+        # Optimizer class class arguments passed to the constructor
+        optimizer_args=dict(lr=2e-4),
+    ),
 )
 # LARGEST CHANNEL WIDTH = 350
 grid_search_weight_sparsity = tune.grid_search([0, 0.5, 0.85])
@@ -202,16 +179,17 @@ grid_search_dimensionality = tune.grid_search([64, 128, 256])
 
 grid_search_model_args = deepcopy(model_args)
 grid_search_model_args.update(sparsity=grid_search_weight_sparsity)
-grid_search_model_args.update(percent_on = grid_search_percent_on)
+grid_search_model_args.update(percent_on=grid_search_percent_on)
 grid_search_model_args.update(num_channels=grid_search_dimensionality)
 
-#only used to split up work amongst different machines
+# only used to split up work amongst different machines
 grid_search_model_args_1 = deepcopy(grid_search_model_args)
 grid_search_model_args_1.update(sparsity=0)
 grid_search_model_args_2 = deepcopy(grid_search_model_args)
 grid_search_model_args_2.update(sparsity=0.5)
 grid_search_model_args_3 = deepcopy(grid_search_model_args)
 grid_search_model_args_3.update(sparsity=0.85)
+
 
 class GreedyInfoMaxExperimentSparse2(
     mixins.LogEveryLoss,
@@ -248,7 +226,6 @@ class MultiHeadedGreedyInfoMaxExperiment(
         error_loss = module_wise_losses.sum()
         super().post_batch(error_loss, complexity_loss, batch_idx, **kwargs)
 
-
     def setup_experiment(self, config):
         num_channels = config["model_args"]["num_channels"]
         config["classifier_config"]["model_args"].update(in_channels=num_channels)
@@ -257,12 +234,13 @@ class MultiHeadedGreedyInfoMaxExperiment(
         super().setup_experiment(config)
 
 
-STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
-STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH.update(dict(
-        experiment_class = GreedyInfoMaxExperimentSparse2,
+SPARSE_SMALL_GRID_SEARCH = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
+SPARSE_SMALL_GRID_SEARCH.update(
+    dict(
+        experiment_class=GreedyInfoMaxExperimentSparse2,
         wandb_args=dict(
             project="greedy_infomax-static-sparsity",
-            name="static_sparse_small_dimensionality_grid_search"
+            name="static_sparse_small_dimensionality_grid_search",
         ),
         model_class=WrappedSparseSmallVisionModel,
         model_args=grid_search_model_args,
@@ -275,29 +253,9 @@ STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH.update(dict(
             # Optimizer class class arguments passed to the constructor
             optimizer_args=dict(lr=2e-4),
         ),
-    ),
+    )
 )
 
-STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_1 = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
-STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_1.update(dict(
-        experiment_class = GreedyInfoMaxExperimentSparse2,
-        wandb_args=dict(
-            project="greedy_infomax-static-sparsity",
-            name="static_sparse_small_dimensionality_grid_search_1"
-        ),
-        model_class=WrappedSparseSmallVisionModel,
-        model_args=grid_search_model_args_1,
-        classifier_config=dict(
-            model_class=ClassificationModel,
-            model_args=dict(num_classes=10),
-            loss_function=torch.nn.functional.cross_entropy,
-            # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
-            optimizer_class=torch.optim.Adam,
-            # Optimizer class class arguments passed to the constructor
-            optimizer_args=dict(lr=2e-4),
-        ),
-    ),
-)
 
 def make_reg_schedule(
     epochs, pct_ramp_start, pct_ramp_end, peak_value, pct_drop, final_value
@@ -334,8 +292,7 @@ SPARSE_VDROP_SMALL = deepcopy(SMALL_SPARSE_BASE)
 SPARSE_VDROP_SMALL.update(
     dict(
         wandb_args=dict(
-            project="greedy_infomax-sparsity-tests",
-            name="sparse_resnet_vdrop_small"
+            project="greedy_infomax-sparsity-tests", name="sparse_resnet_vdrop_small"
         ),
         experiment_class=GreedyInfoMaxExperimentSparsePruning,
         epochs=30,
@@ -352,19 +309,14 @@ SPARSE_VDROP_SMALL.update(
             overlap=2,
             # percent_on=None,
         ),
-        prune_schedule=[
-            (8, 0.8),
-            (14, 0.6),
-            (20, 0.4),
-            (25, 0.3),
-        ],
+        prune_schedule=[(8, 0.8), (14, 0.6), (20, 0.4), (25, 0.3)],
         log_module_sparsities=True,
         reg_scalar=make_reg_schedule(
             epochs=30,
-            pct_ramp_start=4/30,
-            pct_ramp_end=6/30,
+            pct_ramp_start=4 / 30,
+            pct_ramp_end=6 / 30,
             peak_value=0.0003,
-            pct_drop=26/30,
+            pct_drop=26 / 30,
             final_value=0.00001,
         ),
         optimizer_class=torch.optim.Adam,
@@ -379,7 +331,6 @@ SPARSE_VDROP_SMALL.update(
 )
 
 
-
 # grid search using dense activations, sparse weights, nonzero params constant,
 # varying channels, using OneCycleLR
 # (num_channels, required weight density)
@@ -392,30 +343,7 @@ SPARSE_VDROP_SMALL.update(
 # (287, 0.050073336993638744),
 # ]
 
-# channels_density = [
-# (32, 1.0),
-# (45, 0.503),
-# (58, 0.301),
-# (72, 0.194),
-# (100, 0.0993),
-# ]
-
-# channels_density = [
-# (16, 1.0),
-# (23, 0.488),
-# (29, 0.308),
-# (35, 0.212),
-# (49, 0.108),
-# ]
-
-
-channels_density = [
-(4, 1.0),
-(6, 0.42),
-(7, 0.298),
-(9, 0.17),
-(12, 0.085),
-]
+channels_density = [(32, 1.0), (45, 0.503), (58, 0.301), (72, 0.194), (100, 0.0993)]
 
 
 
@@ -423,18 +351,19 @@ experiment_idx = 0
 exp_num_channels, exp_required_density = channels_density[experiment_idx]
 exp_required_sparsity = 1.0 - exp_required_density
 dimensionality_study_args = deepcopy(model_args)
-dimensionality_study_args.update(percent_on = 1.0)
-dimensionality_study_args.update(num_channels= exp_num_channels)
+dimensionality_study_args.update(percent_on=1.0)
+dimensionality_study_args.update(num_channels=exp_num_channels)
 dimensionality_study_args.update(sparsity=exp_required_sparsity)
 STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
-STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY.update(dict(
-        experiment_class = GreedyInfoMaxExperimentSparse2,
+STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY.update(
+    dict(
+        experiment_class=GreedyInfoMaxExperimentSparse2,
         wandb_args=dict(
             project="greedy_infomax-static-sparsity-hyperparameters",
             name=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
-                 f"{str(exp_required_sparsity)[:4]}_sparse",
+            f"{str(exp_required_sparsity)[:4]}_sparse",
             group=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
-                    f"{str(exp_required_sparsity)[:4]}_sparse",
+            f"{str(exp_required_sparsity)[:4]}_sparse",
         ),
         batch_size=32,
         batch_size_supervised=32,
@@ -444,19 +373,19 @@ STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY.update(dict(
         # val_batch_size=16,
         model_class=WrappedSparseSmallVisionModel,
         model_args=dimensionality_study_args,
-        optimizer_class = torch.optim.SGD,
+        optimizer_class=torch.optim.SGD,
         optimizer_args=dict(lr=2e-4),
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
-                max_lr=0.185, #change based on sparsity/dimensionality
-                div_factor=5,  # initial_lr = 0.01
-                final_div_factor=1000,  # min_lr = 0.0000025
-                pct_start=1.0 / 10.0,
-                epochs=10,
-                anneal_strategy="linear",
-                max_momentum=1e-4,
-                cycle_momentum=False,
-            ),
+            max_lr=0.185,  # change based on sparsity/dimensionality
+            div_factor=5,  # initial_lr = 0.01
+            final_div_factor=1000,  # min_lr = 0.0000025
+            pct_start=1.0 / 10.0,
+            epochs=10,
+            anneal_strategy="linear",
+            max_momentum=1e-4,
+            cycle_momentum=False,
+        ),
         classifier_config=dict(
             model_class=ClassificationModel,
             model_args=dict(num_classes=10),
@@ -466,10 +395,11 @@ STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY.update(dict(
             # Optimizer class class arguments passed to the constructor
             optimizer_args=dict(lr=2e-4),
         ),
-    ),
+    )
 )
 
 # Sigopt optimize the onecycleLR
+
 
 class OneCycleLRGreedyInfoMaxSparseSigOpt(SigOptExperiment):
     def update_config_with_suggestion(self, config, suggestion):
@@ -490,11 +420,13 @@ class OneCycleLRGreedyInfoMaxSparseSigOpt(SigOptExperiment):
         assert "lr_scheduler_args" in config
 
         # Optimizer args
-        config["lr_scheduler_args"].update(dict(
-            max_lr=assignments["max_lr"],
-            div_factor=assignments["div_factor"],
-            final_div_factor=assignments["final_div_factor"],
-        ))
+        config["lr_scheduler_args"].update(
+            dict(
+                max_lr=assignments["max_lr"],
+                div_factor=assignments["div_factor"],
+                final_div_factor=assignments["final_div_factor"],
+            )
+        )
 
 
 sigopt_experiment_idx = 2
@@ -505,19 +437,20 @@ sigopt_dimensionality_study_args.update(percent_on=1.0)
 sigopt_dimensionality_study_args.update(num_channels=exp_num_channels)
 sigopt_dimensionality_study_args.update(sparsity=exp_required_sparsity)
 ONE_CYCLE_LR_DIMENSIONALITY_SIGOPT = deepcopy(STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY)
-ONE_CYCLE_LR_DIMENSIONALITY_SIGOPT.update(dict(
-    sigopt_experiment_class=OneCycleLRGreedyInfoMaxSparseSigOpt,
-    wandb_args=dict(
-        project="greedy_infomax-static-sparsity",
-        name=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
-             f"{str(exp_required_sparsity)[:4]}_sparse_sigopt",
-        group=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
-              f"{str(exp_required_sparsity)[:4]}_sparse_sigopt",
-    ),
-    model_args=sigopt_dimensionality_study_args,
-    sigopt_config=dict(
+ONE_CYCLE_LR_DIMENSIONALITY_SIGOPT.update(
+    dict(
+        sigopt_experiment_class=OneCycleLRGreedyInfoMaxSparseSigOpt,
+        wandb_args=dict(
+            project="greedy_infomax-static-sparsity",
+            name=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
+            f"{str(exp_required_sparsity)[:4]}_sparse_sigopt",
+            group=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
+            f"{str(exp_required_sparsity)[:4]}_sparse_sigopt",
+        ),
+        model_args=sigopt_dimensionality_study_args,
+        sigopt_config=dict(
             name=f"sigopt_GIM_sparse_onecycle_{exp_num_channels}_"
-                 f"{str(exp_required_sparsity)[:4]}",
+            f"{str(exp_required_sparsity)[:4]}",
             parameters=[
                 dict(
                     name="max_lr",
@@ -545,26 +478,24 @@ ONE_CYCLE_LR_DIMENSIONALITY_SIGOPT.update(dict(
         ),
         sigopt_experiment_id=409217,
         api_key=os.environ.get("SIGOPT_KEY", None),
-
-    batch_size=32,
-    batch_size_supervised=32,
-    val_batch_size=32,
-    # batch_size=16,
-    # batch_size_supervised=16,
-    # val_batch_size=16,
-    lr_scheduler_args=dict(
-        max_lr=1e-1,  # change based on sparsity/dimensionality
-        div_factor=10,  # initial_lr = 0.01
-        final_div_factor=300,  # min_lr = 0.0000025
-        pct_start=2.0 / 10.0,
-        epochs=10,
-        anneal_strategy="linear",
-        max_momentum=1e-4,
-        cycle_momentum=False,
-    ),
-),
+        batch_size=32,
+        batch_size_supervised=32,
+        val_batch_size=32,
+        # batch_size=16,
+        # batch_size_supervised=16,
+        # val_batch_size=16,
+        lr_scheduler_args=dict(
+            max_lr=1e-1,  # change based on sparsity/dimensionality
+            div_factor=10,  # initial_lr = 0.01
+            final_div_factor=300,  # min_lr = 0.0000025
+            pct_start=2.0 / 10.0,
+            epochs=10,
+            anneal_strategy="linear",
+            max_momentum=1e-4,
+            cycle_momentum=False,
+        ),
+    )
 )
-
 
 
 # using LR range test to optimize LR
@@ -587,6 +518,7 @@ class GreedyInfoMaxExperimentSparseLRRangeTest(
         config["classifier_config"]["model_args"].update(in_channels=num_channels)
         super().setup_experiment(config)
 
+
 #
 # channels_density = [
 # (64, 1.0),
@@ -600,20 +532,21 @@ range_test_experiment_idx = 0
 exp_num_channels, exp_required_density = channels_density[range_test_experiment_idx]
 exp_required_sparsity = 1.0 - exp_required_density
 lr_range_test_args = deepcopy(model_args)
-lr_range_test_args.update(percent_on = 1.0)
-lr_range_test_args.update(num_channels= exp_num_channels)
+lr_range_test_args.update(percent_on=1.0)
+lr_range_test_args.update(num_channels=exp_num_channels)
 lr_range_test_args.update(sparsity=exp_required_sparsity)
 LR_RANGE_TEST = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
-LR_RANGE_TEST.update(dict(
-        experiment_class = GreedyInfoMaxExperimentSparseLRRangeTest,
+LR_RANGE_TEST.update(
+    dict(
+        experiment_class=GreedyInfoMaxExperimentSparseLRRangeTest,
         wandb_args=dict(
             project="greedy_infomax-static-sparsity-hyperparameters",
             name=f"lr_range_test_constant_nonzero_params"
-                 f"_{str(exp_num_channels)}_channels_"
-                 f"{str(exp_required_sparsity)[:4]}_sparse_range_test",
+            f"_{str(exp_num_channels)}_channels_"
+            f"{str(exp_required_sparsity)[:4]}_sparse_range_test",
             group=f"lr_range_test_constant_nonzero_params"
-                  f"_{str(exp_num_channels)}_channels_"
-                    f"{str(exp_required_sparsity)[:4]}_sparse_range_test",
+            f"_{str(exp_num_channels)}_channels_"
+            f"{str(exp_required_sparsity)[:4]}_sparse_range_test",
         ),
         batch_size=32,
         batch_size_supervised=32,
@@ -624,11 +557,10 @@ LR_RANGE_TEST.update(dict(
         # val_batch_size=16,
         model_class=WrappedSparseSmallVisionModel,
         model_args=lr_range_test_args,
-        optimizer_class = torch.optim.SGD,
+        optimizer_class=torch.optim.SGD,
         optimizer_args=dict(lr=2e-4),
         lr_scheduler_class=dict(),
-        lr_scheduler_args=dict(min_lr=2e-4,
-                                max_lr=2),
+        lr_scheduler_args=dict(min_lr=2e-4, max_lr=2),
         classifier_config=dict(
             model_class=ClassificationModel,
             model_args=dict(num_classes=10),
@@ -638,30 +570,42 @@ LR_RANGE_TEST.update(dict(
             # Optimizer class class arguments passed to the constructor
             optimizer_args=dict(lr=2e-4),
             lr_scheduler_class=dict(),
-            lr_scheduler_args=dict(min_lr=2e-4,
-                                   max_lr=2e-4),
+            lr_scheduler_args=dict(min_lr=2e-4, max_lr=2e-4),
             epochs=3,
         ),
-    ),
+    )
 )
 
+#
+# channels_density = [
+# (32, 1.0),
+# (45, 0.503),
+# (58, 0.301),
+# (72, 0.194),
+# (100, 0.0993),
+# ]
+max_lr_grid_search_experiment_idx = 2
+exp_num_channels, exp_required_density = channels_density[
+    max_lr_grid_search_experiment_idx
+]
 max_lr_grid_search_experiment_idx = 4
 exp_num_channels, exp_required_density = channels_density[max_lr_grid_search_experiment_idx]
 exp_required_sparsity = 1.0 - exp_required_density
 max_lr_grid_search_args = deepcopy(model_args)
-max_lr_grid_search_args.update(percent_on = 1.0)
-max_lr_grid_search_args.update(num_channels= exp_num_channels)
+max_lr_grid_search_args.update(percent_on=1.0)
+max_lr_grid_search_args.update(num_channels=exp_num_channels)
 max_lr_grid_search_args.update(sparsity=exp_required_sparsity)
 MAX_LR_GRID_SEARCH = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
-MAX_LR_GRID_SEARCH.update(dict(
-        experiment_class = GreedyInfoMaxExperimentSparse2,
+MAX_LR_GRID_SEARCH.update(
+    dict(
+        experiment_class=GreedyInfoMaxExperimentSparse2,
         wandb_args=dict(
             project="greedy_infomax-static-sparsity-hyperparameters",
             name=f"max_lr_grid_search_constant_nonzero_params"
-                 f"_{str(exp_num_channels)}_channels_"
-                 f"{str(exp_required_sparsity)[:4]}_sparse",
+            f"_{str(exp_num_channels)}_channels_"
+            f"{str(exp_required_sparsity)[:4]}_sparse",
             group=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
-                    f"{str(exp_required_sparsity)[:4]}_sparse",
+            f"{str(exp_required_sparsity)[:4]}_sparse",
         ),
         batch_size=32,
         batch_size_supervised=32,
@@ -671,7 +615,7 @@ MAX_LR_GRID_SEARCH.update(dict(
         # val_batch_size=16,
         model_class=WrappedSparseSmallVisionModel,
         model_args=max_lr_grid_search_args,
-        optimizer_class = torch.optim.SGD,
+        optimizer_class=torch.optim.SGD,
         optimizer_args=dict(lr=2e-4),
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
@@ -694,10 +638,8 @@ MAX_LR_GRID_SEARCH.update(dict(
             # Optimizer class class arguments passed to the constructor
             optimizer_args=dict(lr=2e-4),
         ),
-    ),
+    )
 )
-
-
 
 
 # Super Greedy Implementation (all blocks trained concurrently)
@@ -706,18 +648,19 @@ experiment_idx = 0
 exp_num_channels, exp_required_density = channels_density[experiment_idx]
 exp_required_sparsity = 1.0 - exp_required_density
 super_greedy_model_args = deepcopy(model_args)
-super_greedy_model_args.update(percent_on = 1.0)
-super_greedy_model_args.update(num_channels= exp_num_channels)
+super_greedy_model_args.update(percent_on=1.0)
+super_greedy_model_args.update(num_channels=exp_num_channels)
 super_greedy_model_args.update(sparsity=exp_required_sparsity)
 SUPER_GREEDY_BASE = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
-SUPER_GREEDY_BASE.update(dict(
+SUPER_GREEDY_BASE.update(
+    dict(
         experiment_class=GreedyInfoMaxExperimentSparse2,
         wandb_args=dict(
             project="greedy_infomax-super-greedy",
             name=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
-                 f"{str(exp_required_sparsity)[:4]}_sparse",
+            f"{str(exp_required_sparsity)[:4]}_sparse",
             group=f"constant_nonzero_params_{str(exp_num_channels)}_channels_"
-                    f"{str(exp_required_sparsity)[:4]}_sparse",
+            f"{str(exp_required_sparsity)[:4]}_sparse",
         ),
         batch_size=32,
         batch_size_supervised=32,
@@ -727,19 +670,19 @@ SUPER_GREEDY_BASE.update(dict(
         # val_batch_size=16,
         model_class=WrappedSuperGreedySmallSparseVisionModel,
         model_args=super_greedy_model_args,
-        optimizer_class = torch.optim.SGD,
+        optimizer_class=torch.optim.SGD,
         optimizer_args=dict(lr=2e-4),
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
-                max_lr=0.24, #change based on sparsity/dimensionality
-                div_factor=100,  # initial_lr = 0.01
-                final_div_factor=1000,  # min_lr = 0.0000025
-                pct_start=1.0 / 10.0,
-                epochs=10,
-                anneal_strategy="linear",
-                max_momentum=1e-4,
-                cycle_momentum=False,
-            ),
+            max_lr=0.24,  # change based on sparsity/dimensionality
+            div_factor=100,  # initial_lr = 0.01
+            final_div_factor=1000,  # min_lr = 0.0000025
+            pct_start=1.0 / 10.0,
+            epochs=10,
+            anneal_strategy="linear",
+            max_momentum=1e-4,
+            cycle_momentum=False,
+        ),
         classifier_config=dict(
             model_class=ClassificationModel,
             model_args=dict(num_classes=10),
@@ -749,18 +692,16 @@ SUPER_GREEDY_BASE.update(dict(
             # Optimizer class class arguments passed to the constructor
             optimizer_args=dict(lr=2e-4),
         ),
-    ),
+    )
 )
-
 
 
 CONFIGS = dict(
     sparse_vdrop_small=SPARSE_VDROP_SMALL,
     static_sparse_weights_small=STATIC_SPARSE_WEIGHTS_SMALL,
     static_sparse_activations_small=STATIC_SPARSE_ACTIVATIONS_SMALL,
-    static_sparse_weights_activations_small=STATIC_SPARSE_WEIGHTS_AND_ACTIVATIONS_SMALL,
-    static_sparse_small_dimensionality_grid_search=STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH,
-    static_sparse_small_dimensionality_grid_search_1=STATIC_SPARSE_SMALL_DIMENSIONALITY_GRID_SEARCH_1,
+    static_sparse_weights_activations_small=SPARSE_WEIGHTS_ACTIVATIONS_SMALL,
+    static_sparse_small_dimensionality_grid_search=SPARSE_SMALL_GRID_SEARCH,
     small_sparse_largest_dimension=SMALL_SPARSE_LARGEST_DIMENSION,
     static_sparse_small_dimensionality_study=STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY,
     one_cycle_lr_dimensionality_sigopt=ONE_CYCLE_LR_DIMENSIONALITY_SIGOPT,
