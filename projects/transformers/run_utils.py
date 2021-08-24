@@ -42,6 +42,7 @@ from transformers import (
     AutoConfig,
     AutoModelForMaskedLM,
     AutoModelForSequenceClassification,
+    AutoModelForQuestionAnswering,
     AutoTokenizer,
     EvalPrediction,
     PretrainedConfig,
@@ -523,6 +524,15 @@ def init_datasets_mlm(data_args):
     return datasets, tokenized_datasets, dataset_path
 
 
+def init_datasets_squad(data_args, training_args, model_args):
+    """Get the datasets for finetuning on Squad. Returns dataset."""
+    datasets = load_dataset(
+        data_args.dataset_name, data_args.dataset_config_name,
+        cache_dir=model_args.cache_dir
+    )
+    return datasets
+
+
 def init_datasets_task(data_args, training_args):
     """
     Get the datasets for finetuning on tasks. Returns dataset.
@@ -667,7 +677,7 @@ def init_tokenizer(model_args):
     return tokenizer
 
 
-def init_model(model_args, config, tokenizer, finetuning=False):
+def init_model(model_args, config, tokenizer, finetuning=False, squad=False):
     """"
     Initialize a model for pretraining or finetuning
     """
@@ -682,10 +692,15 @@ def init_model(model_args, config, tokenizer, finetuning=False):
             use_auth_token=True if model_args.use_auth_token else None,
         )
         if finetuning:
+            if not squad:
+                model = AutoModelForSequenceClassification.from_pretrained(
+                    model_args.model_name_or_path, **model_kwargs
+                )
+            else:
+                model = AutoModelForQuestionAnswering.from_pretrained(
+                    model_args.model_name_or_path, **model_kwargs
+                )
             logging.info("Loading a pretrained model for finetuning")
-            model = AutoModelForSequenceClassification.from_pretrained(
-                model_args.model_name_or_path, **model_kwargs
-            )
         else:
             logging.info("Loading a pretrained model to continue pretraining")
             model = AutoModelForMaskedLM.from_pretrained(
