@@ -84,6 +84,8 @@ from run_utils import (
     init_model,
     init_tokenizer,
     init_trainer,
+    init_datasets_squad,
+    preprocess_datasets_squad,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
     rm_prefixed_subdirs,
@@ -372,6 +374,48 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
     )
 
 
+def init_dataset_for_squad(model_args, data_args, training_args,
+                                last_checkpoint=None):
+
+    # TODO
+    # edit multi_eval_sets so you can gather not just multiple eval sets
+    # for a single task, but eval sets from multiple tasks
+    datasets = init_datasets_squad(data_args, training_args)
+
+    # Place holder for now
+    extra_config_kwargs = {}
+    config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
+    tokenizer = init_tokenizer(model_args)
+    model = init_model(model_args, config, tokenizer, finetuning=True)
+    check_sparsity_callback(model, model_args)
+    # Tokenizing and preprocessing the datasets for downstream tasks
+    # TODO: load from cached tokenized datasets for finetuning as well
+    logging.info(f"Tokenizing datasets for finetuning ...")
+    train_dataset, eval_dataset, eval_examples, predict_dataset, predict_examples = \
+            preprocess_datasets_squad(datasets, tokenizer, data_args)
+
+
+    # Data collator
+    # We have already padded to max length if the corresponding flag is True, otherwise we need to pad in the data
+    # collator.
+    data_collator = (
+        default_data_collator
+        if data_args.pad_to_max_length
+        else DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None)
+    )
+
+    return (
+        tokenizer,
+        data_collator,
+        train_dataset,
+        eval_dataset,
+        eval_examples,
+        predict_dataset,
+        predict_examples,
+        model,
+    )
+
+
 def run_finetuning_single_task_with_hp_search(
     model_args, data_args, training_args, last_checkpoint=None
 ):
@@ -600,18 +644,17 @@ def run_finetuning_squad(
     # TODO
     # accept run# as an argument for finetuning with multiple runs on a single task
     # update the save directory to include run#
-    tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
-        is_regression, tokenized_datasets, label_list, config = \
-        init_dataset_for_finetuning(
-            model_args, data_args, training_args, last_checkpoint
-        )
+    tokenizer, data_collator, train_dataset, eval_dataset, eval_examples, predict_dataset, predict_examples, model, = \
+        init_dataset_for_squad(model_args, data_args, training_args, last_checkpoint)
 
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
-    training_args = check_best_metric(training_args, data_args.task_name)
+    # training_args = check_best_metric(training_args, data_args.task_name)
 
     # Update where model is saved for each run
     training_args = update_run_number(training_args, run_idx)
+
+    # training_args.trainer_class = QuestionAnsweringTrainer # import this
 
     # Train
     trainer = init_trainer(

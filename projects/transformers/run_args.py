@@ -342,9 +342,9 @@ class DataTrainingArguments:
     #         "value if set."
     #     },
     # )
-    # version_2_with_negative: bool = field(
-    #     default=False, metadata={"help": "If true, some of the examples do not have an answer."}
-    # )
+    version_2_with_negative: bool = field(
+        default=False, metadata={"help": "If true, some of the examples do not have an answer."}
+    )
     # null_score_diff_threshold: float = field(
     #     default=0.0,
     #     metadata={
@@ -353,21 +353,21 @@ class DataTrainingArguments:
     #         "Only useful when `version_2_with_negative=True`."
     #     },
     # )
-    # doc_stride: int = field(
-    #     default=128,
-    #     metadata={"help": "When splitting up a long document into chunks, how much stride to take between chunks."},
-    # )
-    # n_best_size: int = field(
-    #     default=20,
-    #     metadata={"help": "The total number of n-best predictions to generate when looking for an answer."},
-    # )
-    # max_answer_length: int = field(
-    #     default=30,
-    #     metadata={
-    #         "help": "The maximum length of an answer that can be generated. This is needed because the start "
-    #         "and end predictions are not conditioned on one another."
-    #     },
-    # )
+    doc_stride: int = field(
+        default=128,
+        metadata={"help": "When splitting up a long document into chunks, how much stride to take between chunks."},
+    )
+    n_best_size: int = field(
+        default=20,
+        metadata={"help": "The total number of n-best predictions to generate when looking for an answer."},
+    )
+    max_answer_length: int = field(
+        default=30,
+        metadata={
+            "help": "The maximum length of an answer that can be generated. This is needed because the start "
+            "and end predictions are not conditioned on one another."
+        },
+    )
 
     def __post_init__(self):
         """Input validation"""
