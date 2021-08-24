@@ -23,7 +23,9 @@ from .base import CONFIGS as BASE
 from .batch import CONFIGS as BATCH
 from .batch_mnist import CONFIGS as BATCH_MNIST
 from .centroid import CONFIGS as CENTROID
+from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
 from .no_dendrites import CONFIGS as NO_DENDRITES
+from .profiler import CONFIGS as PROFILER
 from .si_centroid import CONFIGS as SI_CENTROID
 from .sp_context import CONFIGS as SP_CONTEXT
 from .sp_context_search import CONFIGS as SP_PROTO
@@ -39,7 +41,9 @@ CONFIGS.update(BASE)
 CONFIGS.update(BATCH)
 CONFIGS.update(BATCH_MNIST)
 CONFIGS.update(CENTROID)
+CONFIGS.update(HYPERPARAMETERSEARCH)
 CONFIGS.update(NO_DENDRITES)
+CONFIGS.update(PROFILER)
 CONFIGS.update(SI_CENTROID)
-CONFIGS.update(SP_PROTO)
 CONFIGS.update(SP_CONTEXT)
+CONFIGS.update(SP_PROTO)

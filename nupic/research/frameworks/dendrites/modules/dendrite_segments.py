@@ -105,7 +105,7 @@ class DendriteSegments(torch.nn.Module, HasRezeroWeights):
             init_linear_(weight, bias)
 
     def rezero_weights(self):
-        self.weights.data[self.zero_mask.bool()] = 0
+        self.weights.data.masked_fill_(self.zero_mask.bool(), 0)
 
     def forward(self, context):
         """
