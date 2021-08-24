@@ -1134,7 +1134,7 @@ class TaskResults():
 
     def __init__(self, task_name, training_args):
         self.task_name = task_name
-        self.reporting_metrics = reporting_metrics_per_task[self.task_name]
+        self.reporting_metrics = self.reporting_metrics_per_task[self.task_name]
         self.allowed_metrics = get_allowed_metrics(training_args, task_name)
         self.all_results = []
         self._results = None
@@ -1214,8 +1214,8 @@ class TaskResults():
         # Max across runs
         elif reduction == "max":
             # Which run has the best results
-            # argmax_run = np.argmax(aggregated_results[self.reporting_metrics[-1]])
-            argmax_run = np.argmax(aggregated_results[self.best_metric_key])
+            argmax_run = np.argmax(aggregated_results[self.reporting_metrics[-1]])
+            # argmax_run = np.argmax(aggregated_results[self.best_metric_key])
             # Which step in the run has best results
             argmax_step = self.best_idx_per_run[argmax_run]
             self._results = {}

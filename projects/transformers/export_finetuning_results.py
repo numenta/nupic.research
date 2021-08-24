@@ -361,18 +361,43 @@ def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
             plt.savefig(save_name)
 
 
-def merge_data_to_results(data, results={}):
+def merge_data_to_results(results_file, results={}):
+
+    print_message_1 = "Length of results for {0} prior to update: " \
+                      "{1} in file {2}"
+
+    print_message_2 = "Length of results for {0} after update: " \
+                      "{1} in file {2}"
+
+    with open(results_file, "rb") as f:
+        data = pickle.load(f)
 
     if results == {}:
-        return data
+        results.update(data)
+        for task in data.keys():
+            print(print_message_1.format(
+                task,
+                len(results[task].all_results),
+                os.path.split(results_file)[-2])
+            )
+        return results
 
     for task in data.keys():
         if task in results:
-            print(f"Length of results for {task} prior to update: {len(results[task].all_results)}")
+            print(print_message_1.format(
+                task,
+                len(results[task].all_results),
+                os.path.split(results_file)[-2]))
+            # print(f"Length of results for {task} prior to update: {len(results[task].all_results)}")
             for run in data[task].all_results:
                 results[task].all_results.append(run)
-            print(f"Length of results for {task} prior after update: {len(results[task].all_results)}")
+            # print(f"Length of results for {task} prior after update: {len(results[task].all_results)}")
+            print(print_message_2.format(
+                task,
+                len(results[task].all_results),
+                os.path.split(results_file)[-2]))
         else:
+            print("\n\n WARNING, DID NOT EXPECT TO BE HERE")
             results.update(data)
 
     return results
@@ -401,9 +426,7 @@ def load_results(results_files):
     for results_file in results_files:
         if os.path.isdir(results_file):
             results_file = os.path.join(results_file, "task_results.p")
-        with open(results_file, "rb") as f:
-            data = pickle.load(f)
-            results = merge_data_to_results(data, results)
+        results = merge_data_to_results(results_file, results)
 
     results = adapt_old_mnli(results)
     
