@@ -22,7 +22,7 @@
 # Install nupic.torch and nupic.tensorflow directly from github master branch
 nupic.torch @ git+https://github.com/numenta/nupic.torch.git
 nupic.tensorflow @ git+https://github.com/numenta/nupic.tensorflow.git
-numba @ git+https://github.com/numba/numba.git
+numba==0.4.3
 
 awscli
 ax-platform
