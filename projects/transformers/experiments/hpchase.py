@@ -30,6 +30,7 @@ from .trifecta import (
     finetuning_bert_sparse_85_trifecta_100k_glue_get_info,
     finetuning_bert_sparse_90_trifecta_100k_glue_get_info,
     finetuning_bert_sparse_trifecta_100k_glue_get_info,
+    finetuning_bert_sparse_trifecta_2x_get_info,
     finetuning_small_bert_sparse_2x_trifecta_100k_glue,
     finetuning_small_bert_sparse_4x_trifecta_100k_glue,
     finetuning_small_bert_sparse_85_trifecta_100k_glue,
@@ -75,22 +76,47 @@ def update_task_hyperparams(local_config, model_name):
 bert_100k_hp_chase = deepcopy(finetuning_bert_100k_glue_get_info)
 bert_100k_hp_chase = update_task_hyperparams(bert_100k_hp_chase, "bert_100k")
 
+bert_100k_hp_chase_mnli = deepcopy(bert_100k_hp_chase)
+bert_100k_hp_chase_mnli.update(
+    task_name=None,
+    task_names=["mnli"],
+)
+
 # 80%
 trifecta_80_hp_chase = deepcopy(finetuning_bert_sparse_trifecta_100k_glue_get_info)
 trifecta_80_hp_chase = update_task_hyperparams(trifecta_80_hp_chase, "trifecta_80")
+
+trifecta_80_hp_chase_mnli = deepcopy(trifecta_80_hp_chase)
+trifecta_80_hp_chase_mnli.update(
+    task_name=None,
+    task_names=["mnli"],
+)
 
 # 85%
 trifecta_85_hp_chase = deepcopy(finetuning_bert_sparse_85_trifecta_100k_glue_get_info)
 trifecta_85_hp_chase = update_task_hyperparams(trifecta_85_hp_chase, "trifecta_85")
 
+trifecta_85_hp_chase_mnli = deepcopy(trifecta_85_hp_chase)
+trifecta_85_hp_chase_mnli.update(
+    task_name=None,
+    task_names=["mnli"],
+)
+
 # 90%
 trifecta_90_hp_chase = deepcopy(finetuning_bert_sparse_90_trifecta_100k_glue_get_info)
 trifecta_90_hp_chase = update_task_hyperparams(trifecta_90_hp_chase, "trifecta_90")
+
 trifecta_90_hp_chase_mnli = deepcopy(trifecta_90_hp_chase)
 trifecta_90_hp_chase_mnli.update(
     task_name=None,
     task_names=["mnli"],
 )
+
+trifecta_90_hp_chase_follow_up = deepcopy(trifecta_90_hp_chase)
+
+# 2X
+# trifecta_2x_hp_chase = deepcopy(finetuning_bert_sparse_trifecta_2x_get_info)
+# trifecta_2x_hp_chase = update_task_hyperparams(trifecta_2x_hp_chase, "trifecta_2x")
 
 # ---------
 # BERT small variations
@@ -186,10 +212,14 @@ trifecta_4x_small_hp_chase_first_two.update(
 CONFIGS = dict(
     # BERT base
     bert_100k_hp_chase=bert_100k_hp_chase,
+    bert_100k_hp_chase_mnli=bert_100k_hp_chase_mnli,
     trifecta_80_hp_chase=trifecta_80_hp_chase,
+    trifecta_80_hp_chase_mnli=trifecta_80_hp_chase_mnli,
     trifecta_85_hp_chase=trifecta_85_hp_chase,
+    trifecta_85_hp_chase_mnli=trifecta_85_hp_chase_mnli,
     trifecta_90_hp_chase=trifecta_90_hp_chase,
     trifecta_90_hp_chase_mnli=trifecta_90_hp_chase_mnli,
+    trifecta_90_hp_chase_follow_up=trifecta_90_hp_chase_follow_up,
 
     # BERT small
     small_bert_big_dataset_hp_chase=small_bert_big_dataset_hp_chase,
