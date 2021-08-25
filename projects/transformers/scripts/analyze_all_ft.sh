@@ -26,6 +26,7 @@ python ../export_finetuning_results.py \
 # Bert 100k hp chase
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/bert_100k_hp_chase \
+                ~/nta/finetuning/bert_100k_hp_chase_mnli \
                 --model_name bert_100k_hp_chase \
                 --csv ${BASE_CSV} \
                 --pretrained_model Dense
@@ -40,6 +41,7 @@ python ../export_finetuning_results.py \
 # Trifecta 80, hp chase
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/trifecta_80_hp_chase \
+                ~/nta/finetuning/trifecta_80_hp_chase_mnli \
                 --model_name trifecta_80_glue_hp_chase \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_80
@@ -54,6 +56,7 @@ python ../export_finetuning_results.py \
 # Trifecta 85, hp chase
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/trifecta_85_hp_chase \
+                ~/nta/finetuning/trifecta_85_hp_chase_mnli \
                 --model_name trifecta_85_glue_hp_chase \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_85
@@ -66,10 +69,12 @@ python ../export_finetuning_results.py \
                 --pretrained_model Trifecta_90
 
 # Trifecta 90, hp chase
-# Note, second results file was due to run breaking on mnli
+# This model did not complete the right number of runs initially
+# Hence the follow up run
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/trifecta_90_hp_chase \
                 ~/nta/finetuning/trifecta_90_hp_chase_mnli \
+                ~/nta/finetuning/trifecta_90_hp_chase_follow_up \
                 --model_name trifecta_90_glue_hp_chase \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_90

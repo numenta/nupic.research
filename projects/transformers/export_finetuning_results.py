@@ -388,17 +388,14 @@ def merge_data_to_results(results_file, results={}):
                 task,
                 len(results[task].all_results),
                 os.path.split(results_file)[-2]))
-            # print(f"Length of results for {task} prior to update: {len(results[task].all_results)}")
             for run in data[task].all_results:
                 results[task].all_results.append(run)
-            # print(f"Length of results for {task} prior after update: {len(results[task].all_results)}")
             print(print_message_2.format(
                 task,
                 len(results[task].all_results),
                 os.path.split(results_file)[-2]))
         else:
-            print("\n\n WARNING, DID NOT EXPECT TO BE HERE")
-            results.update(data)
+            results[task] = data[task]
 
     return results
 
