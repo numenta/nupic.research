@@ -29,6 +29,8 @@ import time
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
+from .loss_utils import multiple_cross_entropy
+
 def train_block_model(
     model,
     loader,
@@ -126,14 +128,14 @@ def train_block_model(
         optimizer.zero_grad()
         # Output will be a list of list of tensors:
         # output[x][k] = bilinear_module_x, prediction_step_k: tensor
-        output = model(data)
+        output_list = model(data)
 
         # Module specific losses will be a tensor of dimension num modules
         # module_specific_losses[x] = loss from bilinear_module_x
-        module_specific_losses = criterion(output, target)
-        error_loss = module_specific_losses.sum()
+        module_losses = criterion(output_list, target)
+        error_loss = module_losses.sum()
 
-        del data, target, output
+        del data, target, output_list
 
         t2 = time.time()
         if use_amp:
@@ -167,14 +169,14 @@ def train_block_model(
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
                                                               t4 - t3, t5 - t4)
             post_batch_callback(model=model,
-                                error_loss=error_loss.detach(),
+                                error_loss=module_losses.detach(),
                                 complexity_loss=(complexity_loss.detach()
                                                  if complexity_loss is not None
                                                  else None),
                                 batch_idx=batch_idx,
                                 num_images=num_images,
                                 time_string=time_string)
-        del error_loss, complexity_loss, module_specific_losses
+        del error_loss, complexity_loss, module_losses
         t0 = time.time()
 
     if progress_bar is not None:
@@ -187,7 +189,7 @@ def evaluate_block_model(
     loader,
     device,
     batches_in_epoch=sys.maxsize,
-    criterion=F.nll_loss,
+    criterion=multiple_cross_entropy,
     complexity_loss_fn=None,
     active_classes=None,
     progress=None,
@@ -232,8 +234,9 @@ def evaluate_block_model(
     total = 0
 
     # Perform accumulation on device, avoid paying performance cost of .item()
-    loss = torch.tensor(0., device=device)
-    correct = torch.tensor(0, device=device)
+    num_emit_encoding_modules = model.count_emit_encoding_modules
+    module_losses = torch.zeros(num_emit_encoding_modules, device=device)
+    module_correct = torch.zeros(num_emit_encoding_modules, device=device)
 
     async_gpu = loader.pin_memory
 
@@ -253,16 +256,16 @@ def evaluate_block_model(
                 data, target = transform_to_device_fn(data, target, device,
                                                       non_blocking=async_gpu)
 
-            output = model(data)
+            outputs = model(data)
             if active_classes is not None:
-                output = output[:, active_classes]
-            loss += criterion(output, target, reduction="sum")
-            pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum()
+                outputs = outputs[:, :, active_classes] #module, batch, classes
+            module_losses += criterion(outputs, target, reduction="sum")
+            pred = outputs.max(-1, keepdim=True)[1]
+            module_correct += pred.eq(target.view_as(pred)).sum()
             total += len(data)
 
             if post_batch_callback is not None:
-                post_batch_callback(batch_idx=batch_idx, target=target, output=output,
+                post_batch_callback(batch_idx=batch_idx, target=target, output=outputs,
                                     pred=pred)
 
         complexity_loss = (complexity_loss_fn(model)
@@ -272,15 +275,27 @@ def evaluate_block_model(
     if progress is not None:
         loader.close()
 
-    correct = correct.item()
-    loss = loss.item()
+    module_correct = module_correct.item()
+    module_losses = module_losses.item()
 
     result = {
-        "total_correct": correct,
         "total_tested": total,
-        "mean_loss": loss / total if total > 0 else 0,
-        "mean_accuracy": correct / total if total > 0 else 0,
     }
+    result.update({
+        f"total_correct_encoding_{i}": module_correct[i] for i in range(
+            module_correct.shape[0]),
+    })
+    result.update({
+        f"mean_loss_encoding_{i}": module_losses[i] / total if total > 0 else 0 for i in
+        range(
+            module_correct.shape[0]),
+    })
+    result.update({
+        f"mean_accuracy_encoding_{i}": module_correct[i] / total if total > 0 else 0
+        for i in
+        range(
+            module_correct.shape[0]),
+    })
 
     if complexity_loss is not None:
         result["complexity_loss"] = complexity_loss.item()

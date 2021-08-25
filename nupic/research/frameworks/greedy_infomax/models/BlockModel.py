@@ -80,3 +80,9 @@ class BlockModel(nn.Module):
             else:
                 x = module(x)
         return all_outputs
+
+    def count_bilinear_info_modules(self):
+        return sum([1 if isinstance(m, BilinearInfo) else 0 for m in self.modules])
+
+    def count_emit_encoding_modules(self):
+        return sum([1 if isinstance(m, EmitEncoding) else 0 for m in self.modules])

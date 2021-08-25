@@ -27,6 +27,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import nupic.research.frameworks.greedy_infomax.utils.data_utils as data_utils
+from nupic.torch.modules import SparseWeights2d
 
 # used to block gradients between layers
 class GradientBlock(nn.Module):
@@ -56,3 +57,32 @@ class PatchifyInputs(nn.Module):
     def forward(self, x):
         x, n_patches_x, n_patches_y = data_utils.patchify_inputs(x)
         return x, n_patches_x, n_patches_y
+
+class SparseConv2d(nn.Module):
+    def __init__(self, in_channels: int,
+        out_channels: int,
+        kernel_size,
+        stride = 1,
+        padding = 0,
+        dilation = 1,
+        groups = 1,
+        bias = True,
+        padding_mode = 'zeros',
+        sparse_weights_class = SparseWeights2d,
+        sparsity=None,
+        allow_extremes=False):
+        super(SparseConv2d, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels,
+                                out_channels,
+                                kernel_size,
+                                stride=stride,
+                                padding=padding,
+                                dilation=dilation,
+                                groups=groups,
+                                bias=bias,
+                                padding_mode=padding_mode)
+        self.conv2d = sparse_weights_class(self.conv2d,
+                                      sparsity=sparsity,
+                                      allow_extremes=allow_extremes)
+    def forward(self, x):
+        return self.conv2d(x)

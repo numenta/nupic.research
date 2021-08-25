@@ -45,10 +45,11 @@ class CreateBlockModel:
     @classmethod
     def create_model(cls, config, device):
         model_args = config.get("model_args", {})
-        modules_to_create = model_args.get("modules", [])
-        for i, module_dict in enumerate(modules_to_create):
-            modules_to_create[i] = create_model(module_dict, device)
-        model_args["module_instances"] = modules_to_create
+        module_args = model_args.get("module_args", [])
+        modules = []
+        for i, module_dict in enumerate(module_args):
+            modules.append(create_model(module_dict, device))
+        model_args["modules"] = modules
         return create_model(
             model_class=config["model_class"],
             model_args=model_args,

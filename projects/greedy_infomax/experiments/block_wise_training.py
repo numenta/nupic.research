@@ -31,27 +31,11 @@ from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import 
     ClassificationModel,
 )
 from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
-    GradientBlock,
+    GradientBlock, EmitEncoding
 )
-from nupic.research.frameworks.greedy_infomax.mixins.create_block_model import BlockWiseModel
+from nupic.research.frameworks.greedy_infomax.mixins.create_block_model import CreateBlockModel
+from nupic.research.frameworks.greedy_infomax.utils.model_utils import full_sparse_resnet, small_sparse_resnet
 
-from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
-    PreActBlockNoBN, SparsePreActBlockNoBN, BilinearInfoLegacy,
-)
-
-from nupic.research.frameworks.greedy_infomax.models.FullModel import (
-    SparseFullVisionModel,
-    VDropSparseFullVisionModel,
-    FullVisionModel,
-    SmallVisionModel,
-    SparseSmallVisionModel,
-    VDropSparseSmallVisionModel,
-    WrappedSparseSmallVisionModel,
-    SuperGreedySparseSmallVisionModel,
-    WrappedSuperGreedySmallSparseVisionModel,
-)
-from nupic.research.frameworks.greedy_infomax.utils.model_utils import \
-    train_model_gim, evaluate_model_gim
 from nupic.research.frameworks.vernon.distributed import mixins, experiments
 from nupic.torch.modules import SparseWeights2d
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
@@ -61,13 +45,8 @@ from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockMode
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
 class GreedyInfoMaxExperimentBlockWise(
-    mixins.LogEveryLoss,
-    mixins.RezeroWeights,
-    mixins.LogBackpropStructure,
-    BlockWiseModel,
     experiments.SelfSupervisedExperiment,
 ):
-
     # avoid changing key names for sigopt
     @classmethod
     def get_readable_result(cls, result):
@@ -94,26 +73,19 @@ save_checkpoint=None, train=True)
 (PreActBlockNoBN, {args}, previous_checkpoint="checkpoint_file.ckpt"),
 (PreActBlockNoBN, {args}, previous_checkpoint="checkpoint_file.ckpt"), 
 save_checkpoint="save_here.ckpt")
-ResNetEncoder, {args}, previous_checkpoint=None, save_checkpoint="save_there.ckpt")
+(EmitEncoding)
+(BilinearInfo, {args})
+
 ]
 
 """
-
-
-
 # model hyperparameters
 grayscale=True
 num_channels = 64
 input_dims = 1
 if not grayscale:
     input_dims = 3
-
-
-block_wise_small_resnet=dict(
-        patch_size=16,
-        overlap=2,
-        model_blocks=None
-    ),
+block_wise_small_resnet=small_sparse_resnet
 
 
 BLOCK_WISE_BASE = deepcopy(DEFAULT_BASE)
@@ -129,8 +101,8 @@ BLOCK_WISE_BASE.update(dict(
         # batch_size=16,
         # batch_size_supervised=16,
         # val_batch_size=16,
-        model_class=WrappedSuperGreedySmallSparseVisionModel,
-        model_args=super_greedy_model_args,
+        model_class=BlockModel,
+        model_args=small_sparse_resnet,
         optimizer_class = torch.optim.SGD,
         optimizer_args=dict(lr=2e-4),
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,

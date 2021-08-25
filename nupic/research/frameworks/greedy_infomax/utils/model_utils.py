@@ -26,12 +26,14 @@
 
 import torch
 import torch.nn as nn
+from nupic.research.frameworks.greedy_infomax.models import FullModel
 from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import \
     PreActBlockNoBN, PreActBottleneckNoBN, SparsePreActBlockNoBN, \
     SparsePreActBottleneckNoBN, ResNetEncoder, SparseResNetEncoder
 from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import \
     BilinearInfo, SparseBilinearInfo
-from nupic.torch.modules import SparseWeights2d
+from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import \
+    GradientBlock, EmitEncoding, PatchifyInputs, SparseConv2d
 
 def full_sparse_model_blockwise_config(
         negative_samples=16,
@@ -40,9 +42,9 @@ def full_sparse_model_blockwise_config(
         block_dims=None,
         num_channels=None,
         grayscale=True,
+        sparse_weights_class=SparseConv2d,
         patch_size=16,
         overlap=2,
-        sparse_weights_class=SparseWeights2d,
         sparsity=None,
         percent_on=None,
 ):
@@ -74,6 +76,21 @@ def full_sparse_model_blockwise_config(
                       "encoder3": None, }
 
     modules = []
+    modules.append(
+        dict(
+            model_class=PatchifyInputs,
+            model_args=dict(
+                patch_size=patch_size,
+                overlap=overlap,
+            ),
+            init_batch_norm=None,
+            checkpoint_file=None,
+            load_checkpoint_args=None,
+            train=True,
+            save_checkpoint_file=None,
+        )
+    )
+
     conv1_class = nn.Conv2d
     conv1_args = dict(
         in_channels=input_dims,
@@ -83,13 +100,14 @@ def full_sparse_model_blockwise_config(
         padding=2
     )
     if sparsity["conv1"] > 0.3:
-        inner_conv_class = conv1_class
-        inner_conv_args = conv1_args
-        conv1_class = sparse_weights_class
-        conv1_args=dict(model_blocks=[],
-                        sparsity=sparsity["conv1"],
-                        allow_extremes=True)
-
+        conv1_class = SparseConv2d
+        conv1_args.update(
+            dict(
+                sparse_weights_class=sparse_weights_class,
+                sparsity=sparsity["conv1"],
+                allow_extremes=True
+            )
+        )
     modules.append(
         dict(
             model_class=conv1_class,
@@ -103,15 +121,14 @@ def full_sparse_model_blockwise_config(
     )
     for idx in range(len(block_dims)):
         # args
-        num_blocks=[block_dims[idx]],
-        filters=[num_channels[idx]],
+        num_blocks=block_dims[idx],
+        filters=num_channels[idx],
         previous_input_dim = num_channels[0] if idx == 0 else num_channels[idx - 1],
         first_stride = 1 if idx == 0 else 2
-        sparse_weights_class = sparse_weights_class,
-        sparsity = sparsity[f"encoder{idx + 1}"],
-        percent_on = percent_on[f"encoder{idx + 1}"],
-        if sparsity is None:
-            sparsity = {"block1": None,
+        encoder_sparsity = sparsity[f"encoder{idx + 1}"]
+        encoder_percent_on = percent_on[f"encoder{idx + 1}"]
+        if encoder_sparsity is None:
+            encoder_sparsity = {"block1": None,
                         "block2": None,
                         "block3": None,
                         "block4": None,
@@ -119,44 +136,43 @@ def full_sparse_model_blockwise_config(
                         "block6": None,
                         "bilinear_info": None
                         }
-        if percent_on is None:
-            percent_on = {"block1": None,
+        if encoder_percent_on is None:
+            encoder_percent_on = {"block1": None,
                           "block2": None,
                           "block3": None,
                           "block4": None,
                           "block5": None,
                           "block6": None,
                           }
-        for idx in range(len(num_blocks)):
-            strides = [first_stride] + [1] * (num_blocks - 1)
-            in_planes = previous_input_dim
-            planes=filters[idx]
-            for idx, stride in enumerate(strides):
-                modules.append(dict(
-                    model_class=block,
-                    model_args=dict(
-                        in_planes=in_planes,
-                        planes=planes,
-                        stride=stride,
-                        sparse_weights_class=sparse_weights_class,
-                        sparsity=sparsity[f"block{idx + 1}"],
-                        percent_on=percent_on[f"block{idx + 1}"]),
-                    init_batch_norm=None,
-                    checkpoint_file=None,
-                    load_checkpoint_args=None,
-                    train=True,
-                    save_checkpoint_file=None,
-                ))
-                in_planes = planes * block.expansion
-                first_stride = 2
+        strides = [first_stride] + [1] * (num_blocks[0] - 1)
+        in_planes = previous_input_dim
+        planes=filters[0]
+        for idx, stride in enumerate(strides):
+            modules.append(dict(
+                model_class=block,
+                model_args=dict(
+                    in_planes=in_planes,
+                    planes=planes,
+                    stride=stride,
+                    sparse_weights_class=sparse_weights_class,
+                    sparsity=encoder_sparsity[f"block{idx + 1}"],
+                    percent_on=encoder_percent_on[f"block{idx + 1}"]),
+                init_batch_norm=None,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=True,
+                save_checkpoint_file=None,
+            ))
+            in_planes = planes * block.expansion
+            first_stride = 2
         modules.append(
             dict(
                 model_class=SparseBilinearInfo,
                 model_args=dict(
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    negative_samples=16,
-                    k_predictions=5,
+                    in_channels=in_planes,
+                    out_channels=in_planes,
+                    negative_samples=negative_samples,
+                    k_predictions=k_predictions,
                     sparse_weights_class=sparse_weights_class,
                     sparsity=0.1,
                 ),
@@ -167,29 +183,31 @@ def full_sparse_model_blockwise_config(
                 save_checkpoint_file=None,
             )
         )
-    )
+        modules.append(
+            dict(
+                model_class=GradientBlock,
+                model_args=dict(),
+                init_batch_norm=None,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=True,
+                save_checkpoint_file=None,
+            )
+        )
+        modules.append(
+            dict(
+                model_class=EmitEncoding,
+                model_args=dict(),
+                init_batch_norm=None,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=True,
+                save_checkpoint_file=None,
+            )
+        )
+    return modules
 
 
 
-
-
-
-small_resnet = [
-    dict(
-        model_class=nn.Conv2d,
-        model_args=dict(in_channels=input_dims,
-                        out_channels=num_channels,
-                        kernel_size=5,
-                        stride=1,
-                        padding=2),
-        init_batch_norm=None,
-        checkpoint_file=None,
-        load_checkpoint_args=None,
-        train=True,
-        save_checkpoint_file=None,
-    ),
-    dict(
-
-    )
-
-]
+full_sparse_resnet = full_sparse_model_blockwise_config()
+small_sparse_resnet = full_sparse_resnet[:8]

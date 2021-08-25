@@ -25,7 +25,7 @@
 # ----------------------------------------------------------------------
 
 import torch.nn as nn
-
+import torch
 
 class ClassificationModel(nn.Module):
     def __init__(self, in_channels=256, num_classes=10, hidden_nodes=0):
@@ -65,7 +65,7 @@ class MultipleClassificationModel(nn.Module):
         )
 
     def forward(self, encodings):
-        return [
+        return torch.stack([
             classifier(encoding)
             for (classifier, encoding) in zip(self.classifiers, encodings)
-        ]
+        ])
