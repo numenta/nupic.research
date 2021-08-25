@@ -33,7 +33,7 @@ from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import 
 from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
     GradientBlock, EmitEncoding
 )
-from nupic.research.frameworks.greedy_infomax.mixins.create_block_model import CreateBlockModel
+from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import CreateBlockModel
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import full_sparse_resnet, small_sparse_resnet
 
 from nupic.research.frameworks.vernon.distributed import mixins, experiments

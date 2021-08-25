@@ -169,13 +169,14 @@ def train_block_model(
                            + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
                                                               t4 - t3, t5 - t4)
             post_batch_callback(model=model,
-                                error_loss=module_losses.detach(),
+                                error_loss=error_loss.detach(),
                                 complexity_loss=(complexity_loss.detach()
                                                  if complexity_loss is not None
                                                  else None),
                                 batch_idx=batch_idx,
                                 num_images=num_images,
-                                time_string=time_string)
+                                time_string=time_string,
+                                module_losses=module_losses.detach())
         del error_loss, complexity_loss, module_losses
         t0 = time.time()
 
@@ -281,6 +282,10 @@ def evaluate_block_model(
     result = {
         "total_tested": total,
     }
+    result.update({
+        "num_bilinear_info_modules" : model.count_bilinear_info_modules(),
+        "num_emit_encodings": model.count_emit_encodings(),
+    })
     result.update({
         f"total_correct_encoding_{i}": module_correct[i] for i in range(
             module_correct.shape[0]),
