@@ -8,7 +8,6 @@ BASE_CSV=~/nta/nupic.research/projects/transformers/results/base_select_finetuni
 BASE_MD=~/nta/nupic.research/projects/transformers/results/base_select_finetuning_results.md
 
 rm ${BASE_CSV}
-rm ${SMALL_CSV}
 
 ## Base bert
 
@@ -16,6 +15,7 @@ rm ${SMALL_CSV}
 python ../export_finetuning_results.py \
                 ~/nta/tmp/finetuning/finetuning_bert100k_glue_simple_no_ESC \
                 ~/nta/finetuning/bert_100k_hp_chase \
+                ~/nta/finetuning/bert_100k_hp_chase_mnli \
                 --model_name bert_100k_condensed \
                 --csv ${BASE_CSV} \
                 --pretrained_model Dense
@@ -24,6 +24,7 @@ python ../export_finetuning_results.py \
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/finetuning_bert_sparse_trifecta_100k_glue_get_info_nb \
                 ~/nta/finetuning/trifecta_80_hp_chase \
+                ~/nta/finetuning/trifecta_80_hp_chase_mnli \
                 --model_name trifecta_80_condensed \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_80
@@ -32,6 +33,7 @@ python ../export_finetuning_results.py \
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/finetuning_bert_sparse_85_trifecta_100k_glue_get_info \
                 ~/nta/finetuning/trifecta_85_hp_chase \
+                ~/nta/finetuning/trifecta_85_hp_chase_mnli \
                 --model_name trifecta_85_condensed \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_85
@@ -41,6 +43,7 @@ python ../export_finetuning_results.py \
                 ~/nta/finetuning/finetuning_bert_sparse_90_trifecta_100k_glue_get_info \
                 ~/nta/finetuning/trifecta_90_hp_chase \
                 ~/nta/finetuning/trifecta_90_hp_chase_mnli \
+                ~/nta/finetuning/trifecta_90_hp_chase_follow_up \
                 --model_name trifecta_90_condensed \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_90 \
