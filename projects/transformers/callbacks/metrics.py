@@ -66,10 +66,9 @@ class TrackEvalMetrics(TrainerCallback):
                 self.eval_metrics[key].append(metrics[key])
 
         self.call_counter += 1
-        do_remaining_updates = self.maybe_update()
 
         # Update steps, sparsity, learning rate
-        if do_remaining_updates:
+        if self.maybe_update():
             self.update_auxillary_metrics(args, **kwargs)
 
     def maybe_update(self):
@@ -92,7 +91,7 @@ class TrackEvalMetrics(TrainerCallback):
         """
         Stop from accumulating results accross multiple runs
         """
-        self.__init__()
+        self.__init__(self.n_eval_sets, self.sparsity_tolerance)
 
     def update_auxillary_metrics(self, args, **kwargs):
         """

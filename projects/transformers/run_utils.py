@@ -1409,7 +1409,9 @@ def check_if_current_hp_best(old_file, model_args, best_run):
     indicating if you should overwrite, or not.
     """
 
-    # If there is no current fil, write a new file
+    if not best_run:
+        return False
+    # If there is no current file, write a new file
     if not os.path.exists(old_file):
         return True
 

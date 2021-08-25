@@ -475,6 +475,7 @@ def run_finetuning_single_task_with_hp_search(
     # called if ANY of the trials error out, so wrap with try/except.
 
     success = False
+    best_run = None
     try:
         best_run = trainer.hyperparameter_search(**hp_search_kwargs)
         logging.info(f"Best run: {best_run}")
@@ -482,16 +483,8 @@ def run_finetuning_single_task_with_hp_search(
     except TuneError:
         logging.info(f"One or more trials errored out")
     finally:
-        logging.info("An unknown error occured during hp search.")
-
-    # Delete all saved models and checkpoints to save space. All we need
-    # are the params and scores. Currently this is a hack that is specific
-    # to ray. May need to modify so that it serves the same function for
-    # sigopt, once I integrate it.
-    rm_prefixed_subdirs(training_args.output_dir, "run-")
-
-    if not success:
-        return {}
+        # Make sure cleanup code gets called regardless of if hp search completes
+        rm_prefixed_subdirs(training_args.output_dir, "run-")
 
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
     hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
@@ -558,6 +551,7 @@ def run_finetuning_single_task(
               training_args.rm_checkpoints,
               last_checkpoint)
 
+    eval_results = {}
     if training_args.do_eval:
         eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,
