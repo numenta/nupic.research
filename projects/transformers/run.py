@@ -95,6 +95,11 @@ from run_utils import (
     update_run_number,
 )
 
+from utils_qa import (
+    postprocess_qa_predictions,
+    postprocess_qa_predictions_with_beam_search,
+    QuestionAnsweringTrainer
+)
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -654,7 +659,9 @@ def run_finetuning_squad(
     # Update where model is saved for each run
     training_args = update_run_number(training_args, run_idx)
 
-    # training_args.trainer_class = QuestionAnsweringTrainer # import this
+    # TODO
+    # pickup here
+    training_args.trainer_class = QuestionAnsweringTrainer # import this
 
     # Train
     trainer = init_trainer(
