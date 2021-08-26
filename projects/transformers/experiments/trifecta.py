@@ -33,7 +33,7 @@ from trainer_mixins import (
 from .finetuning import (
     finetuning_bert700k_glue,
     finetuning_bert_100k_glue_get_info,
-    finetuning_small_bert_100k_glue,
+    finetuning_small_bert_large_dataset_100k_glue,
 )
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
@@ -356,7 +356,7 @@ small_bert_trifecta_4x_lr_range_test.update(
 # Small BERT finetuning
 # ---------
 
-finetuning_small_bert_trifecta_100k_glue = deepcopy(finetuning_small_bert_100k_glue)
+finetuning_small_bert_trifecta_100k_glue = deepcopy(finetuning_small_bert_large_dataset_100k_glue)
 finetuning_small_bert_trifecta_100k_glue.update(
     # Model arguments
     model_type="fully_static_sparse_bert",

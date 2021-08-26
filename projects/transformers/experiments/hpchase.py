@@ -115,8 +115,8 @@ trifecta_90_hp_chase_mnli.update(
 trifecta_90_hp_chase_follow_up = deepcopy(trifecta_90_hp_chase)
 
 # 2X
-# trifecta_2x_hp_chase = deepcopy(finetuning_bert_sparse_trifecta_2x_get_info)
-# trifecta_2x_hp_chase = update_task_hyperparams(trifecta_2x_hp_chase, "trifecta_2x")
+trifecta_2x_hp_guess = deepcopy(finetuning_bert_sparse_trifecta_2x_get_info)
+trifecta_2x_hp_guess = update_task_hyperparams(trifecta_2x_hp_guess, "trifecta_2x_guess")
 
 # ---------
 # BERT small variations
@@ -220,6 +220,7 @@ CONFIGS = dict(
     trifecta_90_hp_chase=trifecta_90_hp_chase,
     trifecta_90_hp_chase_mnli=trifecta_90_hp_chase_mnli,
     trifecta_90_hp_chase_follow_up=trifecta_90_hp_chase_follow_up,
+    trifecta_2x_hp_guess=trifecta_2x_hp_guess,
 
     # BERT small
     small_bert_big_dataset_hp_chase=small_bert_big_dataset_hp_chase,
