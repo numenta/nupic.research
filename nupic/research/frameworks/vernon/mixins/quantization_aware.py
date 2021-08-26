@@ -22,8 +22,6 @@
 import torch
 import torch.nn.intrinsic as nni
 from torch.quantization import (
-    get_default_qat_module_mappings,
-    get_default_qconfig_propagation_list,
     FakeQuantize,
     MovingAverageMinMaxObserver,
     QConfig,
@@ -32,6 +30,8 @@ from torch.quantization import (
     disable_observer,
     enable_fake_quant,
     enable_observer,
+    get_default_qat_module_mappings,
+    get_default_qconfig_propagation_list,
 )
 from torch.quantization.quantize import _propagate_qconfig_helper, add_observer_
 
