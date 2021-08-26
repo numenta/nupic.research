@@ -382,9 +382,6 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
 def init_dataset_for_squad(model_args, data_args, training_args,
                                 last_checkpoint=None):
 
-    # TODO
-    # edit multi_eval_sets so you can gather not just multiple eval sets
-    # for a single task, but eval sets from multiple tasks
     datasets = init_datasets_squad(data_args, training_args)
 
     # Place holder for now
@@ -646,22 +643,40 @@ def run_finetuning_squad(
 ):
     """On a single task train, evaluate, and save results"""
 
-    # TODO
-    # accept run# as an argument for finetuning with multiple runs on a single task
-    # update the save directory to include run#
-    tokenizer, data_collator, train_dataset, eval_dataset, eval_examples, predict_dataset, predict_examples, model, = \
+    (tokenizer,
+    data_collator,
+    train_dataset,
+    eval_dataset,
+    eval_examples,
+    predict_dataset,
+    predict_examples,
+    model) = \
         init_dataset_for_squad(model_args, data_args, training_args, last_checkpoint)
 
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
-    # training_args = check_best_metric(training_args, data_args.task_name)
+
+    # Instantiate trainer
+    #   Post processing
+    #   Compute metrics
+    # Maybe Train
+    # Maybe Eval
+    # Maybe Predict
 
     # Update where model is saved for each run
     training_args = update_run_number(training_args, run_idx)
 
-    # TODO
-    # pickup here
-    training_args.trainer_class = QuestionAnsweringTrainer # import this
+    training_args.trainer_class = QuestionAnsweringTrainer
+
+    trainer_kwargs = dict(
+        model=model,
+        args=training_args,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        eval_examples=eval_examples,
+        data_collator=data_collator,
+    )
 
     # Train
     trainer = init_trainer(
@@ -672,7 +687,8 @@ def run_finetuning_squad(
         eval_dataset=eval_dataset if training_args.do_eval else None,
         model=model,
         trainer_callbacks=model_args.trainer_callbacks or None,
-        finetuning=True, task_name=data_args.task_name, is_regression=is_regression
+        finetuning=True,
+        task_name=data_args.task_name,
     )
 
     if training_args.do_train:

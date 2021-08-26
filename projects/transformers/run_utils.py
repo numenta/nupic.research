@@ -33,7 +33,7 @@ from hashlib import blake2b
 
 import numpy as np
 import pandas as pd
-from datasets import concatenate_datasets, load_dataset, load_from_disk
+from datasets import concatenate_datasets, load_dataset, load_from_disk, load_metric
 from datasets.dataset_dict import DatasetDict
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import f1_score, matthews_corrcoef
@@ -56,6 +56,11 @@ from finetuning_constants import (
     RAW_REPORTING_METRICS_PER_TASK,
     REPORTING_METRICS_PER_TASK,
 )
+from utils_qa import (
+    postprocess_qa_predictions,
+    postprocess_qa_predictions_with_beam_search
+)
+
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
@@ -1306,13 +1311,9 @@ def init_squad_trainer(tokenizer,
     training_args,
     train_dataset,
     eval_dataset,
-    eval_examples,
     model=None,
     trainer_callbacks=None,
-    finetuning=False,
-    task_name=None,
-    is_regression=False,
-    trainer_class=Trainer,
+    trainer_class=QuestionAnsweringTrainer,
     model_init=None):
 
     """Initialize Trainer, main class that controls the experiment"""
@@ -1363,6 +1364,7 @@ def init_squad_trainer(tokenizer,
         model_init=model_init,
     )
 
+    metric = load_metric("squad_v2" if data_args.version_2_with_negative else "squad")
     def compute_metrics(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
