@@ -4,8 +4,8 @@
 # after results for the last model in a group (like base or small) are added
 
 # Bert base and bert base trifecta
-BASE_CSV=~/nta/nupic.research/projects/transformers/results/base_select_finetuning_results.csv
-BASE_MD=~/nta/nupic.research/projects/transformers/results/base_select_finetuning_results.md
+BASE_CSV=~/nta/nupic.research/projects/transformers/results/base_condensed_finetuning_results.csv
+BASE_MD=~/nta/nupic.research/projects/transformers/results/base_condensed_finetuning_results.md
 
 rm ${BASE_CSV}
 
@@ -13,10 +13,10 @@ rm ${BASE_CSV}
 
 # Bert 100k
 python ../export_finetuning_results.py \
-                ~/nta/tmp/finetuning/finetuning_bert100k_glue_simple_no_ESC \
+                ~/nta/finetuning/finetuning_bert_100k_glue_get_info \
                 ~/nta/finetuning/bert_100k_hp_chase \
                 ~/nta/finetuning/bert_100k_hp_chase_mnli \
-                --model_name bert_100k_condensed \
+                --model_name bert_100k \
                 --csv ${BASE_CSV} \
                 --pretrained_model Dense
 
