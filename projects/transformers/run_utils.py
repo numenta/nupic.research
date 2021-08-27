@@ -58,7 +58,8 @@ from finetuning_constants import (
 )
 from utils_qa import (
     postprocess_qa_predictions,
-    postprocess_qa_predictions_with_beam_search
+    postprocess_qa_predictions_with_beam_search,
+    QuestionAnsweringTrainer,
 )
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
@@ -163,6 +164,25 @@ def evaluate_task(trainer, output_dir, task, eval_dataset):
                 writer.write(f"{key} = {value}\n")
 
     return eval_results
+
+
+def test_squad(trainer, output_dir, predict_dataset, predict_examples, data_args):
+    """Predict test set for squad"""
+
+    logging.info("*** Predict ***")
+    results = trainer.predict(predict_dataset, predict_examples)
+    metrics = results.metrics
+
+    max_predict_samples = (
+            data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
+        )
+    metrics["predict_samples"] = min(max_predict_samples, len(predict_dataset))
+
+    trainer.log_metrics("predict", metrics)
+    trainer.save_metrics("predict", metrics)
+
+    output_test_file = os.path.join(output_dir, "squad.tsv")
+    # Figure out how to write this file out if necessary
 
 
 def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_list):
@@ -687,7 +707,13 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
             # During Feature creation dataset samples might increase, we will select required samples again
             predict_dataset = predict_dataset.select(range(data_args.max_predict_samples))
 
-    return train_dataset, eval_dataset, eval_examples, predict_dataset, predict_examples
+    return (train_dataset,
+            eval_dataset,
+            eval_examples,
+            predict_dataset,
+            predict_examples,
+            answer_column_name
+    )
 
 
 def init_datasets_mlm(data_args):
@@ -984,6 +1010,13 @@ def format_eval_results(eval_results, run, task_name):
 # Code to make sure training / finetuning / hp optimization runs safely
 #####
 
+def check_callback_types(trainer_callbacks):
+    """Always check to make sure callbacks are the right type"""
+    if trainer_callbacks is not None:
+        for cb in trainer_callbacks:
+            assert isinstance(cb, TrainerCallback), \
+                f"Trainer callback {cb} must be an instance of TrainerCallback"
+
 
 def check_for_callback(model_args, class_of_callback):
 
@@ -1211,8 +1244,7 @@ def evaluate_task_handler(trainer,
                           data_args,
                           model_args,
                           training_args,
-                          eval_dataset,
-                          tokenized_datasets):
+                          eval_dataset):
     """
     Handle the last evaluation. If you've been evaluating throughout the
     training process, evaluate again if steps % eval steps is jagged.
@@ -1268,10 +1300,7 @@ def init_trainer(
     model_init=None,
 ):
     """Initialize Trainer, main class that controls the experiment"""
-    if trainer_callbacks is not None:
-        for cb in trainer_callbacks:
-            assert isinstance(cb, TrainerCallback), \
-                "Trainer callbacks must be an instance of TrainerCallback"
+    check_callback_types(trainer_callbacks)
 
     trainer_kwargs = dict(
         model=model,
@@ -1306,63 +1335,10 @@ def init_trainer(
     return trainer
 
 
-def init_squad_trainer(tokenizer,
-    data_collator,
-    training_args,
-    train_dataset,
-    eval_dataset,
-    model=None,
-    trainer_callbacks=None,
-    trainer_class=QuestionAnsweringTrainer,
-    model_init=None):
+def init_squad_trainer(trainer_kwargs, data_args, trainer_class, trainer_callbacks):
 
     """Initialize Trainer, main class that controls the experiment"""
-    if trainer_callbacks is not None:
-        for cb in trainer_callbacks:
-            assert isinstance(cb, TrainerCallback), \
-                "Trainer callbacks must be an instance of TrainerCallback"
-
-    # Post-processing:
-    def post_processing_function(examples, features, predictions, stage="eval"):
-        # Post-processing: we match the start logits and end logits to answers in the original context.
-        predictions, scores_diff_json = postprocess_qa_predictions_with_beam_search(
-            examples=examples,
-            features=features,
-            predictions=predictions,
-            version_2_with_negative=training_args.version_2_with_negative,
-            n_best_size=training_args.n_best_size,
-            max_answer_length=training_args.max_answer_length,
-            start_n_top=model.config.start_n_top,
-            end_n_top=model.config.end_n_top,
-            output_dir=training_args.output_dir,
-            prefix=stage,
-        )
-        # Format the result to the format the metric expects.
-        if training_args.version_2_with_negative:
-            formatted_predictions = [
-                {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}
-                for k, v in predictions.items()
-            ]
-        else:
-            formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
-        
-        # answer_column_name is defined in init_dataset, need to refactor to avoid excessive message passing
-        references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
-        return EvalPrediction(predictions=formatted_predictions, label_ids=references)
-
-    # Define kwargs outside later
-    trainer_kwargs = dict(
-        model=model,
-        args=training_args,
-        tokenizer=tokenizer,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        eval_examples=eval_examples,
-        post_process_function=post_processing_function, # could standardize
-        data_collator=data_collator,
-        callbacks=trainer_callbacks,
-        model_init=model_init,
-    )
+    check_callback_types(trainer_callbacks)
 
     metric = load_metric("squad_v2" if data_args.version_2_with_negative else "squad")
     def compute_metrics(p: EvalPrediction):

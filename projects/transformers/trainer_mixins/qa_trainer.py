@@ -21,6 +21,7 @@
 """Adapted from https://github.com/huggingface/transformers/blob/a13c8145bc2810e3f0a52da22ae6a6366587a41b/examples/pytorch/question-answering/trainer_qa.py#L28"""  # noqa: E501
 
 from transformers.trainer_utils import PredictionOutput
+from transformers import Trainer
 
 class QuestionAnsweringMixin():
     def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):

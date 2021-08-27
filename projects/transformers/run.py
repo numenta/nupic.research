@@ -49,6 +49,7 @@ from transformers import (
     AutoModelForSequenceClassification,
     AutoModelForTableQuestionAnswering,
     DataCollatorWithPadding,
+    EvalPrediction,
     HfArgumentParser,
     default_data_collator,
     set_seed,
@@ -84,21 +85,24 @@ from run_utils import (
     init_model,
     init_tokenizer,
     init_trainer,
+    init_squad_trainer,
     init_datasets_squad,
     preprocess_datasets_squad,
     preprocess_datasets_mlm,
     preprocess_datasets_task,
     rm_prefixed_subdirs,
     run_hyperparameter_search,
+    test_squad,
     test_tasks,
     train,
     update_run_number,
 )
 
+from trainer_mixins import QuestionAnsweringTrainer
+
 from utils_qa import (
     postprocess_qa_predictions,
     postprocess_qa_predictions_with_beam_search,
-    QuestionAnsweringTrainer
 )
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
@@ -393,7 +397,12 @@ def init_dataset_for_squad(model_args, data_args, training_args,
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
     logging.info(f"Tokenizing datasets for finetuning ...")
-    train_dataset, eval_dataset, eval_examples, predict_dataset, predict_examples = \
+    (train_dataset,
+     eval_dataset,
+     eval_examples,
+     predict_dataset,
+     predict_examples,
+     answer_column_name) = \
             preprocess_datasets_squad(datasets, tokenizer, data_args)
 
 
@@ -415,6 +424,7 @@ def init_dataset_for_squad(model_args, data_args, training_args,
         predict_dataset,
         predict_examples,
         model,
+        answer_column_name
     )
 
 
@@ -602,7 +612,7 @@ def run_finetuning_single_task(
     if training_args.do_eval:
         eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,
-            eval_dataset, tokenized_datasets)
+            eval_dataset)
 
     # Test/Predict
     if training_args.do_predict:
@@ -643,14 +653,44 @@ def run_finetuning_squad(
     eval_examples,
     predict_dataset,
     predict_examples,
-    model) = \
+    model,
+    answer_column_name) = \
         init_dataset_for_squad(model_args, data_args, training_args, last_checkpoint)
 
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
 
+    # Post-processing:
+    def post_processing_function(examples, features, predictions, stage="eval"):
+        # Post-processing: we match the start logits and end logits to answers in the original context.
+        predictions, scores_diff_json = postprocess_qa_predictions_with_beam_search(
+            examples=examples,
+            features=features,
+            predictions=predictions,
+            version_2_with_negative=training_args.version_2_with_negative,
+            n_best_size=training_args.n_best_size,
+            max_answer_length=training_args.max_answer_length,
+            start_n_top=model.config.start_n_top,
+            end_n_top=model.config.end_n_top,
+            output_dir=training_args.output_dir,
+            prefix=stage,
+        )
+        # Format the result to the format the metric expects.
+        if training_args.version_2_with_negative:
+            formatted_predictions = [
+                {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}
+                for k, v in predictions.items()
+            ]
+        else:
+            formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
+        
+        # answer_column_name is defined in init_dataset, need to refactor to avoid excessive message passing
+        references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
+        return EvalPrediction(predictions=formatted_predictions, label_ids=references)
+
     # Instantiate trainer
     #   Post processing
+    #       Needs model, training_args, examples, features, predictions, answer_column_name
     #   Compute metrics
     # Maybe Train
     # Maybe Eval
@@ -669,20 +709,15 @@ def run_finetuning_squad(
         eval_dataset=eval_dataset,
         eval_examples=eval_examples,
         data_collator=data_collator,
+        post_process_function=post_processing_function,
+        callbacks=model_args.trainer_callbacks or None,
     )
 
     # Train
-    trainer = init_trainer(
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        training_args=training_args,
-        train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
-        model=model,
-        trainer_callbacks=model_args.trainer_callbacks or None,
-        finetuning=True,
-        task_name=data_args.task_name,
-    )
+    trainer = init_squad_trainer(trainer_kwargs,
+                                 data_args,
+                                 training_args.trainer_class,
+                                 model_args.trainer_callbacks)
 
     if training_args.do_train:
         # Note, rm_checkpoints=True means one model will be saved
@@ -694,25 +729,20 @@ def run_finetuning_squad(
               last_checkpoint)
 
     if training_args.do_eval:
-        eval_results = evaluate_tasks_handler(
+        eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,
-            eval_dataset, tokenized_datasets)
+            eval_dataset)
 
     # Test/Predict
+    # Pick up here
     if training_args.do_predict:
         logging.info("*** Test ***")
 
-        # Handle special case of extra test dataset for MNLI
-        tasks = [data_args.task_name]
-        test_datasets = [test_dataset]
-        if data_args.task_name == "mnli":
-            tasks.append("mnli-mm")
-            test_datasets.append(tokenized_datasets["test_mismatched"])
-
-        test_tasks(
-            trainer, training_args.output_dir, tasks, test_datasets,
-            is_regression, label_list
-        )
+        test_squad(trainer,
+                   training_args.output_dir,
+                   predict_dataset,
+                   predict_examples,
+                   data_args)
 
     # There is an existing issue on training multiple models in sequence in this code
     # There is a memory leakage on the model, a small amount of GPU memory remains after
