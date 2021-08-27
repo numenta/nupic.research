@@ -474,12 +474,10 @@ def run_finetuning_single_task_with_hp_search(
     # Run hp search and save results. Code to remove checkpoints won't get
     # called if ANY of the trials error out, so wrap with try/except.
 
-    success = False
     best_run = None
     try:
         best_run = trainer.hyperparameter_search(**hp_search_kwargs)
         logging.info(f"Best run: {best_run}")
-        success = True
     except TuneError:
         logging.info(f"One or more trials errored out")
     finally:
@@ -488,6 +486,7 @@ def run_finetuning_single_task_with_hp_search(
 
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
     hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
+    # False if best_run stays as None
     write_new = check_if_current_hp_best(hp_res_file, model_args, best_run)
 
     if trainer.is_world_process_zero() and write_new:

@@ -343,7 +343,8 @@ finetuning_bert1mi_small_tasks.update(
 # Bertitos
 # ---------
 
-finetuning_small_bert_large_dataset_100k_glue = deepcopy(finetuning_bert_100k_glue_get_info)
+finetuning_small_bert_large_dataset_100k_glue = deepcopy(
+    finetuning_bert_100k_glue_get_info)
 finetuning_small_bert_large_dataset_100k_glue.update(
     # Model arguments
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k",  # noqa: E501
@@ -367,7 +368,7 @@ CONFIGS = dict(
     debug_finetuning_predict=debug_finetuning_predict,
     finetuning_bert100k_glue=finetuning_bert100k_glue,
     finetuning_bert_100k_glue_get_info=finetuning_bert_100k_glue_get_info,
-    finetuning_small_bert_large_dataset_100k_glue=finetuning_small_bert_large_dataset_100k_glue,
+    finetuning_small_bert_large_dataset_100k_glue=finetuning_small_bert_large_dataset_100k_glue,  # noqa: E501
     finetuning_bert100k_small_tasks=finetuning_bert100k_small_tasks,
     finetuning_tiny_bert50k_glue=finetuning_tiny_bert50k_glue,
     finetuning_bert700k_glue=finetuning_bert700k_glue,

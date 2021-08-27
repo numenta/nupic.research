@@ -356,7 +356,8 @@ small_bert_trifecta_4x_lr_range_test.update(
 # Small BERT finetuning
 # ---------
 
-finetuning_small_bert_trifecta_100k_glue = deepcopy(finetuning_small_bert_large_dataset_100k_glue)
+finetuning_small_bert_trifecta_100k_glue = deepcopy(
+    finetuning_small_bert_large_dataset_100k_glue)
 finetuning_small_bert_trifecta_100k_glue.update(
     # Model arguments
     model_type="fully_static_sparse_bert",

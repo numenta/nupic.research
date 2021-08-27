@@ -29,8 +29,8 @@ from .finetuning import finetuning_bert_100k_glue_get_info
 from .trifecta import (
     finetuning_bert_sparse_85_trifecta_100k_glue_get_info,
     finetuning_bert_sparse_90_trifecta_100k_glue_get_info,
-    finetuning_bert_sparse_trifecta_100k_glue_get_info,
     finetuning_bert_sparse_trifecta_2x_get_info,
+    finetuning_bert_sparse_trifecta_100k_glue_get_info,
     finetuning_small_bert_sparse_2x_trifecta_100k_glue,
     finetuning_small_bert_sparse_4x_trifecta_100k_glue,
     finetuning_small_bert_sparse_85_trifecta_100k_glue,
@@ -118,7 +118,8 @@ trifecta_90_hp_chase_follow_up = deepcopy(trifecta_90_hp_chase)
 # Original batch size per device was 32, reducing here to 8 since it needs to run on
 # a p3.8x, otherwise it will run out of memory.
 trifecta_2x_hp_guess = deepcopy(finetuning_bert_sparse_trifecta_2x_get_info)
-trifecta_2x_hp_guess = update_task_hyperparams(trifecta_2x_hp_guess, "trifecta_2x_guess")
+trifecta_2x_hp_guess = update_task_hyperparams(
+    trifecta_2x_hp_guess, "trifecta_2x_guess")
 trifecta_2x_hp_guess.update(
     per_device_train_batch_size=32 // 4,
     per_device_eval_batch_size=32 // 4,

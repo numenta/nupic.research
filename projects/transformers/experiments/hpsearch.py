@@ -514,7 +514,7 @@ hp_search_finetuning_trifecta_2x_qqp = deepcopy(
 hp_search_finetuning_trifecta_2x_qqp.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k",  # noqa
     task_names=["qqp"],
-    task_hyperparams = dict(
+    task_hyperparams=dict(
         qqp=dict(
             hp_space=lambda trial: dict(
                 learning_rate=tune.loguniform(1e-6, 1e-3),
