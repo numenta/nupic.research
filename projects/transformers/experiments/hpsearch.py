@@ -508,10 +508,22 @@ hp_search_finetuning_trifecta_90_100k_big_tasks.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa
 )
 
-hp_search_finetuning_trifecta_2x_big_tasks = deepcopy(
+# The 2x model is going to be too expensive to do hp search all big tasks
+hp_search_finetuning_trifecta_2x_qqp = deepcopy(
     hp_search_finetuning_trifecta_80_100k_big_tasks)
-hp_search_finetuning_trifecta_2x_big_tasks.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k"  # noqa
+hp_search_finetuning_trifecta_2x_qqp.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k",  # noqa
+    task_names=["qqp"],
+    task_hyperparams=dict(
+        qqp=dict(
+            hp_space=lambda trial: dict(
+                learning_rate=tune.loguniform(1e-6, 1e-3),
+                max_steps=80_000,
+                eval_steps=4_000,
+            ),
+            hp_num_trials=10,
+        )
+    )
 )
 
 
@@ -558,7 +570,7 @@ CONFIGS = dict(
     hp_search_finetuning_trifecta_80_100k_big_tasks=hp_search_finetuning_trifecta_80_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_85_100k_big_tasks=hp_search_finetuning_trifecta_85_100k_big_tasks,  # noqa
     hp_search_finetuning_trifecta_90_100k_big_tasks=hp_search_finetuning_trifecta_90_100k_big_tasks,  # noqa
-    hp_search_finetuning_trifecta_2x_big_tasks=hp_search_finetuning_trifecta_2x_big_tasks,  # noqa
+    hp_search_finetuning_trifecta_2x_qqp=hp_search_finetuning_trifecta_2x_qqp,  # noqa
 )
 
 # run.py knows to do hyperparameter search instead of finetuning based on

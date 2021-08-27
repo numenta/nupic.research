@@ -114,7 +114,7 @@ class TaskResultsAnalysis:
 
         if not ax:
             fig, ax = plt.subplots()
-        
+
         if task not in self.task_results_dict:
             print(f"skipping {task} in run {self.run_name}")
             return fig, ax
@@ -310,10 +310,10 @@ def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
             xwidth = 5 * 4
             yheight = n_rows * 10
             fig, ax = plt.subplots(n_rows,
-                                n_cols,
-                                figsize=(xwidth, yheight),
-                                sharex=True,
-                                sharey=True)
+                                   n_cols,
+                                   figsize=(xwidth, yheight),
+                                   sharex=True,
+                                   sharey=True)
             c = 0
             row = 0
             col = 0
@@ -335,10 +335,10 @@ def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
 
         else:
             fig, ax = plt.subplots(1,
-                                n_models,
-                                figsize=(xwidth, 10),
-                                sharex=True,
-                                sharey=True)
+                                   n_models,
+                                   figsize=(xwidth, 10),
+                                   sharex=True,
+                                   sharey=True)
 
             c = 0
             for model in dict_of_task_analyses.keys():
@@ -361,7 +361,10 @@ def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
             plt.savefig(save_name)
 
 
-def merge_data_to_results(results_file, results={}):
+def merge_data_to_results(results_file, results=None):
+
+    if not results:
+        results = {}
 
     print_message_1 = "Length of results for {0} prior to update: " \
                       "{1} in file {2}"
@@ -388,17 +391,14 @@ def merge_data_to_results(results_file, results={}):
                 task,
                 len(results[task].all_results),
                 os.path.split(results_file)[-2]))
-            # print(f"Length of results for {task} prior to update: {len(results[task].all_results)}")
             for run in data[task].all_results:
                 results[task].all_results.append(run)
-            # print(f"Length of results for {task} prior after update: {len(results[task].all_results)}")
             print(print_message_2.format(
                 task,
                 len(results[task].all_results),
                 os.path.split(results_file)[-2]))
         else:
-            print("\n\n WARNING, DID NOT EXPECT TO BE HERE")
-            results.update(data)
+            results[task] = data[task]
 
     return results
 
@@ -415,7 +415,7 @@ def adapt_old_mnli(results):
             if "mm_eval_accuracy" in task_results.all_results[run]:
                 task_results.all_results[run]["eval_mm_accuracy"] = \
                     task_results.all_results[run]["mm_eval_accuracy"]
-    
+
     results["mnli"].best_metric_key = "eval_mm_accuracy"
 
     return results
@@ -429,7 +429,7 @@ def load_results(results_files):
         results = merge_data_to_results(results_file, results)
 
     results = adapt_old_mnli(results)
-    
+
     return results
 
 
