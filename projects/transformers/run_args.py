@@ -139,6 +139,15 @@ class ModelArguments:
             "help": "Allow user to define custom training arguments per task."
         },
     )
+    task_hyperparams_proxy: str = field(
+        default="No proxy",
+        metadata={
+            "help": "If hyperparameters for this task were borrowed from "
+                    "hyperparameters that were found for another task, that "
+                    "task_hyperparams_proxy is the name of the other task "
+                    "which acts as a proxy for this one."
+        },
+    )
     trainer_callbacks: List = field(
         default_factory=list,
         metadata={
