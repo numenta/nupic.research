@@ -80,6 +80,9 @@ def train_dendrite_model(
     :param progress_bar: Unused
     """
     model.train()
+    # Use asynchronous GPU copies when the memory is pinned
+    # See https://pytorch.org/docs/master/notes/cuda.html
+    async_gpu = loader.pin_memory
     context = None
     if context_vector is not None:
         # Tile context vector
@@ -96,7 +99,9 @@ def train_dendrite_model(
                 data, context = data
             else:
                 data, _ = data
+        data = data.to(device, non_blocking=async_gpu)
         data = data.flatten(start_dim=1)
+        target = target.to(device, non_blocking=async_gpu)
 
         if train_context_fn is not None:
             context = train_context_fn(data)
@@ -106,12 +111,15 @@ def train_dendrite_model(
         if share_labels:
             target = target % num_labels
 
-        data = data.to(device)
-        target = target.to(device)
         if context is not None:
-            context = context.to(device)
+            context = context.to(device, non_blocking=async_gpu)
 
-        optimizer.zero_grad()
+        # FIXME: Pytorch 1.7: Replace with optimizer.zero_grad(set_to_none=True)
+        # optimizer.zero_grad(set_to_none=True)
+        for group in optimizer.param_groups:
+            for p in group["params"]:
+                p.grad = None
+
         forward_args = [data] if context is None else [data, context]
         output = model(*forward_args)
         if active_classes is not None:

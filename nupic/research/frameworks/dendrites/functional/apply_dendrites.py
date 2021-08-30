@@ -26,6 +26,7 @@ a set of dendritic segments.
 """
 
 from collections import namedtuple
+from typing import Optional
 
 import torch
 
@@ -50,6 +51,7 @@ A named tuple for outputs modified by `apply_dendrites`_.
 """
 
 
+@torch.jit.script
 def dendritic_bias_1d(y, dendrite_activations):
     """
     Returns the sum of the feedforward output and the max of the dendrite
@@ -65,7 +67,24 @@ def dendritic_bias_1d(y, dendrite_activations):
     return dendrite_output(y + winning_activations, indices)
 
 
-def dendritic_gate_1d(y, dendrite_activations, indices=None):
+@torch.jit.script
+def gather_activations(dendrite_activations, indices):
+    """
+    Gathers dendritic activations from the given indices.
+
+    :param indices: tensor of indices of winning segments;
+                    shape of batch_size x num_units
+    :param indices: tensor of dendritic activations;
+                    shape of batch_size x num_units x num_segments
+    """
+    unsqueezed = indices.unsqueeze(dim=2)
+    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
+    dendrite_activations = dendrite_activations.squeeze(dim=2)
+    return dendrite_activations
+
+
+@torch.jit.script
+def dendritic_gate_1d(y, dendrite_activations, indices: Optional[torch.Tensor] = None):
     """
     Returns the product of the feedforward output and sigmoid of the the max
     of the dendrite activations along each segment.
@@ -87,6 +106,7 @@ def dendritic_gate_1d(y, dendrite_activations, indices=None):
     return dendrite_output(y * torch.sigmoid(winning_activations), indices)
 
 
+@torch.jit.script
 def dendritic_absolute_max_gate_1d(y, dendrite_activations):
     """
     Returns the product of the feedforward output and the sigmoid of the
@@ -101,7 +121,8 @@ def dendritic_absolute_max_gate_1d(y, dendrite_activations):
     return dendritic_gate_1d(y, dendrite_activations, indices=indices)
 
 
-def dendritic_gate_2d(y, dendrite_activations, indices=None):
+@torch.jit.script
+def dendritic_gate_2d(y, dendrite_activations, indices: Optional[torch.Tensor] = None):
     """
     Returns the output of the max gating convolutional dendritic layer by
     multiplying all values in each output channel by the selected dendrite
@@ -136,6 +157,7 @@ def dendritic_gate_2d(y, dendrite_activations, indices=None):
     return dendrite_output(y_gated, indices)
 
 
+@torch.jit.script
 def dendritic_absolute_max_gate_2d(y, dendrite_activations):
     """
     Returns the output of the absolute max gating convolutional dendritic layer by
@@ -155,18 +177,3 @@ def dendritic_absolute_max_gate_2d(y, dendrite_activations):
     """
     indices = dendrite_activations.abs().max(dim=2).indices
     return dendritic_gate_2d(y, dendrite_activations, indices=indices)
-
-
-def gather_activations(dendrite_activations, indices):
-    """
-    Gathers dendritic activations from the given indices.
-
-    :param indices: tensor of indices of winning segments;
-                    shape of batch_size x num_units
-    :param indices: tensor of dendritic activations;
-                    shape of batch_size x num_units x num_segments
-    """
-    unsqueezed = indices.unsqueeze(dim=2)
-    dendrite_activations = torch.gather(dendrite_activations, dim=2, index=unsqueezed)
-    dendrite_activations = dendrite_activations.squeeze(dim=2)
-    return dendrite_activations

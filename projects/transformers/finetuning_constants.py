@@ -38,7 +38,7 @@ TASK_NAMES = [
 GLUE_NAMES_PER_TASK = {
     "cola": "CoLA",
     "sst2": "SST-2",
-    "mrcp": "MRPC",
+    "mrpc": "MRPC",
     "stsb": "STS-B",
     "qqp": "QQP",
     "mnli": "MNLI-M",
@@ -49,9 +49,22 @@ GLUE_NAMES_PER_TASK = {
     "": "AX"  # diagnostic set, not yet implemented
 }
 
+# Metrics in each task prior to HuggingFace prepending "eval_"
+RAW_REPORTING_METRICS_PER_TASK = {
+    "cola": ["matthews_correlation"],
+    "mnli": ["accuracy"],
+    "mrpc": ["f1", "accuracy"],
+    "qnli": ["accuracy"],
+    "qqp": ["accuracy", "f1"],
+    "rte": ["accuracy"],
+    "sst2": ["accuracy"],
+    "stsb": ["pearson", "spearmanr"],
+    "wnli": ["accuracy"]
+}
+
 REPORTING_METRICS_PER_TASK = {
     "cola": ["eval_matthews_correlation"],
-    "mnli": ["eval_accuracy", "mm_eval_accuracy"],
+    "mnli": ["eval_accuracy", "eval_mm_accuracy"],
     "mrpc": ["eval_f1", "eval_accuracy"],
     "qnli": ["eval_accuracy"],
     "qqp": ["eval_accuracy", "eval_f1"],
