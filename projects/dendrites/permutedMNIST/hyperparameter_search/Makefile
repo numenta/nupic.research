@@ -70,6 +70,10 @@ figs/hyperparameter_search_panel_along_tasks.png: hyperparameters_figures.py \
 	data_hyperparameter_search/w_sparsity_search_50_all.csv
 	python hyperparameters_figures.py \
 
+data_hyperparameter_search/cross_hyperparameter_search.csv: ../analyze_results.py
+	python ../analyze_results.py cross_search -n cross_search -o lasttask && \
+	mv cross_search_lasttask.pkl cross_search_lasttask.csv cross_search_lasttask_analysis.csv data_cross_hyperparameter_search/
+
 clean:
 	rm -rf data_hyperparameter_search/*
 	rm -rf figs/*
