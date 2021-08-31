@@ -400,8 +400,6 @@ def init_dataset_for_squad(model_args, data_args, training_args,
     (train_dataset,
      eval_dataset,
      eval_examples,
-     predict_dataset,
-     predict_examples,
      answer_column_name) = \
             preprocess_datasets_squad(datasets, tokenizer, training_args, data_args)
 
@@ -421,8 +419,6 @@ def init_dataset_for_squad(model_args, data_args, training_args,
         train_dataset,
         eval_dataset,
         eval_examples,
-        predict_dataset,
-        predict_examples,
         model,
         answer_column_name
     )
@@ -651,8 +647,6 @@ def run_finetuning_squad(
     train_dataset,
     eval_dataset,
     eval_examples,
-    predict_dataset,
-    predict_examples,
     model,
     answer_column_name) = \
         init_dataset_for_squad(model_args, data_args, training_args, last_checkpoint)
@@ -723,6 +717,8 @@ def run_finetuning_squad(
         # Note, rm_checkpoints=True means one model will be saved
         # in the output_dir, and all checkpoint subdirectories will be
         # deleted when train() is called.
+        import pdb
+        pdb.set_trace()
         train(trainer,
               training_args.output_dir,
               training_args.rm_checkpoints,
@@ -735,14 +731,14 @@ def run_finetuning_squad(
 
     # Test/Predict
     # Pick up here
-    if training_args.do_predict:
-        logging.info("*** Test ***")
+    # if training_args.do_predict:
+    #     logging.info("*** Test ***")
 
-        test_squad(trainer,
-                   training_args.output_dir,
-                   predict_dataset,
-                   predict_examples,
-                   data_args)
+    #     test_squad(trainer,
+    #                training_args.output_dir,
+    #                predict_dataset,
+    #                predict_examples,
+    #                data_args)
 
     # There is an existing issue on training multiple models in sequence in this code
     # There is a memory leakage on the model, a small amount of GPU memory remains after

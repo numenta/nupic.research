@@ -354,8 +354,9 @@ class DataTrainingArguments:
     #     },
     # )
     doc_stride: int = field(
-        default=128,
-        metadata={"help": "When splitting up a long document into chunks, how much stride to take between chunks."},
+        default=32,
+        metadata={"help": "When splitting up a long document into chunks, how much stride to take between chunks. "
+                  "Known issue: this parameter has to be < 1/2 max_seq_length or it will break. Need to understand why."},
     )
     n_best_size: int = field(
         default=20,
