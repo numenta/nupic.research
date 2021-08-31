@@ -30,9 +30,9 @@ sns.set(style="ticks", font_scale=1.3)
 
 def hyperparameter_dendrites_wit_si_search_panel():
     """
-    Plots a 6 panels figure on 2 rows x 3 columns
-    Rows contains figures representing hyperparameters search for 10 and 50
-    permutedMNIST tasks resulting from hyperparameter_search_.py config file.
+    Plots a 3 panels figure on 1 rows x 3 columns
+    Rows contains figures representing hyperparameters search for 10
+    permutedMNIST tasks resulting from hyperparameter_search.py config file.
     Columns 1 is the number of dendritic segments, columns 2 the activation
     sparsity and column 3 the weight sparsity.
     """
