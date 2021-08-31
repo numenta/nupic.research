@@ -409,7 +409,7 @@ class SupervisedExperiment(ExperimentBase):
         pass
 
     def post_batch(self, model, error_loss, complexity_loss, batch_idx,
-                   num_images, time_string):
+                   num_images, time_string, **kwargs):
         # Update 1cycle learning rate after every batch
         if self.step_lr_every_batch:
             self.lr_scheduler.step()

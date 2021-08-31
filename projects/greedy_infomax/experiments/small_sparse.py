@@ -34,10 +34,6 @@ from nupic.research.frameworks.greedy_infomax.models.FullModel import (
     WrappedSparseSmallVisionModel,
     WrappedSuperGreedySmallSparseVisionModel,
 )
-from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
-    evaluate_model_gim,
-    train_model_gim,
-)
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
 from nupic.torch.modules import SparseWeights2d

@@ -25,24 +25,42 @@ from nupic.research.frameworks.greedy_infomax.utils.train_utils import \
     evaluate_block_model, train_block_model
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import multiple_cross_entropy
 from nupic.research.frameworks.vernon.mixins import StepBasedLogging
+from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import EmitEncoding
+from itertools import chain
+from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockModel
 
 class BlockModelExperiment(StepBasedLogging,
                            SelfSupervisedExperiment):
 
     def setup_experiment(self, config):
+        emit_encoding_channels = [x["model_args"]["channels"]
+                                  for x in config["model_args"]["module_args"]
+                                  if x["model_class"] == EmitEncoding]
+        config["classifier_config"]["model_args"].update(
+            in_channels=emit_encoding_channels
+        )
         super().setup_experiment(config)
         self.evaluate_model = evaluate_block_model
         self.train_model = train_block_model
         self._loss_function_supervised = multiple_cross_entropy
         self.multiple_module_loss_history = []
 
+
     @classmethod
     def create_model(cls, config, device):
+        if config["model_class"] != BlockModel:
+            return super().create_model(config, device)
         model_args = config.get("model_args", {})
         module_args = model_args.get("module_args", [])
         modules = []
         for i, module_dict in enumerate(module_args):
-            modules.append(create_model(module_dict, device))
+            modules.append(create_model(
+                model_class=module_dict["model_class"],
+                model_args=module_dict.get("model_args", {}),
+                init_batch_norm=module_dict.get("init_batch_norm", False),
+                device=device,
+                checkpoint_file=module_dict.get("checkpoint_file", None),
+                load_checkpoint_args=module_dict.get("load_checkpoint_args", {}),))
         model_args["modules"] = modules
         return create_model(
             model_class=config["model_class"],
@@ -53,30 +71,32 @@ class BlockModelExperiment(StepBasedLogging,
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
         )
 
-    @classmethod
-    def create_optimizer(cls, config, device):
-        model_args = config.get("model_args", {})
-        modules = model_args.get("modules", [])
-        module_instances = model_args["model_instances"]
-        parameters_to_train = set()
-        for module_dict, module_instance in zip(modules, module_instances):
-            if module_dict["train"]:
-                parameters_to_train.add(module_instance.parameters())
-        parameters_to_train = list(parameters_to_train)
-        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-        optimizer_args = config.get("optimizer_args", {})
-        return optimizer_class(parameters_to_train, **optimizer_args)
+    # @classmethod
+    # def create_optimizer(cls, config, device):
+    #     if config["model_class"] != BlockModel:
+    #         return super().create_optimizer(config, device)
+    #     model_args = config.get("model_args", {})
+    #     module_args = model_args.get("module_args", [])
+    #     module_instances = model_args["modules"]
+    #     parameters_to_train = []
+    #     for module_dict, module_instance in zip(module_args, module_instances):
+    #         if module_dict["train"]:
+    #             parameters_to_train.append(module_instance.parameters())
+    #     parameters_to_train = chain(*parameters_to_train)
+    #     optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+    #     optimizer_args = config.get("optimizer_args", {})
+    #     return optimizer_class(parameters_to_train, **optimizer_args)
 
     def post_batch(self, error_loss, complexity_loss, batch_idx, **kwargs):
         super().post_batch(error_loss=error_loss,
-                           complexity_loss=complexity_loss, batch_idx=batch_idx,
+                           complexity_loss=complexity_loss,
+                           batch_idx=batch_idx,
                            **kwargs)
         if self.should_log_batch(batch_idx) and "module_losses" in kwargs.keys():
             self.multiple_module_loss_history.append(kwargs["module_losses"].clone())
 
     def run_epoch(self):
         result = super().run_epoch()
-
         if len(self.multiple_module_loss_history) > 0:
             log = torch.stack(self.multiple_module_loss_history)
             module_loss_history = log.cpu().numpy()

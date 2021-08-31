@@ -83,7 +83,7 @@ def full_sparse_model_blockwise_config(
                 patch_size=patch_size,
                 overlap=overlap,
             ),
-            init_batch_norm=None,
+            init_batch_norm=False,
             checkpoint_file=None,
             load_checkpoint_args=None,
             train=True,
@@ -112,7 +112,7 @@ def full_sparse_model_blockwise_config(
         dict(
             model_class=conv1_class,
             model_args=conv1_args,
-            init_batch_norm=None,
+            init_batch_norm=False,
             checkpoint_file=None,
             load_checkpoint_args=None,
             train=True,
@@ -123,7 +123,7 @@ def full_sparse_model_blockwise_config(
         # args
         num_blocks=block_dims[idx],
         filters=num_channels[idx],
-        previous_input_dim = num_channels[0] if idx == 0 else num_channels[idx - 1],
+        previous_input_dim = num_channels[0] if idx == 0 else num_channels[idx - 1]
         first_stride = 1 if idx == 0 else 2
         encoder_sparsity = sparsity[f"encoder{idx + 1}"]
         encoder_percent_on = percent_on[f"encoder{idx + 1}"]
@@ -157,7 +157,7 @@ def full_sparse_model_blockwise_config(
                     sparse_weights_class=sparse_weights_class,
                     sparsity=encoder_sparsity[f"block{idx + 1}"],
                     percent_on=encoder_percent_on[f"block{idx + 1}"]),
-                init_batch_norm=None,
+                init_batch_norm=False,
                 checkpoint_file=None,
                 load_checkpoint_args=None,
                 train=True,
@@ -176,7 +176,7 @@ def full_sparse_model_blockwise_config(
                     sparse_weights_class=sparse_weights_class,
                     sparsity=0.1,
                 ),
-                init_batch_norm=None,
+                init_batch_norm=False,
                 checkpoint_file=None,
                 load_checkpoint_args=None,
                 train=True,
@@ -187,21 +187,21 @@ def full_sparse_model_blockwise_config(
             dict(
                 model_class=GradientBlock,
                 model_args=dict(),
-                init_batch_norm=None,
+                init_batch_norm=False,
                 checkpoint_file=None,
                 load_checkpoint_args=None,
-                train=True,
+                train=False,
                 save_checkpoint_file=None,
             )
         )
         modules.append(
             dict(
                 model_class=EmitEncoding,
-                model_args=dict(),
-                init_batch_norm=None,
+                model_args=dict(channels=in_planes),
+                init_batch_norm=False,
                 checkpoint_file=None,
                 load_checkpoint_args=None,
-                train=True,
+                train=False,
                 save_checkpoint_file=None,
             )
         )

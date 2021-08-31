@@ -82,10 +82,11 @@ class BilinearInfo(nn.Identity):
                 ztwk.shape[0] * ztwk.shape[1] * ztwk.shape[2], ztwk.shape[3]
             )  # y * x * batch, c
             rand_index = torch.randint(
-                ztwk_shuf.shape[0],  # y *  x * batch
+                ztwk_shuf.shape[0],  # y * x * batch
                 (ztwk_shuf.shape[0] * self.negative_samples, 1),
                 dtype=torch.long,
                 device=ztwk_shuf.device,
+                requires_grad=False,
             )
             rand_index = rand_index.repeat(1, ztwk_shuf.shape[1])
             ztwk_shuf = torch.gather(
@@ -118,7 +119,6 @@ class BilinearInfo(nn.Identity):
 
             # #append results to list
             log_f_list.append(log_fk)
-
         return log_f_list
 
 

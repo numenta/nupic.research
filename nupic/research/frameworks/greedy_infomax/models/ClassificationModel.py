@@ -48,11 +48,13 @@ class ClassificationModel(nn.Module):
 
 class MultipleClassificationModel(nn.Module):
     def __init__(self, in_channels=None, num_classes=10, hidden_nodes=None):
-        super().__init__()
-        if self.in_channels is None:
+        super(MultipleClassificationModel, self).__init__()
+        if in_channels is None:
             raise Exception("In channels list is required")
+        self.in_channels = in_channels
         if hidden_nodes is None or len(hidden_nodes) != len(in_channels):
             hidden_nodes = [0 for _ in range(len(in_channels))]
+        self.hidden_nodes = hidden_nodes
         self.classifiers = nn.ModuleList(
             [
                 ClassificationModel(

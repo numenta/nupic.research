@@ -23,9 +23,11 @@ from .default_base import CONFIGS as DEFAULT_BASE
 from .sigopt_experiments import CONFIGS as SIGOPT_EXPERIMENTS
 from .small_sparse import CONFIGS as SMALL_SPARSE
 from .sparse_resnets import CONFIGS as SPARSE_RESNETS
+from .block_wise_training import CONFIGS as BLOCK_WISE
 
 CONFIGS = dict()
 CONFIGS.update(DEFAULT_BASE)
 CONFIGS.update(SPARSE_RESNETS)
 CONFIGS.update(SIGOPT_EXPERIMENTS)
 CONFIGS.update(SMALL_SPARSE)
+CONFIGS.update(BLOCK_WISE)

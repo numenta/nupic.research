@@ -33,78 +33,57 @@ from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import 
 from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
     GradientBlock, EmitEncoding
 )
-from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import CreateBlockModel
+from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import BlockModelExperiment
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import full_sparse_resnet, small_sparse_resnet
 
 from nupic.research.frameworks.vernon.distributed import mixins, experiments
 from nupic.torch.modules import SparseWeights2d
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
 from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockModel
-
+from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import MultipleClassificationModel
+from nupic.research.frameworks.greedy_infomax.utils.loss_utils import \
+    all_module_multiple_cross_entropy_bilinear_info, multiple_cross_entropy
 
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
-class GreedyInfoMaxExperimentBlockWise(
-    experiments.SelfSupervisedExperiment,
-):
-    # avoid changing key names for sigopt
-    @classmethod
-    def get_readable_result(cls, result):
-        return result
-
 
 DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
 
 BATCH_SIZE = 32
 NUM_EPOCHS = 10
 
-"""
-Block wise model example:
 
-
-model_structure:
-[ (model_class=nn.Conv2d, model_args={args}, previous_checkpoint=None, 
-save_checkpoint=None, train=True)
-(BilinearInfo, {args})
-(EmitEncoding)
-(GradientBlock)
-(PreActBlockNoBN, {args}, previous_checkpoint="checkpoint_file.ckpt", save_checkpoint=None),
-(PreActBlockNoBN, {args}, previous_checkpoint="checkpoint_file.ckpt"),
-(PreActBlockNoBN, {args}, previous_checkpoint="checkpoint_file.ckpt"),
-(PreActBlockNoBN, {args}, previous_checkpoint="checkpoint_file.ckpt"), 
-save_checkpoint="save_here.ckpt")
-(EmitEncoding)
-(BilinearInfo, {args})
-
-]
-
-"""
 # model hyperparameters
 grayscale=True
 num_channels = 64
 input_dims = 1
 if not grayscale:
     input_dims = 3
-block_wise_small_resnet=small_sparse_resnet
 
+block_wise_small_resnet_args={"module_args":small_sparse_resnet}
 
-BLOCK_WISE_BASE = deepcopy(DEFAULT_BASE)
-BLOCK_WISE_BASE.update(dict(
-        experiment_class=BlockModel,
+SMALL_BLOCK = deepcopy(DEFAULT_BASE)
+SMALL_BLOCK.update(dict(
+        experiment_class=BlockModelExperiment,
         wandb_args=dict(
-            project="greedy_infomax-block_wise",
-            name=f"block_wise_training",
+            project="greedy_infomax:small_block_model",
+            name=f"base_experiment",
         ),
-        batch_size=32,
-        batch_size_supervised=32,
-        val_batch_size=32,
+        epochs=NUM_EPOCHS,
+        epochs_to_validate=range(10, NUM_EPOCHS, 10),
+        distributed=False,
+        batch_size=BATCH_SIZE,
+        batch_size_supervised=BATCH_SIZE,
+        val_batch_size=BATCH_SIZE,
         # batch_size=16,
         # batch_size_supervised=16,
         # val_batch_size=16,
         model_class=BlockModel,
-        model_args=small_sparse_resnet,
+        model_args=block_wise_small_resnet_args,
         optimizer_class = torch.optim.SGD,
         optimizer_args=dict(lr=2e-4),
+        loss_function=all_module_multiple_cross_entropy_bilinear_info,
+        find_unused_parameters=True,
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
                 max_lr=0.24, #change based on sparsity/dimensionality
@@ -117,9 +96,9 @@ BLOCK_WISE_BASE.update(dict(
                 cycle_momentum=False,
             ),
         classifier_config=dict(
-            model_class=ClassificationModel,
+            model_class=MultipleClassificationModel,
             model_args=dict(num_classes=10),
-            loss_function=torch.nn.functional.cross_entropy,
+            loss_function=multiple_cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
             optimizer_class=torch.optim.Adam,
             # Optimizer class class arguments passed to the constructor
@@ -131,5 +110,5 @@ BLOCK_WISE_BASE.update(dict(
 
 
 CONFIGS = dict(
-
+    small_block=SMALL_BLOCK,
 )

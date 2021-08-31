@@ -39,8 +39,9 @@ class GradientBlock(nn.Module):
 
 # used to emit encodings at various points in the model's computation graph
 class EmitEncoding(nn.Identity):
-    def __init__(self):
+    def __init__(self, channels):
         super(EmitEncoding, self).__init__()
+        self.channels=channels
 
     def encode(self, x, n_patches_x, n_patches_y):
         out = F.adaptive_avg_pool2d(x, 1)
@@ -55,7 +56,8 @@ class PatchifyInputs(nn.Module):
         self.overlap = overlap
 
     def forward(self, x):
-        x, n_patches_x, n_patches_y = data_utils.patchify_inputs(x)
+        x, n_patches_x, n_patches_y = data_utils.patchify_inputs(x, self.patch_size,
+                                                                 self.overlap)
         return x, n_patches_x, n_patches_y
 
 class SparseConv2d(nn.Module):

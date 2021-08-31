@@ -288,18 +288,15 @@ def evaluate_block_model(
     })
     result.update({
         f"total_correct_encoding_{i}": module_correct[i] for i in range(
-            module_correct.shape[0]),
+            module_correct.shape[0])
     })
     result.update({
-        f"mean_loss_encoding_{i}": module_losses[i] / total if total > 0 else 0 for i in
-        range(
-            module_correct.shape[0]),
+        f"mean_loss_encoding_{i}": module_losses[i] / total if total > 0
+        else 0 for i in range(module_correct.shape[0])
     })
     result.update({
         f"mean_accuracy_encoding_{i}": module_correct[i] / total if total > 0 else 0
-        for i in
-        range(
-            module_correct.shape[0]),
+        for i in range(module_correct.shape[0])
     })
 
     if complexity_loss is not None:

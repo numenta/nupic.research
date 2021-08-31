@@ -38,9 +38,10 @@ from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import \
 
 class BlockModel(nn.Module):
     def __init__(self,
-                 modules,):
+                 modules,
+                 **kwargs):
         super(BlockModel, self).__init__()
-        self.modules = nn.ModuleList(modules)
+        self.module_list = nn.ModuleList(modules)
 
     # The forward method only emits BilinearInfo estimations.
     # Notice how there are no detach() calls in this forward pass: the detaching is
@@ -52,7 +53,7 @@ class BlockModel(nn.Module):
     def forward(self, x):
         n_patches_x, n_patches_y = None, None
         log_f_module_list = []
-        for module in self.modules:
+        for module in self.module_list:
             if isinstance(module, PatchifyInputs):
                 x, n_patches_x, n_patches_y = module(x)
             elif isinstance(module, BilinearInfo):

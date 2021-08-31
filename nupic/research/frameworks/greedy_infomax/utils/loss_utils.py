@@ -44,6 +44,7 @@ def multiple_cross_entropy_bilinear_info(log_f_module_list, targets, reduction="
                 (log_fk.shape[0], log_fk.shape[-2], log_fk.shape[-1]),
                 dtype=torch.long,
                 device=log_fk.device,
+                requires_grad=False,
             )  # b, y, x
             total_loss = total_loss + F.cross_entropy(
                 log_fk, true_fk, reduction=reduction
@@ -57,7 +58,8 @@ representing the cross entropy loss of a specific BilinearInfo module.
 def all_module_multiple_cross_entropy_bilinear_info(log_f_module_list, targets,
                                            reduction="mean"):
     device = log_f_module_list[0][0].device
-    module_losses = torch.zeros(len(log_f_module_list),requires_grad=True,
+    module_losses = torch.zeros(len(log_f_module_list),
+                                requires_grad=True,
                                 device=device)
     # Sum losses from each module
     for i, log_f_list in enumerate(log_f_module_list):
@@ -68,10 +70,14 @@ def all_module_multiple_cross_entropy_bilinear_info(log_f_module_list, targets,
                 (log_fk.shape[0], log_fk.shape[-2], log_fk.shape[-1]),
                 dtype=torch.long,
                 device=log_fk.device,
-            )  # b, y, x
-            module_losses[i] = module_losses[i] + F.cross_entropy(
-                log_fk, true_fk, reduction=reduction
-            )
+                requires_grad=False,
+            ) # b, y, x
+            module_losses.index_add(0,
+                                    torch.tensor([i], dtype=torch.long,
+                                                 device=log_fk.device),
+                                    F.cross_entropy(log_fk, true_fk,
+                                                    reduction=reduction)
+                                    )
     return module_losses
 
 
