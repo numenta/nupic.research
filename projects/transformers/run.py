@@ -98,7 +98,7 @@ from run_utils import (
     update_run_number,
 )
 
-from trainer_mixins import QuestionAnsweringTrainer
+from experiments.squad import QuestionAnsweringTrainer
 
 from utils_qa import (
     postprocess_qa_predictions,
@@ -386,24 +386,24 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
 def init_dataset_for_squad(model_args, data_args, training_args,
                                 last_checkpoint=None):
 
-    datasets = init_datasets_squad(data_args, training_args)
+    datasets = init_datasets_squad(data_args, model_args)
 
     # Place holder for now
     extra_config_kwargs = {}
     config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
     tokenizer = init_tokenizer(model_args)
-    model = init_model(model_args, config, tokenizer, finetuning=True)
+    model = init_model(model_args, config, tokenizer, squad=True)
     check_sparsity_callback(model, model_args)
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
-    logging.info(f"Tokenizing datasets for finetuning ...")
+    logging.info(f"Tokenizing datasets for squad ...")
     (train_dataset,
      eval_dataset,
      eval_examples,
      predict_dataset,
      predict_examples,
      answer_column_name) = \
-            preprocess_datasets_squad(datasets, tokenizer, data_args)
+            preprocess_datasets_squad(datasets, tokenizer, training_args, data_args)
 
 
     # Data collator
@@ -801,6 +801,7 @@ def run_finetuning_multiple_tasks(
 
         # These checks can change training args, which can affect TaskResults
         # attributes like metric_for_best_model
+        # TODO: uncomment this check later and update check_best_metric to accomodate squad
         training_args = check_best_metric(training_args, data_args.task_name)
         check_mnli(model_args, data_args.task_name)
         task_results = TaskResults(task_name, training_args)
@@ -815,21 +816,32 @@ def run_finetuning_multiple_tasks(
             set_seed(training_args.seed)
 
             if model_args.hp_num_trials > 1:
-                eval_results = run_finetuning_single_task_with_hp_search(
-                    model_args,
-                    data_args,
-                    training_args,
-                    last_checkpoint=last_checkpoint
-                )
+                if data_args.task_name == "squad":
+                    print("Hp search for squad is not yet implemented")
+                else:
+                    eval_results = run_finetuning_single_task_with_hp_search(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint
+                    )
             else:
-                eval_results = run_finetuning_single_task(
-                    model_args,
-                    data_args,
-                    training_args,
-                    last_checkpoint=last_checkpoint,
-                    run_idx=run_idx
-                )
-
+                if data_args.task_name == "squad":
+                    eval_results = run_finetuning_squad(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint,
+                        run_idx=run_idx
+                    )
+                else:
+                    eval_results = run_finetuning_single_task(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint,
+                        run_idx=run_idx
+                    )
             task_results.append(eval_results)
 
         # Delete all finetuning run directories except for the best one

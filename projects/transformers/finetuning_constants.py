@@ -31,7 +31,8 @@ TASK_NAMES = [
     "rte",
     "sst2",
     "stsb",
-    "wnli"
+    "wnli",
+    "squad",
 ]
 
 # Names of files with test set predictions for uplodaing to glue
@@ -57,6 +58,7 @@ RAW_REPORTING_METRICS_PER_TASK = {
     "qnli": ["accuracy"],
     "qqp": ["accuracy", "f1"],
     "rte": ["accuracy"],
+    "squad": ["exact_match", "f1"],
     "sst2": ["accuracy"],
     "stsb": ["pearson", "spearmanr"],
     "wnli": ["accuracy"]
@@ -69,6 +71,7 @@ REPORTING_METRICS_PER_TASK = {
     "qnli": ["eval_accuracy"],
     "qqp": ["eval_accuracy", "eval_f1"],
     "rte": ["eval_accuracy"],
+    "squad": ["eval_exact_match", "eval_f1"],
     "sst2": ["eval_accuracy"],
     "stsb": ["eval_pearson", "eval_spearmanr"],
     "wnli": ["eval_accuracy"]
@@ -81,7 +84,8 @@ ALL_REPORTING_METRICS = [
     "eval_f1",
     "eval_pearson",
     "eval_spearmanr",
-    "eval_loss"
+    "eval_loss",
+    "eval_exact_match"
 ]
 
 # These are approximate and taken from the table in the paper

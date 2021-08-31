@@ -321,27 +321,27 @@ class DataTrainingArguments:
                     "attempt to update existing entries"
         },
     )
-    # max_train_samples: Optional[int] = field(
-    #     default=None,
-    #     metadata={
-    #         "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
-    #         "value if set."
-    #     },
-    # )
-    # max_eval_samples: Optional[int] = field(
-    #     default=None,
-    #     metadata={
-    #         "help": "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
-    #         "value if set."
-    #     },
-    # )
-    # max_predict_samples: Optional[int] = field(
-    #     default=None,
-    #     metadata={
-    #         "help": "For debugging purposes or quicker training, truncate the number of prediction examples to this "
-    #         "value if set."
-    #     },
-    # )
+    max_train_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
+            "value if set."
+        },
+    )
+    max_eval_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
+            "value if set."
+        },
+    )
+    max_predict_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of prediction examples to this "
+            "value if set."
+        },
+    )
     version_2_with_negative: bool = field(
         default=False, metadata={"help": "If true, some of the examples do not have an answer."}
     )

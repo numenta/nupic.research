@@ -40,6 +40,7 @@ from .regressions import CONFIGS as REGRESSIONS
 from .rigl_bert import CONFIGS as RIGL_BERT
 from .sparse_bert import CONFIGS as SPARSE_BERT
 from .sparse_bertitos import CONFIGS as SPARSE_BERTITOS
+from .squad import CONFIGS as SQUAD
 from .trifecta import CONFIGS as TRIFECTA
 from .wide_bert import CONFIGS as WIDE_BERT
 from .wide_bert_fixed_num_params import CONFIGS as WIDE_BERT_FIXED_NUM_PARAMS
@@ -68,6 +69,7 @@ CONFIGS.update(REGRESSIONS)
 CONFIGS.update(RIGL_BERT)
 CONFIGS.update(SPARSE_BERT)
 CONFIGS.update(SPARSE_BERTITOS)
+CONFIGS.update(SQUAD)
 CONFIGS.update(TRIFECTA)
 CONFIGS.update(WIDE_BERT)
 CONFIGS.update(WIDE_BERT_FIXED_NUM_PARAMS)

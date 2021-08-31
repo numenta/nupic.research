@@ -56,11 +56,7 @@ from finetuning_constants import (
     RAW_REPORTING_METRICS_PER_TASK,
     REPORTING_METRICS_PER_TASK,
 )
-from utils_qa import (
-    postprocess_qa_predictions,
-    postprocess_qa_predictions_with_beam_search,
-    QuestionAnsweringTrainer,
-)
+
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
@@ -103,6 +99,7 @@ TASK_TO_KEYS = {
     "qnli": ("question", "sentence"),
     "qqp": ("question1", "question2"),
     "mnli": ("premise", "hypothesis"),  # includes matched and mismatched
+    "squad": None
 }
 
 
@@ -509,6 +506,8 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
             f"model ({tokenizer.model_max_length}). Using max_seq_length={tokenizer.model_max_length}."
         )
     max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
+    print(f"The max seq length is {max_seq_length}")
+    print(f"The doc stride is {data_args.doc_stride}")
 
     # Training preprocessing
     def prepare_train_features(examples):
@@ -780,7 +779,7 @@ def init_datasets_mlm(data_args):
     return datasets, tokenized_datasets, dataset_path
 
 
-def init_datasets_squad(data_args, training_args, model_args):
+def init_datasets_squad(data_args, model_args):
     """Get the datasets for finetuning on Squad. Returns dataset."""
     datasets = load_dataset(
         data_args.dataset_name, data_args.dataset_config_name,
