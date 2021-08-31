@@ -24,12 +24,13 @@ import torch
 from nupic.research.frameworks.greedy_infomax.utils.train_utils import \
     evaluate_block_model, train_block_model
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import multiple_cross_entropy
-from nupic.research.frameworks.vernon.mixins import StepBasedLogging
+from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import EmitEncoding
 from itertools import chain
 from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockModel
 
-class BlockModelExperiment(StepBasedLogging,
+class BlockModelExperiment(mixins.LogEveryLoss,
+                           mixins.LogEveryLearningRate,
                            SelfSupervisedExperiment):
 
     def setup_experiment(self, config):
@@ -105,12 +106,12 @@ class BlockModelExperiment(StepBasedLogging,
             self.multiple_module_loss_history = []
         return result
 
-    # @classmethod
-    # def get_readable_result(cls, result):
-    #     for i in range(result["num_bilinear_info_modules"]):
-    #         result[f"module_{i}_train_loss"] = result[f"module_{i}_loss_history"][-25:, i].mean()
-    #     return result
-    #
+    @classmethod
+    def get_readable_result(cls, result):
+        # for i in range(result["num_bilinear_info_modules"]):
+        #     result[f"module_{i}_train_loss"] = result[f"module_{i}_loss_history"][-25:, i].mean()
+        return result
+
     @classmethod
     def expand_result_to_time_series(cls, result, config):
         result_by_timestep = super().expand_result_to_time_series(result,

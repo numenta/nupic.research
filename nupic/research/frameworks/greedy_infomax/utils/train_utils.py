@@ -235,7 +235,7 @@ def evaluate_block_model(
     total = 0
 
     # Perform accumulation on device, avoid paying performance cost of .item()
-    num_emit_encoding_modules = model.count_emit_encoding_modules
+    num_emit_encoding_modules = model.encoder.count_emit_encoding_modules()
     module_losses = torch.zeros(num_emit_encoding_modules, device=device)
     module_correct = torch.zeros(num_emit_encoding_modules, device=device)
 
@@ -261,13 +261,13 @@ def evaluate_block_model(
             if active_classes is not None:
                 outputs = outputs[:, :, active_classes] #module, batch, classes
             module_losses += criterion(outputs, target, reduction="sum")
-            pred = outputs.max(-1, keepdim=True)[1]
-            module_correct += pred.eq(target.view_as(pred)).sum()
+            preds = outputs.max(-1, keepdim=True)[1]
+            module_correct += preds.eq(target.view_as(preds)).sum((1, 2))
             total += len(data)
 
             if post_batch_callback is not None:
                 post_batch_callback(batch_idx=batch_idx, target=target, output=outputs,
-                                    pred=pred)
+                                    preds=preds)
 
         complexity_loss = (complexity_loss_fn(model)
                            if complexity_loss_fn is not None
@@ -276,26 +276,27 @@ def evaluate_block_model(
     if progress is not None:
         loader.close()
 
-    module_correct = module_correct.item()
-    module_losses = module_losses.item()
-
     result = {
         "total_tested": total,
+        "total_correct": module_correct[-1].item(),
+        "mean_loss": module_losses[-1].item() / total,
+        "mean_accuracy": module_correct[-1].item() / total,
     }
     result.update({
-        "num_bilinear_info_modules" : model.count_bilinear_info_modules(),
-        "num_emit_encodings": model.count_emit_encodings(),
+        "num_bilinear_info_modules" : model.encoder.count_bilinear_info_modules(),
+        "num_emit_encodings": model.encoder.count_emit_encoding_modules(),
     })
     result.update({
-        f"total_correct_encoding_{i}": module_correct[i] for i in range(
+        f"total_correct_encoding_{i}": module_correct[i].item() for i in range(
             module_correct.shape[0])
     })
     result.update({
-        f"mean_loss_encoding_{i}": module_losses[i] / total if total > 0
+        f"mean_loss_encoding_{i}": module_losses[i].item() / total if total > 0
         else 0 for i in range(module_correct.shape[0])
     })
     result.update({
-        f"mean_accuracy_encoding_{i}": module_correct[i] / total if total > 0 else 0
+        f"mean_accuracy_encoding_{i}": module_correct[i].item() / total if total > 0
+        else 0
         for i in range(module_correct.shape[0])
     })
 

@@ -313,7 +313,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         pass
 
     def post_batch_supervised(
-        self, model, error_loss, complexity_loss, batch_idx, num_images, time_string
+        self, model, error_loss, complexity_loss, batch_idx, num_images, time_string,
+            **kwargs
     ):
         # Update 1cycle learning rate after every batch
         if self.step_lr_every_batch_classifier:

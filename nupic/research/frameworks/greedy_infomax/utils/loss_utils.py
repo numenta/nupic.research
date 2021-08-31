@@ -58,12 +58,13 @@ representing the cross entropy loss of a specific BilinearInfo module.
 def all_module_multiple_cross_entropy_bilinear_info(log_f_module_list, targets,
                                            reduction="mean"):
     device = log_f_module_list[0][0].device
-    module_losses = torch.zeros(len(log_f_module_list),
+    module_losses = torch.empty(0,
                                 requires_grad=True,
                                 device=device)
     # Sum losses from each module
     for i, log_f_list in enumerate(log_f_module_list):
         # Sum losses for each k prediction
+        module_loss = torch.tensor(0.0, requires_grad=True)
         for log_fk in log_f_list:
             # Positive samples are at index 0
             true_fk = torch.zeros(
@@ -72,12 +73,9 @@ def all_module_multiple_cross_entropy_bilinear_info(log_f_module_list, targets,
                 device=log_fk.device,
                 requires_grad=False,
             ) # b, y, x
-            module_losses.index_add(0,
-                                    torch.tensor([i], dtype=torch.long,
-                                                 device=log_fk.device),
-                                    F.cross_entropy(log_fk, true_fk,
-                                                    reduction=reduction)
-                                    )
+            module_loss = module_loss + F.cross_entropy(log_fk, true_fk, reduction=reduction)
+        module_loss = module_loss / len(log_f_list)
+        module_losses = torch.cat([module_losses, module_loss.view(1)])
     return module_losses
 
 
@@ -88,9 +86,11 @@ EmitEncoding module paired with a classification head.
 """
 def multiple_cross_entropy(outputs, targets, reduction="sum"):
     device = outputs.device
-    module_losses = torch.zeros(outputs.shape[0], requires_grad=True, device=device)
+    module_losses = torch.empty(0, requires_grad=True, device=device)
     for i in range(outputs.shape[0]):
-        module_losses[i] += F.cross_entropy(outputs[i], targets)
+        module_losses = torch.cat([module_losses,
+                                   F.cross_entropy(outputs[i], targets).view(1)]
+                                )
     return module_losses
 
 

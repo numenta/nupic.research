@@ -72,7 +72,7 @@ class BlockModel(nn.Module):
     def encode(self, x):
         n_patches_x, n_patches_y = None, None
         all_outputs = []
-        for module in self.modules:
+        for module in self.module_list:
             if isinstance(module, PatchifyInputs):
                 x, n_patches_x, n_patches_y = module(x)
             elif isinstance(module, EmitEncoding):
@@ -83,7 +83,7 @@ class BlockModel(nn.Module):
         return all_outputs
 
     def count_bilinear_info_modules(self):
-        return sum([1 if isinstance(m, BilinearInfo) else 0 for m in self.modules])
+        return sum([1 if isinstance(m, BilinearInfo) else 0 for m in self.module_list])
 
     def count_emit_encoding_modules(self):
-        return sum([1 if isinstance(m, EmitEncoding) else 0 for m in self.modules])
+        return sum([1 if isinstance(m, EmitEncoding) else 0 for m in self.module_list])

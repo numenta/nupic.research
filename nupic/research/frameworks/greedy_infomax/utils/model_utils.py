@@ -185,8 +185,8 @@ def full_sparse_model_blockwise_config(
         )
         modules.append(
             dict(
-                model_class=GradientBlock,
-                model_args=dict(),
+                model_class=EmitEncoding,
+                model_args=dict(channels=in_planes),
                 init_batch_norm=False,
                 checkpoint_file=None,
                 load_checkpoint_args=None,
@@ -194,10 +194,11 @@ def full_sparse_model_blockwise_config(
                 save_checkpoint_file=None,
             )
         )
+
         modules.append(
             dict(
-                model_class=EmitEncoding,
-                model_args=dict(channels=in_planes),
+                model_class=GradientBlock,
+                model_args=dict(),
                 init_batch_norm=False,
                 checkpoint_file=None,
                 load_checkpoint_args=None,
@@ -208,6 +209,5 @@ def full_sparse_model_blockwise_config(
     return modules
 
 
-
-full_sparse_resnet = full_sparse_model_blockwise_config()
-small_sparse_resnet = full_sparse_resnet[:8]
+full_resnet = full_sparse_model_blockwise_config()
+small_resnet = full_resnet[:8]
