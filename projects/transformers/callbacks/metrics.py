@@ -58,6 +58,9 @@ class TrackEvalMetrics(TrainerCallback):
     def on_evaluate(self, args, state, control, metrics, **kwargs):
         """Update eval metrics and possibly step counter, sparsity, and lr"""
 
+        import pdb
+        pdb.set_trace()
+
         # track performance metrics
         for key in metrics.keys():
             if key not in self.eval_metrics:
