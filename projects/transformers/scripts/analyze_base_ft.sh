@@ -52,12 +52,11 @@ python ../export_finetuning_results.py \
                 --pretrained_model Trifecta_90 \
                 --md ${BASE_MD}
 
-
-# ~/nta/finetuning/trifecta_2x_hp_guess_follow_up \
 # Bert 100k
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/finetuning_bert_sparse_trifecta_2x_get_info \
                 ~/nta/finetuning/trifecta_2x_hp_guess \
+                ~/nta/finetuning/trifecta_2x_hp_guess_follow_up \
                 --model_name Trifecta_2x \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_2x
