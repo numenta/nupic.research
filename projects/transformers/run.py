@@ -140,8 +140,6 @@ def main():
         )
         model_args, data_args, training_args = exp_parser.parse_dict(config_dict)
 
-        print(f"Finetuning status immediately after parsing args: {model_args.finetuning}")
-
         # Overrides default behavior of TrainingArguments of setting run name
         # equal to output_dir when not available
         if training_args.run_name == training_args.output_dir:
@@ -274,7 +272,7 @@ def run_pretraining(
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
-    has_track_eval, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
+    _, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
 
     # Run hp search or regular training
     if model_args.hp_num_trials >= 1:
@@ -390,12 +388,9 @@ def init_dataset_for_squad(model_args, data_args, training_args,
 
     datasets = init_datasets_squad(data_args, model_args)
 
-    print(f"Finetuning status after call to general init_datasets_squad: {model_args.finetuning}")
-
     # Place holder for now
     extra_config_kwargs = {}
     config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
-    print(f"Finetuning status after init config: {model_args.finetuning}")
     tokenizer = init_tokenizer(model_args)
     model = init_model(model_args, config, tokenizer, finetuning=True, squad=True)
     check_sparsity_callback(model, model_args)
@@ -656,8 +651,6 @@ def run_finetuning_squad(
     answer_column_name) = \
         init_dataset_for_squad(model_args, data_args, training_args, last_checkpoint)
 
-    print(f"Finetuning status after init dataset: {model_args.finetuning}")
-
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
 
@@ -687,6 +680,8 @@ def run_finetuning_squad(
         
         # answer_column_name is defined in init_dataset, need to refactor to avoid excessive message passing
         references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
+        import pdb
+        pdb.set_trace()
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
     # Instantiate trainer
@@ -724,10 +719,13 @@ def run_finetuning_squad(
         # Note, rm_checkpoints=True means one model will be saved
         # in the output_dir, and all checkpoint subdirectories will be
         # deleted when train() is called.
-        train(trainer,
+        train_result = train(trainer,
               training_args.output_dir,
               training_args.rm_checkpoints,
               last_checkpoint)
+
+    import pdb
+    pdb.set_trace()
 
     if training_args.do_eval:
         eval_results = evaluate_task_handler(
@@ -766,8 +764,6 @@ def run_finetuning_multiple_tasks(
 
     logging.info(f"Finetuning model for downstream tasks.")
 
-    print(f"Finetuning status at top of finetuning multiple tasks: {model_args.finetuning}")
-
     # If results file already exists, open it and only update keys
     results_path = os.path.join(training_args.output_dir, "task_results.p")
     if os.path.exists(results_path) and not data_args.override_finetuning_results:
@@ -805,16 +801,12 @@ def run_finetuning_multiple_tasks(
                 else:
                     setattr(training_args, hp_key, hp_val)
 
-        print(f"Finetuning status after updating task hyperparams: {model_args.finetuning}")
-
         # These checks can change training args, which can affect TaskResults
         # attributes like metric_for_best_model
         # TODO: uncomment this check later and update check_best_metric to accomodate squad
         training_args = check_best_metric(training_args, data_args.task_name)
         check_mnli(model_args, data_args.task_name)
         task_results = TaskResults(task_name, training_args)
-
-        print(f"Finetuning status after initial checks: {model_args.finetuning}")
 
         # Hack to ensure we don't do hp search num_runs times
         if model_args.hp_num_trials > 1:
@@ -837,7 +829,6 @@ def run_finetuning_multiple_tasks(
                     )
             else:
                 if data_args.task_name == "squad":
-                    print(f"Finetuning status right before entering run_finetuning_squad: {model_args.finetuning}")
                     eval_results = run_finetuning_squad(
                         model_args,
                         data_args,

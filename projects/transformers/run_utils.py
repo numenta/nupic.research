@@ -1322,11 +1322,11 @@ def init_squad_trainer(trainer_kwargs, data_args, trainer_class, trainer_callbac
     check_callback_types(trainer_callbacks)
 
     metric = load_metric("squad_v2" if data_args.version_2_with_negative else "squad")
-    def compute_metrics(p: EvalPrediction):
+    def compute_metrics_squad(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     # Modify our compute metrics to use squad?
-    trainer_kwargs.update(compute_metrics=compute_metrics)
+    trainer_kwargs.update(compute_metrics=compute_metrics_squad)
 
     trainer = trainer_class(**trainer_kwargs)
 

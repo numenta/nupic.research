@@ -29,10 +29,16 @@ class QuestionAnsweringMixin():
         self.eval_examples = eval_examples
         self.post_process_function = post_process_function
 
+        import pdb
+        pdb.set_trace()
+
     def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None, metric_key_prefix: str = "eval"):
         eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         eval_examples = self.eval_examples if eval_examples is None else eval_examples
+
+        import pdb
+        pdb.set_trace()
 
         # Temporarily disable metric computation, we will do it in the loop here.
         compute_metrics = self.compute_metrics
