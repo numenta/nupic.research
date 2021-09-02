@@ -107,6 +107,7 @@ KW_SPARSITY_SEARCH["model_args"].update(num_segments=10, weight_sparsity=0.5)
 W_SPARSITY_SEARCH = deepcopy(BASE10)
 W_SPARSITY_SEARCH["model_args"].update(num_segments=10, kw_percent_on=0.1)
 
+# test config for 10 tasks
 TEST = deepcopy(BASE10)
 TEST["model_args"].update(
     kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2
@@ -133,6 +134,7 @@ KW_SPARSITY_SEARCH_50["model_args"].update(
 W_SPARSITY_SEARCH_50 = deepcopy(BASE50)
 W_SPARSITY_SEARCH_50["model_args"].update(num_segments=50, kw_percent_on=0.1)
 
+# test config for 50 tasks
 TEST50 = deepcopy(BASE50)
 TEST50["model_args"].update(
     kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2
@@ -145,18 +147,6 @@ OPTIMAL_50["model_args"].update(
     kw_percent_on=0.05, weight_sparsity=0.5, num_segments=100
 )
 
-# HYPERPARAMETERS SEARCH WITH SI
-# 10 tasks
-SEGMENT_SEARCH_WITH_SI = deepcopy(SEGMENT_SEARCH)
-SEGMENT_SEARCH_WITH_SI["si_args"] = dict(
-    c=0.1, damping=0.1, apply_to_dendrites=True)
-KW_SPARSITY_SEARCH_WITH_SI = deepcopy(KW_SPARSITY_SEARCH)
-KW_SPARSITY_SEARCH_WITH_SI["si_args"] = dict(
-    c=0.1, damping=0.1, apply_to_dendrites=True)
-W_SPARSITY_SEARCH_WITH_SI = deepcopy(W_SPARSITY_SEARCH)
-W_SPARSITY_SEARCH_WITH_SI["si_args"] = dict(
-    c=0.1, damping=0.1, apply_to_dendrites=True)
-
 # Export configurations in this file
 CONFIGS = dict(
     segment_search=SEGMENT_SEARCH,
@@ -168,7 +158,4 @@ CONFIGS = dict(
     test=TEST,
     test50=TEST50,
     optimal_50=OPTIMAL_50,
-    segment_search_with_si=SEGMENT_SEARCH_WITH_SI,
-    kw_sparsity_search_with_si=KW_SPARSITY_SEARCH_WITH_SI,
-    w_sparsity_search_with_si=W_SPARSITY_SEARCH_WITH_SI,
 )
