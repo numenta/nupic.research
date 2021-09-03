@@ -121,7 +121,7 @@ SI_CENTROID_100.update(
     optimizer_args=dict(lr=5e-4),
 )
 
-# HP search on dendrites for 10 tasks with SI+Dendrites. fs
+# HP search on dendrites for 10 tasks with SI+Dendrites.
 SI_CENTROID_HP_10 = deepcopy(SI_CENTROID_10)
 SI_CENTROID_HP_10["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5)
 SI_CENTROID_HP_10["model_args"].update(
@@ -130,7 +130,7 @@ SI_CENTROID_HP_10["tasks_to_validate"] = [9]
 SI_CENTROID_HP_10['si_args'] = dict(
     c=0.1, damping=0.1, apply_to_dendrites=True)
 
-# HP search on dendrites for 10 tasks with SI+Dendrites. fs
+# HP search on dendrites for 10 tasks with SI+Dendrites.
 SI_CENTROID_HP_10_CONTROL = deepcopy(SI_CENTROID_HP_10)
 SI_CENTROID_HP_10_CONTROL["model_args"].update(
     kw_percent_on=0.1, weight_sparsity=0.5)
@@ -147,4 +147,5 @@ CONFIGS = dict(
     si_centroid_50=SI_CENTROID_50,
     si_centroid_100=SI_CENTROID_100,
     si_centroid_hp_10=SI_CENTROID_HP_10,
+    si_centroid_hp_10_control=SI_CENTROID_HP_10_CONTROL
 )
