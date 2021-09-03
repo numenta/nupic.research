@@ -140,6 +140,15 @@ SI_CENTROID_HP_10_CONTROL["tasks_to_validate"] = [9]
 SI_CENTROID_HP_10_CONTROL['si_args'] = dict(
     c=0.1, damping=0.1, apply_to_dendrites=False)
 
+# HP search on dendrites for 50 tasks with SI+Dendrites.
+SI_CENTROID_HP_50 = deepcopy(SI_CENTROID_50)
+SI_CENTROID_HP_50["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5)
+SI_CENTROID_HP_50["model_args"].update(
+    num_segments=tune.grid_search([2, 3, 5, 7, 10, 14, 20, 30, 50, 100]))
+SI_CENTROID_HP_50["tasks_to_validate"] = [49]
+SI_CENTROID_HP_50['si_args'] = dict(
+    c=0.1, damping=0.1, apply_to_dendrites=True)
+SI_CENTROID_HP_10['num_samples'] = 1
 
 # Export configurations in this file
 CONFIGS = dict(
@@ -147,5 +156,6 @@ CONFIGS = dict(
     si_centroid_50=SI_CENTROID_50,
     si_centroid_100=SI_CENTROID_100,
     si_centroid_hp_10=SI_CENTROID_HP_10,
-    si_centroid_hp_10_control=SI_CENTROID_HP_10_CONTROL
+    si_centroid_hp_10_control=SI_CENTROID_HP_10_CONTROL,
+    si_centroid_hp_50=SI_CENTROID_HP_50
 )
