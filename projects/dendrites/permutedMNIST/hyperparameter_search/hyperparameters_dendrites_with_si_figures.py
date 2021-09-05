@@ -40,14 +40,16 @@ def hyperparameter_dendrites_wit_si_search_panel():
     df_path1 = f"{experiment_folder}si_centroid_hp_10_lasttask.csv"
     df1 = pd.read_csv(df_path1)
 
-    df1 = df1[
-        [
-            "Activation sparsity",
-            "FF weight sparsity",
-            "Num segments",
-            "Accuracy",
-        ]
-    ]
+    df_path2 = f"{experiment_folder}si_centroid_hp_10_control_lasttask.csv"
+    df2 = pd.read_csv(df_path2)
+
+    df1 = df1[["Activation sparsity", "FF weight sparsity", "Num segments",
+               "Accuracy"]]
+    df2 = df2[["Activation sparsity", "FF weight sparsity", "Num segments",
+               "Accuracy"]]
+    df1['condition'] = 'dendrite_and_ff'
+    df2['condition'] = 'ff_only'
+    df = pd.concat([df1, df2])
 
     # Figure 1 'Impact of the different hyperparameters on performance
     # full cross product of hyperparameters
@@ -57,28 +59,19 @@ def hyperparameter_dendrites_wit_si_search_panel():
     ax1 = fig.add_subplot(gs[0, 0])
 
     x1 = "Num segments"
-
+    dhue = 'condition'
     y = "Accuracy"
     ort = "v"
-    pal = sns.color_palette(n_colors=6)
+    pal = sns.color_palette(n_colors=9)
     sigma = 0.2
     fig.suptitle(
         "Impact of the number of segments with SI on performance", fontsize=12
     )
 
-    pt.RainCloud(
-        x=x1,
-        y=y,
-        data=df1,
-        palette=pal,
-        bw=sigma,
-        width_viol=0.6,
-        ax=ax1,
-        orient=ort,
-        move=0.2,
-        pointplot=True,
-        alpha=0.65,
-    )
+    pt.RainCloud(x=x1, y=y, hue=dhue, data=df, palette=pal, bw=sigma, width_viol=0.6,
+                 ax=ax1, orient=ort, move=0.2, pointplot=True, alpha=0.65)
+    # pt.RainCloud(x=x1, y=y, data=df, palette=pal, bw=sigma, width_viol=0.6,
+    #              ax=ax1, orient=ort, move=0.2, pointplot=True, alpha=0.65)
 
     ax1.set_ylabel("Mean accuracy", fontsize=16)
     ax1.set_xlabel("Number of dendritic segments", fontsize=16)

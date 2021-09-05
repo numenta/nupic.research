@@ -75,8 +75,13 @@ data_hyperparameter_search_with_si_dendrites/si_centroid_hp_10.csv: ../analyze_r
 	python ../analyze_results.py si_centroid_hp_10 -n si_centroid_hp_10 -o lasttask && \
 	mv si_centroid_hp_10_lasttask.pkl si_centroid_hp_10_lasttask.csv si_centroid_hp_10_lasttask_analysis.csv data_hyperparameter_search_with_si_dendrites/
 
+data_hyperparameter_search_with_si_dendrites/si_centroid_hp_10_control.csv: ../analyze_results.py
+	python ../analyze_results.py si_centroid_hp_10_control -n si_centroid_hp_10_control -o lasttask && \
+	mv si_centroid_hp_10_control_lasttask.pkl si_centroid_hp_10_control_lasttask.csv si_centroid_hp_10_control_lasttask_analysis.csv data_hyperparameter_search_with_si_dendrites/
+
 figs/hyperparameter_search_panel_with_si_dendrites.png: hyperparameters_dendrites_with_si_figures.py \
-	data_hyperparameter_search_with_si_dendrites/si_centroid_hp_10_lasttask.csv
+	data_hyperparameter_search_with_si_dendrites/si_centroid_hp_10_lasttask.csv \
+	data_hyperparameter_search_with_si_dendrites/si_centroid_hp_10_control.csv
 	python hyperparameters_dendrites_with_si_figures.py
 
 clean:
