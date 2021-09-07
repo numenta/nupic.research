@@ -205,31 +205,6 @@ class GreedyInfoMaxExperimentSparse2(
         super().setup_experiment(config)
 
 
-class MultiHeadedGreedyInfoMaxExperiment(
-    mixins.LogEveryLoss,
-    mixins.RezeroWeights,
-    mixins.LogBackpropStructure,
-    mixins.NoiseRobustnessTest,
-    experiments.SelfSupervisedExperiment,
-):
-    # avoid changing key names for sigopt
-    @classmethod
-    def get_readable_result(cls, result):
-        return result
-
-    def post_batch(self, error_loss, complexity_loss, batch_idx, **kwargs):
-        module_wise_losses = error_loss
-        error_loss = module_wise_losses.sum()
-        super().post_batch(error_loss, complexity_loss, batch_idx, **kwargs)
-
-    def setup_experiment(self, config):
-        num_channels = config["model_args"]["num_channels"]
-        config["classifier_config"]["model_args"].update(in_channels=num_channels)
-        config["train_model_func"] = train_model_gim
-        config["evaluate_model_func"] = evaluate_model_gim
-        super().setup_experiment(config)
-
-
 SPARSE_SMALL_GRID_SEARCH = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
 SPARSE_SMALL_GRID_SEARCH.update(
     dict(
@@ -340,7 +315,6 @@ SPARSE_VDROP_SMALL.update(
 # ]
 
 channels_density = [(32, 1.0), (45, 0.503), (58, 0.301), (72, 0.194), (100, 0.0993)]
-
 
 
 experiment_idx = 0
@@ -585,7 +559,9 @@ exp_num_channels, exp_required_density = channels_density[
     max_lr_grid_search_experiment_idx
 ]
 max_lr_grid_search_experiment_idx = 4
-exp_num_channels, exp_required_density = channels_density[max_lr_grid_search_experiment_idx]
+exp_num_channels, exp_required_density = channels_density[
+    max_lr_grid_search_experiment_idx
+]
 exp_required_sparsity = 1.0 - exp_required_density
 max_lr_grid_search_args = deepcopy(model_args)
 max_lr_grid_search_args.update(percent_on=1.0)
@@ -615,16 +591,16 @@ MAX_LR_GRID_SEARCH.update(
         optimizer_args=dict(lr=2e-4),
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
-                max_lr=tune.grid_search([0.12, 0.13, 0.14, 0.15, 0.16, 0.17]),
-                # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
-                div_factor=100,  # initial_lr = 0.01
-                final_div_factor=1000,  # min_lr = 0.0000025
-                pct_start=1.0 / 10.0,
-                epochs=10,
-                anneal_strategy="linear",
-                max_momentum=1e-4,
-                cycle_momentum=False,
-            ),
+            max_lr=tune.grid_search([0.12, 0.13, 0.14, 0.15, 0.16, 0.17]),
+            # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
+            div_factor=100,  # initial_lr = 0.01
+            final_div_factor=1000,  # min_lr = 0.0000025
+            pct_start=1.0 / 10.0,
+            epochs=10,
+            anneal_strategy="linear",
+            max_momentum=1e-4,
+            cycle_momentum=False,
+        ),
         classifier_config=dict(
             model_class=ClassificationModel,
             model_args=dict(num_classes=10),

@@ -72,6 +72,7 @@ STL10_DATASET_ARGS = dict(
     validation=validation_dataset_args,
 )
 
+
 def patchify_inputs(x, patch_size, overlap):
     x = (
         x.unfold(2, patch_size, patch_size // overlap)

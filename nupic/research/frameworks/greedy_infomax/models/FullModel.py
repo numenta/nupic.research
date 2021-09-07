@@ -26,7 +26,7 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
 from nupic.research.frameworks.backprop_structure.modules import (
     MaskedVDropCentralData,
     VDropConv2d,
@@ -52,8 +52,9 @@ class FullVisionModel(torch.nn.Module):
     A modified version of ResNet to compute patch-wise representations. This model
     is the encoder in self-supervised experiments and does not include a built in
     classifier. As an encoder, this module utilizes a .forward() for unsupervised
-    training and a .encode() to produce patch-level representations. The BilinearInfoLegacy
-    modules are thus only called during .forward() to prevent wasted computation.
+    training and a .encode() to produce patch-level representations. The
+    BilinearInfoLegacy modules are thus only called during .forward() to prevent
+    wasted computation.
 
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.

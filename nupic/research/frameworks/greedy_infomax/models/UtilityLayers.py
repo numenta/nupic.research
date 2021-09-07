@@ -26,8 +26,10 @@
 
 import torch.nn as nn
 import torch.nn.functional as F
+
 import nupic.research.frameworks.greedy_infomax.utils.data_utils as data_utils
 from nupic.torch.modules import SparseWeights2d
+
 
 # used to block gradients between layers
 class GradientBlock(nn.Module):
@@ -35,19 +37,21 @@ class GradientBlock(nn.Module):
         super(GradientBlock, self).__init__()
 
     def forward(self, x):
-       return x.detach()
+        return x.detach()
+
 
 # used to emit encodings at various points in the model's computation graph
 class EmitEncoding(nn.Identity):
     def __init__(self, channels):
         super(EmitEncoding, self).__init__()
-        self.channels=channels
+        self.channels = channels
 
     def encode(self, x, n_patches_x, n_patches_y):
         out = F.adaptive_avg_pool2d(x, 1)
         out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
         out = out.permute(0, 3, 1, 2).contiguous()
         return out
+
 
 class PatchifyInputs(nn.Module):
     def __init__(self, patch_size=16, overlap=2):
@@ -56,35 +60,43 @@ class PatchifyInputs(nn.Module):
         self.overlap = overlap
 
     def forward(self, x):
-        x, n_patches_x, n_patches_y = data_utils.patchify_inputs(x, self.patch_size,
-                                                                 self.overlap)
+        x, n_patches_x, n_patches_y = data_utils.patchify_inputs(
+            x, self.patch_size, self.overlap
+        )
         return x, n_patches_x, n_patches_y
 
+
 class SparseConv2d(nn.Module):
-    def __init__(self, in_channels: int,
+    def __init__(
+        self,
+        in_channels: int,
         out_channels: int,
         kernel_size,
-        stride = 1,
-        padding = 0,
-        dilation = 1,
-        groups = 1,
-        bias = True,
-        padding_mode = 'zeros',
-        sparse_weights_class = SparseWeights2d,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=True,
+        padding_mode="zeros",
+        sparse_weights_class=SparseWeights2d,
         sparsity=None,
-        allow_extremes=False):
+        allow_extremes=False,
+    ):
         super(SparseConv2d, self).__init__()
-        self.conv2d = nn.Conv2d(in_channels,
-                                out_channels,
-                                kernel_size,
-                                stride=stride,
-                                padding=padding,
-                                dilation=dilation,
-                                groups=groups,
-                                bias=bias,
-                                padding_mode=padding_mode)
-        self.conv2d = sparse_weights_class(self.conv2d,
-                                      sparsity=sparsity,
-                                      allow_extremes=allow_extremes)
+        self.conv2d = nn.Conv2d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+            padding_mode=padding_mode,
+        )
+        self.conv2d = sparse_weights_class(
+            self.conv2d, sparsity=sparsity, allow_extremes=allow_extremes
+        )
+
     def forward(self, x):
         return self.conv2d(x)

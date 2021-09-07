@@ -25,21 +25,18 @@
 # ----------------------------------------------------------------------
 
 
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import BilinearInfo
-from nupic.research.frameworks.greedy_infomax.utils import data_utils
-from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import \
-    EmitEncoding, PatchifyInputs
-
+from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
+    EmitEncoding,
+    PatchifyInputs,
+)
 
 
 class BlockModel(nn.Module):
-    def __init__(self,
-                 modules,
-                 **kwargs):
+    def __init__(self, modules, **kwargs):
         super(BlockModel, self).__init__()
         self.module_list = nn.ModuleList(modules)
 

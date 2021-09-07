@@ -30,14 +30,9 @@ import torch.nn as nn
 from nupic.research.frameworks.backprop_structure.modules import VDropConv2d
 from nupic.torch.modules import SparseWeights2d
 
+
 class BilinearInfo(nn.Identity):
-    def __init__(
-            self,
-            in_channels,
-            out_channels,
-            negative_samples=16,
-            k_predictions=5,
-    ):
+    def __init__(self, in_channels, out_channels, negative_samples=16, k_predictions=5):
         super().__init__()
         self.negative_samples = negative_samples
         self.k_predictions = k_predictions
@@ -62,8 +57,6 @@ class BilinearInfo(nn.Identity):
                           compared with the default overlap. This parameter should
                           probably be increased for larger overlap values.
         """
-        batch_size = z.shape[0]
-
         # For each k in k_predictions, store a set of log_fk and true_f values
         log_f_list = []
         for k in range(1, self.k_predictions + 1):
@@ -72,9 +65,9 @@ class BilinearInfo(nn.Identity):
             # First half of bilinear model, compute z^T_{t+k} W_k:
             ztwk = (
                 self.W_k[k - 1]  # 1x1 convolution
-                    .forward(z[:, :, (k + skip_step):, :])  # Bx, C , H , W
-                    .permute(2, 3, 0, 1)  # H, W, Bx, C
-                    .contiguous()
+                .forward(z[:, :, (k + skip_step) :, :])  # Bx, C , H , W
+                .permute(2, 3, 0, 1)  # H, W, Bx, C
+                .contiguous()
             )  # y, x, b, c
 
             # Take random samples from z_{t+k} W_k as contrastive samples
@@ -162,6 +155,7 @@ class VDropSparseBilinearInfo(BilinearInfo):
             )
             for _ in range(self.k_predictions)
         )
+
 
 class BilinearInfoLegacy(nn.Module):
     """

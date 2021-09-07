@@ -26,10 +26,13 @@
 
 import sys
 import time
+
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
+
 from .loss_utils import multiple_cross_entropy
+
 
 def train_block_model(
     model,
@@ -106,7 +109,8 @@ def train_block_model(
         if use_amp:
             raise ImportError(
                 "Mixed precision requires NVIDA APEX."
-                "Please install apex from https://www.github.com/nvidia/apex")
+                "Please install apex from https://www.github.com/nvidia/apex"
+            )
 
     t0 = time.time()
     for batch_idx, (data, target) in enumerate(loader):
@@ -118,8 +122,9 @@ def train_block_model(
             data = data.to(device, non_blocking=async_gpu)
             target = target.to(device, non_blocking=async_gpu)
         else:
-            data, target = transform_to_device_fn(data, target, device,
-                                                  non_blocking=async_gpu)
+            data, target = transform_to_device_fn(
+                data, target, device, non_blocking=async_gpu
+            )
         t1 = time.time()
 
         if pre_batch_callback is not None:
@@ -149,9 +154,9 @@ def train_block_model(
         # Compute and backpropagate the complexity loss. This happens after
         # error loss has backpropagated, freeing its computation graph, so the
         # two loss functions don't compete for memory.
-        complexity_loss = (complexity_loss_fn(model)
-                           if complexity_loss_fn is not None
-                           else None)
+        complexity_loss = (
+            complexity_loss_fn(model) if complexity_loss_fn is not None else None
+        )
         if complexity_loss is not None:
             if use_amp:
                 with amp.scale_loss(complexity_loss, optimizer) as scaled_loss:
@@ -164,19 +169,21 @@ def train_block_model(
         t5 = time.time()
 
         if post_batch_callback is not None:
-            time_string = ("Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
-                           "complexity loss forward/backward: {:.3f}s,"
-                           + "weight update: {:.3f}s").format(t1 - t0, t2 - t1, t3 - t2,
-                                                              t4 - t3, t5 - t4)
-            post_batch_callback(model=model,
-                                error_loss=error_loss.detach(),
-                                complexity_loss=(complexity_loss.detach()
-                                                 if complexity_loss is not None
-                                                 else None),
-                                batch_idx=batch_idx,
-                                num_images=num_images,
-                                time_string=time_string,
-                                module_losses=module_losses.detach())
+            time_string = (
+                "Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
+                "complexity loss forward/backward: {:.3f}s," + "weight update: {:.3f}s"
+            ).format(t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4)
+            post_batch_callback(
+                model=model,
+                error_loss=error_loss.detach(),
+                complexity_loss=(
+                    complexity_loss.detach() if complexity_loss is not None else None
+                ),
+                batch_idx=batch_idx,
+                num_images=num_images,
+                time_string=time_string,
+                module_losses=module_losses.detach(),
+            )
         del error_loss, complexity_loss, module_losses
         t0 = time.time()
 
@@ -242,8 +249,7 @@ def evaluate_block_model(
     async_gpu = loader.pin_memory
 
     if progress is not None:
-        loader = tqdm(loader, total=min(len(loader), batches_in_epoch),
-                      **progress)
+        loader = tqdm(loader, total=min(len(loader), batches_in_epoch), **progress)
 
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(loader):
@@ -254,24 +260,26 @@ def evaluate_block_model(
                 data = data.to(device, non_blocking=async_gpu)
                 target = target.to(device, non_blocking=async_gpu)
             else:
-                data, target = transform_to_device_fn(data, target, device,
-                                                      non_blocking=async_gpu)
+                data, target = transform_to_device_fn(
+                    data, target, device, non_blocking=async_gpu
+                )
 
             outputs = model(data)
             if active_classes is not None:
-                outputs = outputs[:, :, active_classes] #module, batch, classes
+                outputs = outputs[:, :, active_classes]  # module, batch, classes
             module_losses += criterion(outputs, target, reduction="sum")
             preds = outputs.max(-1, keepdim=True)[1]
             module_correct += preds.eq(target.view_as(preds)).sum((1, 2))
             total += len(data)
 
             if post_batch_callback is not None:
-                post_batch_callback(batch_idx=batch_idx, target=target, output=outputs,
-                                    preds=preds)
+                post_batch_callback(
+                    batch_idx=batch_idx, target=target, output=outputs, preds=preds
+                )
 
-        complexity_loss = (complexity_loss_fn(model)
-                           if complexity_loss_fn is not None
-                           else None)
+        complexity_loss = (
+            complexity_loss_fn(model) if complexity_loss_fn is not None else None
+        )
 
     if progress is not None:
         loader.close()
@@ -282,30 +290,42 @@ def evaluate_block_model(
         "mean_loss": module_losses[-1].item() / total,
         "mean_accuracy": module_correct[-1].item() / total if total > 0 else 0,
     }
-    result.update({
-        "num_bilinear_info_modules" : model.encoder.count_bilinear_info_modules(),
-        "num_emit_encodings": model.encoder.count_emit_encoding_modules(),
-    })
-    result.update({
-        f"total_correct_encoding_{i}": module_correct[i].item() for i in range(
-            module_correct.shape[0])
-    })
-    result.update({
-        f"mean_loss_encoding_{i}": module_losses[i].item() / total if total > 0
-        else 0 for i in range(module_correct.shape[0])
-    })
-    result.update({
-        f"mean_accuracy_encoding_{i}": module_correct[i].item() / total if total > 0
-        else 0
-        for i in range(module_correct.shape[0])
-    })
+    result.update(
+        {
+            "num_bilinear_info_modules": model.encoder.count_bilinear_info_modules(),
+            "num_emit_encodings": model.encoder.count_emit_encoding_modules(),
+        }
+    )
+    result.update(
+        {
+            f"total_correct_encoding_{i}": module_correct[i].item()
+            for i in range(module_correct.shape[0])
+        }
+    )
+    result.update(
+        {
+            f"mean_loss_encoding_{i}": module_losses[i].item() / total
+            if total > 0
+            else 0
+            for i in range(module_correct.shape[0])
+        }
+    )
+    result.update(
+        {
+            f"mean_accuracy_encoding_{i}": module_correct[i].item() / total
+            if total > 0
+            else 0
+            for i in range(module_correct.shape[0])
+        }
+    )
 
     if complexity_loss is not None:
         result["complexity_loss"] = complexity_loss.item()
 
     return result
 
-#TODO: Aggregate eval results for block model
+
+# TODO: Aggregate eval results for block model
 def aggregate_eval_results(results):
     """Aggregate multiple results from evaluate_model into a single result.
 
@@ -329,8 +349,10 @@ def aggregate_eval_results(results):
         loss = 0
         accuracy = 0
     else:
-        loss = sum(result["mean_loss"] * result["total_tested"]
-                   for result in results) / total
+        loss = (
+            sum(result["mean_loss"] * result["total_tested"] for result in results)
+            / total
+        )
         accuracy = correct / total
 
     return {
@@ -339,4 +361,3 @@ def aggregate_eval_results(results):
         "mean_loss": loss,
         "mean_accuracy": accuracy,
     }
-

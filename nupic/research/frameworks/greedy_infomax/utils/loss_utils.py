@@ -29,9 +29,11 @@ import torch.nn.functional as F
 
 
 """
-Used during unsupervised training of any GIM model. Returns the sum of all 
+Used during unsupervised training of any GIM model. Returns the sum of all
 BilinearInfo cross entropy losses.
 """
+
+
 def multiple_cross_entropy_bilinear_info(log_f_module_list, targets, reduction="mean"):
     device = log_f_module_list[0][0].device
     total_loss = torch.tensor(0.0, requires_grad=True, device=device)
@@ -52,18 +54,18 @@ def multiple_cross_entropy_bilinear_info(log_f_module_list, targets, reduction="
             )
     return total_loss
 
+
 """
-Used when training BlockModels using GIM. Returns a tensor of losses, each entry 
+Used when training BlockModels using GIM. Returns a tensor of losses, each entry
 representing the cross entropy loss of a specific BilinearInfo module.
 """
-def all_module_multiple_log_softmax(log_f_module_list, targets,
-                                    reduction="mean"):
+
+
+def all_module_multiple_log_softmax(log_f_module_list, targets, reduction="mean"):
     device = log_f_module_list[0][0].device
-    module_losses = torch.empty(0,
-                                requires_grad=True,
-                                device=device)
+    module_losses = torch.empty(0, requires_grad=True, device=device)
     # Sum losses from each module
-    for i, log_f_list in enumerate(log_f_module_list):
+    for log_f_list in log_f_module_list:
         # Sum losses for each k prediction
         module_loss = torch.tensor(0.0, requires_grad=True)
         for log_fk in log_f_list:
@@ -76,7 +78,9 @@ def all_module_multiple_log_softmax(log_f_module_list, targets,
             )
             softmax_fk = torch.softmax(log_fk, dim=1)
             log_softmax_fk = torch.log(softmax_fk + 1e-11)
-            module_loss = module_loss + F.nll_loss(log_softmax_fk, true_fk, reduction=reduction)
+            module_loss = module_loss + F.nll_loss(
+                log_softmax_fk, true_fk, reduction=reduction
+            )
         module_loss = module_loss / len(log_f_list)
         module_losses = torch.cat([module_losses, module_loss.view(1)])
     return module_losses
@@ -84,20 +88,22 @@ def all_module_multiple_log_softmax(log_f_module_list, targets,
 
 """
 Used for supervised training of a BlockModel with GIM. This outputs a tensor of losses,
-each of which is the cross entropy classification loss according to a specific 
+each of which is the cross entropy classification loss according to a specific
 EmitEncoding module paired with a classification head.
 """
+
+
 def multiple_cross_entropy(outputs, targets, reduction="sum"):
     device = outputs.device
     module_losses = torch.empty(0, requires_grad=True, device=device)
     for i in range(outputs.shape[0]):
-        module_losses = torch.cat([module_losses,
-                                   F.cross_entropy(outputs[i], targets,
-                                                   reduction=reduction).view(1)]
-                                )
+        module_losses = torch.cat(
+            [
+                module_losses,
+                F.cross_entropy(outputs[i], targets, reduction=reduction).view(1),
+            ]
+        )
     return module_losses
-
-
 
 
 def multiple_log_softmax_nll_loss(data_lists, targets, reduction="mean"):

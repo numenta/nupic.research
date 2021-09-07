@@ -20,13 +20,16 @@
 # ----------------------------------------------------------------------
 
 import unittest
+
 import torch
 import torch.nn as nn
-from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import GradientBlock
-from torchvision.datasets import FakeData
-from torch.utils.data import DataLoader
 from torch.optim import Adam
+from torch.utils.data import DataLoader
+from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
+
+from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import GradientBlock
+
 
 class TestGradientBlock(unittest.TestCase):
 
@@ -53,6 +56,7 @@ class TestGradientBlock(unittest.TestCase):
             linear_grads = model._modules["3"].weight.grad
             self.assertIsNone(conv1_grads)
             self.assertIsNotNone(linear_grads)
+
 
 if __name__ == "__main__":
     unittest.main()
