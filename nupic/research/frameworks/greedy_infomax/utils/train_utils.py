@@ -280,7 +280,7 @@ def evaluate_block_model(
         "total_tested": total,
         "total_correct": module_correct[-1].item(),
         "mean_loss": module_losses[-1].item() / total,
-        "mean_accuracy": module_correct[-1].item() / total,
+        "mean_accuracy": module_correct[-1].item() / total if total > 0 else 0,
     }
     result.update({
         "num_bilinear_info_modules" : model.encoder.count_bilinear_info_modules(),
@@ -304,3 +304,39 @@ def evaluate_block_model(
         result["complexity_loss"] = complexity_loss.item()
 
     return result
+
+#TODO: Aggregate eval results for block model
+def aggregate_eval_results(results):
+    """Aggregate multiple results from evaluate_model into a single result.
+
+    This function ignores fields that don't need aggregation. To get the
+    complete result dict, start with a deepcopy of one of the result dicts,
+    as follows:
+        result = copy.deepcopy(results[0])
+        result.update(aggregate_eval_results(results))
+
+    :param results:
+        A list of return values from evaluate_model.
+    :type results: list
+
+    :return:
+        A single result dict with evaluation results aggregated.
+    :rtype: dict
+    """
+    correct = sum(result["total_correct"] for result in results)
+    total = sum(result["total_tested"] for result in results)
+    if total == 0:
+        loss = 0
+        accuracy = 0
+    else:
+        loss = sum(result["mean_loss"] * result["total_tested"]
+                   for result in results) / total
+        accuracy = correct / total
+
+    return {
+        "total_correct": correct,
+        "total_tested": total,
+        "mean_loss": loss,
+        "mean_accuracy": accuracy,
+    }
+

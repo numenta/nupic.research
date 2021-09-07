@@ -46,6 +46,7 @@ def multiple_cross_entropy_bilinear_info(log_f_module_list, targets, reduction="
                 device=log_fk.device,
                 requires_grad=False,
             )  # b, y, x
+
             total_loss = total_loss + F.cross_entropy(
                 log_fk, true_fk, reduction=reduction
             )
@@ -55,8 +56,8 @@ def multiple_cross_entropy_bilinear_info(log_f_module_list, targets, reduction="
 Used when training BlockModels using GIM. Returns a tensor of losses, each entry 
 representing the cross entropy loss of a specific BilinearInfo module.
 """
-def all_module_multiple_cross_entropy_bilinear_info(log_f_module_list, targets,
-                                           reduction="mean"):
+def all_module_multiple_log_softmax(log_f_module_list, targets,
+                                    reduction="mean"):
     device = log_f_module_list[0][0].device
     module_losses = torch.empty(0,
                                 requires_grad=True,
@@ -72,8 +73,10 @@ def all_module_multiple_cross_entropy_bilinear_info(log_f_module_list, targets,
                 dtype=torch.long,
                 device=log_fk.device,
                 requires_grad=False,
-            ) # b, y, x
-            module_loss = module_loss + F.cross_entropy(log_fk, true_fk, reduction=reduction)
+            )
+            softmax_fk = torch.softmax(log_fk, dim=1)
+            log_softmax_fk = torch.log(softmax_fk + 1e-11)
+            module_loss = module_loss + F.nll_loss(log_softmax_fk, true_fk, reduction=reduction)
         module_loss = module_loss / len(log_f_list)
         module_losses = torch.cat([module_losses, module_loss.view(1)])
     return module_losses
@@ -89,7 +92,8 @@ def multiple_cross_entropy(outputs, targets, reduction="sum"):
     module_losses = torch.empty(0, requires_grad=True, device=device)
     for i in range(outputs.shape[0]):
         module_losses = torch.cat([module_losses,
-                                   F.cross_entropy(outputs[i], targets).view(1)]
+                                   F.cross_entropy(outputs[i], targets,
+                                                   reduction=reduction).view(1)]
                                 )
     return module_losses
 

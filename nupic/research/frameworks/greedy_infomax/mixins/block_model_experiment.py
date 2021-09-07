@@ -31,6 +31,7 @@ from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockMode
 
 class BlockModelExperiment(mixins.LogEveryLoss,
                            mixins.LogEveryLearningRate,
+                           mixins.RezeroWeights,
                            SelfSupervisedExperiment):
 
     def setup_experiment(self, config):

@@ -26,6 +26,7 @@
 
 import torch
 import torch.nn as nn
+from nupic.torch.modules import SparseWeights2d
 from nupic.research.frameworks.greedy_infomax.models import FullModel
 from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import \
     PreActBlockNoBN, PreActBottleneckNoBN, SparsePreActBlockNoBN, \
@@ -42,7 +43,7 @@ def full_sparse_model_blockwise_config(
         block_dims=None,
         num_channels=None,
         grayscale=True,
-        sparse_weights_class=SparseConv2d,
+        sparse_weights_class=SparseWeights2d,
         patch_size=16,
         overlap=2,
         sparsity=None,
@@ -211,3 +212,32 @@ def full_sparse_model_blockwise_config(
 
 full_resnet = full_sparse_model_blockwise_config()
 small_resnet = full_resnet[:8]
+
+full_sparse_resnet=full_sparse_model_blockwise_config(sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.7, conv2=0.7),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.1,  # dense weights
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            block4=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),  # dense
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            block4=dict(conv1=0.7, conv2=0.7),
+            block5=dict(conv1=0.7, conv2=0.7),
+            block6=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.01,  # dense
+        ),
+    ),
+    num_channels=[117, 117, 117]
+)
+small_sparse_resnet = full_sparse_resnet[:8]

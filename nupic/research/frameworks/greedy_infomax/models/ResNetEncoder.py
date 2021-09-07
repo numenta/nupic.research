@@ -427,8 +427,8 @@ class ResNetEncoder(nn.Module):
 
     def forward(self, x, n_patches_x, n_patches_y):
         z, out = self.encode(x, n_patches_x, n_patches_y)
-        log_f_list, true_f_list = self.bilinear_model(out, out)
-        return log_f_list, true_f_list, z
+        log_f_list = self.bilinear_model.estimate_info(out, out)
+        return log_f_list, z
 
 
 class SparseResNetEncoder(ResNetEncoder):

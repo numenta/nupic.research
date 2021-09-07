@@ -517,7 +517,7 @@ class GreedyInfoMaxExperimentSparseLRRangeTest(
 
 #
 # channels_density = [
-# (64, 1.0),
+# (32, 1.0),
 # (45, 0.503),
 # (58, 0.301),
 # (72, 0.194),
