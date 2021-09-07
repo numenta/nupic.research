@@ -97,7 +97,7 @@ class TaskRandomSampler(Sampler):
         self.indices = np.concatenate([self.task_indices[t] for t in self.active_tasks])
 
     def __iter__(self):
-        return (self.indices[i] for i in torch.randperm(len(self.indices)))
+        return (self.indices[i] for i in np.random.permutation(len(self.indices)))
 
     def __len__(self):
         return len(self.indices)
