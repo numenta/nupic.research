@@ -77,13 +77,13 @@ def hyperparameter_dendrites_wit_si_search_panel():
     ax1.set_xlabel("Number of dendritic segments", fontsize=16)
 
     # Add 10 tasks label
-    plt.figtext(-0.02, 0.7, "10 TASKS", fontsize=16)
+    # plt.figtext(-0.02, 0.7, "10 TASKS", fontsize=16)
 
-    fig.suptitle(
-        """Impact of the number of segments on \n 10-tasks
-        permuted MNIST performance""",
-        fontsize=16,
-    )
+    # fig.suptitle(
+    #     """Impact of the number of segments on \n 10-tasks
+    #     permuted MNIST performance""",
+    #     fontsize=16,
+    # )
     if savefigs:
         plt.savefig(
             f"{figs_dir}/hyperparameter_search_panel_with_si_dendrites.png",
