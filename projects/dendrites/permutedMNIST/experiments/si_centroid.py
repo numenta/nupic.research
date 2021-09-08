@@ -140,24 +140,23 @@ SI_CENTROID_HP_10_CONTROL["tasks_to_validate"] = [9]
 SI_CENTROID_HP_10_CONTROL['si_args'] = dict(
     c=0.1, damping=0.1, apply_to_dendrites=False)
 
-# Test on 100 tasks with SI FF + SI Dendrites.
-SI_CENTROID_100_TEST_WITH_SI = deepcopy(SI_CENTROID_100)
-SI_CENTROID_100_TEST_WITH_SI["model_args"].update(
+# Test on 50 tasks with SI FF + SI Dendrites.
+SI_CENTROID_50_TEST_WITH_SI = deepcopy(SI_CENTROID_50)
+SI_CENTROID_50_TEST_WITH_SI["model_args"].update(
     kw_percent_on=0.1, weight_sparsity=0.5)
-SI_CENTROID_100_TEST_WITH_SI["model_args"].update(
-    num_segments=100
-SI_CENTROID_100_TEST_WITH_SI["tasks_to_validate"]=[99]
-SI_CENTROID_100_TEST_WITH_SI['si_args']=dict(
+SI_CENTROID_50_TEST_WITH_SI["model_args"].update(
+    num_segments=50)
+SI_CENTROID_50_TEST_WITH_SI["tasks_to_validate"] = [49]
+SI_CENTROID_50_TEST_WITH_SI['si_args'] = dict(
     c=0.1, damping=0.1, apply_to_dendrites=True)
-SI_CENTROID_100_TEST_WITH_SI['num_samples']=8
+SI_CENTROID_50_TEST_WITH_SI['num_samples'] = 8
 
 # Export configurations in this file
-CONFIGS=dict(
+CONFIGS = dict(
     si_centroid_10=SI_CENTROID_10,
     si_centroid_50=SI_CENTROID_50,
     si_centroid_100=SI_CENTROID_100,
     si_centroid_hp_10=SI_CENTROID_HP_10,
     si_centroid_hp_10_control=SI_CENTROID_HP_10_CONTROL,
-    si_centroid_hp_50=SI_CENTROID_HP_50,
-    si_centrod_100_test_with_si=SI_CENTROID_100_TEST_WITH_SI
+    si_centroid_50_test_with_si=SI_CENTROID_50_TEST_WITH_SI
 )
