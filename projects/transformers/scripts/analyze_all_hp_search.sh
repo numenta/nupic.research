@@ -48,13 +48,8 @@ python ${PYTHON_SCRIPT_DIR}/export_finetuning_hp_search_results.py \
             -c ${HP_CONFIG_DIR}/trifecta_90 \
             -n 0
 
-
-################      TO DO 
-
-# TRIFECTA_2X
-
-# TRIFECTA_4X
-
+# Note, I did not hyperparameter search the 2x model because it was going to be expensive. Instead,
+# I guessed what the hyperparams should be and finetuned once.
 
 ### BERTITIOS
 
