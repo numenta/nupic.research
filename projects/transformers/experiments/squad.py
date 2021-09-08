@@ -26,7 +26,7 @@ from copy import deepcopy
 
 from transformers import Trainer
 
-from .base import debug_bert
+from .finetuning import finetuning_bert_100k_glue_get_info
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
 from trainer_mixins import QuestionAnsweringMixin
 
@@ -34,7 +34,7 @@ class QuestionAnsweringTrainer(QuestionAnsweringMixin, Trainer):
     pass
 
 
-debug_bert_squad = deepcopy(debug_bert)
+debug_bert_squad = deepcopy(finetuning_bert_100k_glue_get_info)
 debug_bert_squad.update(
     finetuning=True,
     task_names=None,
@@ -53,6 +53,7 @@ debug_bert_squad.update(
     max_steps=100,
     eval_steps=20,
     rm_checkpoints=True,
+    load_best_model_at_end=True,
 )
 
 # Export configurations in this file

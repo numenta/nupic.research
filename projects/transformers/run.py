@@ -653,6 +653,7 @@ def run_finetuning_squad(
 
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
+    training_args = check_best_metric(training_args, data_args.task_name)
 
     # Post-processing:
     def post_processing_function(examples, features, predictions, stage="eval"):
@@ -661,7 +662,7 @@ def run_finetuning_squad(
             examples=examples,
             features=features,
             predictions=predictions,
-            version_2_with_negative=training_args.version_2_with_negative,
+            version_2_with_negative=data_args.version_2_with_negative,
             n_best_size=training_args.n_best_size,
             max_answer_length=training_args.max_answer_length,
             start_n_top=model.config.start_n_top,
@@ -670,7 +671,7 @@ def run_finetuning_squad(
             prefix=stage,
         )
         # Format the result to the format the metric expects.
-        if training_args.version_2_with_negative:
+        if data_args.version_2_with_negative:
             formatted_predictions = [
                 {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}
                 for k, v in predictions.items()
@@ -680,8 +681,7 @@ def run_finetuning_squad(
         
         # answer_column_name is defined in init_dataset, need to refactor to avoid excessive message passing
         references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
-        import pdb
-        pdb.set_trace()
+        print(f"About to end post processing: here's an example reference: {references[0]}")
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
     # Instantiate trainer
@@ -719,13 +719,10 @@ def run_finetuning_squad(
         # Note, rm_checkpoints=True means one model will be saved
         # in the output_dir, and all checkpoint subdirectories will be
         # deleted when train() is called.
-        train_result = train(trainer,
+        train(trainer,
               training_args.output_dir,
               training_args.rm_checkpoints,
               last_checkpoint)
-
-    import pdb
-    pdb.set_trace()
 
     if training_args.do_eval:
         eval_results = evaluate_task_handler(
