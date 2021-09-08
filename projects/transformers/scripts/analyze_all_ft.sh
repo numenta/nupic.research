@@ -18,7 +18,7 @@ rm ${SMALL_CSV}
 
 # Bert 100k
 python ../export_finetuning_results.py \
-                ~/nta/tmp/finetuning/finetuning_bert100k_glue_simple_no_ESC \
+                ~/nta/finetuning/finetuning_bert_100k_glue_get_info \
                 --model_name bert_100k_simple \
                 --csv ${BASE_CSV} \
                 --pretrained_model Dense
@@ -69,8 +69,6 @@ python ../export_finetuning_results.py \
                 --pretrained_model Trifecta_90
 
 # Trifecta 90, hp chase
-# This model did not complete the right number of runs initially
-# Hence the follow up run
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/trifecta_90_hp_chase \
                 ~/nta/finetuning/trifecta_90_hp_chase_mnli \
@@ -82,6 +80,8 @@ python ../export_finetuning_results.py \
 # Trifecta 2x
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/finetuning_bert_sparse_trifecta_2x_get_info \
+                ~/nta/finetuning/trifecta_2x_hp_guess \
+                ~/nta/finetuning/trifecta_2x_hp_guess_follow_up \
                 --model_name trifecta_2x_glue_get_info \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_2x \
@@ -90,15 +90,9 @@ python ../export_finetuning_results.py \
 
 ## Small bert
 
-# Note, many of the hyperparameter chases failed for an unknown reason
-# after finetuing on 7/9 tasks. Thus, there are multiple files passed in
-# for hp chase models with names like "first two" or "follow up" to indicate
-# additional runs to get any remaining results
-
 # Bert small 100k
-# Note, the batch size for this model was larger than for small bert
 python ../export_finetuning_results.py \
-                ~/nta/finetuning/finetuning_small_bert_100k_glue \
+                ~/nta/finetuning/finetuning_small_bert_large_dataset_100k_glue \
                 --model_name small_bert_100k_get_info \
                 --csv ${SMALL_CSV} \
                 --pretrained_model Dense_small
