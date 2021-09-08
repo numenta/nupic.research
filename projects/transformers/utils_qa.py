@@ -156,6 +156,7 @@ def postprocess_qa_predictions(
         log_level (:obj:`int`, `optional`, defaults to ``logging.WARNING``):
             ``logging`` log level (e.g., ``logging.WARNING``)
     """
+
     assert len(predictions) == 2, "`predictions` should be a tuple with two elements (start_logits, end_logits)."
     all_start_logits, all_end_logits = predictions
 

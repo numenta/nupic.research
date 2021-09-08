@@ -47,7 +47,8 @@ GLUE_NAMES_PER_TASK = {
     "qnli": "QNLI",
     "rte": "RTE",
     "wnli": "WNLI",
-    "": "AX"  # diagnostic set, not yet implemented
+    "": "AX",  # diagnostic set, not yet implemented
+    "squad": "SQUAD"
 }
 
 # Metrics in each task prior to HuggingFace prepending "eval_"
