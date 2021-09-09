@@ -36,13 +36,14 @@ class QuestionAnsweringTrainer(QuestionAnsweringMixin, Trainer):
 
 debug_bert_squad = deepcopy(finetuning_bert_100k_glue_get_info)
 debug_bert_squad.update(
+    # Model Args
+    model_name_or_path="bert-base-uncased",
     finetuning=True,
     task_names=None,
     task_name="squad",
     dataset_name="squad",
     dataset_config_name="plain_text",
     trainer_class=QuestionAnsweringTrainer,
-    model_name_or_path="bert-base-cased",
     max_seq_length=128,
     do_train=True,
     do_eval=True,
@@ -56,7 +57,31 @@ debug_bert_squad.update(
     load_best_model_at_end=True,
 )
 
+
+# Supposed to train in about 24 minutes
+# Expect f1 score of 88.52, exact_match of 81.22
+bert_squad_replication = deepcopy(debug_bert_squad)
+bert_squad_replication.update(
+    per_device_train_batch_size=12,
+    per_device_eval_batch_size=12,
+    num_train_epochs=2,
+    max_seq_length=384,
+    doc_stride=128,
+    learning_rate=3e-5,
+    save_steps=100_000, # intended to be larger than number of steps in training
+    logging_steps=100_000, # intended to not log until the end
+    trainer_callbacks=[],
+)
+del bert_squad_replication["eval_steps"]
+# del bert_squad_replication["save_steps"]
+del bert_squad_replication["max_steps"]
+
+bert_squad_replication_2 = deepcopy(bert_squad_replication)
+
+
 # Export configurations in this file
 CONFIGS = dict(
-    debug_bert_squad=debug_bert_squad
+    debug_bert_squad=debug_bert_squad,
+    bert_squad_replication=bert_squad_replication,
+    bert_squad_replication_2=bert_squad_replication_2,
 )

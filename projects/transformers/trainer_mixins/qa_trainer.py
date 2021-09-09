@@ -30,7 +30,7 @@ class QuestionAnsweringMixin:
         self.eval_examples = eval_examples
         self.post_process_function = post_process_function
     
-    # *args, **kwargs
+
     def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None, metric_key_prefix: str = "eval"):
         eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
