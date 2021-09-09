@@ -219,7 +219,7 @@ def zero_momentum(optimizer, parameter, mask):
             state["exp_avg_sq"].data *= mask
     elif isinstance(optimizer, torch.optim.SGD):
         state = optimizer.state[parameter]
-        if "momentum_buffer" in state:
+        if state.get("momentum_buffer") is not None:
             state["momentum_buffer"] *= mask
     else:
         raise ValueError(

@@ -22,8 +22,6 @@
 import torch
 import torch.nn.intrinsic as nni
 from torch.quantization import (
-    DEFAULT_QAT_MODULE_MAPPING,
-    DEFAULT_QCONFIG_PROPAGATE_WHITE_LIST,
     FakeQuantize,
     MovingAverageMinMaxObserver,
     QConfig,
@@ -32,15 +30,17 @@ from torch.quantization import (
     disable_observer,
     enable_fake_quant,
     enable_observer,
+    get_default_qat_module_mappings,
+    get_default_qconfig_propagation_list,
 )
 from torch.quantization.quantize import _propagate_qconfig_helper, add_observer_
 
 from nupic.research.frameworks.quantization import QATKWINNER_MODULE_MAPPING
 
-QAT_QUANTIZED_MODULE_MAPPING = dict(DEFAULT_QAT_MODULE_MAPPING)
+QAT_QUANTIZED_MODULE_MAPPING = get_default_qat_module_mappings()
 QAT_QUANTIZED_MODULE_MAPPING.update(QATKWINNER_MODULE_MAPPING)
 QAT_QCONFIG_PROPAGATE_WHITE_LIST = (
-    set(DEFAULT_QCONFIG_PROPAGATE_WHITE_LIST)
+    get_default_qconfig_propagation_list()
     | set(QATKWINNER_MODULE_MAPPING.keys())
 )
 
