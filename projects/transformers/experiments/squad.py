@@ -68,8 +68,8 @@ bert_squad_replication.update(
     max_seq_length=384,
     doc_stride=128,
     learning_rate=3e-5,
-    save_steps=2_500,
-    eval_steps=2_500,
+    save_steps=1_000,
+    eval_steps=1_000,
     logging_steps=100_000, # intended to not log until the end
     trainer_callbacks=[],
 )
@@ -80,7 +80,19 @@ del bert_squad_replication["max_steps"]
 # with different versions of transformers,datasets, tokenizers
 bert_squad_replication_beam_search = deepcopy(bert_squad_replication)
 bert_squad_replication_beam_search.update(
-    beam_search=True
+    model_name_or_path="xlnet-large-cased",
+    beam_search=True,
+    per_device_eval_batch_size=4,
+    per_device_train_batch_size=4,
+    save_steps=5_000,
+    eval_steps=5_000,
+)
+
+bert_squad2_replication = deepcopy(bert_squad_replication_beam_search)
+bert_squad2_replication.update(
+    dataset_name="squad_v2",
+    version_2_with_negative=True,
+    num_train_epochs=4,
 )
 
 # Export configurations in this file
@@ -88,4 +100,5 @@ CONFIGS = dict(
     debug_bert_squad=debug_bert_squad,
     bert_squad_replication=bert_squad_replication,
     bert_squad_replication_beam_search=bert_squad_replication_beam_search,
+    bert_squad2_replication=bert_squad2_replication,
 )

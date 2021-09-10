@@ -681,14 +681,6 @@ def run_finetuning_squad(
         print(f"About to end post processing: here's an example reference: {references[0]}")
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
-    # Instantiate trainer
-    #   Post processing
-    #       Needs model, training_args, examples, features, predictions, answer_column_name
-    #   Compute metrics
-    # Maybe Train
-    # Maybe Eval
-    # Maybe Predict
-
     # Update where model is saved for each run
     training_args = update_run_number(training_args, run_idx)
 
@@ -725,17 +717,6 @@ def run_finetuning_squad(
         eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,
             eval_dataset)
-
-    # Test/Predict
-    # Pick up here
-    # if training_args.do_predict:
-    #     logging.info("*** Test ***")
-
-    #     test_squad(trainer,
-    #                training_args.output_dir,
-    #                predict_dataset,
-    #                predict_examples,
-    #                data_args)
 
     # There is an existing issue on training multiple models in sequence in this code
     # There is a memory leakage on the model, a small amount of GPU memory remains after
