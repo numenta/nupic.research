@@ -506,7 +506,7 @@ def squad_prepare_features_factory(split,
                         examples[key2],
                         **tokenizer_kwargs,
                     )
-            
+
         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
         offset_mapping = tokenized_examples.pop("offset_mapping")
 
@@ -516,10 +516,8 @@ def squad_prepare_features_factory(split,
 
         def preprocess_function(examples):
 
-            (tokenized_examples,
-            sample_mapping,
-            offset_mapping) = pre_pre_process(examples)
-
+            output = pre_pre_process(examples)
+            tokenized_examples, sample_mapping, offset_mapping = output
             examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]  # noqa: E501
 
             # Let's label those examples!
@@ -527,6 +525,7 @@ def squad_prepare_features_factory(split,
             tokenized_examples["end_positions"] = []
 
             if data_args.beam_search:
+                special_tokens = tokenized_examples.pop("special_tokens_mask")
                 tokenized_examples["is_impossible"] = []
                 tokenized_examples["cls_index"] = []
                 tokenized_examples["p_mask"] = []
@@ -598,12 +597,12 @@ def squad_prepare_features_factory(split,
         assert split in ["eval", "val", "test", "predict"], "unknown split"
         def preprocess_function(examples):
 
-            (tokenized_examples,
-            sample_mapping,
-            offset_mapping) = pre_pre_process(examples)
+            output = pre_pre_process(examples)
+            tokenized_examples, sample_mapping, offset_mapping = output
 
             if not data_args.beam_search:
-                examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
+                examples[question_column_name] = [q.lstrip() for q in examples[
+                    question_column_name]]
 
             tokenized_examples["example_id"] = []
 
