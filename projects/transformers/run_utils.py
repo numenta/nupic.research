@@ -666,141 +666,17 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
             f"The max_seq_length passed ({data_args.max_seq_length}) is larger than the maximum length for the"
             f"model ({tokenizer.model_max_length}). Using max_seq_length={tokenizer.model_max_length}."
         )
+
     max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
-    print(f"The max seq length is {max_seq_length}")
-    print(f"The doc stride is {data_args.doc_stride}")
-
-    # prepare_train_features = squad_prepare_features_factory("train", data_args)
-
-    # Training preprocessing
-    def prepare_train_features(examples):
-
-        examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
-
-        # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
-        # in one example possible giving several features when a context is long, each of those features having a
-        # context that overlaps a bit the context of the previous feature.
-
-        tokenizer_kwargs = get_squad_tokenizer_kwargs(data_args.beam_search)
-
-        tokenized_examples = tokenizer(
-            examples[question_column_name if pad_on_right else context_column_name],
-            examples[context_column_name if pad_on_right else question_column_name],
-            **tokenizer_kwargs,
-        )
-
-        # Since one example might give us several features if it has a long context, we need a map from a feature to
-        # its corresponding example. This key gives us just that.
-        sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-        # The offset mappings will give us a map from token to character position in the original context. This will
-        # help us compute the start_positions and end_positions.
-        offset_mapping = tokenized_examples.pop("offset_mapping")
-        # The special tokens will help us build the p_mask (which indicates the tokens that can't be in answers).
-        special_tokens = tokenized_examples.pop("special_tokens_mask")
-
-        # Let's label those examples!
-        tokenized_examples["start_positions"] = []
-        tokenized_examples["end_positions"] = []
-
-        if data_args.beam_search:
-            tokenized_examples["is_impossible"] = []
-            tokenized_examples["cls_index"] = []
-            tokenized_examples["p_mask"] = []
-
-        # Guess: this is iterating over tokens
-        for i, offsets in enumerate(offset_mapping):
-            # We will label impossible answers with the index of the CLS token.
-            input_ids = tokenized_examples["input_ids"][i]
-            cls_index = input_ids.index(tokenizer.cls_token_id)
-            if data_args.beam_search:
-                tokenized_examples["cls_index"].append(cls_index)
-
-            # Grab the sequence corresponding to that example
-            # to know what is the context and what is the question
-            sequence_ids = tokenized_examples.sequence_ids(i)
-
-            if data_args.beam_search:
-                # Grab the sequence corresponding to that example
-                # to know what is the context and what is the question.
-                sequence_ids = tokenized_examples["token_type_ids"][i]
-                for k, s in enumerate(special_tokens[i]):
-                    if s:
-                        sequence_ids[k] = 3
-                context_idx = 1 if pad_on_right else 0
-
-                # Build the p_mask: non special tokens and context gets 0.0,
-                # the others get 1.0. The cls token gets 1.0 too
-                # for predictions of empty answers.
-                tokenized_examples["p_mask"].append(
-                    [
-                        0.0 if (not special_tokens[i][k] and s == context_idx) or k == cls_index else 1.0
-                        for k, s in enumerate(sequence_ids)
-                    ]
-                )
-
-            # One example can give several spans, this is the
-            # index of the example containing this span of text.
-            sample_index = sample_mapping[i]
-            answers = examples[answer_column_name][sample_index]
-            # If no answers are given, set the cls_index as answer.
-            if len(answers["answer_start"]) == 0:
-                tokenized_examples["start_positions"].append(cls_index)
-                tokenized_examples["end_positions"].append(cls_index)
-            else:
-                # Start/end character index of the answer in the text.
-                start_char = answers["answer_start"][0]
-                end_char = start_char + len(answers["text"][0])
-
-                 # Start token index of the current span in the text.
-                if data_args.beam_search:
-                    token_start_index = 0
-                    while sequence_ids[token_start_index] != context_idx:
-                        token_start_index += 1
-                else:
-                    token_start_index = 0
-                    while sequence_ids[token_start_index] != (1 if pad_on_right else 0):
-                        token_start_index += 1
-
-                # End token index of the current span in the text.
-                if data_args.beam_search:
-                    token_end_index = len(input_ids) - 1
-                    while sequence_ids[token_end_index] != context_idx:
-                        token_end_index -= 1
-                else:
-                    token_end_index = len(input_ids) - 1
-                    while sequence_ids[token_end_index] != (1 if pad_on_right else 0):
-                        token_end_index -= 1
-
-                # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-                if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
-                    tokenized_examples["start_positions"].append(cls_index)
-                    tokenized_examples["end_positions"].append(cls_index)
-                else:
-                    # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
-                    # Note: we could go after the last offset if the answer is the last word (edge case).
-                    while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
-                        token_start_index += 1
-                    tokenized_examples["start_positions"].append(token_start_index - 1)
-                    while offsets[token_end_index][1] >= end_char:
-                        token_end_index -= 1
-                    tokenized_examples["end_positions"].append(token_end_index + 1)
-                    if data_args.beam_search:
-                        tokenized_examples["is_impossible"].append(0.0)
-
-        return tokenized_examples
+    prepare_train_features = squad_prepare_features_factory("train", data_args)
 
     train_dataset = None
-    # If returning, maybe train_dataset=None to avoid not defined var
     if training_args.do_train:
         if "train" not in datasets:
             raise ValueError("--do_train requires a train dataset")
         train_dataset = datasets["train"]
-        # import pdb
-        # pdb.set_trace()
         if data_args.max_train_samples is not None:
-            # We will select sample from whole data if agument is specified
             train_dataset = train_dataset.select(range(data_args.max_train_samples))
-        # Create train feature from dataset
 
         # with training_args.main_process_first(desc="train dataset map pre-processing"):
         train_dataset = train_dataset.map(
@@ -809,70 +685,27 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
-            # desc="Running tokenizer on train dataset",
         )
         if data_args.max_train_samples is not None:
-            # Number of samples might increase during Feature Creation, We select only specified max samples
             train_dataset = train_dataset.select(range(data_args.max_train_samples))
 
-    # Validation preprocessing
-    def prepare_validation_features(examples):
-
-        examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
-
-        tokenizer_kwargs = get_squad_tokenizer_kwags(data_args.beam_search)
-        # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
-        # in one example possible giving several features when a context is long, each of those features having a
-        # context that overlaps a bit the context of the previous feature.
-        tokenized_examples = tokenizer(
-            examples[question_column_name if pad_on_right else context_column_name],
-            examples[context_column_name if pad_on_right else question_column_name],
-            **tokenizer_kwargs,
-        )
-
-        # Since one example might give us several features if it has a long context, we need a map from a feature to
-        # its corresponding example. This key gives us just that.
-        sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-
-        # For evaluation, we will need to convert our predictions to substrings of the context, so we keep the
-        # corresponding example_id and we will store the offset mappings.
-        tokenized_examples["example_id"] = []
-
-        for i in range(len(tokenized_examples["input_ids"])):
-            # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-            sequence_ids = tokenized_examples.sequence_ids(i)
-            context_index = 1 if pad_on_right else 0
-
-            # One example can give several spans, this is the index of the example containing this span of text.
-            sample_index = sample_mapping[i]
-            tokenized_examples["example_id"].append(examples["id"][sample_index])
-
-            # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
-            # position is part of the context or not.
-            tokenized_examples["offset_mapping"][i] = [
-                (o if sequence_ids[k] == context_index else None)
-                for k, o in enumerate(tokenized_examples["offset_mapping"][i])
-            ]
-
-        return tokenized_examples
-
+    prepare_validation_features = squad_prepare_features_factory(
+        "val", data_args)
     eval_examples, eval_dataset = None, None
+
     if training_args.do_eval:
         if "validation" not in datasets:
             raise ValueError("--do_eval requires a validation dataset")
         eval_examples = datasets["validation"]
         if data_args.max_eval_samples is not None:
-            # We will select sample from whole data
             eval_examples = eval_examples.select(range(data_args.max_eval_samples))
-        # Validation Feature Creation
-        # with training_args.main_process_first(desc="validation dataset map pre-processing"):
+
         eval_dataset = eval_examples.map(
             prepare_validation_features,
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
-            # desc="Running tokenizer on validation dataset",
         )
         if data_args.max_eval_samples is not None:
             # During Feature creation dataset samples might increase, we will select required samples again
