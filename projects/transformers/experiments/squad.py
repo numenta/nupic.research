@@ -68,20 +68,24 @@ bert_squad_replication.update(
     max_seq_length=384,
     doc_stride=128,
     learning_rate=3e-5,
-    save_steps=100_000, # intended to be larger than number of steps in training
+    save_steps=2_500,
+    eval_steps=2_500,
     logging_steps=100_000, # intended to not log until the end
     trainer_callbacks=[],
 )
-del bert_squad_replication["eval_steps"]
-# del bert_squad_replication["save_steps"]
+
 del bert_squad_replication["max_steps"]
 
-bert_squad_replication_2 = deepcopy(bert_squad_replication)
-
+# Run with a different name when testing in env
+# with different versions of transformers,datasets, tokenizers
+bert_squad_replication_beam_search = deepcopy(bert_squad_replication)
+bert_squad_replication_beam_search.update(
+    beam_search=True
+)
 
 # Export configurations in this file
 CONFIGS = dict(
     debug_bert_squad=debug_bert_squad,
     bert_squad_replication=bert_squad_replication,
-    bert_squad_replication_2=bert_squad_replication_2,
+    bert_squad_replication_beam_search=bert_squad_replication_beam_search,
 )

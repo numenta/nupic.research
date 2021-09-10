@@ -507,17 +507,18 @@ def squad_prepare_features_factory(split,
                         **tokenizer_kwargs,
                     )
 
-        sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-        offset_mapping = tokenized_examples.pop("offset_mapping")
-
-        return tokenized_examples, sample_mapping, offset_mapping
+        return tokenized_examples
 
     if split == "train":
 
         def preprocess_function(examples):
 
-            output = pre_pre_process(examples)
-            tokenized_examples, sample_mapping, offset_mapping = output
+            tokenized_examples = tokenizer(
+                        examples[key1],
+                        examples[key2],
+                        **tokenizer_kwargs)
+            sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+            offset_mapping = tokenized_examples.pop("offset_mapping")
             examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]  # noqa: E501
 
             # Let's label those examples!
@@ -594,12 +595,14 @@ def squad_prepare_features_factory(split,
             return tokenized_examples
 
     else:
-        assert split in ["eval", "val", "test", "predict"], "unknown split"
+        assert split in ["eval", "val", "test", "predict", "validation"], "unknown split"
         def preprocess_function(examples):
 
-            output = pre_pre_process(examples)
-            tokenized_examples, sample_mapping, offset_mapping = output
-
+            tokenized_examples = tokenizer(
+                        examples[key1],
+                        examples[key2],
+                        **tokenizer_kwargs)
+            sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
             if not data_args.beam_search:
                 examples[question_column_name] = [q.lstrip() for q in examples[
                     question_column_name]]
@@ -634,7 +637,7 @@ def squad_prepare_features_factory(split,
                 tokenized_examples["example_id"].append(examples["id"][sample_index])
 
                 tokenized_examples["offset_mapping"][i] = [
-                    (o if sequence_ids[k] == context_index else None)
+                    (o if sequence_ids[k] == context_idx else None)
                     for k, o in enumerate(tokenized_examples["offset_mapping"][i])
                 ]
 
@@ -643,18 +646,19 @@ def squad_prepare_features_factory(split,
     return preprocess_function
 
 
-def prepare_squad_dataset_split(split,
-                    datasets,
-                    data_args,
-                    prepare_features,
-                    column_names):
+def prepare_squad_dataset(split,
+                          datasets,
+                          data_args,
+                          prepare_features,
+                          column_names):
 
     dataset, examples = None, None
     if split not in datasets:
         raise ValueError(f"--this run requires a {split} dataset")
 
     examples = datasets[split]
-    max_samples_key = f"max_{split}_samples"
+    split_key = "eval" if split == "validation" else "train"
+    max_samples_key = f"max_{split_key}_samples"
 
     if getattr(data_args, max_samples_key) is not None:
         examples = examples.select(range(getattr(data_args, max_samples_key)))
@@ -682,7 +686,7 @@ def get_squad_tokenizer_kwargs(data_args, pad_on_right, max_seq_length):
         stride=data_args.doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        padding="max_length" if data_args.pad_to_max_length,
+        padding="max_length" if data_args.pad_to_max_length else False,
     )
 
     if data_args.beam_search:
@@ -723,20 +727,19 @@ def get_squad_kwargs(datasets, tokenizer, training_args, data_args):
     max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
 
     squad_kwargs = dict(
-        tokenized_examples=tokenized_examples,
         question_column_name=question_column_name,
         context_column_name=context_column_name,
         answer_column_name=answer_column_name,
         pad_on_right=pad_on_right,
     )
 
-    return max_seq_length, squad_kwargs
+    return max_seq_length, column_names, squad_kwargs
 
 
 def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
     """Preprocess datasets for finetuning on squad"""
 
-    max_seq_lengh, squad_kwargs = get_squad_kwargs(
+    max_seq_length, column_names, squad_kwargs = get_squad_kwargs(
         datasets, tokenizer, training_args, data_args)
     pad_on_right = squad_kwargs["pad_on_right"]
 
@@ -747,14 +750,16 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
     if training_args.do_train:
         prepare_train_features = squad_prepare_features_factory(
             "train", data_args, tokenizer, tokenizer_kwargs, **squad_kwargs)
-        _, train_dataset = prepare_dataset(
-            datasets, data_args, prepare_train_features, column_names)
+        _, train_dataset = prepare_squad_dataset(
+            "train", datasets, data_args, prepare_train_features,
+            column_names)
 
     if training_args.do_eval:
         prepare_validation_features = squad_prepare_features_factory(
-            "val", data_args, tokenizer, tokenizer_kwargs, **squad_kwargs)
-        eval_examples, eval_dataset = prepare_dataset(
-            datasets, data_args, prepare_validation_features, column_names)
+            "validation", data_args, tokenizer, tokenizer_kwargs, **squad_kwargs)
+        eval_examples, eval_dataset = prepare_squad_dataset(
+            "validation", datasets, data_args, prepare_validation_features,
+            column_names)
 
     # Ignoring predict set for now
 
