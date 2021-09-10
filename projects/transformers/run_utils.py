@@ -483,46 +483,44 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
     return tokenized_datasets
 
 
-def get_squad_tokenizer_kwargs(beam_search):
-
-    tokenizer_kwargs = dict(
-            truncation="only_second" if pad_on_right else "only_first",
-            max_length=max_seq_length,
-            stride=data_args.doc_stride,
-            return_overflowing_tokens=True,
-            return_offsets_mapping=True,
-            padding="max_length" if data_args.pad_to_max_length,
-        )
-
-    if beam_search:
-        tokenizer_kwargs.update(
-            return_special_tokens_mask=True,
-            return_token_type_ids=True,
-            padding="max_length"
-        )
-
-    return tokenizer_kwargs
-
-
-def squad_prepare_features_factory(split, data_args):
+def squad_prepare_features_factory(split,
+                                   data_args,
+                                   tokenizer,
+                                   tokenizer_kwargs,
+                                   question_column_name=None,
+                                   context_column_name=None,
+                                   answer_column_name=None,
+                                   pad_on_right=None,
+                                   ):
     """
-    splits can be train / val / predict
-    beam search can be yes or no
-    create the apporpriate function for all 6 cases
-    note that this function call happens inside preprocess_datasets_squad
-    so it has access to the arguments to that function
+    splits can be train / val / and beam search ca be yes or no
     """
-    tokenizer_kwargs = get_squad_tokenizer_kwargs(data_args.beam_search)
-    tokenized_examples = tokenizer(
-                examples[question_column_name if pad_on_right else context_column_name],
-                examples[context_column_name if pad_on_right else question_column_name],
-                **tokenizer_kwargs,
-            )
+
+    key1 = question_column_name if pad_on_right else context_column_name
+    key2 = context_column_name if pad_on_right else question_column_name
+
+    def pre_pre_process(examples):
+
+        tokenized_examples = tokenizer(
+                        examples[key1],
+                        examples[key2],
+                        **tokenizer_kwargs,
+                    )
+            
+        sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+        offset_mapping = tokenized_examples.pop("offset_mapping")
+
+        return tokenized_examples, sample_mapping, offset_mapping
 
     if split == "train":
 
         def preprocess_function(examples):
-            examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
+
+            (tokenized_examples,
+            sample_mapping,
+            offset_mapping) = pre_pre_process(examples)
+
+            examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]  # noqa: E501
 
             # Let's label those examples!
             tokenized_examples["start_positions"] = []
@@ -600,10 +598,13 @@ def squad_prepare_features_factory(split, data_args):
         assert split in ["eval", "val", "test", "predict"], "unknown split"
         def preprocess_function(examples):
 
+            (tokenized_examples,
+            sample_mapping,
+            offset_mapping) = pre_pre_process(examples)
+
             if not data_args.beam_search:
                 examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
 
-            sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
             tokenized_examples["example_id"] = []
 
             if data_args.beam_search:
@@ -643,10 +644,59 @@ def squad_prepare_features_factory(split, data_args):
     return preprocess_function
 
 
-def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
-    """Preprocess datasets for finetuning"""
+def prepare_squad_dataset_split(split,
+                    datasets,
+                    data_args,
+                    prepare_features,
+                    column_names):
 
-    # Preprocessing the datasets.
+    dataset, examples = None, None
+    if split not in datasets:
+        raise ValueError(f"--this run requires a {split} dataset")
+
+    examples = datasets[split]
+    max_samples_key = f"max_{split}_samples"
+
+    if getattr(data_args, max_samples_key) is not None:
+        examples = examples.select(range(getattr(data_args, max_samples_key)))
+
+    dataset = examples.map(
+        prepare_features,
+        batched=True,
+        num_proc=data_args.preprocessing_num_workers,
+        remove_columns=column_names,
+        load_from_cache_file=not data_args.overwrite_cache,
+    )
+
+    if getattr(data_args, max_samples_key) is not None:
+        dataset = dataset.select(range(getattr(data_args, max_samples_key)))
+
+    return examples, dataset
+
+
+def get_squad_tokenizer_kwargs(data_args, pad_on_right, max_seq_length):
+
+    tokenizer_kwargs = {}
+    tokenizer_kwargs.update(
+        truncation="only_second" if pad_on_right else "only_first",
+        max_length=max_seq_length,
+        stride=data_args.doc_stride,
+        return_overflowing_tokens=True,
+        return_offsets_mapping=True,
+        padding="max_length" if data_args.pad_to_max_length,
+    )
+
+    if data_args.beam_search:
+        tokenizer_kwargs.update(
+            return_special_tokens_mask=True,
+            return_token_type_ids=True,
+            padding="max_length"
+        )
+
+    return tokenizer_kwargs
+
+
+def get_squad_kwargs(datasets, tokenizer, training_args, data_args):
     # Preprocessing is slighlty different for training and evaluation.
     if training_args.do_train:
         column_names = datasets["train"].column_names
@@ -654,70 +704,65 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
         column_names = datasets["validation"].column_names
     else:
         column_names = datasets["test"].column_names
-    question_column_name = "question" if "question" in column_names else column_names[0]
-    context_column_name = "context" if "context" in column_names else column_names[1]
-    answer_column_name = "answers" if "answers" in column_names else column_names[2]
 
-    # Padding side determines if we do (question|context) or (context|question).
+    question_column_name = "question" if "question" in column_names else column_names[0]  # noqa: E501
+    context_column_name = "context" if "context" in column_names else column_names[1]  # noqa: E501
+    answer_column_name = "answers" if "answers" in column_names else column_names[2]  # noqa: E501
+
+    # Padding side determines if we do
+    # (question|context) or (context|question).
     pad_on_right = tokenizer.padding_side == "right"
 
     if data_args.max_seq_length > tokenizer.model_max_length:
         logging.warning(
-            f"The max_seq_length passed ({data_args.max_seq_length}) is larger than the maximum length for the"
-            f"model ({tokenizer.model_max_length}). Using max_seq_length={tokenizer.model_max_length}."
+            f"The max_seq_length passed ({data_args.max_seq_length}) is "
+            "larger than the maximum length for the model "
+            f"({tokenizer.model_max_length}). Using max_seq_length="
+            f"{tokenizer.model_max_length}."
         )
 
     max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
-    prepare_train_features = squad_prepare_features_factory("train", data_args)
 
-    train_dataset = None
+    squad_kwargs = dict(
+        tokenized_examples=tokenized_examples,
+        question_column_name=question_column_name,
+        context_column_name=context_column_name,
+        answer_column_name=answer_column_name,
+        pad_on_right=pad_on_right,
+    )
+
+    return max_seq_length, squad_kwargs
+
+
+def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
+    """Preprocess datasets for finetuning on squad"""
+
+    max_seq_lengh, squad_kwargs = get_squad_kwargs(
+        datasets, tokenizer, training_args, data_args)
+    pad_on_right = squad_kwargs["pad_on_right"]
+
+    tokenizer_kwargs = get_squad_tokenizer_kwargs(
+        data_args, pad_on_right, max_seq_length)
+
+    train_dataset, eval_examples, eval_dataset = None, None, None
     if training_args.do_train:
-        if "train" not in datasets:
-            raise ValueError("--do_train requires a train dataset")
-        train_dataset = datasets["train"]
-        if data_args.max_train_samples is not None:
-            train_dataset = train_dataset.select(range(data_args.max_train_samples))
-
-        # with training_args.main_process_first(desc="train dataset map pre-processing"):
-        train_dataset = train_dataset.map(
-            prepare_train_features,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-        )
-        if data_args.max_train_samples is not None:
-            train_dataset = train_dataset.select(range(data_args.max_train_samples))
-
-    prepare_validation_features = squad_prepare_features_factory(
-        "val", data_args)
-    eval_examples, eval_dataset = None, None
+        prepare_train_features = squad_prepare_features_factory(
+            "train", data_args, tokenizer, tokenizer_kwargs, **squad_kwargs)
+        _, train_dataset = prepare_dataset(
+            datasets, data_args, prepare_train_features, column_names)
 
     if training_args.do_eval:
-        if "validation" not in datasets:
-            raise ValueError("--do_eval requires a validation dataset")
-        eval_examples = datasets["validation"]
-        if data_args.max_eval_samples is not None:
-            eval_examples = eval_examples.select(range(data_args.max_eval_samples))
-
-        eval_dataset = eval_examples.map(
-            prepare_validation_features,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-        )
-        if data_args.max_eval_samples is not None:
-            # During Feature creation dataset samples might increase, we will select required samples again
-            eval_dataset = eval_dataset.select(range(data_args.max_eval_samples))
+        prepare_validation_features = squad_prepare_features_factory(
+            "val", data_args, tokenizer, tokenizer_kwargs, **squad_kwargs)
+        eval_examples, eval_dataset = prepare_dataset(
+            datasets, data_args, prepare_validation_features, column_names)
 
     # Ignoring predict set for now
 
     return (train_dataset,
             eval_dataset,
             eval_examples,
-            answer_column_name
-    )
+            squad_kwargs["answer_column_name"])
 
 
 def init_datasets_mlm(data_args):

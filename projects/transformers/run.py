@@ -394,8 +394,7 @@ def init_dataset_for_squad(model_args, data_args, training_args,
     tokenizer = init_tokenizer(model_args)
     model = init_model(model_args, config, tokenizer, finetuning=True, squad=True)
     check_sparsity_callback(model, model_args)
-    # Tokenizing and preprocessing the datasets for downstream tasks
-    # TODO: load from cached tokenized datasets for finetuning as well
+
     logging.info(f"Tokenizing datasets for squad ...")
     (train_dataset,
      eval_dataset,
@@ -403,10 +402,6 @@ def init_dataset_for_squad(model_args, data_args, training_args,
      answer_column_name) = \
             preprocess_datasets_squad(datasets, tokenizer, training_args, data_args)
 
-
-    # Data collator
-    # We have already padded to max length if the corresponding flag is True, otherwise we need to pad in the data
-    # collator.
     data_collator = (
         default_data_collator
         if data_args.pad_to_max_length
