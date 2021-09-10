@@ -513,122 +513,34 @@ def squad_prepare_features_factory(split, data_args):
     so it has access to the arguments to that function
     """
     tokenizer_kwargs = get_squad_tokenizer_kwargs(data_args.beam_search)
+    tokenized_examples = tokenizer(
+                examples[question_column_name if pad_on_right else context_column_name],
+                examples[context_column_name if pad_on_right else question_column_name],
+                **tokenizer_kwargs,
+            )
 
-    if not data_args.beam_search:
-        if split == 'train':
-            def preprocess_function(examples):
+    if split == "train":
 
-                examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
+        def preprocess_function(examples):
+            examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
 
-                tokenized_examples = tokenizer(
-                    examples[question_column_name if pad_on_right else context_column_name],
-                    examples[context_column_name if pad_on_right else question_column_name],
-                    **tokenizer_kwargs,
-                )
+            # Let's label those examples!
+            tokenized_examples["start_positions"] = []
+            tokenized_examples["end_positions"] = []
 
-                sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-                offset_mapping = tokenized_examples.pop("offset_mapping")
-
-                tokenized_examples["start_positions"] = []
-                tokenized_examples["end_positions"] = []
-
-                for i, offsets in enumerate(offset_mapping):
-                    input_ids = tokenized_examples["input_ids"][i]
-                    cls_index = input_ids.index(tokenizer.cls_token_id)
-                    sequence_ids = tokenized_examples.sequence_ids(i)
-                    sample_index = sample_mapping[i]
-                    answers = examples[answer_column_name][sample_index]
-                    # If no answers are given, set the cls_index as answer.
-                    if len(answers["answer_start"]) == 0:
-                        tokenized_examples["start_positions"].append(cls_index)
-                        tokenized_examples["end_positions"].append(cls_index)
-                    else:
-                        # Start/end character index of the answer in the text.
-                        start_char = answers["answer_start"][0]
-                        end_char = start_char + len(answers["text"][0])
-
-                        # Start token index of the current span in the text.
-                        token_start_index = 0
-                        while sequence_ids[token_start_index] != (1 if pad_on_right else 0):
-                            token_start_index += 1
-                        # End token index of the current span in the text.
-                        token_end_index = len(input_ids) - 1
-                        while sequence_ids[token_end_index] != (1 if pad_on_right else 0):
-                            token_end_index -= 1
-                        # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-                        if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
-                            tokenized_examples["start_positions"].append(cls_index)
-                            tokenized_examples["end_positions"].append(cls_index)
-                        else:
-                            # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
-                            # Note: we could go after the last offset if the answer is the last word (edge case).
-                            while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
-                                token_start_index += 1
-                            tokenized_examples["start_positions"].append(token_start_index - 1)
-                            while offsets[token_end_index][1] >= end_char:
-                                token_end_index -= 1
-                            tokenized_examples["end_positions"].append(token_end_index + 1)
-
-                return tokenized_examples
-
-        else:
-            assert split in ["eval", "val", "test", "predict"], "unknown data split"
-            def preprocess_function(examples):
-
-                examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
-
-                tokenized_examples = tokenizer(
-                    examples[question_column_name if pad_on_right else context_column_name],
-                    examples[context_column_name if pad_on_right else question_column_name],
-                    **tokenizer_kwargs,
-                )
-
-                sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-                tokenized_examples["example_id"] = []
-
-                for i in range(len(tokenized_examples["input_ids"])):
-
-                    sequence_ids = tokenized_examples.sequence_ids(i)
-                    context_index = 1 if pad_on_right else 0
-
-                    sample_index = sample_mapping[i]
-                    tokenized_examples["example_id"].append(examples["id"][sample_index])
-
-                    tokenized_examples["offset_mapping"][i] = [
-                        (o if sequence_ids[k] == context_index else None)
-                        for k, o in enumerate(tokenized_examples["offset_mapping"][i])
-                    ]
-
-                return tokenized_examples
-
-    else:
-        if split == "train":
-            def preprocess_function(examples):
-
-                examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
-
-                tokenized_examples = tokenizer(
-                    examples[question_column_name if pad_on_right else context_column_name],
-                    examples[context_column_name if pad_on_right else question_column_name],
-                    **tokenizer_kwargs,
-                )
-
-                sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-                offset_mapping = tokenized_examples.pop("offset_mapping")
-
-                tokenized_examples["start_positions"] = []
-                tokenized_examples["end_positions"] = []
-
+            if data_args.beam_search:
                 tokenized_examples["is_impossible"] = []
                 tokenized_examples["cls_index"] = []
                 tokenized_examples["p_mask"] = []
 
-                for i, offsets in enumerate(offset_mapping):
-
-                    input_ids = tokenized_examples["input_ids"][i]
-                    cls_index = input_ids.index(tokenizer.cls_token_id)
+            for i, offsets in enumerate(offset_mapping):
+                input_ids = tokenized_examples["input_ids"][i]
+                cls_index = input_ids.index(tokenizer.cls_token_id)
+                if data_args.beam_search:
                     tokenized_examples["cls_index"].append(cls_index)
 
+                sequence_ids = tokenized_examples.sequence_ids(i)
+                if data_args.beam_search:
                     sequence_ids = tokenized_examples["token_type_ids"][i]
                     for k, s in enumerate(special_tokens[i]):
                         if s:
@@ -642,82 +554,93 @@ def squad_prepare_features_factory(split, data_args):
                         ]
                     )
 
-                    sample_index = sample_mapping[i]
-                    answers = examples[answer_column_name][sample_index]
+                sample_index = sample_mapping[i]
+                answers = examples[answer_column_name][sample_index]
+                if len(answers["answer_start"]) == 0:
+                    tokenized_examples["start_positions"].append(cls_index)
+                    tokenized_examples["end_positions"].append(cls_index)
+                else:
+                    start_char = answers["answer_start"][0]
+                    end_char = start_char + len(answers["text"][0])
 
-                    if len(answers["answer_start"]) == 0:
-                        tokenized_examples["start_positions"].append(cls_index)
-                        tokenized_examples["end_positions"].append(cls_index)
-                        tokenized_examples["is_impossible"].append(1.0)
-                    else:
-                        start_char = answers["answer_start"][0]
-                        end_char = start_char + len(answers["text"][0])
-
+                    if data_args.beam_search:
                         token_start_index = 0
                         while sequence_ids[token_start_index] != context_idx:
                             token_start_index += 1
+                    else:
+                        token_start_index = 0
+                        while sequence_ids[token_start_index] != (1 if pad_on_right else 0):
+                            token_start_index += 1
 
+                    if data_args.beam_search:
                         token_end_index = len(input_ids) - 1
                         while sequence_ids[token_end_index] != context_idx:
                             token_end_index -= 1
+                    else:
+                        token_end_index = len(input_ids) - 1
+                        while sequence_ids[token_end_index] != (1 if pad_on_right else 0):
+                            token_end_index -= 1
 
-                        if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
-                            tokenized_examples["start_positions"].append(cls_index)
-                            tokenized_examples["end_positions"].append(cls_index)
-                            tokenized_examples["is_impossible"].append(1.0)
-                        else:
-                            while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
-                                token_start_index += 1
-                            tokenized_examples["start_positions"].append(token_start_index - 1)
-                            while offsets[token_end_index][1] >= end_char:
-                                token_end_index -= 1
-                            tokenized_examples["end_positions"].append(token_end_index + 1)
+                    if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
+                        tokenized_examples["start_positions"].append(cls_index)
+                        tokenized_examples["end_positions"].append(cls_index)
+                    else:
+                        while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
+                            token_start_index += 1
+                        tokenized_examples["start_positions"].append(token_start_index - 1)
+                        while offsets[token_end_index][1] >= end_char:
+                            token_end_index -= 1
+                        tokenized_examples["end_positions"].append(token_end_index + 1)
+                        if data_args.beam_search:
                             tokenized_examples["is_impossible"].append(0.0)
 
-                return tokenized_examples
+            return tokenized_examples
 
-        else:
-            assert split in ["eval", "val", "test", "predict"], "unknown data split"
-            def preprocess_function(examples):
+    else:
+        assert split in ["eval", "val", "test", "predict"], "unknown split"
+        def preprocess_function(examples):
 
-                sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+            if not data_args.beam_search:
+                examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
+
+            sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+            tokenized_examples["example_id"] = []
+
+            if data_args.beam_search:
                 special_tokens = tokenized_examples.pop("special_tokens_mask")
-
-                tokenized_examples["example_id"] = []
                 tokenized_examples["cls_index"] = []
                 tokenized_examples["p_mask"] = []
 
-                for i, input_ids in enumerate(tokenized_examples["input_ids"]):
+            context_idx = 1 if pad_on_right else 0
+            for i, input_ids in enumerate(tokenized_examples["input_ids"]):
+
+                if data_args.beam_search:
                     cls_index = input_ids.index(tokenizer.cls_token_id)
                     tokenized_examples["cls_index"].append(cls_index)
-
                     sequence_ids = tokenized_examples["token_type_ids"][i]
                     for k, s in enumerate(special_tokens[i]):
                         if s:
                             sequence_ids[k] = 3
-                    context_idx = 1 if pad_on_right else 0
-
                     tokenized_examples["p_mask"].append(
                         [
                             0.0 if (not special_tokens[i][k] and s == context_idx) or k == cls_index else 1.0
                             for k, s in enumerate(sequence_ids)
                         ]
                     )
+                else:
+                    sequence_ids = tokenized_examples.sequence_ids(i)
 
-                    sample_index = sample_mapping[i]
-                    tokenized_examples["example_id"].append(examples["id"][sample_index])
+                sample_index = sample_mapping[i]
+                tokenized_examples["example_id"].append(examples["id"][sample_index])
 
-                    tokenized_examples["offset_mapping"][i] = [
-                        (o if sequence_ids[k] == context_idx else None)
-                        for k, o in enumerate(tokenized_examples["offset_mapping"][i])
-                    ]
+                tokenized_examples["offset_mapping"][i] = [
+                    (o if sequence_ids[k] == context_index else None)
+                    for k, o in enumerate(tokenized_examples["offset_mapping"][i])
+                ]
 
-                return tokenized_examples
+            return tokenized_examples
 
-
-
-
-
+    return preprocess_function
 
 
 def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
@@ -746,6 +669,8 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
     max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
     print(f"The max seq length is {max_seq_length}")
     print(f"The doc stride is {data_args.doc_stride}")
+
+    # prepare_train_features = squad_prepare_features_factory("train", data_args)
 
     # Training preprocessing
     def prepare_train_features(examples):
