@@ -55,8 +55,8 @@ debug_bert_squad.update(
     eval_steps=20,
     rm_checkpoints=True,
     load_best_model_at_end=True,
+    warmpup_ratio=0.
 )
-
 
 # Supposed to train in about 24 minutes
 # Expect f1 score of 88.52, exact_match of 81.22
