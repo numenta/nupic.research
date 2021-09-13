@@ -713,6 +713,9 @@ def run_finetuning_squad(
               training_args.rm_checkpoints,
               last_checkpoint)
 
+    import pdb
+    pdb.set_trace()
+
     if training_args.do_eval:
         eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,

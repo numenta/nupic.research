@@ -112,6 +112,10 @@ def train(trainer, output_dir, rm_checkpoints, last_checkpoint=None):
     ))
 
     train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
+
+    import pdb
+    pdb.set_trace()
+
     trainer.save_model()  # Saves the tokenizer too for easy upload
 
     output_train_file = os.path.join(output_dir, "train_results.txt")
@@ -594,8 +598,6 @@ def squad_prepare_features_factory(split,
                         if data_args.beam_search:
                             tokenized_examples["is_impossible"].append(0.0)
 
-            import pdb
-            pdb.set_trace()
             return tokenized_examples
 
     else:

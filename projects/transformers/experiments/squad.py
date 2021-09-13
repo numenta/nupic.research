@@ -71,7 +71,7 @@ bert_squad_replication.update(
     save_steps=1_000,
     eval_steps=1_000,
     logging_steps=100_000, # intended to not log until the end
-    trainer_callbacks=[],
+    # trainer_callbacks=[],
 )
 
 del bert_squad_replication["max_steps"]
@@ -79,6 +79,13 @@ del bert_squad_replication["max_steps"]
 bert_squad_replication_cased = deepcopy(bert_squad_replication)
 bert_squad_replication_cased.update(
     model_name_or_path="bert-base-cased"
+)
+
+bert_squad_debug_tracking = deepcopy(bert_squad_replication_cased)
+bert_squad_debug_tracking.update(
+    save_steps=50,
+    eval_steps=50,
+    max_steps=500
 )
 
 # Run with a different name when testing in env
@@ -107,4 +114,5 @@ CONFIGS = dict(
     bert_squad_replication_beam_search=bert_squad_replication_beam_search,
     bert_squad2_replication=bert_squad2_replication,
     bert_squad_replication_cased=bert_squad_replication_cased,
+    bert_squad_debug_tracking=bert_squad_debug_tracking,
 )
