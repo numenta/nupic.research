@@ -76,6 +76,11 @@ bert_squad_replication.update(
 
 del bert_squad_replication["max_steps"]
 
+bert_squad_replication_cased = deepcopy(bert_squad_replication)
+bert_squad_replication_cased.update(
+    model_name_or_path="bert-base-cased"
+)
+
 # Run with a different name when testing in env
 # with different versions of transformers,datasets, tokenizers
 bert_squad_replication_beam_search = deepcopy(bert_squad_replication)
@@ -101,4 +106,5 @@ CONFIGS = dict(
     bert_squad_replication=bert_squad_replication,
     bert_squad_replication_beam_search=bert_squad_replication_beam_search,
     bert_squad2_replication=bert_squad2_replication,
+    bert_squad_replication_cased=bert_squad_replication_cased,
 )
