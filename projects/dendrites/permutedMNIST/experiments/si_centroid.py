@@ -68,9 +68,9 @@ SI_CENTROID_10 = dict(
     model_args=dict(
         input_size=784,
         output_size=10,
-        # Note we use 2000 hidden units instead of 2048 for
+        # Note we use 2000 hidden units instead of 2048 for a better
+        # comparison with SI and XdG
         hidden_sizes=[2000, 2000],
-        # a better comparison with SI and XdG
         num_segments=10,
         dim_context=784,
         kw=True,
