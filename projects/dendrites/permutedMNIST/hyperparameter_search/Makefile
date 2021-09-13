@@ -76,4 +76,5 @@ data_hyperparameter_search/cross_hyperparameter_search.csv: ../analyze_results.p
 
 clean:
 	rm -rf data_hyperparameter_search/*
+	rm -rf data_cross_hyperparameter_search/*
 	rm -rf figs/*
