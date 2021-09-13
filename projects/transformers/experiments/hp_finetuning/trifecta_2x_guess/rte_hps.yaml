@@ -1,0 +1,3 @@
+learning_rate: 7.e-5 # small decrease from 80 trifecta, still an increase from 2e-5
+max_steps: 428
+warmup_ratio: 0

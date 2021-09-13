@@ -17,106 +17,110 @@
 #
 #  http://numenta.org/licenses/
 #
+import logging
+
 from transformers import TrainerCallback
 
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 
 
 class TrackEvalMetrics(TrainerCallback):
-    """
-    This callback is used to store a time series of metrics (e.g. accuracy),
-    after trainer.evaluate() is called. It is designed to provide the same
-    metrics for training and validation sets, at the same time points.
-    """
-    def __init__(self, sparsity_tolerance=0.01):
+
+    def __init__(self, n_eval_sets=1, sparsity_tolerance=0.01):
         """
-        Set up two dictionaries to track training and eval metrics, and a list
-        to track steps.
+        Set up a dictionary that tracks evaluation metrics
 
         *_metrics dictionaries take metric names (e.g. 'loss') as keys
         and have a list that tracks that metric accross time
 
         Example:
-            self.eval_metrics['acc'] -> [acc1, acc2, ..., accn]
+            self.eval_metrics['acc'] -> [acc_1, acc_2, ..., acc_n]
             self.steps = [eval_steps, eval_steps*2, ..., eval_steps*n]
 
-        This callback also keeps track of model sparsity, and breaks if
-        sparsity changes in absolute value by more than sparsity_tolerance.
-        If you are using a training approach that sparsifies the model, be sure
-        to set sparsity_tolerance to something like 1, so large changes in
-        sparsity are accepted.
+        :param n_eval_sets: int, how many evaluation sets you are evaluating
+                            on. Default is one, but could be 2 for mnli.
+        :param sparsity_tolerance: float, threshold for absolute value change
+                                   in sparsity. If sparsity changes by more
+                                   than tolerance, issue a warning.
         """
 
+        self.sparsity_tolerance = sparsity_tolerance
+        self.n_eval_sets = n_eval_sets
         self.eval_metrics = {}
         self.eval_metrics["sparsity"] = []
         self.eval_metrics["num_total_params"] = []
         self.eval_metrics["num_nonzero_params"] = []
         self.eval_metrics["lr"] = []
-        self.train_metrics = {}
         self.steps = []
-        self.step_counter = 0
+        self.step_counter = 0  # how many training steps
+        self.call_counter = 0  # how many times on_evaluate is called
 
     def on_evaluate(self, args, state, control, metrics, **kwargs):
-        """Update steps counter, training metrics, & eval metrics"""
+        """Update eval metrics and possibly step counter, sparsity, and lr"""
 
-        is_mnli_mm = self.check_for_mnli(metrics)
-        if not is_mnli_mm:
-            self.step_counter += args.eval_steps
-            self.steps.append(self.step_counter)
+        # track performance metrics
+        for key in metrics.keys():
+            if key not in self.eval_metrics:
+                self.eval_metrics[key] = [metrics[key]]
+            else:
+                self.eval_metrics[key].append(metrics[key])
 
-            # track performance metrics
-            for key in metrics.keys():
-                if key not in self.eval_metrics:
-                    self.eval_metrics[key] = [metrics[key]]
-                else:
-                    self.eval_metrics[key].append(metrics[key])
+        self.call_counter += 1
 
-            # track sparsity information
-            num_total, num_nonzero = count_nonzero_params(kwargs["model"])
-            model_sparsity = 1 - (num_nonzero / num_total)
-            self.eval_metrics["num_total_params"].append(num_total)
-            self.eval_metrics["num_nonzero_params"].append(num_nonzero)
-            self.eval_metrics["sparsity"].append(model_sparsity)
+        # Update steps, sparsity, learning rate
+        if self.maybe_update():
+            self.update_auxillary_metrics(args, **kwargs)
 
-            # guarantee that everything stayed sparse,
-            # up to specified tolerance
-            if (self.sparsity_tolerance < 1) and len(self.eval_metrics["sparsity"]) > 1:
-                sparse_diff = self.eval_metrics["sparsity"][0] - self.eval_metrics["sparsity"][-1]  # noqa
-                assert abs(sparse_diff) < self.sparsity_tolerance, "Model sparsity"
-                f"fluctuated beyond acceptable range. {self.eval_metrics['sparsity']}"
+    def maybe_update(self):
+        """
+        If just one eval set
+            update step counter, sparsity, etc.
+        Else
+            update only if you finished cycling through all eval sets
+        """
+        do_remaining_updates = False
+        if self.n_eval_sets > 1:
+            if self.call_counter % self.n_eval_sets == 0:
+                do_remaining_updates = True
+        else:
+            do_remaining_updates = True
 
-            # track learning rate
-            # get_last_lr() returns lr for each parameter group. For now,
-            # assume lrs are the same for all and just track one.
-            if kwargs["lr_scheduler"] is not None:
-                last_lr = kwargs["lr_scheduler"].get_last_lr()
-                self.eval_metrics["lr"].append(last_lr[0])
-
-            # TODO
-            # Possibly update train_results
-            # Possibly wandb logging
+        return do_remaining_updates
 
     def on_train_begin(self, args, state, control, **kwargs):
         """
         Stop from accumulating results accross multiple runs
         """
-        self.__init__()
+        self.__init__(self.n_eval_sets, self.sparsity_tolerance)
 
-    def check_for_mnli(self, metrics):
+    def update_auxillary_metrics(self, args, **kwargs):
+        """
+        Track sparsity, learning rate, and run checks to ensure sparsity
+        is not changing too much. Run only after updating metrics for all
+        eval sets.
+        """
+        # track sparsity information
+        num_total, num_nonzero = count_nonzero_params(kwargs["model"])
+        model_sparsity = 1 - (num_nonzero / num_total)
+        self.eval_metrics["num_total_params"].append(num_total)
+        self.eval_metrics["num_nonzero_params"].append(num_nonzero)
+        self.eval_metrics["sparsity"].append(model_sparsity)
 
-        # Using a workaround for mnli, and only evaluating mnli-mm at the very
-        # end of training. Therefore don't update anything
-        is_mnli_mm = "mm_accuracy" in metrics.keys()
+        # guarantee that everything stayed sparse, up to specified tolerance
+        if (self.sparsity_tolerance < 1) and len(self.eval_metrics["sparsity"]) > 1:
+            sparse_diff = self.eval_metrics["sparsity"][0] - self.eval_metrics["sparsity"][-1]  # noqa
+            if abs(sparse_diff) > self.sparsity_tolerance:
+                logging.warn(
+                    "Model sparsity fluctuated beyond acceptable range."
+                    f"Current sparsity level: {self.eval_metrics['sparsity'][-1]}"
+                )
 
-        # flake8 wants this to be a def, not a lambda
-        def ksplit(k):
-            return k.split("_", 1)[1] if "_" in k else k
+        # track learning rate
+        # get_last_lr() returns lr for each parameter group. For now,
+        # assume lrs are the same for all and just track one.
+        if kwargs["lr_scheduler"] is not None:
+            last_lr = kwargs["lr_scheduler"].get_last_lr()
+            self.eval_metrics["lr"].append(last_lr[0])
 
-        if is_mnli_mm:
-            self.mm_metrics = {ksplit(k): v for k, v in metrics.items()}
-
-        return is_mnli_mm
-
-    # TODO
-    # Aggregate data on train end or at least make it an option
-    # this would make hyperparameter tuning easier.
+        self.step_counter += args.eval_steps
+        self.steps.append(self.step_counter)

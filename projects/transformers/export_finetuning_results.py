@@ -37,6 +37,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from finetuning_constants import REPORTING_METRICS_PER_TASK
+
 
 class TaskResultsAnalysis:
 
@@ -112,6 +114,10 @@ class TaskResultsAnalysis:
 
         if not ax:
             fig, ax = plt.subplots()
+
+        if task not in self.task_results_dict:
+            print(f"skipping {task} in run {self.run_name}")
+            return fig, ax
 
         for run_idx in range(len(self[task].all_results)):
             x, xlabel = self._get_time_and_label(task, run_idx)
@@ -298,26 +304,56 @@ def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
     xwidth = 5 * n_models
     for task in tasks:
 
-        fig, ax = plt.subplots(1,
-                               n_models,
-                               figsize=(xwidth, 10),
-                               sharex=True,
-                               sharey=True)
+        if n_models > 5:
+            n_rows = int(np.ceil(n_models / 4))
+            n_cols = 4
+            xwidth = 5 * 4
+            yheight = n_rows * 10
+            fig, ax = plt.subplots(n_rows,
+                                   n_cols,
+                                   figsize=(xwidth, yheight),
+                                   sharex=True,
+                                   sharey=True)
+            c = 0
+            row = 0
+            col = 0
+            for model in dict_of_task_analyses.keys():
+                row = c // 4
+                col = c % 4
+                _, _ = dict_of_task_analyses[model].plot_metric(
+                    task,
+                    metric,
+                    ax=ax[row, col]
+                )
 
-        c = 0
-        for model in dict_of_task_analyses.keys():
-            _, _ = dict_of_task_analyses[model].plot_metric(
-                task,
-                metric,
-                ax=ax[c]
-            )
+                plt.legend()
 
-            plt.legend()
+                ttl = ax[row, col].get_title()
+                ttl = ttl + f"\n{model}"
+                ax[row, col].set_title(ttl)
+                c = c + 1
 
-            ttl = ax[c].get_title()
-            ttl = ttl + f"\n{model}"
-            ax[c].set_title(ttl)
-            c = c + 1
+        else:
+            fig, ax = plt.subplots(1,
+                                   n_models,
+                                   figsize=(xwidth, 10),
+                                   sharex=True,
+                                   sharey=True)
+
+            c = 0
+            for model in dict_of_task_analyses.keys():
+                _, _ = dict_of_task_analyses[model].plot_metric(
+                    task,
+                    metric,
+                    ax=ax[c]
+                )
+
+                plt.legend()
+
+                ttl = ax[c].get_title()
+                ttl = ttl + f"\n{model}"
+                ax[c].set_title(ttl)
+                c = c + 1
 
         if save_prefix:
             save_name = os.path.join(save_prefix, f"{task}_{metric}_simple_no_esc.png")
@@ -325,18 +361,107 @@ def compare_models(dict_of_task_analyses, tasks, metric, save_prefix=None):
             plt.savefig(save_name)
 
 
+def merge_data_to_results(results_file, results=None):
+
+    if not results:
+        results = {}
+
+    print_message_1 = "Length of results for {0} prior to update: " \
+                      "{1} in file {2}"
+
+    print_message_2 = "Length of results for {0} after update: " \
+                      "{1} in file {2}"
+
+    with open(results_file, "rb") as f:
+        data = pickle.load(f)
+
+    if results == {}:
+        results.update(data)
+        for task in data.keys():
+            print(print_message_1.format(
+                task,
+                len(results[task].all_results),
+                os.path.split(results_file)[-2])
+            )
+        return results
+
+    for task in data.keys():
+        if task in results:
+            print(print_message_1.format(
+                task,
+                len(results[task].all_results),
+                os.path.split(results_file)[-2]))
+            for run in data[task].all_results:
+                results[task].all_results.append(run)
+            print(print_message_2.format(
+                task,
+                len(results[task].all_results),
+                os.path.split(results_file)[-2]))
+        else:
+            results[task] = data[task]
+
+    return results
+
+
+def adapt_old_mnli(results):
+    """
+    TaskResults class has been changing over time. Need to normalize the
+    attributes for consitent results / comparison.
+    """
+    for task in results.keys():
+        task_results = results[task]
+        task_results.reporting_metrics = REPORTING_METRICS_PER_TASK[task]
+        for run in range(len(task_results.all_results)):
+            if "mm_eval_accuracy" in task_results.all_results[run]:
+                task_results.all_results[run]["eval_mm_accuracy"] = \
+                    task_results.all_results[run]["mm_eval_accuracy"]
+
+    results["mnli"].best_metric_key = "eval_mm_accuracy"
+
+    return results
+
+
 def load_results(results_files):
     results = {}
     for results_file in results_files:
         if os.path.isdir(results_file):
             results_file = os.path.join(results_file, "task_results.p")
-        with open(results_file, "rb") as f:
-            results.update(pickle.load(f))
+        results = merge_data_to_results(results_file, results)
+
+    results = adapt_old_mnli(results)
 
     return results
 
 
-def results_to_df(results, reduction, model_name):
+def load_milestone_info(pretrained_model):
+    """
+    Look for the milestones table so you can include the eval loss
+    during pretraining for the pretrained model that the current experiment
+    derives from. If you can't find the pretrained model in the table, just
+    leave it as NaN.
+    """
+    # If pretrained_model wasn't specified as a command line arg
+    if not pretrained_model:
+        return np.nan
+
+    # Load the milestones dataframe
+    milestones_path = os.path.abspath("../results/milestone1.csv")
+    milestones_df = pd.read_csv(milestones_path)
+
+    # Look for eval loss for this model and set to NaN if you can't find it
+    row_matches = pretrained_model == milestones_df["Model Name"]
+    if sum(row_matches) > 0:
+        idx = np.argmax(row_matches)
+        eval_loss = milestones_df["Eval Loss"].iloc[idx]
+    else:
+        print(f"Pretrained model name {pretrained_model} not found in "
+              "milestones dataframe. Setting eval_loss to NaN.")
+        eval_loss = np.nan
+
+    return eval_loss
+
+
+def results_to_df(results, reduction, model_name, eval_loss):
 
     # Aggregate using chosen reduction method
     for _, task_results in results.items():
@@ -365,13 +490,14 @@ def results_to_df(results, reduction, model_name):
     cols = cols[-1:] + cols[:-1]  # Reorder so model_name is first column
     df = df[cols]
 
-    # Add timing information for added context
-    df["date_added"] = pd.to_datetime("today")
+    # Plug in eval loss for pretrained model or set to NaN if N/A
+    df["MLM Eval Loss"] = eval_loss
 
     return df
 
 
-def process_results(results_files, model_name, reduction, csv, md):
+def process_results(results_files, model_name, pretrained_model,
+                    reduction, csv, md):
 
     results = load_results(results_files)
 
@@ -382,8 +508,10 @@ def process_results(results_files, model_name, reduction, csv, md):
             print(f"...loading data from {csv}")
             csv_df = pd.read_csv(csv)
 
+    eval_loss = load_milestone_info(pretrained_model)
+
     # Aggregate using chosen reduction method
-    df = results_to_df(results, reduction, model_name)
+    df = results_to_df(results, reduction, model_name, eval_loss)
 
     # print markdown
     print(df.to_markdown(index=False))
@@ -391,7 +519,7 @@ def process_results(results_files, model_name, reduction, csv, md):
     # create a new csv file to store results
     if csv_df is None:
         print(f"saving results to a new file: {csv}")
-        df.to_csv(csv, index=False)
+        df.to_csv(os.path.abspath(csv), index=False)
     # merge csv file with current results
     else:
         df = pd.concat([csv_df, df], ignore_index=True)
@@ -399,7 +527,7 @@ def process_results(results_files, model_name, reduction, csv, md):
 
     # save a markdown file
     if len(md) > 0:
-        df.to_markdown(md, index=False)
+        df.to_markdown(os.path.abspath(md), index=False)
 
 
 if __name__ == "__main__":
@@ -409,6 +537,9 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model_name", type=str,
                         default="model",
                         help="Name of the model to save")
+    parser.add_argument("-p", "--pretrained_model", type=str,
+                        default="None", help="Name of pretrained model to "
+                        "look for in milestones table")
     parser.add_argument("-r", "--reduction", type=str,
                         default="max", choices=["mean", "max"],
                         help="Reduction method to use to aggregate results"

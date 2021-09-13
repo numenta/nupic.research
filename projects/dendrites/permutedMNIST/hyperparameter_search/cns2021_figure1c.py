@@ -17,6 +17,7 @@
 #
 #  http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -42,30 +43,12 @@ def cns_figure_1c():
     df_path2 = f"{data_folder}kw_sparsity_search.csv"
     df2 = pd.read_csv(df_path2)
 
-    df1 = df1[
-        [
-            "Activation sparsity",
-            "FF weight sparsity",
-            "Num segments",
-            "Accuracy",
-        ]
-    ]
-    df1bis = df1bis[
-        [
-            "Activation sparsity",
-            "FF weight sparsity",
-            "Num segments",
-            "Accuracy",
-        ]
-    ]
-    df2 = df2[
-        [
-            "Activation sparsity",
-            "FF weight sparsity",
-            "Num segments",
-            "Accuracy",
-        ]
-    ]
+    relevant_columns = ["Activation sparsity", "FF weight sparsity", "Num segments",
+                        "Accuracy"]
+
+    df1 = df1[relevant_columns]
+    df1bis = df1bis[relevant_columns]
+    df2 = df2[relevant_columns]
 
     df1 = pd.concat([df1, df1bis])
 
@@ -88,32 +71,10 @@ def cns_figure_1c():
         fontsize=16,
     )
 
-    pt.RainCloud(
-        x=x1,
-        y=y,
-        data=df1,
-        palette=pal,
-        bw=sigma,
-        width_viol=0.6,
-        ax=ax1,
-        orient=ort,
-        move=0.2,
-        pointplot=True,
-        alpha=0.65,
-    )
-    pt.RainCloud(
-        x=x2,
-        y=y,
-        data=df2,
-        palette=pal,
-        bw=sigma,
-        width_viol=0.6,
-        ax=ax2,
-        orient=ort,
-        move=0.2,
-        pointplot=True,
-        alpha=0.65,
-    )
+    pt.RainCloud(x=x1, y=y, data=df1, palette=pal, bw=sigma, width_viol=0.6, ax=ax1,
+                 orient=ort, move=0.2, pointplot=True, alpha=0.65)
+    pt.RainCloud(x=x2, y=y, data=df2, palette=pal, bw=sigma, width_viol=0.6, ax=ax2,
+                 orient=ort, move=0.2, pointplot=True, alpha=0.65)
     ax1.set_ylim([0.9, 0.96])
     ax1.set_ylabel("Mean accuracy", fontsize=16)
     ax1.set_xlabel("Number of dendritic segments", fontsize=16)
@@ -126,20 +87,8 @@ def cns_figure_1c():
     ax2.set_xticklabels(
         ["0.99", "0.95", "0.9", "0.8", "0.6", "0.4", "0.2", "0.1"], fontsize=14
     )
-    ax2.set_yticklabels(
-        [
-            "0.60",
-            "0.65",
-            "0.70",
-            "0.75",
-            "0.80",
-            "0.85",
-            "0.90",
-            "0.95",
-            "1.0",
-        ],
-        fontsize=14,
-    )
+    ax2.set_yticklabels(["0.60", "0.65", "0.70", "0.75", "0.80", "0.85", "0.90",
+                         "0.95", "1.0"], fontsize=14)
     ax2.set_xlabel("Activation sparsity", fontsize=16)
 
     if savefigs:

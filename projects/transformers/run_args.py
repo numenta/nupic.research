@@ -49,6 +49,14 @@ class CustomTrainingArguments(TrainingArguments):
                     "for addition arguments when trainer mixins are used."
         }
     )
+    rm_checkpoints: bool = field(
+        default=False,
+        metadata={
+            "help": "Remove all checkpoint directories at the end of training"
+                    ". The model that is output at the end of training will "
+                    "still be saved."
+        }
+    )
 
 
 @dataclass
@@ -129,6 +137,15 @@ class ModelArguments:
         default_factory=dict,
         metadata={
             "help": "Allow user to define custom training arguments per task."
+        },
+    )
+    task_hyperparams_proxy: str = field(
+        default="No proxy",
+        metadata={
+            "help": "If hyperparameters for this task were borrowed from "
+                    "hyperparameters that were found for another task, that "
+                    "task_hyperparams_proxy is the name of the other task "
+                    "which acts as a proxy for this one."
         },
     )
     trainer_callbacks: List = field(

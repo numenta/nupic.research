@@ -78,7 +78,7 @@ class RestoreUtilsTest1(unittest.TestCase):
         # Make all params twice as large to differentiate it from an init-ed model.
         for name, param in self.model.named_parameters():
             if ("cnn" in name or "linear" in name) and ("weight" in name):
-                param[:] = param.data * 2
+                param.data[:] = param.data * 2
 
         # self.model.eval()
         self.in_1 = torch.rand(2, 1, 28, 28)

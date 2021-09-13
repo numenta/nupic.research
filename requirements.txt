@@ -35,9 +35,8 @@ matplotlib
 numpy
 pandas
 python-dateutil==2.8.0
-# fastai 2.1 requires pytorch 1.7, nupic.torch requires pytorch 1.6
-fastai<2.1
-pillow==7.0.0
+fastai
+pillow>=7.0.0
 python-dotenv
 ray[tune]==0.8.3
 requests
@@ -45,9 +44,7 @@ scikit-image
 seaborn>=0.11.1
 sigopt
 tabulate
-# temporary workaround to ensure torch 1.6 is installed
-torch==1.6
-torchvision==0.7.0
+torchvision
 tqdm
 h5py
 pretrainedmodels==0.7.4

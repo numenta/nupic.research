@@ -74,7 +74,7 @@ FUSE_MODULES_FUNCTIONS = {
 FUSE_MODULES_TYPES = sum(FUSE_MODULES_FUNCTIONS.keys(), ())
 
 
-def fuse_conv_linear_bn(mod_list):
+def fuse_conv_linear_bn(mod_list, additional_fuser_method_mapping=None):
     """
     Modified `torch.quantization.fuse_known_modules` adding support for linear,
     batch_norm modules.
@@ -92,7 +92,7 @@ def fuse_conv_linear_bn(mod_list):
     fuser_function = FUSE_MODULES_FUNCTIONS.get(module_types, None)
     if fuser_function is None:
         # Falls back to torch.quantization.fuse_known_modules
-        return fuse_known_modules(mod_list)
+        return fuse_known_modules(mod_list, additional_fuser_method_mapping)
 
     new_mod = [None] * len(mod_list)
     new_mod[0] = fuser_function(*mod_list)
