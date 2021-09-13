@@ -38,11 +38,13 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     small_resnet,
     small_sparse_resnet,
+    full_sparse_model_blockwise_config,
 )
 
-from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
+from .block_wise_training import CONFIGS as BLOCKWISE_CONFIGS
 
-DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
+SMALL_BLOCK = BLOCKWISE_CONFIGS["small_block"]
+SMALL_SPARSE_BLOCK = BLOCKWISE_CONFIGS["small_sparse_block"]
 
 BATCH_SIZE = 32
 NUM_EPOCHS = 10
@@ -50,12 +52,12 @@ NUM_EPOCHS = 10
 block_wise_small_resnet_args = {"module_args": small_resnet}
 block_wise_small_sparse_resnet_args = {"module_args": small_sparse_resnet}
 
-SMALL_BLOCK = deepcopy(DEFAULT_BASE)
-SMALL_BLOCK.update(
+DENSE_BLOCKWISE = deepcopy(SMALL_BLOCK)
+DENSE_BLOCKWISE.update(
     dict(
         experiment_class=BlockModelExperiment,
         wandb_args=dict(
-            project="greedy_infomax-small_block_model", name=f"base_experiment"
+            project="greedy_infomax_blockwise_tuning", name=f"conv1"
         ),
         epochs=NUM_EPOCHS,
         epochs_to_validate=range(NUM_EPOCHS),
@@ -152,6 +154,13 @@ SMALL_SPARSE_BLOCK_LR_GRID_SEARCH.update(
         cycle_momentum=False,
     ),
 )
+
+# model hyperparameters
+grayscale = True
+num_channels = 64
+input_dims = 1
+if not grayscale:
+    input_dims = 3
 
 
 CONFIGS = dict(

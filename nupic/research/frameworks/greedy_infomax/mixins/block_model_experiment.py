@@ -28,10 +28,13 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
 from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
     evaluate_block_model,
     train_block_model,
+    aggregate_eval_results_block,
 )
 from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.vernon.distributed import SelfSupervisedExperiment
 from nupic.research.frameworks.vernon.network_utils import create_model
+import copy
+import itertools
 
 
 class BlockModelExperiment(
@@ -83,21 +86,21 @@ class BlockModelExperiment(
             load_checkpoint_args=config.get("load_checkpoint_args", {}),
         )
 
-    # @classmethod
-    # def create_optimizer(cls, config, device):
-    #     if config["model_class"] != BlockModel:
-    #         return super().create_optimizer(config, device)
-    #     model_args = config.get("model_args", {})
-    #     module_args = model_args.get("module_args", [])
-    #     module_instances = model_args["modules"]
-    #     parameters_to_train = []
-    #     for module_dict, module_instance in zip(module_args, module_instances):
-    #         if module_dict["train"]:
-    #             parameters_to_train.append(module_instance.parameters())
-    #     parameters_to_train = chain(*parameters_to_train)
-    #     optimizer_class = config.get("optimizer_class", torch.optim.SGD)
-    #     optimizer_args = config.get("optimizer_args", {})
-    #     return optimizer_class(parameters_to_train, **optimizer_args)
+    @classmethod
+    def create_optimizer(cls, config, device):
+        if config["model_class"] != BlockModel:
+            return super().create_optimizer(config, device)
+        model_args = config.get("model_args", {})
+        module_args = model_args.get("module_args", [])
+        module_instances = model_args["modules"]
+        parameters_to_train = []
+        for module_dict, module_instance in zip(module_args, module_instances):
+            if module_dict.get("train", True):
+                parameters_to_train.append(module_instance.parameters())
+        parameters_to_train = itertools.chain(*parameters_to_train)
+        optimizer_class = config.get("optimizer_class", torch.optim.SGD)
+        optimizer_args = config.get("optimizer_args", {})
+        return optimizer_class(parameters_to_train, **optimizer_args)
 
     def post_batch(self, error_loss, complexity_loss, batch_idx, **kwargs):
         super().post_batch(
@@ -131,6 +134,12 @@ class BlockModelExperiment(
             for t, loss in zip(recorded_timesteps, result[f"module_{i}_loss_history"]):
                 result_by_timestep[t].update({f"module_{i}_train_loss": loss})
         return result_by_timestep
+
+    @classmethod
+    def _aggregate_validation_results(cls, results):
+        result = copy.copy(results[0])
+        result.update(aggregate_eval_results_block(results))
+        return result
 
     @classmethod
     def get_execution_order(cls):

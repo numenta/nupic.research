@@ -325,8 +325,7 @@ def evaluate_block_model(
     return result
 
 
-# TODO: Aggregate eval results for block model
-def aggregate_eval_results(results):
+def aggregate_eval_results_block(results):
     """Aggregate multiple results from evaluate_model into a single result.
 
     This function ignores fields that don't need aggregation. To get the
@@ -345,19 +344,56 @@ def aggregate_eval_results(results):
     """
     correct = sum(result["total_correct"] for result in results)
     total = sum(result["total_tested"] for result in results)
+    num_emit_encoding_modules = results[0]["num_emit_encoding_modules"]
+    num_bilinear_info_modules = results[0]["num_bilinear_info_modules"]
     if total == 0:
         loss = 0
         accuracy = 0
+        encoding_loss = [0 for _ in range(num_emit_encoding_modules)]
+        encoding_mean_accuracy = [0 for _ in range(num_emit_encoding_modules)]
+        encoding_correct = [0 for _ in range(num_emit_encoding_modules)]
     else:
         loss = (
             sum(result["mean_loss"] * result["total_tested"] for result in results)
             / total
         )
         accuracy = correct / total
+        encoding_correct = [sum(
+            result[f"total_correct_encoding_{i}"] for result in results
+        )
+            for i in range(num_emit_encoding_modules)]
 
-    return {
+        encoding_loss = [sum( result[f"mean_loss_encoding_{i}"] * result[
+            "total_tested"]  for result in results) / total
+            for i in range(num_emit_encoding_modules)]
+
+        encoding_mean_accuracy = [x / total for x in encoding_correct]
+
+    result = {
         "total_correct": correct,
         "total_tested": total,
         "mean_loss": loss,
         "mean_accuracy": accuracy,
+        "num_bilinear_info_modules": num_bilinear_info_modules,
+        "num_emit_encoding_modules": num_emit_encoding_modules,
     }
+    result.update(
+        {
+            f"total_correct_encoding_{i}": encoding_correct[i]
+            for i in range(num_emit_encoding_modules)
+        }
+    )
+    result.update(
+        {
+            f"mean_loss_encoding_{i}": encoding_loss[i]
+            for i in range(num_emit_encoding_modules)
+        }
+    )
+    result.update(
+        {
+            f"mean_accuracy_encoding_{i}": encoding_mean_accuracy[i]
+            for i in range(num_emit_encoding_modules)
+        }
+    )
+
+    return result
