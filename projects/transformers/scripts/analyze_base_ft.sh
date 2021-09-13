@@ -11,6 +11,9 @@ rm ${BASE_CSV}
 
 ## Base bert
 
+# Note, before the follow up on dense, results prior to early stopping or
+# load_best_model_at_end can be found in the directory below
+# ~/nta/tmp/finetuning/finetuning_bert100k_glue_simple_no_ESC \
 # Bert 100k
 python ../export_finetuning_results.py \
                 ~/nta/finetuning/finetuning_bert_100k_glue_get_info \
@@ -48,3 +51,12 @@ python ../export_finetuning_results.py \
                 --csv ${BASE_CSV} \
                 --pretrained_model Trifecta_90 \
                 --md ${BASE_MD}
+
+# Bert 100k
+python ../export_finetuning_results.py \
+                ~/nta/finetuning/finetuning_bert_sparse_trifecta_2x_get_info \
+                ~/nta/finetuning/trifecta_2x_hp_guess \
+                ~/nta/finetuning/trifecta_2x_hp_guess_follow_up \
+                --model_name Trifecta_2x \
+                --csv ${BASE_CSV} \
+                --pretrained_model Trifecta_2x
