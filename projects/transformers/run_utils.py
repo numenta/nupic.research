@@ -1257,7 +1257,7 @@ def check_best_metric(training_args, task_name, metric=None):
 
     print("metric configuration after checks: "
           f"{metric}, {greater_is_better}")
-    training_args.greater_is_beter = greater_is_better
+    training_args.greater_is_better = greater_is_better
     training_args.metric_for_best_model = metric
 
     return training_args
@@ -1398,7 +1398,9 @@ def init_squad_trainer(trainer_kwargs, data_args, trainer_class, trainer_callbac
 
     """Initialize Trainer, main class that controls the experiment"""
     check_callback_types(trainer_callbacks)
+    print(f"training args mertric config after checking callback types: {training_args.greater_is_better}, {training_args.metric_for_best_model}")
 
+    # metric checks belong after this, not before
     metric = load_metric("squad_v2" if data_args.version_2_with_negative else "squad")
     def compute_metrics_squad(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)

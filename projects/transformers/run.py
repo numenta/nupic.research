@@ -650,6 +650,8 @@ def run_finetuning_squad(
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
 
+    print(f"training args mertric config after checks: {training_args.greater_is_better}, {training_args.metric_for_best_model}")
+
     # Post-processing:
     def post_processing_function(examples, features, predictions, stage="eval"):
         # Post-processing: we match the start logits and end logits to answers in the original context.
@@ -684,6 +686,9 @@ def run_finetuning_squad(
     # Update where model is saved for each run
     training_args = update_run_number(training_args, run_idx)
 
+    print(f"training args mertric config after update run #: {training_args.greater_is_better}, {training_args.metric_for_best_model}")
+
+
     training_args.trainer_class = QuestionAnsweringTrainer
 
     trainer_kwargs = dict(
@@ -703,6 +708,10 @@ def run_finetuning_squad(
                                  data_args,
                                  training_args.trainer_class,
                                  model_args.trainer_callbacks)
+
+    print("training args mertric config after instantiating trainer: ")
+    print(f"{trainer.args.greater_is_better}, {trainer.args.metric_for_best_model}")
+
 
     if training_args.do_train:
         # Note, rm_checkpoints=True means one model will be saved
