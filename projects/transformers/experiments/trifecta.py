@@ -405,12 +405,27 @@ finetuning_small_bert_sparse_4x_trifecta_100k_glue.update(
 # BERT Base
 # ---------
 
-
+# SQUAD
 squad_trifecta_100k = deepcopy(bert_100k_squad)
 squad_trifecta_100k.update(
     trainer_callbacks=[
         RezeroWeightsCallback(),
         TrackEvalMetrics()]
+)
+
+squad_trifecta_85_100k = deepcopy(bert_100k_squad)
+squad_trifecta_85_100k.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k"  # noqa: E501
+)
+
+squad_trifecta_90_100k = deepcopy(bert_100k_squad)
+squad_trifecta_90_100k.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa: E501
+)
+
+squad_trifecta_2x_100k = deepcopy(bert_100k_squad)
+squad_trifecta_2x_100k.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k",  # noqa: E501
 )
 
 # BERT Base with KD + RigL + OneCycle LR
@@ -681,12 +696,15 @@ CONFIGS = dict(
     finetuning_bert_sparse_trifecta_100k_glue_get_info=finetuning_bert_sparse_trifecta_100k_glue_get_info,  # noqa: E501
     verify_bert_sparse_trifecta_100k=verify_bert_sparse_trifecta_100k,
     #   85% sparse
+    squad_trifecta_85_100k=squad_trifecta_85_100k,
     bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
     finetuning_bert_sparse_85_trifecta_100k_glue_get_info=finetuning_bert_sparse_85_trifecta_100k_glue_get_info,  # noqa: E501
     #   90% sparse
+    squad_trifecta_90_100k=squad_trifecta_90_100k,
     bert_sparse_90_trifecta_100k=bert_sparse_90_trifecta_100k,
     finetuning_bert_sparse_90_trifecta_100k_glue_get_info=finetuning_bert_sparse_90_trifecta_100k_glue_get_info,  # noqa: E501
     #   2x wide ~16 Mi Params
+    squad_trifecta_2x_100k=squad_trifecta_2x_100k,
     bert_sparse_trifecta_2x_100k=bert_sparse_trifecta_2x_100k,
     bert_sparse_2x_100k_kd_lr_range_test=bert_sparse_2x_100k_kd_lr_range_test,
     finetuning_bert_sparse_trifecta_2x_get_info=finetuning_bert_sparse_trifecta_2x_get_info,  # noqa E501
