@@ -29,6 +29,10 @@ import torch.nn.functional as F
 
 
 def multiple_cross_entropy(data_lists, targets, reduction="mean"):
+    """
+    Calculates the cross entropy for the output of each BilinearInfo module and returns
+    the sum.
+    """
     log_f_module_list, true_f_module_list = data_lists
     device = log_f_module_list[0][0].device
     total_loss = torch.tensor(0.0, requires_grad=True, device=device)
@@ -43,10 +47,19 @@ def multiple_cross_entropy(data_lists, targets, reduction="mean"):
 
 
 def multiple_log_softmax_nll_loss(data_lists, targets, reduction="mean"):
+    """
+    Computes the log softmax of multiple BilinearInfo module outputs and then takes the
+    sum of their negative log-likelihood losses.
+    """
     return module_specific_log_softmax_nll_loss(data_lists, targets).sum()
 
 
 def module_specific_log_softmax_nll_loss(data_lists, targets, reduction="mean"):
+    """
+    Instead of taking the sum of losses of all modules, this returns a tensor with size
+    equal to the number of modules, each entry being the loss contribution of a single
+    BilinearInfo module.
+    """
     log_f_module_list, true_f_module_list = data_lists
     device = log_f_module_list[0][0].device
     total_loss = torch.zeros(len(log_f_module_list), requires_grad=False, device=device)
@@ -67,6 +80,12 @@ def module_specific_log_softmax_nll_loss(data_lists, targets, reduction="mean"):
 
 
 def true_gim_loss(data_lists, targets, reduction="mean"):
+    """
+    Calculates the "true" GreedyInfoMax loss function defined in the paper for each
+    module, then takes the sum. The difference lies in the fact that the numerator
+    should not be included in the denominator, whereas the softmax function includes the
+    numerator in the denominator.
+    """
     log_f_module_list, true_f_module_list = data_lists
     device = log_f_module_list[0][0].device
     total_loss = torch.tensor(0.0, requires_grad=True, device=device)
@@ -81,6 +100,10 @@ def true_gim_loss(data_lists, targets, reduction="mean"):
 
 
 def module_specific_cross_entropy(data_lists, targets, reduction="mean", module=-1):
+    """
+    Calculates the cross entropy loss for a single module out of the multiple
+    BilinearInfo module outputs provided in data_lists.
+    """
     log_f_module_list, true_f_module_list = data_lists
     device = log_f_module_list[0][0].device
     total_loss = torch.tensor(0.0, requires_grad=True, device=device)

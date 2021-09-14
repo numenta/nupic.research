@@ -29,7 +29,6 @@ import time
 
 import torch
 import torch.nn.functional as F
-from tqdm import tqdm
 
 
 def gen_orthgonal(dim):
@@ -71,7 +70,7 @@ def patchify_inputs(x, patch_size, overlap):
     return x, n_patches_x, n_patches_y
 
 
-def train_model_gim(
+def train_gim_model(
     model,
     loader,
     optimizer,
@@ -107,7 +106,6 @@ def train_model_gim(
     :param active_classes: a list of indices of the heads that are active for a given
                            task; only relevant if this function is being used in a
                            continual learning scenario
-    :type active_classes: list of int or None
     :param pre_batch_callback: Callback function to be called before every batch
                                with the following parameters: model, batch_idx
     :type pre_batch_callback: function
@@ -120,10 +118,8 @@ def train_model_gim(
                                    the data or targets, and determining what
                                    actually needs to get sent to the device.
     :type transform_to_device_fn: function
-    :param progress_bar: Optional :class:`tqdm` progress bar args.
-                         None for no progress bar
-    :type progress_bar: dict or None
-
+    :param progress_bar: Unused
+    :param active_classes: Unused
     :return: mean loss for epoch
     :rtype: float
     """
@@ -131,24 +127,6 @@ def train_model_gim(
     # Use asynchronous GPU copies when the memory is pinned
     # See https://pytorch.org/docs/master/notes/cuda.html
     async_gpu = loader.pin_memory
-    if progress_bar is not None:
-        loader = tqdm(loader, **progress_bar)
-        # update progress bar total based on batches_in_epoch
-        if batches_in_epoch < len(loader):
-            loader.total = batches_in_epoch
-
-    # Check if training with Apex Mixed Precision
-    # FIXME: There should be another way to check if 'amp' is enabled
-    use_amp = hasattr(optimizer, "_amp_stash")
-    try:
-        from apex import amp
-    except ImportError:
-        if use_amp:
-            raise ImportError(
-                "Mixed precision requires NVIDA APEX."
-                "Please install apex from https://www.github.com/nvidia/apex"
-            )
-
     t0 = time.time()
     for batch_idx, (data, target) in enumerate(loader):
         if batch_idx >= batches_in_epoch:
@@ -180,12 +158,7 @@ def train_model_gim(
         del data, target, output
 
         t2 = time.time()
-        if use_amp:
-            with amp.scale_loss(error_loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            error_loss.backward()
-
+        error_loss.backward()
         t3 = time.time()
 
         # Compute and backpropagate the complexity loss. This happens after
@@ -195,11 +168,7 @@ def train_model_gim(
             complexity_loss_fn(model) if complexity_loss_fn is not None else None
         )
         if complexity_loss is not None:
-            if use_amp:
-                with amp.scale_loss(complexity_loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                complexity_loss.backward()
+            complexity_loss.backward()
 
         t4 = time.time()
         optimizer.step()
@@ -223,12 +192,8 @@ def train_model_gim(
         del error_loss, complexity_loss, module_specific_losses
         t0 = time.time()
 
-    if progress_bar is not None:
-        loader.n = loader.total
-        loader.close()
 
-
-def evaluate_model_gim(
+def evaluate_gim_model(
     model,
     loader,
     device,
@@ -258,8 +223,6 @@ def evaluate_model_gim(
                            task; only relevant if this function is being used in a
                            continual learning scenario
     :type active_classes: list of int or None
-    :param progress: Optional :class:`tqdm` progress bar args. None for no progress bar
-    :type progress: dict or None
     :param post_batch_callback: Callback function to be called after every batch
                                 with the following parameters:
                                 batch_idx, target, output, pred
@@ -270,6 +233,8 @@ def evaluate_model_gim(
                                    the data or targets, and determining what
                                    actually needs to get sent to the device.
     :type transform_to_device_fn: function
+    :param progress: Unused
+
 
     :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
     :rtype: dict
@@ -282,10 +247,6 @@ def evaluate_model_gim(
     correct = torch.tensor(0, device=device)
 
     async_gpu = loader.pin_memory
-
-    if progress is not None:
-        loader = tqdm(loader, total=min(len(loader), batches_in_epoch), **progress)
-
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(loader):
             if batch_idx >= batches_in_epoch:
@@ -315,10 +276,6 @@ def evaluate_model_gim(
         complexity_loss = (
             complexity_loss_fn(model) if complexity_loss_fn is not None else None
         )
-
-    if progress is not None:
-        loader.close()
-
     correct = correct.item()
     loss = loss.item()
 

@@ -51,7 +51,7 @@ class BilinearInfo(nn.Module):
 
     After computing this value for all necessary positive and contrastive samples,
     the positive examples are at index 0 and the rest are indices 1:n, where n is
-    the number of contrastive samples per positive sample. Therefore, the the loss
+    the number of contrastive samples per positive sample. Therefore, the loss
     simply becomes nn.CrossEntropy with the "class" index set to 0:
 
         loss(x,class)= −log( exp(x[class] / (∑_j exp(x[j]) )
@@ -123,9 +123,7 @@ class BilinearInfo(nn.Module):
                 ztwk.shape[2],
                 self.negative_samples,
                 ztwk.shape[3],
-            ).permute(
-                0, 1, 2, 4, 3
-            )  # y, x, b, c, n
+            ).permute(0, 1, 2, 4, 3)  # y, x, b, c, n
 
             # Multiply ztwk and context for full bilinear model
             context = (
@@ -157,6 +155,15 @@ class BilinearInfo(nn.Module):
 
 
 class SparseBilinearInfo(BilinearInfo):
+    """
+    A mutual information estimator which operates the same as the above BilinearInfo
+    class, but instead uses sparse convolutional layers in place of the dense
+    convolutional layers.
+
+    :param sparse_weights_class: the class which will wrap the dense convolutional
+                                 layers and induce sparsity
+    :param sparsity: the static sparsity of the weights for each estimator W[k]
+    """
     def __init__(
         self,
         in_channels,
@@ -164,17 +171,25 @@ class SparseBilinearInfo(BilinearInfo):
         negative_samples=16,
         k_predictions=5,
         sparse_weights_class=SparseWeights2d,
-        sparsity=0.1,
+        sparsity=0.0,
     ):
         super(SparseBilinearInfo, self).__init__(
             in_channels, out_channels, negative_samples, k_predictions
         )
-        if sparsity and sparsity > 0.3:
+        if sparsity > 0.3:
             for i in range(len(self.W_k)):
                 self.W_k[i] = sparse_weights_class(self.W_k[i], sparsity=sparsity)
 
 
 class VDropSparseBilinearInfo(BilinearInfo):
+    """
+    Another sparse weights implementation of the above BilinearInfo mutual information
+    estimator, except using variational dropout convolutional layers instead of static
+    sparse convolutional layers.
+
+    :param central_data: As in other VDrop models, a VDropCentralData instance used by
+                         the variational dropout optimization process
+    """
     def __init__(
         self,
         in_channels,

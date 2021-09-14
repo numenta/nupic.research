@@ -31,7 +31,7 @@ from nupic.research.frameworks.backprop_structure.modules import (
     MaskedVDropCentralData,
     VDropConv2d,
 )
-from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
+from nupic.research.frameworks.greedy_infomax.models.resnet_encoder import (
     PreActBlockNoBN,
     PreActBottleneckNoBN,
     ResNetEncoder,

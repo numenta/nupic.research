@@ -27,8 +27,19 @@
 import torch.nn as nn
 
 
-class ClassificationModel(nn.Module):
-    def __init__(self, in_channels=256, num_classes=10, hidden_nodes=0):
+class Classifier(nn.Module):
+    """
+    A simple multilayer perceptron classification head which outputs a distribution
+    over possible class labels. This is used in the supervised phase of Greedy
+    InfoMax experiments to tell how "useful" a given encoding is by proxy of how
+    well an encoding can be mapped to the correct class label.
+
+    :param in_channels: The dimensionality of the input to this model
+    :param num_classes: The dimensionality of the output (the number of possible
+    class labels)
+
+    """
+    def __init__(self, in_channels=256, num_classes=10):
         super().__init__()
         self.in_channels = in_channels
         self.avg_pool = nn.AvgPool2d((7, 7), padding=0)
@@ -40,27 +51,33 @@ class ClassificationModel(nn.Module):
     def forward(self, x):
         # detach x just in case it's still connected to active parts of the
         # computation graph
+        batch_size = x.shape[0]
         x = x.detach()
         x = self.avg_pool(x).squeeze()
         x = self.model(x).squeeze()
-        return x
+        return x.view(batch_size, -1)
 
 
-class MultipleClassificationModel(nn.Module):
-    def __init__(self, in_channels=None, num_classes=10, hidden_nodes=None):
+class MultiClassifier(nn.Module):
+    """
+    A model which contains many classification models. Oftentimes, a Greedy InfoMax
+    experiment that uses the BlockModel will emit several different encodings,
+    one for each EmitEncoding layer. This model allows for a classifier to be
+    independently fit to each encoding layer, which shows how well each layer can be
+    used on a downstream task.
+
+    """
+    def __init__(self, in_channels=None, num_classes=10):
         super().__init__()
         if self.in_channels is None:
             raise Exception("In channels list is required")
-        if hidden_nodes is None or len(hidden_nodes) != len(in_channels):
-            hidden_nodes = [0 for _ in range(len(in_channels))]
         self.classifiers = nn.ModuleList(
             [
-                ClassificationModel(
+                Classifier(
                     in_channels=in_channels[i],
                     num_classes=num_classes,
-                    hidden_nodes=hidden_nodes[i],
                 )
-                for i in range(len(hidden_nodes))
+                for i in range(len(in_channels))
             ]
         )
 

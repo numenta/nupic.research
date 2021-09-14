@@ -24,10 +24,10 @@ from copy import deepcopy
 import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
-    ClassificationModel,
+from nupic.research.frameworks.greedy_infomax.models.classification_model import (
+    Classifier,
 )
-from nupic.research.frameworks.greedy_infomax.models.FullModel import (
+from nupic.research.frameworks.greedy_infomax.models.full_model import (
     SparseFullVisionModel,
 )
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
@@ -214,7 +214,7 @@ LARGE_SPARSE_WEIGHTS_ACTIVATIONS.update(
             percent_on=sparse_activations_only_args["percent_on"],
         ),
         classifier_config=dict(
-            model_class=ClassificationModel,
+            model_class=Classifier,
             model_args=dict(in_channels=512, num_classes=NUM_CLASSES),
             loss_function=torch.nn.functional.cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -257,7 +257,7 @@ LARGE_SPARSE_WEIGHTS_ACTIVATIONS.update(
 #             sparse_weights_class=SparseWeights2d,
 #         ),
 #         classifier_config=dict(
-#             model_class=ClassificationModel,
+#             model_class=Classifier,
 #             model_args=dict(in_channels=256, num_classes=NUM_CLASSES),
 #             loss_function=torch.nn.functional.cross_entropy,
 #             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"

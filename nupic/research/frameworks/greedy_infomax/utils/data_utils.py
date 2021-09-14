@@ -24,16 +24,23 @@
 # https://arxiv.org/abs/1905.11786
 # ----------------------------------------------------------------------
 
-
-from copy import deepcopy
-
 from torchvision import transforms
 
 
-# get transforms for the dataset
+"""
+Composes transforms specific to GreedyInfoMax experiments according to an arguments
+dictionary.
+:param val: An optional boolean which specifies whether the dataset is for a training or
+            validation. Defaults to False.
+:param aug: A dictionary which specifies the augmentations to apply to the dataset.
+            Keys include "randcrop" and "flip", which determine whether to randomly
+            crop or flip the samples respectively.
+
+"""
+
+
 def get_transforms(val=False, aug=None):
     trans = []
-
     if aug["randcrop"]:
         if not val:
             trans.append(transforms.RandomCrop(aug["randcrop"]))
@@ -49,25 +56,3 @@ def get_transforms(val=False, aug=None):
 
     trans = transforms.Compose(trans)
     return trans
-
-
-# labeled train set: mean [0.4469, 0.4400, 0.4069], std [0.2603, 0.2566, 0.2713]
-aug = {"randcrop": 64, "flip": True, "bw_mean": [0.4120], "bw_std": [0.2570]}
-transform_unsupervised = get_transforms(val=False, aug=aug)
-transform_validation = transform_supervised = get_transforms(val=True, aug=aug)
-
-base_dataset_args = dict(root="~/nta/data/STL10/", download=False)
-# base_dataset_args = dict(root="~/nta/data/STL10/stl10_binary", download=False)
-unsupervised_dataset_args = deepcopy(base_dataset_args)
-unsupervised_dataset_args.update(
-    dict(transform=transform_unsupervised, split="unlabeled")
-)
-supervised_dataset_args = deepcopy(base_dataset_args)
-supervised_dataset_args.update(dict(transform=transform_supervised, split="train"))
-validation_dataset_args = deepcopy(base_dataset_args)
-validation_dataset_args.update(dict(transform=transform_validation, split="test"))
-STL10_DATASET_ARGS = dict(
-    unsupervised=unsupervised_dataset_args,
-    supervised=supervised_dataset_args,
-    validation=validation_dataset_args,
-)
