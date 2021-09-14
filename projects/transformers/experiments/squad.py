@@ -88,6 +88,11 @@ bert_squad_debug_tracking.update(
     max_steps=500
 )
 
+bert_100k_squad = deepcopy(bert_squad_replication_cased)
+bert_100k_squad.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
+)
+
 # Run with a different name when testing in env
 # with different versions of transformers,datasets, tokenizers
 bert_squad_replication_beam_search = deepcopy(bert_squad_replication)
@@ -115,4 +120,5 @@ CONFIGS = dict(
     bert_squad2_replication=bert_squad2_replication,
     bert_squad_replication_cased=bert_squad_replication_cased,
     bert_squad_debug_tracking=bert_squad_debug_tracking,
+    bert_100k_squad=bert_100k_squad
 )

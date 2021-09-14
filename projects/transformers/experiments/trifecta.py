@@ -37,6 +37,7 @@ from .finetuning import (
 )
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
+from .squad import bert_100k_squad
 
 
 """
@@ -405,6 +406,13 @@ finetuning_small_bert_sparse_4x_trifecta_100k_glue.update(
 # ---------
 
 
+squad_trifecta_100k = deepcopy(bert_100k_squad)
+squad_trifecta_100k.update(
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        TrackEvalMetrics()]
+)
+
 # BERT Base with KD + RigL + OneCycle LR
 # This achieves and eval-loss of 2.138, just slightly under 2.154 from its dense
 # counterpart. See `sparse_v5_trifecta_100k` in the README for more details.
@@ -667,6 +675,7 @@ CONFIGS = dict(
 
     # BERT Base
     #   80% sparse
+    squad_trifecta_100k=squad_trifecta_100k,
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,  # noqa: E501
     finetuning_bert_sparse_trifecta_100k_glue_get_info=finetuning_bert_sparse_trifecta_100k_glue_get_info,  # noqa: E501
