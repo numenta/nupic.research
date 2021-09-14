@@ -113,9 +113,6 @@ def train(trainer, output_dir, rm_checkpoints, last_checkpoint=None):
 
     train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
 
-    import pdb
-    pdb.set_trace()
-
     trainer.save_model()  # Saves the tokenizer too for easy upload
 
     output_train_file = os.path.join(output_dir, "train_results.txt")
@@ -1398,7 +1395,6 @@ def init_squad_trainer(trainer_kwargs, data_args, trainer_class, trainer_callbac
 
     """Initialize Trainer, main class that controls the experiment"""
     check_callback_types(trainer_callbacks)
-    print(f"training args mertric config after checking callback types: {training_args.greater_is_better}, {training_args.metric_for_best_model}")
 
     # metric checks belong after this, not before
     metric = load_metric("squad_v2" if data_args.version_2_with_negative else "squad")
@@ -1835,8 +1831,7 @@ def get_best_run_and_link_best_predictions(training_args,
     set, then create a symlink between {task_name}_best.tsv and the test set
     predictions of the run with the best eval scores. (e.g. CoLA_best.tsv).
     """
-    import pdb
-    pdb.set_trace()
+
     # get the filename with predictions from the best model
     best_run = task_results.get_model_with_best_max()
     task_path = os.path.dirname(training_args.output_dir)
