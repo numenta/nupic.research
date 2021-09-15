@@ -408,7 +408,7 @@ finetuning_small_bert_sparse_4x_trifecta_100k_glue.update(
 # SQUAD
 squad_trifecta_100k = deepcopy(bert_100k_squad)
 squad_trifecta_100k.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k"  # noqa: E501
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
     trainer_callbacks=[
         RezeroWeightsCallback(),
         TrackEvalMetrics()]

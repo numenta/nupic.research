@@ -1008,6 +1008,10 @@ def init_model(model_args, config, tokenizer, finetuning=False, squad=False):
                     model_args.model_name_or_path, **model_kwargs
                 )
             else:
+                print(f"model kwargs: {model_kwargs}")
+                print(f"model args: {model_args}")
+                import pdb
+                pdb.set_trace()
                 model = AutoModelForQuestionAnswering.from_pretrained(
                     model_args.model_name_or_path, **model_kwargs
                 )
