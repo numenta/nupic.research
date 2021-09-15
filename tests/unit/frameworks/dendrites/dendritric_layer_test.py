@@ -57,7 +57,7 @@ class DendriteSegmentsTests(unittest.TestCase):
             num_units=10, num_segments=20, dim_context=15, sparsity=sparsity, bias=True
         )
 
-        weights = dendrite_segments.weights
+        weights = dendrite_segments.weights.data
         weights[:] = 1
         dendrite_segments.rezero_weights()
 
@@ -279,7 +279,7 @@ class BiasingDendriticLayerTests(unittest.TestCase):
         )
 
         linear_weights = linear.weight.data
-        dendrite_weights = dendrite_layer.segments.weights
+        dendrite_weights = dendrite_layer.segments.weights.data
         linear_weights[:] = 1
         dendrite_weights[:] = 1
         dendrite_layer.rezero_weights()
