@@ -514,13 +514,13 @@ def squad_prepare_features_factory(split,
 
         def preprocess_function(examples):
 
+            examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]  # noqa: E501
             tokenized_examples = tokenizer(
                         examples[key1],
                         examples[key2],
                         **tokenizer_kwargs)
             sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
             offset_mapping = tokenized_examples.pop("offset_mapping")
-            examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]  # noqa: E501
 
             # Let's label those examples!
             tokenized_examples["start_positions"] = []
@@ -540,9 +540,12 @@ def squad_prepare_features_factory(split,
                 if data_args.beam_search:
                     tokenized_examples["cls_index"].append(cls_index)
 
-                sequence_ids = tokenized_examples.sequence_ids(i)
                 if data_args.beam_search:
                     sequence_ids = tokenized_examples["token_type_ids"][i]
+                else:
+                    sequence_ids = tokenized_examples.sequence_ids(i)
+
+                if data_args.beam_search:
                     for k, s in enumerate(special_tokens[i]):
                         if s:
                             sequence_ids[k] = 3
@@ -560,6 +563,8 @@ def squad_prepare_features_factory(split,
                 if len(answers["answer_start"]) == 0:
                     tokenized_examples["start_positions"].append(cls_index)
                     tokenized_examples["end_positions"].append(cls_index)
+                    if data_args.beam_search:
+                        tokenized_examples["is_impossible"].append(1.0)
                 else:
                     start_char = answers["answer_start"][0]
                     end_char = start_char + len(answers["text"][0])
@@ -585,6 +590,8 @@ def squad_prepare_features_factory(split,
                     if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
                         tokenized_examples["start_positions"].append(cls_index)
                         tokenized_examples["end_positions"].append(cls_index)
+                        if data_args.beam_search:
+                            tokenized_examples["is_impossible"].append(1.0)
                     else:
                         while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
                             token_start_index += 1
