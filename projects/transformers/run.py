@@ -653,19 +653,36 @@ def run_finetuning_squad(
     # Post-processing:
     def post_processing_function(examples, features, predictions, stage="eval"):
         # Post-processing: we match the start logits and end logits to answers in the original context.
-        predictions = postprocess_qa_predictions(
-            examples=examples,
-            features=features,
-            predictions=predictions,
-            version_2_with_negative=data_args.version_2_with_negative,
-            n_best_size=data_args.n_best_size,
-            max_answer_length=data_args.max_answer_length,
-            # I have no idea where these arguments came from
-            # start_n_top=model.config.start_n_top,
-            # end_n_top=model.config.end_n_top,
-            output_dir=training_args.output_dir,
-            prefix=stage,
-        )
+
+        if data_args.beam_search:
+            predictions, scores_diff_json = postprocess_qa_predictions_with_beam_search(
+                examples=examples,
+                features=features,
+                predictions=predictions,
+                version_2_with_negative=data_args.version_2_with_negative,
+                n_best_size=data_args.n_best_size,
+                max_answer_length=data_args.max_answer_length,
+                start_n_top=model.config.start_n_top,
+                end_n_top=model.config.end_n_top,
+                output_dir=training_args.output_dir,
+                log_level=log_level,
+                prefix=stage,
+            )
+
+        else:
+            predictions = postprocess_qa_predictions(
+                examples=examples,
+                features=features,
+                predictions=predictions,
+                version_2_with_negative=data_args.version_2_with_negative,
+                n_best_size=data_args.n_best_size,
+                max_answer_length=data_args.max_answer_length,
+                # I have no idea where these arguments came from
+                # start_n_top=model.config.start_n_top,
+                # end_n_top=model.config.end_n_top,
+                output_dir=training_args.output_dir,
+                prefix=stage,
+            )
 
         # Format the result to the format the metric expects.
         if data_args.version_2_with_negative:
