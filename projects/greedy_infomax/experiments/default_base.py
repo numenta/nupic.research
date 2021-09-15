@@ -26,11 +26,11 @@ import torch
 from torch.utils.data.dataset import Subset
 from torchvision.datasets import STL10
 
-from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
-    ClassificationModel,
+from nupic.research.frameworks.greedy_infomax.models.classification_model import (
+    Classifier,
 )
-from nupic.research.frameworks.greedy_infomax.models.FullModel import FullVisionModel
-from nupic.research.frameworks.greedy_infomax.utils.data_utils import STL10_DATASET_ARGS
+from nupic.research.frameworks.greedy_infomax.models.full_model import FullVisionModel
+from nupic.research.frameworks.greedy_infomax.utils.data_utils import get_transforms
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_log_softmax_nll_loss,
 )
@@ -90,6 +90,28 @@ class GreedyInfoMaxExperiment(
         return result
 
 
+# labeled train set: mean [0.4469, 0.4400, 0.4069], std [0.2603, 0.2566, 0.2713]
+aug = {"randcrop": 64, "flip": True, "bw_mean": [0.4120], "bw_std": [0.2570]}
+transform_unsupervised = get_transforms(val=False, aug=aug)
+transform_validation = transform_supervised = get_transforms(val=True, aug=aug)
+
+base_dataset_args = dict(root="~/nta/data/STL10/", download=False)
+# base_dataset_args = dict(root="~/nta/data/STL10/stl10_binary", download=False)
+unsupervised_dataset_args = deepcopy(base_dataset_args)
+unsupervised_dataset_args.update(
+    dict(transform=transform_unsupervised, split="unlabeled")
+)
+supervised_dataset_args = deepcopy(base_dataset_args)
+supervised_dataset_args.update(dict(transform=transform_supervised, split="train"))
+validation_dataset_args = deepcopy(base_dataset_args)
+validation_dataset_args.update(dict(transform=transform_validation, split="test"))
+STL10_DATASET_ARGS = dict(
+    unsupervised=unsupervised_dataset_args,
+    supervised=supervised_dataset_args,
+    validation=validation_dataset_args,
+)
+
+
 BATCH_SIZE = 32
 NUM_CLASSES = 10
 NUM_EPOCHS = 60
@@ -102,13 +124,6 @@ DEFAULT_BASE = dict(
     # Dataset
     dataset_class=STL10,
     dataset_args=STL10_DATASET_ARGS,
-    #               STL10:
-    # 500 training images (10 pre-defined folds)
-    # 8000 test images (800 test images per class)
-    # 100,000 unlabeled images
-    # num_unsupervised_samples=1000,
-    # num_supervised_samples=500,
-    # num_validation_samples=32,
     reuse_actors=True,
     # Seed
     # seed=tune.sample_from(lambda spec: np.random.randint(1, 100)),
@@ -120,15 +135,10 @@ DEFAULT_BASE = dict(
     batch_size_supervised=32,
     # Validation batch size
     val_batch_size=32,
-    # Number of batches per epoch. Useful for debugging
-    # batches_in_epoch=25,
     # Number of batches per supervised epoch
-    # batches_in_epoch_supervised = 25,
     unsupervised_loader_drop_last=False,
     supervised_loader_drop_last=False,
     validation_loader_drop_last=False,
-    # batches_in_epoch_supervised=1,
-    # batches_in_epoch_val=1,
     # Update this to stop training when accuracy reaches the metric value
     # For example, stop=dict(mean_accuracy=0.75),
     stop=dict(),
@@ -149,7 +159,7 @@ DEFAULT_BASE = dict(
         overlap=2,
     ),
     classifier_config=dict(
-        model_class=ClassificationModel,
+        model_class=Classifier,
         model_args=dict(in_channels=256, num_classes=NUM_CLASSES),
         loss_function=torch.nn.functional.cross_entropy,
         # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -245,8 +255,6 @@ VALIDATE_ONLY.update(
         epochs_to_validate=[60, 61],
         supervised_training_epochs_per_validation=20,
         num_unsupervised_samples=32,
-        # num_supervised_samples=500,
-        # num_validation_samples=32,
     )
 )
 

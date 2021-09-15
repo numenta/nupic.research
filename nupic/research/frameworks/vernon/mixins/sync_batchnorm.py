@@ -22,11 +22,20 @@ import torch.nn as nn
 
 
 class SyncBatchNorm:
+    """
+    This mixin converts the BatchNorm modules to SyncBatchNorm modules when utilizing
+    distributed training on GPUs.
+
+    Example config:
+        config=dict(
+            use_sync_batchnorm=True
+        )
+    """
     def create_model(self, config, device):
         model = super().create_model(config, device)
-        use_synch_batchnorm = config.get("use_synch_batchnorm", True)
+        use_sync_batchnorm = config.get("use_sync_batchnorm", True)
         distributed = config.get("distributed", False)
-        if use_synch_batchnorm and distributed and next(model.parameters()).is_cuda:
+        if use_sync_batchnorm and distributed and next(model.parameters()).is_cuda:
             # Convert batch norm to sync batch norms
             model = nn.modules.SyncBatchNorm.convert_sync_batchnorm(module=model)
         return model

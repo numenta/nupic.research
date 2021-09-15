@@ -25,14 +25,18 @@ from copy import deepcopy
 import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
-    ClassificationModel,
+from nupic.research.frameworks.greedy_infomax.models.classification_model import (
+    Classifier,
 )
-from nupic.research.frameworks.greedy_infomax.models.FullModel import (
+from nupic.research.frameworks.greedy_infomax.models.full_model import (
     SparseSmallVisionModel,
     VDropSparseSmallVisionModel,
     WrappedSparseSmallVisionModel,
     WrappedSuperGreedySmallSparseVisionModel,
+)
+from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
+    evaluate_gim_model,
+    train_gim_model,
 )
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
@@ -104,7 +108,7 @@ SMALL_SPARSE_BASE.update(
         noise_levels=[0.1, 0.5, 0.9],
         model_args=model_args,
         classifier_config=dict(
-            model_class=ClassificationModel,
+            model_class=Classifier,
             model_args=dict(in_channels=64, num_classes=10),
             loss_function=torch.nn.functional.cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -159,7 +163,7 @@ SMALL_SPARSE_LARGEST_DIMENSION.update(
     ),
     model_args=dimension_search_model_args,
     classifier_config=dict(
-        model_class=ClassificationModel,
+        model_class=Classifier,
         model_args=dict(num_classes=dimension_search_model_args["num_channels"]),
         loss_function=torch.nn.functional.cross_entropy,
         # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -205,6 +209,31 @@ class GreedyInfoMaxExperimentSparse2(
         super().setup_experiment(config)
 
 
+class MultiHeadedGreedyInfoMaxExperiment(
+    mixins.LogEveryLoss,
+    mixins.RezeroWeights,
+    mixins.LogBackpropStructure,
+    mixins.NoiseRobustnessTest,
+    experiments.SelfSupervisedExperiment,
+):
+    # avoid changing key names for sigopt
+    @classmethod
+    def get_readable_result(cls, result):
+        return result
+
+    def post_batch(self, error_loss, complexity_loss, batch_idx, **kwargs):
+        module_wise_losses = error_loss
+        error_loss = module_wise_losses.sum()
+        super().post_batch(error_loss, complexity_loss, batch_idx, **kwargs)
+
+    def setup_experiment(self, config):
+        num_channels = config["model_args"]["num_channels"]
+        config["classifier_config"]["model_args"].update(in_channels=num_channels)
+        config["train_model_func"] = train_gim_model
+        config["evaluate_model_func"] = evaluate_gim_model
+        super().setup_experiment(config)
+
+
 SPARSE_SMALL_GRID_SEARCH = deepcopy(STATIC_SPARSE_WEIGHTS_SMALL)
 SPARSE_SMALL_GRID_SEARCH.update(
     dict(
@@ -216,7 +245,7 @@ SPARSE_SMALL_GRID_SEARCH.update(
         model_class=WrappedSparseSmallVisionModel,
         model_args=grid_search_model_args,
         classifier_config=dict(
-            model_class=ClassificationModel,
+            model_class=Classifier,
             model_args=dict(num_classes=10),
             loss_function=torch.nn.functional.cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -357,7 +386,7 @@ STATIC_SPARSE_SMALL_DIMENSIONALITY_STUDY.update(
             cycle_momentum=False,
         ),
         classifier_config=dict(
-            model_class=ClassificationModel,
+            model_class=Classifier,
             model_args=dict(num_classes=10),
             loss_function=torch.nn.functional.cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -532,7 +561,7 @@ LR_RANGE_TEST.update(
         lr_scheduler_class=dict(),
         lr_scheduler_args=dict(min_lr=2e-4, max_lr=2),
         classifier_config=dict(
-            model_class=ClassificationModel,
+            model_class=Classifier,
             model_args=dict(num_classes=10),
             loss_function=torch.nn.functional.cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -555,10 +584,6 @@ LR_RANGE_TEST.update(
 # (100, 0.0993),
 # ]
 max_lr_grid_search_experiment_idx = 2
-exp_num_channels, exp_required_density = channels_density[
-    max_lr_grid_search_experiment_idx
-]
-max_lr_grid_search_experiment_idx = 4
 exp_num_channels, exp_required_density = channels_density[
     max_lr_grid_search_experiment_idx
 ]
@@ -602,7 +627,7 @@ MAX_LR_GRID_SEARCH.update(
             cycle_momentum=False,
         ),
         classifier_config=dict(
-            model_class=ClassificationModel,
+            model_class=Classifier,
             model_args=dict(num_classes=10),
             loss_function=torch.nn.functional.cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -656,7 +681,7 @@ SUPER_GREEDY_BASE.update(
             cycle_momentum=False,
         ),
         classifier_config=dict(
-            model_class=ClassificationModel,
+            model_class=Classifier,
             model_args=dict(num_classes=10),
             loss_function=torch.nn.functional.cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"

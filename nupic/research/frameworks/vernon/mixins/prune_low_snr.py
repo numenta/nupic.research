@@ -103,7 +103,7 @@ class PruneLowSNRLayers:
         model = self.model
         if hasattr(model, "module"):
             model = model.module
-        vdrop_data = model.module.vdrop_data
+        vdrop_data = model.vdrop_data
         total_prunable_parameters = vdrop_data.z_mask.size(0)
         remaining_nonzero_parameters = vdrop_data.z_mask.double().sum().item()
         model_density = remaining_nonzero_parameters / total_prunable_parameters

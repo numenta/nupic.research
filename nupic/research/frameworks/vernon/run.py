@@ -25,8 +25,8 @@ import time
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
+from nupic.research.frameworks.vernon.distributed import ImagenetExperiment
 from nupic.research.frameworks.vernon.experiment_utils import get_free_port
-from nupic.research.frameworks.vernon.experiments import SupervisedExperiment
 
 # Disable HDF5 locking
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
@@ -56,8 +56,8 @@ def worker(rank, world_size, dist_url, config, queue):
     config["distributed"] = True
 
     # Setup imagenet experiment for this process
-    experiment_class = config.get("experiment_class", SupervisedExperiment)
-    assert issubclass(experiment_class, SupervisedExperiment)
+    experiment_class = config.get("experiment_class", ImagenetExperiment)
+    assert issubclass(experiment_class, ImagenetExperiment)
     exp = experiment_class()
     exp.setup_experiment(config)
 
@@ -100,7 +100,6 @@ def head(_, config, world_size, logger, on_checkpoint, queue, results):
     """
     Head background process used to consume worker results as they become
     available
-
     :param config: Experiment configuration
     :param world_size: Total number of workers
     :param logger: Optional result logger callback reporting the results on
@@ -111,11 +110,10 @@ def head(_, config, world_size, logger, on_checkpoint, queue, results):
                   worker and head processes
     :param results: Multiprocessing managed list used to return the results back
                     to the main process
-
     """
     # Collect worker results as they become available waiting until all worker
     # processes are done.
-    experiment_class = config.get("experiment_class", SupervisedExperiment)
+    experiment_class = config.get("experiment_class", ImagenetExperiment)
     worker_results = collections.defaultdict(list)
     pending_workers = world_size
     while pending_workers > 0:
@@ -133,12 +131,11 @@ def head(_, config, world_size, logger, on_checkpoint, queue, results):
             epoch_result = worker_results[epoch]
             if len(epoch_result) == world_size:
                 epoch_result = experiment_class.aggregate_results(epoch_result)
-                epoch_result.update(
-                    epoch=epoch,
-                    timestamp=time.time(),
-                    pid=os.getpid(),
-                    hostname=os.uname()[1],
-                )
+                epoch_result.update(epoch=epoch,
+                                    timestamp=time.time(),
+                                    pid=os.getpid(),
+                                    hostname=os.uname()[1],
+                                    )
                 # Log epoch result
                 results.append(epoch_result)
                 if logger is not None:
@@ -172,21 +169,14 @@ def run(config, logger=None, on_checkpoint=None):
     # become available
     dist_url = f"tcp://localhost:{get_free_port()}"
     queue = mp.SimpleQueue()
-    ctx_worker = mp.spawn(
-        worker,
-        args=(world_size, dist_url, config, queue),
-        nprocs=world_size,
-        join=False,
-    )  # non-blocking
+    ctx_worker = mp.spawn(worker, args=(world_size, dist_url, config, queue),
+                          nprocs=world_size, join=False)  # non-blocking
 
     # Launch head process used to collect worker results as they become available
     manager = mp.Manager()
     results = manager.list()
-    ctx_head = mp.spawn(
-        head,
-        args=(config, world_size, logger, on_checkpoint, queue, results),
-        join=False,
-    )  # non-blocking
+    ctx_head = mp.spawn(head, args=(config, world_size, logger, on_checkpoint,
+                                    queue, results), join=False)  # non-blocking
 
     try:
         # Wait until all worker processes finish or any of them fail
