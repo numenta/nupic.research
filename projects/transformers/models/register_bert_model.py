@@ -27,6 +27,7 @@ from transformers import (
     CONFIG_MAPPING,
     MODEL_FOR_MASKED_LM_MAPPING,
     MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING,
+    MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING,
     TOKENIZER_MAPPING,
     BertConfig,
     BertForMaskedLM,
@@ -46,6 +47,7 @@ from . import __dict__ as __models_dict__
 __models_dict__["CONFIG_MAPPING"] = CONFIG_MAPPING
 __models_dict__["MODEL_FOR_MASKED_LM_MAPPING"] = MODEL_FOR_MASKED_LM_MAPPING
 __models_dict__["MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING"] = MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING # noqa E501
+__models_dict__["MODEL_FOR_QUESTION_ANSWERING"] = MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING
 __models_dict__["TOKENIZER_MAPPING"] = TOKENIZER_MAPPING
 
 
@@ -102,11 +104,13 @@ def register_bert_model(bert_cls):
     config_cls = create_config_class(bert_cls, name_prefix)
     masked_lm_cls = create_masked_lm_class(bert_cls, name_prefix)
     seq_classification_cls = create_sequence_classification_class(bert_cls, name_prefix)
+    question_answering_cls = create_question_answering_class(bert_cls, name_prefix)
 
     # Specify the correct config class
     bert_cls.config_class = config_cls
     masked_lm_cls.config_class = config_cls
     seq_classification_cls.config_class = config_cls
+    question_answering_cls.config_class = config_cls
 
     # Update Transformers mappings to auto-load these new models.
     CONFIG_MAPPING.update({
@@ -121,12 +125,16 @@ def register_bert_model(bert_cls):
     MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING.update({
         config_cls: seq_classification_cls
     })
+    MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING.update({
+        config_cls: question_answering_cls
+    })
 
     # Update the `models` modules so that these classes may be imported.
     __models_dict__.update({
         config_cls.__name__: config_cls,
         masked_lm_cls.__name__: masked_lm_cls,
         seq_classification_cls.__name__: seq_classification_cls,
+        question_answering_cls.__name__: question_answering_cls,
     })
 
 
@@ -282,6 +290,43 @@ def create_sequence_classification_class(bert_cls, name_prefix):
 
     # Rename new model class and format docstring.
     new_cls = NewBertForSequenceClassification
+    new_cls.__name__ = new_cls.__name__.replace("New", name_prefix)
+    new_cls.__doc__ = new_cls.__doc__.format(name_prefix=name_prefix)
+
+    return new_cls
+
+def create_question_answering_class(bert_cls, name_prefix):
+    """
+    Create a BertForQuestionAnswering that calls `bert_cls` in it's forward.
+    """
+
+    class NewBertForQuestionAnswering(BertForQuestionAnswering):
+        """
+        Bert Model with a span classification head on top for extractive
+        question-answering tasks like SQuAD (a linear layers on top of the
+        hidden-states output to compute `span start logits` and
+        `span end logits`).
+
+        https://huggingface.co/transformers/model_doc/bert.html#transformers.models.bert.modeling_bert.BertForQuestionAnswering  # noqa: E501
+        """
+
+        def __init__(self, config):
+
+            # Call the init one parent class up.
+            # Otherwise, the model will be defined twice.
+            BertPreTrainedModel.__init__(self, config)
+
+            self.num_labels = config.num_labels
+
+            # Replace `BertModel` with SparseBertModel.
+            self.bert = bert_cls(config)
+            self.dropout = nn.Dropout(config.hidden_dropout_prob)
+            self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+
+            self.init_weights()
+
+    # Rename new model class and format docstring.
+    new_cls = NewBertForQuestionAnswering
     new_cls.__name__ = new_cls.__name__.replace("New", name_prefix)
     new_cls.__doc__ = new_cls.__doc__.format(name_prefix=name_prefix)
 
