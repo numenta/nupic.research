@@ -108,6 +108,7 @@ bert_squad_replication_beam_search.update(
 bert_squad2_replication = deepcopy(bert_squad_replication_beam_search)
 bert_squad2_replication.update(
     dataset_name="squad_v2",
+    dataset_config_name="squad_v2",
     version_2_with_negative=True,
     num_train_epochs=4,
 )
