@@ -77,10 +77,10 @@ class ModelCompareTest(unittest.TestCase):
         self.assertEqual(total_nonzero_params, expected_params)
         self.assertEqual(total_params, expected_params)
 
-        model[0].weight[0, 0] = 0.0
-        model[0].weight[0, 1] = 0.0
-        model[2].weight[0, 0] = 0.0
-        model[2].weight[1, 0] = 0.0
+        model[0].weight.data[0, 0] = 0.0
+        model[0].weight.data[0, 1] = 0.0
+        model[2].weight.data[0, 0] = 0.0
+        model[2].weight.data[1, 0] = 0.0
 
         total_params, total_nonzero_params = count_nonzero_params(model)
         self.assertEqual(total_nonzero_params, expected_params - 4)
@@ -95,10 +95,10 @@ class ModelCompareTest(unittest.TestCase):
         self.assertEqual(total_nonzero_params, expected_params)
         self.assertEqual(total_params, expected_params)
 
-        model[0].weight[0, 0, 3, 3] = 0.0
-        model[0].weight[1, 0, 1, 1] = 0.0
-        model[4].weight[0, 0] = 0.0
-        model[4].weight[1, 0] = 0.0
+        model[0].weight.data[0, 0, 3, 3] = 0.0
+        model[0].weight.data[1, 0, 1, 1] = 0.0
+        model[4].weight.data[0, 0] = 0.0
+        model[4].weight.data[1, 0] = 0.0
 
         total_params, total_nonzero_params = count_nonzero_params(model)
         self.assertEqual(total_nonzero_params, expected_params - 4)

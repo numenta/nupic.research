@@ -59,8 +59,8 @@ class ModelCompareTest(unittest.TestCase):
         """Compare a network with itself except for one weight"""
         model1 = simple_linear_net()
         model2 = copy.deepcopy(model1)
-        model1._modules["0"].weight[0][0] = 1.0
-        model2._modules["0"].weight[0][0] = -1.0
+        model1._modules["0"].weight.data[0][0] = 1.0
+        model2._modules["0"].weight.data[0][0] = -1.0
         self.assertFalse(compare_models(model1, model2, (32,)))
 
     def test_different(self):
