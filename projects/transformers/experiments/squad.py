@@ -101,12 +101,14 @@ bert_squad_replication_beam_search.update(
     beam_search=True,
     per_device_eval_batch_size=4,
     per_device_train_batch_size=4,
-    save_steps=5_000,
-    eval_steps=5_000,
+    save_steps=500,
+    eval_steps=500,
+    max_steps=5_000,
 )
 
 bert_squad2_replication = deepcopy(bert_squad_replication_beam_search)
 bert_squad2_replication.update(
+    model_name_or_path="bert-base-cased",
     dataset_name="squad_v2",
     dataset_config_name="squad_v2",
     version_2_with_negative=True,

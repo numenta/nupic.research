@@ -32,6 +32,7 @@ from transformers import (
     BertConfig,
     BertForMaskedLM,
     BertForSequenceClassification,
+    BertForQuestionAnswering,
     BertPreTrainedModel,
     BertTokenizer,
     BertTokenizerFast,
