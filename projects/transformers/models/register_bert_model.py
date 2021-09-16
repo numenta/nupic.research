@@ -111,7 +111,7 @@ def register_bert_model(bert_cls):
     bert_cls.config_class = config_cls
     masked_lm_cls.config_class = config_cls
     seq_classification_cls.config_class = config_cls
-    question_answering_cls.config_class = config_cls
+    # question_answering_cls.config_class = config_cls
 
     # Update Transformers mappings to auto-load these new models.
     CONFIG_MAPPING.update({

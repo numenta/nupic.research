@@ -1079,7 +1079,7 @@ def check_squad_version(data_args):
     """
 
     if data_args.dataset_name == "squad_v2":
-        if not data_args.verions_2_with_negative:
+        if not data_args.version_2_with_negative:
             logging.warning(
                 "Warning, you specified squad_v2 but not version_2_with_negative."
                 " Turning version_2_with_negative on."

@@ -37,7 +37,7 @@ class QuestionAnsweringTrainer(QuestionAnsweringMixin, Trainer):
 debug_bert_squad_base = deepcopy(finetuning_bert_100k_glue_get_info)
 debug_bert_squad_base.update(
     # Model Args
-    model_name_or_path="bert-base-uncased",
+    model_name_or_path="bert-base-cased",
     finetuning=True,
     task_names=None,
     task_name="squad",
@@ -74,69 +74,40 @@ bert_squad_replication.update(
     # trainer_callbacks=[],
 )
 
-debug_bert_squad_fast = deepcopy(bert_squad_replication)
-debug_bert_squad_fast.update(
+del bert_squad_replication["max_steps"]
+
+debug_squad_v1_no_beam = deepcopy(bert_squad_replication)
+debug_squad_v1_no_beam.update(
     save_steps=100,
     eval_steps=100,
     max_steps=500,
 )
 
-del bert_squad_replication["max_steps"]
-
-bert_squad_replication_cased = deepcopy(bert_squad_replication)
-bert_squad_replication_cased.update(
-    model_name_or_path="bert-base-cased"
+debug_squad_v1_beam = deepcopy(debug_squad_v1_no_beam)
+debug_squad_v1_beam.update(
+    beam_search=True
 )
 
-bert_squad_debug_tracking = deepcopy(bert_squad_replication_cased)
-bert_squad_debug_tracking.update(
-    save_steps=50,
-    eval_steps=50,
-    max_steps=500
-)
-
-bert_100k_squad = deepcopy(bert_squad_replication_cased)
-bert_100k_squad.update(
-    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k",  # noqa: E501
-)
-
-# Run with a different name when testing in env
-# with different versions of transformers,datasets, tokenizers
-bert_squad_replication_beam_search = deepcopy(bert_squad_replication)
-bert_squad_replication_beam_search.update(
-    model_name_or_path="xlnet-large-cased",
-    beam_search=True,
-    per_device_eval_batch_size=4,
-    per_device_train_batch_size=4,
-    save_steps=100,
-    eval_steps=100,
-    max_steps=1_000,
-)
-
-bert_squad2_replication = deepcopy(bert_squad_replication_beam_search)
-bert_squad2_replication.update(
-    # model_name_or_path="bert-base-cased",
+debug_squad_v2_no_beam = deepcopy(debug_squad_v1_no_beam)
+debug_squad_v2_no_beam.update(
     dataset_name="squad_v2",
     dataset_config_name="squad_v2",
     task_name="squad",
     version_2_with_negative=True,
-    num_train_epochs=2,
 )
 
-bert_squad2_replication_no_beam_search = deepcopy(bert_squad2_replication)
-bert_squad2_replication_no_beam_search.update(
-    beam_search=False
+debug_squad_v2_beam = deepcopy(debug_squad_v2_no_beam)
+debug_squad_v2_beam.update(
+    beam_search=True
 )
+
 
 # Export configurations in this file
 CONFIGS = dict(
     debug_bert_squad_base=debug_bert_squad_base,
-    debug_bert_squad_fast=debug_bert_squad_fast,
     bert_squad_replication=bert_squad_replication,
-    bert_squad_replication_beam_search=bert_squad_replication_beam_search,
-    bert_squad2_replication=bert_squad2_replication,
-    bert_squad2_replication_no_beam_search=bert_squad2_replication_no_beam_search,
-    bert_squad_replication_cased=bert_squad_replication_cased,
-    bert_squad_debug_tracking=bert_squad_debug_tracking,
-    bert_100k_squad=bert_100k_squad
+    debug_squad_v1_no_beam=debug_squad_v1_no_beam,
+    debug_squad_v1_beam=debug_squad_v1_beam,
+    debug_squad_v2_no_beam=debug_squad_v2_no_beam,
+    debug_squad_v2_beam=debug_squad_v2_beam,
 )
