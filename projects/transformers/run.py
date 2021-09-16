@@ -677,9 +677,6 @@ def run_finetuning_squad(
                 version_2_with_negative=data_args.version_2_with_negative,
                 n_best_size=data_args.n_best_size,
                 max_answer_length=data_args.max_answer_length,
-                # I have no idea where these arguments came from
-                # start_n_top=model.config.start_n_top,
-                # end_n_top=model.config.end_n_top,
                 output_dir=training_args.output_dir,
                 prefix=stage,
             )
