@@ -653,7 +653,9 @@ def run_finetuning_squad(
 
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
-    training_args = check_best_metric(training_args, data_args.task_name)
+    # Pass dataset_name instead of task_name for the special case of squad
+    # squad and squad_v2 have different metrics and datasets, but same task_name
+    training_args = check_best_metric(training_args, data_args.dataset_name)
 
     # Post-processing:
     def post_processing_function(examples, features, predictions, stage="eval"):
