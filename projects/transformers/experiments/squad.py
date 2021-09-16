@@ -34,8 +34,8 @@ class QuestionAnsweringTrainer(QuestionAnsweringMixin, Trainer):
     pass
 
 
-debug_bert_squad = deepcopy(finetuning_bert_100k_glue_get_info)
-debug_bert_squad.update(
+debug_bert_squad_base = deepcopy(finetuning_bert_100k_glue_get_info)
+debug_bert_squad_base.update(
     # Model Args
     model_name_or_path="bert-base-uncased",
     finetuning=True,
@@ -58,9 +58,9 @@ debug_bert_squad.update(
     warmup_ratio=0.
 )
 
-# Supposed to train in about 24 minutes
+# Supposed to train in about 24 minutes, takes an hour though
 # Expect f1 score of 88.52, exact_match of 81.22
-bert_squad_replication = deepcopy(debug_bert_squad)
+bert_squad_replication = deepcopy(debug_bert_squad_base)
 bert_squad_replication.update(
     per_device_train_batch_size=12,
     per_device_eval_batch_size=12,
@@ -72,6 +72,13 @@ bert_squad_replication.update(
     eval_steps=1_000,
     logging_steps=100_000, # intended to not log until the end
     # trainer_callbacks=[],
+)
+
+debug_bert_squad_fast = deepcopy(bert_squad_replication)
+debug_bert_squad_fast.update(
+    save_steps=100,
+    eval_steps=100,
+    max_steps=500,
 )
 
 del bert_squad_replication["max_steps"]
@@ -101,23 +108,24 @@ bert_squad_replication_beam_search.update(
     beam_search=True,
     per_device_eval_batch_size=4,
     per_device_train_batch_size=4,
-    save_steps=500,
-    eval_steps=500,
-    max_steps=5_000,
+    save_steps=100,
+    eval_steps=100,
+    max_steps=1_000,
 )
 
 bert_squad2_replication = deepcopy(bert_squad_replication_beam_search)
 bert_squad2_replication.update(
-    model_name_or_path="bert-base-cased",
+    # model_name_or_path="bert-base-cased",
     dataset_name="squad_v2",
     dataset_config_name="squad_v2",
     version_2_with_negative=True,
-    num_train_epochs=4,
+    num_train_epochs=2,
 )
 
 # Export configurations in this file
 CONFIGS = dict(
-    debug_bert_squad=debug_bert_squad,
+    debug_bert_squad_base=debug_bert_squad_base,
+    debug_bert_squad_fast=debug_bert_squad_fast,
     bert_squad_replication=bert_squad_replication,
     bert_squad_replication_beam_search=bert_squad_replication_beam_search,
     bert_squad2_replication=bert_squad2_replication,

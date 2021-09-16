@@ -406,6 +406,13 @@ finetuning_small_bert_sparse_4x_trifecta_100k_glue.update(
 # ---------
 
 # SQUAD
+
+debug_squad_trifecta_100k = deepcopy(bert_100k_squad)
+debug_squad_trifecta_100k.update(
+    save_steps=100,
+    eval_steps=100,
+    max_steps=500,
+)
 squad_trifecta_100k = deepcopy(bert_100k_squad)
 squad_trifecta_100k.update(
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
@@ -691,6 +698,7 @@ CONFIGS = dict(
 
     # BERT Base
     #   80% sparse
+    debug_squad_trifecta_100k=debug_squad_trifecta_100k,
     squad_trifecta_100k=squad_trifecta_100k,
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,  # noqa: E501

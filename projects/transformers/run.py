@@ -665,7 +665,7 @@ def run_finetuning_squad(
                 start_n_top=model.config.start_n_top,
                 end_n_top=model.config.end_n_top,
                 output_dir=training_args.output_dir,
-                log_level=log_level,
+                # log_level=log_level,
                 prefix=stage,
             )
 
