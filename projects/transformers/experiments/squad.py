@@ -86,7 +86,9 @@ debug_squad_v1_no_beam.update(
 debug_squad_v1_beam = deepcopy(debug_squad_v1_no_beam)
 debug_squad_v1_beam.update(
     beam_search=True,
-    model_name_or_path="xlnet-large-cased"
+    model_name_or_path="xlnet-large-cased",
+    per_device_eval_batch_size=4,
+    per_device_train_batch_size=4,
 )
 
 debug_squad_v2_no_beam = deepcopy(debug_squad_v1_no_beam)
@@ -100,7 +102,9 @@ debug_squad_v2_no_beam.update(
 debug_squad_v2_beam = deepcopy(debug_squad_v2_no_beam)
 debug_squad_v2_beam.update(
     beam_search=True,
-    model_name_or_path="xlnet-large-cased"
+    model_name_or_path="xlnet-large-cased",
+    per_device_eval_batch_size=4,
+    per_device_train_batch_size=4,
 )
 
 bert_100k_squad = deepcopy(bert_squad_replication)
