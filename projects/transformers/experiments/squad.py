@@ -101,6 +101,11 @@ debug_squad_v2_beam.update(
     beam_search=True
 )
 
+bert_squad_100k = deepcopy(bert_squad_replication)
+bert_squad_100k.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_100k"
+)
+
 
 # Export configurations in this file
 CONFIGS = dict(
@@ -110,4 +115,5 @@ CONFIGS = dict(
     debug_squad_v1_beam=debug_squad_v1_beam,
     debug_squad_v2_no_beam=debug_squad_v2_no_beam,
     debug_squad_v2_beam=debug_squad_v2_beam,
+    bert_squad_100k=bert_squad_100k,
 )
