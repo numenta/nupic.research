@@ -532,8 +532,7 @@ def squad_prepare_features_factory(split,
                 tokenized_examples["cls_index"] = []
                 tokenized_examples["p_mask"] = []
 
-            # Pick up here - something about this loop is breaking
-            # when beam search is on
+
             for i, offsets in enumerate(offset_mapping):
                 input_ids = tokenized_examples["input_ids"][i]
                 cls_index = input_ids.index(tokenizer.cls_token_id)

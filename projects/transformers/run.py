@@ -685,11 +685,17 @@ def run_finetuning_squad(
             )
 
         # Format the result to the format the metric expects.
+
         if data_args.version_2_with_negative:
-            formatted_predictions = [
-                {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}
-                for k, v in predictions.items()
-            ]
+            if data_args.beam_search:
+                formatted_predictions = [
+                    {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}
+                    for k, v in predictions.items()
+                ]
+            else:
+                formatted_predictions = [
+                    {"id": k, "prediction_text": v, "no_answer_probability": 0.0} for k, v in predictions.items()
+                ]
         else:
             formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
         
