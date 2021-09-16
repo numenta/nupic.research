@@ -365,8 +365,8 @@ def aggregate_eval_results_block(results):
         )
             for i in range(num_emit_encoding_modules)]
 
-        encoding_loss = [sum( result[f"mean_loss_encoding_{i}"] * result[
-            "total_tested"]  for result in results) / total
+        encoding_loss = [sum(result[f"mean_loss_encoding_{i}"] * result[
+            "total_tested"] for result in results) / total
             for i in range(num_emit_encoding_modules)]
 
         encoding_mean_accuracy = [x / total for x in encoding_correct]
