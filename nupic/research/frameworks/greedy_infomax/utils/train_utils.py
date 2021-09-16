@@ -269,7 +269,9 @@ def evaluate_block_model(
                 outputs = outputs[:, :, active_classes]  # module, batch, classes
             module_losses += criterion(outputs, target, reduction="sum")
             preds = outputs.max(-1, keepdim=True)[1]
-            module_correct += preds.eq(target.view_as(preds)).sum((1, 2))
+            module_correct += preds.eq(
+                target.repeat(len(module_correct), 1).view_as(preds)
+            ).sum((1, 2))
             total += len(data)
 
             if post_batch_callback is not None:
@@ -293,7 +295,7 @@ def evaluate_block_model(
     result.update(
         {
             "num_bilinear_info_modules": model.encoder.count_bilinear_info_modules(),
-            "num_emit_encodings": model.encoder.count_emit_encoding_modules(),
+            "num_emit_encoding_modules": model.encoder.count_emit_encoding_modules(),
         }
     )
     result.update(

@@ -18,23 +18,24 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+import copy
+import itertools
+
 import torch
 
-from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockModel
-from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import EmitEncoding
+from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
+from nupic.research.frameworks.greedy_infomax.models.utility_layers import EmitEncoding
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_cross_entropy,
 )
 from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
+    aggregate_eval_results_block,
     evaluate_block_model,
     train_block_model,
-    aggregate_eval_results_block,
 )
 from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.vernon.distributed import SelfSupervisedExperiment
 from nupic.research.frameworks.vernon.network_utils import create_model
-import copy
-import itertools
 
 
 class BlockModelExperiment(

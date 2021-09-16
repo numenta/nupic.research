@@ -27,15 +27,17 @@ import torch
 from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import (
     BlockModelExperiment,
 )
-from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockModel
-from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
-    MultipleClassificationModel,
+from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
+from nupic.research.frameworks.greedy_infomax.models.classification_model import (
+    MultiClassifier,
 )
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     all_module_multiple_log_softmax,
     multiple_cross_entropy,
 )
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
+    full_resnet,
+    full_sparse_resnet,
     small_resnet,
     small_sparse_resnet,
 )
@@ -49,6 +51,8 @@ NUM_EPOCHS = 10
 
 block_wise_small_resnet_args = {"module_args": small_resnet}
 block_wise_small_sparse_resnet_args = {"module_args": small_sparse_resnet}
+block_wise_full_resnet_args = {"module_args": full_resnet}
+block_wise_full_sparse_resnet_args = {"module_args": full_sparse_resnet}
 
 SMALL_BLOCK = deepcopy(DEFAULT_BASE)
 SMALL_BLOCK.update(
@@ -88,7 +92,7 @@ SMALL_BLOCK.update(
             cycle_momentum=False,
         ),
         classifier_config=dict(
-            model_class=MultipleClassificationModel,
+            model_class=MultiClassifier,
             model_args=dict(num_classes=10),
             loss_function=multiple_cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -134,7 +138,6 @@ SMALL_SPARSE_BLOCK.update(
 )
 
 
-
 SMALL_SPARSE_BLOCK_LR_GRID_SEARCH = deepcopy(SMALL_SPARSE_BLOCK)
 SMALL_SPARSE_BLOCK_LR_GRID_SEARCH.update(
     wandb_args=dict(
@@ -153,10 +156,56 @@ SMALL_SPARSE_BLOCK_LR_GRID_SEARCH.update(
     ),
 )
 
+FULL_NUM_EPOCHS = 300
+FULL_BLOCK = deepcopy(SMALL_BLOCK)
+FULL_BLOCK.update(dict(
+    wandb_args=dict(
+        project="greedy_infomax-full_block_model",
+        name=f"base_experiment"
+    ),
+    epochs=FULL_NUM_EPOCHS,
+    epochs_to_validate=range(FULL_NUM_EPOCHS),
+    model_args=block_wise_full_resnet_args,
+    optimizer_class=torch.optim.SGD,
+    lr_scheduler_args=dict(
+        max_lr=0.017,  # change based on sparsity/dimensionality
+        div_factor=4,  # initial_lr = 0.06
+        final_div_factor=200,  # min_lr = 0.0000025
+        pct_start=10.0 / 300.0,
+        epochs=FULL_NUM_EPOCHS,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
+))
+
+FULL_SPARSE_BLOCK = deepcopy(FULL_BLOCK)
+FULL_SPARSE_BLOCK.update(dict(
+    wandb_args=dict(
+        project="greedy_infomax-full_block_model",
+        name=f"base_experiment"
+    ),
+    epochs=FULL_NUM_EPOCHS,
+    epochs_to_validate=range(FULL_NUM_EPOCHS),
+    model_args=block_wise_full_resnet_args,
+    optimizer_class=torch.optim.SGD,
+    lr_scheduler_args=dict(
+        max_lr=0.017,  # change based on sparsity/dimensionality
+        div_factor=4,  # initial_lr = 0.06
+        final_div_factor=200,  # min_lr = 0.0000025
+        pct_start=10.0 / 300.0,
+        epochs=FULL_NUM_EPOCHS,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
+))
 
 CONFIGS = dict(
     small_block=SMALL_BLOCK,
     small_block_lr_grid_search=SMALL_BLOCK_LR_GRID_SEARCH,
     small_sparse_block=SMALL_SPARSE_BLOCK,
     small_sparse_block_lr_grid_search=SMALL_SPARSE_BLOCK_LR_GRID_SEARCH,
+    full_block=FULL_BLOCK,
+    full_sparse_block=FULL_SPARSE_BLOCK,
 )

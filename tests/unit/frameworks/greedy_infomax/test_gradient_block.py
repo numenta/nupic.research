@@ -28,7 +28,7 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
-from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import GradientBlock
+from nupic.research.frameworks.greedy_infomax.models.utility_layers import GradientBlock
 
 
 class TestGradientBlock(unittest.TestCase):

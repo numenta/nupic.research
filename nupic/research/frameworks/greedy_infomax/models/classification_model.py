@@ -70,15 +70,17 @@ class MultiClassifier(nn.Module):
     """
     def __init__(self, in_channels=None, num_classes=10):
         super().__init__()
+        self.in_channels = in_channels
+        self.num_classes = num_classes
         if self.in_channels is None:
             raise Exception("In channels list is required")
         self.classifiers = nn.ModuleList(
             [
                 Classifier(
-                    in_channels=in_channels[i],
-                    num_classes=num_classes,
+                    in_channels=self.in_channels[i],
+                    num_classes=self.num_classes,
                 )
-                for i in range(len(in_channels))
+                for i in range(len(self.in_channels))
             ]
         )
 

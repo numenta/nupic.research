@@ -28,8 +28,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import BilinearInfo
-from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
+from nupic.research.frameworks.greedy_infomax.models.bilinear_info import BilinearInfo
+from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
     EmitEncoding,
     PatchifyInputs,
 )

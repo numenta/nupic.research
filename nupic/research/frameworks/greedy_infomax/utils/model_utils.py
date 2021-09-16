@@ -26,14 +26,14 @@
 
 import torch.nn as nn
 
-from nupic.research.frameworks.greedy_infomax.models.BilinearInfo import (
+from nupic.research.frameworks.greedy_infomax.models.bilinear_info import (
     SparseBilinearInfo,
 )
-from nupic.research.frameworks.greedy_infomax.models.ResNetEncoder import (
+from nupic.research.frameworks.greedy_infomax.models.resnet_encoder import (
     SparsePreActBlockNoBN,
     SparsePreActBottleneckNoBN,
 )
-from nupic.research.frameworks.greedy_infomax.models.UtilityLayers import (
+from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
     EmitEncoding,
     GradientBlock,
     PatchifyInputs,

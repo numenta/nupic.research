@@ -27,18 +27,19 @@ import torch
 from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import (
     BlockModelExperiment,
 )
-from nupic.research.frameworks.greedy_infomax.models.BlockModel import BlockModel
-from nupic.research.frameworks.greedy_infomax.models.ClassificationModel import (
-    MultipleClassificationModel,
+from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
+from nupic.research.frameworks.greedy_infomax.models.classification_model import (
+    MultiClassifier,
 )
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     all_module_multiple_log_softmax,
     multiple_cross_entropy,
 )
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
+    full_resnet,
+    full_sparse_resnet,
     small_resnet,
     small_sparse_resnet,
-    full_sparse_model_blockwise_config,
 )
 
 from .block_wise_training import CONFIGS as BLOCKWISE_CONFIGS
@@ -51,6 +52,8 @@ NUM_EPOCHS = 10
 
 block_wise_small_resnet_args = {"module_args": small_resnet}
 block_wise_small_sparse_resnet_args = {"module_args": small_sparse_resnet}
+block_wise_full_resnet_args = {"module_args": full_resnet}
+block_wise_full_sparse_resnet_args = {"module_args": full_sparse_resnet}
 
 DENSE_BLOCKWISE = deepcopy(SMALL_BLOCK)
 DENSE_BLOCKWISE.update(
@@ -90,7 +93,7 @@ DENSE_BLOCKWISE.update(
             cycle_momentum=False,
         ),
         classifier_config=dict(
-            model_class=MultipleClassificationModel,
+            model_class=MultiClassifier,
             model_args=dict(num_classes=10),
             loss_function=multiple_cross_entropy,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
@@ -134,8 +137,6 @@ SMALL_SPARSE_BLOCK.update(
         optimizer_args=dict(lr=0.16)
     )
 )
-
-
 
 SMALL_SPARSE_BLOCK_LR_GRID_SEARCH = deepcopy(SMALL_SPARSE_BLOCK)
 SMALL_SPARSE_BLOCK_LR_GRID_SEARCH.update(
