@@ -73,6 +73,9 @@ REPORTING_METRICS_PER_TASK = {
     "qqp": ["eval_accuracy", "eval_f1"],
     "rte": ["eval_accuracy"],
     "squad": ["eval_exact_match", "eval_f1"],
+    "squad_v2": ["eval_NoAns_exact", "eval_HasAns_exact", "eval_exact",
+                 "eval_best_exact", "eval_NoAns_f1", "eval_HasAns_f1",
+                 "eval_f1", "eval_best_f1"],
     "sst2": ["eval_accuracy"],
     "stsb": ["eval_pearson", "eval_spearmanr"],
     "wnli": ["eval_accuracy"]

@@ -72,6 +72,7 @@ from run_utils import (
     check_hp_compute_objective,
     check_if_current_hp_best,
     check_mnli,
+    check_squad_version,
     check_rm_checkpoints,
     check_sparsity_callback,
     compute_objective,
@@ -636,6 +637,10 @@ def run_finetuning_squad(
     model_args, data_args, training_args, last_checkpoint=None, run_idx=None,
 ):
     """On a single task train, evaluate, and save results"""
+
+    # Make sure dataset name, task name, and version_2_with_negative
+    # match before loading the dataset
+    data_args = check_squad_version(data_args)
 
     (tokenizer,
     data_collator,

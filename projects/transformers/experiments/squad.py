@@ -118,8 +118,14 @@ bert_squad2_replication.update(
     # model_name_or_path="bert-base-cased",
     dataset_name="squad_v2",
     dataset_config_name="squad_v2",
+    task_name="squad",
     version_2_with_negative=True,
     num_train_epochs=2,
+)
+
+bert_squad2_replication_no_beam_search = deepcopy(bert_squad2_replication)
+bert_squad2_replication_no_beam_search.update(
+    beam_search=False
 )
 
 # Export configurations in this file
@@ -129,6 +135,7 @@ CONFIGS = dict(
     bert_squad_replication=bert_squad_replication,
     bert_squad_replication_beam_search=bert_squad_replication_beam_search,
     bert_squad2_replication=bert_squad2_replication,
+    bert_squad2_replication_no_beam_search=bert_squad2_replication_no_beam_search,
     bert_squad_replication_cased=bert_squad_replication_cased,
     bert_squad_debug_tracking=bert_squad_debug_tracking,
     bert_100k_squad=bert_100k_squad

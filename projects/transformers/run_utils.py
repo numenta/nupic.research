@@ -100,7 +100,8 @@ TASK_TO_KEYS = {
     "qnli": ("question", "sentence"),
     "qqp": ("question1", "question2"),
     "mnli": ("premise", "hypothesis"),  # includes matched and mismatched
-    "squad": None
+    "squad": None,
+    "squad_v2": None
 }
 
 
@@ -1072,6 +1073,28 @@ def format_eval_results(eval_results, run, task_name):
 # Code to make sure training / finetuning / hp optimization runs safely
 #####
 
+def check_squad_version(data_args):
+    """
+    Ensure dataset name and version_2_with_negative match.
+    """
+
+    if data_args.dataset_name == "squad_v2":
+        if not data_args.verions_2_with_negative:
+            logging.warning(
+                "Warning, you specified squad_v2 but not version_2_with_negative."
+                " Turning version_2_with_negative on."
+            )
+            data_args.version_2_with_negative = True
+    else:
+        if data_args.version_2_with_negative:
+            logging.warning(
+                "Warning, you specified version_2_with_negative but not squad_v2. "
+                "Turning version_2_with_negative off."
+            )
+            data_args.version_2_with_negative = False
+    
+    return data_args
+
 def check_callback_types(trainer_callbacks):
     """Always check to make sure callbacks are the right type"""
     if trainer_callbacks is not None:
@@ -1232,7 +1255,7 @@ def check_metric_is_allowed(metric, allowed_metrics, task_name=None):
         logging.warning(
             "Warning, code will break because the current metric for best model"
             f" ({metric}) is not being tracked."
-            "Defaulting metric_for_best_model to {new_metric}"
+            f"Defaulting metric_for_best_model to {new_metric}"
         )
         return new_metric
     else:
