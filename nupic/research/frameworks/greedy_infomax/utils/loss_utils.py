@@ -28,7 +28,7 @@ import torch
 import torch.nn.functional as F
 
 
-def multiple_cross_entropy(data_lists, targets, reduction="mean"):
+def multiple_cross_entropy(log_f_module_list, targets, reduction="mean"):
     """
     Calculates the cross entropy for the output of each BilinearInfo module and returns
     the sum.
@@ -91,7 +91,7 @@ EmitEncoding module paired with a classification head.
 """
 
 
-def multiple_cross_entropy(outputs, targets, reduction="sum"):
+def multiple_cross_entropy_legacy(outputs, targets, reduction="sum"):
     device = outputs.device
     module_losses = torch.empty(0, requires_grad=True, device=device)
     for i in range(outputs.shape[0]):
