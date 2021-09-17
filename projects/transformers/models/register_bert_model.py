@@ -314,9 +314,8 @@ def create_question_answering_class(bert_cls, name_prefix):
 
         def __init__(self, config):
 
-            # import pdb
-            # pdb.set_trace()
-
+            import pdb
+            pdb.set_trace()
             # Call the init one parent class up.
             # Otherwise, the model will be defined twice.
             BertPreTrainedModel.__init__(self, config)

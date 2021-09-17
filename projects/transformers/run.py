@@ -404,10 +404,10 @@ def init_dataset_for_squad(model_args,
     if data_args.pad_to_max_length:
         data_collator = default_data_collator
     else:
-        pad_to_multiple = 8 if training_args.fp16 else None
+        pad_to_multiple_of = 8 if training_args.fp16 else None
         data_collator = \
             DataCollatorWithPadding(tokenizer,
-                                    pad_to_multiple=pad_to_multiple)
+                                    pad_to_multiple_of=pad_to_multiple_of)
 
     return (
         tokenizer,

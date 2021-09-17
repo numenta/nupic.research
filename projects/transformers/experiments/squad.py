@@ -49,7 +49,7 @@ debug_bert_squad_base.update(
     max_seq_length=128,
     do_train=True,
     do_eval=True,
-    do_predict=True,
+    do_predict=False,
     trainer_callbacks=[
         TrackEvalMetrics(),
     ],

@@ -140,9 +140,7 @@ def postprocess_qa_predictions(  # noqa: C901
 
             # Update minimum null prediction.
             feature_null_score = start_logits[0] + end_logits[0]
-            cond_1 = min_null_prediction is None
-            cond_2 = min_null_prediction["score"] > feature_null_score
-            if (cond_1 or cond_2):
+            if min_null_prediction is None or min_null_prediction["score"] > feature_null_score:  # noqa: E501
                 min_null_prediction = {
                     "offsets": (0, 0),
                     "score": feature_null_score,
@@ -175,9 +173,8 @@ def postprocess_qa_predictions(  # noqa: C901
                         continue
                     # Don't consider answer that don't have the maximum context
                     # availableif such information is provided.
-                    ctx_not_none = token_is_max_context is not None
-                    max_ctx = token_is_max_context.get(str(start_index), False)
-                    if ctx_not_none and not max_ctx:
+
+                    if token_is_max_context is not None and not token_is_max_context.get(str(start_index), False):  # noqa: E501
                         continue
                     prelim_predictions.append(
                         {

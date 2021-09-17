@@ -521,6 +521,8 @@ def squad_prepare_features_factory(  # noqa: C901
             tokenized_examples["start_positions"] = []
             tokenized_examples["end_positions"] = []
 
+            context_idx = 1 if pad_on_right else 0
+
             if data_args.beam_search:
                 special_tokens = tokenized_examples.pop("special_tokens_mask")
                 tokenized_examples["is_impossible"] = []
@@ -542,7 +544,6 @@ def squad_prepare_features_factory(  # noqa: C901
                     for k, s in enumerate(special_tokens[i]):
                         if s:
                             sequence_ids[k] = 3
-                    context_idx = 1 if pad_on_right else 0
 
                     tokenized_examples["p_mask"].append(
                         [
@@ -578,9 +579,7 @@ def squad_prepare_features_factory(  # noqa: C901
                         if data_args.beam_search:
                             tokenized_examples["is_impossible"].append(1.0)
                     else:
-                        while_cond_1 = token_start_index < len(offsets)
-                        while_cond_2 = offsets[token_start_index][0] <= start_char
-                        while while_cond_1 and while_cond_2:
+                        while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:  # noqa: E501
                             token_start_index += 1
                         tokenized_examples["start_positions"].append(
                             token_start_index - 1)
