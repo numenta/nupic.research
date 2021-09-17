@@ -569,23 +569,14 @@ def squad_prepare_features_factory(split,
                     start_char = answers["answer_start"][0]
                     end_char = start_char + len(answers["text"][0])
 
-                    if data_args.beam_search:
-                        token_start_index = 0
-                        while sequence_ids[token_start_index] != context_idx:
-                            token_start_index += 1
-                    else:
-                        token_start_index = 0
-                        while sequence_ids[token_start_index] != (1 if pad_on_right else 0):
-                            token_start_index += 1
 
-                    if data_args.beam_search:
-                        token_end_index = len(input_ids) - 1
-                        while sequence_ids[token_end_index] != context_idx:
-                            token_end_index -= 1
-                    else:
-                        token_end_index = len(input_ids) - 1
-                        while sequence_ids[token_end_index] != (1 if pad_on_right else 0):
-                            token_end_index -= 1
+                    token_start_index = 0
+                    while sequence_ids[token_start_index] != context_idx:
+                        token_start_index += 1
+
+                    token_end_index = len(input_ids) - 1
+                    while sequence_ids[token_end_index] != context_idx:
+                        token_end_index -= 1
 
                     if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
                         tokenized_examples["start_positions"].append(cls_index)
