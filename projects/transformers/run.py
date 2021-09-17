@@ -47,7 +47,6 @@ from ray.tune.error import TuneError as TuneError
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     AutoModelForSequenceClassification,
-    AutoModelForTableQuestionAnswering,
     DataCollatorWithPadding,
     EvalPrediction,
     HfArgumentParser,
@@ -59,6 +58,7 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from callbacks import TrackEvalMetrics
 from experiments import CONFIGS
+from experiments.squad import QuestionAnsweringTrainer
 from integrations import (  # noqa I001
     CustomWandbCallback,
     init_ray_wandb_logger_callback,
@@ -72,9 +72,9 @@ from run_utils import (
     check_hp_compute_objective,
     check_if_current_hp_best,
     check_mnli,
-    check_squad_version,
     check_rm_checkpoints,
     check_sparsity_callback,
+    check_squad_version,
     compute_objective,
     evaluate_language_model,
     evaluate_task_handler,
@@ -82,25 +82,21 @@ from run_utils import (
     get_labels,
     init_config,
     init_datasets_mlm,
+    init_datasets_squad,
     init_datasets_task,
     init_model,
+    init_squad_trainer,
     init_tokenizer,
     init_trainer,
-    init_squad_trainer,
-    init_datasets_squad,
-    preprocess_datasets_squad,
     preprocess_datasets_mlm,
+    preprocess_datasets_squad,
     preprocess_datasets_task,
     rm_prefixed_subdirs,
     run_hyperparameter_search,
-    test_squad,
     test_tasks,
     train,
     update_run_number,
 )
-
-from experiments.squad import QuestionAnsweringTrainer
-
 from utils_qa import (
     postprocess_qa_predictions,
     postprocess_qa_predictions_with_beam_search,
@@ -745,6 +741,9 @@ def run_finetuning_squad(
         eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,
             eval_dataset)
+
+    if training_args.do_predict:
+        raise NotImplementedError("Storing test results for squad not yet implemented")
 
     # There is an existing issue on training multiple models in sequence in this code
     # There is a memory leakage on the model, a small amount of GPU memory remains after

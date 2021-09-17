@@ -31,8 +31,8 @@ from transformers import (
     TOKENIZER_MAPPING,
     BertConfig,
     BertForMaskedLM,
-    BertForSequenceClassification,
     BertForQuestionAnswering,
+    BertForSequenceClassification,
     BertPreTrainedModel,
     BertTokenizer,
     BertTokenizerFast,
@@ -47,8 +47,8 @@ from . import __dict__ as __models_dict__
 # Keep a copy of the mappings so they may be directly accessed.
 __models_dict__["CONFIG_MAPPING"] = CONFIG_MAPPING
 __models_dict__["MODEL_FOR_MASKED_LM_MAPPING"] = MODEL_FOR_MASKED_LM_MAPPING
-__models_dict__["MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING"] = MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING # noqa E501
-__models_dict__["MODEL_FOR_QUESTION_ANSWERING"] = MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING
+__models_dict__["MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING"] = MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING  # noqa E501
+__models_dict__["MODEL_FOR_QUESTION_ANSWERING"] = MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING  # noqa E501
 __models_dict__["TOKENIZER_MAPPING"] = TOKENIZER_MAPPING
 
 
@@ -295,6 +295,7 @@ def create_sequence_classification_class(bert_cls, name_prefix):
     new_cls.__doc__ = new_cls.__doc__.format(name_prefix=name_prefix)
 
     return new_cls
+
 
 def create_question_answering_class(bert_cls, name_prefix):
     """
