@@ -26,9 +26,11 @@ from copy import deepcopy
 
 from transformers import Trainer
 
-from .finetuning import finetuning_bert_100k_glue_get_info
-from callbacks import RezeroWeightsCallback, TrackEvalMetrics
+from callbacks import TrackEvalMetrics
 from trainer_mixins import QuestionAnsweringMixin
+
+from .finetuning import finetuning_bert_100k_glue_get_info
+
 
 class QuestionAnsweringTrainer(QuestionAnsweringMixin, Trainer):
     pass
@@ -70,8 +72,7 @@ bert_squad_replication.update(
     learning_rate=3e-5,
     save_steps=1_000,
     eval_steps=1_000,
-    logging_steps=100_000, # intended to not log until the end
-    # trainer_callbacks=[],
+    logging_steps=100_000,  # intended to not log until the end
 )
 
 del bert_squad_replication["max_steps"]
