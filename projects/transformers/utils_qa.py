@@ -30,12 +30,13 @@ from typing import Optional, Tuple
 import numpy as np
 from tqdm.auto import tqdm
 
-from transformers import Trainer
-from transformers.trainer_utils import PredictionOutput
-
 logger = logging.getLogger(__name__)
 
-def postprocess_qa_predictions(
+
+# TODO
+# There's a massive amount of duplicate code here
+# Need to refactor and simplify at some point
+def postprocess_qa_predictions(  # noqa: C901
     examples,
     features,
     predictions: Tuple[np.ndarray, np.ndarray],
@@ -48,43 +49,56 @@ def postprocess_qa_predictions(
     log_level: Optional[int] = logging.WARNING,
 ):
     """
-    Post-processes the predictions of a question-answering model to convert them to answers that are substrings of the
-    original contexts. This is the base postprocessing functions for models that only return start and end logits.
+    Post-processes the predictions of a question-answering model to convert them
+    to answers that are substrings of the original contexts. This is the base
+    postprocessing functions for models that only return start and end logits.
 
     Args:
-        examples: The non-preprocessed dataset (see the main script for more information).
-        features: The processed dataset (see the main script for more information).
+        examples: The non-preprocessed dataset
+                  (see the main script for more information).
+        features: The processed dataset
+                  (see the main script for more information).
         predictions (:obj:`Tuple[np.ndarray, np.ndarray]`):
-            The predictions of the model: two arrays containing the start logits and the end logits respectively. Its
-            first dimension must match the number of elements of :obj:`features`.
+            The predictions of the model: two arrays containing the start logits and
+            the end logits respectively. Its first dimension must match the number
+            of elements of :obj:`features`.
         version_2_with_negative (:obj:`bool`, `optional`, defaults to :obj:`False`):
             Whether or not the underlying dataset contains examples with no answers.
         n_best_size (:obj:`int`, `optional`, defaults to 20):
-            The total number of n-best predictions to generate when looking for an answer.
+            The total number of n-best predictions to generate when looking for an
+            answer.
         max_answer_length (:obj:`int`, `optional`, defaults to 30):
-            The maximum length of an answer that can be generated. This is needed because the start and end predictions
-            are not conditioned on one another.
+            The maximum length of an answer that can be generated. This is needed
+            because the start and end predictions are not conditioned on one another.
         null_score_diff_threshold (:obj:`float`, `optional`, defaults to 0):
-            The threshold used to select the null answer: if the best answer has a score that is less than the score of
-            the null answer minus this threshold, the null answer is selected for this example (note that the score of
-            the null answer for an example giving several features is the minimum of the scores for the null answer on
-            each feature: all features must be aligned on the fact they `want` to predict a null answer).
+            The threshold used to select the null answer: if the best answer has a
+            score that is less than the score of the null answer minus this
+            threshold, the null answer is selected for this example (note that the
+            score of the null answer for an example giving several features is the
+            minimum of the scores for the null answer on each feature: all features
+            must be aligned on the fact they `want` to predict a null answer).
 
             Only useful when :obj:`version_2_with_negative` is :obj:`True`.
         output_dir (:obj:`str`, `optional`):
-            If provided, the dictionaries of predictions, n_best predictions (with their scores and logits) and, if
-            :obj:`version_2_with_negative=True`, the dictionary of the scores differences between best and null
+            If provided, the dictionaries of predictions, n_best predictions
+            (with their scores and logits) and, if :obj:`version_2_with_negative=True`,
+            the dictionary of the scores differences between best and null
             answers, are saved in `output_dir`.
         prefix (:obj:`str`, `optional`):
-            If provided, the dictionaries mentioned above are saved with `prefix` added to their names.
+            If provided, the dictionaries mentioned above are saved with `prefix`
+            added to their names.
         log_level (:obj:`int`, `optional`, defaults to ``logging.WARNING``):
             ``logging`` log level (e.g., ``logging.WARNING``)
     """
 
-    assert len(predictions) == 2, "`predictions` should be a tuple with two elements (start_logits, end_logits)."
-    all_start_logits, all_end_logits = predictions
+    msg_1 = "`predictions` should be a tuple with two elements "
+    msg_1 += "(start_logits, end_logits)."
+    msg_2 = "Got {0} predictions and {1} features."
 
-    assert len(predictions[0]) == len(features), f"Got {len(predictions[0])} predictions and {len(features)} features."
+    assert len(predictions) == 2, msg_1
+    all_start_logits, all_end_logits = predictions
+    assert len(predictions[0]) == len(features), msg_2.format(
+        len(predictions[0]), len(features))
 
     # Build a map example to its corresponding features.
     example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
@@ -100,7 +114,8 @@ def postprocess_qa_predictions(
 
     # Logging.
     logger.setLevel(log_level)
-    logger.info(f"Post-processing {len(examples)} example predictions split into {len(features)} features.")
+    logger.info(f"Post-processing {len(examples)} example predictions split into "
+                f"{len(features)} features.")
 
     # Let's loop over all the examples!
     for example_index, example in enumerate(tqdm(examples)):
@@ -115,16 +130,19 @@ def postprocess_qa_predictions(
             # We grab the predictions of the model for this feature.
             start_logits = all_start_logits[feature_index]
             end_logits = all_end_logits[feature_index]
-            # This is what will allow us to map some the positions in our logits to span of texts in the original
-            # context.
+            # This is what will allow us to map some the positions in our logits to
+            # span of texts in the original context.
             offset_mapping = features[feature_index]["offset_mapping"]
-            # Optional `token_is_max_context`, if provided we will remove answers that do not have the maximum context
-            # available in the current feature.
-            token_is_max_context = features[feature_index].get("token_is_max_context", None)
+            # Optional `token_is_max_context`, if provided we will remove answers that
+            # do not have the maximum context available in the current feature.
+            token_is_max_context = features[feature_index].get(
+                "token_is_max_context", None)
 
             # Update minimum null prediction.
             feature_null_score = start_logits[0] + end_logits[0]
-            if min_null_prediction is None or min_null_prediction["score"] > feature_null_score:
+            cond_1 = min_null_prediction is None
+            cond_2 = min_null_prediction["score"] > feature_null_score
+            if (cond_1 or cond_2):
                 min_null_prediction = {
                     "offsets": (0, 0),
                     "score": feature_null_score,
@@ -132,13 +150,17 @@ def postprocess_qa_predictions(
                     "end_logit": end_logits[0],
                 }
 
-            # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
-            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            # Go through all possibilities for the `n_best_size`
+            # greater start and end logits.
+            start_indexes = np.argsort(start_logits)
+            start_indexes = start_indexes[-1 : -n_best_size - 1 : -1].tolist()
+            end_indexes = np.argsort(end_logits)
+            end_indexes = end_indexes[-1 : -n_best_size - 1 : -1].tolist()
             for start_index in start_indexes:
                 for end_index in end_indexes:
-                    # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
-                    # to part of the input_ids that are not in the context.
+                    # Don't consider out-of-scope answers, either because the indices
+                    # are out of bounds or correspond to part of the input_ids that
+                    # are not in the context.
                     if (
                         start_index >= len(offset_mapping)
                         or end_index >= len(offset_mapping)
@@ -146,16 +168,21 @@ def postprocess_qa_predictions(
                         or offset_mapping[end_index] is None
                     ):
                         continue
-                    # Don't consider answers with a length that is either < 0 or > max_answer_length.
-                    if end_index < start_index or end_index - start_index + 1 > max_answer_length:
+                    # Don't consider answers with a length that is either < 0 or > max
+                    end_lt_start = end_index < start_index
+                    end_gt_max = end_index - start_index + 1 > max_answer_length
+                    if end_lt_start or end_gt_max:
                         continue
-                    # Don't consider answer that don't have the maximum context available (if such information is
-                    # provided).
-                    if token_is_max_context is not None and not token_is_max_context.get(str(start_index), False):
+                    # Don't consider answer that don't have the maximum context
+                    # availableif such information is provided.
+                    ctx_not_none = token_is_max_context is not None
+                    max_ctx = token_is_max_context.get(str(start_index), False)
+                    if ctx_not_none and not max_ctx:
                         continue
                     prelim_predictions.append(
                         {
-                            "offsets": (offset_mapping[start_index][0], offset_mapping[end_index][1]),
+                            "offsets": (offset_mapping[start_index][0],
+                                        offset_mapping[end_index][1]),
                             "score": start_logits[start_index] + end_logits[end_index],
                             "start_logit": start_logits[start_index],
                             "end_logit": end_logits[end_index],
@@ -167,10 +194,13 @@ def postprocess_qa_predictions(
             null_score = min_null_prediction["score"]
 
         # Only keep the best `n_best_size` predictions.
-        predictions = sorted(prelim_predictions, key=lambda x: x["score"], reverse=True)[:n_best_size]
+        predictions = sorted(prelim_predictions, key=lambda x: x["score"], reverse=True)
+        predictions = predictions[:n_best_size]
 
-        # Add back the minimum null prediction if it was removed because of its low score.
-        if version_2_with_negative and not any(p["offsets"] == (0, 0) for p in predictions):
+        # Add back the minimum null prediction if it was removed
+        # because of its low score.
+        any_p_offsets = any(p["offsets"] == (0, 0) for p in predictions)
+        if version_2_with_negative and not any_p_offsets:
             predictions.append(min_null_prediction)
 
         # Use the offsets to gather the answer text in the original context.
@@ -179,13 +209,17 @@ def postprocess_qa_predictions(
             offsets = pred.pop("offsets")
             pred["text"] = context[offsets[0] : offsets[1]]
 
-        # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
-        # failure.
-        if len(predictions) == 0 or (len(predictions) == 1 and predictions[0]["text"] == ""):
-            predictions.insert(0, {"text": "empty", "start_logit": 0.0, "end_logit": 0.0, "score": 0.0})
+        # In the very rare edge case we have not a single non-null prediction,
+        # we create a fake prediction to avoid failure.
+        edge_case = (len(predictions) == 1 and predictions[0]["text"] == "")
+        if len(predictions) == 0 or edge_case:
+            predictions.insert(0, {"text": "empty",
+                                   "start_logit": 0.0,
+                                   "end_logit": 0.0,
+                                   "score": 0.0})
 
-        # Compute the softmax of all scores (we do it with numpy to stay independent from torch/tf in this file, using
-        # the LogSumExp trick).
+        # Compute the softmax of all scores (we do it with numpy to stay independent
+        # from torch/tf in this file, using the LogSumExp trick).
         scores = np.array([pred.pop("score") for pred in predictions])
         exp_scores = np.exp(scores - np.max(scores))
         probs = exp_scores / exp_scores.sum()
@@ -205,8 +239,10 @@ def postprocess_qa_predictions(
             best_non_null_pred = predictions[i]
 
             # Then we compare to the null prediction using the threshold.
-            score_diff = null_score - best_non_null_pred["start_logit"] - best_non_null_pred["end_logit"]
-            scores_diff_json[example["id"]] = float(score_diff)  # To be JSON-serializable.
+            score_diff = null_score - best_non_null_pred["start_logit"]
+            score_diff -= best_non_null_pred["end_logit"]
+            # To be JSON-serializable.
+            scores_diff_json[example["id"]] = float(score_diff)
             if score_diff > null_score_diff_threshold:
                 all_predictions[example["id"]] = ""
             else:
@@ -214,7 +250,7 @@ def postprocess_qa_predictions(
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
         all_nbest_json[example["id"]] = [
-            {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}
+            {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}  # noqa E501
             for pred in predictions
         ]
 
@@ -222,16 +258,19 @@ def postprocess_qa_predictions(
     if output_dir is not None:
         assert os.path.isdir(output_dir), f"{output_dir} is not a directory."
 
-        prediction_file = os.path.join(
-            output_dir, "predictions.json" if prefix is None else f"{prefix}_predictions.json"
-        )
-        nbest_file = os.path.join(
-            output_dir, "nbest_predictions.json" if prefix is None else f"{prefix}_nbest_predictions.json"
-        )
+        if prefix is None:
+            prediction_name = "predictions.json"
+            nbest_name = "nbest_predictions.json"
+            null_odds_name = "null_odds.json"
+        else:
+            prediction_name = f"{prefix}_predictions.json"
+            nbest_name = f"{prefix}_nbest_predictions.json"
+            null_odds_name = f"{prefix}_null_odds.json"
+        prediction_file = os.path.join(output_dir, prediction_name)
+        nbest_file = os.path.join(output_dir, nbest_name)
+
         if version_2_with_negative:
-            null_odds_file = os.path.join(
-                output_dir, "null_odds.json" if prefix is None else f"{prefix}_null_odds.json"
-            )
+            null_odds_file = os.path.join(output_dir, null_odds_name)
 
         logger.info(f"Saving predictions to {prediction_file}.")
         with open(prediction_file, "w") as writer:
@@ -261,38 +300,51 @@ def postprocess_qa_predictions_with_beam_search(
     log_level: Optional[int] = logging.WARNING,
 ):
     """
-    Post-processes the predictions of a question-answering model with beam search to convert them to answers that are substrings of the
-    original contexts. This is the postprocessing functions for models that return start and end logits, indices, as well as
-    cls token predictions.
+    Post-processes the predictions of a question-answering model with beam search to
+    convert them to answers that are substrings of the original contexts.
+    This is the postprocessing functions for models that return start and end logits,
+    indices, as well as cls token predictions.
 
     Args:
-        examples: The non-preprocessed dataset (see the main script for more information).
-        features: The processed dataset (see the main script for more information).
+        examples: The non-preprocessed dataset
+                  (see the main script for more information).
+        features: The processed dataset
+                  (see the main script for more information).
         predictions (:obj:`Tuple[np.ndarray, np.ndarray]`):
-            The predictions of the model: two arrays containing the start logits and the end logits respectively. Its
-            first dimension must match the number of elements of :obj:`features`.
+            The predictions of the model: two arrays containing the start logits
+            and the end logits respectively. Its first dimension must match the number
+            of elements of :obj:`features`.
         version_2_with_negative (:obj:`bool`, `optional`, defaults to :obj:`False`):
             Whether or not the underlying dataset contains examples with no answers.
         n_best_size (:obj:`int`, `optional`, defaults to 20):
-            The total number of n-best predictions to generate when looking for an answer.
+            The total number of n-best predictions to generate when looking for an
+            answer.
         max_answer_length (:obj:`int`, `optional`, defaults to 30):
-            The maximum length of an answer that can be generated. This is needed because the start and end predictions
-            are not conditioned on one another.
+            The maximum length of an answer that can be generated. This is needed
+            because the start and end predictions are not conditioned on one another.
         start_n_top (:obj:`int`, `optional`, defaults to 5):
-            The number of top start logits too keep when searching for the :obj:`n_best_size` predictions.
+            The number of top start logits too keep when searching for the
+            :obj:`n_best_size` predictions.
         end_n_top (:obj:`int`, `optional`, defaults to 5):
-            The number of top end logits too keep when searching for the :obj:`n_best_size` predictions.
+            The number of top end logits too keep when searching for the
+            :obj:`n_best_size` predictions.
         output_dir (:obj:`str`, `optional`):
-            If provided, the dictionaries of predictions, n_best predictions (with their scores and logits) and, if
-            :obj:`version_2_with_negative=True`, the dictionary of the scores differences between best and null
-            answers, are saved in `output_dir`.
+            If provided, the dictionaries of predictions, n_best predictions
+            (with their scores and logits) and, if :obj:`version_2_with_negative=True`,
+            the dictionary of the scores differences between best and null answers,
+            are saved in `output_dir`.
         prefix (:obj:`str`, `optional`):
-            If provided, the dictionaries mentioned above are saved with `prefix` added to their names.
+            If provided, the dictionaries mentioned above are saved with `prefix`
+            added to their names.
         log_level (:obj:`int`, `optional`, defaults to ``logging.WARNING``):
             ``logging`` log level (e.g., ``logging.WARNING``)
     """
     assert len(predictions) == 5, "`predictions` should be a tuple with five elements."
-    start_top_log_probs, start_top_index, end_top_log_probs, end_top_index, cls_logits = predictions
+    start_top_log_probs = predictions[0]
+    start_top_index = predictions[1]
+    end_top_log_probs, = predictions[2]
+    end_top_index = predictions[3]
+    cls_logits = predictions[4]
 
     assert len(predictions[0]) == len(
         features
@@ -311,7 +363,8 @@ def postprocess_qa_predictions_with_beam_search(
 
     # Logging.
     logger.setLevel(log_level)
-    logger.info(f"Post-processing {len(examples)} example predictions split into {len(features)} features.")
+    logger.info(f"Post-processing {len(examples)} example predictions split into:"
+                f"{len(features)} features.")
 
     # Let's loop over all the examples!
     for example_index, example in enumerate(tqdm(examples)):
@@ -329,25 +382,28 @@ def postprocess_qa_predictions_with_beam_search(
             end_log_prob = end_top_log_probs[feature_index]
             end_indexes = end_top_index[feature_index]
             feature_null_score = cls_logits[feature_index]
-            # This is what will allow us to map some the positions in our logits to span of texts in the original
-            # context.
+            # This is what will allow us to map some the positions in our logits to
+            # span of texts in the original context.
             offset_mapping = features[feature_index]["offset_mapping"]
-            # Optional `token_is_max_context`, if provided we will remove answers that do not have the maximum context
+            # Optional `token_is_max_context`, if provided we will remove answers that
+            # do not have the maximum context
             # available in the current feature.
-            token_is_max_context = features[feature_index].get("token_is_max_context", None)
+            token_is_max_context = features[feature_index].get(
+                "token_is_max_context", None)
 
             # Update minimum null prediction
             if min_null_score is None or feature_null_score < min_null_score:
                 min_null_score = feature_null_score
 
-            # Go through all possibilities for the `n_start_top`/`n_end_top` greater start and end logits.
+            # Go through all possibilities for the `n_start_top`/`n_end_top` greater
+            # start and end logits.
             for i in range(start_n_top):
                 for j in range(end_n_top):
                     start_index = int(start_indexes[i])
                     j_index = i * end_n_top + j
                     end_index = int(end_indexes[j_index])
-                    # Don't consider out-of-scope answers (last part of the test should be unnecessary because of the
-                    # p_mask but let's not take any risk)
+                    # Don't consider out-of-scope answers (last part of the test should
+                    # be unnecessary because of the p_mask but let's not take any risk)
                     if (
                         start_index >= len(offset_mapping)
                         or end_index >= len(offset_mapping)
@@ -355,16 +411,22 @@ def postprocess_qa_predictions_with_beam_search(
                         or offset_mapping[end_index] is None
                     ):
                         continue
-                    # Don't consider answers with a length negative or > max_answer_length.
-                    if end_index < start_index or end_index - start_index + 1 > max_answer_length:
+                    # Don't consider answers with a length negative or
+                    # > max_answer_length.
+                    end_lt_start = end_index < start_index
+                    end_gt_max = end_index - start_index + 1 > max_answer_length
+                    if end_lt_start or end_gt_max:
                         continue
-                    # Don't consider answer that don't have the maximum context available (if such information is
-                    # provided).
-                    if token_is_max_context is not None and not token_is_max_context.get(str(start_index), False):
+                    # Don't consider answer that don't have the maximum context
+                    # available (if such information is provided).
+                    ctx_not_none = token_is_max_context is not None
+                    max_ctx = token_is_max_context.get(str(start_index), False)
+                    if ctx_not_none and not max_ctx:
                         continue
                     prelim_predictions.append(
                         {
-                            "offsets": (offset_mapping[start_index][0], offset_mapping[end_index][1]),
+                            "offsets": (offset_mapping[start_index][0],
+                                        offset_mapping[end_index][1]),
                             "score": start_log_prob[i] + end_log_prob[j_index],
                             "start_log_prob": start_log_prob[i],
                             "end_log_prob": end_log_prob[j_index],
@@ -372,7 +434,8 @@ def postprocess_qa_predictions_with_beam_search(
                     )
 
         # Only keep the best `n_best_size` predictions.
-        predictions = sorted(prelim_predictions, key=lambda x: x["score"], reverse=True)[:n_best_size]
+        predictions = sorted(prelim_predictions, key=lambda x: x["score"], reverse=True)
+        predictions = predictions[:n_best_size]
 
         # Use the offsets to gather the answer text in the original context.
         context = example["context"]
@@ -380,13 +443,16 @@ def postprocess_qa_predictions_with_beam_search(
             offsets = pred.pop("offsets")
             pred["text"] = context[offsets[0] : offsets[1]]
 
-        # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
-        # failure.
+        # In the very rare edge case we have not a single non-null prediction, we
+        # create a fake prediction to avoid failure.
         if len(predictions) == 0:
-            predictions.insert(0, {"text": "", "start_logit": -1e-6, "end_logit": -1e-6, "score": -2e-6})
+            predictions.insert(0, {"text": "",
+                                   "start_logit": -1e-6,
+                                   "end_logit": -1e-6,
+                                   "score": -2e-6})
 
-        # Compute the softmax of all scores (we do it with numpy to stay independent from torch/tf in this file, using
-        # the LogSumExp trick).
+        # Compute the softmax of all scores (we do it with numpy to stay independent
+        # from torch/tf in this file, using the LogSumExp trick).
         scores = np.array([pred.pop("score") for pred in predictions])
         exp_scores = np.exp(scores - np.max(scores))
         probs = exp_scores / exp_scores.sum()
@@ -402,7 +468,7 @@ def postprocess_qa_predictions_with_beam_search(
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
         all_nbest_json[example["id"]] = [
-            {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}
+            {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}  # noqa E501
             for pred in predictions
         ]
 
@@ -410,16 +476,19 @@ def postprocess_qa_predictions_with_beam_search(
     if output_dir is not None:
         assert os.path.isdir(output_dir), f"{output_dir} is not a directory."
 
-        prediction_file = os.path.join(
-            output_dir, "predictions.json" if prefix is None else f"{prefix}_predictions.json"
-        )
-        nbest_file = os.path.join(
-            output_dir, "nbest_predictions.json" if prefix is None else f"{prefix}_nbest_predictions.json"
-        )
+        if prefix is None:
+            prediction_name = "predictions.json"
+            nbest_name = "nbest_predictions.json"
+            null_odds_name = "null_odds.json"
+        else:
+            prediction_name = f"{prefix}_predictions.json"
+            nbest_name = f"{prefix}_nbest_predictions.json"
+            null_odds_name = f"{prefix}_null_odds.json"
+        prediction_file = os.path.join(output_dir, prediction_name)
+        nbest_file = os.path.join(output_dir, nbest_name)
+
         if version_2_with_negative:
-            null_odds_file = os.path.join(
-                output_dir, "null_odds.json" if prefix is None else f"{prefix}_null_odds.json"
-            )
+            null_odds_file = os.path.join(output_dir, null_odds_name)
 
         logger.info(f"Saving predictions to {prediction_file}.")
         with open(prediction_file, "w") as writer:

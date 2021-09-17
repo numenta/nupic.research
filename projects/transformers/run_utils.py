@@ -41,12 +41,11 @@ from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
     AutoModelForMaskedLM,
-    AutoModelForSequenceClassification,
     AutoModelForQuestionAnswering,
+    AutoModelForSequenceClassification,
     AutoTokenizer,
     EvalPrediction,
     PretrainedConfig,
-    squad_convert_examples_to_features,
     Trainer,
     TrainerCallback,
 )
@@ -57,8 +56,6 @@ from finetuning_constants import (
     RAW_REPORTING_METRICS_PER_TASK,
     REPORTING_METRICS_PER_TASK,
 )
-
-
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
 
@@ -173,16 +170,18 @@ def test_squad(trainer, output_dir, predict_dataset, predict_examples, data_args
     results = trainer.predict(predict_dataset, predict_examples)
     metrics = results.metrics
 
-    max_predict_samples = (
-            data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
-        )
+    if data_args.max_predict_samples is not None:
+        max_predict_samples = data_args.max_predict_samples
+    else:
+        max_predict_samples = len(predict_dataset)
+
     metrics["predict_samples"] = min(max_predict_samples, len(predict_dataset))
 
     trainer.log_metrics("predict", metrics)
     trainer.save_metrics("predict", metrics)
 
-    output_test_file = os.path.join(output_dir, "squad.tsv")
-    # Figure out how to write this file out if necessary
+    output_test_file = os.path.join(output_dir, "squad.tsv")  # noqa F841
+    # Skipping predictions for now, will write file later if necessary
 
 
 def test_tasks(trainer, output_dir, tasks, test_datasets, is_regression, label_list):
@@ -485,7 +484,8 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
     return tokenized_datasets
 
 
-def squad_prepare_features_factory(split,
+def squad_prepare_features_factory(  # noqa: C901
+                                   split,
                                    data_args,
                                    tokenizer,
                                    tokenizer_kwargs,
@@ -504,10 +504,7 @@ def squad_prepare_features_factory(split,
     def pre_pre_process(examples):
 
         tokenized_examples = tokenizer(
-                        examples[key1],
-                        examples[key2],
-                        **tokenizer_kwargs,
-                    )
+            examples[key1], examples[key2], **tokenizer_kwargs)
 
         return tokenized_examples
 
@@ -516,10 +513,7 @@ def squad_prepare_features_factory(split,
         def preprocess_function(examples):
 
             examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]  # noqa: E501
-            tokenized_examples = tokenizer(
-                        examples[key1],
-                        examples[key2],
-                        **tokenizer_kwargs)
+            tokenized_examples = pre_pre_process(examples)
             sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
             offset_mapping = tokenized_examples.pop("offset_mapping")
 
@@ -532,7 +526,6 @@ def squad_prepare_features_factory(split,
                 tokenized_examples["is_impossible"] = []
                 tokenized_examples["cls_index"] = []
                 tokenized_examples["p_mask"] = []
-
 
             for i, offsets in enumerate(offset_mapping):
                 input_ids = tokenized_examples["input_ids"][i]
@@ -553,7 +546,7 @@ def squad_prepare_features_factory(split,
 
                     tokenized_examples["p_mask"].append(
                         [
-                            0.0 if (not special_tokens[i][k] and s == context_idx) or k == cls_index else 1.0
+                            0.0 if (not special_tokens[i][k] and s == context_idx) or k == cls_index else 1.0  # noqa: E501
                             for k, s in enumerate(sequence_ids)
                         ]
                     )
@@ -569,7 +562,6 @@ def squad_prepare_features_factory(split,
                     start_char = answers["answer_start"][0]
                     end_char = start_char + len(answers["text"][0])
 
-
                     token_start_index = 0
                     while sequence_ids[token_start_index] != context_idx:
                         token_start_index += 1
@@ -578,15 +570,20 @@ def squad_prepare_features_factory(split,
                     while sequence_ids[token_end_index] != context_idx:
                         token_end_index -= 1
 
-                    if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
+                    offsets_lte_start = offsets[token_start_index][0] <= start_char
+                    offsets_gte_end = offsets[token_end_index][1] >= end_char
+                    if not (offsets_lte_start and offsets_gte_end):
                         tokenized_examples["start_positions"].append(cls_index)
                         tokenized_examples["end_positions"].append(cls_index)
                         if data_args.beam_search:
                             tokenized_examples["is_impossible"].append(1.0)
                     else:
-                        while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
+                        while_cond_1 = token_start_index < len(offsets)
+                        while_cond_2 = offsets[token_start_index][0] <= start_char
+                        while while_cond_1 and while_cond_2:
                             token_start_index += 1
-                        tokenized_examples["start_positions"].append(token_start_index - 1)
+                        tokenized_examples["start_positions"].append(
+                            token_start_index - 1)
                         while offsets[token_end_index][1] >= end_char:
                             token_end_index -= 1
                         tokenized_examples["end_positions"].append(token_end_index + 1)
@@ -596,13 +593,11 @@ def squad_prepare_features_factory(split,
             return tokenized_examples
 
     else:
-        assert split in ["eval", "val", "test", "predict", "validation"], "unknown split"
+        msg = "unknown split specified"
+        assert split in ["eval", "val", "test", "predict", "validation"], msg
         def preprocess_function(examples):
 
-            tokenized_examples = tokenizer(
-                        examples[key1],
-                        examples[key2],
-                        **tokenizer_kwargs)
+            tokenized_examples = pre_pre_process(examples)
             sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
             if not data_args.beam_search:
                 examples[question_column_name] = [q.lstrip() for q in examples[
@@ -627,7 +622,7 @@ def squad_prepare_features_factory(split,
                             sequence_ids[k] = 3
                     tokenized_examples["p_mask"].append(
                         [
-                            0.0 if (not special_tokens[i][k] and s == context_idx) or k == cls_index else 1.0
+                            0.0 if (not special_tokens[i][k] and s == context_idx) or k == cls_index else 1.0  # noqa: E501
                             for k, s in enumerate(sequence_ids)
                         ]
                     )
@@ -841,6 +836,7 @@ def init_datasets_squad(data_args, model_args):
         cache_dir=model_args.cache_dir
     )
     return datasets
+
 
 def init_datasets_task(data_args, training_args):
     """
@@ -1064,6 +1060,7 @@ def format_eval_results(eval_results, run, task_name):
 # Code to make sure training / finetuning / hp optimization runs safely
 #####
 
+
 def check_squad_version(data_args):
     """
     Ensure dataset name and version_2_with_negative match.
@@ -1083,8 +1080,9 @@ def check_squad_version(data_args):
                 "Turning version_2_with_negative off."
             )
             data_args.version_2_with_negative = False
-    
+
     return data_args
+
 
 def check_callback_types(trainer_callbacks):
     """Always check to make sure callbacks are the right type"""
@@ -1418,6 +1416,7 @@ def init_squad_trainer(trainer_kwargs, data_args, trainer_class, trainer_callbac
 
     # metric checks belong after this, not before
     metric = load_metric("squad_v2" if data_args.version_2_with_negative else "squad")
+
     def compute_metrics_squad(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 

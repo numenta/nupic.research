@@ -380,8 +380,10 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
     )
 
 
-def init_dataset_for_squad(model_args, data_args, training_args,
-                                last_checkpoint=None):
+def init_dataset_for_squad(model_args,
+                           data_args,
+                           training_args,
+                           last_checkpoint=None):
 
     datasets = init_datasets_squad(data_args, model_args)
 
@@ -397,13 +399,15 @@ def init_dataset_for_squad(model_args, data_args, training_args,
      eval_dataset,
      eval_examples,
      answer_column_name) = \
-            preprocess_datasets_squad(datasets, tokenizer, training_args, data_args)
+        preprocess_datasets_squad(datasets, tokenizer, training_args, data_args)
 
-    data_collator = (
-        default_data_collator
-        if data_args.pad_to_max_length
-        else DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None)
-    )
+    if data_args.pad_to_max_length:
+        data_collator = default_data_collator
+    else:
+        pad_to_multiple = 8 if training_args.fp16 else None
+        data_collator = \
+            DataCollatorWithPadding(tokenizer,
+                                    pad_to_multiple=pad_to_multiple)
 
     return (
         tokenizer,
@@ -638,14 +642,18 @@ def run_finetuning_squad(
     # match before loading the dataset
     data_args = check_squad_version(data_args)
 
-    (tokenizer,
-    data_collator,
-    train_dataset,
-    eval_dataset,
-    eval_examples,
-    model,
-    answer_column_name) = \
-        init_dataset_for_squad(model_args, data_args, training_args, last_checkpoint)
+    data_init = init_dataset_for_squad(model_args,
+                                       data_args,
+                                       training_args,
+                                       last_checkpoint)
+
+    tokenizer = data_init[0]
+    data_collator = data_init[1]
+    train_dataset = data_init[2]
+    eval_dataset = data_init[3]
+    eval_examples = data_init[4]
+    model = data_init[5]
+    answer_column_name = data_init[6]
 
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
@@ -655,22 +663,24 @@ def run_finetuning_squad(
 
     # Post-processing:
     def post_processing_function(examples, features, predictions, stage="eval"):
-        # Post-processing: we match the start logits and end logits to answers in the original context.
+        # Post-processing: we match the start logits and end logits to
+        # answers in the original context.
 
         if data_args.beam_search:
-            predictions, scores_diff_json = postprocess_qa_predictions_with_beam_search(
-                examples=examples,
-                features=features,
-                predictions=predictions,
-                version_2_with_negative=data_args.version_2_with_negative,
-                n_best_size=data_args.n_best_size,
-                max_answer_length=data_args.max_answer_length,
-                start_n_top=model.config.start_n_top,
-                end_n_top=model.config.end_n_top,
-                output_dir=training_args.output_dir,
-                # log_level=log_level,
-                prefix=stage,
-            )
+            predictions, scores_diff_json = \
+                postprocess_qa_predictions_with_beam_search(
+                    examples=examples,
+                    features=features,
+                    predictions=predictions,
+                    version_2_with_negative=data_args.version_2_with_negative,
+                    n_best_size=data_args.n_best_size,
+                    max_answer_length=data_args.max_answer_length,
+                    start_n_top=model.config.start_n_top,
+                    end_n_top=model.config.end_n_top,
+                    output_dir=training_args.output_dir,
+                    # log_level=log_level,
+                    prefix=stage,
+                )
 
         else:
             predictions = postprocess_qa_predictions(
@@ -684,23 +694,20 @@ def run_finetuning_squad(
                 prefix=stage,
             )
 
-        # Format the result to the format the metric expects.
-
         if data_args.version_2_with_negative:
             if data_args.beam_search:
                 formatted_predictions = [
-                    {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}
+                    {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}  # noqa E501
                     for k, v in predictions.items()
                 ]
             else:
                 formatted_predictions = [
-                    {"id": k, "prediction_text": v, "no_answer_probability": 0.0} for k, v in predictions.items()
+                    {"id": k, "prediction_text": v, "no_answer_probability": 0.0} for k, v in predictions.items()  # noqa E501
                 ]
         else:
-            formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
-        
-        # answer_column_name is defined in init_dataset, need to refactor to avoid excessive message passing
-        references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
+            formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]  # noqa E501
+
+        references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]  # noqa E501
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
     # Update where model is saved for each run
@@ -726,7 +733,6 @@ def run_finetuning_squad(
                                  training_args.trainer_class,
                                  model_args.trainer_callbacks)
 
-
     if training_args.do_train:
         # Note, rm_checkpoints=True means one model will be saved
         # in the output_dir, and all checkpoint subdirectories will be
@@ -735,7 +741,6 @@ def run_finetuning_squad(
               training_args.output_dir,
               training_args.rm_checkpoints,
               last_checkpoint)
-
 
     if training_args.do_eval:
         eval_results = evaluate_task_handler(
@@ -800,9 +805,6 @@ def run_finetuning_multiple_tasks(
                 else:
                     setattr(training_args, hp_key, hp_val)
 
-        # These checks can change training args, which can affect TaskResults
-        # attributes like metric_for_best_model
-        # TODO: uncomment this check later and update check_best_metric to accomodate squad
         training_args = check_best_metric(training_args, data_args.task_name)
         check_mnli(model_args, data_args.task_name)
         task_results = TaskResults(task_name, training_args)
