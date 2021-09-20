@@ -31,7 +31,7 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from .loss_utils import multiple_cross_entropy
+from .loss_utils import multiple_cross_entropy, multiple_cross_entropy_supervised
 
 
 def train_block_model(
@@ -39,7 +39,7 @@ def train_block_model(
     loader,
     optimizer,
     device,
-    criterion=F.nll_loss,
+    criterion=multiple_cross_entropy,
     complexity_loss_fn=None,
     batches_in_epoch=sys.maxsize,
     active_classes=None,
@@ -197,7 +197,7 @@ def evaluate_block_model(
     loader,
     device,
     batches_in_epoch=sys.maxsize,
-    criterion=multiple_cross_entropy,
+    criterion=multiple_cross_entropy_supervised,
     complexity_loss_fn=None,
     active_classes=None,
     progress=None,

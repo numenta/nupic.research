@@ -30,10 +30,12 @@ from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment impo
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.classification_model import (
     MultiClassifier,
+    MultiFlattenClassifier
 )
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
-    all_module_multiple_log_softmax,
+    multiple_cross_entropy_supervised,
     multiple_cross_entropy,
+    all_module_multiple_log_softmax
 )
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     full_resnet,
@@ -82,10 +84,10 @@ SMALL_BLOCK.update(
         find_unused_parameters=True,
         lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
-            max_lr=0.017,  # change based on sparsity/dimensionality
+            max_lr=0.12,  # change based on sparsity/dimensionality
             div_factor=4,  # initial_lr = 0.06
             final_div_factor=200,  # min_lr = 0.0000025
-            pct_start=2.0 / 10.0,
+            pct_start=1.0 / 10.0,
             epochs=10,
             anneal_strategy="linear",
             max_momentum=1e-4,
@@ -94,7 +96,7 @@ SMALL_BLOCK.update(
         classifier_config=dict(
             model_class=MultiClassifier,
             model_args=dict(num_classes=10),
-            loss_function=multiple_cross_entropy,
+            loss_function=multiple_cross_entropy_supervised,
             # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
             optimizer_class=torch.optim.Adam,
             # Optimizer class class arguments passed to the constructor
@@ -102,6 +104,22 @@ SMALL_BLOCK.update(
         ),
     )
 )
+
+SMALL_BLOCK_FLATTEN = deepcopy(SMALL_BLOCK)
+SMALL_BLOCK_FLATTEN.update(dict(
+        wandb_args=dict(
+            project="greedy_infomax-small_block_model", name=f"flatten_classifier"
+        ),
+        classifier_config=dict(
+            model_class=MultiFlattenClassifier,
+            model_args=dict(num_classes=10, num_patches=49),
+            loss_function=multiple_cross_entropy_supervised,
+            # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
+            optimizer_class=torch.optim.Adam,
+            # Optimizer class class arguments passed to the constructor
+            optimizer_args=dict(lr=2e-4),
+        ),
+))
 
 SMALL_BLOCK_LR_GRID_SEARCH = deepcopy(SMALL_BLOCK)
 SMALL_BLOCK_LR_GRID_SEARCH.update(
@@ -187,7 +205,7 @@ FULL_SPARSE_BLOCK.update(dict(
     ),
     epochs=FULL_NUM_EPOCHS,
     epochs_to_validate=range(FULL_NUM_EPOCHS),
-    model_args=block_wise_full_resnet_args,
+    model_args=block_wise_full_sparse_resnet_args,
     optimizer_class=torch.optim.SGD,
     lr_scheduler_args=dict(
         max_lr=0.017,  # change based on sparsity/dimensionality
@@ -204,6 +222,7 @@ FULL_SPARSE_BLOCK.update(dict(
 CONFIGS = dict(
     small_block=SMALL_BLOCK,
     small_block_lr_grid_search=SMALL_BLOCK_LR_GRID_SEARCH,
+    small_block_flatten=SMALL_BLOCK_FLATTEN,
     small_sparse_block=SMALL_SPARSE_BLOCK,
     small_sparse_block_lr_grid_search=SMALL_SPARSE_BLOCK_LR_GRID_SEARCH,
     full_block=FULL_BLOCK,

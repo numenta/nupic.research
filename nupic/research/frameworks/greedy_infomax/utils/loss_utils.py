@@ -89,9 +89,7 @@ Used for supervised training of a BlockModel with GIM. This outputs a tensor of 
 each of which is the cross entropy classification loss according to a specific
 EmitEncoding module paired with a classification head.
 """
-
-
-def multiple_cross_entropy_legacy(outputs, targets, reduction="sum"):
+def multiple_cross_entropy_supervised(outputs, targets, reduction="sum"):
     device = outputs.device
     module_losses = torch.empty(0, requires_grad=True, device=device)
     for i in range(outputs.shape[0]):

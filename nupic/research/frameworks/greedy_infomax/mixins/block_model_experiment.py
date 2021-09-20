@@ -56,7 +56,6 @@ class BlockModelExperiment(
         super().setup_experiment(config)
         self.evaluate_model = evaluate_block_model
         self.train_model = train_block_model
-        self._loss_function_supervised = multiple_cross_entropy
         self.multiple_module_loss_history = []
 
     @classmethod

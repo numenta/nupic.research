@@ -268,15 +268,15 @@ class SparsePreActBottleneckNoBN(PreActBottleneckNoBN):
                 in_planes, percent_on=percent_on["nonlinearity1"]
             )
         if percent_on["nonlinearity2"] >= 0.5:
-            self.nonlinearity1 = F.relu
+            self.nonlinearity2 = F.relu
         else:
-            self.nonlinearity1 = KWinners2d(
+            self.nonlinearity2 = KWinners2d(
                 in_planes, percent_on=percent_on["nonlinearity2"]
             )
         if percent_on["nonlinearity3"] >= 0.5:
-            self.nonlinearity1 = F.relu
+            self.nonlinearity3 = F.relu
         else:
-            self.nonlinearity1 = KWinners2d(
+            self.nonlinearity3 = KWinners2d(
                 in_planes, percent_on=percent_on["nonlinearity3"]
             )
 
