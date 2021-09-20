@@ -27,7 +27,7 @@ from transformers import (
     CONFIG_MAPPING,
     MODEL_FOR_MASKED_LM_MAPPING,
     MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING,
-    MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING,
+    MODEL_FOR_QUESTION_ANSWERING_MAPPING,
     TOKENIZER_MAPPING,
     BertConfig,
     BertForMaskedLM,
@@ -48,7 +48,7 @@ from . import __dict__ as __models_dict__
 __models_dict__["CONFIG_MAPPING"] = CONFIG_MAPPING
 __models_dict__["MODEL_FOR_MASKED_LM_MAPPING"] = MODEL_FOR_MASKED_LM_MAPPING
 __models_dict__["MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING"] = MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING  # noqa E501
-__models_dict__["MODEL_FOR_QUESTION_ANSWERING"] = MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING  # noqa E501
+__models_dict__["MODEL_FOR_QUESTION_ANSWERING"] = MODEL_FOR_QUESTION_ANSWERING_MAPPING  # noqa E501
 __models_dict__["TOKENIZER_MAPPING"] = TOKENIZER_MAPPING
 
 
@@ -126,7 +126,7 @@ def register_bert_model(bert_cls):
     MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING.update({
         config_cls: seq_classification_cls
     })
-    MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING.update({
+    MODEL_FOR_QUESTION_ANSWERING_MAPPING.update({
         config_cls: question_answering_cls
     })
 
@@ -275,7 +275,8 @@ def create_sequence_classification_class(bert_cls, name_prefix):
         """
 
         def __init__(self, config):
-
+            import pdb
+            pdb.set_trace()
             # Call the init one parent class up.
             # Otherwise, the model will be defined twice.
             BertPreTrainedModel.__init__(self, config)
