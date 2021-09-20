@@ -124,6 +124,11 @@ trifecta_2x_hp_guess.update(
     per_device_train_batch_size=32 // 4,
     per_device_eval_batch_size=32 // 4,
 )
+trifecta_2x_hp_guess_follow_up = deepcopy(trifecta_2x_hp_guess)
+trifecta_2x_hp_guess_follow_up.update(
+    task_name=None,
+    task_names=["mrpc", "cola", "mnli", "qnli", "qqp", "sst2"]
+)
 
 # ---------
 # BERT small variations
@@ -228,6 +233,7 @@ CONFIGS = dict(
     trifecta_90_hp_chase_mnli=trifecta_90_hp_chase_mnli,
     trifecta_90_hp_chase_follow_up=trifecta_90_hp_chase_follow_up,
     trifecta_2x_hp_guess=trifecta_2x_hp_guess,
+    trifecta_2x_hp_guess_follow_up=trifecta_2x_hp_guess_follow_up,
 
     # BERT small
     small_bert_big_dataset_hp_chase=small_bert_big_dataset_hp_chase,

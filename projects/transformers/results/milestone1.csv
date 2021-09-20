@@ -1,13 +1,13 @@
-Model Name,# non-zero params / all params,Pre-training Checkpoint Folder,Eval Loss,Pre-training Additional Notes,Finetuning Checkpoint Folder,GLUE Score Eval,GLUE Score Test,Finetuning Additional Notes
-Dense,27.5M / 27.5M,,2.154,,/mnt/efs/results/bcohen/experiments/transformers/fin,75.36,,
-Trifecta_80,22M / 110M,/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k,2.138,"actual sparsity 79.58%, on-params=22,615,340",/mnt/efs/results/bcohen/experiments/transformers/finetuning_bert_sparse_trifecta_100k_glue_get_info,(running),,"Performed as good or better than other models mostly, except mnli_mm"
-Trifecta_85,16.5M / 110M,/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k,2.211,"actual sparsity 84.61%, on-params=16,577,932",/mnt/efs/results/bcohen/experiments/transformers/finetuning_bert_sparse_85_trifecta_100k_glue_get_info,72.58,,"load_best_model_at_end is on, learning rate has linear warmup and decay, 10 percent of steps dedicated to warmup, learning rate is 2e-5"
-Trifecta_90,11M / 110M,/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k,2.326,"actual sparsity  89.55%, on-params=11,255,156",/mnt/efs/results/bcohen/experiments/transformers/finetuning_bert_sparse_90_trifecta_100k_glue_get_info,71.13,,as above
-Trifecta_2x,16.5M / 220M,/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k,2.21,"actual sparsity  95.7%, on-params= 16,561,784",/mnt/efs/results/bcohen/experiments/transformers/finetuning_bert_sparse_trifecta_2x_get_info,(running),,
-Trifecta_4x,11M / 440M,,,,,,,
-Dense_small,27.5M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k,3.037,"on_params=27,523,072",,,,
-Trifecta_small_80,5.5M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_80%_trifecta_100k,3.219,"actual_sparsity=80%, on_params=5,504,980",,,,
-Trifecta_small_85,4.1M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_85%_trifecta_100k,3.304,"actual sparsity 85.05%, on_params=4,114,156",,,,
-Trifecta_small_90,2.7M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_90%_trifecta_100k,3.344,"actual sparsity=89.84, on_params=2,768,712",,,,
-Trifecta_small_2x,4.1M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_2x_trifecta_100k,3.365,"actual sparsity=94.88, on_params=4,104,008",,,,
-Trifecta_small_4x,2.7 M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_4x_trifecta_100k,3.465,"actual_sparsity=98.93% on_params=2,787,340",,,,
+Model Name,# non-zero params / all params,Pre-training Checkpoint Folder,Eval Loss,Pre-training Additional Notes
+Dense,27.5M / 27.5M,,2.154,
+Trifecta_80,22M / 110M,/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k,2.138,"actual sparsity 79.58%, on-params=22,615,340"
+Trifecta_85,16.5M / 110M,/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k,2.211,"actual sparsity 84.61%, on-params=16,577,932"
+Trifecta_90,11M / 110M,/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k,2.326,"actual sparsity  89.55%, on-params=11,255,156"
+Trifecta_2x,16.5M / 220M,/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k,2.21,"actual sparsity  95.7%, on-params= 16,561,784"
+Trifecta_4x,11M / 440M,,,
+Dense_small,27.5M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_large_dataset_100k,3.037,"on_params=27,523,072"
+Trifecta_small_80,5.5M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_80%_trifecta_100k,3.219,"actual_sparsity=80%, on_params=5,504,980"
+Trifecta_small_85,4.1M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_85%_trifecta_100k,3.304,"actual sparsity 85.05%, on_params=4,114,156"
+Trifecta_small_90,2.7M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_90%_trifecta_100k,3.344,"actual sparsity=89.84, on_params=2,768,712"
+Trifecta_small_2x,4.1M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_2x_trifecta_100k,3.365,"actual sparsity=94.88, on_params=4,104,008"
+Trifecta_small_4x,2.7 M / 27.5M,/mnt/efs/results/pretrained-models/transformers-local/small_bert_4x_trifecta_100k,3.465,"actual_sparsity=98.93% on_params=2,787,340"

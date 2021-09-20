@@ -91,7 +91,8 @@ jobs:
       # FIXME: Downgrading pip to 20.2 until we resolve all the issues with the new pip dependency resolver
       - run: pip install --user pip==20.2
       # FIXME: remove numba installation command once dependency issues with numpy 1.21.2 is fixed on a new numba release
-      - run: pip install --user numba==0.43.0
+      #        Caused by this PR https://github.com/numba/numba/pull/7209
+      - run: pip install --user numba==0.53.0
       - run: pip install --user flake8-formatter-junit-xml
       # FIXME: PEP-517 doesn't allow for editable installs. See https://github.com/pypa/pip/issues/7953
       - run: pip install --no-use-pep517 --user -e ".[dev]"

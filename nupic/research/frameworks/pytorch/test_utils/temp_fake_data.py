@@ -130,8 +130,8 @@ class TempFakeSavedData(object):
 
             image_tensor = transform(image)
             image_name = "img_" + str(i) + ".png"
-            class_name = "class_" + str(target.item())
-            classes.append(target.item())
+            class_name = "class_" + str(target)
+            classes.append(target)
 
             self.data_saver.append_tensor(
                 image_tensor, image_name, group_name, class_name)
