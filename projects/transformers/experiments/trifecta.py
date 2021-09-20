@@ -428,6 +428,7 @@ debug_squad_trifecta_v2_no_beam.update(
     trainer_callbacks=[
         TrackEvalMetrics(),
         RezeroWeightsCallback()],
+    max_steps=300
 )
 
 debug_squad_trifecta_v2_beam = deepcopy(debug_squad_trifecta_v2_no_beam)

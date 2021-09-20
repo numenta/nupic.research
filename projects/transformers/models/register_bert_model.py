@@ -58,7 +58,8 @@ def register_bert_model(bert_cls):
         1. Creates an associated BertConfig
         2. Creates an associated BertForMaskedLM
         3. Creates an associated BertForSequenceClassification
-        4. Registers these classes with Transformers model mappings
+        4. Creates an associated BertForQuestionAnswering
+        5. Registers these classes with Transformers model mappings
 
     This last step ensures that the resulting config and models may be used by
     AutoConfig, AutoModelForMaskedLM, and AutoModelForSequenceClassification.
