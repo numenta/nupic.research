@@ -809,12 +809,10 @@ def run_finetuning_multiple_tasks(
         if data_args.task_name == "squad":
             training_args = check_best_metric(training_args, data_args.dataset_name)
             task_results = TaskResults(data_args.dataset_name, training_args)
-            print(f"metric after check in run_finetuning_multiple_tasks: {training_args.metric_for_best_model}")
         else:
             training_args = check_best_metric(training_args, data_args.task_name)
             task_results = TaskResults(task_name, training_args)
         check_mnli(model_args, data_args.task_name)
-        print(f"task_results best metric key: {task_results.best_metric_key}")
 
         # Hack to ensure we don't do hp search num_runs times
         if model_args.hp_num_trials > 1:
