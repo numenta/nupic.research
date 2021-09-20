@@ -411,6 +411,9 @@ debug_squad_trifecta_v1_no_beam = deepcopy(debug_squad_v1_no_beam)
 debug_squad_trifecta_v1_no_beam.update(
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
+    trainer_callbacks=[
+        TrackEvalMetrics(),
+        RezeroWeightsCallback()],
 )
 
 debug_squad_trifecta_v1_beam = deepcopy(debug_squad_trifecta_v1_no_beam)
@@ -422,6 +425,9 @@ debug_squad_trifecta_v2_no_beam = deepcopy(debug_squad_v2_no_beam)
 debug_squad_trifecta_v2_no_beam.update(
     model_type="fully_static_sparse_bert",
     model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
+    trainer_callbacks=[
+        TrackEvalMetrics(),
+        RezeroWeightsCallback()],
 )
 
 debug_squad_trifecta_v2_beam = deepcopy(debug_squad_trifecta_v2_no_beam)
