@@ -19,16 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import copy
-import torch
 import unittest
+
+import torch
 from transformers import CONFIG_MAPPING, AutoModelForMaskedLM
 
 # FIXME: Importing module relative to the project
 import projects.transformers.models  # noqa: F401
-from projects.transformers.trainer_mixins.deepspeed import replace_sparse_transformer_layer  # noqa
 from nupic.research.frameworks.dynamic_sparse import global_prune_by_abs_weight
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.torch.modules.sparse_weights import SparseWeightsBase, rezero_weights
+from projects.transformers.trainer_mixins.deepspeed import (
+    replace_sparse_transformer_layer  # noqa,
+)
 
 
 def _compute_sparsity(model):

@@ -202,7 +202,7 @@ finetuning_bert700k_glue.update(
     ),
     trainer_callbacks=[
         TrackEvalMetrics(),
-        ],
+    ],
 )
 
 finetuning_bert100k_glue = deepcopy(finetuning_bert700k_glue)

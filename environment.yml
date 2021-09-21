@@ -25,7 +25,7 @@ dependencies:
 
       # Install projects extra dependency
       # See `setup.cfg` for available extras.
-      - pip install -e ".[vernon,imagenet,gsc,dendrites]"
+      - -e ".[vernon,imagenet,gsc,dendrites]"
       # FIXME: transformers dependencies are not compatible with vernon
-      # - pip install -e ".[transformers]"
+      # -e ".[transformers]"
 

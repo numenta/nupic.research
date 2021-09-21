@@ -19,9 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import torch
 import unittest
 from collections import OrderedDict
+
+import torch
 
 # FIXME: Importing module relative to the project
 from projects.transformers.models import SparseEmbeddings

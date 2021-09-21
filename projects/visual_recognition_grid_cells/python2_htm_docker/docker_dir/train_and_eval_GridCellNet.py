@@ -73,21 +73,21 @@ SANITY_CHECK = None  # Options are None or "one_class_training", the latter whic
 
 
 def object_learning_and_inference(
-    EVAL_ON_TRAINING_DATA_BOOL,  # noqa: N803
-    locationModuleWidth,
-    feature_columns_to_grid_cells_threshold,
-    grid_cells_to_feature_columns_threshold,
-    bumpType,
-    cellCoordinateOffsets,
-    cellsPerColumn,
-    activeColumnCount,
-    columnCount,
-    featuresPerObject,
-    objectWidth,
-    numModules,
-    seed1,
-    seed2,
-    anchoringMethod):
+        EVAL_ON_TRAINING_DATA_BOOL,  # noqa: N803
+        locationModuleWidth,
+        feature_columns_to_grid_cells_threshold,
+        grid_cells_to_feature_columns_threshold,
+        bumpType,
+        cellCoordinateOffsets,
+        cellsPerColumn,
+        activeColumnCount,
+        columnCount,
+        featuresPerObject,
+        objectWidth,
+        numModules,
+        seed1,
+        seed2,
+        anchoringMethod):
 
     if seed1 is not None:
         print("Setting random seed")

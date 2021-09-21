@@ -18,9 +18,10 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+import unittest
+
 import numpy as np
 import torch
-import unittest
 from transformers import CONFIG_MAPPING, AdamW, AutoModelForMaskedLM
 
 # FIXME: Importing module relative to the project
