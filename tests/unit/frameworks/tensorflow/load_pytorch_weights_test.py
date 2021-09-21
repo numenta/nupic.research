@@ -20,8 +20,10 @@
 import unittest
 
 import numpy as np
-import tensorflow.compat.v1 as tf
+import pytest
 import torch
+
+tf = pytest.importorskip("tensorflow.compat.v1")
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.platform import test
 

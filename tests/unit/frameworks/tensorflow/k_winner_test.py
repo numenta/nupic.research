@@ -21,7 +21,9 @@
 import random
 
 import numpy as np
-import tensorflow.compat.v1 as tf
+import pytest
+
+tf = pytest.importorskip("tensorflow.compat.v1")
 from tensorflow.python.framework import test_util
 from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.models import Model
