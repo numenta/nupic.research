@@ -4,26 +4,30 @@
 name: nupic.research
 channels:
   - defaults
+  - pytorch
+  - nvidia
+  - conda-forge
 
 dependencies:
-  - python=3.7
-  - pip=20.2
+  - python=3.8
+  - pip
 
   # FIXME: remove numba installation command once dependency issues with numpy 1.21.2 is fixed on a new numba release
   #        Caused by this PR https://github.com/numba/numba/pull/7209
   - numba=0.53.0
-
-  # Dependencies not available in conda
   - pip:
-      # Install nupic.torch and  nupic.tensorflow libraries in develop mode.
-      # Assume both libraries were cloned into ${HOME}/nta folder
-      # If you don't want to install nupic.torch and nupic.tensorflow in develop
-      # mode just comment the following lines and use the versions indicated in
-      # the requirements.txt file
-      - -e ${HOME}/nta/nupic.torch --no-binary :all
-      - -e ${HOME}/nta/nupic.tensorflow --no-binary :all
+      # Install nupic.torch libraries in develop mode.
+      # Assume libraries were cloned into ${HOME}/nta folder
+      - -e ${HOME}/nta/nupic.torch
 
-      # Install nupic.research in develop mode
-      - -r requirements-dev.txt
-      - -e . --no-binary :all
+      # Install nupic.research in development mode with dev tools extras enabled
+      - -e ".[dev]"
+
+      # Install projects extra dependency
+      # See `setup.cfg` for available extras.
+      # - -e ".[vernon]"
+      # - -e ".[imagenet]"
+      # - -e ".[gsc]"
+      # - -e ".[dendrites]"
+      # - -e ".[transformers]"
 

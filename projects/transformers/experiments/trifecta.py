@@ -536,7 +536,7 @@ finetuning_bert_sparse_trifecta_100k_glue.update(
     trainer_callbacks=[
         RezeroWeightsCallback(),
         TrackEvalMetrics(),
-        ],
+    ],
     rm_checkpoints=True,
 )
 
