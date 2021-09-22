@@ -25,7 +25,9 @@ dependencies:
 
       # Install projects extra dependency
       # See `setup.cfg` for available extras.
-      - -e ".[vernon,imagenet,gsc,dendrites]"
-      # FIXME: transformers dependencies are not compatible with vernon
-      # -e ".[transformers]"
+      # - -e ".[vernon]"
+      # - -e ".[imagenet]"
+      # - -e ".[gsc]"
+      # - -e ".[dendrites]"
+      # - -e ".[transformers]"
 
