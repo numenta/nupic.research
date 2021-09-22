@@ -185,7 +185,7 @@ class TrialsCollection:
             self.completed = pickle.load(f)
 
     @staticmethod  # noqa: C901
-    def expand_trials(base_config, num_samples=1):
+    def expand_trials(base_config, num_samples=1):  # noqa: C901
         """
         Convert experiments using SearchOption into a list of experiments
         List of experiments can be executed in parallel or sequentially
