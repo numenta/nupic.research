@@ -44,8 +44,12 @@ def run(config):
         return run_single_instance(config)
 
     # Connect to ray
-    address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
-    ray.init(address=address, local_mode=config.get("local_mode", False))
+    local_mode = config.get("local_mode", False)
+    if local_mode:
+        address = None
+    else:
+        address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
+    ray.init(address=address, local_mode=local_mode)
 
     # Register serializer and deserializer - needed when logging arrays and tensors.
     if not config.get("local_mode", False):
