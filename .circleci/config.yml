@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-version: 2
+version: 2.1
 
 jobs:
   checkout_code:
@@ -49,7 +49,7 @@ jobs:
 
       # Cache git-lfs files
       - run: git lfs install
-      - run: git lfs ls-files -l | cut -d' ' -f1 | sort > git-lfs.sha
+      - run: git lfs ls-files -l | cut -d ' ' -f1 | sort > git-lfs.sha
       - restore_cache:
           key: git-lfs-files-v1-key-{{ checksum "git-lfs.sha" }}
       - run: git lfs pull
@@ -77,27 +77,21 @@ jobs:
   install_dependencies:
     working_directory: ~/nta/nupic.research
     docker:
-      - image: circleci/python:3.7
+      - image: circleci/python:3.8
     steps:
       - attach_workspace:
           at: ~/nta
       - run:
-          name: Get nupic.torch and nupic.tensorflow latest SHA
+          name: Get nupic.torch latest SHA
           command: |
             git ls-remote git://github.com/numenta/nupic.torch.git HEAD > nupic.torch.sha
-            git ls-remote git://github.com/numenta/nupic.tensorflow.git HEAD > nupic.tensorflow.sha
+            pip install --prefix ~/.local git+https://github.com/numenta/nupic.torch.git
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
-      # FIXME: Downgrading pip to 20.2 until we resolve all the issues with the new pip dependency resolver
-      - run: pip install --user pip==20.2
-      # FIXME: remove numba installation command once dependency issues with numpy 1.21.2 is fixed on a new numba release
-      #        Caused by this PR https://github.com/numba/numba/pull/7209
-      - run: pip install --user numba==0.53.0
-      - run: pip install --user flake8-formatter-junit-xml
-      # FIXME: PEP-517 doesn't allow for editable installs. See https://github.com/pypa/pip/issues/7953
-      - run: pip install --no-use-pep517 --user -e ".[dev]"
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+      - run: pip install --prefix ~/.local flake8-formatter-junit-xml
+      - run: pip install --prefix ~/.local -e ".[dev,imagenet,dendrites,gsc]"
       - save_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
           paths:
             - ~/.local
       - persist_to_workspace:
@@ -107,12 +101,12 @@ jobs:
   check_style:
     working_directory: ~/nta/nupic.research
     docker:
-      - image: circleci/python:3.7
+      - image: circleci/python:3.8
     steps:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
       - run:
           name: Check Style
           command: |
@@ -123,32 +117,36 @@ jobs:
 
   test:
     working_directory: ~/nta/nupic.research
+    parallelism: 4 
     docker:
-      - image: circleci/python:3.7
+      - image: circleci/python:3.8
     steps:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
       - run:
           name: Run python tests
           environment:
             PYTEST_ADDOPTS: --junitxml=test_results/pytest/results.xml --verbose
           command: |
+            set -e
+            cp -f .circleci/pytest.ini pytest.ini
+            TEST_FILES=$(circleci tests glob "tests/**/*.py" | circleci tests split --split-by=timings --show-counts)
             mkdir -p test_results/pytest
-            pytest
+            pytest $TEST_FILES
       - store_test_results:
           path: test_results
 
   build:
     working_directory: ~/nta/nupic.research
     docker:
-      - image: circleci/python:3.7
+      - image: circleci/python:3.8
     steps:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "nupic.tensorflow.sha" }}-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
       - run:
           name: Build wheel
           environment:
@@ -159,7 +157,7 @@ jobs:
 
 
 workflows:
-  version: 2
+  version: 2.1
 
   validate-build-test:
     jobs:

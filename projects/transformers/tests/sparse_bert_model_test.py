@@ -19,10 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import sys
 import tempfile
 import unittest
-from os.path import abspath
 
 from transformers import (
     CONFIG_MAPPING,
@@ -32,15 +30,14 @@ from transformers import (
     AutoModelForSequenceClassification,
 )
 
-from models import (
+from nupic.torch.modules import SparseWeights
+# FIXME: Importing module relative to the project
+from projects.transformers.models import (
     SparseEmbeddings,
     StaticSparseEncoderBertConfig,
     StaticSparseEncoderBertForMaskedLM,
     StaticSparseEncoderBertForSequenceClassification,
 )
-from nupic.torch.modules import SparseWeights
-
-sys.path.insert(0, abspath("../"))
 
 
 class SparseBertModelTest(unittest.TestCase):

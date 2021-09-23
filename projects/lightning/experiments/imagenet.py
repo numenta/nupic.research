@@ -26,7 +26,7 @@ import torch
 from nupic.research.frameworks.lightning import mixins
 from nupic.research.frameworks.lightning.models import SupervisedModel
 from nupic.research.frameworks.pytorch import datasets
-from nupic.research.frameworks.pytorch.models import (
+from nupic.research.frameworks.pytorch.models.pretrained_models import (
     resnet50_swsl,
     resnext50_32x4d_swsl,
     se_resnet50,

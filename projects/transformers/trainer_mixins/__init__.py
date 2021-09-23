@@ -26,4 +26,5 @@ from .multi_eval_sets import MultiEvalSetsTrainerMixin
 from .gmp import GradualMagnitudePruningMixin, ThreeStageLRMixin
 from .one_cycle_lr import OneCycleLRMixin
 from .profiler import TorchProfilerMixin
+from .qa_trainer import QuestionAnsweringMixin
 from .rigl import RigLMixin

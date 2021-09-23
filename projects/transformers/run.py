@@ -48,6 +48,7 @@ from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     AutoModelForSequenceClassification,
     DataCollatorWithPadding,
+    EvalPrediction,
     HfArgumentParser,
     default_data_collator,
     set_seed,
@@ -57,6 +58,7 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from callbacks import TrackEvalMetrics
 from experiments import CONFIGS
+from experiments.squad import QuestionAnsweringTrainer
 from integrations import (  # noqa I001
     CustomWandbCallback,
     init_ray_wandb_logger_callback,
@@ -72,6 +74,7 @@ from run_utils import (
     check_mnli,
     check_rm_checkpoints,
     check_sparsity_callback,
+    check_squad_version,
     compute_objective,
     evaluate_language_model,
     evaluate_task_handler,
@@ -79,17 +82,24 @@ from run_utils import (
     get_labels,
     init_config,
     init_datasets_mlm,
+    init_datasets_squad,
     init_datasets_task,
     init_model,
+    init_squad_trainer,
     init_tokenizer,
     init_trainer,
     preprocess_datasets_mlm,
+    preprocess_datasets_squad,
     preprocess_datasets_task,
     rm_prefixed_subdirs,
     run_hyperparameter_search,
     test_tasks,
     train,
     update_run_number,
+)
+from utils_qa import (
+    postprocess_qa_predictions,
+    postprocess_qa_predictions_with_beam_search,
 )
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
@@ -259,7 +269,7 @@ def run_pretraining(
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
-    has_track_eval, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
+    _, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
 
     # Run hp search or regular training
     if model_args.hp_num_trials >= 1:
@@ -367,6 +377,46 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
     return (
         tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model,
         is_regression, tokenized_datasets, label_list, config
+    )
+
+
+def init_dataset_for_squad(model_args,
+                           data_args,
+                           training_args,
+                           last_checkpoint=None):
+
+    datasets = init_datasets_squad(data_args, model_args)
+
+    # Place holder for now
+    extra_config_kwargs = {}
+    config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
+    tokenizer = init_tokenizer(model_args)
+    model = init_model(model_args, config, tokenizer, finetuning=True, squad=True)
+    check_sparsity_callback(model, model_args)
+
+    logging.info(f"Tokenizing datasets for squad ...")
+    (train_dataset,
+     eval_dataset,
+     eval_examples,
+     answer_column_name) = \
+        preprocess_datasets_squad(datasets, tokenizer, training_args, data_args)
+
+    if data_args.pad_to_max_length:
+        data_collator = default_data_collator
+    else:
+        pad_to_multiple_of = 8 if training_args.fp16 else None
+        data_collator = \
+            DataCollatorWithPadding(tokenizer,
+                                    pad_to_multiple_of=pad_to_multiple_of)
+
+    return (
+        tokenizer,
+        data_collator,
+        train_dataset,
+        eval_dataset,
+        eval_examples,
+        model,
+        answer_column_name
     )
 
 
@@ -554,7 +604,7 @@ def run_finetuning_single_task(
     if training_args.do_eval:
         eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,
-            eval_dataset, tokenized_datasets)
+            eval_dataset)
 
     # Test/Predict
     if training_args.do_predict:
@@ -571,6 +621,135 @@ def run_finetuning_single_task(
             trainer, training_args.output_dir, tasks, test_datasets,
             is_regression, label_list
         )
+
+    # There is an existing issue on training multiple models in sequence in this code
+    # There is a memory leakage on the model, a small amount of GPU memory remains after
+    # the run and accumulates over several runs. It fails with OOM after about 20 runs,
+    # even when all tensors on GPU are explicitly deleted, garbage is collected and
+    # cache is cleared. Tried multiple solutions but this weird little hack is the only
+    # thing that worked.
+    model.to("cpu")
+
+    return eval_results
+
+
+def run_finetuning_squad(
+    model_args, data_args, training_args, last_checkpoint=None, run_idx=None,
+):
+    """On a single task train, evaluate, and save results"""
+
+    # Make sure dataset name, task name, and version_2_with_negative
+    # match before loading the dataset
+    data_args = check_squad_version(data_args)
+
+    data_init = init_dataset_for_squad(model_args,
+                                       data_args,
+                                       training_args,
+                                       last_checkpoint)
+
+    tokenizer = data_init[0]
+    data_collator = data_init[1]
+    train_dataset = data_init[2]
+    eval_dataset = data_init[3]
+    eval_examples = data_init[4]
+    model = data_init[5]
+    answer_column_name = data_init[6]
+
+    # Code safety
+    check_eval_and_max_steps(training_args, train_dataset)
+    # Pass dataset_name instead of task_name for the special case of squad
+    # squad and squad_v2 have different metrics and datasets, but same task_name
+    training_args = check_best_metric(training_args, data_args.dataset_name)
+
+    # Post-processing:
+    def post_processing_function(examples, features, predictions, stage="eval"):
+        # Post-processing: we match the start logits and end logits to
+        # answers in the original context.
+
+        if data_args.beam_search:
+            predictions, scores_diff_json = \
+                postprocess_qa_predictions_with_beam_search(
+                    examples=examples,
+                    features=features,
+                    predictions=predictions,
+                    version_2_with_negative=data_args.version_2_with_negative,
+                    n_best_size=data_args.n_best_size,
+                    max_answer_length=data_args.max_answer_length,
+                    start_n_top=model.config.start_n_top,
+                    end_n_top=model.config.end_n_top,
+                    output_dir=training_args.output_dir,
+                    # log_level=log_level,
+                    prefix=stage,
+                )
+
+        else:
+            predictions = postprocess_qa_predictions(
+                examples=examples,
+                features=features,
+                predictions=predictions,
+                version_2_with_negative=data_args.version_2_with_negative,
+                n_best_size=data_args.n_best_size,
+                max_answer_length=data_args.max_answer_length,
+                output_dir=training_args.output_dir,
+                prefix=stage,
+            )
+
+        if data_args.version_2_with_negative:
+            if data_args.beam_search:
+                formatted_predictions = [
+                    {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}  # noqa E501
+                    for k, v in predictions.items()
+                ]
+            else:
+                formatted_predictions = [
+                    {"id": k, "prediction_text": v, "no_answer_probability": 0.0} for k, v in predictions.items()  # noqa E501
+                ]
+        else:
+            formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]  # noqa E501
+
+        references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]  # noqa E501
+        return EvalPrediction(predictions=formatted_predictions, label_ids=references)
+
+    # Update where model is saved for each run
+    training_args = update_run_number(training_args, run_idx)
+
+    training_args.trainer_class = QuestionAnsweringTrainer
+
+    trainer_kwargs = dict(
+        model=model,
+        args=training_args,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        eval_examples=eval_examples,
+        data_collator=data_collator,
+        post_process_function=post_processing_function,
+        callbacks=model_args.trainer_callbacks or None,
+    )
+
+    # Train
+    trainer = init_squad_trainer(trainer_kwargs,
+                                 data_args,
+                                 training_args.trainer_class,
+                                 model_args.trainer_callbacks)
+
+    if training_args.do_train:
+        # Note, rm_checkpoints=True means one model will be saved
+        # in the output_dir, and all checkpoint subdirectories will be
+        # deleted when train() is called.
+        train(trainer,
+              training_args.output_dir,
+              training_args.rm_checkpoints,
+              last_checkpoint)
+
+    eval_results = {}
+    if training_args.do_eval:
+        eval_results = evaluate_task_handler(
+            trainer, data_args, model_args, training_args,
+            eval_dataset)
+
+    if training_args.do_predict:
+        raise NotImplementedError("Storing test results for squad not yet implemented")
 
     # There is an existing issue on training multiple models in sequence in this code
     # There is a memory leakage on the model, a small amount of GPU memory remains after
@@ -627,11 +806,13 @@ def run_finetuning_multiple_tasks(
                 else:
                     setattr(training_args, hp_key, hp_val)
 
-        # These checks can change training args, which can affect TaskResults
-        # attributes like metric_for_best_model
-        training_args = check_best_metric(training_args, data_args.task_name)
+        if data_args.task_name == "squad":
+            training_args = check_best_metric(training_args, data_args.dataset_name)
+            task_results = TaskResults(data_args.dataset_name, training_args)
+        else:
+            training_args = check_best_metric(training_args, data_args.task_name)
+            task_results = TaskResults(task_name, training_args)
         check_mnli(model_args, data_args.task_name)
-        task_results = TaskResults(task_name, training_args)
 
         # Hack to ensure we don't do hp search num_runs times
         if model_args.hp_num_trials > 1:
@@ -643,21 +824,32 @@ def run_finetuning_multiple_tasks(
             set_seed(training_args.seed)
 
             if model_args.hp_num_trials > 1:
-                eval_results = run_finetuning_single_task_with_hp_search(
-                    model_args,
-                    data_args,
-                    training_args,
-                    last_checkpoint=last_checkpoint
-                )
+                if data_args.task_name == "squad":
+                    print("Hp search for squad is not yet implemented")
+                else:
+                    eval_results = run_finetuning_single_task_with_hp_search(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint
+                    )
             else:
-                eval_results = run_finetuning_single_task(
-                    model_args,
-                    data_args,
-                    training_args,
-                    last_checkpoint=last_checkpoint,
-                    run_idx=run_idx
-                )
-
+                if data_args.task_name == "squad":
+                    eval_results = run_finetuning_squad(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint,
+                        run_idx=run_idx
+                    )
+                else:
+                    eval_results = run_finetuning_single_task(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint,
+                        run_idx=run_idx
+                    )
             task_results.append(eval_results)
 
         # Delete all finetuning run directories except for the best one

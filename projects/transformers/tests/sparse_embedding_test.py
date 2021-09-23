@@ -19,16 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import sys
 import unittest
 from collections import OrderedDict
-from os.path import expanduser
 
 import torch
 
-from models import SparseEmbeddings  # noqa
-
-sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers")) # noqa
+# FIXME: Importing module relative to the project
+from projects.transformers.models import SparseEmbeddings
 
 
 def create_simple_model():

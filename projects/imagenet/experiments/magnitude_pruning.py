@@ -27,7 +27,7 @@ import torch.nn.init
 import torch.optim
 from ray import tune
 
-from nupic.research.frameworks.pytorch.models import resnet50_swsl
+from nupic.research.frameworks.pytorch.models.pretrained_models import resnet50_swsl
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.modules import prunable_conv2d, prunable_linear
 from nupic.research.frameworks.vernon.distributed import ImagenetExperiment, mixins
