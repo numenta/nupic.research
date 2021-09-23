@@ -131,7 +131,8 @@ jobs:
             PYTEST_ADDOPTS: --junitxml=test_results/pytest/results.xml --verbose
           command: |
             set -e
-            TEST_FILES=$(circleci tests glob "tests/**/*.py" | circleci tests split --split-by=timings)
+            cp -f .circleci/pytest.ini pytest.ini
+            TEST_FILES=$(circleci tests glob "tests/**/*.py" | circleci tests split --split-by=timings --show-counts)
             mkdir -p test_results/pytest
             pytest $TEST_FILES
       - store_test_results:
