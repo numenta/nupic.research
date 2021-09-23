@@ -495,7 +495,18 @@ def squad_prepare_features_factory(  # noqa: C901
                                    pad_on_right=None,
                                    ):
     """
-    splits can be train / val / and beam search ca be yes or no
+    Choose a function for preprocesssing squad datasets based on
+        split (train vs. eval) and beam search (on or off).
+
+    This is a helper for preprocess_datasets_squad.
+
+    This code is based directly on
+    https://github.com/huggingface/transformers/tree/master/examples/pytorch/question-answering  # noqa: E501
+
+    The original code simply had separate files for beam search and simple qa, and
+    separate but nearly identical functions for preprocessing train/val/test splits.
+    This code is a fast attempt to consolidate multiple functions. Change at your own
+    risk.
     """
 
     key1 = question_column_name if pad_on_right else context_column_name
@@ -512,12 +523,13 @@ def squad_prepare_features_factory(  # noqa: C901
 
         def preprocess_function(examples):
 
-            examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]  # noqa: E501
+            examples[question_column_name] = [
+                q.lstrip() for q in examples[question_column_name]
+            ]
             tokenized_examples = pre_pre_process(examples)
             sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
             offset_mapping = tokenized_examples.pop("offset_mapping")
 
-            # Let's label those examples!
             tokenized_examples["start_positions"] = []
             tokenized_examples["end_positions"] = []
 
@@ -646,6 +658,12 @@ def prepare_squad_dataset(split,
                           data_args,
                           prepare_features,
                           column_names):
+    """
+    Take the train/val/test split, generate the appropriate preprocessing
+    function, apply the preprocessing function to the dataset, select down
+    to the correct number of examples, and return examples and dataset. This
+    is a helper for preprocess_datasets_squad.
+    """
 
     dataset, examples = None, None
     if split not in datasets:
@@ -673,6 +691,15 @@ def prepare_squad_dataset(split,
 
 
 def get_squad_tokenizer_kwargs(data_args, pad_on_right, max_seq_length):
+    """
+    Generate the keyword args for squad tokenizer depending on if beam search
+    is being used or not.
+
+    A bunch of arguments relating to tokenizer, column names, padding, etc.
+    need to be parsed and used to create the squad datasets. In the original HF code,
+    separate functions had copies of the code for parsing. I tried to separate out
+    the parsing steps into functions. This is a helper for preprocess_datasets_squad.
+    """
 
     tokenizer_kwargs = {}
     tokenizer_kwargs.update(
@@ -695,6 +722,11 @@ def get_squad_tokenizer_kwargs(data_args, pad_on_right, max_seq_length):
 
 
 def get_squad_kwargs(datasets, tokenizer, training_args, data_args):
+    """
+    Generate series of arguments relating to column names, padding, max_lengths,
+    etc. that are needed for preprocessing squad datasets.
+    """
+
     # Preprocessing is slighlty different for training and evaluation.
     if training_args.do_train:
         column_names = datasets["train"].column_names
@@ -732,16 +764,22 @@ def get_squad_kwargs(datasets, tokenizer, training_args, data_args):
 
 
 def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
-    """Preprocess datasets for finetuning on squad"""
+    """
+    Preprocess datasets for finetuning on squad
+    """
 
+    # Generate arguments needed for preprocessing
     max_seq_length, column_names, squad_kwargs = get_squad_kwargs(
         datasets, tokenizer, training_args, data_args)
     pad_on_right = squad_kwargs["pad_on_right"]
 
+    # Generate more arguments needed for preprocessing
     tokenizer_kwargs = get_squad_tokenizer_kwargs(
         data_args, pad_on_right, max_seq_length)
 
     train_dataset, eval_examples, eval_dataset = None, None, None
+    # Get the preprocessing function for the training data,
+    # and preprocess the dataset
     if training_args.do_train:
         prepare_train_features = squad_prepare_features_factory(
             "train", data_args, tokenizer, tokenizer_kwargs, **squad_kwargs)
@@ -749,6 +787,8 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
             "train", datasets, data_args, prepare_train_features,
             column_names)
 
+    # Get the preprocessing function for the validation data,
+    # and preprocess the dataset
     if training_args.do_eval:
         prepare_validation_features = squad_prepare_features_factory(
             "validation", data_args, tokenizer, tokenizer_kwargs, **squad_kwargs)
@@ -756,8 +796,7 @@ def preprocess_datasets_squad(datasets, tokenizer, training_args, data_args):
             "validation", datasets, data_args, prepare_validation_features,
             column_names)
 
-    # Ignoring predict set for now
-
+    # Ignoring predict/test set for now
     return (train_dataset,
             eval_dataset,
             eval_examples,
