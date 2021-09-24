@@ -30,7 +30,7 @@ from nupic.research.frameworks.dynamic_sparse import global_prune_by_abs_weight
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.torch.modules.sparse_weights import SparseWeightsBase, rezero_weights
 from projects.transformers.trainer_mixins.deepspeed import (
-    replace_sparse_transformer_layer  # noqa,
+    replace_sparse_transformer_layer  # noqa,,,,
 )
 
 
