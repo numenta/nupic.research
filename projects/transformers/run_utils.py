@@ -35,6 +35,8 @@ import numpy as np
 import pandas as pd
 from datasets import concatenate_datasets, load_dataset, load_from_disk, load_metric
 from datasets.dataset_dict import DatasetDict
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics import f1_score, matthews_corrcoef
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -56,8 +58,6 @@ from finetuning_constants import (
 )
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.torch.modules.sparse_weights import SparseWeightsBase
-from scipy.stats import pearsonr, spearmanr
-from sklearn.metrics import f1_score, matthews_corrcoef
 
 __all__ = [
     "evaluate_language_model",

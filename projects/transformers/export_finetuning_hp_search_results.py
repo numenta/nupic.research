@@ -40,6 +40,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
+from scipy import stats as ss
 from tqdm import tqdm
 
 from finetuning_constants import (
@@ -47,7 +48,6 @@ from finetuning_constants import (
     REPORTING_METRICS_PER_TASK,
     TASK_NAMES,
 )
-from scipy import stats as ss
 
 warnings.filterwarnings("ignore")
 

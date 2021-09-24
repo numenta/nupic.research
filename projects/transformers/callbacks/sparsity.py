@@ -22,12 +22,12 @@
 import logging
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 import wandb
 from pandas import DataFrame
 from torch import count_nonzero
 from transformers import TrainerCallback
 
-import seaborn as sns
 from nupic.research.frameworks.pytorch.model_utils import (
     count_nonzero_params,
     filter_modules,
