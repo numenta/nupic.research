@@ -24,14 +24,13 @@ import os
 from collections import MutableMapping
 
 import wandb
+from ray.tune.integration.wandb import WandbLoggerCallback
 from transformers.integrations import (
     INTEGRATION_TO_CALLBACK,
     WandbCallback,
     is_wandb_available,
     logger,
 )
-
-from ray.tune.integration.wandb import WandbLoggerCallback
 
 
 """

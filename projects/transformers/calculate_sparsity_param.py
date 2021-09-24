@@ -23,10 +23,10 @@
 import argparse
 from dataclasses import replace
 
-from transformers import AutoModelForMaskedLM, HfArgumentParser
-
 # FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
 import ray  # noqa: F401, I001
+from transformers import AutoModelForMaskedLM, HfArgumentParser
+
 from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.model_utils import (
     calc_model_sparsity,

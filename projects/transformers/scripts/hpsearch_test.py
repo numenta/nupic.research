@@ -18,6 +18,7 @@
 #  http://numenta.org/licenses/
 #
 
+from ray import tune
 from transformers import (
     AutoConfig,
     AutoModelForMaskedLM,
@@ -27,7 +28,6 @@ from transformers import (
 )
 
 from dataloading_utils import get_dataset_wkbc, resize_position_embeddings
-from ray import tune
 
 if __name__ == "__main__":
 

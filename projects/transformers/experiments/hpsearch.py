@@ -24,10 +24,10 @@ Base Transformers Experiment configuration.
 
 from copy import deepcopy
 
+from ray import tune
 from transformers import Trainer
 
 from callbacks import RezeroWeightsCallback, TrackEvalMetrics
-from ray import tune
 from trainer_mixins import MultiEvalSetsTrainerMixin
 
 from .base import bert_base
