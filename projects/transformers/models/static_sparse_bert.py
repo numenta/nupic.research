@@ -222,7 +222,6 @@ class FullyStaticSparseBertModel(BertModel):
             setattr(self.embeddings, embedding_name, sparse_module.to(device))
 
 
-
 def _get_resized_sparse_embeddings(self, old_embeddings, new_num_tokens=None):
     """
     Build a resized Embedding Module from a provided token Embedding Module. Increasing
