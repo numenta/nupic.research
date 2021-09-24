@@ -39,11 +39,8 @@ from copy import deepcopy
 from functools import partial
 from pprint import pformat
 
-# FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
-import ray  # noqa: F401, I001
 import torch.distributed
 import transformers
-from ray.tune.error import TuneError as TuneError
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     AutoModelForSequenceClassification,
@@ -56,6 +53,8 @@ from transformers import (
 from transformers.integrations import is_wandb_available
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
+# FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
+import ray  # noqa: F401, I001
 from callbacks import TrackEvalMetrics
 from experiments import CONFIGS
 from experiments.squad import QuestionAnsweringTrainer
@@ -63,6 +62,7 @@ from integrations import (  # noqa I001
     CustomWandbCallback,
     init_ray_wandb_logger_callback,
 )
+from ray.tune.error import TuneError as TuneError
 from run_args import CustomTrainingArguments, DataTrainingArguments, ModelArguments
 from run_utils import (
     TaskResults,

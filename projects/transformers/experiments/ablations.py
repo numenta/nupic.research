@@ -20,10 +20,10 @@
 # ----------------------------------------------------------------------
 from copy import deepcopy
 
-from ray import tune
 from transformers import Trainer
 
 from callbacks import PlotDensitiesCallback, RezeroWeightsCallback
+from ray import tune
 from trainer_mixins import DistillationTrainerMixin, OneCycleLRMixin, RigLMixin
 
 from .bertitos import tiny_bert_100k

@@ -28,10 +28,10 @@ Not tested for modified sparse models.
 
 import argparse
 
-# FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
-import ray  # noqa: F401, I001
 from transformers import AutoModelForMaskedLM, HfArgumentParser
 
+# FIXME: The experiments import Ray, but it must be imported before Pickle # noqa I001
+import ray  # noqa: F401, I001
 from experiments import CONFIGS
 from nupic.research.frameworks.pytorch.model_utils import filter_params, get_module_attr
 from nupic.torch.modules.sparse_weights import SparseWeightsBase

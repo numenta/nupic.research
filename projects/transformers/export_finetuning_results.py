@@ -35,9 +35,9 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 from finetuning_constants import REPORTING_METRICS_PER_TASK
+from scipy import stats
 
 
 class TaskResultsAnalysis:
