@@ -258,7 +258,7 @@ CONFIGS = dict(
     sparse_cl_100=SPARSE_CL_100,
     sparse_cl_100_no_norm=SPARSE_CL_100_NO_NORM,
 
-    dense_cl_2=DENSE_CL_2,  
+    dense_cl_2=DENSE_CL_2,
     dense_cl_50=DENSE_CL_50,
     dense_cl_50_no_norm=DENSE_CL_50_NO_NORM,
     dense_cl_100=DENSE_CL_100,
