@@ -107,6 +107,7 @@ venv.bak/
 # IDE
 .idea
 .vscode
+Session.vim
 
 # MacOS hidden files
 .DS_Store

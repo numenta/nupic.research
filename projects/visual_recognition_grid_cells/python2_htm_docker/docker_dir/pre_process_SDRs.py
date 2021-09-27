@@ -28,9 +28,9 @@ import numpy as np
 
 
 def generate_image_objects(
-    data_set, num_samples_per_class, objectWidth,  # noqa: N803
-    locationModuleWidth, data_set_section="SDR_classifiers_training",  # noqa: N803
-    sanity_check=None):
+        data_set, num_samples_per_class, objectWidth,  # noqa: N803
+        locationModuleWidth, data_set_section="SDR_classifiers_training",  # noqa: N803
+        sanity_check=None):
 
     print("Loading " + data_set_section + " data-set from " + data_set)
     input_data = np.load("training_and_testing_data/" + data_set + "_SDRs_"

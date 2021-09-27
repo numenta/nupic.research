@@ -36,7 +36,7 @@ from nupic.research.frameworks.backprop_structure.modules import (
     prunable_vdrop_linear,
 )
 from nupic.research.frameworks.backprop_structure.networks import vdrop_resnet50
-from nupic.research.frameworks.pytorch.models import resnet50_swsl
+from nupic.research.frameworks.pytorch.models.pretrained_models import resnet50_swsl
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
 from nupic.research.frameworks.pytorch.modules import sparse_conv2d, sparse_linear
 from nupic.research.frameworks.vernon.distributed import ImagenetExperiment, mixins

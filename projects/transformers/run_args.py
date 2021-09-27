@@ -321,6 +321,69 @@ class DataTrainingArguments:
                     "attempt to update existing entries"
         },
     )
+    max_train_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of"
+                    " training examples to this value if set."
+        },
+    )
+    max_eval_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of"
+                    " evaluation examples to this value if set."
+        },
+    )
+    max_predict_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of"
+                    " prediction examples to this value if set."
+        },
+    )
+    version_2_with_negative: bool = field(
+        default=False, metadata={"help": "If true, "
+                                         "some of the examples do not have an answer."}
+    )
+    null_score_diff_threshold: float = field(
+        default=0.0,
+        metadata={
+            "help": "The threshold used to select the null answer: if the best answer "
+                    "has a score that is less than the score of the null answer minus "
+                    "this threshold, the null answer is selected for this example. "
+                    "Only useful when `version_2_with_negative=True."
+        },
+    )
+    doc_stride: int = field(
+        default=32,
+        metadata={
+            "help": "When splitting up a long document into chunks, how much stride "
+                    "to take between chunks. "
+        },
+    )
+    n_best_size: int = field(
+        default=20,
+        metadata={
+            "help": "The total number of n-best predictions to generate when looking "
+                    "for an answer."},
+    )
+    max_answer_length: int = field(
+        default=30,
+        metadata={
+            "help": "The maximum length of an answer that can be generated. This is "
+                    "needed because the start and end predictions are not conditioned "
+                    "on one another."
+        },
+    )
+    beam_search: bool = field(
+        default=False,
+        metadata={
+            "help": "When doing question answering with squad, this determines"
+                    " if postprocess_qa_predictions or "
+                    "postprocess_qa_predictions_with_beam_search is used"
+        },
+    )
 
     def __post_init__(self):
         """Input validation"""
