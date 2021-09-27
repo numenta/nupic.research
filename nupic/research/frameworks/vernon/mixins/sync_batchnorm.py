@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -18,39 +18,31 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
-import os
-
-import torch.autograd
+import torch.nn as nn
 
 
-class ProfileAutograd:
+class SyncBatchNorm:
     """
-    Use torch's autograd profiler during training.
+    This mixin converts the BatchNorm modules to SyncBatchNorm modules when utilizing
+    distributed training on GPUs.
+
+    Example config:
+        config=dict(
+            use_sync_batchnorm=True
+        )
     """
-
-    def setup_experiment(self, config):
-        super().setup_experiment(config)
-        # Only profile from rank 0
-        self.profile_autograd = self.rank == 0
-
-    def train_epoch(self):
-        with torch.autograd.profiler.profile(
-            use_cuda=torch.cuda.is_available(), enabled=self.profile_autograd
-        ) as prof:
-            super().train_epoch()
-
-        if self.profile_autograd and prof is not None:
-            self.logger.info(prof.key_averages().table(sort_by="cuda_time_total"))
-
-            prof.export_chrome_trace(
-                os.path.join(self.logdir, f"autograd{self.current_epoch}.trace")
-            )
+    def create_model(self, config, device):
+        model = super().create_model(config, device)
+        use_sync_batchnorm = config.get("use_sync_batchnorm", True)
+        distributed = config.get("distributed", False)
+        if use_sync_batchnorm and distributed and next(model.parameters()).is_cuda:
+            # Convert batch norm to sync batch norms
+            model = nn.modules.SyncBatchNorm.convert_sync_batchnorm(module=model)
+        return model
 
     @classmethod
     def get_execution_order(cls):
         eo = super().get_execution_order()
-        eo["setup_experiment"].append("ProfileAutograd initialization")
-        eo["train_epoch"].insert(0, "ProfileAutograd begin")
-        eo["train_epoch"].append("ProfileAutograd end")
+        eo["setup_experiment"].insert(0, "Sync Batchnorm begin")
+        eo["setup_experiment"].append("Sync Batchnorm end")
         return eo
