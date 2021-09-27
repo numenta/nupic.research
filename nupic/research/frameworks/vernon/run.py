@@ -100,7 +100,6 @@ def head(_, config, world_size, logger, on_checkpoint, queue, results):
     """
     Head background process used to consume worker results as they become
     available
-
     :param config: Experiment configuration
     :param world_size: Total number of workers
     :param logger: Optional result logger callback reporting the results on
@@ -111,7 +110,6 @@ def head(_, config, world_size, logger, on_checkpoint, queue, results):
                   worker and head processes
     :param results: Multiprocessing managed list used to return the results back
                     to the main process
-
     """
     # Collect worker results as they become available waiting until all worker
     # processes are done.

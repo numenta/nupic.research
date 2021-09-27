@@ -36,20 +36,23 @@ from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment as SupervisedExperimentBase,
 )
 
-__all__ = [
-    "SupervisedExperiment",
-]
+__all__ = ["SupervisedExperiment"]
 
 
-class SupervisedExperiment(DistributedBase,
-                           SupervisedExperimentBase):
+class SupervisedExperiment(DistributedBase, SupervisedExperimentBase):
     """
     Distributed SupervisedExperiment.
+
+    TODO: Document find_unused_parameters for reference
     """
+
     def setup_experiment(self, config):
         super().setup_experiment(config)
         if self.distributed:
-            self.model = DistributedDataParallel(self.model)
+            self.model = DistributedDataParallel(
+                self.model,
+                find_unused_parameters=config.get("find_unused_parameters", False),
+            )
         else:
             self.model = DataParallel(self.model)
 
@@ -105,8 +108,7 @@ class SupervisedExperiment(DistributedBase,
             create_train_sampler=[exp + ": Create distributed sampler"],
             create_validation_sampler=[exp + ": Create distributed sampler"],
             aggregate_results=[exp + ": Aggregate validation results"],
-            aggregate_pre_experiment_results=[
-                exp + ": Aggregate validation results"],
+            aggregate_pre_experiment_results=[exp + ": Aggregate validation results"],
         )
 
         return eo
