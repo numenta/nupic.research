@@ -28,4 +28,4 @@ wandb>=0.10.27,<0.11.0 # this can be updated in a future version of transformers
 cloudpickle>=1.6.0
 pickle5>=0.0.11
 ray==1.4.0  # required to use Ray Tune
-transformers==4.8.1  # 4.8.1 required to use Ray Tune
+transformers==4.8.1

@@ -43,11 +43,12 @@ from pprint import pformat
 import ray  # noqa: F401, I001
 import torch.distributed
 import transformers
+from ray.tune.error import TuneError as TuneError
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     AutoModelForSequenceClassification,
     DataCollatorWithPadding,
-    EarlyStoppingCallback,
+    EvalPrediction,
     HfArgumentParser,
     default_data_collator,
     set_seed,
@@ -57,6 +58,7 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
 from callbacks import TrackEvalMetrics
 from experiments import CONFIGS
+from experiments.squad import QuestionAnsweringTrainer
 from integrations import (  # noqa I001
     CustomWandbCallback,
     init_ray_wandb_logger_callback,
@@ -69,26 +71,35 @@ from run_utils import (
     check_for_callback,
     check_hp_compute_objective,
     check_if_current_hp_best,
+    check_mnli,
     check_rm_checkpoints,
     check_sparsity_callback,
+    check_squad_version,
     compute_objective,
     evaluate_language_model,
-    evaluate_tasks_handler,
+    evaluate_task_handler,
     get_best_run_and_link_best_predictions,
     get_labels,
     init_config,
     init_datasets_mlm,
+    init_datasets_squad,
     init_datasets_task,
     init_model,
+    init_squad_trainer,
     init_tokenizer,
     init_trainer,
     preprocess_datasets_mlm,
+    preprocess_datasets_squad,
     preprocess_datasets_task,
     rm_prefixed_subdirs,
     run_hyperparameter_search,
     test_tasks,
     train,
     update_run_number,
+)
+from utils_qa import (
+    postprocess_qa_predictions,
+    postprocess_qa_predictions_with_beam_search,
 )
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
@@ -258,7 +269,7 @@ def run_pretraining(
         tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
-    has_track_eval, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
+    _, metric_callback = check_for_callback(model_args, TrackEvalMetrics)
 
     # Run hp search or regular training
     if model_args.hp_num_trials >= 1:
@@ -300,6 +311,10 @@ def run_pretraining(
 
 def init_dataset_for_finetuning(model_args, data_args, training_args,
                                 last_checkpoint=None):
+
+    # TODO
+    # edit multi_eval_sets so you can gather not just multiple eval sets
+    # for a single task, but eval sets from multiple tasks
     datasets = init_datasets_task(data_args, training_args)
     is_regression, label_list, num_labels = get_labels(datasets, data_args)
     logging.info(f"Training {data_args.task_name} with {num_labels} labels")
@@ -313,7 +328,7 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
     tokenizer = init_tokenizer(model_args)
     model = init_model(model_args, config, tokenizer, finetuning=True)
     check_sparsity_callback(model, model_args)
-
+    check_mnli(model_args, data_args.task_name)
     # Tokenizing and preprocessing the datasets for downstream tasks
     # TODO: load from cached tokenized datasets for finetuning as well
     logging.info(f"Tokenizing datasets for finetuning ...")
@@ -324,9 +339,21 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
 
     # Separate into train, eval and test
     train_dataset = tokenized_datasets["train"]
-    eval_dataset = tokenized_datasets[
-        "validation_matched" if data_args.task_name == "mnli" else "validation"
-    ]
+
+    # Allow multiple eval sets. For now, assume mnli is the only case
+    eval_dataset = []
+    if data_args.task_name == "mnli":
+        if "eval_sets" in training_args.trainer_mixin_args:
+            for eval_set in training_args.trainer_mixin_args["eval_sets"]:
+                eval_dataset.append(tokenized_datasets[eval_set])
+        else:
+            eval_dataset.append(tokenized_datasets["validation_matched"])
+    else:
+        eval_dataset.append(tokenized_datasets["validation"])
+
+    # If only one eval set, no need for a list
+    if len(eval_dataset) == 1:
+        eval_dataset = eval_dataset[0]
 
     test_dataset = None
     if (data_args.task_name is not None or data_args.test_file is not None):
@@ -353,6 +380,46 @@ def init_dataset_for_finetuning(model_args, data_args, training_args,
     )
 
 
+def init_dataset_for_squad(model_args,
+                           data_args,
+                           training_args,
+                           last_checkpoint=None):
+
+    datasets = init_datasets_squad(data_args, model_args)
+
+    # Place holder for now
+    extra_config_kwargs = {}
+    config = init_config(model_args, extra_config_kwargs=extra_config_kwargs)
+    tokenizer = init_tokenizer(model_args)
+    model = init_model(model_args, config, tokenizer, finetuning=True, squad=True)
+    check_sparsity_callback(model, model_args)
+
+    logging.info(f"Tokenizing datasets for squad ...")
+    (train_dataset,
+     eval_dataset,
+     eval_examples,
+     answer_column_name) = \
+        preprocess_datasets_squad(datasets, tokenizer, training_args, data_args)
+
+    if data_args.pad_to_max_length:
+        data_collator = default_data_collator
+    else:
+        pad_to_multiple_of = 8 if training_args.fp16 else None
+        data_collator = \
+            DataCollatorWithPadding(tokenizer,
+                                    pad_to_multiple_of=pad_to_multiple_of)
+
+    return (
+        tokenizer,
+        data_collator,
+        train_dataset,
+        eval_dataset,
+        eval_examples,
+        model,
+        answer_column_name
+    )
+
+
 def run_finetuning_single_task_with_hp_search(
     model_args, data_args, training_args, last_checkpoint=None
 ):
@@ -375,16 +442,29 @@ def run_finetuning_single_task_with_hp_search(
     # Code safety run a second time due to training_args being changed above
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
-    model_args = check_hp_compute_objective(model_args, data_args.task_name)
+    model_args = check_hp_compute_objective(model_args,
+                                            data_args.task_name,
+                                            training_args)
     check_sparsity_callback(model, model_args)
 
     # Get fraction of the validation dataset to use in hp search
-    if model_args.hp_validation_dataset_pct < 1:
-        hp_eval_dataset = eval_dataset.shard(
-            index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
-        )
+    if isinstance(eval_dataset, list):
+        hp_eval_dataset = []
+        for dataset in eval_dataset:
+            if model_args.hp_validation_dataset_pct < 1:
+                eval_set = dataset.shard(
+                    index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
+                )
+            else:
+                eval_set = dataset
+            hp_eval_dataset.append(eval_set)
     else:
-        hp_eval_dataset = eval_dataset
+        if model_args.hp_validation_dataset_pct < 1:
+            hp_eval_dataset = eval_dataset.shard(
+                index=1, num_shards=int(1 / model_args.hp_validation_dataset_pct)
+            )
+        else:
+            hp_eval_dataset = eval_dataset
 
     # Specify how to re-init model each training run.
     def model_init():
@@ -441,18 +521,22 @@ def run_finetuning_single_task_with_hp_search(
     # Update any extra kwargs defined in config
     hp_search_kwargs.update(**model_args.hp_extra_kwargs)
 
-    # Run hp search and save results
-    best_run = trainer.hyperparameter_search(**hp_search_kwargs)
-    logging.info(f"Best run: {best_run}")
+    # Run hp search and save results. Code to remove checkpoints won't get
+    # called if ANY of the trials error out, so wrap with try/except.
 
-    # Delete all saved models and checkpoints to save space. All we need
-    # are the params and scores. Currently this is a hack that is specific
-    # to ray. May need to modify so that it serves the same function for
-    # sigopt, once I integrate it.
-    rm_prefixed_subdirs(training_args.output_dir, "run-")
+    best_run = None
+    try:
+        best_run = trainer.hyperparameter_search(**hp_search_kwargs)
+        logging.info(f"Best run: {best_run}")
+    except TuneError:
+        logging.info(f"One or more trials errored out")
+    finally:
+        # Make sure cleanup code gets called regardless of if hp search completes
+        rm_prefixed_subdirs(training_args.output_dir, "run-")
 
     hp_res_file_name = f"best_run_results_{model_args.hp_compute_objective[1]}.txt"
     hp_res_file = os.path.join(training_args.output_dir, hp_res_file_name)
+    # False if best_run stays as None
     write_new = check_if_current_hp_best(hp_res_file, model_args, best_run)
 
     if trainer.is_world_process_zero() and write_new:
@@ -481,9 +565,6 @@ def run_finetuning_single_task(
 ):
     """On a single task train, evaluate, and save results"""
 
-    # TODO
-    # accept run# as an argument for finetuning with multiple runs on a single task
-    # update the save directory to include run#
     tokenizer, data_collator, train_dataset, eval_dataset, test_dataset, model, \
         is_regression, tokenized_datasets, label_list, config = \
         init_dataset_for_finetuning(
@@ -493,7 +574,7 @@ def run_finetuning_single_task(
     # Code safety
     check_eval_and_max_steps(training_args, train_dataset)
     training_args = check_best_metric(training_args, data_args.task_name)
-
+    check_mnli(model_args, data_args.task_name)
     # Update where model is saved for each run
     training_args = update_run_number(training_args, run_idx)
 
@@ -505,6 +586,7 @@ def run_finetuning_single_task(
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
         model=model,
+        trainer_class=model_args.trainer_class,
         trainer_callbacks=model_args.trainer_callbacks or None,
         finetuning=True, task_name=data_args.task_name, is_regression=is_regression
     )
@@ -518,10 +600,11 @@ def run_finetuning_single_task(
               training_args.rm_checkpoints,
               last_checkpoint)
 
+    eval_results = {}
     if training_args.do_eval:
-        eval_results = evaluate_tasks_handler(
+        eval_results = evaluate_task_handler(
             trainer, data_args, model_args, training_args,
-            eval_dataset, tokenized_datasets)
+            eval_dataset)
 
     # Test/Predict
     if training_args.do_predict:
@@ -550,6 +633,135 @@ def run_finetuning_single_task(
     return eval_results
 
 
+def run_finetuning_squad(
+    model_args, data_args, training_args, last_checkpoint=None, run_idx=None,
+):
+    """On a single task train, evaluate, and save results"""
+
+    # Make sure dataset name, task name, and version_2_with_negative
+    # match before loading the dataset
+    data_args = check_squad_version(data_args)
+
+    data_init = init_dataset_for_squad(model_args,
+                                       data_args,
+                                       training_args,
+                                       last_checkpoint)
+
+    tokenizer = data_init[0]
+    data_collator = data_init[1]
+    train_dataset = data_init[2]
+    eval_dataset = data_init[3]
+    eval_examples = data_init[4]
+    model = data_init[5]
+    answer_column_name = data_init[6]
+
+    # Code safety
+    check_eval_and_max_steps(training_args, train_dataset)
+    # Pass dataset_name instead of task_name for the special case of squad
+    # squad and squad_v2 have different metrics and datasets, but same task_name
+    training_args = check_best_metric(training_args, data_args.dataset_name)
+
+    # Post-processing:
+    def post_processing_function(examples, features, predictions, stage="eval"):
+        # Post-processing: we match the start logits and end logits to
+        # answers in the original context.
+
+        if data_args.beam_search:
+            predictions, scores_diff_json = \
+                postprocess_qa_predictions_with_beam_search(
+                    examples=examples,
+                    features=features,
+                    predictions=predictions,
+                    version_2_with_negative=data_args.version_2_with_negative,
+                    n_best_size=data_args.n_best_size,
+                    max_answer_length=data_args.max_answer_length,
+                    start_n_top=model.config.start_n_top,
+                    end_n_top=model.config.end_n_top,
+                    output_dir=training_args.output_dir,
+                    # log_level=log_level,
+                    prefix=stage,
+                )
+
+        else:
+            predictions = postprocess_qa_predictions(
+                examples=examples,
+                features=features,
+                predictions=predictions,
+                version_2_with_negative=data_args.version_2_with_negative,
+                n_best_size=data_args.n_best_size,
+                max_answer_length=data_args.max_answer_length,
+                output_dir=training_args.output_dir,
+                prefix=stage,
+            )
+
+        if data_args.version_2_with_negative:
+            if data_args.beam_search:
+                formatted_predictions = [
+                    {"id": k, "prediction_text": v, "no_answer_probability": scores_diff_json[k]}  # noqa E501
+                    for k, v in predictions.items()
+                ]
+            else:
+                formatted_predictions = [
+                    {"id": k, "prediction_text": v, "no_answer_probability": 0.0} for k, v in predictions.items()  # noqa E501
+                ]
+        else:
+            formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]  # noqa E501
+
+        references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]  # noqa E501
+        return EvalPrediction(predictions=formatted_predictions, label_ids=references)
+
+    # Update where model is saved for each run
+    training_args = update_run_number(training_args, run_idx)
+
+    training_args.trainer_class = QuestionAnsweringTrainer
+
+    trainer_kwargs = dict(
+        model=model,
+        args=training_args,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        eval_examples=eval_examples,
+        data_collator=data_collator,
+        post_process_function=post_processing_function,
+        callbacks=model_args.trainer_callbacks or None,
+    )
+
+    # Train
+    trainer = init_squad_trainer(trainer_kwargs,
+                                 data_args,
+                                 training_args.trainer_class,
+                                 model_args.trainer_callbacks)
+
+    if training_args.do_train:
+        # Note, rm_checkpoints=True means one model will be saved
+        # in the output_dir, and all checkpoint subdirectories will be
+        # deleted when train() is called.
+        train(trainer,
+              training_args.output_dir,
+              training_args.rm_checkpoints,
+              last_checkpoint)
+
+    eval_results = {}
+    if training_args.do_eval:
+        eval_results = evaluate_task_handler(
+            trainer, data_args, model_args, training_args,
+            eval_dataset)
+
+    if training_args.do_predict:
+        raise NotImplementedError("Storing test results for squad not yet implemented")
+
+    # There is an existing issue on training multiple models in sequence in this code
+    # There is a memory leakage on the model, a small amount of GPU memory remains after
+    # the run and accumulates over several runs. It fails with OOM after about 20 runs,
+    # even when all tensors on GPU are explicitly deleted, garbage is collected and
+    # cache is cleared. Tried multiple solutions but this weird little hack is the only
+    # thing that worked.
+    model.to("cpu")
+
+    return eval_results
+
+
 def run_finetuning_multiple_tasks(
     model_args, data_args, training_args, last_checkpoint=None
 ):
@@ -566,8 +778,6 @@ def run_finetuning_multiple_tasks(
     else:
         results = {}
 
-    # Different callbacks result in different control flow.
-    has_early_stopping, _ = check_for_callback(model_args, EarlyStoppingCallback)
     has_track_eval, _ = check_for_callback(model_args, TrackEvalMetrics)
     if not has_track_eval:
         logging.warn(
@@ -576,27 +786,33 @@ def run_finetuning_multiple_tasks(
         )
 
     base_training_args = deepcopy(training_args)
+    base_model_args = deepcopy(model_args)
     for task_name in data_args.task_names:
         data_args.task_name = task_name
         training_args = deepcopy(base_training_args)
+        model_args = deepcopy(base_model_args)
         # For each task, save to a subfolder within run's root folder
         training_args.run_name = f"{base_training_args.run_name}_{task_name}"
         training_args.output_dir = os.path.join(
             base_training_args.output_dir, task_name
         )
 
+        model_arg_keys = ["trainer_class", "task_hyperparams_proxy"]
         if task_name in model_args.task_hyperparams:
             for hp_key, hp_val in model_args.task_hyperparams[task_name].items():
-                if "hp_" in hp_key:
+                # maybe handle proxy task here
+                if ("hp_" in hp_key) or hp_key in model_arg_keys:
                     setattr(model_args, hp_key, hp_val)
                 else:
-                    # I forget why this is here
-                    # TODO: check when this happens
                     setattr(training_args, hp_key, hp_val)
 
-        task_results = TaskResults(task_name,
-                                   has_early_stopping,
-                                   training_args=training_args)
+        if data_args.task_name == "squad":
+            training_args = check_best_metric(training_args, data_args.dataset_name)
+            task_results = TaskResults(data_args.dataset_name, training_args)
+        else:
+            training_args = check_best_metric(training_args, data_args.task_name)
+            task_results = TaskResults(task_name, training_args)
+        check_mnli(model_args, data_args.task_name)
 
         # Hack to ensure we don't do hp search num_runs times
         if model_args.hp_num_trials > 1:
@@ -608,33 +824,40 @@ def run_finetuning_multiple_tasks(
             set_seed(training_args.seed)
 
             if model_args.hp_num_trials > 1:
-                eval_results = run_finetuning_single_task_with_hp_search(
-                    model_args,
-                    data_args,
-                    training_args,
-                    last_checkpoint=last_checkpoint
-                )
+                if data_args.task_name == "squad":
+                    print("Hp search for squad is not yet implemented")
+                else:
+                    eval_results = run_finetuning_single_task_with_hp_search(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint
+                    )
             else:
-                eval_results = run_finetuning_single_task(
-                    model_args,
-                    data_args,
-                    training_args,
-                    last_checkpoint=last_checkpoint,
-                    run_idx=run_idx
-                )
-
+                if data_args.task_name == "squad":
+                    eval_results = run_finetuning_squad(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint,
+                        run_idx=run_idx
+                    )
+                else:
+                    eval_results = run_finetuning_single_task(
+                        model_args,
+                        data_args,
+                        training_args,
+                        last_checkpoint=last_checkpoint,
+                        run_idx=run_idx
+                    )
             task_results.append(eval_results)
-
-        # Find the predictions of the best model and sym link to a file
-        # labeled with "_best" at the end. Warning, assumes
-        # load_best_model_at_end is on.
-        best_run = get_best_run_and_link_best_predictions(
-            training_args, task_results, task_name)
 
         # Delete all finetuning run directories except for the best one
         # Ignore if this is a hyperparameter run, since the excess
         # is deleted within that function.
         if (model_args.hp_num_trials <= 1):
+            best_run = get_best_run_and_link_best_predictions(
+                training_args, task_results, task_name)
             skip = "run_" + best_run
             task_output_dir = os.path.dirname(training_args.output_dir)
             rm_prefixed_subdirs(task_output_dir, "run_", skip=skip)
