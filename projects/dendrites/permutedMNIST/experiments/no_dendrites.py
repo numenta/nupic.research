@@ -249,7 +249,7 @@ DENSE_CL_100.update(
 )
 
 
-# Export configurations in this file
+# Export all configurations in this file
 CONFIGS = dict(
     sparse_cl_2=SPARSE_CL_2,
     sparse_cl_10_search=SPARSE_CL_10_SEARCH,
