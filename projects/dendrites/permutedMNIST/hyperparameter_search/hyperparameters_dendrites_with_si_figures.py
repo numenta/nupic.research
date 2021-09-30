@@ -47,8 +47,8 @@ def hyperparameter_dendrites_wit_si_search_panel():
                "Accuracy"]]
     df2 = df2[["Activation sparsity", "FF weight sparsity", "Num segments",
                "Accuracy"]]
-    df1['condition'] = 'dendrite_and_ff'
-    df2['condition'] = 'ff_only'
+    df1["condition"] = "dendrite_and_ff"
+    df2["condition"] = "ff_only"
     df = pd.concat([df1, df2])
 
     # Figure 1 'Impact of the different hyperparameters on performance
@@ -59,7 +59,7 @@ def hyperparameter_dendrites_wit_si_search_panel():
     ax1 = fig.add_subplot(gs[0, 0])
 
     x1 = "Num segments"
-    dhue = 'condition'
+    dhue = "condition"
     y = "Accuracy"
     ort = "v"
     pal = sns.color_palette(n_colors=9)
