@@ -83,7 +83,7 @@ SP_CONTEXT_10 = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=2,
-    tasks_to_validate=(0, 1, 4, 9, 14, 19, 24, 29, 34, 39, 44, 49),
+    tasks_to_validate=(0, 1, 4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 74, 99),
     num_tasks=10,
     num_classes=10 * 10,
     distributed=False,
@@ -139,6 +139,29 @@ SP_CONTEXT_50.update(
     ),
 )
 
+SP_CONTEXT_100 = deepcopy(SP_CONTEXT_50)
+SP_CONTEXT_100["dataset_args"].update(num_tasks=100)
+SP_CONTEXT_100["env_config"]["wandb"].update(
+    name="sp_context_100",
+    group="sp_context_100",
+)
+SP_CONTEXT_100["model_args"].update(
+    num_segments=100,
+)
+SP_CONTEXT_100.update(
+    num_tasks=100,
+    num_classes=10 * 100,
+    num_samples=1,
+)
+
+SP_CONTEXT_100_NO_NORM = deepcopy(SP_CONTEXT_100)
+SP_CONTEXT_100_NO_NORM["dataset_args"].update(normalize=False)
+SP_CONTEXT_100_NO_NORM["env_config"]["wandb"].update(
+    name="sp_context_100_no_norm",
+    group="sp_context_100_no_norm",
+)
+
+
 # Search using 4 tasks only
 SP_CONTEXT_4_SEARCH = deepcopy(SP_CONTEXT_10)
 SP_CONTEXT_4_SEARCH["dataset_args"].update(num_tasks=4)
@@ -174,4 +197,6 @@ CONFIGS = dict(
     sp_context_4_search=SP_CONTEXT_4_SEARCH,
     sp_context_10=SP_CONTEXT_10,
     sp_context_50=SP_CONTEXT_50,
+    sp_context_100=SP_CONTEXT_100,
+    sp_context_100_no_norm=SP_CONTEXT_100_NO_NORM,
 )
