@@ -37,6 +37,7 @@ from .finetuning import (
 )
 from .sparse_bert import fully_static_sparse_bert_100k_fp16
 from .sparse_bertitos import small_bert_sparse_100k, tiny_bert_sparse_100k
+from .squad import bert_100k_squad, debug_squad_v1_no_beam, debug_squad_v2_no_beam
 
 
 """
@@ -404,6 +405,59 @@ finetuning_small_bert_sparse_4x_trifecta_100k_glue.update(
 # BERT Base
 # ---------
 
+# SQUAD
+
+debug_squad_trifecta_v1_no_beam = deepcopy(debug_squad_v1_no_beam)
+debug_squad_trifecta_v1_no_beam.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
+    trainer_callbacks=[
+        TrackEvalMetrics(),
+        RezeroWeightsCallback()],
+)
+
+debug_squad_trifecta_v1_beam = deepcopy(debug_squad_trifecta_v1_no_beam)
+debug_squad_trifecta_v1_beam.update(
+    beam_search=True
+)
+
+debug_squad_trifecta_v2_no_beam = deepcopy(debug_squad_v2_no_beam)
+debug_squad_trifecta_v2_no_beam.update(
+    model_type="fully_static_sparse_bert",
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
+    trainer_callbacks=[
+        TrackEvalMetrics(),
+        RezeroWeightsCallback()],
+    max_steps=200
+)
+
+debug_squad_trifecta_v2_beam = deepcopy(debug_squad_trifecta_v2_no_beam)
+debug_squad_trifecta_v2_beam.update(
+    beam_search=True
+)
+
+squad_trifecta_100k = deepcopy(bert_100k_squad)
+squad_trifecta_100k.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_80%_trifecta_100k",  # noqa: E501
+    trainer_callbacks=[
+        RezeroWeightsCallback(),
+        TrackEvalMetrics()]
+)
+
+squad_trifecta_85_100k = deepcopy(bert_100k_squad)
+squad_trifecta_85_100k.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_85%_trifecta_100k"  # noqa: E501
+)
+
+squad_trifecta_90_100k = deepcopy(bert_100k_squad)
+squad_trifecta_90_100k.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_90%_trifecta_100k"  # noqa: E501
+)
+
+squad_trifecta_2x_100k = deepcopy(bert_100k_squad)
+squad_trifecta_2x_100k.update(
+    model_name_or_path="/mnt/efs/results/pretrained-models/transformers-local/bert_sparse_2x_trifecta_100k",  # noqa: E501
+)
 
 # BERT Base with KD + RigL + OneCycle LR
 # This achieves and eval-loss of 2.138, just slightly under 2.154 from its dense
@@ -482,7 +536,7 @@ finetuning_bert_sparse_trifecta_100k_glue.update(
     trainer_callbacks=[
         RezeroWeightsCallback(),
         TrackEvalMetrics(),
-        ],
+    ],
     rm_checkpoints=True,
 )
 
@@ -666,18 +720,28 @@ CONFIGS = dict(
     finetuning_small_bert_sparse_4x_trifecta_100k_glue=finetuning_small_bert_sparse_4x_trifecta_100k_glue,  # noqa: E501
 
     # BERT Base
+
+    # Squad debugging
+    debug_squad_trifecta_v1_no_beam=debug_squad_trifecta_v1_no_beam,
+    debug_squad_trifecta_v1_beam=debug_squad_trifecta_v1_beam,
+    debug_squad_trifecta_v2_no_beam=debug_squad_trifecta_v2_no_beam,
+    debug_squad_trifecta_v2_beam=debug_squad_trifecta_v2_beam,
     #   80% sparse
+    squad_trifecta_100k=squad_trifecta_100k,
     bert_sparse_trifecta_100k=bert_sparse_trifecta_100k,
     finetuning_bert_sparse_trifecta_100k_glue=finetuning_bert_sparse_trifecta_100k_glue,  # noqa: E501
     finetuning_bert_sparse_trifecta_100k_glue_get_info=finetuning_bert_sparse_trifecta_100k_glue_get_info,  # noqa: E501
     verify_bert_sparse_trifecta_100k=verify_bert_sparse_trifecta_100k,
     #   85% sparse
+    squad_trifecta_85_100k=squad_trifecta_85_100k,
     bert_sparse_85_trifecta_100k=bert_sparse_85_trifecta_100k,
     finetuning_bert_sparse_85_trifecta_100k_glue_get_info=finetuning_bert_sparse_85_trifecta_100k_glue_get_info,  # noqa: E501
     #   90% sparse
+    squad_trifecta_90_100k=squad_trifecta_90_100k,
     bert_sparse_90_trifecta_100k=bert_sparse_90_trifecta_100k,
     finetuning_bert_sparse_90_trifecta_100k_glue_get_info=finetuning_bert_sparse_90_trifecta_100k_glue_get_info,  # noqa: E501
     #   2x wide ~16 Mi Params
+    squad_trifecta_2x_100k=squad_trifecta_2x_100k,
     bert_sparse_trifecta_2x_100k=bert_sparse_trifecta_2x_100k,
     bert_sparse_2x_100k_kd_lr_range_test=bert_sparse_2x_100k_kd_lr_range_test,
     finetuning_bert_sparse_trifecta_2x_get_info=finetuning_bert_sparse_trifecta_2x_get_info,  # noqa E501

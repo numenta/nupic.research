@@ -107,6 +107,7 @@ venv.bak/
 # IDE
 .idea
 .vscode
+Session.vim
 
 # MacOS hidden files
 .DS_Store
@@ -125,5 +126,5 @@ checkcode.sh
 /projects/whydense/cifar/results1
 /projects/transformers/sample_files
 /projects/transformers/results
-/nupic/research/frameworks/greedy_infomax/Greedy_InfoMax/
+/nupic/research/frameworks/greedy_infomax/Greedy_InfoMax/**
 /projects/transformers/.deepspeed_env

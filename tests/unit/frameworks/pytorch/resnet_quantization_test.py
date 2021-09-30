@@ -27,7 +27,6 @@ import torch.nn.intrinsic as nni
 
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.models.sparse_resnets import resnet34, resnet50
-from nupic.research.frameworks.vernon.network_utils import create_model
 
 TEST_MODEL_CLASS = [resnet34, resnet50]
 
@@ -35,12 +34,8 @@ TEST_MODEL_CLASS = [resnet34, resnet50]
 def _create_test_model(model_class):
     model_args = dict(config=dict(num_classes=3, defaults_sparse=True))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = create_model(
-        model_class=model_class,
-        model_args=model_args,
-        init_batch_norm=False,
-        device=device,
-    )
+    model = model_class(**model_args)
+    model.to(device)
     return model
 
 

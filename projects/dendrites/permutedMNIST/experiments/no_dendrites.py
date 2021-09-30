@@ -83,7 +83,7 @@ SPARSE_CL_2 = dict(
     batch_size=128,
     val_batch_size=512,
     epochs=1,
-    tasks_to_validate=range(100),
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
     num_classes=10 * 2,
     num_tasks=2,
     distributed=False,
@@ -114,13 +114,41 @@ SPARSE_CL_50 = deepcopy(SPARSE_CL_2)
 SPARSE_CL_50["dataset_args"].update(num_tasks=50)
 SPARSE_CL_50["env_config"]["wandb"].update(
     name="sparse_cl_50",
-    group="sparse_cl_50_optimized",
+    group="sparse_cl_50_optimized   ",
 )
 SPARSE_CL_50.update(
     num_tasks=50,
     num_classes=10 * 50,
     num_samples=1,
 )
+
+SPARSE_CL_50_NO_NORM = deepcopy(SPARSE_CL_50)
+SPARSE_CL_50_NO_NORM["dataset_args"].update(normalize=False)
+SPARSE_CL_50_NO_NORM["env_config"]["wandb"].update(
+    name="sparse_cl_50_no_norm",
+    group="sparse_cl_50_no_norm",
+)
+
+
+SPARSE_CL_100 = deepcopy(SPARSE_CL_2)
+SPARSE_CL_100["dataset_args"].update(num_tasks=100)
+SPARSE_CL_100["env_config"]["wandb"].update(
+    name="sparse_cl_100",
+    group="sparse_cl_100",
+)
+SPARSE_CL_100.update(
+    num_tasks=100,
+    num_classes=10 * 100,
+    num_samples=1,
+)
+
+SPARSE_CL_100_NO_NORM = deepcopy(SPARSE_CL_100)
+SPARSE_CL_100_NO_NORM["dataset_args"].update(normalize=False)
+SPARSE_CL_100_NO_NORM["env_config"]["wandb"].update(
+    name="sparse_cl_100_no_norm",
+    group="sparse_cl_100_no_norm",
+)
+
 
 # Used for hyperparameter optimization. No wandb for now until we figure out multiple
 # runs.
@@ -192,13 +220,46 @@ DENSE_CL_50.update(
     ),
 )
 
+DENSE_CL_50_NO_NORM = deepcopy(DENSE_CL_50)
+DENSE_CL_50_NO_NORM["dataset_args"].update(normalize=False)
+DENSE_CL_50_NO_NORM["env_config"]["wandb"].update(
+    name="dense_cl_50_no_norm",
+    group="dense_cl_50_no_norm",
+)
 
-# Export configurations in this file
+
+DENSE_CL_100 = deepcopy(DENSE_CL_2)
+DENSE_CL_100["dataset_args"].update(num_tasks=100)
+DENSE_CL_100.update(
+    num_tasks=100,
+    num_classes=10 * 100,
+
+    # For wandb
+    env_config=dict(
+        wandb=dict(
+            entity="nupic-research",
+            project="dendrite_baselines",
+            name="dense_cl_100",
+            group="dense_cl_100",
+            notes="""
+        Dense network with continual learning
+        """
+        )
+    ),
+)
+
+
+# Export all configurations in this file
 CONFIGS = dict(
     sparse_cl_2=SPARSE_CL_2,
     sparse_cl_10_search=SPARSE_CL_10_SEARCH,
     sparse_cl_50=SPARSE_CL_50,
+    sparse_cl_50_no_norm=SPARSE_CL_50_NO_NORM,
+    sparse_cl_100=SPARSE_CL_100,
+    sparse_cl_100_no_norm=SPARSE_CL_100_NO_NORM,
 
     dense_cl_2=DENSE_CL_2,
     dense_cl_50=DENSE_CL_50,
+    dense_cl_50_no_norm=DENSE_CL_50_NO_NORM,
+    dense_cl_100=DENSE_CL_100,
 )
