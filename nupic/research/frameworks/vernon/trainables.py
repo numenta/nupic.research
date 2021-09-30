@@ -512,6 +512,7 @@ class SigOptTrainableMixin:
             if self.iteration >= self.epochs - 1:
                 result["early_stop"] = 1.0
                 # check that all metrics are present
+                print(result)
                 for name in self.metric_names:
                     if result[name] is not None:
                         self.logger.info(f"Updating observation {name} with value=",

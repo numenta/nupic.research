@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,7 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .cl_experiment import *
-from .meta_cl_experiment import *
-from .supervised_experiment import *
-from .self_supervised_experiment import *
+from .default_base import CONFIGS as DEFAULT_BASE
+from .sigopt_experiments import CONFIGS as SIGOPT_EXPERIMENTS
+from .small_sparse import CONFIGS as SMALL_SPARSE
+from .sparse_resnets import CONFIGS as SPARSE_RESNETS
+
+CONFIGS = dict()
+CONFIGS.update(DEFAULT_BASE)
+CONFIGS.update(SPARSE_RESNETS)
+CONFIGS.update(SIGOPT_EXPERIMENTS)
+CONFIGS.update(SMALL_SPARSE)
