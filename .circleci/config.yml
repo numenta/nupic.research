@@ -34,16 +34,17 @@ jobs:
 
       # Cache git-lfs installation
       - restore_cache:
-          key: git-lfs-bin-v1-key
+          key: git-lfs-bin-v2-key
       - run:
           name: Install git-lfs
+          # FIXME: Downgrade git-lfs due to https://github.com/git-lfs/git-lfs/issues/4660
           command: >
             test -f ~/bin/git-lfs || (
             curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash;
-            sudo apt-get install git-lfs;
+            sudo apt-get install git-lfs=2.13.3;
             mkdir ~/bin; sudo mv /usr/bin/git-lfs ~/bin/git-lfs;)
       - save_cache:
-          key: git-lfs-bin-v1-key
+          key: git-lfs-bin-v2-key
           paths:
             - ~/bin/git-lfs
 
