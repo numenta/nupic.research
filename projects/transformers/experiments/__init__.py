@@ -31,15 +31,16 @@ from .deepspeed import CONFIGS as DEEPSPEED
 from .distillation import CONFIGS as DISTILLATION
 from .eighty_percent_sparse import CONFIGS as EIGHT_PERCENT_SPARSE
 from .finetuning import CONFIGS as FINETUNING
+from .gmp_bert import CONFIGS as GMP_BERT
 from .hpchase import CONFIGS as HPCHASE
 from .hpsearch import CONFIGS as HPSEARCH
-from .gmp_bert import CONFIGS as GMP_BERT
 from .one_cycle_lr import CONFIGS as ONE_CYCLE_LR
 from .profiler import CONFIGS as PROFILER
 from .regressions import CONFIGS as REGRESSIONS
 from .rigl_bert import CONFIGS as RIGL_BERT
 from .sparse_bert import CONFIGS as SPARSE_BERT
 from .sparse_bertitos import CONFIGS as SPARSE_BERTITOS
+from .squad import CONFIGS as SQUAD
 from .trifecta import CONFIGS as TRIFECTA
 from .wide_bert import CONFIGS as WIDE_BERT
 from .wide_bert_fixed_num_params import CONFIGS as WIDE_BERT_FIXED_NUM_PARAMS
@@ -68,6 +69,7 @@ CONFIGS.update(REGRESSIONS)
 CONFIGS.update(RIGL_BERT)
 CONFIGS.update(SPARSE_BERT)
 CONFIGS.update(SPARSE_BERTITOS)
+CONFIGS.update(SQUAD)
 CONFIGS.update(TRIFECTA)
 CONFIGS.update(WIDE_BERT)
 CONFIGS.update(WIDE_BERT_FIXED_NUM_PARAMS)

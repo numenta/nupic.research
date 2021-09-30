@@ -80,7 +80,6 @@ class RegularizeLoss(StepBasedLogging):
 
     def complexity_loss(self, model):
         c_loss = super().complexity_loss(model)
-        assert model is self.model
         reg = torch.stack([module.regularization()
                            for module in self._regularized_modules]).sum()
         if self.model.training:

@@ -29,7 +29,7 @@ import nupic.research.frameworks.pytorch.models.resnets
 import nupic.research.frameworks.pytorch.models.sparse_resnets
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.model_utils import serialize_state_dict
-from nupic.research.frameworks.vernon.network_utils import create_model
+from nupic.research.frameworks.pytorch.restore_utils import load_state_from_checkpoint
 
 
 class ResNetSerialization(unittest.TestCase):
@@ -41,12 +41,8 @@ class ResNetSerialization(unittest.TestCase):
         model_class = nupic.research.frameworks.pytorch.models.sparse_resnets.resnet50
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        model = create_model(
-            model_class=model_class,
-            model_args=model_args,
-            init_batch_norm=False,
-            device=device,
-        )
+        model = model_class(**model_args)
+        model.to(device)
 
         state = {}
         with io.BytesIO() as buffer:
@@ -57,13 +53,9 @@ class ResNetSerialization(unittest.TestCase):
             pickle.dump(state, checkpoint_file)
             checkpoint_file.flush()
 
-            model2 = create_model(
-                model_class=model_class,
-                model_args=model_args,
-                init_batch_norm=False,
-                device=device,
-                checkpoint_file=checkpoint_file.name
-            )
+            model2 = model_class(**model_args)
+            model2.to(device)
+            load_state_from_checkpoint(model2, checkpoint_file.name, device)
 
             self.assertTrue(compare_models(model, model2, (3, 224, 224)))
 
@@ -74,12 +66,8 @@ class ResNetSerialization(unittest.TestCase):
         model_class = nupic.research.frameworks.pytorch.models.resnets.resnet50
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        model = create_model(
-            model_class=model_class,
-            model_args=model_args,
-            init_batch_norm=False,
-            device=device,
-        )
+        model = model_class(**model_args)
+        model.to(device)
 
         state = {}
         with io.BytesIO() as buffer:
@@ -90,13 +78,9 @@ class ResNetSerialization(unittest.TestCase):
             pickle.dump(state, checkpoint_file)
             checkpoint_file.flush()
 
-            model2 = create_model(
-                model_class=model_class,
-                model_args=model_args,
-                init_batch_norm=False,
-                device=device,
-                checkpoint_file=checkpoint_file.name
-            )
+            model2 = model_class(**model_args)
+            model2.to(device)
+            load_state_from_checkpoint(model2, checkpoint_file.name, device)
 
             self.assertTrue(compare_models(model, model2, (3, 224, 224)))
 

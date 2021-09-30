@@ -24,7 +24,7 @@ import sys
 import torch
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import OneCycleLR
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
 from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
@@ -116,12 +116,6 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                                                          validation loop
             - reuse_unsupervised_dataset: if True, will reuse the unsupervised
                                           dataset during supervised training
-            - num_unsupervised_samples: optionally select a random subset from the
-                                        unsupervised dataset for faster training
-            - num_supervised_samples: optionally select a random subset from the
-                                      supervised dataset for faster training
-            - num_validation_samples: optionally select a random subset from the
-                                      validation dataset for faster validation
         """
 
         super().setup_experiment(config)
@@ -131,7 +125,9 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
         self.encoder = self.model
         self.classifier = self.create_model(classifier_config, self.device)
-        self.model = EncoderClassifier(self.encoder, self.classifier)
+        self.logger.debug(self.classifier)
+        self.encoder_classifier = EncoderClassifier(self.encoder, self.classifier)
+        self.encoder_classifier.to(self.device)
 
         self.encoder_optimizer = self.optimizer
         self.classifier_optimizer = self.create_optimizer(
@@ -253,23 +249,14 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
     @classmethod
     def create_unsupervised_sampler(cls, config, dataset):
-        num_samples = config.get("num_unsupervised_samples", -1)
-        if num_samples > 0:
-            return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod
     def create_supervised_sampler(cls, config, dataset):
-        num_samples = config.get("num_supervised_samples", -1)
-        if num_samples > 0:
-            return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod
     def create_validation_sampler(cls, config, dataset):
-        num_samples = config.get("num_validation_samples", -1)
-        if num_samples > 0:
-            return RandomSampler(dataset, replacement=True, num_samples=num_samples)
         return None
 
     @classmethod
@@ -316,7 +303,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         """
         return self._loss_function_supervised(output, target, reduction=reduction)
 
-    def encoder_complexity_loss(self, model):
+    def encoder_classifier_complexity_loss(self, model):
         """
         The encoder complexity component of the loss function.
         """
@@ -336,7 +323,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         pass
 
     def post_batch_wrapper_supervised(self, **kwargs):
-        self.post_optimizer_step_supervised(self.model)
+        self.post_optimizer_step_supervised(self.encoder_classifier)
         self.post_batch_supervised(**kwargs)
 
     def transform_data_to_device_unsupervised(self, data, target, device, non_blocking):
@@ -362,7 +349,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             optimizer=self.encoder_optimizer,
             device=self.device,
             criterion=self.error_loss,
-            complexity_loss_fn=self.encoder_complexity_loss,
+            complexity_loss_fn=self.complexity_loss,
             batches_in_epoch=self.batches_in_epoch,
             pre_batch_callback=self.pre_batch,
             post_batch_callback=self.post_batch_wrapper,
@@ -376,10 +363,10 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         First, it optionally resets the classifier if specified in the config. This
         can be used to ensure "fairness" between validation trials. Defaults to
         false, which should not cause problems so long as
-        supervised_epcochs_per_validaiton is enough for the classifier to converge.
+        supervised_epochs_per_validation is enough for the classifier to converge.
 
         Second, this method trains the classifier in a supervised fashion for a
-        specified number of epochs. self.model refers to the entire
+        specified number of epochs. self.encoder_classifier refers to the entire
         EncoderClassifier model, whose .forward() method is as follows:
 
             def forward(self, x):
@@ -405,12 +392,12 @@ class SelfSupervisedExperiment(SupervisedExperiment):
 
         for _ in range(self.supervised_training_epochs_per_validation):
             self.train_model(
-                model=self.model,
+                model=self.encoder_classifier,
                 loader=self.supervised_loader,
                 optimizer=self.classifier_optimizer,
                 device=self.device,
                 criterion=self.supervised_loss,
-                complexity_loss_fn=self.complexity_loss,
+                complexity_loss_fn=self.encoder_classifier_complexity_loss,
                 batches_in_epoch=self.batches_in_epoch_supervised,
                 pre_batch_callback=self.pre_batch_supervised,
                 post_batch_callback=self.post_batch_wrapper_supervised,
@@ -418,11 +405,11 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             )
 
         return self.evaluate_model(
-            model=self.model,
+            model=self.encoder_classifier,
             loader=self.val_loader,
             device=self.device,
             criterion=self.supervised_loss,
-            complexity_loss_fn=self.complexity_loss,
+            complexity_loss_fn=self.encoder_classifier_complexity_loss,
             batches_in_epoch=self.batches_in_epoch_val,
             transform_to_device_fn=self.transform_data_to_device,
         )
@@ -442,7 +429,9 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             create_supervised_sampler=[exp + ".create_supervised_sampler"],
             unsupervised_loss=[exp + ".unsupervised_loss"],
             supervised_loss=[exp + ".supervised_loss"],
-            encoder_complexity_loss=[exp + ".encoder_complexity_loss"],
+            encoder_classifier_complexity_loss=[
+                exp + ".encoder_classifier_complexity_loss"
+            ],
             pre_batch_supervised=[exp + ".pre_batch_supervised"],
             post_batch_supervised=[exp + ".post_batch_supervised"],
             post_optimizer_step_supervised=[exp + ".post_optimizer_step_supervised"],

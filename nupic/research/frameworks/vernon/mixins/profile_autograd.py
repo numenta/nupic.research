@@ -28,6 +28,7 @@ class ProfileAutograd:
     """
     Use torch's autograd profiler during training.
     """
+
     def setup_experiment(self, config):
         super().setup_experiment(config)
         # Only profile from rank 0
@@ -35,16 +36,16 @@ class ProfileAutograd:
 
     def train_epoch(self):
         with torch.autograd.profiler.profile(
-                use_cuda=torch.cuda.is_available(),
-                enabled=self.profile_autograd) as prof:
+            use_cuda=torch.cuda.is_available(), enabled=self.profile_autograd
+        ) as prof:
             super().train_epoch()
 
         if self.profile_autograd and prof is not None:
-            self.logger.info(prof.key_averages().table(
-                sort_by="self_cpu_time_total"))
+            self.logger.info(prof.key_averages().table(sort_by="cuda_time_total"))
 
-            prof.export_chrome_trace(os.path.join(
-                self.logdir, f"autograd{self.current_epoch}.trace"))
+            prof.export_chrome_trace(
+                os.path.join(self.logdir, f"autograd{self.current_epoch}.trace")
+            )
 
     @classmethod
     def get_execution_order(cls):
