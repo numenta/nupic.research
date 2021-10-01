@@ -1,4 +1,10 @@
+To reproduce the different figures exploring various types of hyperparameter search in the context of dendrites networks:
+
+All the configs for running the various hyperparameter searches are in the file `hyperparameter_search.py` .
+
+
 1. For the exploration of the number of segments, k-winner and weights sparsity HP searches in a basic dendritic network with the centroid context approach, the config are the following:  
+
   - segment_search
   - kw_sparsity_search
   - kw_sparsity_search_50

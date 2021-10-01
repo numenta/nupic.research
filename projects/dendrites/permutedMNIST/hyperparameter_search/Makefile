@@ -84,7 +84,12 @@ figs/hyperparameter_search_panel_with_si_dendrites.png: hyperparameters_dendrite
 	data_hyperparameter_search_with_si_dendrites/si_centroid_hp_10_control.csv
 	python hyperparameters_dendrites_with_si_figures.py
 
+data_hyperparameter_search/cross_hyperparameter_search.csv: ../analyze_results.py
+	python ../analyze_results.py cross_search -n cross_search -o lasttask && \
+	mv cross_search_lasttask.pkl cross_search_lasttask.csv cross_search_lasttask_analysis.csv data_cross_hyperparameter_search/
+
 clean:
 	rm -rf data_hyperparameter_search/*
 	rm -rf data_hyperparameter_search_with_si/*
+	rm -rf data_cross_hyperparameter_search/*
 	rm -rf figs/*
