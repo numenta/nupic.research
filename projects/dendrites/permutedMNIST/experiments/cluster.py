@@ -29,10 +29,10 @@ import os
 from copy import deepcopy
 
 import numpy as np
+import ray.tune as tune
 import torch
 import torch.nn.functional as F
 
-import ray.tune as tune
 from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
