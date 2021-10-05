@@ -68,9 +68,8 @@ SI_CENTROID_10 = dict(
     model_args=dict(
         input_size=784,
         output_size=10,
-        # Note we use 2000 hidden units instead of 2048 for a better
-        # comparison with SI and XdG
-        hidden_sizes=[2000, 2000],
+        hidden_sizes=[2000, 2000],  # Note we use 2000 hidden units instead of 2048 for
+                                    # a better comparison with SI and XdG
         num_segments=10,
         dim_context=784,
         kw=True,
@@ -121,35 +120,60 @@ SI_CENTROID_100.update(
     optimizer_args=dict(lr=5e-4),
 )
 
+
+# -------------------------- HYPERPARAMETER SEARCH CONFIGS -------------------------- #
+
 # HP search on dendrites for 10 tasks with SI FF + SI Dendrites.
 SI_CENTROID_HP_10 = deepcopy(SI_CENTROID_10)
-SI_CENTROID_HP_10["model_args"].update(kw_percent_on=0.1, weight_sparsity=0.5)
 SI_CENTROID_HP_10["model_args"].update(
-    num_segments=tune.grid_search([2, 3, 5, 7, 10, 14, 20, 30, 50, 100]))
-SI_CENTROID_HP_10["tasks_to_validate"] = [9]
-SI_CENTROID_HP_10["si_args"] = dict(
-    c=0.1, damping=0.1, apply_to_dendrites=True)
+    kw_percent_on=0.1,
+    weight_sparsity=0.5,
+    num_segments=tune.grid_search([2, 3, 5, 7, 10, 14, 20, 30, 50, 100])
+)
+SI_CENTROID_HP_10.update(
+    tasks_to_validate=[9],
+
+    si_args=dict(
+        c=0.1,
+        damping=0.1,
+        apply_to_dendrites=True
+    )
+)
 
 # HP search on dendrites for 10 tasks with SI FF.
 SI_CENTROID_HP_10_CONTROL = deepcopy(SI_CENTROID_HP_10)
 SI_CENTROID_HP_10_CONTROL["model_args"].update(
-    kw_percent_on=0.1, weight_sparsity=0.5)
-SI_CENTROID_HP_10_CONTROL["model_args"].update(
-    num_segments=tune.grid_search([2, 3, 5, 7, 10, 14, 20, 30, 50, 100]))
-SI_CENTROID_HP_10_CONTROL["tasks_to_validate"] = [9]
-SI_CENTROID_HP_10_CONTROL["si_args"] = dict(
-    c=0.1, damping=0.1, apply_to_dendrites=False)
+    kw_percent_on=0.1,
+    weight_sparsity=0.5,
+    num_segments=tune.grid_search([2, 3, 5, 7, 10, 14, 20, 30, 50, 100])
+)
+SI_CENTROID_HP_10_CONTROL.update(
+    tasks_to_validate=[10],
+
+    si_args=dict(
+        c=0.1,
+        damping=0.1,
+        apply_to_dendrites=False
+    )
+)
 
 # Test on 50 tasks with SI FF + SI Dendrites.
 SI_CENTROID_50_TEST_WITH_SI = deepcopy(SI_CENTROID_50)
 SI_CENTROID_50_TEST_WITH_SI["model_args"].update(
-    kw_percent_on=0.1, weight_sparsity=0.5)
-SI_CENTROID_50_TEST_WITH_SI["model_args"].update(
-    num_segments=50)
-SI_CENTROID_50_TEST_WITH_SI["tasks_to_validate"] = [49]
-SI_CENTROID_50_TEST_WITH_SI["si_args"] = dict(
-    c=0.1, damping=0.1, apply_to_dendrites=True)
-SI_CENTROID_50_TEST_WITH_SI["num_samples"] = 8
+    kw_percent_on=0.1,
+    weight_sparsity=0.5,
+    num_segments=50
+)
+SI_CENTROID_50_TEST_WITH_SI.update(
+    num_samples=8,
+    tasks_to_validate=[49],
+
+    si_args=dict(
+        c=0.1,
+        damping=0.1,
+        apply_to_dendrites=True
+    )
+)
 
 # Export configurations in this file
 CONFIGS = dict(
