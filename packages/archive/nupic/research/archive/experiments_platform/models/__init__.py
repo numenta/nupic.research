@@ -18,5 +18,5 @@
 #  http://numenta.org/licenses/
 #
 
-from nupic.research.frameworks.dynamic_sparse.networks import *
-from nupic.research.frameworks.stochastic_connections.dynamic_sparse_compat.networks import *
+from nupic.research.archive.dynamic_sparse.models import *
+from nupic.research.frameworks.stochastic_connections.dynamic_sparse_compat.models import *

@@ -23,7 +23,7 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable
 
-from nupic.research.frameworks.dynamic_sparse.networks.layers import (
+from nupic.research.archive.dynamic_sparse.networks.layers import (
     DSConv2d,
     calc_sparsity,
     init_coactivation_tracking,

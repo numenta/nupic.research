@@ -24,8 +24,8 @@ from itertools import product
 import numpy as np
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.networks import DynamicSparseBase
-from nupic.research.frameworks.dynamic_sparse.networks.layers import (
+from nupic.research.archive.dynamic_sparse.networks import DynamicSparseBase
+from nupic.research.archive.dynamic_sparse.networks.layers import (
     init_coactivation_tracking,
 )
 

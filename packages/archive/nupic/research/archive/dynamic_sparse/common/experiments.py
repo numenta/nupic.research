@@ -24,8 +24,8 @@ from copy import deepcopy
 from ray import tune
 from ray.tune.suggest.sigopt import SigOptSearch
 
-import nupic.research.frameworks.dynamic_sparse.models as models
-import nupic.research.frameworks.dynamic_sparse.networks as networks
+import nupic.research.archive.dynamic_sparse.models as models
+import nupic.research.archive.dynamic_sparse.networks as networks
 
 from .datasets import load_dataset
 

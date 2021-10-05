@@ -112,7 +112,7 @@ jobs:
           name: Check Style
           command: |
             mkdir -p test_results/flake8
-            ~/.local/bin/flake8 --show-source --format junit-xml --output-file test_results/flake8/results.xml nupic tests projects
+            ~/.local/bin/flake8 --show-source --format junit-xml --output-file test_results/flake8/results.xml packages nupic tests projects
       - store_test_results:
           path: test_results
 
