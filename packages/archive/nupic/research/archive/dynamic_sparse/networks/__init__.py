@@ -18,6 +18,8 @@
 #  http://numenta.org/licenses/
 #
 
+from nupic.research.frameworks.pytorch.models.resnets import resnet18, resnet50
+
 from .gsc import *
 from .hebbian import *
 from .hebbian_v0 import GSCHeb as GSCHeb_v0
@@ -25,4 +27,3 @@ from .layers import *
 from .main import *
 from .utils import *
 from .wideresnet import *
-from nupic.research.frameworks.pytorch.models.resnets import resnet18,resnet50
