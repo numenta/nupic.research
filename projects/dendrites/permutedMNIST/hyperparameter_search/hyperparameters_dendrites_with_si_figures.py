@@ -51,8 +51,6 @@ def hyperparameter_dendrites_wit_si_search_panel():
     df2["condition"] = "ff_only"
     df = pd.concat([df1, df2])
 
-    # Figure 1 'Impact of the different hyperparameters on performance
-    # full cross product of hyperparameters
     gs = gridspec.GridSpec(1, 1)
     fig = plt.figure(figsize=(5, 5))
 
@@ -68,22 +66,13 @@ def hyperparameter_dendrites_wit_si_search_panel():
         "Impact of the number of segments with SI on performance", fontsize=12
     )
 
-    pt.RainCloud(x=x1, y=y, hue=dhue, data=df, palette=pal, bw=sigma, width_viol=0.6,
-                 ax=ax1, orient=ort, move=0.2, pointplot=True, alpha=0.65)
-    # pt.RainCloud(x=x1, y=y, data=df, palette=pal, bw=sigma, width_viol=0.6,
-    #              ax=ax1, orient=ort, move=0.2, pointplot=True, alpha=0.65)
+    pt.RainCloud(x=x1, y=y, hue=dhue, data=df, palette=pal, bw=sigma,
+                 width_viol=0.6, ax=ax1, orient=ort, move=0.2, pointplot=True,
+                 alpha=0.65)
 
     ax1.set_ylabel("Mean accuracy", fontsize=16)
     ax1.set_xlabel("Number of dendritic segments", fontsize=16)
 
-    # Add 10 tasks label
-    # plt.figtext(-0.02, 0.7, "10 TASKS", fontsize=16)
-
-    # fig.suptitle(
-    #     """Impact of the number of segments on \n 10-tasks
-    #     permuted MNIST performance""",
-    #     fontsize=16,
-    # )
     if savefigs:
         plt.savefig(
             f"{figs_dir}/hyperparameter_search_panel_with_si_dendrites.png",
