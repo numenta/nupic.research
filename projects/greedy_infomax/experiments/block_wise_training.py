@@ -23,7 +23,7 @@ from copy import deepcopy
 
 import ray.tune as tune
 import torch
-
+import time
 from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import (
     BlockModelExperiment,
 )
@@ -35,16 +35,19 @@ from nupic.research.frameworks.greedy_infomax.models.classification_model import
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_cross_entropy_supervised,
     multiple_cross_entropy,
-    all_module_multiple_log_softmax
+    all_module_multiple_log_softmax,
+    all_module_multiple_log_softmax_multi_gpu,
 )
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     full_resnet,
-    full_sparse_resnet,
+    full_sparse_resnet_34,
     small_resnet,
     small_sparse_resnet,
+    full_resnet_50,
 )
-
-from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
+from torch.nn.parallel import DataParallel
+from projects.greedy_infomax.experiments.default_base import CONFIGS as DEFAULT_BASE_CONFIGS
+from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
 
 DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
 
@@ -54,7 +57,8 @@ NUM_EPOCHS = 10
 block_wise_small_resnet_args = {"module_args": small_resnet}
 block_wise_small_sparse_resnet_args = {"module_args": small_sparse_resnet}
 block_wise_full_resnet_args = {"module_args": full_resnet}
-block_wise_full_sparse_resnet_args = {"module_args": full_sparse_resnet}
+block_wise_full_resnet_50_args = {"module_args": full_resnet_50}
+block_wise_full_sparse_resnet_args = {"module_args": full_sparse_resnet_34}
 
 SMALL_BLOCK = deepcopy(DEFAULT_BASE)
 SMALL_BLOCK.update(
@@ -69,20 +73,20 @@ SMALL_BLOCK.update(
         batch_size=BATCH_SIZE,
         batch_size_supervised=BATCH_SIZE,
         val_batch_size=BATCH_SIZE,
-        # batches_in_epoch=1,
-        # batches_in_epoch_supervised=1,
-        # batches_in_epoch_val=4,
+        # batches_in_epoch=10,
+        # batches_in_epoch_supervised=10,
+        # batches_in_epoch_val=10,
         # supervised_training_epochs_per_validation=1,
         # batch_size=16,
         # batch_size_supervised=16,
         # val_batch_size=16,
         model_class=BlockModel,
         model_args=block_wise_small_resnet_args,
-        optimizer_class=torch.optim.SGD,
+        optimizer_class=torch.optim.Adam,
         optimizer_args=dict(lr=2e-4),
         loss_function=all_module_multiple_log_softmax,
         find_unused_parameters=True,
-        lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
+        lr_scheduler_class=None, #torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
             max_lr=0.12,  # change based on sparsity/dimensionality
             div_factor=4,  # initial_lr = 0.06
@@ -219,6 +223,67 @@ FULL_SPARSE_BLOCK.update(dict(
     ),
 ))
 
+
+class CustomBlockModelExperiment(BlockModelExperiment):
+    def setup_experiment(self, config):
+        super(CustomBlockModelExperiment, self).setup_experiment(config)
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+
+        #nested dataparallel
+        # self.encoder = DataParallel(self.encoder)
+        # self.classifier = DataParallel(self.classifier)
+        # self.encoder_classifier = EncoderClassifier(self.encoder, self.classifier)
+
+        #not nested dataparallel
+        self.encoder_classifier = DataParallel(self.encoder_classifier)
+        self.classifier = DataParallel(self.classifier)
+        self.encoder = DataParallel(self.encoder)
+
+FULL_RESNET_50 = deepcopy(FULL_BLOCK)
+NUM_GPUS = 8
+FULL_RESNET_50.update(dict(
+        experiment_class=CustomBlockModelExperiment,
+        wandb_args=dict(
+            project="greedy_infomax_full_block_experiment",
+            name=f"resnet50_dataparallel_updated"
+        ),
+        epochs=FULL_NUM_EPOCHS,
+        epochs_to_validate=range(10, FULL_NUM_EPOCHS + 1, FULL_NUM_EPOCHS//10),
+        distributed=False, #DON'T CHANGE THIS
+        supervised_training_epochs_per_validation=50,
+        #uncomment this section for small batches / debugging purposes
+        # batches_in_epoch=2,
+        # batches_in_epoch_val=2,
+        # batches_in_epoch_supervised=2,
+        # batch_size = 2,
+        # batch_size_supervised=2,
+        # val_batch_size=2,
+
+        batch_size=16 * NUM_GPUS, #multiply by num_gpu's
+        batch_size_supervised=16 * NUM_GPUS,
+        val_batch_size=16 * NUM_GPUS,
+        model_class=BlockModel,
+        model_args=block_wise_full_resnet_50_args,
+        optimizer_class=torch.optim.Adam,
+        optimizer_args=dict(lr=2e-4),
+        loss_function=all_module_multiple_log_softmax,
+        find_unused_parameters=True,
+        device_ids=list(range(NUM_GPUS)),
+        pin_memory=False,
+        lr_scheduler_class=None,
+        classifier_config=dict(
+            model_class=MultiClassifier,
+            model_args=dict(num_classes=10),
+            loss_function=multiple_cross_entropy_supervised,
+            # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
+            optimizer_class=torch.optim.Adam,
+            # Optimizer class class arguments passed to the constructor
+            optimizer_args=dict(lr=2e-4),
+            distributed=False,
+        ),
+))
+
 CONFIGS = dict(
     small_block=SMALL_BLOCK,
     small_block_lr_grid_search=SMALL_BLOCK_LR_GRID_SEARCH,
@@ -227,4 +292,5 @@ CONFIGS = dict(
     small_sparse_block_lr_grid_search=SMALL_SPARSE_BLOCK_LR_GRID_SEARCH,
     full_block=FULL_BLOCK,
     full_sparse_block=FULL_SPARSE_BLOCK,
+    full_resnet_50=FULL_RESNET_50,
 )

@@ -34,7 +34,7 @@ from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
     train_block_model,
 )
 from nupic.research.frameworks.vernon import mixins
-from nupic.research.frameworks.vernon.distributed import SelfSupervisedExperiment
+from nupic.research.frameworks.vernon import SelfSupervisedExperiment
 from nupic.research.frameworks.vernon.network_utils import create_model
 
 
@@ -55,8 +55,10 @@ class BlockModelExperiment(
         )
         super().setup_experiment(config)
         self.evaluate_model = evaluate_block_model
-        self.train_model = train_block_model
+        self.train_model = self.train_model_supervised = train_block_model
         self.multiple_module_loss_history = []
+
+
 
     @classmethod
     def create_model(cls, config, device):
@@ -120,6 +122,7 @@ class BlockModelExperiment(
             for i in range(log.shape[1]):
                 result[f"module_{i}_loss_history"] = module_loss_history[:, i].tolist()
             self.multiple_module_loss_history = []
+            result["num_bilinear_info_modules"] = int(log.shape[1])
         return result
 
     @classmethod

@@ -42,6 +42,44 @@ from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
 from nupic.torch.modules import SparseWeights2d
 
 
+
+def _make_layer_config(
+        block,
+        num_blocks,
+        planes,
+        in_planes,
+        stride=1,
+        sparse_weights_class=SparseWeights2d,
+        sparsity=None,
+        percent_on=None,):
+    layer_config = []
+    strides = [stride] + [1] * (num_blocks - 1)
+    if sparsity is None:
+        sparsity = {}
+    if percent_on is None:
+        percent_on = {}
+    for i, stride in enumerate(strides):
+        layer_config.append(
+            dict(
+                model_class=block,
+                model_args=dict(
+                    in_planes=in_planes,
+                    planes=planes,
+                    stride=stride,
+                    sparse_weights_class=sparse_weights_class,
+                    sparsity=sparsity.get(f"block{i + 1}", None),
+                    percent_on=percent_on.get(f"block{i + 1}", None),
+                ),
+                init_batch_norm=False,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=True,
+                save_checkpoint_file=None,
+            )
+        )
+        in_planes = planes * block.expansion
+    return layer_config
+
 def full_sparse_model_blockwise_config(
     negative_samples=16,
     k_predictions=5,
@@ -120,61 +158,29 @@ def full_sparse_model_blockwise_config(
     )
     for idx in range(len(block_dims)):
         # args
-        num_blocks = (block_dims[idx],)
-        filters = (num_channels[idx],)
+        num_blocks = block_dims[idx]
+        filters = num_channels[idx]
         previous_input_dim = num_channels[0] if idx == 0 else num_channels[idx - 1]
         first_stride = 1 if idx == 0 else 2
         encoder_sparsity = sparsity[f"encoder{idx + 1}"]
         encoder_percent_on = percent_on[f"encoder{idx + 1}"]
-        if encoder_sparsity is None:
-            encoder_sparsity = {
-                "block1": None,
-                "block2": None,
-                "block3": None,
-                "block4": None,
-                "block5": None,
-                "block6": None,
-                "bilinear_info": None,
-            }
-        if encoder_percent_on is None:
-            encoder_percent_on = {
-                "block1": None,
-                "block2": None,
-                "block3": None,
-                "block4": None,
-                "block5": None,
-                "block6": None,
-            }
-        strides = [first_stride] + [1] * (num_blocks[0] - 1)
-        in_planes = previous_input_dim
-        planes = filters[0]
-        for idx, stride in enumerate(strides):
-            modules.append(
-                dict(
-                    model_class=block,
-                    model_args=dict(
-                        in_planes=in_planes,
-                        planes=planes,
-                        stride=stride,
-                        sparse_weights_class=sparse_weights_class,
-                        sparsity=encoder_sparsity[f"block{idx + 1}"],
-                        percent_on=encoder_percent_on[f"block{idx + 1}"],
-                    ),
-                    init_batch_norm=False,
-                    checkpoint_file=None,
-                    load_checkpoint_args=None,
-                    train=True,
-                    save_checkpoint_file=None,
-                )
-            )
-            in_planes = planes * block.expansion
-            first_stride = 2
+        in_planes = previous_input_dim if idx==0 else previous_input_dim * block.expansion
+        modules.extend(_make_layer_config(
+            block,
+            num_blocks,
+            filters,
+            in_planes,
+            sparse_weights_class=SparseWeights2d,
+            sparsity=encoder_sparsity,
+            percent_on=encoder_percent_on,
+            stride=first_stride,
+        ))
         modules.append(
             dict(
                 model_class=SparseBilinearInfo,
                 model_args=dict(
-                    in_channels=in_planes,
-                    out_channels=in_planes,
+                    in_channels=filters * block.expansion,
+                    out_channels=filters * block.expansion,
                     negative_samples=negative_samples,
                     k_predictions=k_predictions,
                     sparse_weights_class=sparse_weights_class,
@@ -190,7 +196,7 @@ def full_sparse_model_blockwise_config(
         modules.append(
             dict(
                 model_class=EmitEncoding,
-                model_args=dict(channels=in_planes),
+                model_args=dict(channels=filters * block.expansion),
                 init_batch_norm=False,
                 checkpoint_file=None,
                 load_checkpoint_args=None,
@@ -213,10 +219,14 @@ def full_sparse_model_blockwise_config(
     return modules
 
 
+
+
+#predefined configs
+full_resnet_50 = full_sparse_model_blockwise_config(resnet_50=True)
+
 full_resnet = full_sparse_model_blockwise_config(resnet_50=False)
 small_resnet = full_sparse_model_blockwise_config()[:8]
-full_sparse_resnet = full_sparse_model_blockwise_config(
-    resnet_50=True,
+full_sparse_resnet_34 = full_sparse_model_blockwise_config(
     sparsity=dict(
         conv1=0.01,  # dense
         encoder1=dict(

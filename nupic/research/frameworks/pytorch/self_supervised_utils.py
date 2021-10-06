@@ -33,3 +33,5 @@ class EncoderClassifier(torch.nn.Module):
             encoded = self.encoder.encode(x)
         out = self.classifier(encoded)
         return out
+
+

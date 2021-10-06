@@ -30,14 +30,12 @@ from nupic.research.frameworks.greedy_infomax.Greedy_InfoMax.GreedyInfoMax.visio
     .models.FullModel import FullVisionModel
 from optparse import OptionParser
 import time
-from torch.nn import DataParallel
-from torch.nn.parallel import DistributedDataParallel
 
 
 if __name__ == "__main__":
     experiment_config = CONFIGS["full_resnet_50"]
     experiment_config["distributed"] = False
-    experiment_config["batch_size"]=5
+    experiment_config["batch_size"]=1
     experiment_config["lr_scheduler_class"] = None
     experiment_class = experiment_config["experiment_class"]()
     experiment_class.setup_experiment(experiment_config)
@@ -60,8 +58,8 @@ if __name__ == "__main__":
 
     model_2 = FullVisionModel(opt, calc_loss=True)
     for p1, p2 in zip(model_1.parameters(), model_2.parameters()):
-        # print(f"OUR MODEL:{p1.mean()}, {p1.var()}")
-        # print(f"SINDY'S MODEL:{p2.mean()}, {p2.var()}")
+        print(f"OUR MODEL:{p1.mean()}, {p1.var()}")
+        print(f"SINDY'S MODEL:{p2.mean()}, {p2.var()}")
         p2.data = p1.data.clone()
 
     opt_2 = torch.optim.SGD(model_2.parameters(), lr=2e-4)
@@ -94,16 +92,6 @@ if __name__ == "__main__":
 
         loss_1.backward()
         loss_2.backward()
-
-        print("VERNON")
-        for name, param in model_1.named_parameters():
-            if param.grad is None:
-                print(name)
-
-        print("GIM")
-        for name, param in model_2.named_parameters():
-            if param.grad is None:
-                print(name)
 
         for p1, p2 in zip(model_1.parameters(), model_2.parameters()):
             assert torch.all(p1.grad == p2.grad)

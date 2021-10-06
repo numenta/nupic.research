@@ -158,7 +158,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             self.step_lr_every_batch_classifier = True
 
         self.reset_classifier_on_validate = classifier_config.get(
-            "reset_on_validate", False
+            "reset_on_validate", True
         )
 
         self.supervised_training_epochs_per_validation = config.get(
@@ -199,9 +199,10 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                 "batch_size", config.get("unsupervised_batch_size", 1)
             ),
             shuffle=sampler is None,
+            # shuffle=True,
             num_workers=config.get("workers", 0),
             sampler=sampler,
-            pin_memory=torch.cuda.is_available(),
+            pin_memory=config.get("pin_memory", torch.cuda.is_available()),
             drop_last=config.get(
                 "train_loader_drop_last",
                 config.get("unsupervised_loader_drop_last", True),
@@ -225,7 +226,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             shuffle=sampler is None,
             num_workers=config.get("workers", 0),
             sampler=sampler,
-            pin_memory=torch.cuda.is_available(),
+            pin_memory=config.get("pin_memory", torch.cuda.is_available()),
             drop_last=config.get("supervised_loader_drop_last", True),
         )
 
@@ -244,7 +245,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             shuffle=False,
             num_workers=config.get("workers", 0),
             sampler=sampler,
-            pin_memory=torch.cuda.is_available(),
+            pin_memory=config.get("pin_memory", torch.cuda.is_available()),
         )
 
     @classmethod
@@ -390,9 +391,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             for layer in self.classifier.children():
                 if hasattr(layer, "reset_parameters"):
                     layer.reset_parameters()
-
         for _ in range(self.supervised_training_epochs_per_validation):
-            self.train_model(
+            self.train_model_supervised(
                 model=self.encoder_classifier,
                 loader=self.supervised_loader,
                 optimizer=self.classifier_optimizer,

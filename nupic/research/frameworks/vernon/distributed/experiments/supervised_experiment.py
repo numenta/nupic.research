@@ -48,13 +48,16 @@ class SupervisedExperiment(DistributedBase, SupervisedExperimentBase):
 
     def setup_experiment(self, config):
         super().setup_experiment(config)
+        print(f"self.distributed: {self.distributed}")
+        print(f"config distributed: {config.get('distributed', None)}")
         if self.distributed:
             self.model = DistributedDataParallel(
                 self.model,
                 find_unused_parameters=config.get("find_unused_parameters", False),
             )
         else:
-            self.model = DataParallel(self.model)
+            self.model = DataParallel(self.model,
+                                      device_ids=config.get("device_ids", None))
 
     def pre_epoch(self):
         super().pre_epoch()

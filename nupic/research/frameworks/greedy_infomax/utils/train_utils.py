@@ -31,7 +31,7 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from .loss_utils import multiple_cross_entropy, multiple_cross_entropy_supervised
+from .loss_utils import all_module_multiple_log_softmax, multiple_cross_entropy_supervised
 
 
 def train_block_model(
@@ -39,7 +39,7 @@ def train_block_model(
     loader,
     optimizer,
     device,
-    criterion=multiple_cross_entropy,
+    criterion=all_module_multiple_log_softmax,
     complexity_loss_fn=None,
     batches_in_epoch=sys.maxsize,
     active_classes=None,
@@ -131,10 +131,15 @@ def train_block_model(
             pre_batch_callback(model=model, batch_idx=batch_idx)
 
         optimizer.zero_grad()
+        model.zero_grad()
         # Output will be a list of list of tensors:
         # output[x][k] = bilinear_module_x, prediction_step_k: tensor
         output_list = model(data)
-
+        # print(f"Data shape: {data.shape}")
+        # print(f"Output list len: {len(output_list)}")
+        # print(f"Output list[0] len: {len(output_list[0])}")
+        # print(f"Output list[0][0].shape: {output_list[0][0].shape}")
+        # print(f"Train model, target.shape: {target.shape}")
         # Module specific losses will be a tensor of dimension num modules
         # module_specific_losses[x] = loss from bilinear_module_x
         module_losses = criterion(output_list, target)
@@ -242,7 +247,13 @@ def evaluate_block_model(
     total = 0
 
     # Perform accumulation on device, avoid paying performance cost of .item()
-    num_emit_encoding_modules = model.encoder.count_emit_encoding_modules()
+    if isinstance(model, torch.nn.parallel.DataParallel):
+        num_emit_encoding_modules = model.module.encoder.count_emit_encoding_modules()
+        num_bilinear_info_modules = model.module.encoder.count_bilinear_info_modules()
+    else:
+        num_emit_encoding_modules = model.encoder.count_emit_encoding_modules()
+        num_bilinear_info_modules = model.encoder.count_bilinear_info_modules()
+
     module_losses = torch.zeros(num_emit_encoding_modules, device=device)
     module_correct = torch.zeros(num_emit_encoding_modules, device=device)
 
@@ -265,13 +276,15 @@ def evaluate_block_model(
                 )
 
             outputs = model(data)
+            # print(f"Evaluate model data.shape: {data.shape}")
+            # print(f"Evaluate model len(outputs): {data.shape}")
+            # print(f"Evaluate model targets.shape: {target.shape}")
             if active_classes is not None:
                 outputs = outputs[:, :, active_classes]  # module, batch, classes
             module_losses += criterion(outputs, target, reduction="sum")
-            preds = outputs.max(-1, keepdim=True)[1]
-            module_correct += preds.eq(
-                target.repeat(len(module_correct), 1).view_as(preds)
-            ).sum((1, 2))
+            preds = [o.max(-1, keepdim=True)[1] for o in outputs]
+            for i in range(len(preds)):
+                module_correct[i] += preds[i].view_as(target).eq(target).sum()
             total += len(data)
 
             if post_batch_callback is not None:
@@ -294,8 +307,8 @@ def evaluate_block_model(
     }
     result.update(
         {
-            "num_bilinear_info_modules": model.encoder.count_bilinear_info_modules(),
-            "num_emit_encoding_modules": model.encoder.count_emit_encoding_modules(),
+            "num_bilinear_info_modules": num_bilinear_info_modules,
+            "num_emit_encoding_modules": num_emit_encoding_modules,
         }
     )
     result.update(
@@ -346,8 +359,8 @@ def aggregate_eval_results_block(results):
     """
     correct = sum(result["total_correct"] for result in results)
     total = sum(result["total_tested"] for result in results)
-    num_emit_encoding_modules = results[0]["num_emit_encoding_modules"]
-    num_bilinear_info_modules = results[0]["num_bilinear_info_modules"]
+    num_emit_encoding_modules = results[0].get("num_emit_encoding_modules", 3)
+    num_bilinear_info_modules = results[0].get("num_bilinear_info_modules", 3)
     if total == 0:
         loss = 0
         accuracy = 0
@@ -397,5 +410,4 @@ def aggregate_eval_results_block(results):
             for i in range(num_emit_encoding_modules)
         }
     )
-
     return result

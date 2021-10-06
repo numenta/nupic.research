@@ -47,9 +47,12 @@ if __name__ == "__main__":
 
     # Merge configuration with command line arguments
     config.update(vars(args))
+    from pprint import pprint
+
 
     # Process args and modify config appropriately.
     config = process_args(args, config)
+
     if config is None:
         pass
     else:

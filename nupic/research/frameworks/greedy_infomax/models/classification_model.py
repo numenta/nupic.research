@@ -117,12 +117,9 @@ class MultiClassifier(nn.Module):
         )
 
     def forward(self, encodings):
-        return torch.stack(
-            [
-                classifier(encoding)
-                for (classifier, encoding) in zip(self.classifiers, encodings)
-            ]
-        )
+        return [classifier(encoding)
+                for (classifier, encoding) in zip(self.classifiers, encodings)]
+
 
 class MultiFlattenClassifier(nn.Module):
     """
