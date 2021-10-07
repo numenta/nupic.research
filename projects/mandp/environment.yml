@@ -1,7 +1,7 @@
 # This file may be used to create an environment using:
 # $ conda env create --name <env> --file <this file>
 # platform: osx-64
-name: nupic.research.dynamic_sparse
+name: nupic.research.mandp  
 channels:
   - defaults
   - pytorch
@@ -11,6 +11,7 @@ channels:
 dependencies:
   - python=3.8
   - pip
+  - ffmpeg
 
   - pip:
       # Install nupic.torch and nupic.rearch libraries in develop mode.
@@ -19,5 +20,5 @@ dependencies:
       - -e ${HOME}/nta/nupic.research[dev]
 
       # Install projects extra dependency
-      - -e ${HOME}/nta/nupic.research/packages/archive
+      - -e ${HOME}/nta/nupic.research/packages/mandp  
 
