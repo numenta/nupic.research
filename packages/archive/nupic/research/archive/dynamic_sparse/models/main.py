@@ -31,7 +31,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
-from nupic.research.frameworks.dynamic_sparse.networks import NumScheduler
+from nupic.research.archive.dynamic_sparse.networks import NumScheduler
 from nupic.torch.modules import update_boost_strength
 
 from .loggers import BaseLogger, SparseLogger

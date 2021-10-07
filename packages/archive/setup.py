@@ -1,5 +1,6 @@
+# ------------------------------------------------------------------------------
 #  Numenta Platform for Intelligent Computing (NuPIC)
-#  Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+#  Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 #  with Numenta, Inc., for a separate license for this software code, the
 #  following terms and conditions apply:
 #
@@ -17,6 +18,7 @@
 #
 #  http://numenta.org/licenses/
 #
+# ------------------------------------------------------------------------------
+from setuptools import setup
 
-from nupic.research.frameworks.dynamic_sparse.models import *
-from nupic.research.frameworks.stochastic_connections.dynamic_sparse_compat.models import *
+setup()

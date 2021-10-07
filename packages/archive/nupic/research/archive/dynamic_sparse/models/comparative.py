@@ -21,7 +21,7 @@
 
 import torch
 
-from nupic.research.frameworks.dynamic_sparse.networks import DynamicSparseBase
+from nupic.research.archive.dynamic_sparse.networks import DynamicSparseBase
 
 from .main import SparseModel
 

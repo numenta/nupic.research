@@ -26,7 +26,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from nupic.research.frameworks.dynamic_sparse.common.dataloaders import (
+from nupic.research.archive.dynamic_sparse.common.dataloaders import (
     PreprocessedSpeechDataLoader,
     VaryingDataLoader,
 )
