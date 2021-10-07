@@ -18,12 +18,31 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+import torch.nn as nn
 
-"""
-This __init__ updates the transformer model and config mappings to include custom sparse
-Bert models. This way, they may be automatically loaded via AutoModelForMaskedLM and
-related utilities.
-"""
 
-from .sparse_embedding import *
-from .static_sparse_bert import *
+class SyncBatchNorm:
+    """
+    This mixin converts the BatchNorm modules to SyncBatchNorm modules when utilizing
+    distributed training on GPUs.
+
+    Example config:
+        config=dict(
+            use_sync_batchnorm=True
+        )
+    """
+    def create_model(self, config, device):
+        model = super().create_model(config, device)
+        use_sync_batchnorm = config.get("use_sync_batchnorm", True)
+        distributed = config.get("distributed", False)
+        if use_sync_batchnorm and distributed and next(model.parameters()).is_cuda:
+            # Convert batch norm to sync batch norms
+            model = nn.modules.SyncBatchNorm.convert_sync_batchnorm(module=model)
+        return model
+
+    @classmethod
+    def get_execution_order(cls):
+        eo = super().get_execution_order()
+        eo["setup_experiment"].insert(0, "Sync Batchnorm begin")
+        eo["setup_experiment"].append("Sync Batchnorm end")
+        return eo

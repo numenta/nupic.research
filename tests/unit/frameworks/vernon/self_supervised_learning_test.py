@@ -104,9 +104,9 @@ class SelfSupervisedLearningTest(unittest.TestCase):
         # Setup experiment and initialize model.
         exp = self_supervised_config["experiment_class"]()
         exp.setup_experiment(self_supervised_config)
-        self.assertIsInstance(exp.model, EncoderClassifier)
-        self.assertTrue(hasattr(exp.model, "classifier"))
-        self.assertTrue(hasattr(exp.model, "encoder"))
+        self.assertIsInstance(exp.encoder_classifier, EncoderClassifier)
+        self.assertTrue(hasattr(exp.encoder_classifier, "classifier"))
+        self.assertTrue(hasattr(exp.encoder_classifier, "encoder"))
         # Loop through some pseudo epochs.
         for _ in range(5):
             exp.run_epoch()

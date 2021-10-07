@@ -485,15 +485,14 @@ def preprocess_datasets_task(datasets, tokenizer, data_args, model,
 
 
 def squad_prepare_features_factory(  # noqa: C901
-                                   split,
-                                   data_args,
-                                   tokenizer,
-                                   tokenizer_kwargs,
-                                   question_column_name=None,
-                                   context_column_name=None,
-                                   answer_column_name=None,
-                                   pad_on_right=None,
-                                   ):
+        split,
+        data_args,
+        tokenizer,
+        tokenizer_kwargs,
+        question_column_name=None,
+        context_column_name=None,
+        answer_column_name=None,
+        pad_on_right=None):
     """
     Choose a function for preprocesssing squad datasets based on
         split (train vs. eval) and beam search (on or off).
@@ -606,6 +605,7 @@ def squad_prepare_features_factory(  # noqa: C901
     else:
         msg = "unknown split specified"
         assert split in ["eval", "val", "test", "predict", "validation"], msg
+
         def preprocess_function(examples):
 
             tokenized_examples = pre_pre_process(examples)

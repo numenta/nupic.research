@@ -56,7 +56,9 @@ class LogEveryLoss(StepBasedLogging):
 
         if len(self.error_loss_history) > 0:
             log = torch.stack(self.error_loss_history)
-            result["error_loss_history"] = log.cpu().numpy().tolist()
+            error_loss_history = log.cpu().numpy()
+            result["error_loss_history"] = error_loss_history.tolist()
+            result["train_loss"] = error_loss_history[-25:].mean()
             self.error_loss_history = []
 
         if len(self.complexity_loss_history) > 0:
