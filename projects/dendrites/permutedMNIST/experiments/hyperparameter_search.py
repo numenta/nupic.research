@@ -107,6 +107,7 @@ KW_SPARSITY_SEARCH["model_args"].update(num_segments=10, weight_sparsity=0.5)
 W_SPARSITY_SEARCH = deepcopy(BASE10)
 W_SPARSITY_SEARCH["model_args"].update(num_segments=10, kw_percent_on=0.1)
 
+# test config for 10 tasks
 TEST = deepcopy(BASE10)
 TEST["model_args"].update(
     kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2
@@ -133,6 +134,7 @@ KW_SPARSITY_SEARCH_50["model_args"].update(
 W_SPARSITY_SEARCH_50 = deepcopy(BASE50)
 W_SPARSITY_SEARCH_50["model_args"].update(num_segments=50, kw_percent_on=0.1)
 
+# test config for 50 tasks
 TEST50 = deepcopy(BASE50)
 TEST50["model_args"].update(
     kw_percent_on=0.1, weight_sparsity=0.5, num_segments=2
