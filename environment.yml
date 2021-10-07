@@ -12,9 +12,6 @@ dependencies:
   - python=3.8
   - pip
 
-  # FIXME: remove numba installation command once dependency issues with numpy 1.21.2 is fixed on a new numba release
-  #        Caused by this PR https://github.com/numba/numba/pull/7209
-  - numba=0.53.0
   - pip:
       # Install nupic.torch libraries in develop mode.
       # Assume libraries were cloned into ${HOME}/nta folder
