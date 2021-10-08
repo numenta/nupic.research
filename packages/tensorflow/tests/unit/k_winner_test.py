@@ -21,13 +21,12 @@
 import random
 
 import numpy as np
-import pytest
-tf = pytest.importorskip("tensorflow.compat.v1")  # noqa
-from tensorflow.python.framework import test_util  # noqa
-from tensorflow.python.keras.layers import Input  # noqa
-from tensorflow.python.keras.models import Model  # noqa
-from nupic.research.frameworks.tensorflow.layers.k_winners import KWinners, KWinners2d  # noqa
-# noqa
+import tensorflow.compat.v1 as tf
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model
+from tensorflow.python.framework import test_util
+
+from nupic.research.frameworks.tensorflow.layers.k_winners import KWinners, KWinners2d
 
 tf.enable_eager_execution()
 
