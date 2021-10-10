@@ -128,7 +128,7 @@ CENTROID_2 = deepcopy(CENTROID_10)
 CENTROID_2["dataset_args"].update(num_tasks=2)
 CENTROID_2["model_args"].update(num_segments=2)
 CENTROID_2["dataset_args"].update(
-    download=True
+    download=False
 )
 CENTROID_2.update(
     epochs=1,

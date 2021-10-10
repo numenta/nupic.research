@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # set nargs = "+" and turn into a for loop
     parser.add_argument("-e", "--experiment", dest="name", nargs="+", default="default_base",
                         help="Experiment to run", choices=list(CONFIGS.keys()))
-    parser.add_argument("-ray", "--run_with_ray_tune", dest="run_with_ray_tune",
+    parser.add_argument("-r", "--run_with_ray_tune", dest="run_with_ray_tune",
                         type=bool, default=True,
                         help="run by calling vernon.run_with_ray_tune or vernon.run")
 
@@ -62,6 +62,7 @@ if __name__ == "__main__":
 
         # Merge configuration with command line arguments
         config.update(vars(args))
+        config.update(name=experiment)
 
         config = process_args(args, config)
 
