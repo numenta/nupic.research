@@ -57,7 +57,7 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
 # Centroid method for inferring contexts: 10 permutedMNIST tasks
 CENTROID_10 = dict(
     experiment_class=CentroidExperiment,
-    num_samples=8,
+    num_samples=1,
 
     # Results path
     local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
@@ -65,7 +65,7 @@ CENTROID_10 = dict(
     dataset_class=PermutedMNIST,
     dataset_args=dict(
         num_tasks=10,
-        root=os.path.expanduser("~/nta/results/data/"),
+        root=os.path.expanduser("~/nta/results/data/"),  # change to /mnt/datasets/ or something
         download=False,  # Change to True if running for the first time
         seed=42,
     ),
@@ -127,6 +127,9 @@ CENTROID_50.update(
 CENTROID_2 = deepcopy(CENTROID_10)
 CENTROID_2["dataset_args"].update(num_tasks=2)
 CENTROID_2["model_args"].update(num_segments=2)
+CENTROID_2["dataset_args"].update(
+    download=True
+)
 CENTROID_2.update(
     epochs=1,
     num_samples=1,

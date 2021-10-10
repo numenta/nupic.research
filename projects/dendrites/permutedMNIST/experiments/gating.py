@@ -38,6 +38,7 @@ from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedM
 from nupic.research.frameworks.vernon import mixins
 
 from .base import DEFAULT_BASE
+from .centroid import CENTROID_10
 
 BASE_GATING_BIAS = deepcopy(DEFAULT_BASE)
 BASE_GATING_BIAS.update(
@@ -47,6 +48,12 @@ BASE_GATING_BIAS["model_args"].update(
     dendritic_layer_class=BiasingDendriticLayer,
 )
 
+CENTROID_10_DENDRITE_BIAS = deepcopy(CENTROID_10)
+CENTROID_10_DENDRITE_BIAS["model_args"].update(
+    dendritic_layer_class=BiasingDendriticLayer
+)
+
 CONFIGS=dict(
-    BASE_GATING_BIAS
+    base_gating_bias=BASE_GATING_BIAS,
+    centroid_10_dendrite_bias=CENTROID_10_DENDRITE_BIAS
 )
