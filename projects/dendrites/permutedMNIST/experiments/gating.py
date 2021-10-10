@@ -19,7 +19,9 @@
 #
 
 """
-Base Experiment configuration.
+Experiments designed to investigate different dendritic functions that mix feddforward
+and dendritic inputs. Examples include additive bias, multiplicative, multiplicative
+gating, etc.
 """
 
 import os
@@ -30,7 +32,7 @@ import ray.tune as tune
 import torch
 import torch.nn.functional as F
 
-from nupic.research.frameworks.dendrites import DendriticMLP, BiasingDendriticLayer
+from nupic.research.frameworks.dendrites import DendriticMLP, BiasingDendriticLayer, AbsoluteMaxGatingDendriticLayer, GatingDendriticLayer
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
@@ -44,6 +46,7 @@ BASE_GATING_BIAS = deepcopy(DEFAULT_BASE)
 BASE_GATING_BIAS.update(
     epochs=1
 )
+
 BASE_GATING_BIAS["model_args"].update(
     dendritic_layer_class=BiasingDendriticLayer,
 )
@@ -53,7 +56,20 @@ CENTROID_10_DENDRITE_BIAS["model_args"].update(
     dendritic_layer_class=BiasingDendriticLayer
 )
 
+CENTROID_10_DENDRITE_GATE = deepcopy(CENTROID_10)
+CENTROID_10_DENDRITE_GATE["model_args"].update(
+    dendritic_layer_class=GatingDendriticLayer
+)
+
+CENTROID_10_DENDRITE_ABSMAXGATE = deepcopy(CENTROID_10)
+CENTROID_10_DENDRITE_ABSMAXGATE["model_args"].update(
+    dendritic_layer_class=AbsoluteMaxGatingDendriticLayer
+)
+
 CONFIGS=dict(
     base_gating_bias=BASE_GATING_BIAS,
-    centroid_10_dendrite_bias=CENTROID_10_DENDRITE_BIAS
+    centroid_10_dendrite_bias=CENTROID_10_DENDRITE_BIAS,
+    centroid_10_dendrite_absmaxgate=CENTROID_10_DENDRITE_ABSMAXGATE,
+    centroid_10_dendrite_gate=CENTROID_10_DENDRITE_GATE,
+    # TODO: multiplicative but not gating
 )
