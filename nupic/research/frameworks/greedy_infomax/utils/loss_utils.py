@@ -80,6 +80,46 @@ def all_module_multiple_log_softmax(log_f_module_list, targets, reduction="mean"
         module_losses = torch.cat([module_losses, module_loss.view(1)])
     return module_losses
 
+def all_module_multiple_log_softmax_2(log_f_module_list, targets, reduction="mean"):
+    device = log_f_module_list[0][0].device
+    module_losses = torch.zeros(len(log_f_module_list), requires_grad=True, device=device)
+    for i, log_f_list in enumerate(log_f_module_list):
+        k_step_losses = torch.zeros(len(log_f_list), requires_grad=True, device=device)
+        # print(f"k_step_losses.shape: {k_step_losses.shape}")
+        for k, log_fk in enumerate(log_f_list):
+            # Positive samples are at index 0
+            true_fk = torch.zeros(
+                (log_fk.shape[0], log_fk.shape[-2], log_fk.shape[-1]),
+                dtype=torch.long,
+                device=device,
+                requires_grad=False,
+            )
+            # print(f"true_fk.shape: {true_fk.shape}")
+            log_fk = log_fk.to(device)
+            # print(f"log_fk.shape: {log_fk.shape}")
+            softmax_fk = torch.softmax(log_fk, dim=1)
+            log_softmax_fk = torch.log(softmax_fk + 1e-11)
+            k_step_loss = F.nll_loss(
+                log_softmax_fk, true_fk, reduction=reduction
+            )
+            # print(f"k_step_loss.shape: {k_step_loss.shape}")
+            k_step_losses = torch.index_add(k_step_losses,
+                                            0,
+                                            torch.tensor(k, device=device),
+                                            k_step_loss.view(1))
+        k_step_losses = torch.mean(k_step_losses, 0)
+        module_losses = torch.index_add(module_losses,
+                                        0,
+                                        torch.tensor(i, device=device),
+                                        k_step_losses.view(1))
+    return module_losses
+
+def all_module_losses(module_losses, targets, reduction="mean"):
+    device = module_losses[0].device
+    return torch.tensor([torch.mean(l, 0) for l in module_losses],
+                        device=device,
+                        requires_grad=True)
+
 
 """
 Used for supervised training of a BlockModel with GIM. This outputs a tensor of losses,

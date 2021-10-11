@@ -26,6 +26,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from nupic.research.frameworks.backprop_structure.modules import VDropConv2d
 from nupic.torch.modules import SparseWeights2d
@@ -58,7 +59,8 @@ class BilinearInfo(nn.Identity):
                           probably be increased for larger overlap values.
         """
         # For each k in k_predictions, store a set of log_fk and true_f values
-        log_f_list = []
+        device = z.device
+        total_loss = torch.zeros(1, device=device, requires_grad=True)
         for k in range(1, self.k_predictions + 1):
             # Compute log f(c_t, x_{t+k}) = z^T_{t+k} W_k c_t
 
@@ -68,7 +70,7 @@ class BilinearInfo(nn.Identity):
                 .forward(z[:, :, (k + skip_step) :, :])  # Bx, C , H , W
                 .permute(2, 3, 0, 1)  # H, W, Bx, C
                 .contiguous()
-            )  # y, x, b, c
+            ).to(device)  # y, x, b, c
 
             # Take random samples from z_{t+k} W_k as contrastive samples
             ztwk_shuf = ztwk.view(
@@ -78,7 +80,7 @@ class BilinearInfo(nn.Identity):
                 ztwk_shuf.shape[0],  # y * x * batch
                 (ztwk_shuf.shape[0] * self.negative_samples, 1),
                 dtype=torch.long,
-                device=ztwk_shuf.device,
+                device=device,
                 requires_grad=False,
             )
             rand_index = rand_index.repeat(1, ztwk_shuf.shape[1])
@@ -96,7 +98,7 @@ class BilinearInfo(nn.Identity):
             # Multiply ztwk and context for full bilinear model
             context = (
                 c[:, :, : -(k + skip_step), :].permute(2, 3, 0, 1).unsqueeze(-2)
-            )  # y, x, b, 1, c
+            ).to(device)  # y, x, b, 1, c
 
             log_fk_main = torch.matmul(context, ztwk.unsqueeze(-1)).squeeze(
                 -2
@@ -108,9 +110,23 @@ class BilinearInfo(nn.Identity):
             log_fk = torch.cat((log_fk_main, log_fk_shuf), 3)  # y, x, b, 1+n
             log_fk = log_fk.permute(2, 3, 0, 1)  # b, 1+n, y, x
 
-            # #append results to list
-            log_f_list.append(log_fk)
-        return log_f_list
+            softmax_fk = torch.softmax(log_fk, dim=1)
+            log_softmax_fk = torch.log(softmax_fk + 1e-11)
+
+            # Positive samples are at index 0
+            true_fk = torch.zeros(
+                (log_fk.shape[0], log_fk.shape[-2], log_fk.shape[-1]),
+                dtype=torch.long,
+                device=device,
+                requires_grad=False,
+            )
+
+            total_loss = torch.add(total_loss, F.nll_loss(
+                log_softmax_fk, true_fk, reduction="mean"
+            ))
+
+        total_loss = torch.div(total_loss, self.k_predictions)
+        return total_loss
 
 
 class SparseBilinearInfo(BilinearInfo):

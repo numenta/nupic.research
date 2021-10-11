@@ -36,7 +36,8 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_cross_entropy_supervised,
     multiple_cross_entropy,
     all_module_multiple_log_softmax,
-    all_module_multiple_log_softmax_multi_gpu,
+    all_module_multiple_log_softmax_2,
+    all_module_losses
 )
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     full_resnet,
@@ -267,7 +268,7 @@ FULL_RESNET_50.update(dict(
         model_args=block_wise_full_resnet_50_args,
         optimizer_class=torch.optim.Adam,
         optimizer_args=dict(lr=2e-4),
-        loss_function=all_module_multiple_log_softmax,
+        loss_function=all_module_losses,
         find_unused_parameters=True,
         device_ids=list(range(NUM_GPUS)),
         pin_memory=False,

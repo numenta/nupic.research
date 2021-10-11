@@ -57,8 +57,8 @@ class BlockModel(nn.Module):
                 out = F.adaptive_avg_pool2d(x, 1)
                 out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
                 out = out.permute(0, 3, 1, 2).contiguous()
-                log_f_list = module.estimate_info(out, out)
-                log_f_module_list.append(log_f_list)
+                module_loss = module.estimate_info(out, out)
+                log_f_module_list.append(module_loss)
             else:
                 x = module(x)
         return log_f_module_list
