@@ -32,11 +32,7 @@ from ray import tune
 
 from nupic.research.frameworks.vernon.ray_custom_logger import DEFAULT_LOGGERS
 
-from .ray_ax_utils import (
-    AxSearch,
-    ax_client_with_explicit_strategy,
-    get_ray_trials,
-)
+from .ray_ax_utils import AxSearch, ax_client_with_explicit_strategy, get_ray_trials
 
 
 def hyperparameter_loss(config, result):

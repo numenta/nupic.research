@@ -25,10 +25,7 @@ from importlib import import_module
 import numpy as np
 from ray import tune
 
-from nupic.research.frameworks.ax.ray_ax import (
-    get_best_config,
-    get_frontier_trials,
-)
+from nupic.research.frameworks.ax.ray_ax import get_best_config, get_frontier_trials
 from nupic.research.frameworks.backprop_structure.networks import (
     gsc_lenet_backpropstructure,
     gsc_lesparsenet,
