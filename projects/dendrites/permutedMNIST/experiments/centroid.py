@@ -35,7 +35,7 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B
+from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B, EvalPerTask
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 from nupic.torch.modules import KWinners
@@ -53,6 +53,8 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
                                  CentroidExperiment):
     pass
 
+class CentroidExperimentPerClass(EvalPerTask, CentroidExperiment):
+    pass
 
 # Centroid method for inferring contexts: 10 permutedMNIST tasks
 CENTROID_10 = dict(
@@ -138,6 +140,11 @@ CENTROID_2.update(
     seed=6024,
 )
 
+CENTROID_2_PER_TASK = deepcopy(CENTROID_2)
+CENTROID_2_PER_TASK.update(
+    experiment_class=CentroidExperimentPerClass,
+)
+
 # This config saves hidden unit activations per task for later plotting
 FIGURE_1B = deepcopy(CENTROID_10)
 FIGURE_1B.update(
@@ -165,6 +172,7 @@ CENTROID_100.update(
 # Export configurations in this file
 CONFIGS = dict(
     centroid_2=CENTROID_2,
+    centroid_2_per_task=CENTROID_2_PER_TASK,
     centroid_10=CENTROID_10,
     centroid_50=CENTROID_50,
     centroid_100=CENTROID_100,
