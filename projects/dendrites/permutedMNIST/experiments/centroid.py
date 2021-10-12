@@ -53,6 +53,10 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
                                  CentroidExperiment):
     pass
 
+
+# Probably the issue is you overwrote the validation function
+# and that means all the work done by the validation function in 
+# mixins.centroid_context gets undone which is why the assert statement is failing
 class CentroidExperimentPerClass(EvalPerTask, CentroidExperiment):
     pass
 
