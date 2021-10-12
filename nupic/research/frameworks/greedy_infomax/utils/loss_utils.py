@@ -115,10 +115,9 @@ def all_module_multiple_log_softmax_2(log_f_module_list, targets, reduction="mea
     return module_losses
 
 def all_module_losses(module_losses, targets, reduction="mean"):
-    device = module_losses[0].device
-    return torch.tensor([torch.mean(l, 0) for l in module_losses],
-                        device=device,
-                        requires_grad=True)
+    module_losses = torch.stack(module_losses, 1).view(-1, len(module_losses)) #g, n
+    module_losses = torch.mean(module_losses, 0) #n
+    return module_losses
 
 
 """

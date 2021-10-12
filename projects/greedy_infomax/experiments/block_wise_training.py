@@ -179,7 +179,7 @@ SMALL_SPARSE_BLOCK_LR_GRID_SEARCH.update(
     ),
 )
 
-FULL_NUM_EPOCHS = 300
+FULL_NUM_EPOCHS = 100
 FULL_BLOCK = deepcopy(SMALL_BLOCK)
 FULL_BLOCK.update(dict(
     wandb_args=dict(
@@ -238,7 +238,6 @@ class CustomBlockModelExperiment(BlockModelExperiment):
 
         #not nested dataparallel
         self.encoder_classifier = DataParallel(self.encoder_classifier)
-        self.classifier = DataParallel(self.classifier)
         self.encoder = DataParallel(self.encoder)
 
 FULL_RESNET_50 = deepcopy(FULL_BLOCK)
@@ -247,7 +246,7 @@ FULL_RESNET_50.update(dict(
         experiment_class=CustomBlockModelExperiment,
         wandb_args=dict(
             project="greedy_infomax_full_block_experiment",
-            name=f"resnet50_dataparallel_updated"
+            name=f"resnet50_dataparallel_updated_2"
         ),
         epochs=FULL_NUM_EPOCHS,
         epochs_to_validate=range(10, FULL_NUM_EPOCHS + 1, FULL_NUM_EPOCHS//10),
@@ -261,6 +260,11 @@ FULL_RESNET_50.update(dict(
         # batch_size_supervised=2,
         # val_batch_size=2,
 
+        #Drop last to avoid weird batches
+        unsupervised_loader_drop_last=True,
+        supervised_loader_drop_last=True,
+        validation_loader_drop_last=True,
+
         batch_size=16 * NUM_GPUS, #multiply by num_gpu's
         batch_size_supervised=16 * NUM_GPUS,
         val_batch_size=16 * NUM_GPUS,
@@ -273,6 +277,7 @@ FULL_RESNET_50.update(dict(
         device_ids=list(range(NUM_GPUS)),
         pin_memory=False,
         lr_scheduler_class=None,
+        cuda_launch_blocking=False,
         classifier_config=dict(
             model_class=MultiClassifier,
             model_args=dict(num_classes=10),

@@ -36,7 +36,7 @@ from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
 from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.vernon import SelfSupervisedExperiment
 from nupic.research.frameworks.vernon.network_utils import create_model
-
+import os
 
 class BlockModelExperiment(
     mixins.LogEveryLoss,
@@ -45,6 +45,8 @@ class BlockModelExperiment(
     SelfSupervisedExperiment,
 ):
     def setup_experiment(self, config):
+        if config.get("cuda_launch_blocking", False):
+            os.environ["CUDA_LAUNCH_BLOCKING"] = "1" #cuda
         emit_encoding_channels = [
             x["model_args"]["channels"]
             for x in config["model_args"]["module_args"]

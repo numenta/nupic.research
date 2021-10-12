@@ -60,7 +60,7 @@ class BilinearInfo(nn.Identity):
         """
         # For each k in k_predictions, store a set of log_fk and true_f values
         device = z.device
-        total_loss = torch.zeros(1, device=device, requires_grad=True)
+        total_loss = torch.tensor(0.0, requires_grad=True)
         for k in range(1, self.k_predictions + 1):
             # Compute log f(c_t, x_{t+k}) = z^T_{t+k} W_k c_t
 
@@ -121,11 +121,12 @@ class BilinearInfo(nn.Identity):
                 requires_grad=False,
             )
 
-            total_loss = torch.add(total_loss, F.nll_loss(
+            k_step_loss = torch.div(F.nll_loss(
                 log_softmax_fk, true_fk, reduction="mean"
-            ))
+            ), self.k_predictions)
 
-        total_loss = torch.div(total_loss, self.k_predictions)
+            total_loss = torch.add(total_loss, k_step_loss)
+
         return total_loss
 
 
