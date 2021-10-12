@@ -21,14 +21,15 @@
 
 from copy import deepcopy
 
-import numpy as np
 import torch
 import torch.nn as nn
-from torchvision.datasets import STL10
-from nupic.research.frameworks.greedy_infomax.utils.data_utils import get_transforms
-from nupic.research.frameworks.vernon.distributed import experiments, mixins
 import torch.nn.functional as F
+from torchvision.datasets import STL10
+
+from nupic.research.frameworks.greedy_infomax.utils.data_utils import get_transforms
 from nupic.research.frameworks.pytorch.models.resnets import resnet50
+from nupic.research.frameworks.vernon.distributed import experiments
+
 # labeled train set: mean [0.4469, 0.4400, 0.4069], std [0.2603, 0.2566, 0.2713]
 aug = {"randcrop": 64, "flip": True, "bw_mean": [0.4120], "bw_std": [0.2570]}
 transform_unsupervised = get_transforms(val=False, aug=aug)
@@ -55,6 +56,7 @@ BATCH_SIZE = 32
 NUM_CLASSES = 10
 NUM_EPOCHS = 100
 
+
 class STL10SupervisedExperiment(
     experiments.SupervisedExperiment
 ):
@@ -70,6 +72,7 @@ class STL10SupervisedExperiment(
         else:
             dataset_args.update(split="test")
         return dataset_class(**dataset_args)
+
 
 class SimpleMLP(nn.Sequential):
     def __init__(self, in_features, out_features, bias=True):
@@ -117,14 +120,14 @@ STL10_SUPERVISED = dict(
     ),
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
     lr_scheduler_args=dict(
-            max_lr=1e-3,  # change based on sparsity/dimensionality
-            div_factor=5,  # initial_lr = 0.01
-            final_div_factor=1000,  # min_lr = 0.0000025
-            pct_start=1.0 / 10.0,
-            epochs=NUM_EPOCHS,
-            anneal_strategy="linear",
-            max_momentum=1e-4,
-            cycle_momentum=False,
+        max_lr=1e-3,  # change based on sparsity/dimensionality
+        div_factor=5,  # initial_lr = 0.01
+        final_div_factor=1000,  # min_lr = 0.0000025
+        pct_start=1.0 / 10.0,
+        epochs=NUM_EPOCHS,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
     ),
     loss_function=F.cross_entropy,  # each GIM layer has a cross-entropy
     # Optimizer class. Must inherit from "torch.optim.Optimizer"

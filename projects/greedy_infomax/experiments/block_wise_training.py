@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import time
 from copy import deepcopy
 
 import ray.tune as tune
@@ -37,8 +36,6 @@ from nupic.research.frameworks.greedy_infomax.models.classification_model import
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     all_module_losses,
     all_module_multiple_log_softmax,
-    all_module_multiple_log_softmax_2,
-    multiple_cross_entropy,
     multiple_cross_entropy_supervised,
 )
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
@@ -48,7 +45,6 @@ from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     small_resnet,
     small_sparse_resnet,
 )
-from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
 from projects.greedy_infomax.experiments.default_base import (
     CONFIGS as DEFAULT_BASE_CONFIGS,
 )
@@ -90,7 +86,7 @@ SMALL_BLOCK.update(
         optimizer_args=dict(lr=2e-4),
         loss_function=all_module_multiple_log_softmax,
         find_unused_parameters=True,
-        lr_scheduler_class=None, #torch.optim.lr_scheduler.OneCycleLR,
+        lr_scheduler_class=None,  # torch.optim.lr_scheduler.OneCycleLR,
         lr_scheduler_args=dict(
             max_lr=0.12,  # change based on sparsity/dimensionality
             div_factor=4,  # initial_lr = 0.06
