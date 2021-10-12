@@ -28,10 +28,12 @@ import sys
 import time
 
 import torch
-import torch.nn.functional as F
 from tqdm import tqdm
 
-from .loss_utils import all_module_multiple_log_softmax, multiple_cross_entropy_supervised
+from .loss_utils import (
+    all_module_multiple_log_softmax,
+    multiple_cross_entropy_supervised,
+)
 
 
 def train_block_model(

@@ -51,10 +51,13 @@ def multiple_cross_entropy(log_f_module_list, targets, reduction="mean"):
             )
     return total_loss
 
+
 """
 Used when training BlockModels using GIM. Returns a tensor of losses, each entry
 representing the cross entropy loss of a specific BilinearInfo module.
 """
+
+
 def all_module_multiple_log_softmax(log_f_module_list, targets, reduction="mean"):
     device = log_f_module_list[0][0].device
     module_losses = torch.empty(0, requires_grad=True, device=device)
@@ -80,9 +83,12 @@ def all_module_multiple_log_softmax(log_f_module_list, targets, reduction="mean"
         module_losses = torch.cat([module_losses, module_loss.view(1)])
     return module_losses
 
+
 def all_module_multiple_log_softmax_2(log_f_module_list, targets, reduction="mean"):
     device = log_f_module_list[0][0].device
-    module_losses = torch.zeros(len(log_f_module_list), requires_grad=True, device=device)
+    module_losses = torch.zeros(len(log_f_module_list),
+                                requires_grad=True,
+                                device=device)
     for i, log_f_list in enumerate(log_f_module_list):
         k_step_losses = torch.zeros(len(log_f_list), requires_grad=True, device=device)
         # print(f"k_step_losses.shape: {k_step_losses.shape}")
@@ -114,9 +120,10 @@ def all_module_multiple_log_softmax_2(log_f_module_list, targets, reduction="mea
                                         k_step_losses.view(1))
     return module_losses
 
+
 def all_module_losses(module_losses, targets, reduction="mean"):
-    module_losses = torch.stack(module_losses, 1).view(-1, len(module_losses)) #g, n
-    module_losses = torch.mean(module_losses, 0) #n
+    module_losses = torch.stack(module_losses, 1).view(-1, len(module_losses))  # g, n
+    module_losses = torch.mean(module_losses, 0)  # n
     return module_losses
 
 
@@ -125,6 +132,8 @@ Used for supervised training of a BlockModel with GIM. This outputs a tensor of 
 each of which is the cross entropy classification loss according to a specific
 EmitEncoding module paired with a classification head.
 """
+
+
 def multiple_cross_entropy_supervised(outputs, targets, reduction="sum"):
     device = outputs[0].device
     module_losses = torch.empty(0, requires_grad=True, device=device)

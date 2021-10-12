@@ -58,6 +58,7 @@ class Classifier(nn.Module):
         x = self.model(x).squeeze()
         return x.view(batch_size, -1)
 
+
 class FlattenClassifier(nn.Module):
     """
     A simple multilayer perceptron classification head which outputs a distribution
@@ -79,7 +80,9 @@ class FlattenClassifier(nn.Module):
             "flatten", nn.Flatten(),
         )
         self.model.add_module(
-            "layer1", nn.Linear(self.in_channels * self.num_patches, num_classes, bias=True)
+            "layer1", nn.Linear(self.in_channels * self.num_patches,
+                                num_classes,
+                                bias=True)
         )
 
     def forward(self, x):

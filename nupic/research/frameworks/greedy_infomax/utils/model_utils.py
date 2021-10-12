@@ -42,7 +42,6 @@ from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
 from nupic.torch.modules import SparseWeights2d
 
 
-
 def _make_layer_config(
         block,
         num_blocks,
@@ -79,6 +78,7 @@ def _make_layer_config(
         )
         in_planes = planes * block.expansion
     return layer_config
+
 
 def full_sparse_model_blockwise_config(
     negative_samples=16,
@@ -164,7 +164,10 @@ def full_sparse_model_blockwise_config(
         first_stride = 1 if idx == 0 else 2
         encoder_sparsity = sparsity[f"encoder{idx + 1}"]
         encoder_percent_on = percent_on[f"encoder{idx + 1}"]
-        in_planes = previous_input_dim if idx==0 else previous_input_dim * block.expansion
+        if idx == 0:
+            in_planes = previous_input_dim
+        else:
+            in_planes = previous_input_dim * block.expansion
         modules.extend(_make_layer_config(
             block,
             num_blocks,
@@ -219,11 +222,8 @@ def full_sparse_model_blockwise_config(
     return modules
 
 
-
-
-#predefined configs
+# predefined configs
 full_resnet_50 = full_sparse_model_blockwise_config(resnet_50=True)
-
 full_resnet = full_sparse_model_blockwise_config(resnet_50=False)
 small_resnet = full_sparse_model_blockwise_config()[:8]
 full_sparse_resnet_34 = full_sparse_model_blockwise_config(

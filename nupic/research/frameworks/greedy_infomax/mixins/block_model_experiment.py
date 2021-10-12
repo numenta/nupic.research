@@ -20,23 +20,20 @@
 # ----------------------------------------------------------------------
 import copy
 import itertools
+import os
 
 import torch
 
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.utility_layers import EmitEncoding
-from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
-    multiple_cross_entropy,
-)
 from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
     aggregate_eval_results_block,
     evaluate_block_model,
     train_block_model,
 )
-from nupic.research.frameworks.vernon import mixins
-from nupic.research.frameworks.vernon import SelfSupervisedExperiment
+from nupic.research.frameworks.vernon import SelfSupervisedExperiment, mixins
 from nupic.research.frameworks.vernon.network_utils import create_model
-import os
+
 
 class BlockModelExperiment(
     mixins.LogEveryLoss,
@@ -46,7 +43,7 @@ class BlockModelExperiment(
 ):
     def setup_experiment(self, config):
         if config.get("cuda_launch_blocking", False):
-            os.environ["CUDA_LAUNCH_BLOCKING"] = "1" #cuda
+            os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
         emit_encoding_channels = [
             x["model_args"]["channels"]
             for x in config["model_args"]["module_args"]
@@ -59,7 +56,6 @@ class BlockModelExperiment(
         self.evaluate_model = evaluate_block_model
         self.train_model = self.train_model_supervised = train_block_model
         self.multiple_module_loss_history = []
-
 
 
     @classmethod
