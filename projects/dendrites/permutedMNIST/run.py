@@ -55,9 +55,6 @@ if __name__ == "__main__":
         parser.print_help()
         exit(1)
 
-    # import pdb
-    # pdb.set_trace()
-
     for experiment in args.name:
 
         # Get configuration values

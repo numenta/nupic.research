@@ -35,9 +35,6 @@ class EvalPerTask:
     Mixin for getting metrics, namely accuracy, for each task independently
     """
 
-    def setup_experiment(self, config):
-        super().setup_experiment(config)
-
     def validate(self, loader=None):
         """
         Run validation on the currently active tasks, and gather accuracy measures
@@ -49,18 +46,11 @@ class EvalPerTask:
             loader = self.val_loader
 
         results = {}
-        print(f"self.current_task")
         for task in range(self.current_task + 1):
             self.val_loader.sampler.set_active_tasks(task)
 
-            print(f"about to evaluate on task {task}")
             # Store results for each individual task in results[task]
-            task_results = evaluate_dendrite_model(
-                model=self.model, loader=loader, device=self.device,
-                criterion=self.error_loss, infer_context_fn=self.infer_context_fn,
-                share_labels=True, num_labels=10
-            )
-            print(f"done evaluating on task {task}")
+            task_results = super().validate(loader)
             results[task] = task_results
 
         # Loop over results per task to get averages
@@ -90,7 +80,7 @@ class EvalPerTask:
                     new_results[sub_key] = results[key][sub_key]
             else:
                 for sub_key in results[key]:
-                    new_sub_key = "_".join(sub_key, str(key))
+                    new_sub_key = "_".join([sub_key, str(key)])
                     new_results[new_sub_key] = results[key][sub_key]
 
         return new_results

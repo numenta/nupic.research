@@ -40,36 +40,33 @@ from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedM
 from nupic.research.frameworks.vernon import mixins
 
 from .base import DEFAULT_BASE
-from .centroid import CENTROID_10
+from .centroid import CENTROID_10, CentroidExperimentPerTask
 
-BASE_GATING_BIAS = deepcopy(DEFAULT_BASE)
-BASE_GATING_BIAS.update(
-    epochs=1
+CENTROID_10_PER_TASK = deepcopy(CENTROID_10)
+CENTROID_10_PER_TASK.update(
+    experiment_class=CentroidExperimentPerTask
 )
 
-BASE_GATING_BIAS["model_args"].update(
-    dendritic_layer_class=BiasingDendriticLayer,
-)
-
-CENTROID_10_DENDRITE_BIAS = deepcopy(CENTROID_10)
+CENTROID_10_DENDRITE_BIAS = deepcopy(CENTROID_10_PER_TASK)
 CENTROID_10_DENDRITE_BIAS["model_args"].update(
     dendritic_layer_class=BiasingDendriticLayer
 )
 
-CENTROID_10_DENDRITE_GATE = deepcopy(CENTROID_10)
+CENTROID_10_DENDRITE_GATE = deepcopy(CENTROID_10_PER_TASK)
 CENTROID_10_DENDRITE_GATE["model_args"].update(
     dendritic_layer_class=GatingDendriticLayer
 )
 
-CENTROID_10_DENDRITE_ABSMAXGATE = deepcopy(CENTROID_10)
+CENTROID_10_DENDRITE_ABSMAXGATE = deepcopy(CENTROID_10_PER_TASK)
 CENTROID_10_DENDRITE_ABSMAXGATE["model_args"].update(
     dendritic_layer_class=AbsoluteMaxGatingDendriticLayer
 )
 
 CONFIGS=dict(
-    base_gating_bias=BASE_GATING_BIAS,
+    centroid_10_per_task=CENTROID_10_PER_TASK,
     centroid_10_dendrite_bias=CENTROID_10_DENDRITE_BIAS,
     centroid_10_dendrite_absmaxgate=CENTROID_10_DENDRITE_ABSMAXGATE,
     centroid_10_dendrite_gate=CENTROID_10_DENDRITE_GATE,
     # TODO: multiplicative but not gating
 )
+# comment to verify syncing is working

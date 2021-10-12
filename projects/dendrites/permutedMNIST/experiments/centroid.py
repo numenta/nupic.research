@@ -54,10 +54,7 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
     pass
 
 
-# Probably the issue is you overwrote the validation function
-# and that means all the work done by the validation function in 
-# mixins.centroid_context gets undone which is why the assert statement is failing
-class CentroidExperimentPerClass(EvalPerTask, CentroidExperiment):
+class CentroidExperimentPerTask(EvalPerTask, CentroidExperiment):
     pass
 
 # Centroid method for inferring contexts: 10 permutedMNIST tasks
@@ -146,7 +143,7 @@ CENTROID_2.update(
 
 CENTROID_2_PER_TASK = deepcopy(CENTROID_2)
 CENTROID_2_PER_TASK.update(
-    experiment_class=CentroidExperimentPerClass,
+    experiment_class=CentroidExperimentPerTask,
 )
 
 # This config saves hidden unit activations per task for later plotting
