@@ -19,20 +19,19 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 import copy
-import sys
 import unittest
-from os.path import expanduser
 
 import torch
 from transformers import CONFIG_MAPPING, AutoModelForMaskedLM
 
+# FIXME: Importing module relative to the project
+import projects.transformers.models  # noqa: F401
 from nupic.research.frameworks.dynamic_sparse import global_prune_by_abs_weight
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 from nupic.torch.modules.sparse_weights import SparseWeightsBase, rezero_weights
-
-sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers"))  # noqa
-import models  # noqa :F401
-from trainer_mixins.deepspeed import replace_sparse_transformer_layer  # noqa
+from projects.transformers.trainer_mixins.deepspeed import (
+    replace_sparse_transformer_layer  # noqa,,,,
+)
 
 
 def _compute_sparsity(model):
@@ -44,6 +43,7 @@ def _compute_sparsity(model):
     return float(1.0 - (total_nonzero / total_params))
 
 
+@unittest.skipUnless(torch.cuda.is_available(), "This test must run on the GPU")
 class SparseBertModelTest(unittest.TestCase):
     def setUp(self):
         set_random_seed(42)

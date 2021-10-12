@@ -18,15 +18,14 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
-import sys
 import unittest
-from os.path import expanduser
 
 import numpy as np
 import torch
 from transformers import CONFIG_MAPPING, AdamW, AutoModelForMaskedLM
 
+# FIXME: Importing module relative to the project
+import projects.transformers.models  # noqa: F401
 from nupic.research.frameworks.dynamic_sparse import (
     global_add_by_abs_grad,
     global_prune_by_abs_weight,
@@ -36,9 +35,6 @@ from nupic.research.frameworks.pytorch.model_utils import (
     filter_modules,
 )
 from nupic.torch.modules.sparse_weights import SparseWeightsBase, rezero_weights
-
-sys.path.insert(0, expanduser("~/nta/nupic.research/projects/transformers"))
-import models  # noqa F401
 
 
 def simple_sparse_transformer():

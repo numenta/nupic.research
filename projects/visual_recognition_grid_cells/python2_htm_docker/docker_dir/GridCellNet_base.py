@@ -199,14 +199,14 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
         return class_targets
 
     def inferObjectWithRandomMovements(self,  # noqa: C901, N802
-                                         objectDescription,  # noqa: N803
-                                         objectImage,  # noqa: N803
-                                         all_class_targets,
-                                         cellsPerColumn,  # noqa: N803
-                                         trial_iter,
-                                         fixed_touch_sequence=None,
-                                         numSensations=None,
-                                         randomLocation=False):
+                                       objectDescription,  # noqa: N803
+                                       objectImage,  # noqa: N803
+                                       all_class_targets,
+                                       cellsPerColumn,  # noqa: N803
+                                       trial_iter,
+                                       fixed_touch_sequence=None,
+                                       numSensations=None,
+                                       randomLocation=False):
         """
         Attempt to recognize the specified object with the network. Moves
         the sensor over the object until the object is recognized.

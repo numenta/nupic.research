@@ -516,6 +516,10 @@ def plot_hp_regs(X, y, hp_regs, task_name=None, **subplot_kwargs):  # noqa: capi
     return fig, ax
 
 
+# TODO
+# Put new functions from notebooks here
+
+
 def reg_and_plot(df, metric, column_names=None, task_name=None, **kwargs):
 
     hp_regs, X, y = lin_regress_1d_metric_onto_hps(df, metric, column_names)  # noqa: capital X is a matrix

@@ -37,6 +37,9 @@ from nupic.research.frameworks.pytorch.model_utils import (
 )
 from nupic.torch.modules import SparseWeights
 
+# Import new class to override embedding related functions. # noqa
+# This class was implicitly defined through register_bert_model # noqa
+from . import FullyStaticSparseBertForMaskedLM  # noqa
 from .register_bert_model import register_bert_model
 from .sparse_embedding import SparseEmbeddings
 
@@ -217,10 +220,6 @@ class FullyStaticSparseBertModel(BertModel):
             layer_sparsity = get_sparsity(f"bert.embeddings.{embedding_name}")
             sparse_module = SparseEmbeddings(dense_module, sparsity=layer_sparsity)
             setattr(self.embeddings, embedding_name, sparse_module.to(device))
-
-# Import new class to override embedding related functions. # noqa
-# This class was implicitly defined through register_bert_model # noqa
-from . import FullyStaticSparseBertForMaskedLM  # noqa
 
 
 def _get_resized_sparse_embeddings(self, old_embeddings, new_num_tokens=None):
