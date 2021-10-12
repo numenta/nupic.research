@@ -49,11 +49,18 @@ class EvalPerTask:
             loader = self.val_loader
 
         results = {}
-        for task in range(len(self.current_task)):
+        print(f"self.current_task")
+        for task in range(self.current_task + 1):
             self.val_loader.sampler.set_active_tasks(task)
 
+            print(f"about to evaluate on task {task}")
             # Store results for each individual task in results[task]
-            task_results = evaluate_dendrite_model("stuff")
+            task_results = evaluate_dendrite_model(
+                model=self.model, loader=loader, device=self.device,
+                criterion=self.error_loss, infer_context_fn=self.infer_context_fn,
+                share_labels=True, num_labels=10
+            )
+            print(f"done evaluating on task {task}")
             results[task] = task_results
 
         # Loop over results per task to get averages
@@ -62,6 +69,8 @@ class EvalPerTask:
 
         # Flatten dictionary and add task id to key name (e.g. mean_accuracy_4)
         results = self.format_results(results)
+
+        self.val_loader.sampler.set_active_tasks(self.current_task)
 
         return results
 

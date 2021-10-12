@@ -46,14 +46,17 @@ if __name__ == "__main__":
     # set nargs = "+" and turn into a for loop
     parser.add_argument("-e", "--experiment", dest="name", nargs="+", default="default_base",
                         help="Experiment to run", choices=list(CONFIGS.keys()))
-    parser.add_argument("-r", "--run_with_ray_tune", dest="run_with_ray_tune",
-                        type=bool, default=True,
+    parser.add_argument("--run_without_ray_tune", dest="run_without_ray_tune",
+                        type=bool, default=False,
                         help="run by calling vernon.run_with_ray_tune or vernon.run")
 
     args = parser.parse_args()
     if args.name is None:
         parser.print_help()
         exit(1)
+
+    # import pdb
+    # pdb.set_trace()
 
     for experiment in args.name:
 
@@ -68,7 +71,7 @@ if __name__ == "__main__":
 
         if config is None:
             continue
-        if args.run_with_ray_tune:
-            run_with_ray_tune(config)
-        else:
+        if args.run_without_ray_tune:
             run(config)
+        else:
+            run_with_ray_tune(config)
