@@ -23,7 +23,6 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
 import ptitprince as pt
 
 sns.set(style="ticks", font_scale=1.3)
