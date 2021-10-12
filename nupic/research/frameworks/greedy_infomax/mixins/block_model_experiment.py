@@ -57,7 +57,6 @@ class BlockModelExperiment(
         self.train_model = self.train_model_supervised = train_block_model
         self.multiple_module_loss_history = []
 
-
     @classmethod
     def create_model(cls, config, device):
         if config["model_class"] != BlockModel:

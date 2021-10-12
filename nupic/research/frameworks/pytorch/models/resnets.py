@@ -333,7 +333,7 @@ class ResNet(nn.Module):
 
         features = [
             # stem
-            ("stem", conv_layer(1, 64, kernel_size=7, stride=2,
+            ("stem", conv_layer(3, 64, kernel_size=7, stride=2,
                                 padding=3, bias=False, **conv_args["stem"])),
             ("bn_stem", norm_layer(64, **norm_args["stem"])),
             ("act_stem", act_layer(64, **act_args["stem"])),

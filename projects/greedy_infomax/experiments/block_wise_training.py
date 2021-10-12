@@ -19,36 +19,39 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import time
 from copy import deepcopy
 
 import ray.tune as tune
 import torch
-import time
+from torch.nn.parallel import DataParallel
+
 from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import (
     BlockModelExperiment,
 )
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.classification_model import (
     MultiClassifier,
-    MultiFlattenClassifier
+    MultiFlattenClassifier,
 )
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
-    multiple_cross_entropy_supervised,
-    multiple_cross_entropy,
+    all_module_losses,
     all_module_multiple_log_softmax,
     all_module_multiple_log_softmax_2,
-    all_module_losses
+    multiple_cross_entropy,
+    multiple_cross_entropy_supervised,
 )
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     full_resnet,
+    full_resnet_50,
     full_sparse_resnet_34,
     small_resnet,
     small_sparse_resnet,
-    full_resnet_50,
 )
-from torch.nn.parallel import DataParallel
-from projects.greedy_infomax.experiments.default_base import CONFIGS as DEFAULT_BASE_CONFIGS
 from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
+from projects.greedy_infomax.experiments.default_base import (
+    CONFIGS as DEFAULT_BASE_CONFIGS,
+)
 
 DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
 
@@ -112,18 +115,18 @@ SMALL_BLOCK.update(
 
 SMALL_BLOCK_FLATTEN = deepcopy(SMALL_BLOCK)
 SMALL_BLOCK_FLATTEN.update(dict(
-        wandb_args=dict(
-            project="greedy_infomax-small_block_model", name=f"flatten_classifier"
-        ),
-        classifier_config=dict(
-            model_class=MultiFlattenClassifier,
-            model_args=dict(num_classes=10, num_patches=49),
-            loss_function=multiple_cross_entropy_supervised,
-            # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
-            optimizer_class=torch.optim.Adam,
-            # Optimizer class class arguments passed to the constructor
-            optimizer_args=dict(lr=2e-4),
-        ),
+    wandb_args=dict(
+        project="greedy_infomax-small_block_model", name=f"flatten_classifier"
+    ),
+    classifier_config=dict(
+        model_class=MultiFlattenClassifier,
+        model_args=dict(num_classes=10, num_patches=49),
+        loss_function=multiple_cross_entropy_supervised,
+        # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
+        optimizer_class=torch.optim.Adam,
+        # Optimizer class class arguments passed to the constructor
+        optimizer_args=dict(lr=2e-4),
+    ),
 ))
 
 SMALL_BLOCK_LR_GRID_SEARCH = deepcopy(SMALL_BLOCK)
@@ -231,63 +234,58 @@ class CustomBlockModelExperiment(BlockModelExperiment):
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = False
 
-        #nested dataparallel
-        # self.encoder = DataParallel(self.encoder)
-        # self.classifier = DataParallel(self.classifier)
-        # self.encoder_classifier = EncoderClassifier(self.encoder, self.classifier)
-
-        #not nested dataparallel
         self.encoder_classifier = DataParallel(self.encoder_classifier)
         self.encoder = DataParallel(self.encoder)
+
 
 FULL_RESNET_50 = deepcopy(FULL_BLOCK)
 NUM_GPUS = 8
 FULL_RESNET_50.update(dict(
-        experiment_class=CustomBlockModelExperiment,
-        wandb_args=dict(
-            project="greedy_infomax_full_block_experiment",
-            name=f"resnet50_dataparallel_updated_2"
-        ),
-        epochs=FULL_NUM_EPOCHS,
-        epochs_to_validate=range(10, FULL_NUM_EPOCHS + 1, FULL_NUM_EPOCHS//10),
-        distributed=False, #DON'T CHANGE THIS
-        supervised_training_epochs_per_validation=50,
-        #uncomment this section for small batches / debugging purposes
-        # batches_in_epoch=2,
-        # batches_in_epoch_val=2,
-        # batches_in_epoch_supervised=2,
-        # batch_size = 2,
-        # batch_size_supervised=2,
-        # val_batch_size=2,
+    experiment_class=CustomBlockModelExperiment,
+    wandb_args=dict(
+        project="greedy_infomax_full_block_experiment",
+        name=f"resnet50_dataparallel_updated_2"
+    ),
+    epochs=FULL_NUM_EPOCHS,
+    epochs_to_validate=range(10, FULL_NUM_EPOCHS + 1, FULL_NUM_EPOCHS // 10),
+    distributed=False,
+    supervised_training_epochs_per_validation=50,
+    # Uncomment this section for small batches / debugging purposes
+    # batches_in_epoch=2,
+    # batches_in_epoch_val=2,
+    # batches_in_epoch_supervised=2,
+    # batch_size = 2,
+    # batch_size_supervised=2,
+    # val_batch_size=2,
 
-        #Drop last to avoid weird batches
-        unsupervised_loader_drop_last=True,
-        supervised_loader_drop_last=True,
-        validation_loader_drop_last=True,
+    # Drop last to avoid weird batches
+    unsupervised_loader_drop_last=True,
+    supervised_loader_drop_last=True,
+    validation_loader_drop_last=True,
 
-        batch_size=16 * NUM_GPUS, #multiply by num_gpu's
-        batch_size_supervised=16 * NUM_GPUS,
-        val_batch_size=16 * NUM_GPUS,
-        model_class=BlockModel,
-        model_args=block_wise_full_resnet_50_args,
+    batch_size=16 * NUM_GPUS,  # Multiply by num_gpus
+    batch_size_supervised=16 * NUM_GPUS,
+    val_batch_size=16 * NUM_GPUS,
+    model_class=BlockModel,
+    model_args=block_wise_full_resnet_50_args,
+    optimizer_class=torch.optim.Adam,
+    optimizer_args=dict(lr=2e-4),
+    loss_function=all_module_losses,
+    find_unused_parameters=True,
+    device_ids=list(range(NUM_GPUS)),
+    pin_memory=False,
+    lr_scheduler_class=None,
+    cuda_launch_blocking=False,
+    classifier_config=dict(
+        model_class=MultiClassifier,
+        model_args=dict(num_classes=10),
+        loss_function=multiple_cross_entropy_supervised,
+        # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
         optimizer_class=torch.optim.Adam,
+        # Optimizer class class arguments passed to the constructor
         optimizer_args=dict(lr=2e-4),
-        loss_function=all_module_losses,
-        find_unused_parameters=True,
-        device_ids=list(range(NUM_GPUS)),
-        pin_memory=False,
-        lr_scheduler_class=None,
-        cuda_launch_blocking=False,
-        classifier_config=dict(
-            model_class=MultiClassifier,
-            model_args=dict(num_classes=10),
-            loss_function=multiple_cross_entropy_supervised,
-            # Classifier Optimizer class. Must inherit from "torch.optim.Optimizer"
-            optimizer_class=torch.optim.Adam,
-            # Optimizer class class arguments passed to the constructor
-            optimizer_args=dict(lr=2e-4),
-            distributed=False,
-        ),
+        distributed=False,
+    ),
 ))
 
 CONFIGS = dict(
