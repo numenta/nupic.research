@@ -20,15 +20,13 @@
 import unittest
 
 import numpy as np
-import pytest
+import tensorflow.compat.v1 as tf
 import torch
-tf = pytest.importorskip("tensorflow.compat.v1")  # noqa
-from tensorflow.python.keras import keras_parameterized  # noqa
-from tensorflow.python.platform import test  # noqa
+from tensorflow.python.keras import keras_parameterized
+from tensorflow.python.platform import test
 
-from nupic.research.frameworks.tensorflow.utils import load_gsc_weights_from_pytorch  # noqa
-from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN  # noqa
-# noqa
+from nupic.research.frameworks.tensorflow.utils import load_gsc_weights_from_pytorch
+from nupic.tensorflow.models import GSCSparseCNN, GSCSuperSparseCNN
 
 
 @unittest.skip("FIXME: RES-982")
