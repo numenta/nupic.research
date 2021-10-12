@@ -35,7 +35,7 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B
+from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B, EvalPerTask
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 from nupic.torch.modules import KWinners
@@ -54,10 +54,14 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
     pass
 
 
+class CentroidExperimentPerTask(EvalPerTask, CentroidExperiment):
+    pass
+
+
 # Centroid method for inferring contexts: 10 permutedMNIST tasks
 CENTROID_10 = dict(
-    experiment_class=CentroidExperiment,
-    num_samples=8,
+    experiment_class=CentroidExperimentPerTask,
+    num_samples=1,
 
     # Results path
     local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
@@ -87,7 +91,7 @@ CENTROID_10 = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=3,
-    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
+    tasks_to_validate=list(range(10)),
     num_tasks=10,
     num_classes=10 * 10,
     distributed=False,
@@ -108,6 +112,7 @@ CENTROID_50.update(
     num_tasks=50,
     num_classes=10 * 50,
     num_samples=1,
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 
     # For wandb
     env_config=dict(
@@ -127,6 +132,9 @@ CENTROID_50.update(
 CENTROID_2 = deepcopy(CENTROID_10)
 CENTROID_2["dataset_args"].update(num_tasks=2)
 CENTROID_2["model_args"].update(num_segments=2)
+CENTROID_2["dataset_args"].update(
+    download=False
+)
 CENTROID_2.update(
     epochs=1,
     num_samples=1,
@@ -141,6 +149,7 @@ FIGURE_1B.update(
     experiment_class=CentroidFigure1BExperiment,
     num_tasks=2,
     num_samples=1,
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 
     plot_hidden_activations_args=dict(
         include_modules=[KWinners],
@@ -157,6 +166,7 @@ CENTROID_100.update(
     num_tasks=100,
     num_classes=10 * 100,
     optimizer_args=dict(lr=1e-4),
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 )
 
 # Export configurations in this file
