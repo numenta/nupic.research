@@ -44,7 +44,8 @@ from .centroid import CENTROID_10, CentroidExperimentPerTask
 
 CENTROID_10_PER_TASK = deepcopy(CENTROID_10)
 CENTROID_10_PER_TASK.update(
-    experiment_class=CentroidExperimentPerTask
+    experiment_class=CentroidExperimentPerTask,
+    tasks_to_validate=list(range(10)),
 )
 
 CENTROID_10_DENDRITE_BIAS = deepcopy(CENTROID_10_PER_TASK)
