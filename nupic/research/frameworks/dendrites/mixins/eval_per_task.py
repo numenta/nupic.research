@@ -18,17 +18,10 @@
 #  http://numenta.org/licenses/
 #
 
-import string
-
-import numpy as np
-import torch
-
-from nupic.research.frameworks.dendrites import (
-    evaluate_dendrite_model)
-
 __all__ = [
     "EvalPerTask",
 ]
+
 
 class EvalPerTask:
     """
@@ -101,7 +94,7 @@ class EvalPerTask:
             total = 0
             for key in keys:
                 total += results[key][metric]
-            
+
             mean = total / len(keys)
             average_metrics[metric] = mean
 
