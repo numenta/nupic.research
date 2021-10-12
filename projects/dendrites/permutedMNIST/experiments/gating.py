@@ -24,22 +24,14 @@ and dendritic inputs. Examples include additive bias, multiplicative, multiplica
 gating, etc.
 """
 
-import os
 from copy import deepcopy
 
-import numpy as np
-import ray.tune as tune
-import torch
-import torch.nn.functional as F
-
-from nupic.research.frameworks.dendrites import DendriticMLP, BiasingDendriticLayer, AbsoluteMaxGatingDendriticLayer, GatingDendriticLayer
-from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
-    DendriteContinualLearningExperiment,
+from nupic.research.frameworks.dendrites import (
+    AbsoluteMaxGatingDendriticLayer,
+    BiasingDendriticLayer,
+    GatingDendriticLayer,
 )
-from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
-from nupic.research.frameworks.vernon import mixins
 
-from .base import DEFAULT_BASE
 from .centroid import CENTROID_10, CentroidExperimentPerTask
 
 CENTROID_10_PER_TASK = deepcopy(CENTROID_10)
@@ -63,7 +55,7 @@ CENTROID_10_DENDRITE_ABSMAXGATE["model_args"].update(
     dendritic_layer_class=AbsoluteMaxGatingDendriticLayer
 )
 
-CONFIGS=dict(
+CONFIGS = dict(
     centroid_10_per_task=CENTROID_10_PER_TASK,
     centroid_10_dendrite_bias=CENTROID_10_DENDRITE_BIAS,
     centroid_10_dendrite_absmaxgate=CENTROID_10_DENDRITE_ABSMAXGATE,

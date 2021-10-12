@@ -44,8 +44,9 @@ if __name__ == "__main__":
 
     # TODO
     # set nargs = "+" and turn into a for loop
-    parser.add_argument("-e", "--experiment", dest="name", nargs="+", default="default_base",
-                        help="Experiment to run", choices=list(CONFIGS.keys()))
+    parser.add_argument("-e", "--experiment", dest="name", nargs="+",
+                        default="default_base", help="Experiment to run",
+                        choices=list(CONFIGS.keys()))
     parser.add_argument("--run_without_ray_tune", dest="run_without_ray_tune",
                         type=bool, default=False,
                         help="run by calling vernon.run_with_ray_tune or vernon.run")

@@ -57,9 +57,10 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
 class CentroidExperimentPerTask(EvalPerTask, CentroidExperiment):
     pass
 
+
 # Centroid method for inferring contexts: 10 permutedMNIST tasks
 CENTROID_10 = dict(
-    experiment_class=CentroidExperiment,
+    experiment_class=CentroidExperimentPerTask,
     num_samples=1,
 
     # Results path
@@ -68,7 +69,7 @@ CENTROID_10 = dict(
     dataset_class=PermutedMNIST,
     dataset_args=dict(
         num_tasks=10,
-        root=os.path.expanduser("~/nta/results/data/"),  # change to /mnt/datasets/ or something
+        root=os.path.expanduser("~/nta/results/data/"),
         download=False,  # Change to True if running for the first time
         seed=42,
     ),
@@ -111,6 +112,7 @@ CENTROID_50.update(
     num_tasks=50,
     num_classes=10 * 50,
     num_samples=1,
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 
     # For wandb
     env_config=dict(
@@ -141,17 +143,13 @@ CENTROID_2.update(
     seed=6024,
 )
 
-CENTROID_2_PER_TASK = deepcopy(CENTROID_2)
-CENTROID_2_PER_TASK.update(
-    experiment_class=CentroidExperimentPerTask,
-)
-
 # This config saves hidden unit activations per task for later plotting
 FIGURE_1B = deepcopy(CENTROID_10)
 FIGURE_1B.update(
     experiment_class=CentroidFigure1BExperiment,
     num_tasks=2,
     num_samples=1,
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 
     plot_hidden_activations_args=dict(
         include_modules=[KWinners],
@@ -168,12 +166,12 @@ CENTROID_100.update(
     num_tasks=100,
     num_classes=10 * 100,
     optimizer_args=dict(lr=1e-4),
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 )
 
 # Export configurations in this file
 CONFIGS = dict(
     centroid_2=CENTROID_2,
-    centroid_2_per_task=CENTROID_2_PER_TASK,
     centroid_10=CENTROID_10,
     centroid_50=CENTROID_50,
     centroid_100=CENTROID_100,
