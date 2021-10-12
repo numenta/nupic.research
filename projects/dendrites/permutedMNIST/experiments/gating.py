@@ -70,4 +70,3 @@ CONFIGS=dict(
     centroid_10_dendrite_gate=CENTROID_10_DENDRITE_GATE,
     # TODO: multiplicative but not gating
 )
-# comment to verify syncing is working
