@@ -49,7 +49,6 @@ from .profile import Profile
 from .profile_autograd import ProfileAutograd
 from .prune_low_magnitude import PruneLowMagnitude
 from .prune_low_snr import PruneLowSNRGlobal, PruneLowSNRLayers
-from .quantization_aware import QuantizationAware
 from .reduce_lr_after_task import ReduceLRAfterTask
 from .regularize_loss import RegularizeLoss
 from .report_max_accuracy import ReportMaxAccuracy
