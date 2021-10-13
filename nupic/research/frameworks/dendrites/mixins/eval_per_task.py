@@ -47,55 +47,55 @@ class EvalPerTask:
             results[task] = task_results
 
         # Loop over results per task to get averages
-        task_average_results = self.average_over_tasks(results)
+        task_average_results = average_over_tasks(results)
         results["task_average"] = task_average_results
 
         # Flatten dictionary and add task id to key name (e.g. mean_accuracy_4)
-        results = self.format_results(results)
+        results = format_results(results)
 
         self.val_loader.sampler.set_active_tasks(self.current_task)
 
         return results
 
-    def format_results(self, results):
-        """
-        Flatten results dictionary and add task id to key name
+def format_results(results):
+    """
+    Flatten results dictionary and add task id to key name
 
-        :param results: Nested dictionary similar to
-                        results[task_i] = {metric_name: metric_value}
+    :param results: Nested dictionary similar to
+                    results[task_i] = {metric_name: metric_value}
 
-        Returns dictionary similar to results[metric_name_i] = metric_value
-        """
-        new_results = {}
-        for key in results.keys():
-            if key == "task_average":
-                for sub_key in results[key]:
-                    new_results[sub_key] = results[key][sub_key]
-            else:
-                for sub_key in results[key]:
-                    new_sub_key = "_".join([sub_key, str(key)])
-                    new_results[new_sub_key] = results[key][sub_key]
+    Returns dictionary similar to results[metric_name_i] = metric_value
+    """
+    new_results = {}
+    for key in results.keys():
+        if key == "task_average":
+            for sub_key in results[key]:
+                new_results[sub_key] = results[key][sub_key]
+        else:
+            for sub_key in results[key]:
+                new_sub_key = "_".join([sub_key, str(key)])
+                new_results[new_sub_key] = results[key][sub_key]
 
-        return new_results
+    return new_results
 
-    def average_over_tasks(self, results):
-        """
-        Sum metrics for each task and divide by n_tasks to get average results.
-        Assumes number of samples per task is the same for all, as is the case for
-        permutedMNIST.
-        """
-        # Get all metrics
-        keys = list(results.keys())
-        metrics = list(results[keys[0]].keys())
+def average_over_tasks(results):
+    """
+    Sum metrics for each task and divide by n_tasks to get average results.
+    Assumes number of samples per task is the same for all, as is the case for
+    permutedMNIST.
+    """
+    # Get all metrics
+    keys = list(results.keys())
+    metrics = list(results[keys[0]].keys())
 
-        # loop over tasks and average
-        average_metrics = {}
-        for metric in metrics:
-            total = 0
-            for key in keys:
-                total += results[key][metric]
+    # loop over tasks and average
+    average_metrics = {}
+    for metric in metrics:
+        total = 0
+        for key in keys:
+            total += results[key][metric]
 
-            mean = total / len(keys)
-            average_metrics[metric] = mean
+        mean = total / len(keys)
+        average_metrics[metric] = mean
 
-        return average_metrics
+    return average_metrics

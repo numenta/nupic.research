@@ -34,29 +34,29 @@ from nupic.research.frameworks.dendrites import (
 
 from .centroid import CENTROID_10, CentroidExperimentEvalPerTask
 
-CENTROID_10_PER_TASK = deepcopy(CENTROID_10)
-CENTROID_10_PER_TASK.update(
+CENTROID_10_EVAL_PER_TASK = deepcopy(CENTROID_10)
+CENTROID_10_EVAL_PER_TASK.update(
     experiment_class=CentroidExperimentEvalPerTask,
     tasks_to_validate=list(range(10)),
 )
 
-CENTROID_10_DENDRITE_BIAS = deepcopy(CENTROID_10_PER_TASK)
+CENTROID_10_DENDRITE_BIAS = deepcopy(CENTROID_10_EVAL_PER_TASK)
 CENTROID_10_DENDRITE_BIAS["model_args"].update(
     dendritic_layer_class=BiasingDendriticLayer
 )
 
-CENTROID_10_DENDRITE_GATE = deepcopy(CENTROID_10_PER_TASK)
+CENTROID_10_DENDRITE_GATE = deepcopy(CENTROID_10_EVAL_PER_TASK)
 CENTROID_10_DENDRITE_GATE["model_args"].update(
     dendritic_layer_class=GatingDendriticLayer
 )
 
-CENTROID_10_DENDRITE_ABSMAXGATE = deepcopy(CENTROID_10_PER_TASK)
+CENTROID_10_DENDRITE_ABSMAXGATE = deepcopy(CENTROID_10_EVAL_PER_TASK)
 CENTROID_10_DENDRITE_ABSMAXGATE["model_args"].update(
     dendritic_layer_class=AbsoluteMaxGatingDendriticLayer
 )
 
 CONFIGS = dict(
-    centroid_10_per_task=CENTROID_10_PER_TASK,
+    centroid_10_eval_per_task=CENTROID_10_EVAL_PER_TASK,
     centroid_10_dendrite_bias=CENTROID_10_DENDRITE_BIAS,
     centroid_10_dendrite_absmaxgate=CENTROID_10_DENDRITE_ABSMAXGATE,
     centroid_10_dendrite_gate=CENTROID_10_DENDRITE_GATE,

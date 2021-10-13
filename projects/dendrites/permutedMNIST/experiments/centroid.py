@@ -60,7 +60,7 @@ class CentroidExperimentEvalPerTask(EvalPerTask, CentroidExperiment):
 
 # Centroid method for inferring contexts: 10 permutedMNIST tasks
 CENTROID_10 = dict(
-    experiment_class=CentroidExperimentPerTask,
+    experiment_class=CentroidExperimentEvalPerTask,
     num_samples=1,
 
     # Results path
