@@ -86,10 +86,10 @@ jobs:
           name: Get nupic.torch latest SHA
           command: |
             git ls-remote git://github.com/numenta/nupic.torch.git HEAD > nupic.torch.sha
-            pip install --prefix ~/.local git+https://github.com/numenta/nupic.torch.git
       - restore_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
-      - run: pip install --prefix ~/.local flake8-formatter-junit-xml
+      - run: pip show flake8-formatter-junit-xml || pip install --prefix ~/.local flake8-formatter-junit-xml
+      - run: pip show nupic.torch || pip install --prefix ~/.local git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch
       - run: pip install --prefix ~/.local -e ".[dev,imagenet,dendrites,gsc]"
       - save_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
