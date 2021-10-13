@@ -1,0 +1,23 @@
+# This file may be used to create an environment using:
+# $ conda env create --name <env> --file <this file>
+# platform: osx-64
+name: nupic.research.lightning  
+channels:
+  - defaults
+  - pytorch
+  - nvidia
+  - conda-forge
+
+dependencies:
+  - python=3.8
+  - pip
+
+  - pip:
+      # Install nupic.torch and nupic.rearch libraries in develop mode.
+      # Assume libraries were cloned into ${HOME}/nta folder
+      - -e ${HOME}/nta/nupic.torch
+      - -e ${HOME}/nta/nupic.research[dev]
+
+      # Install projects extra dependency
+      - -e ${HOME}/nta/nupic.research/packages/lightning  
+
