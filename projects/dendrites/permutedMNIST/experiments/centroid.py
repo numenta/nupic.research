@@ -91,7 +91,7 @@ CENTROID_10 = dict(
     batch_size=256,
     val_batch_size=512,
     epochs=3,
-    tasks_to_validate=list(range(10)),
+    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
     num_tasks=10,
     num_classes=10 * 10,
     distributed=False,
@@ -112,7 +112,6 @@ CENTROID_50.update(
     num_tasks=50,
     num_classes=10 * 50,
     num_samples=1,
-    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 
     # For wandb
     env_config=dict(
@@ -149,7 +148,6 @@ FIGURE_1B.update(
     experiment_class=CentroidFigure1BExperiment,
     num_tasks=2,
     num_samples=1,
-    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 
     plot_hidden_activations_args=dict(
         include_modules=[KWinners],
@@ -166,7 +164,6 @@ CENTROID_100.update(
     num_tasks=100,
     num_classes=10 * 100,
     optimizer_args=dict(lr=1e-4),
-    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
 )
 
 # Export configurations in this file
