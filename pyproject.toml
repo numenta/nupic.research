@@ -27,5 +27,5 @@ known_standard_library = 'posixpath'
 known_first_party = ['nupic.research', 'nupic.torch', 'nupic.tensorflow']
 known_third_party = ['elasticsearch', 'dotenv', 'torch', 'tensorflow', 'tabulate',
                      'tqdm', 'wandb', 'transformers', 'tokenizers', 'datasets', 
-                     'deepspeed', 'scipy', 'sklearn', 'seaborn']
+                     'deepspeed', 'scipy', 'sklearn', 'seaborn', 'ptitprince']
 
