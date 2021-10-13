@@ -54,7 +54,7 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
     pass
 
 
-class CentroidExperimentPerTask(EvalPerTask, CentroidExperiment):
+class CentroidExperimentEvalPerTask(EvalPerTask, CentroidExperiment):
     pass
 
 

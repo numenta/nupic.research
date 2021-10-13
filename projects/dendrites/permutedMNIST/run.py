@@ -42,8 +42,6 @@ if __name__ == "__main__":
         parents=DEFAULT_PARSERS,
     )
 
-    # TODO
-    # set nargs = "+" and turn into a for loop
     parser.add_argument("-e", "--experiment", dest="name", nargs="+",
                         default="default_base", help="Experiment to run",
                         choices=list(CONFIGS.keys()))

@@ -19,7 +19,7 @@
 #
 
 """
-Experiments designed to investigate different dendritic functions that mix feddforward
+Experiments designed to investigate different dendritic functions that mix feedforward
 and dendritic inputs. Examples include additive bias, multiplicative, multiplicative
 gating, etc.
 """
@@ -32,11 +32,11 @@ from nupic.research.frameworks.dendrites import (
     GatingDendriticLayer,
 )
 
-from .centroid import CENTROID_10, CentroidExperimentPerTask
+from .centroid import CENTROID_10, CentroidExperimentEvalPerTask
 
 CENTROID_10_PER_TASK = deepcopy(CENTROID_10)
 CENTROID_10_PER_TASK.update(
-    experiment_class=CentroidExperimentPerTask,
+    experiment_class=CentroidExperimentEvalPerTask,
     tasks_to_validate=list(range(10)),
 )
 
