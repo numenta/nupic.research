@@ -57,6 +57,7 @@ class EvalPerTask:
 
         return results
 
+
 def format_results(results):
     """
     Flatten results dictionary and add task id to key name
@@ -77,6 +78,7 @@ def format_results(results):
                 new_results[new_sub_key] = results[key][sub_key]
 
     return new_results
+
 
 def average_over_tasks(results):
     """
