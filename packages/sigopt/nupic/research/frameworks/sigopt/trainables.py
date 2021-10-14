@@ -20,8 +20,6 @@
 
 from pprint import pformat, pprint
 
-from ray.tune import Trainable
-
 from nupic.research.frameworks.sigopt import SigOptExperiment
 from nupic.research.frameworks.trainables import (
     DistributedTrainable,
@@ -117,4 +115,3 @@ class SigOptRemoteProcessTrainable(SigOptTrainableMixin, RemoteProcessTrainable)
 
 class SigOptDistributedTrainable(SigOptTrainableMixin, DistributedTrainable):
     pass
-
