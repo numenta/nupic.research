@@ -146,9 +146,10 @@ def get_tune_kwargs(config):
     distributed = issubclass(config.get("experiment_class"),
                              interfaces.DistributedAggregation)
     if "sigopt_config" in config:
-        default_trainable = (trainables.SigOptDistributedTrainable
+        import nupic.research.frameworks.sigopt.trainables as sigopt
+        default_trainable = (sigopt.SigOptDistributedTrainable
                              if distributed
-                             else trainables.SigOptRemoteProcessTrainable)
+                             else sigopt.SigOptRemoteProcessTrainable)
     else:
         default_trainable = (trainables.DistributedTrainable
                              if distributed

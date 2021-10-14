@@ -20,9 +20,11 @@ dependencies:
       # Install nupic.research in development mode with dev tools extras enabled
       - -e ".[dev]"
 
+      # Install nupic.research common frameworks
+      - -e packages/sigopt
+
       # Install projects extra dependency
       # See `setup.cfg` for available extras.
-      # - -e ".[vernon]"
       # - -e ".[imagenet]"
       # - -e ".[gsc]"
       # - -e ".[dendrites]"
