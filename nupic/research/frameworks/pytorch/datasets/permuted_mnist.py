@@ -37,7 +37,7 @@ class PermutedMNIST(MNIST):
     """
 
     def __init__(self, num_tasks, seed, train, root=".", target_transform=None,
-                 download=False, normalize=True, cat_one_hot_context=False):
+                 download=False, normalize=True):
 
         t = [transforms.ToTensor()]
         if normalize:
@@ -47,7 +47,6 @@ class PermutedMNIST(MNIST):
                          target_transform=target_transform, download=download)
 
         self.num_tasks = num_tasks
-        self.cat_one_hot_contex = cat_one_hot_contex
 
         # Use a generator object to manually set the seed and generate the same
         # num_tasks random permutations for both training and validation datasets; the
@@ -75,15 +74,6 @@ class PermutedMNIST(MNIST):
 
         # Apply permutation to `img`
         img = permute(img, self.permutations[task_id])
-
-        # Concatenate a one-hot context vector to the end of the image
-        if self.cat_one_hot_contex:
-            # prints for debugging / checking implementation
-            if index == 2_000:
-                print(f"Dimension prior to adding one hot context: {img.size()}")
-            img = torch.cat(img, self.task_id_to_one_hot(task_id))
-            if index == 2_000:
-                print(f"Dimension after ading one hot context: {img.size()}")
 
         # Since target values are not shared between tasks, `target` should be in the
         # range [0 + 10 * task_id, 9 + 10 * task_id]

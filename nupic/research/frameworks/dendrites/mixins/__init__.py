@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from .centroid_figure_1b import *
+from .concat_one_hot_context import *
 from .eval_per_task import *
 from .sp_context_analysis import *
 from .sp_context import SpatialPoolerContext
