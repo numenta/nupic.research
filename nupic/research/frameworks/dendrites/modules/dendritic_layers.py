@@ -239,6 +239,47 @@ class ZeroSegmentDendriticLayer(SparseWeights):
         return None
 
 
+class ZeroSegmentDendriticLayerCatContext(SparseWeights):
+
+    """
+    Just like ZeroSegmentDendriticLayer, but takes insted of ignoring context, it
+    concatenates the context to the input features. Context is assumed to be 1-hot.
+    Main use case is comparing an MLP to dendritic network. Dendritic networks have
+    context by default, so this is a way of manufacturing a type of context for MLPs.
+    """
+
+    def __init__(
+        self, module, dim_context, module_sparsity, dendrite_sparsity,
+        num_segments=0, dendrite_bias=False
+    ):
+        """
+        :param module: linear module from in-units to out-units
+        :param dim_context: must be exactly the same as the number of tasks
+        :param module_sparsity: sparsity applied over linear module
+        :param dendrite_sparsity: (ignored)
+        :param num_segments: number of dendrite segments per out-unit. Must be 0.
+        :param dendrite_bias: (ignored)
+        """
+        assert(num_segments == 0)
+
+        self.dim_context = 0
+        super().__init__(module,
+                         sparsity=module_sparsity,
+                         allow_extremes=True)
+
+        self.segments = None
+        self.rezero_weights()
+
+    def forward(self, x, context):
+        x = torch.cat((x, context))
+        return super().forward(x)
+
+    @property
+    def segment_weights(self):
+        return None
+
+
+
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
     """
     Base class for all 2d Dendritic Layer modules.

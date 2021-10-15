@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .ablations import CONFIGS as ABLATIONS
 from .base import CONFIGS as BASE
 from .batch import CONFIGS as BATCH
 from .batch_mnist import CONFIGS as BATCH_MNIST
@@ -38,6 +39,7 @@ __all__ = ["CONFIGS"]
 
 # Collect all configurations
 CONFIGS = dict()
+CONFIGS.update(ABLATIONS)
 CONFIGS.update(BASE)
 CONFIGS.update(BATCH)
 CONFIGS.update(BATCH_MNIST)

@@ -120,8 +120,18 @@ class DendriticMLP(nn.Module):
             dendrite_sparsity = 0.0
         else:
             dendrite_sparsity = self.dendrite_weight_sparsity
+
+        # Allow user to specify multiple layer types, with backward compatibility.
+        # Just specify dendritic_layer_class as a module, and automatically broadcast
+        # to a list of modules. Or, specify a list of customized modules.
+        if not isinstance(dendritic_layer_class, list):
+            dendritic_layer_classes = [dendritic_layer_class
+                                       for i in
+                                       range(len(self.hidden_sizes))]
+        else:
+            dendritic_layer_classes = dendritic_layer_class
         for i in range(len(self.hidden_sizes)):
-            curr_dend = dendritic_layer_class(
+            curr_dend = dendritic_layer_classes[i](
                 module=nn.Linear(input_size, self.hidden_sizes[i], bias=True),
                 num_segments=num_segments,
                 dim_context=dim_context,

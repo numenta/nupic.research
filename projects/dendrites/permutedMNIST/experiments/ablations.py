@@ -27,6 +27,9 @@ gating, etc.
 from copy import deepcopy
 import os
 import ray.tune as tune
+import torch
+import torch.nn.functional as F
+import numpy as np
 
 from nupic.research.frameworks.dendrites import (
     DendriticMLP,
@@ -79,8 +82,9 @@ DENSE_CL_10_NO_DENDRITES.update(
     num_classes=10 * 10,  # TODO: do we need to specify this, num_tasks under dataset args as well as out here?
     num_tasks=10,
     distributed=False,
-    seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
-    num_samples=1,  # Increase to run multiple experiments in parallel
+    # code broke with this line, so I commented it out. But this might mean
+    # random seed is always 42.
+    # seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
 
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
@@ -104,49 +108,42 @@ DENSE_CL_10_NO_DENDRITES.update(
 # some compute.
 SPARSE_CL_10_NO_DENDRITES = deepcopy(DENSE_CL_10_NO_DENDRITES)
 SPARSE_CL_10_NO_DENDRITES["model_args"].update(
-    weight_sparsity=tune.grid_search(list(range(10))),
-
-    # For wandb
-    env_config=dict(
-        wandb=dict(
-            entity="nupic-research",
-            project="dendrite_baselines",
-            name="SPARSE_CL_10_NO_DENDRITES",
-            group="DENDRITE_ABLATIONS",
-        ),
-    ),
+    weight_sparsity=tune.grid_search([0.1, 0.5, 0.9]),
+)
+SPARSE_CL_10_NO_DENDRITES["env_config"]["wandb"].update(
+    name="SPARSE_CL_10_NO_DENDRITES",
 )
 
 DENSE_CL_10_KW_NO_DENDRITES = deepcopy(DENSE_CL_10_NO_DENDRITES)
 DENSE_CL_10_KW_NO_DENDRITES["model_args"].update(
     kw=True,
     kw_percent_on=tune.grid_search([.01, .05, .1, .25, .5]),
-
-    # For wandb
-    env_config=dict(
-        wandb=dict(
-            entity="nupic-research",
-            project="dendrite_baselines",
-            name="DENSE_CL_10_KW_NO_DENDRITES",
-            group="DENDRITE_ABLATIONS",
-        ),
-    ),
+)
+DENSE_CL_10_KW_NO_DENDRITES["env_config"]["wandb"].update(
+    name="DENSE_CL_10_KW_NO_DENDRITES",
 )
 
 SPARSE_CL_10_KW_NO_DENDRITES = deepcopy(SPARSE_CL_10_NO_DENDRITES)
 SPARSE_CL_10_KW_NO_DENDRITES.update(
     kw=True,
     kw_percent_on=tune.grid_search([.01, .05, .1, .25, .5]),
+)
+SPARSE_CL_10_KW_NO_DENDRITES["env_config"]["wandb"].update(
+    name="SPARSE_CL_10_KW_NO_DENDRITES",
+)
 
-    # For wandb
-    env_config=dict(
-        wandb=dict(
-            entity="nupic-research",
-            project="dendrite_baselines",
-            name="SPARSE_CL_10_KW_NO_DENDRITES",
-            group="DENDRITE_ABLATIONS",
-        ),
-    ),
+DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES = deepcopy(DENSE_CL_10_NO_DENDRITES)
+DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["dataset_args"].update(
+    cat_one_hot_context=True
+)
+DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["env_config"]["wandb"].update(
+    name="DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES",
+)
+DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["model_args"].update(
+    input_size=784+10,  # original dimension + 1 for each task
+)
+DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES.update(
+    optimizer_args=dict(lr=5e-3)
 )
 
 # TODO: figure out how to concatenate task_id as context
@@ -155,4 +152,5 @@ CONFIGS = dict(
     sparse_cl_10_no_dendrites=SPARSE_CL_10_NO_DENDRITES,
     dense_cl_10_kw_no_dendrites=DENSE_CL_10_KW_NO_DENDRITES,
     sparse_cl_10_kw_no_dendrites=SPARSE_CL_10_KW_NO_DENDRITES,
+    dense_cl_10_one_hot_ctx_no_dendrites=DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES,
 )
