@@ -29,7 +29,7 @@ import os
 import ray.tune as tune
 import torch
 import torch.nn.functional as F
-import numpy as np
+# import numpy as np
 
 from nupic.research.frameworks.dendrites import (
     DendriticMLP,
@@ -43,7 +43,7 @@ from nupic.research.frameworks.dendrites.modules.dendritic_layers import (
     ZeroSegmentDendriticLayer,
 )
 
-from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
+from nupic.research.frameworks.pytorch.datasets import OneHotContextPermutedMNIST, PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.dendrites.mixins import EvalPerTask
 
@@ -53,6 +53,11 @@ from .no_dendrites import NoDendriteExperiment, SPARSE_CL_2
 class NoDendriteExperimentEvalPerTask(EvalPerTask, NoDendriteExperiment):
     pass
 
+# class NoDendriteExperimentOneHotContextEvalPerTask(EvalPerTask,
+#                                                    OneHotContext,
+#                                                    NoDendriteExperiment):
+#     pass
+
 
 DENSE_CL_10_NO_DENDRITES = deepcopy(SPARSE_CL_2)
 DENSE_CL_10_NO_DENDRITES.update(
@@ -60,7 +65,7 @@ DENSE_CL_10_NO_DENDRITES.update(
     dataset_args=dict(
         num_tasks=10,
         root=os.path.expanduser("~/nta/results/data/"),
-        download=False,  # Change to True if running for the first time
+        download=True,  # Change to True if running for the first time
         seed=42,
     ),
     model_args=dict(
@@ -89,7 +94,7 @@ DENSE_CL_10_NO_DENDRITES.update(
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
-    optimizer_args=dict(lr=tune.grid_search([5e-4, 5e-3, 5e-2])),
+    optimizer_args=dict(lr=5e-4),
 
     # For wandb
     env_config=dict(
@@ -133,17 +138,48 @@ SPARSE_CL_10_KW_NO_DENDRITES["env_config"]["wandb"].update(
 )
 
 DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES = deepcopy(DENSE_CL_10_NO_DENDRITES)
-DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["dataset_args"].update(
-    cat_one_hot_context=True
-)
+# DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["dataset_args"].update(
+#     cat_one_hot_context=True
+# )
 DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["env_config"]["wandb"].update(
     name="DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES",
 )
 DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["model_args"].update(
     input_size=784+10,  # original dimension + 1 for each task
+    hidden_sizes=[2048, 2048],  # hidden layers get context too
+    weight_sparsity=0.,
+    kw=False,
 )
 DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES.update(
-    optimizer_args=dict(lr=5e-3)
+    optimizer_args=dict(lr=5e-3),
+    dataset_class=OneHotContextPermutedMNIST,
+    # experiment_class=NoDendriteExperimentOneHotContextEvalPerTask,
+)
+
+DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES_DEBUG = deepcopy(DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES)
+DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES_DEBUG.update(
+    experiment_class=NoDendriteExperimentEvalPerTask,
+    # num_tasks is both a dataset arg and an arg to cl_experiment
+    num_tasks=2,
+    num_classes=10*2,
+    dataset_args=dict(
+        num_tasks=2,
+        root=os.path.expanduser("~/nta/results/data/"),
+        download=True,  # Change to True if running for the first time
+        seed=42,
+    ),
+    model_args=dict(
+        input_size=784 + 2,
+        output_size=10,  # Single output head shared by all tasks
+        hidden_sizes=[2048, 2048],
+        num_segments=0,
+        dim_context=0,
+        kw=False,
+        dendrite_weight_sparsity=0.0,
+        weight_sparsity=0.,
+        context_percent_on=0.0,
+        dendritic_layer_class=ZeroSegmentDendriticLayer,
+    )
 )
 
 # TODO: figure out how to concatenate task_id as context
@@ -153,4 +189,5 @@ CONFIGS = dict(
     dense_cl_10_kw_no_dendrites=DENSE_CL_10_KW_NO_DENDRITES,
     sparse_cl_10_kw_no_dendrites=SPARSE_CL_10_KW_NO_DENDRITES,
     dense_cl_10_one_hot_ctx_no_dendrites=DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES,
+    dense_cl_10_one_hot_ctx_no_dendrites_debug=DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES_DEBUG
 )

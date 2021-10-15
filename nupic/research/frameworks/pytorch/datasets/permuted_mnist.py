@@ -141,7 +141,7 @@ class OneHotContextPermutedMNIST(PermutedMNIST):
     Dataloader for permutedMNIST that permutes, then flattens, then concatenates
     one hot context vector.
     """
-    def __init__(self, num_tasks, dim_context, seed, train, root=".",
+    def __init__(self, num_tasks, seed, train, root=".",
                  target_transform=None, download=False):
 
         super().__init__(
@@ -149,29 +149,12 @@ class OneHotContextPermutedMNIST(PermutedMNIST):
 
     def __getitem__(self, index):
 
-        img, target = super().__getitem__(index % len(self.data))
-
-        # Determine which task `index` corresponds to
+        img, target = super().__getitem__(index)
         task_id = self.get_task_id(index)
-
-        # Get the context vector
         context = self.task_id_to_one_hot(task_id)
-
-        # Apply permutation to `img`
         img = permute(img, self.permutations[task_id])
-
-        print(f"img size before flattening: {img.size()}")
-        # Flatten it out
         img = img.flatten()
-
-        print(f"img size after flattening before concatenating: {img.size()}")
-        # Put the context on the end
         img = torch.cat((img, context))
-
-        print(f"img size at end: {img.size()}")
-        # Since target values are not shared between tasks, `target` should be in the
-        # range [0 + 10 * task_id, 9 + 10 * task_id]
-        target += 10 * task_id
 
         return img, target
 
