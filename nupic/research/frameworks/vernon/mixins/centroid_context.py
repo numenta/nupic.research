@@ -78,14 +78,14 @@ class CentroidContext(metaclass=abc.ABCMeta):
                                        share_labels=True, num_labels=10,
                                        infer_context_fn=infer_centroid(self.contexts))
     
-    def compress_dendrites_to_dict(self):
+    # def compress_dendrites_to_dict(self):
 
-        layer_neuron_context_to_gating_level = {}
-        layer = 0
-        for module in self.model._layers():
-            if isinstance(module, DendriticLayerBase):
+    #     layer_neuron_context_to_gating_level = {}
+    #     layer = 0
+    #     dendrite_params = filter_params(self.model,
+    #                                     include_modeles=[DendriticLayerBase])
 
-        for ctx in self.contexts
+    #     for ctx in self.contexts
 
 
 def compute_centroid(loader):
