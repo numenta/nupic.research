@@ -84,7 +84,7 @@ THREE_LAYER_MLP_10.update(
     # hyperparameter search that maximized final test accuracy across all tasks for the
     # MLP
     epochs=5,
-    optimizer_args=dict(lr=3e-6) 
+    optimizer_args=dict(lr=3e-6)
 )
 
 
