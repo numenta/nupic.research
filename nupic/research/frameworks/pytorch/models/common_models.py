@@ -25,7 +25,7 @@ from nupic.research.frameworks.pytorch.models.le_sparse_net import (
     add_sparse_linear_layer,
 )
 
-_all__ = [
+__all__ = [
     "StandardMLP",
     "ModifiedInitStandardMLP",
     "SparseMLP",
