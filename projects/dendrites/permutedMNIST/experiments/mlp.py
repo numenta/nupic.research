@@ -35,7 +35,7 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.pytorch.models import StandardMLP
+from nupic.research.frameworks.pytorch.models import ModifiedInitStandardMLP
 from nupic.research.frameworks.vernon import mixins
 from nupic.torch.functions import kwinners
 
@@ -47,33 +47,6 @@ def kwinners_wrapper(y):
 class MLPExperiment(mixins.PermutedMNISTTaskIndices,
                     DendriteContinualLearningExperiment):
     pass
-
-
-class ContinualLearningMLP(StandardMLP):
-    """
-    An MLP used for continual learning experiments on permutedMNIST. The weight
-    initialization has been modified to improve performance.
-    """
-
-    def __init__(self, input_size, num_classes, hidden_sizes):
-        super().__init__(input_size, num_classes, hidden_sizes)
-
-        # Modified Kaiming weight initialization which considers 1) the density of
-        # the input vector and 2) the weight density in addition to the fan-in
-
-        weight_density = 1.0
-        input_flag = False
-        for layer in self.classifier:
-            if isinstance(layer, torch.nn.Linear):
-
-                # Assume input is fully dense, but hidden layer activations are only
-                # 50% dense due to ReLU
-                input_density = 1.0 if not input_flag else 0.5
-                input_flag = True
-
-                _, fan_in = layer.weight.size()
-                bound = 1.0 / np.sqrt(input_density * weight_density * fan_in)
-                torch.nn.init.uniform_(layer.weight, -bound, bound)
 
 
 DEFAULT = dict(
@@ -107,7 +80,7 @@ THREE_LAYER_MLP_10 = deepcopy(DEFAULT)
 THREE_LAYER_MLP_10["dataset_args"].update(num_tasks=10)
 THREE_LAYER_MLP_10["model_args"].update(hidden_sizes=[2048, 2048])
 THREE_LAYER_MLP_10.update(
-    model_class=ContinualLearningMLP,
+    model_class=ModifiedInitStandardMLP,
 
     num_tasks=10,
     num_classes=10 * 10,
@@ -135,7 +108,7 @@ TEN_LAYER_MLP_10["model_args"].update(
     hidden_sizes=[2048 for _ in range(9)]
 )
 TEN_LAYER_MLP_10.update(
-    model_class=ContinualLearningMLP,
+    model_class=ModifiedInitStandardMLP,
 
     num_tasks=10,
     num_classes=10 * 10,
