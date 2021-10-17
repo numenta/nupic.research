@@ -37,11 +37,6 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.pytorch.models import ModifiedInitStandardMLP
 from nupic.research.frameworks.vernon import mixins
-from nupic.torch.functions import kwinners
-
-
-def kwinners_wrapper(y):
-    return kwinners(y, duty_cycles=None, k=102, boost_strength=0)
 
 
 class MLPExperiment(mixins.PermutedMNISTTaskIndices,
@@ -85,8 +80,11 @@ THREE_LAYER_MLP_10.update(
     num_tasks=10,
     num_classes=10 * 10,
 
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks for the
+    # MLP
     epochs=5,
-    optimizer_args=dict(lr=3e-6)
+    optimizer_args=dict(lr=3e-6) 
 )
 
 
@@ -96,6 +94,9 @@ THREE_LAYER_MLP_100.update(
     num_tasks=100,
     num_classes=10 * 100,
 
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks for the
+    # MLP
     epochs=3,
     optimizer_args=dict(lr=1e-6)
 )
@@ -113,6 +114,9 @@ TEN_LAYER_MLP_10.update(
     num_tasks=10,
     num_classes=10 * 10,
 
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks for the
+    # MLP
     epochs=3,
     optimizer_args=dict(lr=3e-6)
 )
@@ -124,6 +128,9 @@ TEN_LAYER_MLP_100.update(
     num_tasks=100,
     num_classes=10 * 100,
 
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks for the
+    # MLP
     epochs=3,
     optimizer_args=dict(lr=3e-7)
 )
