@@ -151,10 +151,29 @@ DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["model_args"].update(
     kw=False,
 )
 DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES.update(
-    optimizer_args=dict(lr=5e-3),
+    optimizer_args=dict(lr=5e-4),
     dataset_class=OneHotContextPermutedMNIST,
     # experiment_class=NoDendriteExperimentOneHotContextEvalPerTask,
 )
+
+SPARSE_CL_10_ONE_HOT_CTX_NO_DENDRITES= deepcopy(DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES)
+SPARSE_CL_10_ONE_HOT_CTX_NO_DENDRITES["model_args"].update(
+    weight_sparsity=tune.grid_search([0.1, 0.5, 0.9])
+)
+
+DENSE_CL_10_KW_ONE_HOT_CTX_NO_DENDRITES = deepcopy(DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES)
+DENSE_CL_10_KW_ONE_HOT_CTX_NO_DENDRITES["model_args"].update(
+    kw=True,
+    kw_percent_on=tune.grid_search([.01, .05, .1, .25, .5])
+)
+
+SPARSE_CL_10_KW_ONE_HOT_CTX_NO_DENDRITES = deepcopy(SPARSE_CL_10_ONE_HOT_CTX_NO_DENDRITES)
+SPARSE_CL_10_KW_ONE_HOT_CTX_NO_DENDRITES["model_args"].update(
+    weight_sparsity=0.9,
+    kw=True,
+    kw_percent_on=tune.grid_search([.01, .1, .3])
+)
+
 
 DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES_DEBUG = deepcopy(DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES)
 DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES_DEBUG.update(
@@ -189,5 +208,8 @@ CONFIGS = dict(
     dense_cl_10_kw_no_dendrites=DENSE_CL_10_KW_NO_DENDRITES,
     sparse_cl_10_kw_no_dendrites=SPARSE_CL_10_KW_NO_DENDRITES,
     dense_cl_10_one_hot_ctx_no_dendrites=DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES,
-    dense_cl_10_one_hot_ctx_no_dendrites_debug=DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES_DEBUG
+    dense_cl_10_one_hot_ctx_no_dendrites_debug=DENSE_CL_10_ONE_HOT_CTX_NO_DENDRITES_DEBUG,
+    dense_cl_10_kw_one_hot_ctx_no_dendrites=DENSE_CL_10_KW_ONE_HOT_CTX_NO_DENDRITES,
+    sparse_cl_10_one_hot_ctx_no_dendrites=SPARSE_CL_10_ONE_HOT_CTX_NO_DENDRITES,
+    sparse_cl_10_kw_one_hot_ctx_no_dendrites=SPARSE_CL_10_KW_ONE_HOT_CTX_NO_DENDRITES
 )

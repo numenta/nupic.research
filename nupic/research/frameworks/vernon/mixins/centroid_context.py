@@ -24,6 +24,8 @@ import abc
 import torch
 
 from nupic.research.frameworks.dendrites import evaluate_dendrite_model
+from nupic.research.frameworks.dendrites import DendriticLayerBase  # For caching parameters
+from nupic.research.frameworks.pytorch.model_utils import filter_params
 
 __all__ = [
     "CentroidContext",
@@ -75,6 +77,15 @@ class CentroidContext(metaclass=abc.ABCMeta):
                                        criterion=self.error_loss,
                                        share_labels=True, num_labels=10,
                                        infer_context_fn=infer_centroid(self.contexts))
+    
+    def compress_dendrites_to_dict(self):
+
+        layer_neuron_context_to_gating_level = {}
+        layer = 0
+        for module in self.model._layers():
+            if isinstance(module, DendriticLayerBase):
+
+        for ctx in self.contexts
 
 
 def compute_centroid(loader):
