@@ -28,9 +28,7 @@ import nupic.research.frameworks.backprop_structure.dataset_managers as datasets
 import nupic.research.frameworks.backprop_structure.experiments as experiments
 import nupic.research.frameworks.backprop_structure.experiments.mixins as mixins
 import nupic.research.frameworks.backprop_structure.networks as networks
-from nupic.research.frameworks.backprop_structure.ray_ax import (
-    ax_optimize_accuracy_weightsparsity,
-)
+from nupic.research.frameworks.ax.ray_ax import ax_optimize_accuracy_weightsparsity
 
 NUM_TRAINING_ITERATIONS = 100
 
