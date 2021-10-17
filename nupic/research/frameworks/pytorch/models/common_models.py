@@ -67,8 +67,8 @@ class ModifiedInitStandardMLP(StandardMLP):
     +/- 1/sqrt(I x W x F)
 
     where I is the density of the input for a given layer, W is always 1.0 (since MLPs
-    have dense weights), and F is the number of inputs received. This only differs from
-    Kaiming initialization by incorporating input_density and weight_density. Biases
+    have dense weights), and F is fan-in. This only differs from Kaiming Uniform
+    initialization by incorporating input density (I) and weight density (W). Biases
     are unaffected.
     """
 
