@@ -25,6 +25,7 @@ from .batch_mnist import CONFIGS as BATCH_MNIST
 from .centroid import CONFIGS as CENTROID
 from .gating import CONFIGS as GATING
 from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
+from .mlp import CONFIGS as MLP
 from .no_dendrites import CONFIGS as NO_DENDRITES
 from .profiler import CONFIGS as PROFILER
 from .si_centroid import CONFIGS as SI_CENTROID
@@ -44,6 +45,7 @@ CONFIGS.update(BATCH_MNIST)
 CONFIGS.update(CENTROID)
 CONFIGS.update(GATING)
 CONFIGS.update(HYPERPARAMETERSEARCH)
+CONFIGS.update(MLP)
 CONFIGS.update(NO_DENDRITES)
 CONFIGS.update(PROFILER)
 CONFIGS.update(SI_CENTROID)
