@@ -95,7 +95,18 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
     """
     A variant of permutedMNIST where each permutation (i.e., 'task') is associated with
     a context: a binary sparse vector. The `__getitem__` method returns the context
-    vector along with the data sample and target.
+    vector along with the data sample and target. Multiple types of context vectors are
+    possible, and the context can be returned with data in a tuple, or concatenated to
+    the data in which case the data are flattened first.
+
+    Unique to ContextDependentPermutedMNIST
+        :param context_type: string indicating what kind of context vector to select.
+                             Must be one of ["sparse_binary", "one_hot", "centroid"].
+        :param combine_context_as: string indicating if context should be combined with
+                                   data by packing both in a tuple, or concatenating
+                                   context to the data. Must be one of
+                                   ["tuple", "concatenate"]. Note that if concatenate is
+                                   specified, data will be flattened!
     """
 
     def __init__(self, num_tasks, seed, train, context_type="sparse_binary",
@@ -114,9 +125,9 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             # Initialize random binary sparse context vectors for each permutation
             self.init_sparse_binary_contexts(seed)
         elif context_type == "one_hot":
-            self.init_one_hot_context(seed)
+            self.init_one_hot_context()
         elif context_type == "centroid":
-            self.init_centroids(seed)
+            self.init_centroids()
         else:
             error_msg = f"context_type must be one of {context_type_choices}"
             raise ValueError(error_msg)
@@ -138,6 +149,7 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         task_id = self.get_task_id(index)
         context = self.contexts[task_id,:]
         return self.combine_context(img, context), target
+
 
     def init_sparse_binary_contexts(self, seed):
         percent_on = 0.05
@@ -165,23 +177,24 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         to compute the mean image for the base dataset. After that you can just apply
         each permutation to the mean vector.
         """
+        self.dim_context = 784
         self.centroids = torch.zeros((self.num_tasks, 28, 28))
         for index in range(len(self.data)):
-            img, _ = self[index]
-            self.centroids[0] += img
+            img, _ = super().__getitem__(index)
+            self.centroids[0] += img.squeeze(0)
 
         # This first row has the pixelwise sum for MNIST, divide to get mean
         self.centroids[0] /= len(self.data)
 
         # Now just apply permutations to the mean vector, one for each remaining task
         for task in range(1, self.num_tasks):
-            self.centroids[task] = permute(self.centroids[0], task)
+            self.centroids[task] = permute(self.centroids[0].unsqueeze(0), self.permutations[task])
 
         # 28 x 28 -> 784
         self.contexts = self.centroids.flatten(start_dim=1)
 
     def init_one_hot_context(self):
-
+        self.dim_context = self.num_tasks
         self.contexts = torch.eye(self.num_tasks, self.num_tasks)
 
 
@@ -206,4 +219,4 @@ def tuple_context(x, context):
 
 def concat_context(x, context):
     img = x.flatten()
-    return torch.cat(img, context)
+    return torch.cat((img, context))
