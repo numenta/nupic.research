@@ -113,7 +113,9 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
     def __init__(self, column,
                  features_dic=None,
                  noiseFactor=0,  # noqa: N803
-                 moduleNoiseFactor=0):
+                 moduleNoiseFactor=0,
+                 num_grid_cells=40*50*50,
+                 num_classes=10):
         """
         @param column (PIUNColumn)
         A two-layer network.
@@ -124,6 +126,9 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
         Overwrite the original initializer to enable loading image-based features
         """
         self.column = column
+
+        # Weights to learn associations between active locations and class labels
+        self.class_weights = np.zeros((num_grid_cells, num_classes))
 
         # Use these for classifying SDRs and for testing whether they're correct.
         # Allow storing multiple representations, in case the experiment learns
@@ -161,49 +166,77 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
 
         self.representationSet = set()
 
-    def getClassFeatures(self,  # noqa: N802
-                         objectClass,  # noqa: N803
-                         featuresPerObject):
+    def learnObject(self,
+                  objectDescription,
+                  randomLocation=False,
+                  useNoise=False,
+                  noisyTrainingTime=1):
         """
-        For all the feature locations, get all of the location representations for a
-        given class (e.g. all examples of "9"s in MNIST, as opposed to particular
-        examples of a 9)
-
-        @param objectClass (str)
-        The target class, e.g. "2"
-
-        @param featuresPerObject (int)
-
-        @return class_targets (list)
-        Target representations for the given class
+        Train the network to recognize the specified object. Move the sensor to one of
+        its features and activate a random location representation in the location
+        layer. Move the sensor over the object, updating the location representation
+        through path integration. At each point on the object, form reciprocal
+        connections between the represention of the location and the representation
+        of the sensory input.
+        @param objectDescription (dict)
+        For example:
+        {"name": "Object 1",
+         "features": [{"top": 0, "left": 0, "width": 10, "height": 10, "name": "A"},
+                      {"top": 0, "left": 10, "width": 10, "height": 10, "name": "B"}]}
+        @return locationsAreUnique (bool)
+        True if this object was assigned a unique set of locations. False if a
+        location on this object has the same location representation as another
+        location somewhere else.
         """
-        class_targets = []
+        self.reset()
+        self.column.activateRandomLocation()
 
-        for i_feature in range(featuresPerObject):
+        locationsAreUnique = True
+        all_locations = []
 
-            name_iter = 0
-            target_representations_temp = np.array([])
+        if randomLocation or useNoise:
+            numIters = noisyTrainingTime
+        else:
+            numIters = 1
+        for i in xrange(numIters):
+            for iFeature, feature in enumerate(objectDescription["features"]):
+                self._move(feature, randomLocation=randomLocation, useNoise=useNoise)
+                featureSDR = self.features[feature["name"]]
+                self._sense(featureSDR, learn=True, waitForSettle=False)
 
-            while len(self.locationRepresentations[(objectClass
-                                                   + "_" + str(name_iter), 0)]) > 0:
+                locationRepresentation = self.column.getSensoryAssociatedLocationRepresentation()
+                self.locationRepresentations[(objectDescription["name"],
+                                              iFeature)].append(locationRepresentation)
+                self.inputRepresentations[(objectDescription["name"],
+                                           iFeature, feature["name"])] = (
+                                             self.column.L4.getWinnerCells())
 
-                target_representations_temp = np.concatenate(
-                    (target_representations_temp, np.concatenate(
-                        self.locationRepresentations[
-                            (objectClass + "_" + str(name_iter), i_feature)])))
+                locationTuple = tuple(locationRepresentation)
+                locationsAreUnique = (locationsAreUnique and
+                                      locationTuple not in self.representationSet)
 
-                name_iter += 1
+                # Track all the grid cells active over learning of an object
+                all_locations.extend(locationRepresentation)
 
-            class_targets.append(set(target_representations_temp))
+                self.representationSet.add(tuple(locationRepresentation))
 
-        return class_targets
+            # Update the weights associating location reps with class labels
+            unique_locations = list(set(all_locations))
+
+            # Index by grid-cells that were active and the true class (i.e. supervised signal)
+            self.class_weights[unique_locations, int(objectDescription["name"][0])] += 1
+
+        self.learnedObjects.append(objectDescription)
+
+        return locationsAreUnique
+
 
     def inferObjectWithRandomMovements(self,  # noqa: C901, N802
                                        objectDescription,  # noqa: N803
                                        objectImage,  # noqa: N803
-                                       all_class_targets,
                                        cellsPerColumn,  # noqa: N803
                                        trial_iter,
+                                       class_threshold,
                                        fixed_touch_sequence=None,
                                        numSensations=None,
                                        randomLocation=False):
@@ -219,9 +252,6 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
 
         @objectImage (Numpy array)
         The current object's image
-
-        @all_class_targets (list)
-        Target representations for each class
 
         @cellsPerColumn (int)
 
@@ -275,6 +305,10 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
             sense_sequence = []  # contains a list of all the previous input SDRs
             prediction_sequence = []  # contains a list of the current SDR prediction,
             # as well as previously sensed input SDRs up until inference is successful
+            classification_visualization = {}
+            classification_visualization['classified'] = []
+            classification_visualization['proportion'] = []
+            classification_visualization['step'] = []
 
             for i_feature in touchSequence:
                 currentStep += 1
@@ -336,59 +370,33 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
                     representation = \
                         self.column.getSensoryAssociatedLocationRepresentation()
 
-                    classification_list = []
+                    max_active_proportion = 0.0
 
-                    if len(set(representation)) > 0:
+                    # NB a minimum number of steps are required before inference takes place
+                    # This reduces false positives in very early inference
+                    if (len(set(representation)) > 0) and (currentStep >= 5):
 
-                        # Check the representation against all possible target classes
-                        for target_iter in range(10):
-                            target_representations = \
-                                all_class_targets[target_iter][i_feature]
+                        # Vector to store 1 where a location has been active
+                        active_loc_vector = np.zeros(np.shape(self.class_weights)[0])
 
-                            if (set(representation) <= target_representations):
-                                classification_list.append(target_iter)
-                                print("Classified as a " + str(target_iter)
-                                      + " with ground truth of "
-                                      + objectDescription["name"])
+                        active_loc_vector[representation] = 1
 
-                    if len(classification_list) > 1:
-                        print("Classification list : classified as multiple classes!")
-                        print(classification_list)
+                        class_node_activations = np.matmul(active_loc_vector, self.class_weights)
 
-                        print("***Provisional code to handle multiple classes"
-                              "implemented, but as never experienced, the reliability"
-                              "of the intersection resolution is untested***")
-                        exit()
+                        # Track the proportion by which the most active node is firing, as well as whether it's the correct node
+                        max_active_proportion = np.max(class_node_activations)/np.sum(class_node_activations)
 
-                        intersection_list = []
+                        # For later plotting of classification behaviour
+                        # Useful in hyperparameter tuning
+                        classification_visualization['classified'].append(np.argmax(class_node_activations) == int(objectDescription["name"][0]))
+                        classification_visualization['proportion'].append(max_active_proportion)
+                        classification_visualization['step'].append(currentStep)
 
-                        # Check the amount of overlap between the representations of
-                        for ambiguous_class_iter in range(len(classification_list)):
-
-                            intersection_list.append(
-                                len(set(representation).intersection(
-                                    all_class_targets[
-                                        classification_list[
-                                            ambiguous_class_iter]][i_feature])))
-
-                        # *** note this does not deal with Numpy's behaviour if two
-                        # locations have the same maximum value -->
-                        # see https://numpy.org/doc/stable/reference/
-                        # generated/numpy.argmax.html
-
-                        print("Intersection list:")
-                        print(intersection_list)
-                        classification_list = classification_list[
-                            np.armax(intersection_list)]
-
-                        print("After checking intersections, resolved to:")
-                        print(classification_list)
-
-                    inferred = (len(classification_list) == 1)
+                    inferred = (max_active_proportion >= class_threshold)
 
                     if inferred:
-                        if classification_list[0] == int(objectDescription["name"][0]):
-                            print("Correctly classified")
+                        if np.argmax(class_node_activations) == int(objectDescription["name"][0]):
+                            print("\nCorrectly classified")
                             inferredStep = currentStep  # noqa: N806
                             plt.imsave("correctly_classified/trial_" + str(trial_iter)
                                        + "_" + objectDescription["name"]
@@ -396,13 +404,14 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
                             incorrect = {"never_converged": 0, "false_convergence": 0}
 
                         else:
-                            print("Incorrectly classified")
+                            print("\nIncorrectly classified a " + objectDescription["name"][0]
+                                  + " as a " + str(np.argmax(class_node_activations)))
                             incorrect = {"never_converged": 0, "false_convergence": 1}
                             plt.imsave("misclassified/trial_" + str(trial_iter)
                                        + "_example_" + objectDescription["name"]
-                                       + "_converged_to_" + str(classification_list[0])
+                                       + "_converged_to_" + str(np.argmax(class_node_activations))
                                        + ".png", objectImage)
-                            return None, incorrect, prediction_sequence, touchSequence
+                            return None, incorrect, prediction_sequence, touchSequence, classification_visualization
 
                 finished = ((((inferred and numSensations is None)
                             or (numSensations is not None and currentStep
@@ -422,4 +431,4 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
             print("\nNever converged!")
             print("Inferred step when never converged " + str(inferredStep))
 
-        return inferredStep, incorrect, prediction_sequence, touchSequence
+        return inferredStep, incorrect, prediction_sequence, touchSequence, classification_visualization
