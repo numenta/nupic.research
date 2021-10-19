@@ -100,6 +100,7 @@ THREE_LAYER_MLP_10_CENTROID_SPARSE = deepcopy(THREE_LAYER_MLP_10_CENTROID)
 THREE_LAYER_MLP_10_CENTROID_SPARSE.update(
     model_class=SparseMLP,
     model_args=dict(
+        kw_percent_on=(1., 1.),
         weight_sparsity=tune.grid_search([(0.1, 0.1), (0.5, 0.5), (0.9, 0.9),]),
         input_size=784 + 784,  # + 10 due to 10 tasks
         hidden_sizes=[2048, 2048],
@@ -107,34 +108,32 @@ THREE_LAYER_MLP_10_CENTROID_SPARSE.update(
     )
 )
 THREE_LAYER_MLP_10_CENTROID_SPARSE["model_args"].update(
-    weight_sparsity=tune.grid_search([0.1, 0.5, 0.9]),
+    weight_sparsity=tune.grid_search([(0.1, 0.1), (0.5, 0.5), (0.9, 0.9),]),
 )
 THREE_LAYER_MLP_10_CENTROID_SPARSE["env_config"]["wandb"].update(
     name="THREE_LAYER_MLP_10_CENTROID_SPARSE",
 )
 
-THREE_LAYER_MLP_10_ONEHOT_DENSE_KW = deepcopy(THREE_LAYER_MLP_10_ONEHOT)
+THREE_LAYER_MLP_10_ONEHOT_DENSE_KW = deepcopy(THREE_LAYER_MLP_10_ONEHOT_SPARSE)
 THREE_LAYER_MLP_10_ONEHOT_DENSE_KW["model_args"].update(
-    weight_sparsity=0.,
-    kw_percent_on=tune.grid_search([.01, .05, .1, .25, .5])
+    weight_sparsity=(0., 0.),
+    kw_percent_on=tune.grid_search([(.01, 0.1), (.05, .05), (.1, .1), (.25, .25), (.5, .5)])
 )
 
 THREE_LAYER_MLP_10_CENTROID_DENSE_KW = deepcopy(THREE_LAYER_MLP_10_CENTROID_SPARSE)
 THREE_LAYER_MLP_10_CENTROID_DENSE_KW.update(
-    weight_sparsity=0.,
-    kw_percent_on=tune.grid_search([.01, .05, .1, .25, .5])
+    weight_sparsity=(0., 0.),
+    kw_percent_on=tune.grid_search([(.01, 0.1), (.05, .05), (.1, .1), (.25, .25), (.5, .5)])
 )
 
 THREE_LAYER_MLP_10_ONEHOT_SPARSE_KW = deepcopy(THREE_LAYER_MLP_10_ONEHOT_SPARSE)
 THREE_LAYER_MLP_10_ONEHOT_SPARSE_KW["model_args"].update(
-    kw_percent_on=tune.grid_search([.01, .05, .1, .25, .5]),
-    weight_sparsity=tune.grid_search([0.1, 0.5, 0.9]),
+    kw_percent_on=tune.grid_search([(.01, 0.1), (.05, .05), (.1, .1), (.25, .25), (.5, .5)]),
 )
 
-THREE_LAYER_MLP_10_CENTROID_SPARSE_KW = deepcopy(THREE_LAYER_MLP_10_CENTROID_DENSE_KW)
-THREE_LAYER_MLP_10_CENTROID_SPARSE_KW.update(
-    kw_percent_on=tune.grid_search([.01, .05, .1, .25, .5]),
-    weight_sparsity=tune.grid_search([0.1, 0.5, 0.9]),
+THREE_LAYER_MLP_10_CENTROID_SPARSE_KW = deepcopy(THREE_LAYER_MLP_10_CENTROID_SPARSE)
+THREE_LAYER_MLP_10_CENTROID_SPARSE_KW["model_args"].update(
+    kw_percent_on=tune.grid_search([(.01, 0.1), (.05, .05), (.1, .1), (.25, .25), (.5, .5)]),
 )
 
 CONFIGS = dict(

@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .ablations import CONFIGS as ABLATIONS
 from .base import CONFIGS as BASE
 from .batch import CONFIGS as BATCH
 from .batch_mnist import CONFIGS as BATCH_MNIST
@@ -27,6 +26,7 @@ from .centroid import CONFIGS as CENTROID
 from .gating import CONFIGS as GATING
 from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
 from .mlp import CONFIGS as MLP
+from .mlp_with_context import CONFIGS as MLP_WITH_CONTEXT
 from .no_dendrites import CONFIGS as NO_DENDRITES
 from .profiler import CONFIGS as PROFILER
 from .si_centroid import CONFIGS as SI_CENTROID
@@ -40,7 +40,6 @@ __all__ = ["CONFIGS"]
 
 # Collect all configurations
 CONFIGS = dict()
-CONFIGS.update(ABLATIONS)
 CONFIGS.update(BASE)
 CONFIGS.update(BATCH)
 CONFIGS.update(BATCH_MNIST)
@@ -48,6 +47,7 @@ CONFIGS.update(CENTROID)
 CONFIGS.update(GATING)
 CONFIGS.update(HYPERPARAMETERSEARCH)
 CONFIGS.update(MLP)
+CONFIGS.update(MLP_WITH_CONTEXT)
 CONFIGS.update(NO_DENDRITES)
 CONFIGS.update(PROFILER)
 CONFIGS.update(SI_CENTROID)
