@@ -38,6 +38,7 @@ from nupic.research.frameworks.vernon.network_utils import create_model
 class BlockModelExperiment(
     mixins.LogEveryLoss,
     mixins.LogEveryLearningRate,
+    mixins.LogBackpropStructure,
     mixins.RezeroWeights,
     SelfSupervisedExperiment,
 ):

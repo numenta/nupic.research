@@ -254,7 +254,7 @@ full_sparse_resnet_34 = full_sparse_model_blockwise_config(
     ),
     num_channels=[117, 233, 467],
 )
-small_sparse_resnet = full_sparse_model_blockwise_config(
+small_sparse_70_resnet = full_sparse_model_blockwise_config(
     sparsity=dict(
         conv1=0.01,  # dense
         encoder1=dict(
@@ -281,4 +281,33 @@ small_sparse_resnet = full_sparse_model_blockwise_config(
         ),
     ),
     num_channels=[117, 233, 467],
+)[:8]
+
+small_sparse_80_resnet = full_sparse_model_blockwise_config(
+    sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.8, conv2=0.8),
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.1,  # dense weights
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            block4=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),  # dense
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            block4=dict(conv1=0.8, conv2=0.8),
+            block5=dict(conv1=0.8, conv2=0.8),
+            block6=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.01,  # dense
+        ),
+    ),
+    num_channels=[143, 143, 143],
 )[:8]

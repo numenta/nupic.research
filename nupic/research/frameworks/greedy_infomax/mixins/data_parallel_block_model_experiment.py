@@ -19,21 +19,16 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .default_base import CONFIGS as DEFAULT_BASE
-from .sigopt_experiments import CONFIGS as SIGOPT_EXPERIMENTS
-from .small_sparse import CONFIGS as SMALL_SPARSE
-from .sparse_resnets import CONFIGS as SPARSE_RESNETS
-from .block_wise_training import CONFIGS as BLOCK_WISE
-from .linear_classification import CONFIGS as LINEAR_CLASSIFICATION
-from .block_sparse_optimization import CONFIGS as BLOCK_SPARSE_OPTIMIZATION
-from .block_resnet50_optimization import CONFIGS as BLOCK_RESNET50
 
-CONFIGS = dict()
-CONFIGS.update(DEFAULT_BASE)
-CONFIGS.update(SPARSE_RESNETS)
-CONFIGS.update(SIGOPT_EXPERIMENTS)
-CONFIGS.update(SMALL_SPARSE)
-CONFIGS.update(BLOCK_WISE)
-CONFIGS.update(LINEAR_CLASSIFICATION)
-CONFIGS.update(BLOCK_SPARSE_OPTIMIZATION)
-CONFIGS.update(BLOCK_RESNET50)
+import torch
+from .block_model_experiment import BlockModelExperiment
+from torch.nn.parallel import DataParallel
+
+class DataParallelBlockModelExperiment(BlockModelExperiment):
+    def setup_experiment(self, config):
+        super(DataParallelBlockModelExperiment, self).setup_experiment(config)
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+
+        self.encoder_classifier = DataParallel(self.encoder_classifier)
+        self.encoder = DataParallel(self.encoder)

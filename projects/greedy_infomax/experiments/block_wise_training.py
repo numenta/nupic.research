@@ -23,11 +23,12 @@ from copy import deepcopy
 
 import ray.tune as tune
 import torch
-from torch.nn.parallel import DataParallel
 
 from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import (
     BlockModelExperiment,
 )
+from nupic.research.frameworks.greedy_infomax.mixins\
+    .data_parallel_block_model_experiment import DataParallelBlockModelExperiment
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.classification_model import (
     MultiClassifier,
@@ -43,7 +44,7 @@ from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     full_resnet_50,
     full_sparse_resnet_34,
     small_resnet,
-    small_sparse_resnet,
+    small_sparse_70_resnet,
 )
 from projects.greedy_infomax.experiments.default_base import (
     CONFIGS as DEFAULT_BASE_CONFIGS,
@@ -55,7 +56,7 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 10
 
 block_wise_small_resnet_args = {"module_args": small_resnet}
-block_wise_small_sparse_resnet_args = {"module_args": small_sparse_resnet}
+block_wise_small_sparse_resnet_args = {"module_args": small_sparse_70_resnet}
 block_wise_full_resnet_args = {"module_args": full_resnet}
 block_wise_full_resnet_50_args = {"module_args": full_resnet_50}
 block_wise_full_sparse_resnet_args = {"module_args": full_sparse_resnet_34}
@@ -223,21 +224,10 @@ FULL_SPARSE_BLOCK.update(dict(
     ),
 ))
 
-
-class CustomBlockModelExperiment(BlockModelExperiment):
-    def setup_experiment(self, config):
-        super(CustomBlockModelExperiment, self).setup_experiment(config)
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.deterministic = False
-
-        self.encoder_classifier = DataParallel(self.encoder_classifier)
-        self.encoder = DataParallel(self.encoder)
-
-
 FULL_RESNET_50 = deepcopy(FULL_BLOCK)
 NUM_GPUS = 8
 FULL_RESNET_50.update(dict(
-    experiment_class=CustomBlockModelExperiment,
+    experiment_class=DataParallelBlockModelExperiment,
     wandb_args=dict(
         project="greedy_infomax_full_block_experiment",
         name=f"resnet50_dataparallel_updated_2"
