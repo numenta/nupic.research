@@ -23,7 +23,6 @@ from copy import deepcopy
 
 import ray.tune as tune
 import torch
-from torch.nn.parallel import DataParallel
 
 from nupic.research.frameworks.greedy_infomax.mixins.data_parallel_block_model_experiment import (
     DataParallelBlockModelExperiment,
@@ -34,18 +33,12 @@ from nupic.research.frameworks.greedy_infomax.models.classification_model import
 )
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     all_module_losses,
-    all_module_multiple_log_softmax,
     multiple_cross_entropy_supervised,
 )
-from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
-    full_resnet,
-    full_resnet_50,
-    full_sparse_resnet_34,
-    small_resnet,
-    small_sparse_70_resnet,
+from nupic.research.frameworks.greedy_infomax.utils.model_utils import full_resnet_50
+from projects.greedy_infomax.experiments.block_wise_training import (
+    CONFIGS as BLOCK_WISE_CONFIGS,
 )
-from projects.greedy_infomax.experiments.block_wise_training import CONFIGS as \
-    BLOCK_WISE_CONFIGS
 
 FULL_RESNET_50 = BLOCK_WISE_CONFIGS["full_resnet_50"]
 
@@ -62,7 +55,7 @@ RESNET_50_ONE_CYCLE_LR_GRID_SEARCH.update(dict(
         name=f"onecycle_grid_search_iteration_2"
     ),
     epochs=NUM_EPOCHS,
-    epochs_to_validate=[NUM_EPOCHS-1,], #no need to validate, just looking at training
+    epochs_to_validate=[NUM_EPOCHS - 1, ],
     # loss
     distributed=False,
     supervised_training_epochs_per_validation=50,
@@ -93,16 +86,16 @@ RESNET_50_ONE_CYCLE_LR_GRID_SEARCH.update(dict(
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
     # current best between 3e-4 and 3e-3
     lr_scheduler_args=dict(
-                max_lr=tune.grid_search([0.0006, 0.0009, 0.0012, 0.0015, 0.002]),
-                # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
-                div_factor=100,  # initial_lr = 0.01
-                final_div_factor=1000,  # min_lr = 0.0000025
-                pct_start=1.0 / 10.0,
-                epochs=NUM_EPOCHS,
-                anneal_strategy="linear",
-                max_momentum=1e-4,
-                cycle_momentum=False,
-            ),
+        max_lr=tune.grid_search([0.0006, 0.0009, 0.0012, 0.0015, 0.002]),
+        # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
+        div_factor=100,  # initial_lr = 0.01
+        final_div_factor=1000,  # min_lr = 0.0000025
+        pct_start=1.0 / 10.0,
+        epochs=NUM_EPOCHS,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
     cuda_launch_blocking=False,
     classifier_config=dict(
         model_class=MultiClassifier,

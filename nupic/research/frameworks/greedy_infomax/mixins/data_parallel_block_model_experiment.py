@@ -21,8 +21,10 @@
 
 
 import torch
-from .block_model_experiment import BlockModelExperiment
 from torch.nn.parallel import DataParallel
+
+from .block_model_experiment import BlockModelExperiment
+
 
 class DataParallelBlockModelExperiment(BlockModelExperiment):
     def setup_experiment(self, config):

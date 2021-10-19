@@ -145,7 +145,7 @@ def train_block_model(
         # Module specific losses will be a tensor of dimension num modules
         # module_specific_losses[x] = loss from bilinear_module_x
         # num_bilinear_info_modules (3)
-        module_losses = criterion(output_list, target) # dim:
+        module_losses = criterion(output_list, target)
         error_loss = module_losses.sum()
 
         del data, target, output_list

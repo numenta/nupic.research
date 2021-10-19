@@ -93,7 +93,7 @@ SMALL_DENSE_ONE_CYCLE_GRID_SEARCH.update(dict(
     lr_scheduler_args=dict(
                 # 0.001, 0.003, 0.01
                 # 0.006, 0.008
-                max_lr=tune.grid_search([0.005, 0.008, 0.011]),
+                max_lr=tune.grid_search([0.0045, 0.0055, 0.0065]),
                 # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
                 div_factor=100,  # initial_lr = 0.01
                 final_div_factor=1000,  # min_lr = 0.0000025
@@ -124,9 +124,7 @@ SMALL_SPARSE_70_ONE_CYCE_GRID_SEARCH.update(
     ),
     model_args=small_sparse_70_resnet_args,
     lr_scheduler_args=dict(
-                max_lr=tune.grid_search([1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1,
-                                         3e-1]),
-                # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
+                max_lr=tune.grid_search([0.0045, 0.0055, 0.006]),
                 div_factor=100,  # initial_lr = 0.01
                 final_div_factor=1000,  # min_lr = 0.0000025
                 pct_start=1.0 / 10.0,
@@ -146,8 +144,7 @@ SMALL_SPARSE_80_ONE_CYCE_GRID_SEARCH.update(
     ),
     model_args=small_sparse_80_resnet_args,
     lr_scheduler_args=dict(
-                max_lr=tune.grid_search([1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1,
-                                         3e-1]),
+                max_lr=tune.grid_search([0.004, 0.008, 0.012]),
                 # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
                 div_factor=100,  # initial_lr = 0.01
                 final_div_factor=1000,  # min_lr = 0.0000025
