@@ -52,13 +52,13 @@ def multiple_cross_entropy(log_f_module_list, targets, reduction="mean"):
     return total_loss
 
 
-"""
-Used when training BlockModels using GIM. Returns a tensor of losses, each entry
-representing the cross entropy loss of a specific BilinearInfo module.
-
-Use this loss function when training with a DistributedDataParallel.
-"""
 def all_module_multiple_log_softmax(log_f_module_list, targets, reduction="mean"):
+    """
+    Used when training BlockModels using GIM. Returns a tensor of losses, each entry
+    representing the cross entropy loss of a specific BilinearInfo module.
+
+    Use this loss function when training with a DistributedDataParallel.
+    """
     device = log_f_module_list[0][0].device
     module_losses = torch.empty(0, requires_grad=True, device=device)
     # Sum losses from each module
@@ -84,25 +84,25 @@ def all_module_multiple_log_softmax(log_f_module_list, targets, reduction="mean"
     return module_losses
 
 
-"""
-Functionally, this loss function is used in the same way that the other loss 
-functions in this file are used. However, this was created to accommodate the fact 
-that the true InfoNCE loss has been pushed into the forward pass of the BilinearInfo 
-estimators, which was done in order to make the BlockModel work when wrapped under 
-DataParallel.
-"""
 def all_module_losses(module_losses, targets, reduction="mean"):
+    """
+    Functionally, this loss function is used in the same way that the other loss
+    functions in this file are used. However, this was created to accommodate the fact
+    that the true InfoNCE loss has been pushed into the forward pass of the BilinearInfo
+    estimators, which was done in order to make the BlockModel work when wrapped under
+    DataParallel.
+    """
     module_losses = torch.stack(module_losses, 1).view(-1, len(module_losses))  # g, n
     module_losses = torch.mean(module_losses, 0)  # n
     return module_losses
 
 
-"""
-Used for supervised training of a BlockModel with GIM. This outputs a tensor of losses,
-each of which is the cross entropy classification loss according to a specific
-EmitEncoding module paired with a classification head.
-"""
 def multiple_cross_entropy_supervised(outputs, targets, reduction="sum"):
+    """
+    Used for supervised training of a BlockModel with GIM. This outputs a tensor of
+    losses, each of which is the cross entropy classification loss according to a
+    specific EmitEncoding module paired with a classification head.
+    """
     device = outputs[0].device
     module_losses = torch.empty(0, requires_grad=True, device=device)
     for i in range(len(outputs)):
