@@ -132,7 +132,7 @@ THREE_LAYER_MLP_10_ONEHOT_DENSE_KW["model_args"].update(
 )
 
 THREE_LAYER_MLP_10_CENTROID_DENSE_KW = deepcopy(THREE_LAYER_MLP_10_CENTROID_SPARSE)
-THREE_LAYER_MLP_10_CENTROID_DENSE_KW.update(
+THREE_LAYER_MLP_10_CENTROID_DENSE_KW["model_args"].update(
     weight_sparsity=(0., 0.),
     kw_percent_on=tune.grid_search([(.01, 0.1), (.05, .05), (.1, .1), (.25, .25), (.5, .5)])
 )
