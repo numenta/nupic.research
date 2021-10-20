@@ -115,6 +115,7 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
 
         super().__init__(num_tasks, seed, train, root, target_transform, download)
         self.dim_context = dim_context
+        self.context_type = context_type
 
         # options for type of context and way of combining with input x
         context_type_choices = ["sparse_binary", "one_hot", "centroid"]
@@ -128,6 +129,8 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             self.init_one_hot_context()
         elif context_type == "centroid":
             self.init_centroids()
+        elif context_type == "self":
+            pass  # don't need to set anything up
         else:
             error_msg = f"context_type must be one of {context_type_choices}"
             raise ValueError(error_msg)
@@ -141,14 +144,30 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             error_msg = f"combine_context_as must be one of {combine_context_as_choices}"
             raise ValueError(error_msg)
 
-    def __getitem__(self, index):
-        """
-        Returns image, context, and target.
-        """
-        img, target = super().__getitem__(index)
-        task_id = self.get_task_id(index)
-        context = self.contexts[task_id,:]
-        return self.combine_context(img, context), target
+        self.__getitem__ = self.get_item_factory()
+
+    def get_item_factory(self):
+        if self.context_type == "self":
+            def _get_item(self, index):
+                img, target = super().__getitem__(index)
+                return self.combine_context(img, img), target
+        else:
+            def _get_item(self, index):
+                img, target = super().__getitem__(index)
+                task_id = self.get_task_id(index)
+                context = self.contexts[task_id,:]
+                return self.combine_context(img, context), target
+        
+        return _get_item
+
+    # def __getitem__(self, index):
+    #     """
+    #     Returns image, context, and target.
+    #     """
+    #     img, target = super().__getitem__(index)
+    #     task_id = self.get_task_id(index)
+    #     context = self.contexts[task_id,:]
+    #     return self.combine_context(img, context), target
 
 
     def init_sparse_binary_contexts(self, seed):
