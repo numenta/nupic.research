@@ -27,8 +27,7 @@ import torch
 from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import (
     BlockModelExperiment,
 )
-from nupic.research.frameworks.greedy_infomax.mixins\
-    .data_parallel_block_model_experiment import DataParallelBlockModelExperiment
+from nupic.research.frameworks.greedy_infomax.mixins.data_parallel_block_model_experiment import DataParallelBlockModelExperiment # noqa E501
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.classification_model import (
     MultiClassifier,

@@ -19,28 +19,28 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import os
+
 from copy import deepcopy
 
 import ray.tune as tune
 import torch
-from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 
+from nupic.research.frameworks.greedy_infomax.mixins.data_parallel_block_model_experiment import DataParallelBlockModelExperiment # noqa E501
+from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.classification_model import (
     MultiClassifier,
 )
-from nupic.research.frameworks.greedy_infomax.utils.model_utils import small_resnet, \
-    small_sparse_80_resnet, small_sparse_70_resnet
-from nupic.research.frameworks.greedy_infomax.mixins\
-    .data_parallel_block_model_experiment import DataParallelBlockModelExperiment
-
-from projects.greedy_infomax.experiments.block_wise_training import CONFIGS as \
-    BLOCK_WISE_CONFIGS
-
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     all_module_losses,
-    all_module_multiple_log_softmax,
     multiple_cross_entropy_supervised,
+)
+from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
+    small_resnet,
+    small_sparse_70_resnet,
+    small_sparse_80_resnet,
+)
+from projects.greedy_infomax.experiments.block_wise_training import (
+    CONFIGS as BLOCK_WISE_CONFIGS,
 )
 
 FULL_RESNET_50 = BLOCK_WISE_CONFIGS["full_resnet_50"]
@@ -61,7 +61,7 @@ SMALL_DENSE_ONE_CYCLE_GRID_SEARCH.update(dict(
         name=f"small_dense"
     ),
     epochs=NUM_EPOCHS,
-    epochs_to_validate=[NUM_EPOCHS-1,], #no need to validate, just looking at training
+    epochs_to_validate=[NUM_EPOCHS - 1, ],
     # loss
     distributed=False,
     supervised_training_epochs_per_validation=50,
@@ -91,18 +91,18 @@ SMALL_DENSE_ONE_CYCLE_GRID_SEARCH.update(dict(
     pin_memory=False,
     lr_scheduler_class=torch.optim.lr_scheduler.OneCycleLR,
     lr_scheduler_args=dict(
-                # 0.001, 0.003, 0.01
-                # 0.006, 0.008
-                max_lr=tune.grid_search([0.0045, 0.0055, 0.0065]),
-                # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
-                div_factor=100,  # initial_lr = 0.01
-                final_div_factor=1000,  # min_lr = 0.0000025
-                pct_start=1.0 / 10.0,
-                epochs=NUM_EPOCHS,
-                anneal_strategy="linear",
-                max_momentum=1e-4,
-                cycle_momentum=False,
-            ),
+        # 0.001, 0.003, 0.01
+        # 0.006, 0.008
+        max_lr=tune.grid_search([0.0045, 0.0055, 0.0065]),
+        # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
+        div_factor=100,  # initial_lr = 0.01
+        final_div_factor=1000,  # min_lr = 0.0000025
+        pct_start=1.0 / 10.0,
+        epochs=NUM_EPOCHS,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
     cuda_launch_blocking=False,
     classifier_config=dict(
         model_class=MultiClassifier,
@@ -124,15 +124,15 @@ SMALL_SPARSE_70_ONE_CYCE_GRID_SEARCH.update(
     ),
     model_args=small_sparse_70_resnet_args,
     lr_scheduler_args=dict(
-                max_lr=tune.grid_search([0.0045, 0.0055, 0.006]),
-                div_factor=100,  # initial_lr = 0.01
-                final_div_factor=1000,  # min_lr = 0.0000025
-                pct_start=1.0 / 10.0,
-                epochs=NUM_EPOCHS,
-                anneal_strategy="linear",
-                max_momentum=1e-4,
-                cycle_momentum=False,
-        ),
+        max_lr=tune.grid_search([0.0045, 0.0055, 0.006]),
+        div_factor=100,  # initial_lr = 0.01
+        final_div_factor=1000,  # min_lr = 0.0000025
+        pct_start=1.0 / 10.0,
+        epochs=NUM_EPOCHS,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
 )
 
 
@@ -144,15 +144,15 @@ SMALL_SPARSE_80_ONE_CYCE_GRID_SEARCH.update(
     ),
     model_args=small_sparse_80_resnet_args,
     lr_scheduler_args=dict(
-                max_lr=tune.grid_search([0.004, 0.008, 0.012]),
-                # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
-                div_factor=100,  # initial_lr = 0.01
-                final_div_factor=1000,  # min_lr = 0.0000025
-                pct_start=1.0 / 10.0,
-                epochs=NUM_EPOCHS,
-                anneal_strategy="linear",
-                max_momentum=1e-4,
-                cycle_momentum=False,
+        max_lr=tune.grid_search([0.004, 0.008, 0.012]),
+        # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
+        div_factor=100,  # initial_lr = 0.01
+        final_div_factor=1000,  # min_lr = 0.0000025
+        pct_start=1.0 / 10.0,
+        epochs=NUM_EPOCHS,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
     ),
 )
 
