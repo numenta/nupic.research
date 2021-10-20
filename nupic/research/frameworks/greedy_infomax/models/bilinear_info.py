@@ -33,6 +33,21 @@ from nupic.torch.modules import SparseWeights2d
 
 
 class BilinearInfo(nn.Identity):
+    """
+    A module which estimates the mutual information between patches in its input
+    in a contrastive setting. Patch-level representations are evaluated on the amount
+    of information they convey about nearby (spatially coherent) patches. The
+    positive sample is compared to many negative samples, and the bilinear model
+    should be able to pick out the positive sample from the lineup (indicating high
+    mutual information). This inherits from nn.Identity because it is used in the
+    BlockModel setting. This module should be estimating the information content
+    of the patches during the unsupervised training portion of the experiment, i.e.
+    estimate_info(), but should pass through for the supervised training and
+    validation loops. See BlockModel for reference. Also, it computes the loss for
+    the model in the forward pass as opposed to in the loss function. This reflects
+    the original codebase, and is important for compatibility with DataParallel.
+
+    """
     def __init__(self, in_channels, out_channels, negative_samples=16, k_predictions=5):
         super().__init__()
         self.negative_samples = negative_samples
@@ -192,7 +207,13 @@ class VDropSparseBilinearInfo(BilinearInfo):
 class BilinearInfoLegacy(nn.Module):
     """
     From the Greedy InfoMax paper, a module which estimates the mutual information
-    between two representations through a bilinear model.
+    between two representations through a bilinear model. This is now named
+    "BilinearInfoLegacy" because it was used in older GreedyInfoMax experiments which
+    did not make use of the BlockModel. There are two differences between the
+    versions; first this one inherits from nn.Module, whereas the more recent
+    implementation inherits from nn.Identity. Second, this model does not compute the
+    full loss in the forward pass, whereas the newer implementation does compute the
+    loss in the forward pass.
 
     Recall the loss for Greedy InfoMax:
 
