@@ -99,8 +99,6 @@ def train_dendrite_model(
                 data, context = data
             else:
                 data, _ = data
-        else:
-            raise ValueError
         data = data.to(device, non_blocking=async_gpu)
         data = data.flatten(start_dim=1)
         target = target.to(device, non_blocking=async_gpu)
