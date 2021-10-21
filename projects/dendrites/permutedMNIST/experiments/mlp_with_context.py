@@ -94,6 +94,16 @@ THREE_LAYER_MLP_10_CENTROID["model_args"].update(
     input_size=784 + 784,  # 784 image + 784 context
 )
 
+THREE_LAYER_MLP_10_SPARSE_BINARY = deepcopy(THREE_LAYER_MLP_10_ONEHOT)
+THREE_LAYER_MLP_10_SPARSE_BINARY["dataset_args"].update(
+        context_type="sparse_binary",
+        combine_context_as="concatenate",
+        dim_context=784,
+)
+THREE_LAYER_MLP_10_SPARSE_BINARY["model_args"].update(
+    input_size=784 + 784
+)
+
 
 THREE_LAYER_MLP_10_ONEHOT_SPARSE = deepcopy(THREE_LAYER_MLP_10_ONEHOT)
 THREE_LAYER_MLP_10_ONEHOT_SPARSE.update(
@@ -131,7 +141,6 @@ THREE_LAYER_MLP_10_ONEHOT_DENSE_KW["model_args"].update(
     kw_percent_on=tune.grid_search([(.01, 0.1), (.05, .05), (.1, .1), (.25, .25), (.5, .5)])
 )
 
-# This was the rotten apple that didn't update model args properly!
 THREE_LAYER_MLP_10_CENTROID_DENSE_KW = deepcopy(THREE_LAYER_MLP_10_CENTROID_SPARSE)
 THREE_LAYER_MLP_10_CENTROID_DENSE_KW["model_args"].update(
     weight_sparsity=(0., 0.),
@@ -274,6 +283,47 @@ THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_["dataset_args"].update(
     num_tasks=100
 )
 
+### Sparse binary conext
+
+THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE = deepcopy(THREE_LAYER_MLP_10_SPARSE_BINARY)
+THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE.update(
+    experiment_class=NoDendriteExperiment,
+    model_class=DendriticMLP,
+    model_args=dict(
+        input_size=784 + 784,
+        output_size=10,  # Single output head shared by all tasks
+        hidden_sizes=[2048, 2048],
+        num_segments=0,
+        dim_context=0,
+        kw=False,
+        dendrite_weight_sparsity=0.0,
+        weight_sparsity=tune.grid_search([0.1, 0.5, 0.9]),
+        context_percent_on=0.0,
+        dendritic_layer_class=ZeroSegmentDendriticLayer,
+    ),
+)
+
+THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_DENSE_KW = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE)
+THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_DENSE_KW.update(
+    model_args=dict(
+        input_size=784 + 784,
+        output_size=10,  # Single output head shared by all tasks
+        hidden_sizes=[2048, 2048],
+        num_segments=0,
+        dim_context=0,
+        kw=True,
+        kw_percent_on=tune.grid_search([.01, .05, .1, .25, .5]),
+        dendrite_weight_sparsity=0.0,
+        weight_sparsity=0.,
+        context_percent_on=0.0,
+        dendritic_layer_class=ZeroSegmentDendriticLayer,
+    ),
+)
+
+THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE_KW = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_DENSE_KW)
+THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE_KW["model_args"].update(
+    weight_sparsity=tune.grid_search([0.1, 0.5, 0.9]),
+)
 
 CONFIGS = dict(
     # onehot context mlp
@@ -288,6 +338,9 @@ CONFIGS = dict(
     three_layer_mlp_10_centroid_dense_kw=THREE_LAYER_MLP_10_CENTROID_DENSE_KW,
     three_layer_mlp_10_centroid_sparse_kw=THREE_LAYER_MLP_10_CENTROID_SPARSE_KW,
 
+    # sparse binary mlp
+    three_layer_mlp_10_sparse_binary=THREE_LAYER_MLP_10_SPARSE_BINARY,
+
     # Zero segment onehot context
     three_layer_zero_segment_10_onehot_dense_kw_=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_,
     three_layer_zero_segment_10_onehot_sparse_=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_,
@@ -297,6 +350,11 @@ CONFIGS = dict(
     three_layer_zero_segment_10_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_,
     three_layer_zero_segment_10_centroid_sparse_=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_,
     three_layer_zero_segment_10_centroid_sparse_kw_=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW_,
+
+    # Zero segment sparse binary
+    three_layer_zero_segment_10_sparse_binary_sparse=THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE,
+    three_layer_zero_segment_10_sparse_binary_dense_kw=THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_DENSE_KW,
+    three_layer_zero_segment_10_sparse_binary_sparse_kw=THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE_KW,
 
     # Scan number of tasks
     three_layer_zero_segment_30_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_,

@@ -131,8 +131,6 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             self.init_one_hot_context()
         elif context_type == "centroid":
             self.init_centroids()
-        elif context_type == "self":
-            pass  # don't need to set anything up
         else:
             error_msg = f"context_type must be one of {context_type_choices}"
             raise ValueError(error_msg)
@@ -205,8 +203,8 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
 
 class SelfContextPermutedMNIST(PermutedMNIST):
 
-    def __init__(self, num_tasks, seed, train, context_type="sparse_binary",
-                 root=".", target_transform=None, download=False):
+    def __init__(self, num_tasks, seed, train, root=".", target_transform=None,
+                 download=False):
 
         super().__init__(num_tasks, seed, train, root, target_transform, download)
 
