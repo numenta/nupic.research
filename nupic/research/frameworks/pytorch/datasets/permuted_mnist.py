@@ -210,9 +210,10 @@ class SelfContextPermutedMNIST(PermutedMNIST):
 
         super().__init__(num_tasks, seed, train, root, target_transform, download)
 
-    def get_item_factory(self):
+    def __getitem__(self, index):
         img, target = super().__getitem__(index)
-        return self.combine_context(img, img), target
+        img = img.flatten()
+        return (img, img), target
 
 
 def permute(x, permutation):
