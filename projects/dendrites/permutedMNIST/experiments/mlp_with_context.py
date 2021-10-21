@@ -131,6 +131,7 @@ THREE_LAYER_MLP_10_ONEHOT_DENSE_KW["model_args"].update(
     kw_percent_on=tune.grid_search([(.01, 0.1), (.05, .05), (.1, .1), (.25, .25), (.5, .5)])
 )
 
+# This was the rotten apple that didn't update model args properly!
 THREE_LAYER_MLP_10_CENTROID_DENSE_KW = deepcopy(THREE_LAYER_MLP_10_CENTROID_SPARSE)
 THREE_LAYER_MLP_10_CENTROID_DENSE_KW["model_args"].update(
     weight_sparsity=(0., 0.),
@@ -168,8 +169,8 @@ THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW.update(
     )
 )
 
-THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW = deepcopy(THREE_LAYER_MLP_10_CENTROID_DENSE_KW)
-THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW.update(
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_ = deepcopy(THREE_LAYER_MLP_10_CENTROID_DENSE_KW)
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_.update(
     experiment_class=NoDendriteExperiment,
     model_class=DendriticMLP,
     model_args=dict(
@@ -203,8 +204,8 @@ THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE.update(
     )
 )
 
-THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW)
-THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE.update(
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_ = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_.update(
     model_args=dict(
         input_size=784 + 784,
         output_size=10,  # Single output head shared by all tasks
@@ -225,10 +226,54 @@ THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW["model_args"].update(
     weight_sparsity=tune.grid_search([0.1, 0.5, 0.9])
 )
 
-THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW)
-THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW["model_args"].update(
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW_ = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW_["model_args"].update(
     weight_sparsity=tune.grid_search([0.1, 0.5, 0.9])
 )
+
+THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_ = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_.update(
+    dataset_args=dict(
+        num_tasks=30,
+        download=True,
+        seed=np.random.randint(2, 10_000),
+        context_type="centroid",
+        combine_context_as="concatenate",
+    ),
+    model_args=dict(
+        input_size=784 + 784,
+        output_size=10,  # Single output head shared by all tasks
+        hidden_sizes=[2048, 2048],
+        num_segments=0,
+        dim_context=0,
+        kw=True,
+        kw_percent_on=0.05,
+        dendrite_weight_sparsity=0.0,
+        weight_sparsity=0.,
+        context_percent_on=0.0,
+        dendritic_layer_class=ZeroSegmentDendriticLayer,
+    ),
+    num_classes=10 * 30,
+    optimizer_args=dict(lr=0.0001),
+)
+
+THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_ = deepcopy(THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_.update(
+    num_classes=10 * 50,
+)
+THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_["dataset_args"].update(
+    num_tasks=50
+)
+
+
+THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_ = deepcopy(THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_.update(
+    num_classes=10 * 100,
+)
+THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_["dataset_args"].update(
+    num_tasks=100
+)
+
 
 CONFIGS = dict(
     # onehot context mlp
@@ -249,7 +294,12 @@ CONFIGS = dict(
     three_layer_zero_segment_10_onehot_sparse_kw=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW,
 
     # Zero segment centroid context
-    three_layer_zero_segment_10_centroid_dense_kw=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW,
-    three_layer_zero_segment_10_centroid_sparse=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE,
-    three_layer_zero_segment_10_centroid_sparse_kw=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW,
+    three_layer_zero_segment_10_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_,
+    three_layer_zero_segment_10_centroid_sparse_=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_,
+    three_layer_zero_segment_10_centroid_sparse_kw_=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW_,
+
+    # Scan number of tasks
+    three_layer_zero_segment_30_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_,
+    three_layer_zero_segment_50_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_,
+    three_layer_zero_segment_100_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_,
 )
