@@ -97,7 +97,9 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
     a context: a binary sparse vector. The `__getitem__` method returns the context
     vector along with the data sample and target. Multiple types of context vectors are
     possible, and the context can be returned with data in a tuple, or concatenated to
-    the data in which case the data are flattened first.
+    the data in which case the data are flattened first. This class assumes there is one
+    context per task. The class below assumes each image is its own context, hence the
+    decision to put it in a separate class.
 
     Unique to ContextDependentPermutedMNIST
         :param context_type: string indicating what kind of context vector to select.
@@ -144,30 +146,14 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             error_msg = f"combine_context_as must be one of {combine_context_as_choices}"
             raise ValueError(error_msg)
 
-        self.__getitem__ = self.get_item_factory()
-
-    def get_item_factory(self):
-        if self.context_type == "self":
-            def _get_item(self, index):
-                img, target = super().__getitem__(index)
-                return self.combine_context(img, img), target
-        else:
-            def _get_item(self, index):
-                img, target = super().__getitem__(index)
-                task_id = self.get_task_id(index)
-                context = self.contexts[task_id,:]
-                return self.combine_context(img, context), target
-        
-        return _get_item
-
-    # def __getitem__(self, index):
-    #     """
-    #     Returns image, context, and target.
-    #     """
-    #     img, target = super().__getitem__(index)
-    #     task_id = self.get_task_id(index)
-    #     context = self.contexts[task_id,:]
-    #     return self.combine_context(img, context), target
+    def __getitem__(self, index):
+        """
+        Returns image, context, and target.
+        """
+        img, target = super().__getitem__(index)
+        task_id = self.get_task_id(index)
+        context = self.contexts[task_id,:]
+        return self.combine_context(img, context), target
 
 
     def init_sparse_binary_contexts(self, seed):
@@ -215,6 +201,18 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
     def init_one_hot_context(self):
         self.dim_context = self.num_tasks
         self.contexts = torch.eye(self.num_tasks, self.num_tasks)
+
+
+class SelfContextPermutedMNIST(PermutedMNIST):
+
+    def __init__(self, num_tasks, seed, train, context_type="sparse_binary",
+                 root=".", target_transform=None, download=False):
+
+        super().__init__(num_tasks, seed, train, root, target_transform, download)
+
+    def get_item_factory(self):
+        img, target = super().__getitem__(index)
+        return self.combine_context(img, img), target
 
 
 def permute(x, permutation):
