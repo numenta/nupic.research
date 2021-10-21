@@ -150,8 +150,8 @@ THREE_LAYER_MLP_10_CENTROID_SPARSE_KW["model_args"].update(
 
 ### Zero segment instead of SparseMLP
 
-THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW = deepcopy(THREE_LAYER_MLP_10_ONEHOT_DENSE_KW)
-THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW.update(
+THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_ = deepcopy(THREE_LAYER_MLP_10_ONEHOT_DENSE_KW)
+THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_.update(
     experiment_class=NoDendriteExperiment,
     model_class=DendriticMLP,
     model_args=dict(
@@ -188,8 +188,8 @@ THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_.update(
     )
 )
 
-THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW)
-THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE.update(
+THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_ = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_.update(
     model_args=dict(
         input_size=784 + 10,
         output_size=10,  # Single output head shared by all tasks
@@ -221,8 +221,8 @@ THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_.update(
 )
 
 
-THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW)
-THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW["model_args"].update(
+THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW_ = deepcopy(THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW_["model_args"].update(
     weight_sparsity=tune.grid_search([0.1, 0.5, 0.9])
 )
 
@@ -289,9 +289,9 @@ CONFIGS = dict(
     three_layer_mlp_10_centroid_sparse_kw=THREE_LAYER_MLP_10_CENTROID_SPARSE_KW,
 
     # Zero segment onehot context
-    three_layer_zero_segment_10_onehot_dense_kw=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW,
-    three_layer_zero_segment_10_onehot_sparse=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE,
-    three_layer_zero_segment_10_onehot_sparse_kw=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW,
+    three_layer_zero_segment_10_onehot_dense_kw_=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_,
+    three_layer_zero_segment_10_onehot_sparse_=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_,
+    three_layer_zero_segment_10_onehot_sparse_kw_=THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW_,
 
     # Zero segment centroid context
     three_layer_zero_segment_10_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_,
