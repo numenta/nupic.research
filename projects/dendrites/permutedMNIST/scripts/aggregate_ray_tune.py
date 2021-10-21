@@ -1,37 +1,30 @@
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see htt"://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+#
 
 import argparse
 import json
-import pandas as pd
 import os
 import re
+
+import pandas as pd
 from tqdm import tqdm
-
-def load(experiment_path):
-    """Load a single experiment into a dataframe"""
-    experiment_path = os.path.expanduser(experiment_path)
-    experiment_states = _get_experiment_states(experiment_path, exit_on_fail=True)
-
-    # run once per experiment state
-    # columns might differ between experiments
-    summaries = []
-    histories = {}
-    all_hyperparams = set()
-    for exp_state, exp_name in experiment_states:
-        progress, params = _read_experiment(exp_state, experiment_path)
-        local_hyperparams = params_to_set(params)
-        if len(progress) != 0:
-            summaries.append(
-                _get_value(progress, params, exp_name)
-            )
-            all_hyperparams = all_hyperparams.union(local_hyperparams)
-            histories.update(progress)
-
-    # concats all dataframes if there are any and return
-    if not summaries:
-        return pd.DataFrame([]), pd.DataFrame([]), all_hyperparams
-
-    summary_df = pd.concat(summaries, axis=0, ignore_index=True, sort=False)
-    return summary_df, histories, all_hyperparams
 
 
 def param_val_to_float(val):
@@ -69,9 +62,9 @@ def read_result(result_file):
     the mean_accuracy measure is on the last line, so for now just skip to that result.
     """
     with open(result_file, "r") as f:
-        for line in f:
+        for _line in f:
             pass
-        results = pd.Series(json.loads(line))
+        results = pd.Series(json.loads(_line))
 
     if "mean_accuracy" not in results:
         msg = f"Skipping file {result_file} that did not have mean_accuracy measure "
@@ -94,7 +87,7 @@ def read_result(result_file):
 
 def get_all_results(base_dir):
     results = []
-    for dirpath, dirname, files in tqdm(os.walk(base_dir)):
+    for dirpath, _, files in tqdm(os.walk(base_dir)):
         for file in files:
             if file == "result.json":
                 result_file = os.path.join(dirpath, file)

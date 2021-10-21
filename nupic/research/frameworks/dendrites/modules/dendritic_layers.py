@@ -279,7 +279,6 @@ class ZeroSegmentDendriticLayerCatContext(SparseWeights):
         return None
 
 
-
 class DendriticLayer2dBase(SparseWeights2d, metaclass=abc.ABCMeta):
     """
     Base class for all 2d Dendritic Layer modules.

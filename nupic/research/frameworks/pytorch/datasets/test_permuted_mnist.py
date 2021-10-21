@@ -21,6 +21,7 @@
 
 
 import torch
+
 from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
 
 num_tasks = 5
@@ -30,11 +31,11 @@ download = True
 dim_context = 1024
 
 sparse_binary_tuple_mnist = ContextDependentPermutedMNIST(
-    num_tasks = num_tasks,
-    seed = seed,
-    train = train,
-    download = False,
-    dim_context = dim_context,
+    num_tasks=num_tasks,
+    seed=seed,
+    train=train,
+    download=False,
+    dim_context=dim_context,
 )
 
 data0, target0 = sparse_binary_tuple_mnist[0]
@@ -51,12 +52,12 @@ assert data0[1].size()[0] == dim_context  # the context
 assert sparse_binary_tuple_mnist.dim_context == dim_context
 
 sparse_binary_concat_mnist = ContextDependentPermutedMNIST(
-    num_tasks = num_tasks,
-    seed = seed,
-    train = train,
-    download = False,
-    dim_context = dim_context,
-    combine_context_as = "concatenate"
+    num_tasks=num_tasks,
+    seed=seed,
+    train=train,
+    download=False,
+    dim_context=dim_context,
+    combine_context_as="concatenate"
 )
 
 data0, target0 = sparse_binary_concat_mnist[0]
@@ -73,13 +74,13 @@ assert sparse_binary_concat_mnist.dim_context == dim_context
 
 
 one_hot_tuple_mnist = ContextDependentPermutedMNIST(
-    num_tasks = num_tasks,
-    seed = seed,
-    train = train,
-    download = False,
-    dim_context = dim_context,
+    num_tasks=num_tasks,
+    seed=seed,
+    train=train,
+    download=False,
+    dim_context=dim_context,
     context_type="one_hot",
-    combine_context_as = "tuple",
+    combine_context_as="tuple",
 )
 
 data0, target0 = one_hot_tuple_mnist[0]
@@ -97,13 +98,13 @@ assert one_hot_tuple_mnist.dim_context == num_tasks
 
 
 one_hot_concat_mnist = ContextDependentPermutedMNIST(
-    num_tasks = num_tasks,
-    seed = seed,
-    train = train,
-    download = False,
-    dim_context = dim_context,
+    num_tasks=num_tasks,
+    seed=seed,
+    train=train,
+    download=False,
+    dim_context=dim_context,
     context_type="one_hot",
-    combine_context_as = "concatenate"
+    combine_context_as="concatenate"
 )
 
 data0, target0 = one_hot_concat_mnist[0]
@@ -120,13 +121,13 @@ assert one_hot_concat_mnist.dim_context == num_tasks
 
 
 centroid_tuple_mnist = ContextDependentPermutedMNIST(
-    num_tasks = num_tasks,
-    seed = seed,
-    train = train,
-    download = False,
-    dim_context = dim_context,
+    num_tasks=num_tasks,
+    seed=seed,
+    train=train,
+    download=False,
+    dim_context=dim_context,
     context_type="centroid",
-    combine_context_as = "tuple",
+    combine_context_as="tuple",
 )
 
 data0, target0 = centroid_tuple_mnist[0]
@@ -151,24 +152,28 @@ for index in range(len(centroid_tuple_mnist)):
 
 manual_centroids /= len(centroid_tuple_mnist.data)
 
-disagreement_no_permutations = torch.abs(manual_centroids[0] - centroid_tuple_mnist.contexts[0]).sum()
-disagreement_permutation_2 = torch.abs(manual_centroids[2] - centroid_tuple_mnist.contexts[2]).sum()
+disagreement_no_permutations = torch.abs(
+    manual_centroids[0] - centroid_tuple_mnist.contexts[0]).sum()
+disagreement_permutation_2 = torch.abs(
+    manual_centroids[2] - centroid_tuple_mnist.contexts[2]).sum()
 
-print(f"Absolute difference between centroids task 0 for two methods: mnist raw: {disagreement_no_permutations}")
-print(f"Absolute difference between centroids task 2 for two methods: mnist raw: {disagreement_permutation_2}")
+# breaking apart variables to keep line lengths short enoguh for flake8
+fmsg = "Absolute difference between centroids task"
+print(f"{fmsg} 0 for two methods: mnist raw: {disagreement_no_permutations}")
+print(f"{fmsg} 2 for two methods: mnist raw: {disagreement_permutation_2}")
 
 assert disagreement_no_permutations < .001
 assert disagreement_permutation_2 < .001
 
 
 centroid_concat_mnist = ContextDependentPermutedMNIST(
-    num_tasks = num_tasks,
-    seed = seed,
-    train = train,
-    download = False,
-    dim_context = dim_context,
+    num_tasks=num_tasks,
+    seed=seed,
+    train=train,
+    download=False,
+    dim_context=dim_context,
     context_type="centroid",
-    combine_context_as = "concatenate"
+    combine_context_as="concatenate"
 )
 
 data0, target0 = centroid_concat_mnist[0]

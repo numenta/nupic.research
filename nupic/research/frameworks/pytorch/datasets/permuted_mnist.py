@@ -141,7 +141,7 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         elif combine_context_as == "concatenate":
             self.combine_context = concat_context
         else:
-            error_msg = f"combine_context_as must be one of {combine_context_as_choices}"
+            error_msg = f"combine_context_as must be one of {combine_context_as_choices}"  # noqa E501
             raise ValueError(error_msg)
 
     def __getitem__(self, index):
@@ -150,9 +150,8 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         """
         img, target = super().__getitem__(index)
         task_id = self.get_task_id(index)
-        context = self.contexts[task_id,:]
+        context = self.contexts[task_id, :]
         return self.combine_context(img, context), target
-
 
     def init_sparse_binary_contexts(self, seed):
         percent_on = 0.05
@@ -191,7 +190,8 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
 
         # Now just apply permutations to the mean vector, one for each remaining task
         for task in range(1, self.num_tasks):
-            self.centroids[task] = permute(self.centroids[0].unsqueeze(0), self.permutations[task])
+            self.centroids[task] = permute(self.centroids[0].unsqueeze(0),
+                                           self.permutations[task])
 
         # 28 x 28 -> 784
         self.contexts = self.centroids.flatten(start_dim=1)
@@ -230,8 +230,10 @@ def permute(x, permutation):
     x = x.view(1, height, width)
     return x
 
+
 def tuple_context(x, context):
     return (x, context)
+
 
 def concat_context(x, context):
     img = x.flatten()

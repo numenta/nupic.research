@@ -23,7 +23,6 @@ Experiment file that runs dendritic networks which use the raw image as context
 """
 
 import os
-from copy import deepcopy
 
 import numpy as np
 import ray.tune as tune
@@ -39,8 +38,8 @@ from nupic.research.frameworks.vernon import mixins
 
 
 class SimpleExperiment(mixins.RezeroWeights,
-                         mixins.PermutedMNISTTaskIndices,
-                         DendriteContinualLearningExperiment):
+                       mixins.PermutedMNISTTaskIndices,
+                       DendriteContinualLearningExperiment):
     pass
 
 

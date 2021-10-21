@@ -24,8 +24,6 @@ import abc
 import torch
 
 from nupic.research.frameworks.dendrites import evaluate_dendrite_model
-from nupic.research.frameworks.dendrites import DendriticLayerBase  # For caching parameters
-from nupic.research.frameworks.pytorch.model_utils import filter_params
 
 __all__ = [
     "CentroidContext",

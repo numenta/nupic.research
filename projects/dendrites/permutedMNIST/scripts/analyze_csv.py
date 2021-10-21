@@ -1,26 +1,48 @@
+#  Numenta Platform for Intelligent Computing (NuPIC)
+#  Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
+#  with Numenta, Inc., for a separate license for this software code, the
+#  following terms and conditions apply:
+#
+#  This program is free software you can redistribute it and/or modify
+#  it under the terms of the GNU Affero Public License version 3 as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#  See the GNU Affero Public License for more details.
+#
+#  You should have received a copy of the GNU Affero Public License
+#  along with this program.  If not, see htt"://www.gnu.org/licenses.
+#
+#  http://numenta.org/licenses/
+#
+
 import ast
 import collections
-import matplotlib.pyplot as plt
-import numpy as np
-import os
+
+import pandas as pd
+
 
 """
 Code intended to read and analyze csvs that are the result of either
 aggregate_results.sh or aggregate_results.py
 """
 
-def parse_configs(X):
+
+def parse_configs(x):
     """
     Use ast to parse config column. Json will not work due to the mixture
     of single and double quotes. Returns dataframe with only config info.
     Helper function for read_and_parse_csv.
     """
-    flat_dicts = [flatten(ast.literal_eval(Xiloc[i]["config"]))
-                    for i in range(Xshape[0])]
+    flat_dicts = [flatten(ast.literal_eval(x.iloc[i]["config"]))
+                  for i in range(x.shape[0])]
     config_df = pd.DataFrame(flat_dicts)
     return config_df
 
-def flatten(d, parent_key='', sep='_'):
+
+def flatten(d, parent_key="", sep="_"):
     """
     Helper for parsing config column. AST parser returns nested dictionary.
     This flattens dictionary by prepending parent keys to full key name.
@@ -53,6 +75,6 @@ def read_and_parse_csv(csv_path):
     config_dict.reset_index(inplace=True)
 
     # Merge dataframes
-    X = pd.merge(data, config_dict)
+    X = pd.merge(data, config_dict)  # noqa N806 (capital X is a matrix)
 
     return X
