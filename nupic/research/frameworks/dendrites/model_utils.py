@@ -83,7 +83,7 @@ def train_dendrite_model(
     # Use asynchronous GPU copies when the memory is pinned
     # See https://pytorch.org/docs/master/notes/cuda.html
     async_gpu = loader.pin_memory
-    context = None  # bug?
+    context = None
     if context_vector is not None:
         # Tile context vector
         context = context_vector.repeat(loader.batch_size, 1)
