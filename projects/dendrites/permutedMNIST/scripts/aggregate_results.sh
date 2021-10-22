@@ -44,9 +44,9 @@ python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centr
 python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw_
 python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw_
 
-python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw__
-python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw__
-python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw__
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw___
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw___
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw___
 
 
 # python combine_csv.py -A ${RESULTS_DIR}/three_layer_mlp_10_onehot/aggregate_results.csv \
@@ -57,14 +57,10 @@ python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_cent
 #                       -O ${RESULTS_DIR}/all_results.csv
 
 
-python combine_csv.py -A ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_dense_kw_/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw_/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw_/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw_/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw__/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw__/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw__/aggregate_results.csv \
-                         -O ${RESULTS_DIR}/centroid_scan_n_tasks.csv
+# python combine_csv.py -A ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw___/aggregate_results.csv \
+#                          ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw___/aggregate_results.csv \
+#                          ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw___/aggregate_results.csv \
+#                          -O ${RESULTS_DIR}/centroid_scan_n_tasks.csv
 
 
 python combine_csv.py -A ${RESULTS_DIR}/three_layer_mlp_10_centroid/aggregate_results.csv \
@@ -74,7 +70,7 @@ python combine_csv.py -A ${RESULTS_DIR}/three_layer_mlp_10_centroid/aggregate_re
                          -O ${RESULTS_DIR}/centroid_results.csv
 
 python combine_csv.py -A ${RESULTS_DIR}/three_layer_mlp_10_onehot/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_mlp_10_onehot_sparse_/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_mlp_10_onehot_dense_kw_/aggregate_results.csv \
-                         ${RESULTS_DIR}/three_layer_mlp_10_onehot_sparse_kw_/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_10_onehot_sparse_/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_10_onehot_dense_kw_/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_10_onehot_sparse_kw_/aggregate_results.csv \
                          -O ${RESULTS_DIR}/onehot_results.csv
