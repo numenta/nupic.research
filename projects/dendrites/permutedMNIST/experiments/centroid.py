@@ -139,7 +139,7 @@ CENTROID_10.update(
 # This experiment configuration is for visualizing the hidden activations in an Active
 # Dendrites Network on a per-task basis; it produces `.pt` files which can then be used
 # by the hidden activations script to generate visualizations
-HIDDEN_ACTIVATIONS_PER_TASK = deepcopy(CENTROID_2)
+HIDDEN_ACTIVATIONS_PER_TASK = deepcopy(CENTROID_10)
 HIDDEN_ACTIVATIONS_PER_TASK.update(
     experiment_class=CentroidFigure1BExperiment,
 
