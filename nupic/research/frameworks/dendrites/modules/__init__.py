@@ -22,13 +22,14 @@
 from .apply_dendrites import *
 from .boosted_dendrites import *
 from .dendrite_segments import DendriteSegments
-from .dendritic_mlp import DendriticMLP
 from .dendritic_layers import (
     AbsoluteMaxGatingDendriticLayer,
     AbsoluteMaxGatingDendriticLayer2d,
     BiasingDendriticLayer,
+    DendriticLayerBase,
     GatingDendriticLayer,
     GatingDendriticLayer2d,
-    DendriticLayerBase,
-    OneSegmentDendriticLayer
+    OneSegmentDendriticLayer,
+    ZeroSegmentDendriticLayer,
 )
+from .dendritic_mlp import DendriticMLP
