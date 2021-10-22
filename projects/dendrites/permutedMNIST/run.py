@@ -33,29 +33,41 @@ import copy
 
 from experiments import CONFIGS
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
-from nupic.research.frameworks.vernon.run_with_raytune import run
+from nupic.research.frameworks.vernon.run import run as run
+from nupic.research.frameworks.vernon.run_with_raytune import run as run_with_ray_tune
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         parents=DEFAULT_PARSERS,
     )
-    parser.add_argument("-e", "--experiment", dest="name", default="default_base",
-                        help="Experiment to run", choices=CONFIGS.keys())
+
+    parser.add_argument("-e", "--experiment", dest="name", nargs="+",
+                        default="default_base", help="Experiment to run",
+                        choices=list(CONFIGS.keys()))
+    parser.add_argument("--run_without_ray_tune", dest="run_without_ray_tune",
+                        type=bool, default=False,
+                        help="run by calling vernon.run_with_ray_tune or vernon.run")
+
     args = parser.parse_args()
     if args.name is None:
         parser.print_help()
         exit(1)
 
-    # Get configuration values
-    config = copy.deepcopy(CONFIGS[args.name])
+    for experiment in args.name:
 
-    # Merge configuration with command line arguments
-    config.update(vars(args))
+        # Get configuration values
+        config = copy.deepcopy(CONFIGS[experiment])
 
-    config = process_args(args, config)
+        # Merge configuration with command line arguments
+        config.update(vars(args))
+        config.update(name=experiment)
 
-    if config is None:
-        pass
-    else:
-        run(config)
+        config = process_args(args, config)
+
+        if config is None:
+            continue
+        if args.run_without_ray_tune:
+            run(config)
+        else:
+            run_with_ray_tune(config)
