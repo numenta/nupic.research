@@ -20,6 +20,8 @@ dependencies:
       # Install nupic.research in development mode with dev tools extras enabled
       - -e ".[dev]"
 
+      - -e packages/greedy_infomax
+
       # Install projects extra dependency
       # See `setup.cfg` for available extras.
       # - -e ".[vernon]"
