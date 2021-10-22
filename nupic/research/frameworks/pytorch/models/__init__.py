@@ -18,6 +18,7 @@
 #  http://numenta.org/licenses/
 #
 
+from .common_models import *
 from .le_sparse_net import LeSparseNet
 from .mobilenetv1 import (
     MobileNetV1,
@@ -28,4 +29,3 @@ from .mobilenetv1 import (
 from .not_so_densenet import DenseNetCIFAR, NoSoDenseNetCIFAR
 from .resnet_models import ResNet, resnet9
 from .vgg_sparse_net import VGGSparseNet, vgg19_dense_net, vgg19_sparse_net
-from .common_models import StandardMLP, OMLNetwork, OmniglotCNN, MetaContinualLearningMLP
