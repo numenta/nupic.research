@@ -27,12 +27,13 @@ import torch
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
+from nupic.research.frameworks.dendrites import mixins
 from nupic.research.frameworks.pytorch.hooks import ModelHookManager
-from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
+from nupic.research.frameworks.vernon import SupervisedExperiment
 from nupic.torch.modules import KWinners, SparseWeights
 
 
-class TrackStatsSupervisedExperiment(mixins.PlotRepresentationOverlap,
+class TrackStatsSupervisedExperiment(mixins.PlotHiddenActivations,
                                      SupervisedExperiment):
     pass
 
@@ -79,10 +80,9 @@ simple_supervised_config = dict(
         input_shape=(1, 4, 4),
     ),
 
-    plot_representation_overlap_args=dict(
-        include_modules=[torch.nn.ReLU, KWinners],
+    plot_hidden_activations_args=dict(
+        include_modules=[torch.nn.Linear, KWinners],
         plot_freq=2,
-        plot_args=dict(annotate=False),
         max_samples_to_plot=400
     ),
 
@@ -94,15 +94,14 @@ simple_supervised_config = dict(
 )
 
 
-class PlotRepresentationOverlapTest(unittest.TestCase):
+class PlotHiddenActivationsTest(unittest.TestCase):
     """
-    This is a test class for the `PlotRepresentationOverlap` mixin.
+    This is a test class for the `PlotHiddenActivations` mixin.
     """
 
-    def test_representation_overlap_tracking_supervised_experiment(self):
+    def test_hidden_activations_tracking_supervised_experiment(self):
         """
-        Test whether the mixin tracks representation overlap values in the supervised
-        setting.
+        Test whether the mixin tracks hidden activations in the supervised setting.
         """
 
         # Setup experiment and initialize model.
@@ -110,7 +109,7 @@ class PlotRepresentationOverlapTest(unittest.TestCase):
         exp.setup_experiment(simple_supervised_config)
 
         # Validate that the hook managers are not null.
-        self.assertIsInstance(exp.ro_hook, ModelHookManager)
+        self.assertIsInstance(exp.ha_hook, ModelHookManager)
 
         # Loop through some pseudo epochs.
         for i in range(6):
@@ -118,13 +117,15 @@ class PlotRepresentationOverlapTest(unittest.TestCase):
 
             # The plot frequency is 2 and should be logged every 2 epochs.
             if i % 2 == 0:
-                self.assertTrue("representation_overlap_matrix/kwinners" in ret)
-                self.assertTrue("representation_overlap_interclass/kwinners" in ret)
-                self.assertTrue("representation_overlap_intraclass/kwinners" in ret)
+                self.assertTrue("hidden_activations/kwinners" in ret)
+                self.assertTrue("hidden_activations/classifier.module" in ret)
+
+                ha = ret["_activations/classifier.module"]
+                self.assertTrue(isinstance(ha, np.ndarray))
 
             # All the the tensors tracked should be of the same batch size.
-            batch_size1 = exp.ro_targets.size(0)
-            batch_size2 = exp.ro_hook.hooks[0]._activations.shape[0]
+            batch_size1 = exp.ha_targets.size(0)
+            batch_size2 = exp.ha_hook.hooks[0]._activations.shape[0]
 
             if i == 0:
                 self.assertTrue(batch_size1 == batch_size2 == 200)
@@ -134,20 +135,20 @@ class PlotRepresentationOverlapTest(unittest.TestCase):
 
     def test_no_tracking_args_given_supervised_experiment(self):
         """
-        Test the edge case where representation overlap values are not tracked in the
+        Test the edge case where hidden activations are not tracked in the
         supervised setting.
         """
 
         # Remove tracking params.
         no_tracking_config = deepcopy(simple_supervised_config)
-        no_tracking_config.pop("plot_representation_overlap_args")
+        no_tracking_config.pop("plot_hidden_activations_args")
 
         # Setup experiment and initialize model.
         exp = no_tracking_config["experiment_class"]()
         exp.setup_experiment(no_tracking_config)
 
         # Validate that the hook managers are null.
-        self.assertEqual(len(exp.ro_hook.hooks), 0)
+        self.assertEqual(len(exp.ha_hook.hooks), 0)
 
         # Loop through some pseudo epochs.
         for _ in range(5):
@@ -155,7 +156,7 @@ class PlotRepresentationOverlapTest(unittest.TestCase):
 
             # Validate that nothing is being tracked.
             for k in ret.keys():
-                self.assertTrue("representation_overlap" not in k)
+                self.assertTrue("hidden_activations" not in k)
 
 
 if __name__ == "__main__":

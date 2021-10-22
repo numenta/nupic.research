@@ -18,8 +18,13 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
+from .centroid_context import *
 from .centroid_figure_1b import *
+from .context_signal import *
+from .dendrite_metrics import *
 from .eval_per_task import *
-from .sp_context_analysis import *
+from .hidden_activations import *
+from .representation_overlap import *
 from .sp_context import SpatialPoolerContext
+from .sp_context_analysis import *
+from .update_dendrite_boost_strength import *

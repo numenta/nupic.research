@@ -36,13 +36,14 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
+from nupic.research.frameworks.dendrites.mixins import CentroidContext
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 
 
 class SICentroidExperiment(mixins.SynapticIntelligence,
                            mixins.RezeroWeights,
-                           mixins.CentroidContext,
+                           CentroidContext,
                            mixins.PermutedMNISTTaskIndices,
                            DendriteContinualLearningExperiment):
     pass

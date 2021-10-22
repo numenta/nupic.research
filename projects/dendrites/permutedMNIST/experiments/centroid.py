@@ -35,21 +35,26 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B, EvalPerTask
+from nupic.research.frameworks.dendrites.mixins import (
+    CentroidContext,
+    CentroidFigure1B,
+    EvalPerTask,
+    PlotHiddenActivations,
+)
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 from nupic.torch.modules import KWinners
 
 
 class CentroidExperiment(mixins.RezeroWeights,
-                         mixins.CentroidContext,
+                         CentroidContext,
                          mixins.PermutedMNISTTaskIndices,
                          DendriteContinualLearningExperiment):
     pass
 
 
 class CentroidFigure1BExperiment(CentroidFigure1B,
-                                 mixins.PlotHiddenActivations,
+                                 PlotHiddenActivations,
                                  CentroidExperiment):
     pass
 
