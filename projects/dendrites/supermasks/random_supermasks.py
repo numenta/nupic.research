@@ -46,7 +46,8 @@ from nupic.research.frameworks.dendrites import (
     plot_representation_overlap_matrix,
 )
 from nupic.research.frameworks.dendrites.routing import generate_context_vectors
-from nupic.research.frameworks.vernon import SupervisedExperiment, vernon_mixins
+from nupic.research.frameworks.vernon import SupervisedExperiment
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners, SparseWeights
 
 
