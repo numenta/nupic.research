@@ -248,6 +248,7 @@ THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW_["model_args"].update(
 THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_.update(
+    num_samples=8,
     dataset_args=dict(
         num_tasks=30,
         download=True,
@@ -269,6 +270,8 @@ THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_.update(
         dendritic_layer_class=ZeroSegmentDendriticLayer,
     ),
     num_classes=10 * 30,
+    num_tasks=30,
+    tasks_to_validate=[29],
     optimizer_args=dict(lr=0.0001),
 )
 
@@ -276,6 +279,8 @@ THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_.update(
     num_classes=10 * 50,
+    num_tasks=50,
+    tasks_to_validate=[49],
 )
 THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_["dataset_args"].update(
     num_tasks=50
@@ -286,6 +291,8 @@ THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_.update(
     num_classes=10 * 100,
+    num_tasks=100,
+    tasks_to_validate=[99],
 )
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_["dataset_args"].update(
     num_tasks=100
@@ -370,7 +377,7 @@ CONFIGS = dict(
     three_layer_zero_segment_10_sparse_binary_sparse_kw=THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE_KW,  # noqa E501
 
     # Scan number of tasks
-    three_layer_zero_segment_30_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_,  # noqa E501
-    three_layer_zero_segment_50_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_,  # noqa E501
-    three_layer_zero_segment_100_centroid_dense_kw_=THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_,  # noqa E501
+    three_layer_zero_segment_30_centroid_dense_kw___=THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_,  # noqa E501
+    three_layer_zero_segment_50_centroid_dense_kw___=THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_,  # noqa E501
+    three_layer_zero_segment_100_centroid_dense_kw___=THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_,  # noqa E501
 )
