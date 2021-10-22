@@ -19,8 +19,9 @@
 #
 
 """
-Experiment file that runs dendritic networks which infer the context vector via
-constructing a prototype during inference.
+Experiment file that runs Active Dendrites Networks which 1) construct a prototype
+context vector during training, and 2) try to infer the correct prototype for each task
+during inference.
 """
 
 import os
@@ -35,7 +36,7 @@ from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B, EvalPerTask
+from nupic.research.frameworks.dendrites.mixins import CentroidFigure1B
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 from nupic.torch.modules import KWinners
@@ -54,13 +55,8 @@ class CentroidFigure1BExperiment(CentroidFigure1B,
     pass
 
 
-class CentroidExperimentEvalPerTask(EvalPerTask, CentroidExperiment):
-    pass
-
-
-# Centroid method for inferring contexts: 10 permutedMNIST tasks
-CENTROID_10 = dict(
-    experiment_class=CentroidExperimentEvalPerTask,
+CENTROID_BASE = dict(
+    experiment_class=CentroidExperiment,
     num_samples=1,
 
     # Results path
@@ -68,7 +64,6 @@ CENTROID_10 = dict(
 
     dataset_class=PermutedMNIST,
     dataset_args=dict(
-        num_tasks=10,
         root=os.path.expanduser("~/nta/results/data/"),
         download=False,  # Change to True if running for the first time
         seed=42,
@@ -79,7 +74,6 @@ CENTROID_10 = dict(
         input_size=784,
         output_size=10,  # Single output head shared by all tasks
         hidden_sizes=[2048, 2048],
-        num_segments=10,
         dim_context=784,
         kw=True,
         kw_percent_on=0.05,
@@ -90,64 +84,64 @@ CENTROID_10 = dict(
 
     batch_size=256,
     val_batch_size=512,
-    epochs=3,
-    tasks_to_validate=[0, 1, 2, 3, 4, 9, 24, 49, 74, 99],
-    num_tasks=10,
-    num_classes=10 * 10,
+    tasks_to_validate=[1, 4, 9, 24, 49, 99],
     distributed=False,
     seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
 
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
+)
+
+
+CENTROID_2 = deepcopy(CENTROID_BASE)
+CENTROID_2["dataset_args"].update(num_tasks=2)
+CENTROID_2["model_args"].update(num_segments=2)
+CENTROID_2.update(
+    num_tasks=2,
+    num_classes=10 * 2,
+
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks
+    epochs=1,
     optimizer_args=dict(lr=5e-4),
 )
 
-# Centroid method for inferring contexts: 50 permutedMNIST tasks
-CENTROID_50 = deepcopy(CENTROID_10)
-CENTROID_50["dataset_args"].update(num_tasks=50)
-CENTROID_50["model_args"].update(num_segments=50)
-CENTROID_50.update(
-    epochs=2,
-    num_tasks=50,
-    num_classes=10 * 50,
-    num_samples=1,
 
-    # For wandb
-    env_config=dict(
-        wandb=dict(
-            entity="nupic-research",
-            project="dendrite_baselines",
-            name="sparse_prototype_50",
-            group="sparse_prototype_50",
-            notes="""
-            Sparse network using prototypes as context.
-            """
-        )
-    ),
-)
+CENTROID_5 = deepcopy(CENTROID_BASE)
+CENTROID_5["dataset_args"].update(num_tasks=5)
+CENTROID_5["model_args"].update(num_segments=5)
+CENTROID_5.update(
+    num_tasks=5,
+    num_classes=10 * 5,
 
-# Two tasks only, for debugging
-CENTROID_2 = deepcopy(CENTROID_10)
-CENTROID_2["dataset_args"].update(num_tasks=2)
-CENTROID_2["model_args"].update(num_segments=2)
-CENTROID_2["dataset_args"].update(
-    download=False
-)
-CENTROID_2.update(
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks
     epochs=1,
-    num_samples=1,
-    num_tasks=2,
-    num_classes=10 * 2,
-    seed=6024,
+    optimizer_args=dict(lr=5e-4),
 )
 
-# This config saves hidden unit activations per task for later plotting
-FIGURE_1B = deepcopy(CENTROID_10)
-FIGURE_1B.update(
+
+CENTROID_10 = deepcopy(CENTROID_BASE)
+CENTROID_10["dataset_args"].update(num_tasks=10)
+CENTROID_10["model_args"].update(num_segments=10)
+CENTROID_10.update(
+    num_tasks=10,
+    num_classes=10 * 10,
+
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks
+    epochs=3,
+    optimizer_args=dict(lr=5e-4),
+)
+
+
+# This experiment configuration is for visualizing the hidden activations in an Active
+# Dendrites Network on a per-task basis; it produces `.pt` files which can then be used
+# by the hidden activations script to generate visualizations
+HIDDEN_ACTIVATIONS_PER_TASK = deepcopy(CENTROID_2)
+HIDDEN_ACTIVATIONS_PER_TASK.update(
     experiment_class=CentroidFigure1BExperiment,
-    num_tasks=2,
-    num_samples=1,
 
     plot_hidden_activations_args=dict(
         include_modules=[KWinners],
@@ -156,21 +150,56 @@ FIGURE_1B.update(
     ),
 )
 
-CENTROID_100 = deepcopy(CENTROID_10)
+
+CENTROID_25 = deepcopy(CENTROID_BASE)
+CENTROID_25["dataset_args"].update(num_tasks=25)
+CENTROID_25["model_args"].update(num_segments=25)
+CENTROID_25.update(
+    num_tasks=25,
+    num_classes=10 * 25,
+
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks
+    epochs=5,
+    optimizer_args=dict(lr=3e-4),
+)
+
+
+CENTROID_50 = deepcopy(CENTROID_BASE)
+CENTROID_50["dataset_args"].update(num_tasks=50)
+CENTROID_50["model_args"].update(num_segments=50)
+CENTROID_50.update(
+    num_tasks=50,
+    num_classes=10 * 50,
+
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks
+    epochs=3,
+    optimizer_args=dict(lr=3e-4),
+)
+
+
+CENTROID_100 = deepcopy(CENTROID_BASE)
 CENTROID_100["dataset_args"].update(num_tasks=100)
 CENTROID_100["model_args"].update(num_segments=100)
 CENTROID_100.update(
-    num_samples=8,
     num_tasks=100,
     num_classes=10 * 100,
+
+    # The following number of training epochs and learning rate were chosen based on a
+    # hyperparameter search that maximized final test accuracy across all tasks
+    epochs=3,
     optimizer_args=dict(lr=1e-4),
 )
+
 
 # Export configurations in this file
 CONFIGS = dict(
     centroid_2=CENTROID_2,
+    centroid_5=CENTROID_5,
     centroid_10=CENTROID_10,
+    hidden_activations_per_task=HIDDEN_ACTIVATIONS_PER_TASK,
+    centroid_25=CENTROID_25,
     centroid_50=CENTROID_50,
     centroid_100=CENTROID_100,
-    figure_1b=FIGURE_1B,
 )
