@@ -36,19 +36,9 @@ import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
-from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
-    DendriteContinualLearningExperiment,
-)
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import mixins
 
-
-class CentroidExperiment(mixins.RezeroWeights,
-                         mixins.CentroidContext,
-                         mixins.PermutedMNISTTaskIndices,
-                         DendriteContinualLearningExperiment):
-    pass
-
+from .centroid import CentroidExperiment
 
 BASE = dict(
     experiment_class=CentroidExperiment,
