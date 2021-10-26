@@ -24,8 +24,6 @@
 Mixin that uses the feedforward input as the context input.
 """
 
-import abc
-
 __all__ = [
     "InputAsContext",
     "input_as_context",
