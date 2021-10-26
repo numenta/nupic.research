@@ -23,6 +23,8 @@ from .base import CONFIGS as BASE
 from .batch import CONFIGS as BATCH
 from .batch_mnist import CONFIGS as BATCH_MNIST
 from .centroid import CONFIGS as CENTROID
+from .centroid_ten_segments import CONFIGS as CENTROID_TEN_SEGMENTS
+from .dendrites_xor_sparsity import CONFIGS as DENDRITES_XOR_SPARSITY
 from .gating import CONFIGS as GATING
 from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
 from .input_as_context import CONFIGS as INPUT_AS_CONTEXT
@@ -45,6 +47,8 @@ CONFIGS.update(BASE)
 CONFIGS.update(BATCH)
 CONFIGS.update(BATCH_MNIST)
 CONFIGS.update(CENTROID)
+CONFIGS.update(CENTROID_TEN_SEGMENTS)
+CONFIGS.update(DENDRITES_XOR_SPARSITY)
 CONFIGS.update(GATING)
 CONFIGS.update(HYPERPARAMETERSEARCH)
 CONFIGS.update(INPUT_AS_CONTEXT)
