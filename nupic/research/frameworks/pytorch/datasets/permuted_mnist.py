@@ -128,9 +128,9 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             # Initialize random binary sparse context vectors for each permutation
             self.init_sparse_binary_contexts(seed)
         elif context_type == "one_hot":
-            self.init_one_hot_context()
+            self.init_one_hot_contexts()
         elif context_type == "centroid":
-            self.init_centroids()
+            self.init_centroid_contexts()
         else:
             error_msg = f"context_type must be one of {context_type_choices}"
             raise ValueError(error_msg)
@@ -154,6 +154,11 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         return self.combine_context(img, context), target
 
     def init_sparse_binary_contexts(self, seed):
+
+        if self.dim_context is None:
+            error_msg = "Please specify dim_context when using sparse_binary_context"
+            raise ValueError(error_msg)
+
         percent_on = 0.05
         num_contexts = self.num_tasks
 
@@ -173,7 +178,7 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             self.contexts[i, :] = self.contexts[i, torch.randperm(self.dim_context,
                                                                   generator=g)]
 
-    def init_centroids(self):
+    def init_centroid_contexts(self):
         """
         Code to compute the mean image from each permutation. Note that you only need
         to compute the mean image for the base dataset. After that you can just apply
@@ -196,7 +201,7 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         # 28 x 28 -> 784
         self.contexts = self.centroids.flatten(start_dim=1)
 
-    def init_one_hot_context(self):
+    def init_one_hot_contexts(self):
         self.dim_context = self.num_tasks
         self.contexts = torch.eye(self.num_tasks, self.num_tasks)
 
