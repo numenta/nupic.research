@@ -22,15 +22,15 @@
 from .base import CONFIGS as BASE
 from .batch import CONFIGS as BATCH
 from .batch_mnist import CONFIGS as BATCH_MNIST
-from .centroid import CONFIGS as CENTROID
-from .centroid_ten_segments import CONFIGS as CENTROID_TEN_SEGMENTS
 from .dendrites_xor_sparsity import CONFIGS as DENDRITES_XOR_SPARSITY
 from .gating import CONFIGS as GATING
 from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
 from .mlp import CONFIGS as MLP
 from .no_dendrites import CONFIGS as NO_DENDRITES
 from .profiler import CONFIGS as PROFILER
-from .si_centroid import CONFIGS as SI_CENTROID
+from .prototype import CONFIGS as PROTOTYPE
+from .prototype_ten_segments import CONFIGS as PROTOTYPE_TEN_SEGMENTS
+from .si_prototype import CONFIGS as SI_PROTOTYPE
 from .sp_context import CONFIGS as SP_CONTEXT
 from .sp_context_search import CONFIGS as SP_PROTO
 
@@ -44,14 +44,14 @@ CONFIGS = dict()
 CONFIGS.update(BASE)
 CONFIGS.update(BATCH)
 CONFIGS.update(BATCH_MNIST)
-CONFIGS.update(CENTROID)
-CONFIGS.update(CENTROID_TEN_SEGMENTS)
+CONFIGS.update(PROTOTYPE)
+CONFIGS.update(PROTOTYPE_TEN_SEGMENTS)
 CONFIGS.update(DENDRITES_XOR_SPARSITY)
 CONFIGS.update(GATING)
 CONFIGS.update(HYPERPARAMETERSEARCH)
 CONFIGS.update(MLP)
 CONFIGS.update(NO_DENDRITES)
 CONFIGS.update(PROFILER)
-CONFIGS.update(SI_CENTROID)
+CONFIGS.update(SI_PROTOTYPE)
 CONFIGS.update(SP_CONTEXT)
 CONFIGS.update(SP_PROTO)
