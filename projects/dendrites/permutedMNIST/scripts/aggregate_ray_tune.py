@@ -87,17 +87,19 @@ def read_result(result_file):
 
 def get_all_results(base_dir):
     results = []
+    empty_files = []
     for dirpath, _, files in tqdm(os.walk(base_dir)):
         for file in files:
             if file == "result.json":
                 result_file = os.path.join(dirpath, file)
                 if os.stat(result_file).st_size == 0:
-                    print(f"Skipping empty file: {result_file}")
+                    empty_files.append(result_file)
                     continue
                 result = read_result(result_file)
                 if result is not None:
                     results.append(result)
 
+    print(f"Skipped over {len(empty_files)} files.")
     return results
 
 

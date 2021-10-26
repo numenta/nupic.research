@@ -22,6 +22,7 @@
 
 
 RESULTS_DIR=~/nta/dendrites_results/mlp
+DENDRITES_DIR=~/nta/dendrites_results/dendrites
 
 # Centroid context
 python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_mlp_10_centroid
@@ -36,41 +37,85 @@ python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_10_oneho
 python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_10_onehot_sparse_kw_
 
 # Sparse binary context
-
-# (these are running)
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_mlp_10_sparse_binary
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_10_sparse_binary_sparse
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_10_sparse_binary_dense_kw
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_10_sparse_binary_sparse_kw
 
 # Centroid context: scan n tasks
-python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw_
-python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw_
-python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw_
-
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_dense_kw___
 python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw___
-python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw___
-python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw___
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw___
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw__
+
+# Scan num epochs at each num_tasks for best centroid model
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw_scan_epoch
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw_scan_epoch
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw_scan_epoch
+
+# Scan number of tasks using optimal n_epochs
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw_best_epoch
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw_best_epoch
+python aggregate_ray_tune.py -d ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw_best_epoch
+
+# Self-context: search n_epochs and learning_rate
+python aggregate_ray_tune.py -d ${DENDRITES_DIR}/self_context_10
+
+# Self-context: scan n_tasks
+python aggregate_ray_tune.py -d ${DENDRITES_DIR}/self_context_10_
+python aggregate_ray_tune.py -d ${DENDRITES_DIR}/self_context_25_
+python aggregate_ray_tune.py -d ${DENDRITES_DIR}/self_context_50_
+python aggregate_ray_tune.py -d ${DENDRITES_DIR}/self_context_100_
 
 
-# python combine_csv.py -A ${RESULTS_DIR}/three_layer_mlp_10_onehot/aggregate_results.csv \
-#                          ${RESULTS_DIR}/three_layer_mlp_10_centroid/aggregate_results.csv \
-#                          ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_sparse_/aggregate_results.csv \
-#                          ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_dense_kw_/aggregate_results.csv \
-#                          ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_sparse_kw_/aggregate_results.csv \
-#                       -O ${RESULTS_DIR}/all_results.csv
+# Combine self-context runs scanning n_tasks
+python combine_csv.py -A ${DENDRITES_DIR}/self_context_25_/aggregate_results.csv \
+                         ${DENDRITES_DIR}/self_context_50_/aggregate_results.csv \
+                         ${DENDRITES_DIR}/self_context_100_/aggregate_results.csv \
+                         -O ${DENDRITES_DIR}/self_context_scan_n_tasks.csv
 
 
-# python combine_csv.py -A ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw___/aggregate_results.csv \
-#                          ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw___/aggregate_results.csv \
-#                          ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw___/aggregate_results.csv \
-#                          -O ${RESULTS_DIR}/centroid_scan_n_tasks.csv
+# Combine centroid fixing best num epochs at each n_tasks
+python combine_csv.py -A ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw_best_epoch/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw_best_epoch/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw_best_epoch/aggregate_results.csv \
+                         -O ${RESULTS_DIR}/centroid_scan_n_tasks_best_epochs.csv
 
 
+# Combine centroid num epoch scans
+python combine_csv.py -A ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw_scan_epoch/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw_scan_epoch/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw_scan_epoch/aggregate_results.csv \
+                         -O ${RESULTS_DIR}/centroid_scan_n_epochs.csv
+
+
+# Combine centroid n_tasks scan
+python combine_csv.py -A ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_dense_kw___/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_30_centroid_dense_kw___/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_50_centroid_dense_kw___/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_100_centroid_dense_kw__/aggregate_results.csv \
+                         -O ${RESULTS_DIR}/centroid_scan_n_tasks.csv
+
+
+# Combine centroid 10 hyperparameter searches
 python combine_csv.py -A ${RESULTS_DIR}/three_layer_mlp_10_centroid/aggregate_results.csv \
                          ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_sparse_/aggregate_results.csv \
                          ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_dense_kw_/aggregate_results.csv \
                          ${RESULTS_DIR}/three_layer_zero_segment_10_centroid_sparse_kw_/aggregate_results.csv \
                          -O ${RESULTS_DIR}/centroid_results.csv
 
+
+# Combine onehot 10 hyperparameter searches
 python combine_csv.py -A ${RESULTS_DIR}/three_layer_mlp_10_onehot/aggregate_results.csv \
                          ${RESULTS_DIR}/three_layer_zero_segment_10_onehot_sparse_/aggregate_results.csv \
                          ${RESULTS_DIR}/three_layer_zero_segment_10_onehot_dense_kw_/aggregate_results.csv \
                          ${RESULTS_DIR}/three_layer_zero_segment_10_onehot_sparse_kw_/aggregate_results.csv \
                          -O ${RESULTS_DIR}/onehot_results.csv
+
+
+# Combine sparse binary hyperparameter searches
+python combine_csv.py -A ${RESULTS_DIR}/three_layer_mlp_10_sparse_binary/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_10_sparse_binary_sparse/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_10_sparse_binary_dense_kw/aggregate_results.csv \
+                         ${RESULTS_DIR}/three_layer_zero_segment_10_sparse_binary_sparse_kw/aggregate_results.csv \
+                         -O ${RESULTS_DIR}/sparse_binary_results.csv
