@@ -31,27 +31,29 @@ import torch
 import torch.nn.functional as F
 
 from nupic.research.frameworks.dendrites import DendriticMLP
+from nupic.research.frameworks.dendrites.mixins import InputAsContext
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.pytorch.datasets import SelfContextPermutedMNIST
+from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins
 
 
-class SimpleExperiment(mixins.RezeroWeights,
+class SimpleExperiment(InputAsContext,
+                       mixins.RezeroWeights,
                        mixins.PermutedMNISTTaskIndices,
                        DendriteContinualLearningExperiment):
     pass
 
 
-SELF_CONTEXT_10 = dict(
+INPUT_AS_CONTEXT_10 = dict(
     experiment_class=SimpleExperiment,
     num_samples=1,
 
     # Results path
     local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
 
-    dataset_class=SelfContextPermutedMNIST,
+    dataset_class=PermutedMNIST,
     dataset_args=dict(
         num_tasks=10,
         root=os.path.expanduser("~/nta/results/data/"),
@@ -89,43 +91,53 @@ SELF_CONTEXT_10 = dict(
 )
 
 
+# Used to verify that input_as_context mixin produces the same results as
+# previous implementation with a separate dataloader.
+INPUT_AS_CONTEXT_10_REGRESSION_TEST = deepcopy(INPUT_AS_CONTEXT_10)
+INPUT_AS_CONTEXT_10_REGRESSION_TEST.update(
+    epochs=4,
+    optimizer_args=dict(lr=.0001),
+)
+
+
 # 4 epochs and lr=.0001 were the best parameters
-SELF_CONTEXT_10_ = deepcopy(SELF_CONTEXT_10)
-SELF_CONTEXT_10_.update(
+INPUT_AS_CONTEXT_10_ = deepcopy(INPUT_AS_CONTEXT_10)
+INPUT_AS_CONTEXT_10_.update(
     num_samples=4,
     epochs=4,
     optimizer_args=dict(lr=.0001)
 )
 
-SELF_CONTEXT_25_ = deepcopy(SELF_CONTEXT_10_)
-SELF_CONTEXT_25_.update(
+INPUT_AS_CONTEXT_25_ = deepcopy(INPUT_AS_CONTEXT_10_)
+INPUT_AS_CONTEXT_25_.update(
     num_tasks=25
 )
-SELF_CONTEXT_25_["dataset_args"].update(
+INPUT_AS_CONTEXT_25_["dataset_args"].update(
     num_tasks=25
 )
 
-SELF_CONTEXT_50_ = deepcopy(SELF_CONTEXT_10_)
-SELF_CONTEXT_50_.update(
+INPUT_AS_CONTEXT_50_ = deepcopy(INPUT_AS_CONTEXT_10_)
+INPUT_AS_CONTEXT_50_.update(
     num_tasks=50
 )
-SELF_CONTEXT_50_["dataset_args"].update(
+INPUT_AS_CONTEXT_50_["dataset_args"].update(
     num_tasks=50
 )
 
-SELF_CONTEXT_100_ = deepcopy(SELF_CONTEXT_10_)
-SELF_CONTEXT_100_.update(
+INPUT_AS_CONTEXT_100_ = deepcopy(INPUT_AS_CONTEXT_10_)
+INPUT_AS_CONTEXT_100_.update(
     num_tasks=100
 )
-SELF_CONTEXT_100_["dataset_args"].update(
+INPUT_AS_CONTEXT_100_["dataset_args"].update(
     num_tasks=100
 )
 
 # Export configurations in this file
 CONFIGS = dict(
-    self_context_10=SELF_CONTEXT_10,
-    self_context_10_=SELF_CONTEXT_10_,
-    self_context_25_=SELF_CONTEXT_25_,
-    self_context_50_=SELF_CONTEXT_50_,
-    self_context_100_=SELF_CONTEXT_100_,
+    input_as_context_10_regression_test=INPUT_AS_CONTEXT_10_REGRESSION_TEST,
+    input_as_context_10=INPUT_AS_CONTEXT_10,
+    input_as_context_10_=INPUT_AS_CONTEXT_10_,
+    input_as_context_25_=INPUT_AS_CONTEXT_25_,
+    input_as_context_50_=INPUT_AS_CONTEXT_50_,
+    input_as_context_100_=INPUT_AS_CONTEXT_100_,
 )

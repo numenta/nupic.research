@@ -206,19 +206,6 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         self.contexts = torch.eye(self.num_tasks, self.num_tasks)
 
 
-class SelfContextPermutedMNIST(PermutedMNIST):
-
-    def __init__(self, num_tasks, seed, train, root=".", target_transform=None,
-                 download=False):
-
-        super().__init__(num_tasks, seed, train, root, target_transform, download)
-
-    def __getitem__(self, index):
-        img, target = super().__getitem__(index)
-        img = img.flatten()
-        return (img, img), target
-
-
 def permute(x, permutation):
     """
     Applies the permutation specified by `permutation` to `x` and returns the resulting

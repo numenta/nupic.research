@@ -19,8 +19,23 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .input_as_context import *
-from .centroid_figure_1b import *
-from .eval_per_task import *
-from .sp_context_analysis import *
-from .sp_context import SpatialPoolerContext
+import abc
+
+__all__ = [
+    "InputAsContext",
+    "input_as_context",
+]
+
+
+class InputAsContext(metaclass=abc.ABCMeta):
+
+    def setup_experiment(self, config):
+
+        super().setup_experiment(config)
+
+        self.train_context_fn = input_as_context
+        self.infer_context_fn = input_as_context
+
+
+def input_as_context(data):
+    return data
