@@ -275,6 +275,33 @@ THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_.update(
     optimizer_args=dict(lr=0.0001),
 )
 
+THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_SCAN_EPOCH = deepcopy(
+    THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_
+)
+THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_SCAN_EPOCH.update(
+    epochs=tune.grid_search([1, 2, 3, 4]),
+    num_samples=1,
+)
+
+THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_BEST_EPOCH = deepcopy(
+    THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_
+)
+THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_BEST_EPOCH.update(
+    epochs=3,
+)
+
+
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_AVG = deepcopy(
+    THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_AVG.update(
+    num_classes=10 * 10,
+    num_tasks=10,
+    tasks_to_validate=[9],
+)
+THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_AVG["dataset_args"].update(
+    num_tasks=10
+)
+
 THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_.update(
@@ -286,6 +313,20 @@ THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_["dataset_args"].update(
     num_tasks=50
 )
 
+THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_SCAN_EPOCH = deepcopy(
+    THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_
+)
+THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_SCAN_EPOCH.update(
+    epochs=tune.grid_search([1, 2, 3, 4]),
+    num_samples=1,
+)
+
+THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_BEST_EPOCH = deepcopy(
+    THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_
+)
+THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_BEST_EPOCH.update(
+    epochs=2,
+)
 
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
@@ -296,6 +337,31 @@ THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_.update(
 )
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_["dataset_args"].update(
     num_tasks=100
+)
+
+THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_SCAN_EPOCH = deepcopy(
+    THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_SCAN_EPOCH.update(
+    epochs=tune.grid_search([1, 2, 3, 4]),
+    num_samples=1,
+)
+
+THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_BEST_EPOCH = deepcopy(
+    THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_
+)
+THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_BEST_EPOCH.update(
+    epochs=1,
+)
+
+THREE_LAYER_ZERO_SEGMENT_250_CENTROID_DENSE_KW_ = deepcopy(
+    THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
+THREE_LAYER_ZERO_SEGMENT_250_CENTROID_DENSE_KW_.update(
+    num_classes=10 * 250,
+    num_tasks=250,
+    tasks_to_validate=[249],
+)
+THREE_LAYER_ZERO_SEGMENT_250_CENTROID_DENSE_KW_["dataset_args"].update(
+    num_tasks=250
 )
 
 ###
@@ -377,7 +443,18 @@ CONFIGS = dict(
     three_layer_zero_segment_10_sparse_binary_sparse_kw=THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE_KW,  # noqa E501
 
     # Scan number of tasks
+    three_layer_zero_segment_10_centroid_dense_kw___=THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_AVG,  # noqa E501
     three_layer_zero_segment_30_centroid_dense_kw___=THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_,  # noqa E501
     three_layer_zero_segment_50_centroid_dense_kw___=THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_,  # noqa E501
     three_layer_zero_segment_100_centroid_dense_kw___=THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_,  # noqa E501
+
+    # Check num epochs for each num_tasks in best model
+    three_layer_zero_segment_30_centroid_dense_kw_scan_epoch=THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_SCAN_EPOCH,  # noqa E501
+    three_layer_zero_segment_50_centroid_dense_kw_scan_epoch=THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_SCAN_EPOCH,  # noqa E501
+    three_layer_zero_segment_100_centroid_dense_kw_scan_epoch=THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_SCAN_EPOCH,  # noqa E501
+
+    # Scan number of tasks using optimal n_epochs
+    three_layer_zero_segment_30_centroid_dense_kw_best_epoch=THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_BEST_EPOCH,  # noqa E501
+    three_layer_zero_segment_50_centroid_dense_kw_best_epoch=THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_BEST_EPOCH,  # noqa E501
+    three_layer_zero_segment_100_centroid_dense_kw_best_epoch=THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_BEST_EPOCH,  # noqa E501
 )

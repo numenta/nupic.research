@@ -23,6 +23,7 @@ Experiment file that runs dendritic networks which use the raw image as context
 """
 
 import os
+from copy import deepcopy
 
 import numpy as np
 import ray.tune as tune
@@ -88,7 +89,43 @@ SELF_CONTEXT_10 = dict(
 )
 
 
+# 4 epochs and lr=.0001 were the best parameters
+SELF_CONTEXT_10_ = deepcopy(SELF_CONTEXT_10)
+SELF_CONTEXT_10_.update(
+    num_samples=4,
+    epochs=4,
+    optimizer_args=dict(lr=.0001)
+)
+
+SELF_CONTEXT_25_ = deepcopy(SELF_CONTEXT_10_)
+SELF_CONTEXT_25_.update(
+    num_tasks=25
+)
+SELF_CONTEXT_25_["dataset_args"].update(
+    num_tasks=25
+)
+
+SELF_CONTEXT_50_ = deepcopy(SELF_CONTEXT_10_)
+SELF_CONTEXT_50_.update(
+    num_tasks=50
+)
+SELF_CONTEXT_50_["dataset_args"].update(
+    num_tasks=50
+)
+
+SELF_CONTEXT_100_ = deepcopy(SELF_CONTEXT_10_)
+SELF_CONTEXT_100_.update(
+    num_tasks=100
+)
+SELF_CONTEXT_100_["dataset_args"].update(
+    num_tasks=100
+)
+
 # Export configurations in this file
 CONFIGS = dict(
     self_context_10=SELF_CONTEXT_10,
+    self_context_10_=SELF_CONTEXT_10_,
+    self_context_25_=SELF_CONTEXT_25_,
+    self_context_50_=SELF_CONTEXT_50_,
+    self_context_100_=SELF_CONTEXT_100_,
 )
