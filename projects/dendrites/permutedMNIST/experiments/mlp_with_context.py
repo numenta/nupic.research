@@ -260,7 +260,7 @@ THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW_["model_args"].update(
 # Pick the best MLP from all the models above, and scan up to 30, 50, 100 tasks
 # Best model happened to use centroid context, lr=.0001, kw_percent_on = .05
 # Hyperparameters were fixed for some of these experiments. The suffix scan_epoch means
-# for each num_tasks (03, 50 , 100), tune the number of epochs to train for on each task.
+# for each num_tasks (03, 50 , 100), tune the number of epochs to train for per task.
 # The suffix best_epoch means using the number of epochs found from scan_epochs.
 ###
 
