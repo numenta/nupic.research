@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 
-class InputAsContext(metaclass=abc.ABCMeta):
+class InputAsContext:
 
     def setup_experiment(self, config):
 
