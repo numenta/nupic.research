@@ -41,6 +41,7 @@ from .mlp import THREE_LAYER_MLP_10
 from.no_dendrites import NoDendriteExperiment
 
 
+# 10 tasks, dense MLP, onehot context vector concatenated to the input
 THREE_LAYER_MLP_10_ONEHOT = deepcopy(THREE_LAYER_MLP_10)
 THREE_LAYER_MLP_10_ONEHOT.update(
     dataset_class=ContextDependentPermutedMNIST,
@@ -74,6 +75,8 @@ THREE_LAYER_MLP_10_ONEHOT.update(
     ),
 )
 
+# 10 tasks, dense mlp, centroid (mean image per task) as context concatenated
+# to the input
 THREE_LAYER_MLP_10_CENTROID = deepcopy(THREE_LAYER_MLP_10_ONEHOT)
 THREE_LAYER_MLP_10_CENTROID["dataset_args"].update(
     context_type="centroid",
@@ -83,6 +86,8 @@ THREE_LAYER_MLP_10_CENTROID["model_args"].update(
     input_size=784 + 784,  # 784 image + 784 context
 )
 
+# 10 tasks, one random sparse binary vector as context per task concatenated
+# to the input
 THREE_LAYER_MLP_10_SPARSE_BINARY = deepcopy(THREE_LAYER_MLP_10_ONEHOT)
 THREE_LAYER_MLP_10_SPARSE_BINARY["dataset_args"].update(
     context_type="sparse_binary",
@@ -93,7 +98,9 @@ THREE_LAYER_MLP_10_SPARSE_BINARY["model_args"].update(
     input_size=784 + 784
 )
 
-
+# As above, but sparse weights. Note that configs that say three_layer_MLP
+# are no longer used if there is sparsity, as these include things like boosting
+# and duty cycles. I kept these configs here as more of a historical record.
 THREE_LAYER_MLP_10_ONEHOT_SPARSE = deepcopy(THREE_LAYER_MLP_10_ONEHOT)
 THREE_LAYER_MLP_10_ONEHOT_SPARSE.update(
     model_class=SparseMLP,
@@ -154,6 +161,8 @@ THREE_LAYER_MLP_10_CENTROID_SPARSE_KW["model_args"].update(
 # Zero segment instead of SparseMLP
 ###
 
+# 10 tasks, onehot vector with task id concatenated to input
+# k winners activations, but dense weights
 THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_ = deepcopy(
     THREE_LAYER_MLP_10_ONEHOT_DENSE_KW)
 THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_.update(
@@ -174,6 +183,7 @@ THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_.update(
     )
 )
 
+# as above, but centroid context concatenated to input image
 THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_MLP_10_CENTROID_DENSE_KW)
 THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_.update(
@@ -194,6 +204,9 @@ THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_.update(
     )
 )
 
+
+# 10 tasks, onehot task vector concatenated to input
+# sparse weights, dense activations
 THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_.update(
@@ -211,6 +224,7 @@ THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_.update(
     )
 )
 
+# as above, but centroid context
 THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_.update(
@@ -228,7 +242,7 @@ THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_.update(
     )
 )
 
-
+# as above, onehot context vector, BOTH sparse weights and activations
 THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_10_ONEHOT_SPARSE_KW_["model_args"].update(
@@ -243,8 +257,14 @@ THREE_LAYER_ZERO_SEGMENT_10_CENTROID_SPARSE_KW_["model_args"].update(
 
 ###
 # Scan n tasks
+# Pick the best MLP from all the models above, and scan up to 30, 50, 100 tasks
+# Best model happened to use centroid context, lr=.0001, kw_percent_on = .05
+# Hyperparameters were fixed for some of these experiments. The suffix scan_epoch means
+# for each num_tasks (03, 50 , 100), tune the number of epochs to train for on each task.
+# The suffix best_epoch means using the number of epochs found from scan_epochs.
 ###
 
+# 30 tasks, no epoch tuning
 THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_.update(
@@ -275,6 +295,8 @@ THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_.update(
     optimizer_args=dict(lr=0.0001),
 )
 
+
+# 30 tasks, tune the number of epochs
 THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_SCAN_EPOCH = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_
 )
@@ -283,6 +305,8 @@ THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_SCAN_EPOCH.update(
     num_samples=1,
 )
 
+# 30 tasks, using the tuned epochs parameter. Runs 8 times so you can average over
+# different random seeds.
 THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_BEST_EPOCH = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_
 )
@@ -290,7 +314,8 @@ THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_BEST_EPOCH.update(
     epochs=3,
 )
 
-
+# Did not scan epochs for the 10 task model, just use best hyperparameters
+# and average over 8 runs.
 THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_AVG = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_AVG.update(
@@ -302,6 +327,7 @@ THREE_LAYER_ZERO_SEGMENT_10_CENTROID_DENSE_KW_AVG["dataset_args"].update(
     num_tasks=10
 )
 
+# 50 tasks, prior to tuning number of epochs
 THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_.update(
@@ -313,6 +339,7 @@ THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_["dataset_args"].update(
     num_tasks=50
 )
 
+# 50 tasks, scan the number of epochs
 THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_SCAN_EPOCH = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_
 )
@@ -321,6 +348,7 @@ THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_SCAN_EPOCH.update(
     num_samples=1,
 )
 
+# 50 tasks, use best number of epochs
 THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_BEST_EPOCH = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_
 )
@@ -328,6 +356,7 @@ THREE_LAYER_ZERO_SEGMENT_50_CENTROID_DENSE_KW_BEST_EPOCH.update(
     epochs=2,
 )
 
+# 100 tasks, pre epoch tuning
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_.update(
@@ -339,6 +368,7 @@ THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_["dataset_args"].update(
     num_tasks=100
 )
 
+# 100 tasks, tuning epochs
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_SCAN_EPOCH = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_SCAN_EPOCH.update(
@@ -346,6 +376,7 @@ THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_SCAN_EPOCH.update(
     num_samples=1,
 )
 
+# 100 tasks, best epoch parameter
 THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_BEST_EPOCH = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_
 )
@@ -353,6 +384,11 @@ THREE_LAYER_ZERO_SEGMENT_100_CENTROID_DENSE_KW_BEST_EPOCH.update(
     epochs=1,
 )
 
+
+# 250 tasks, pre epoch tuning. I never actually ran this, but results were suggesting
+# that the performance gap between best MLP with context, and dendrites model is widest
+# when the number of tasks is largest. Running with way more tasks could be interesting
+# to try, so the config is available.
 THREE_LAYER_ZERO_SEGMENT_250_CENTROID_DENSE_KW_ = deepcopy(
     THREE_LAYER_ZERO_SEGMENT_30_CENTROID_DENSE_KW_)
 THREE_LAYER_ZERO_SEGMENT_250_CENTROID_DENSE_KW_.update(
@@ -365,7 +401,7 @@ THREE_LAYER_ZERO_SEGMENT_250_CENTROID_DENSE_KW_["dataset_args"].update(
 )
 
 ###
-# Sparse binary conext
+# Hyperparameter tuning for MLP or ZeroSegmentDendrite model using sparse binary context
 ###
 
 THREE_LAYER_ZERO_SEGMENT_10_SPARSE_BINARY_SPARSE = deepcopy(

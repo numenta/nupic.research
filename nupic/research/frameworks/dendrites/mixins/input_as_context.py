@@ -19,6 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+
+"""
+Mixin that uses the feedforward input as the context input.
+"""
+
 import abc
 
 __all__ = [

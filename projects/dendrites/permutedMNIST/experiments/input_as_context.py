@@ -108,6 +108,8 @@ INPUT_AS_CONTEXT_10_.update(
     optimizer_args=dict(lr=.0001)
 )
 
+
+# Fix best hyperparameters and increase the number of tasks to 25, 50, 100
 INPUT_AS_CONTEXT_25_ = deepcopy(INPUT_AS_CONTEXT_10_)
 INPUT_AS_CONTEXT_25_.update(
     num_tasks=25
