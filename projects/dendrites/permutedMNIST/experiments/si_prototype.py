@@ -177,7 +177,7 @@ SI_PROTOTYPE_50_TEST_WITH_SI.update(
 
 # Export configurations in this file
 CONFIGS = dict(
-    si__10=SI_PROTOTYPE_10,
+    si_prototype_10=SI_PROTOTYPE_10,
     si_prototype_50=SI_PROTOTYPE_50,
     si_prototype_100=SI_PROTOTYPE_100,
     si_prototype_hp_10=SI_PROTOTYPE_HP_10,
