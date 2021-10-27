@@ -19,16 +19,22 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
+from nupic.research.frameworks.meta_continual_learning.experiments import (
+    MetaContinualLearningExperiment,
+)
+from nupic.research.frameworks.meta_continual_learning.mixins import (
+    mixins as metacl_mixins,
+)
+from nupic.research.frameworks.vernon import mixins
 
 
-class OMLExperiment(mixins.OnlineMetaLearning,
+class OMLExperiment(metacl_mixins.OnlineMetaLearning,
                     MetaContinualLearningExperiment):
     pass
 
 
 class DendritesExperiment(mixins.RezeroWeights,
-                          mixins.OnlineMetaLearning,
+                          metacl_mixins.OnlineMetaLearning,
                           MetaContinualLearningExperiment):
     """
     This is similar to OMLExperiment, but now there is rezero weights.
@@ -38,7 +44,7 @@ class DendritesExperiment(mixins.RezeroWeights,
 
 class BoostedDendritesExperiment(mixins.UpdateDendriteBoostStrength,
                                  mixins.RezeroWeights,
-                                 mixins.OnlineMetaLearning,
+                                 metacl_mixins.OnlineMetaLearning,
                                  MetaContinualLearningExperiment):
     """
     This is similar to DendritesExperiment, but with an added mixin to update the boost

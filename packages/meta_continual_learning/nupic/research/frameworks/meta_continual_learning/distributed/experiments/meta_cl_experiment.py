@@ -24,16 +24,16 @@ import torch.distributed as dist
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
 
-from nupic.research.frameworks.continual_learning.maml_utils import clone_model
+from nupic.research.frameworks.meta_continual_learning.experiments import (
+    MetaContinualLearningExperiment as MetaContinualLearningExperimentBase,
+)
+from nupic.research.frameworks.meta_continual_learning.maml_utils import clone_model
 from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
     TaskDistributedSampler,
 )
 from nupic.research.frameworks.pytorch.model_utils import get_parent_module
 from nupic.research.frameworks.vernon.distributed.experiments.components import (
     DistributedBase,
-)
-from nupic.research.frameworks.vernon.experiments.meta_cl_experiment import (
-    MetaContinualLearningExperiment as MetaContinualLearningExperimentBase,
 )
 
 __all__ = [

@@ -38,6 +38,10 @@ from nupic.research.frameworks.pytorch.model_utils import (
     train_model,
 )
 
+__all__ = [
+    "OnlineMetaLearning",
+]
+
 
 class OnlineMetaLearning(object):
     """

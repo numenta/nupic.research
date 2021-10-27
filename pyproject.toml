@@ -17,6 +17,16 @@ exclude = '''
 )/
 '''
 
+[tool.pytest.ini_options]
+minversion = '6.0'
+addopts = '-ra -n auto'
+testpaths = [
+    'tests/unit',
+]
+filterwarnings = [
+    'ignore:.*:DeprecationWarning'
+]
+
 [tool.isort]
 multi_line_output = 3
 include_trailing_comma = true

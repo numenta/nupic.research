@@ -30,21 +30,12 @@ from nupic.research.frameworks.dendrites import (
     DendriticAbsoluteMaxGate1d,
     plot_mean_selected_activations,
 )
-from nupic.research.frameworks.vernon import (
-    MetaContinualLearningExperiment,
-    SupervisedExperiment,
-    mixins,
-)
+from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
 from nupic.torch.modules import KWinners, SparseWeights
 
 
 class TrackStatsSupervisedExperiment(mixins.PlotDendriteMetrics,
                                      SupervisedExperiment):
-    pass
-
-
-class TrackStatsMetaCLExperiment(mixins.PlotDendriteMetrics,
-                                 MetaContinualLearningExperiment):
     pass
 
 
@@ -116,13 +107,6 @@ simple_supervised_config = dict(
 )
 
 
-simple_metacl_config = {**simple_supervised_config}
-simple_metacl_config.update(
-    experiment_class=TrackStatsMetaCLExperiment,
-    fast_params=[".*"],  # <- all params
-)
-
-
 class PlotDendriteMetricsTest(unittest.TestCase):
     """
     This is a test class for the `PlotDendriteMetrics` mixin.
@@ -169,37 +153,6 @@ class PlotDendriteMetricsTest(unittest.TestCase):
             else:
                 # These should cap off at `num_samples_to_track=400`
                 self.assertTrue(batch_size1 == batch_size2 == batch_size3 == 400)
-
-    def test_dendrite_metrics_tracking_metacl_experiment(self):
-        """
-        Test whether TrackMeanSelectedActivations works in the metacl setting.
-        """
-
-        # Setup experiment and initialize model.
-        exp = simple_metacl_config["experiment_class"]()
-        exp.setup_experiment(simple_metacl_config)
-
-        # Loop through some pseudo epochs.
-        for i in range(5):
-            ret = exp.run_epoch()
-
-            # The plot frequency is 2 and should be logged every 2 epochs.
-            if i % 2 == 0:
-                self.assertTrue("mean_selected/dendritic_gate" in ret)
-
-                # Raw data should be logged whenever a plot is logged.
-                self.assertTrue("targets/dendritic_gate" in ret)
-                self.assertTrue("dendrite_activations/dendritic_gate" in ret)
-                self.assertTrue("winning_mask/dendritic_gate" in ret)
-
-                # The raw data should be a numpy array.
-                targets = ret["targets/dendritic_gate"]
-                activations = ret["dendrite_activations/dendritic_gate"]
-                winners = ret["winning_mask/dendritic_gate"]
-
-                self.assertTrue(isinstance(targets, np.ndarray))
-                self.assertTrue(isinstance(activations, np.ndarray))
-                self.assertTrue(isinstance(winners, np.ndarray))
 
 
 if __name__ == "__main__":
