@@ -102,6 +102,13 @@ THREE_LAYER_MLP_100.update(
 )
 
 
+THREE_LAYER_MLP_250 = deepcopy(THREE_LAYER_MLP_100)
+THREE_LAYER_MLP_250.update(
+    num_tasks=250,
+    num_classes=10 * 250,
+)
+
+
 # MLP with 10 layers on 10 permutedMNIST tasks
 TEN_LAYER_MLP_10 = deepcopy(DEFAULT)
 TEN_LAYER_MLP_10["dataset_args"].update(num_tasks=100)
