@@ -19,7 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .centroid_context import *
 from .composite_loss import CompositeLoss
 from .configure_optimizer_param_groups import ConfigureOptimizerParamGroups
 from .constrain_parameters import ConstrainParameters
@@ -47,6 +46,7 @@ from .oml import OnlineMetaLearning
 from .permuted_mnist_task_indices import *
 from .profile import Profile
 from .profile_autograd import ProfileAutograd
+from .prototype_context import *
 from .prune_low_magnitude import PruneLowMagnitude
 from .prune_low_snr import PruneLowSNRGlobal, PruneLowSNRLayers
 from .reduce_lr_after_task import ReduceLRAfterTask
