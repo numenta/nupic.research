@@ -37,10 +37,10 @@ def hyperparameter_dendrites_wit_si_search_panel():
     sparsity and column 3 the weight sparsity.
     """
 
-    df_path1 = f"{experiment_folder}si_centroid_hp_10_lasttask.csv"
+    df_path1 = f"{experiment_folder}si_prototype_hp_10_lasttask.csv"
     df1 = pd.read_csv(df_path1)
 
-    df_path2 = f"{experiment_folder}si_centroid_hp_10_control_lasttask.csv"
+    df_path2 = f"{experiment_folder}si_prototype_hp_10_control_lasttask.csv"
     df2 = pd.read_csv(df_path2)
 
     df1 = df1[["Activation sparsity", "FF weight sparsity", "Num segments",

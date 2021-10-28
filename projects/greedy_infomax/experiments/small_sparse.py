@@ -62,7 +62,7 @@ DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
 
 BATCH_SIZE = 32
 NUM_EPOCHS = 10
-model_args = DEFAULT_BASE["model_args"]
+model_args = deepcopy(DEFAULT_BASE["model_args"])
 static_sparse_weights = dict(
     # weight sparsity
     sparsity=dict(

@@ -34,7 +34,6 @@ class EvalPerTask:
         for each of those tasks independently.
         """
 
-        # Figure this out
         if loader is None:
             loader = self.val_loader
 
