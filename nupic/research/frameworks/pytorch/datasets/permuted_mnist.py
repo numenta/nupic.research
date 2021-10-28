@@ -103,7 +103,7 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
 
     Unique to ContextDependentPermutedMNIST
         :param context_type: string indicating what kind of context vector to select.
-                             Must be one of ["sparse_binary", "one_hot", "centroid"].
+                             Must be one of ["sparse_binary", "one_hot", "prototype"].
         :param combine_context_as: string indicating if context should be combined with
                                    data by packing both in a tuple, or concatenating
                                    context to the data. Must be one of
@@ -120,7 +120,7 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         self.context_type = context_type
 
         # options for type of context and way of combining with input x
-        context_type_choices = ["sparse_binary", "one_hot", "centroid"]
+        context_type_choices = ["sparse_binary", "one_hot", "prototype"]
         combine_context_as_choices = ["tuple", "concatenate"]
 
         # Parse type of context
@@ -129,8 +129,8 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             self.init_sparse_binary_contexts(seed)
         elif context_type == "one_hot":
             self.init_one_hot_contexts()
-        elif context_type == "centroid":
-            self.init_centroid_contexts()
+        elif context_type == "prototype":
+            self.init_prototype_contexts()
         else:
             error_msg = f"context_type must be one of {context_type_choices}"
             raise ValueError(error_msg)
@@ -178,28 +178,28 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
             self.contexts[i, :] = self.contexts[i, torch.randperm(self.dim_context,
                                                                   generator=g)]
 
-    def init_centroid_contexts(self):
+    def init_prototype_contexts(self):
         """
         Code to compute the mean image from each permutation. Note that you only need
         to compute the mean image for the base dataset. After that you can just apply
         each permutation to the mean vector.
         """
         self.dim_context = 784
-        self.centroids = torch.zeros((self.num_tasks, 28, 28))
+        self.contexts = torch.zeros((self.num_tasks, 28, 28))
         for index in range(len(self.data)):
             img, _ = super().__getitem__(index)
-            self.centroids[0] += img.squeeze(0)
+            self.contexts[0] += img.squeeze(0)
 
         # This first row has the pixelwise sum for MNIST, divide to get mean
-        self.centroids[0] /= len(self.data)
+        self.contexts[0] /= len(self.data)
 
         # Now just apply permutations to the mean vector, one for each remaining task
         for task in range(1, self.num_tasks):
-            self.centroids[task] = permute(self.centroids[0].unsqueeze(0),
-                                           self.permutations[task])
+            self.contexts[task] = permute(self.contexts[0].unsqueeze(0),
+                                          self.permutations[task])
 
         # 28 x 28 -> 784
-        self.contexts = self.centroids.flatten(start_dim=1)
+        self.contexts = self.contexts.flatten(start_dim=1)
 
     def init_one_hot_contexts(self):
         self.dim_context = self.num_tasks

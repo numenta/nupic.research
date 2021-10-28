@@ -27,7 +27,7 @@ import torch
 
 from nupic.research.frameworks.vernon import mixins
 
-from .centroid import CENTROID_10, CENTROID_50
+from .prototype import PROTOTYPE_10, PROTOTYPE_50
 
 __all__ = ["CONFIGS"]
 
@@ -41,9 +41,9 @@ WANDB_ARGS = {
     "group": "profiler",
     "notes": "Profiler for dendrite network",
 }
-CENTROID_10_PROFILER = deepcopy(CENTROID_10)
-experiment_class = CENTROID_10_PROFILER["experiment_class"]
-CENTROID_10_PROFILER.update(
+PROTOTYPE_10_PROFILER = deepcopy(PROTOTYPE_10)
+experiment_class = PROTOTYPE_10_PROFILER["experiment_class"]
+PROTOTYPE_10_PROFILER.update(
     experiment_class=mixins.inject_torch_profiler_mixin(experiment_class),
     epochs=1,
     num_samples=1,
@@ -51,12 +51,12 @@ CENTROID_10_PROFILER.update(
     wandb_args=WANDB_ARGS,
 )
 
-CENTROID_10_ONE_SEGMENT_PROFILER = deepcopy(CENTROID_10_PROFILER)
-CENTROID_10_ONE_SEGMENT_PROFILER["model_args"].update(num_segments=1)
+PROTOTYPE_10_ONE_SEGMENT_PROFILER = deepcopy(PROTOTYPE_10_PROFILER)
+PROTOTYPE_10_ONE_SEGMENT_PROFILER["model_args"].update(num_segments=1)
 
-CENTROID_50_PROFILER = deepcopy(CENTROID_50)
-experiment_class = CENTROID_50_PROFILER["experiment_class"]
-CENTROID_50_PROFILER.update(
+PROTOTYPE_50_PROFILER = deepcopy(PROTOTYPE_50)
+experiment_class = PROTOTYPE_50_PROFILER["experiment_class"]
+PROTOTYPE_50_PROFILER.update(
     experiment_class=mixins.inject_torch_profiler_mixin(experiment_class),
     epochs=1,
     num_samples=1,
@@ -64,13 +64,13 @@ CENTROID_50_PROFILER.update(
     wandb_args=WANDB_ARGS,
 )
 
-CENTROID_10_TWO_SEGMENT_PROFILER = deepcopy(CENTROID_10_PROFILER)
-CENTROID_10_TWO_SEGMENT_PROFILER["model_args"].update(num_segments=2)
+PROTOTYPE_10_TWO_SEGMENT_PROFILER = deepcopy(PROTOTYPE_10_PROFILER)
+PROTOTYPE_10_TWO_SEGMENT_PROFILER["model_args"].update(num_segments=2)
 
 # Export configurations in this file
 CONFIGS = dict(
-    centroid_10_profiler=CENTROID_10_PROFILER,
-    centroid_10_one_segment_profiler=CENTROID_10_ONE_SEGMENT_PROFILER,
-    centroid_10_two_segment_profiler=CENTROID_10_TWO_SEGMENT_PROFILER,
-    centroid_50_profiler=CENTROID_50_PROFILER,
+    prototype_10_profiler=PROTOTYPE_10_PROFILER,
+    prototype_10_one_segment_profiler=PROTOTYPE_10_ONE_SEGMENT_PROFILER,
+    prototype_10_two_segment_profiler=PROTOTYPE_10_TWO_SEGMENT_PROFILER,
+    prototype_50_profiler=PROTOTYPE_50_PROFILER,
 )

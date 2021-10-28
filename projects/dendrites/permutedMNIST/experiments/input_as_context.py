@@ -61,7 +61,7 @@ INPUT_AS_CONTEXT_10 = dict(
         seed=42,
     ),
 
-    model_class=DendriticMLP,  # CentroidDendriticMLP does not affect accuracy..??
+    model_class=DendriticMLP,
     model_args=dict(
         input_size=784,
         output_size=10,  # Single output head shared by all tasks
