@@ -46,7 +46,7 @@ class SpatialPoolerAnalysis(metaclass=abc.ABCMeta):
         # cycle
         self.model.train()
 
-        # Tensor for accumulating each task's centroid vector
+        # Tensor for accumulating each task's prototype vector
         self.contexts = torch.zeros((0, self.dim_context))
         self.tasks = []
 

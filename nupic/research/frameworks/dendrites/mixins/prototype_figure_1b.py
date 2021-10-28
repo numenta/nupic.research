@@ -24,11 +24,11 @@ import numpy as np
 import torch
 
 __all__ = [
-    "CentroidFigure1B",
+    "PrototypeFigure1B",
 ]
 
 
-class CentroidFigure1B:
+class PrototypeFigure1B:
     """
     Mixin for generating data used to plot Figure 1B in the following CNS submission:
 
