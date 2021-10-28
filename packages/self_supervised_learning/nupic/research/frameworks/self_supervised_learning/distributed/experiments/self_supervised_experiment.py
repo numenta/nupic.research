@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.vernon import (
+from nupic.research.frameworks.self_supervised_learning.experiments import (
     SelfSupervisedExperiment as SelfSupervisedExperimentBase,
 )
 from nupic.research.frameworks.vernon.distributed.experiments import (

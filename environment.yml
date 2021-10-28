@@ -20,6 +20,8 @@ dependencies:
       # Install nupic.research in development mode with dev tools extras enabled
       - -e ".[dev]"
 
+      - -e packages/self_supervised_learning
+
       # Install projects extra dependency
       # See `setup.cfg` for available extras.
       # - -e ".[vernon]"
