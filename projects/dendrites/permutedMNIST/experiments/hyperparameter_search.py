@@ -45,7 +45,7 @@ from nupic.research.frameworks.vernon import mixins
 
 class NbSegmentSearchExperiment(
     mixins.RezeroWeights,
-    mixins.CentroidContext,
+    mixins.PrototypeContext,
     mixins.PermutedMNISTTaskIndices,
     DendriteContinualLearningExperiment,
 ):
