@@ -62,7 +62,7 @@ DEFAULT_BASE = dict(
         root=os.path.expanduser("~/nta/results/data/"),
         dim_context=1024,
         seed=42,
-        download=False,  # Change to True if running for the first time
+        download=True,  # Change to True if running for the first time
     ),
 
     model_class=DendriticMLP,

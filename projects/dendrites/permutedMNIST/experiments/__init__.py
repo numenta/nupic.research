@@ -25,7 +25,9 @@ from .batch_mnist import CONFIGS as BATCH_MNIST
 from .dendrites_xor_sparsity import CONFIGS as DENDRITES_XOR_SPARSITY
 from .gating import CONFIGS as GATING
 from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
+from .input_as_context import CONFIGS as INPUT_AS_CONTEXT
 from .mlp import CONFIGS as MLP
+from .mlp_with_context import CONFIGS as MLP_WITH_CONTEXT
 from .no_dendrites import CONFIGS as NO_DENDRITES
 from .profiler import CONFIGS as PROFILER
 from .prototype import CONFIGS as PROTOTYPE
@@ -47,7 +49,9 @@ CONFIGS.update(BATCH_MNIST)
 CONFIGS.update(DENDRITES_XOR_SPARSITY)
 CONFIGS.update(GATING)
 CONFIGS.update(HYPERPARAMETERSEARCH)
+CONFIGS.update(INPUT_AS_CONTEXT)
 CONFIGS.update(MLP)
+CONFIGS.update(MLP_WITH_CONTEXT)
 CONFIGS.update(NO_DENDRITES)
 CONFIGS.update(PROFILER)
 CONFIGS.update(PROTOTYPE)

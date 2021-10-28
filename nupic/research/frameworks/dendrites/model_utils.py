@@ -94,7 +94,7 @@ def train_dendrite_model(
 
         # `data` may be a 2-item list comprising the example data and context signal in
         # case context is explicitly provided
-        if isinstance(data, list):
+        if isinstance(data, (list, tuple)):
             if context_vector is None:
                 data, context = data
             else:
