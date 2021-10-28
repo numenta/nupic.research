@@ -69,6 +69,8 @@ def train_dendrite_model(
     :param active_classes: List of indices of the heads that are active for a given
                            task; only relevant if this function is being used in a
                            continual learning scenario
+    :param train_context_fn: A function that computes the context vector to use given a
+                             batch of data samples
     :param context_vector: If not None, use this context vector in place of any that
                            we get from the loader
     :param post_batch_callback: Callback function to be called after every batch

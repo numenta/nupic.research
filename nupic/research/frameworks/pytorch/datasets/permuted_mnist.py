@@ -185,21 +185,21 @@ class ContextDependentPermutedMNIST(PermutedMNIST):
         each permutation to the mean vector.
         """
         self.dim_context = 784
-        self.prototypes = torch.zeros((self.num_tasks, 28, 28))
+        self.contexts = torch.zeros((self.num_tasks, 28, 28))
         for index in range(len(self.data)):
             img, _ = super().__getitem__(index)
-            self.prototypes[0] += img.squeeze(0)
+            self.contexts[0] += img.squeeze(0)
 
         # This first row has the pixelwise sum for MNIST, divide to get mean
-        self.prototypes[0] /= len(self.data)
+        self.contexts[0] /= len(self.data)
 
         # Now just apply permutations to the mean vector, one for each remaining task
         for task in range(1, self.num_tasks):
-            self.prototypes[task] = permute(self.prototypes[0].unsqueeze(0),
-                                           self.permutations[task])
+            self.contexts[task] = permute(self.contexts[0].unsqueeze(0),
+                                          self.permutations[task])
 
         # 28 x 28 -> 784
-        self.contexts = self.prototypes.flatten(start_dim=1)
+        self.contexts = self.contexts.flatten(start_dim=1)
 
     def init_one_hot_contexts(self):
         self.dim_context = self.num_tasks
