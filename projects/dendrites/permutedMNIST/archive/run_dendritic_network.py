@@ -32,9 +32,12 @@ stabilization' (Masse et al., 2018).
 import torch
 import torch.nn.functional as F
 
+from nupic.research.frameworks.continual_learning.experiments import (
+    ContinualLearningExperiment,
+)
 from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedMNIST
-from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
+from nupic.research.frameworks.vernon import mixins
 
 
 # ------ Experiment class

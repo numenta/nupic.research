@@ -26,6 +26,7 @@ import numpy as np
 import ray.tune as tune
 import torch.nn as nn
 
+from nupic.research.frameworks.continual_learning import mixins as cl_mixins
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
@@ -37,7 +38,7 @@ from nupic.torch.modules import KWinners, SparseWeights
 
 class SPExperiment(mixins.RezeroWeights,
                    mixins.UpdateBoostStrength,
-                   mixins.PermutedMNISTTaskIndices,
+                   cl_mixins.PermutedMNISTTaskIndices,
                    SpatialPoolerAnalysis,
                    DendriteContinualLearningExperiment):
     pass

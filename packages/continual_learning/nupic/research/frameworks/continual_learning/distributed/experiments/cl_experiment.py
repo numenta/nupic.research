@@ -22,14 +22,12 @@
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
 
-from nupic.research.frameworks.pytorch.dataset_utils.samplers import (
-    TaskDistributedSampler,
+from nupic.research.frameworks.continual_learning.experiments.cl_experiment import (
+    ContinualLearningExperiment as ContinualLearningExperimentBase,
 )
+from nupic.research.frameworks.continual_learning.samplers import TaskDistributedSampler
 from nupic.research.frameworks.vernon.distributed.experiments.components import (
     DistributedBase,
-)
-from nupic.research.frameworks.vernon.experiments.cl_experiment import (
-    ContinualLearningExperiment as ContinualLearningExperimentBase,
 )
 
 __all__ = [

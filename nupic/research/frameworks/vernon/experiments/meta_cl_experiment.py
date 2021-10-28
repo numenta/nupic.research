@@ -26,8 +26,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from nupic.research.frameworks.continual_learning.maml_utils import clone_model
-from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
+from nupic.research.frameworks.continual_learning.samplers import TaskRandomSampler
+from nupic.research.frameworks.meta_continual_learning.maml_utils import clone_model
 from nupic.research.frameworks.pytorch.model_utils import (
     filter_params,
     get_parent_module,

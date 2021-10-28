@@ -26,6 +26,7 @@ gating, etc.
 
 from copy import deepcopy
 
+from nupic.research.frameworks.continual_learning import mixins as cl_mixins
 from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
     BiasingDendriticLayer,
@@ -43,7 +44,7 @@ from .prototype import PROTOTYPE_10
 class PrototypeExperimentEvalPerTask(EvalPerTask,
                                      mixins.RezeroWeights,
                                      mixins.PrototypeContext,
-                                     mixins.PermutedMNISTTaskIndices,
+                                     cl_mixins.PermutedMNISTTaskIndices,
                                      DendriteContinualLearningExperiment):
     pass
 

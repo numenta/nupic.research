@@ -30,18 +30,18 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 
+from nupic.research.frameworks.continual_learning import experiments, mixins
 from nupic.research.frameworks.pytorch.datasets import torchvisiondataset
 from nupic.research.frameworks.pytorch.models import StandardMLP
-from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 
 
 class EWCContinualLearningExperiment(mixins.ElasticWeightConsolidation,
-                                     ContinualLearningExperiment):
+                                     experiments.ContinualLearningExperiment):
     pass
 
 
 class ReduceLRContinualLearningExperiment(mixins.ReduceLRAfterTask,
-                                          ContinualLearningExperiment):
+                                          experiments.ContinualLearningExperiment):
     pass
 
 
@@ -124,7 +124,7 @@ cl_mnist = dict(
         "eval_all_visited_tasks",
         "eval_individual_tasks",
     ],
-    experiment_class=ContinualLearningExperiment,
+    experiment_class=experiments.ContinualLearningExperiment,
     num_classes=10,
     num_tasks=5,
     # regular experiments

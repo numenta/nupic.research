@@ -30,6 +30,7 @@ import ray.tune as tune
 import torch
 import torch.nn.functional as F
 
+from nupic.research.frameworks.continual_learning import mixins as cl_mixins
 from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
@@ -41,7 +42,7 @@ from nupic.research.frameworks.vernon import mixins
 
 class SimpleExperiment(InputAsContext,
                        mixins.RezeroWeights,
-                       mixins.PermutedMNISTTaskIndices,
+                       cl_mixins.PermutedMNISTTaskIndices,
                        DendriteContinualLearningExperiment):
     pass
 

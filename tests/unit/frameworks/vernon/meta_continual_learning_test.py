@@ -24,7 +24,7 @@ import unittest
 
 import torch
 
-from nupic.research.frameworks.continual_learning.maml_utils import clone_model
+from nupic.research.frameworks.meta_continual_learning.maml_utils import clone_model
 from nupic.research.frameworks.pytorch.models import OMLNetwork
 from nupic.research.frameworks.vernon import MetaContinualLearningExperiment
 

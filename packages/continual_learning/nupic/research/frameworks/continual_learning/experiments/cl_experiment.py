@@ -25,11 +25,9 @@ from collections import defaultdict
 import torch
 from torchvision import transforms
 
-from nupic.research.frameworks.pytorch.dataset_utils.samplers import TaskRandomSampler
+from nupic.research.frameworks.continual_learning.mixins import ContinualLearningMetrics
+from nupic.research.frameworks.continual_learning.samplers import TaskRandomSampler
 from nupic.research.frameworks.pytorch.model_utils import evaluate_model, train_model
-from nupic.research.frameworks.vernon.experiments.components.evaluation_metrics import (
-    ContinualLearningMetrics,
-)
 from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment,
 )

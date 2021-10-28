@@ -32,6 +32,7 @@ import ray.tune as tune
 import torch
 import torch.nn.functional as F
 
+from nupic.research.frameworks.continual_learning import mixins as cl_mixins
 from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
     DendriticMLP,
@@ -46,7 +47,7 @@ from nupic.research.frameworks.vernon import mixins
 
 class PrototypeExperiment(mixins.RezeroWeights,
                           mixins.PrototypeContext,
-                          mixins.PermutedMNISTTaskIndices,
+                          cl_mixins.PermutedMNISTTaskIndices,
                           DendriteContinualLearningExperiment):
     pass
 

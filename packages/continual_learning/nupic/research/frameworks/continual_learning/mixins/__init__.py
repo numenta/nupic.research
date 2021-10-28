@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -19,6 +19,8 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .meta_cl_experiment import *
-from .supervised_experiment import *
-from .self_supervised_experiment import *
+from .continual_evaluation_metrics import ContinualLearningMetrics
+from .ewc import ElasticWeightConsolidation
+from .permuted_mnist_task_indices import PermutedMNISTTaskIndices
+from .reduce_lr_after_task import ReduceLRAfterTask
+from .si import SynapticIntelligence
