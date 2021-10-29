@@ -29,7 +29,7 @@ from nupic.research.frameworks.meta_continual_learning.experiments import (
 )
 from nupic.research.frameworks.meta_continual_learning.models import OMLNetwork
 from nupic.research.frameworks.pytorch.datasets import omniglot
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 from .anml_replicate import metacl_anml_replicate
 from .oml_replicate import metacl_oml_replicate, oml_datasplit_without_norm
@@ -188,7 +188,7 @@ oml_datasplit_without_norm_2000.update(
 
 
 class KWinnerOMLExperiment(metacl_mixins.OnlineMetaLearning,
-                           mixins.UpdateBoostStrength,
+                           vernon_mixins.UpdateBoostStrength,
                            MetaContinualLearningExperiment):
     pass
 

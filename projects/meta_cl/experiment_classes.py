@@ -25,7 +25,7 @@ from nupic.research.frameworks.meta_continual_learning.experiments import (
 from nupic.research.frameworks.meta_continual_learning.mixins import (
     mixins as metacl_mixins,
 )
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 
 class OMLExperiment(metacl_mixins.OnlineMetaLearning,
@@ -33,7 +33,7 @@ class OMLExperiment(metacl_mixins.OnlineMetaLearning,
     pass
 
 
-class DendritesExperiment(mixins.RezeroWeights,
+class DendritesExperiment(vernon_mixins.RezeroWeights,
                           metacl_mixins.OnlineMetaLearning,
                           MetaContinualLearningExperiment):
     """
@@ -42,8 +42,8 @@ class DendritesExperiment(mixins.RezeroWeights,
     pass
 
 
-class BoostedDendritesExperiment(mixins.UpdateDendriteBoostStrength,
-                                 mixins.RezeroWeights,
+class BoostedDendritesExperiment(vernon_mixins.UpdateDendriteBoostStrength,
+                                 vernon_mixins.RezeroWeights,
                                  metacl_mixins.OnlineMetaLearning,
                                  MetaContinualLearningExperiment):
     """
