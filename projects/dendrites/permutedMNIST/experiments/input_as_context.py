@@ -37,11 +37,11 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
 )
 from nupic.research.frameworks.dendrites.mixins import InputAsContext
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 
 class SimpleExperiment(InputAsContext,
-                       mixins.RezeroWeights,
+                       vernon_mixins.RezeroWeights,
                        cl_mixins.PermutedMNISTTaskIndices,
                        DendriteContinualLearningExperiment):
     pass

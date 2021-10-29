@@ -39,19 +39,19 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
 )
 from nupic.research.frameworks.dendrites.mixins import PrototypeFigure1B
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners
 
 
-class PrototypeExperiment(mixins.RezeroWeights,
-                          mixins.PrototypeContext,
+class PrototypeExperiment(vernon_mixins.RezeroWeights,
+                          vernon_mixins.PrototypeContext,
                           cl_mixins.PermutedMNISTTaskIndices,
                           DendriteContinualLearningExperiment):
     pass
 
 
 class PrototypeFigure1BExperiment(PrototypeFigure1B,
-                                  mixins.PlotHiddenActivations,
+                                  vernon_mixins.PlotHiddenActivations,
                                   PrototypeExperiment):
     pass
 

@@ -36,14 +36,14 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
 from nupic.research.frameworks.dendrites.mixins import EvalPerTask
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 from .prototype import PROTOTYPE_10
 
 
 class PrototypeExperimentEvalPerTask(EvalPerTask,
-                                     mixins.RezeroWeights,
-                                     mixins.PrototypeContext,
+                                     vernon_mixins.RezeroWeights,
+                                     vernon_mixins.PrototypeContext,
                                      cl_mixins.PermutedMNISTTaskIndices,
                                      DendriteContinualLearningExperiment):
     pass

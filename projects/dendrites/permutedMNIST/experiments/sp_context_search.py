@@ -32,12 +32,12 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
 )
 from nupic.research.frameworks.dendrites.mixins import SpatialPoolerAnalysis
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners, SparseWeights
 
 
-class SPExperiment(mixins.RezeroWeights,
-                   mixins.UpdateBoostStrength,
+class SPExperiment(vernon_mixins.RezeroWeights,
+                   vernon_mixins.UpdateBoostStrength,
                    cl_mixins.PermutedMNISTTaskIndices,
                    SpatialPoolerAnalysis,
                    DendriteContinualLearningExperiment):

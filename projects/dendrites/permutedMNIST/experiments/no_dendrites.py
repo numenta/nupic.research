@@ -40,12 +40,12 @@ from nupic.research.frameworks.dendrites.modules.dendritic_layers import (
     ZeroSegmentDendriticLayer,
 )
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 
-class NoDendriteExperiment(mixins.RezeroWeights,
+class NoDendriteExperiment(vernon_mixins.RezeroWeights,
                            cl_mixins.PermutedMNISTTaskIndices,
-                           mixins.UpdateBoostStrength,
+                           vernon_mixins.UpdateBoostStrength,
                            DendriteContinualLearningExperiment):
     pass
 

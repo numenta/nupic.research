@@ -39,15 +39,15 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 """Permuted MNIST with DendriticMLP"""
 
 
 class NbSegmentSearchExperiment(
-    mixins.RezeroWeights,
-    mixins.PrototypeContext,
-    mixins.PermutedMNISTTaskIndices,
+    vernon_mixins.RezeroWeights,
+    vernon_mixins.PrototypeContext,
+    vernon_mixins.PermutedMNISTTaskIndices,
     cl_mixins.PermutedMNISTTaskIndices,
     DendriteContinualLearningExperiment,
 ):
