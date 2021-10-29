@@ -18,14 +18,27 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-from .prototype_context import *
-from .prototype_figure_1b import *
-from .context_signal import *
-from .dendrite_metrics import *
-from .eval_per_task import *
-from .hidden_activations import *
-from .input_as_context import *
-from .representation_overlap import *
-from .sp_context import SpatialPoolerContext
-from .sp_context_analysis import *
-from .update_dendrite_boost_strength import *
+
+
+"""
+Mixin that uses the feedforward input as the context input.
+"""
+
+__all__ = [
+    "InputAsContext",
+    "input_as_context",
+]
+
+
+class InputAsContext:
+
+    def setup_experiment(self, config):
+
+        super().setup_experiment(config)
+
+        self.train_context_fn = input_as_context
+        self.infer_context_fn = input_as_context
+
+
+def input_as_context(data):
+    return data

@@ -72,7 +72,7 @@ class SP(nn.Module):
         return self.kw(self.linear(x))
 
 
-# Centroid method for inferring contexts: 50 permutedMNIST tasks
+# Prototype method for inferring contexts: 50 permutedMNIST tasks
 SP_PROTOTYPE_50 = dict(
     experiment_class=SPExperiment,
     num_samples=1,
