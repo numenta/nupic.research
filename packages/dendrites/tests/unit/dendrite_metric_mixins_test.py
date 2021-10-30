@@ -28,12 +28,12 @@ from torchvision.transforms import ToTensor
 
 from nupic.research.frameworks.dendrites import (
     DendriticAbsoluteMaxGate1d,
+    mixins,
     plot_mean_selected_activations,
 )
 from nupic.research.frameworks.vernon import (
     MetaContinualLearningExperiment,
     SupervisedExperiment,
-    mixins,
 )
 from nupic.torch.modules import KWinners, SparseWeights
 

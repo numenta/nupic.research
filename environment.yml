@@ -19,8 +19,9 @@ dependencies:
 
       # Install nupic.research in development mode with dev tools extras enabled
       - -e ".[dev]"
-
+      
       # Install nupic.research common frameworks
+      - -e packages/dendrites
       - -e packages/sigopt
       - -e packages/wandb
       - -e packages/dynamic_sparse
@@ -30,6 +31,5 @@ dependencies:
       # See `setup.cfg` for available extras.
       # - -e ".[imagenet]"
       # - -e ".[gsc]"
-      # - -e ".[dendrites]"
       # - -e ".[transformers]"
 

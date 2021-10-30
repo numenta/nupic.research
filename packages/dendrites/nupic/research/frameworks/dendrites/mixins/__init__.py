@@ -18,9 +18,14 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
-from .input_as_context import *
-from .eval_per_task import *
+from .prototype_context import *
 from .prototype_figure_1b import *
+from .context_signal import *
+from .dendrite_metrics import *
+from .eval_per_task import *
+from .hidden_activations import *
+from .input_as_context import *
+from .representation_overlap import *
 from .sp_context import SpatialPoolerContext
 from .sp_context_analysis import *
+from .update_dendrite_boost_strength import *
