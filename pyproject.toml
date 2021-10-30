@@ -29,5 +29,5 @@ known_third_party = ['elasticsearch', 'dotenv', 'torch', 'tensorflow', 'tabulate
                      'tqdm', 'wandb', 'transformers', 'tokenizers', 'datasets', 
                      'deepspeed', 'scipy', 'sklearn', 'seaborn', 'librosa',
                      'pytorch_lightning', 'pretrainedmodels', 'ax', 'ptitprince',
-                     'sigopt']
+                     'sigopt', 'wandb']
 

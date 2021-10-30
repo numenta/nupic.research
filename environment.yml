@@ -22,6 +22,7 @@ dependencies:
 
       # Install nupic.research common frameworks
       - -e packages/sigopt
+      - -e packages/wandb
 
       # Install projects extra dependency
       # See `setup.cfg` for available extras.
