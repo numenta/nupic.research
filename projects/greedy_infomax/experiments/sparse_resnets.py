@@ -30,7 +30,8 @@ from nupic.research.frameworks.greedy_infomax.models.classification_model import
 from nupic.research.frameworks.greedy_infomax.models.full_model import (
     SparseFullVisionModel,
 )
-from nupic.research.frameworks.vernon.distributed import experiments, mixins
+from nupic.research.frameworks.self_supervised_learning.distributed import experiments
+from nupic.research.frameworks.vernon.distributed import mixins
 from nupic.torch.modules import SparseWeights2d
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS

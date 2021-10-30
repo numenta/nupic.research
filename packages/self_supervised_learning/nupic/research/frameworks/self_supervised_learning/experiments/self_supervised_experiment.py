@@ -27,7 +27,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
-from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
+from nupic.research.frameworks.self_supervised_learning.utils import EncoderClassifier
 from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment,
 )

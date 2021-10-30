@@ -21,4 +21,3 @@
 
 from .cl_experiment import *
 from .supervised_experiment import *
-from .self_supervised_experiment import *

@@ -29,6 +29,8 @@ dependencies:
 
       - -e packages/greedy_infomax
 
+      - -e packages/self_supervised_learning
+
       # Install projects extra dependency
       # See `setup.cfg` for available extras.
       # - -e ".[imagenet]"

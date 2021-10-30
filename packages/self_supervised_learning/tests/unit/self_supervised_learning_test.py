@@ -27,8 +27,10 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torchvision.datasets.fakedata import FakeData
 
-from nupic.research.frameworks.pytorch.self_supervised_utils import EncoderClassifier
-from nupic.research.frameworks.vernon import SelfSupervisedExperiment
+from nupic.research.frameworks.self_supervised_learning.experiments import (
+    SelfSupervisedExperiment,
+)
+from nupic.research.frameworks.self_supervised_learning.utils import EncoderClassifier
 
 
 class AutoEncoder(torch.nn.Module):
