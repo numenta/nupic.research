@@ -86,15 +86,19 @@ jobs:
           name: Get nupic.torch latest SHA
           command: |
             git ls-remote git://github.com/numenta/nupic.torch.git HEAD > nupic.torch.sha
+      - run:
+          name: Collect package dependencies
+          command: |
+            cat requirements.txt | grep 'packages' | cut -f2 -d ' ' | xargs -I {} cat {}/setup.cfg > packages.dependencies
+
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
       - run: pip show flake8-formatter-junit-xml || pip install --prefix ~/.local flake8-formatter-junit-xml
       - run: pip show nupic.torch || pip install --prefix ~/.local git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch
-      - run: pip show nupic.research || pip install --prefix ~/.local -e ".[dev,imagenet,gsc]"
-      - run: pip show nupic.research.continual_learning || pip install --prefix ~/.local -e packages/continual_learning
+      - run: pip show nupic.research || pip install --prefix ~/.local -r requirements.txt
       - run: pip list
       - save_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
           paths:
             - ~/.local
       - persist_to_workspace:
@@ -109,7 +113,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
       - run:
           name: Check Style
           command: |
@@ -127,7 +131,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
       - run:
           name: Run python tests
           environment:
@@ -149,7 +153,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
       - run:
           name: Build wheel
           environment:
