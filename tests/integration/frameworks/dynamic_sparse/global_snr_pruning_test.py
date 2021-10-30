@@ -29,7 +29,7 @@ from torchvision.datasets import FakeData
 from nupic.research.frameworks.vernon import experiments, mixins
 
 bp = pytest.importorskip(
-    "nupic.research.backprop_structure.modules",
+    "nupic.research.frameworks.backprop_structure.modules",
     reason="This test requires 'backprop_structure' framework package. "
            "Please install the packages using "
            "'pip install -e packages/backprop_structure'")
