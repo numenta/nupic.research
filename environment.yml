@@ -23,6 +23,7 @@ dependencies:
       # Install nupic.research common frameworks
       - -e packages/sigopt
       - -e packages/wandb
+      - -e packages/dynamic_sparse
 
       # Install projects extra dependency
       # See `setup.cfg` for available extras.
