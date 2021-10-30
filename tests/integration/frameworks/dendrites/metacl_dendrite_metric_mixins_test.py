@@ -18,28 +18,24 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
-
-import os
 import unittest
 
 import numpy as np
+import pytest
 import torch
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
-from nupic.research.frameworks.dendrites import (
-    DendriticAbsoluteMaxGate1d,
-    plot_winning_segment_distributions,
-)
-from nupic.research.frameworks.meta_continual_learning.experiments import (
-    MetaContinualLearningExperiment,
-)
-from nupic.research.frameworks.vernon import mixins
 from nupic.torch.modules import KWinners, SparseWeights
 
+dendrites = pytest.importorskip("nupic.research.frameworks.dendrites")
+dendrites_mixins = pytest.importorskip("nupic.research.frameworks.dendrites.mixins")
+metacl = pytest.importorskip(
+    "nupic.research.frameworks.meta_continual_learning.experiments")
 
-class TrackedSegmentsMetaCLExperiment(mixins.PlotDendriteMetrics,
-                                      MetaContinualLearningExperiment):
+
+class TrackStatsMetaCLExperiment(dendrites_mixins.PlotDendriteMetrics,
+                                 metacl.MetaContinualLearningExperiment):
     pass
 
 
@@ -48,7 +44,7 @@ class SimpleMLP(torch.nn.Module):
         super().__init__()
 
         in_features = np.prod(input_shape)
-        self.dendritic_gate = DendriticAbsoluteMaxGate1d()
+        self.dendritic_gate = dendrites.DendriticAbsoluteMaxGate1d()
         self.flatten = torch.nn.Flatten()
         self.kwinners = KWinners(n=16, percent_on=0.75, k_inference_factor=1)
         self.classifier = SparseWeights(
@@ -73,28 +69,10 @@ def fake_data(size=100, image_size=(1, 4, 4), train=False):
     return FakeData(size=size, image_size=image_size, transform=ToTensor())
 
 
-def get_plot_args():
-    return dict(
-        num_units_to_plot=5,
-        seed=torch.initial_seed()
-    )
-
-
-def plot_winning_segment_distributions_(
-    dendrite_activations_,
-    winning_mask,
-    targets_,
-    **kwargs
-):
-    """Adjust signature to work with `PlotDendriteMetrics` mixin."""
-    return plot_winning_segment_distributions(winning_mask, **kwargs)
-
-
 simple_metacl_config = dict(
 
-    experiment_class=TrackedSegmentsMetaCLExperiment,
+    experiment_class=TrackStatsMetaCLExperiment,
     num_classes=10,
-    fast_params=[".*"],  # <- all params
 
     # Dataset
     dataset_class=fake_data,
@@ -111,49 +89,59 @@ simple_metacl_config = dict(
         input_shape=(1, 4, 4),
     ),
 
-    # Plotting args.
     plot_dendrite_metrics_args=dict(
-        include_modules=[DendriticAbsoluteMaxGate1d],
-        winning_segments=dict(
-            plot_func=plot_winning_segment_distributions_,
+        include_modules=[dendrites.DendriticAbsoluteMaxGate1d],
+        mean_selected=dict(
+            max_samples_to_plot=400,
             plot_freq=2,
-            plot_args=get_plot_args,
-            max_samples_to_track=10000,
+            plot_func=dendrites.plot_mean_selected_activations
         )
     ),
 
     # Optimizer class class arguments passed to the constructor
     optimizer_args=dict(lr=0.1),
+    fast_params=[".*"],  # <- all params get updated in inner loop
 
     # Suppress logging.
-    log_level="NOTSET"
+    log_level="NOTSET",
 )
 
 
-class CustomDendritMetricsTest(unittest.TestCase):
+class PlotDendriteMetricsTest(unittest.TestCase):
     """
-    This is a test class for the `PlotDendriteMetrics` mixin used for plotting custom
-    metrics.
+    This is a test class for the `PlotDendriteMetrics` mixin.
     """
 
-    def test_plot_winning_segment_distributions(self):
-
-        os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
+    def test_dendrite_metrics_tracking_metacl_experiment(self):
+        """
+        Test whether TrackMeanSelectedActivations works in the metacl setting.
+        """
 
         # Setup experiment and initialize model.
         exp = simple_metacl_config["experiment_class"]()
         exp.setup_experiment(simple_metacl_config)
 
         # Loop through some pseudo epochs.
-        for i in range(6):
+        for i in range(5):
             ret = exp.run_epoch()
 
+            # The plot frequency is 2 and should be logged every 2 epochs.
             if i % 2 == 0:
-                # import matplotlib.pyplot as plt
-                # plt.show()
-                self.assertTrue("winning_segments/dendritic_gate" in ret)
-            else:
-                self.assertTrue("winning_segments/dendritic_gate" not in ret)
+                self.assertTrue("mean_selected/dendritic_gate" in ret)
+
+                # Raw data should be logged whenever a plot is logged.
+                self.assertTrue("targets/dendritic_gate" in ret)
+                self.assertTrue("dendrite_activations/dendritic_gate" in ret)
+                self.assertTrue("winning_mask/dendritic_gate" in ret)
+
+                # The raw data should be a numpy array.
+                targets = ret["targets/dendritic_gate"]
+                activations = ret["dendrite_activations/dendritic_gate"]
+                winners = ret["winning_mask/dendritic_gate"]
+
+                self.assertTrue(isinstance(targets, np.ndarray))
+                self.assertTrue(isinstance(activations, np.ndarray))
+                self.assertTrue(isinstance(winners, np.ndarray))
 
 
 if __name__ == "__main__":

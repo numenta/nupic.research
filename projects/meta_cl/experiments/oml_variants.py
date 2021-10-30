@@ -23,9 +23,13 @@ from copy import deepcopy
 
 from experiment_classes import IIDTrainingOMLExperiment, OMLExperiment
 from networks import KWinnerOMLNetwork
+from nupic.research.frameworks.meta_continual_learning import mixins as metacl_mixins
+from nupic.research.frameworks.meta_continual_learning.experiments import (
+    MetaContinualLearningExperiment,
+)
+from nupic.research.frameworks.meta_continual_learning.models import OMLNetwork
 from nupic.research.frameworks.pytorch.datasets import omniglot
-from nupic.research.frameworks.pytorch.models import OMLNetwork
-from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 from .anml_replicate import metacl_anml_replicate
 from .oml_replicate import metacl_oml_replicate, oml_datasplit_without_norm
@@ -183,8 +187,8 @@ oml_datasplit_without_norm_2000.update(
 )
 
 
-class KWinnerOMLExperiment(mixins.OnlineMetaLearning,
-                           mixins.UpdateBoostStrength,
+class KWinnerOMLExperiment(metacl_mixins.OnlineMetaLearning,
+                           vernon_mixins.UpdateBoostStrength,
                            MetaContinualLearningExperiment):
     pass
 

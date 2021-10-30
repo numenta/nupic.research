@@ -24,9 +24,11 @@ import unittest
 
 import torch
 
-from nupic.research.frameworks.continual_learning.maml_utils import clone_model
-from nupic.research.frameworks.pytorch.models import OMLNetwork
-from nupic.research.frameworks.vernon import MetaContinualLearningExperiment
+from nupic.research.frameworks.meta_continual_learning.experiments import (
+    MetaContinualLearningExperiment,
+)
+from nupic.research.frameworks.meta_continual_learning.maml_utils import clone_model
+from nupic.research.frameworks.meta_continual_learning.models import OMLNetwork
 
 # Retrieve function that updates params in place.
 # This enables taking gradients of gradients.

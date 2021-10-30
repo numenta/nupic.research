@@ -27,13 +27,16 @@ import torch
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
+from nupic.research.frameworks.meta_continual_learning.experiments import (
+    MetaContinualLearningExperiment,
+)
 from nupic.research.frameworks.pytorch.hooks import ModelHookManager
-from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
+from nupic.research.frameworks.vernon import mixins
 from nupic.torch.modules import KWinners, SparseWeights
 
 
-class TrackStatsSupervisedExperiment(mixins.TrackRepresentationSparsity,
-                                     SupervisedExperiment):
+class TrackStatsMetaCLExperiment(mixins.TrackRepresentationSparsity,
+                                 MetaContinualLearningExperiment):
     pass
 
 
@@ -59,9 +62,9 @@ def fake_data(size=100, image_size=(1, 4, 4), train=False):
     return FakeData(size=size, image_size=image_size, transform=ToTensor())
 
 
-simple_supervised_config = dict(
+simple_metacl_config = dict(
 
-    experiment_class=TrackStatsSupervisedExperiment,
+    experiment_class=TrackStatsMetaCLExperiment,
     num_classes=10,
 
     # Dataset
@@ -100,17 +103,17 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
     This is a test class for the `TrackRepresentationSparsity` mixin.
     """
 
-    def test_sparsity_tracking_supervised_experiment(self):
+    def test_sparsity_tracking_metacl_experiment(self):
         """
-        Ensure both input and output sparsities can be tracked during a supervised
+        Ensure both input and output sparsities can be tracked during a metacl
         experiment.
         """
 
         # Setup experiment and initialize model.
-        exp = simple_supervised_config["experiment_class"]()
-        exp.setup_experiment(simple_supervised_config)
+        exp = simple_metacl_config["experiment_class"]()
+        exp.setup_experiment(simple_metacl_config)
 
-        # Validate that the hook managers are not null.
+        # Validate that the hook managers are not null at the start of training.
         self.assertIsInstance(exp.input_hook_manager, ModelHookManager)
         self.assertIsInstance(exp.output_hook_manager, ModelHookManager)
 
@@ -124,32 +127,28 @@ class TrackRepresentationSparsityTest(unittest.TestCase):
             name = "input_sparsity/classifier.module (Linear)"
             self.assertTrue(name in ret.keys())
             sparsity = ret[name]
-            self.assertTrue(np.isclose(sparsity, 0.25, atol=1e-3))
+            self.assertTrue(np.isclose(sparsity, 0.25, atol=0.003))
 
             name = "output_sparsity/classifier.module (Linear)"
             self.assertTrue(name in ret.keys())
             sparsity = ret[name]
             self.assertTrue(np.isclose(sparsity, 0, atol=1e-3))
 
-    def test_no_tracking_args_given_supervised_experiment(self):
+    def test_no_tracking_args_given_metacl_exp(self):
         """
-        Test the edge case for supervised experiment where neither input and output
+        Test the edge case for metacl experiment where neither input and output
         sparsities are tracked.
         """
 
         # Remove tracking params.
-        no_tracking_config = deepcopy(simple_supervised_config)
+        no_tracking_config = deepcopy(simple_metacl_config)
         no_tracking_config.pop("track_input_sparsity_args")
         no_tracking_config.pop("track_output_sparsity_args")
 
         # Setup experiment and initialize model.
         exp = no_tracking_config["experiment_class"]()
-        with self.assertLogs("TrackStatsSupervisedExperiment", "WARNING"):
+        with self.assertLogs("TrackStatsMetaCLExperiment", "WARNING"):
             exp.setup_experiment(no_tracking_config)
-
-        # Validate that the hook managers are null.
-        self.assertEqual(len(exp.input_hook_manager.hooks), 0)
-        self.assertEqual(len(exp.output_hook_manager.hooks), 0)
 
         # Loop through some pseudo epochs.
         for _ in range(5):

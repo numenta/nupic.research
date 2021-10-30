@@ -26,6 +26,9 @@ import torch
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
 
+from nupic.research.frameworks.meta_continual_learning.experiments import (
+    MetaContinualLearningExperiment,
+)
 from nupic.research.frameworks.pytorch.model_utils import count_nonzero_params
 from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
 from nupic.torch.modules import SparseWeights
@@ -33,6 +36,11 @@ from nupic.torch.modules import SparseWeights
 
 class SupervisedRezeroWeights(mixins.RezeroWeights,
                               SupervisedExperiment):
+    pass
+
+
+class MetaCLRezeroWeights(mixins.RezeroWeights,
+                          MetaContinualLearningExperiment):
     pass
 
 
@@ -54,9 +62,9 @@ def fake_data(size=100, image_size=(1, 4, 4), train=False):
     return FakeData(size=size, image_size=image_size, transform=ToTensor())
 
 
-supervised_experiment = dict(
+metacl_experiment = dict(
 
-    experiment_class=SupervisedRezeroWeights,
+    experiment_class=MetaCLRezeroWeights,
     num_classes=10,
 
     # Dataset
@@ -76,6 +84,7 @@ supervised_experiment = dict(
 
     # Optimizer class class arguments passed to the constructor
     optimizer_args=dict(lr=0.1),
+    fast_params=[".*"],  # <- all params
 )
 
 
@@ -89,20 +98,36 @@ class RezeroWeightTest(unittest.TestCase):
 
     def test_simple_model_is_half_sparse(self):
 
-        # Supervised Experiment:
+        # MetaCL Experiment:
         #   Validate that the fully rezeroed model has exactly 80 on-params
-        exp = supervised_experiment["experiment_class"]
-        model = exp.create_model(supervised_experiment, "cpu")
+        exp = metacl_experiment["experiment_class"]
+        model = exp.create_model(metacl_experiment, "cpu")
         model.classifier.module.weight.data[:] = 1
         model.classifier.rezero_weights()
         total_params, on_params = count_nonzero_params(model)
         assert on_params == 80
 
-    def test_supervised_experiment_with_rezero_weights(self):
+    def test_metacl_experiment_with_rezero_weights(self):
+
+        # Get experiment class.
+        exp = metacl_experiment["experiment_class"]()
+
+        # The classes are sampled randomly, so we need a way to make sure
+        # the experiment will only sample from what's been randomly generated.
+        metacl_experiment.pop("num_classes")
+        dataset = exp.load_dataset(metacl_experiment, train=True)
+        class_indices = exp.compute_class_indices(metacl_experiment, dataset)
+        fast_and_slow_sampler = exp.create_train_sampler(metacl_experiment, dataset,
+                                                         class_indices=class_indices)
+        replay_sampler = exp.create_replay_sampler(metacl_experiment, dataset,
+                                                   class_indices=class_indices)
+        metacl_experiment.update(
+            fast_and_slow_classes=list(fast_and_slow_sampler.task_indices.keys()),
+            replay_classes=list(replay_sampler.task_indices.keys()),
+        )
 
         # Setup experiment and initialize model.
-        exp = supervised_experiment["experiment_class"]()
-        exp.setup_experiment(supervised_experiment)
+        exp.setup_experiment(metacl_experiment)
         total_params, on_params = count_nonzero_params(exp.model)
         assert total_params == 160
         assert on_params <= 80  # Less than as some may be randomly zero.
