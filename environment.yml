@@ -24,6 +24,7 @@ dependencies:
       - -e packages/sigopt
       - -e packages/wandb
       - -e packages/dynamic_sparse
+      - -e packages/backprop_structure
 
       # Install projects extra dependency
       # See `setup.cfg` for available extras.

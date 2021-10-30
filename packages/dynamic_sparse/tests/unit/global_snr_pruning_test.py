@@ -21,16 +21,18 @@
 
 import unittest
 
+import pytest
 import torch
 from torchvision import transforms
 from torchvision.datasets import FakeData
 
-from nupic.research.frameworks.backprop_structure.modules import (
-    MaskedVDropCentralData,
-    VDropConv2d,
-    VDropLinear,
-)
 from nupic.research.frameworks.vernon import experiments, mixins
+
+bp = pytest.importorskip(
+    "nupic.research.backprop_structure.modules",
+    reason="This test requires 'backprop_structure' framework package. "
+           "Please install the packages using "
+           "'pip install -e packages/backprop_structure'")
 
 # Chosen so that all linear transformations can be of shape 4 x 4
 INPUT_SHAPE = (1, 10, 10)
@@ -40,11 +42,11 @@ class SimpleVDropNet(torch.nn.Sequential):
     def __init__(self, input_shape=INPUT_SHAPE, hidden_size=100, output_size=10):
         super().__init__()
 
-        self.vdrop_central_data = MaskedVDropCentralData()
+        self.vdrop_central_data = bp.MaskedVDropCentralData()
         self.flatten = torch.nn.Flatten()
-        self.vdrop_conv2d = VDropConv2d(1, 10, 3, self.vdrop_central_data)
-        self.vdrop_linear_1 = VDropLinear(640, hidden_size, self.vdrop_central_data)
-        self.vdrop_linear_2 = VDropLinear(
+        self.vdrop_conv2d = bp.VDropConv2d(1, 10, 3, self.vdrop_central_data)
+        self.vdrop_linear_1 = bp.VDropLinear(640, hidden_size, self.vdrop_central_data)
+        self.vdrop_linear_2 = bp.VDropLinear(
             hidden_size, output_size, self.vdrop_central_data
         )
         self.vdrop_central_data.finalize()
