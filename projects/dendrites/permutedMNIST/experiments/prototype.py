@@ -34,10 +34,10 @@ import torch.nn.functional as F
 
 from nupic.research.frameworks.continual_learning import mixins as cl_mixins
 from nupic.research.frameworks.dendrites import DendriticMLP
+from nupic.research.frameworks.dendrites import mixins as dendrites_mixins
 from nupic.research.frameworks.dendrites.experiments import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites import mixins as dendrites_mixins
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners
