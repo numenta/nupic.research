@@ -32,13 +32,13 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from nupic.research.frameworks.continual_learning import experiments, mixins
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
 
 
 class SIContinualLearningExperiment(mixins.SynapticIntelligence,
                                     mixins.PermutedMNISTTaskIndices,
-                                    ContinualLearningExperiment):
+                                    experiments.ContinualLearningExperiment):
     pass
 
 

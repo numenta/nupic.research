@@ -26,24 +26,25 @@ gating, etc.
 
 from copy import deepcopy
 
+from nupic.research.frameworks.continual_learning import mixins as cl_mixins
 from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
     BiasingDendriticLayer,
     GatingDendriticLayer,
 )
-from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
+from nupic.research.frameworks.dendrites import mixins as dendrites_mixins
+from nupic.research.frameworks.dendrites.experiments import (
     DendriteContinualLearningExperiment,
 )
-from nupic.research.frameworks.dendrites.mixins import EvalPerTask, PrototypeContext
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 from .prototype import PROTOTYPE_10
 
 
-class PrototypeExperimentEvalPerTask(EvalPerTask,
-                                     mixins.RezeroWeights,
-                                     PrototypeContext,
-                                     mixins.PermutedMNISTTaskIndices,
+class PrototypeExperimentEvalPerTask(dendrites_mixins.EvalPerTask,
+                                     vernon_mixins.RezeroWeights,
+                                     dendrites_mixins.PrototypeContext,
+                                     cl_mixins.PermutedMNISTTaskIndices,
                                      DendriteContinualLearningExperiment):
     pass
 

@@ -19,11 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from nupic.research.frameworks.continual_learning.experiments import (
+    ContinualLearningExperiment,
+)
 from nupic.research.frameworks.dendrites import (
     evaluate_dendrite_model,
     train_dendrite_model,
 )
-from nupic.research.frameworks.vernon import ContinualLearningExperiment
 
 __all__ = [
     "DendriteContinualLearningExperiment",

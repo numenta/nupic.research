@@ -458,7 +458,7 @@ class DebugTrainable(Trainable):
         self.experiment.setup_experiment(config)
 
     def _train(self):
-        ret = self.experiment.run_task()
+        ret = self.experiment.run_iteration()
         readable_result = self.experiment_class.get_readable_result(ret)
         print(f"End Iteration Result: {readable_result}")
 

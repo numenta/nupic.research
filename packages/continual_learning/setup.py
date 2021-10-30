@@ -19,20 +19,6 @@
 #  http://numenta.org/licenses/
 #
 # ------------------------------------------------------------------------------
-[metadata]
-name = nupic.research.dendrites
-version = 0.0.1.dev0
+from setuptools import setup
 
-[options]
-zip_safe = False
-packages = find_namespace:
-install_requires =
-    nupic.research
-    nupic.research.continual_learning
-    ptitprince==0.2.5
-    seaborn==0.11.1
-    sklearn
-
-[options.packages.find]
-include = nupic.research.*
-
+setup()

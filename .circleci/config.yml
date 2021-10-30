@@ -87,12 +87,14 @@ jobs:
           command: |
             git ls-remote git://github.com/numenta/nupic.torch.git HEAD > nupic.torch.sha
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
       - run: pip show flake8-formatter-junit-xml || pip install --prefix ~/.local flake8-formatter-junit-xml
       - run: pip show nupic.torch || pip install --prefix ~/.local git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch
-      - run: pip install --prefix ~/.local -e ".[dev,imagenet,gsc]"
+      - run: pip show nupic.research || pip install --prefix ~/.local -e ".[dev,imagenet,gsc]"
+      - run: pip show nupic.research.continual_learning || pip install --prefix ~/.local -e packages/continual_learning
+      - run: pip list
       - save_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
           paths:
             - ~/.local
       - persist_to_workspace:
@@ -107,7 +109,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
       - run:
           name: Check Style
           command: |
@@ -125,7 +127,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
       - run:
           name: Run python tests
           environment:
@@ -147,7 +149,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages/continual_learning/setup.cfg"}}
       - run:
           name: Build wheel
           environment:

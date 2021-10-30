@@ -24,10 +24,9 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from nupic.research.frameworks.continual_learning.dend_kwinners import (
-    DendriteKWinners2dLocal,
-)
 from nupic.torch.modules import SparseWeights
+
+from .dend_kwinners import DendriteKWinners2dLocal
 
 
 class DendriteInput(nn.Module):
