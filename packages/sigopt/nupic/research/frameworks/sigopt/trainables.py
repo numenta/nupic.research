@@ -21,7 +21,7 @@
 from pprint import pformat, pprint
 
 from nupic.research.frameworks.sigopt import SigOptExperiment
-from nupic.research.frameworks.trainables import (
+from nupic.research.frameworks.vernon.trainables import (
     DistributedTrainable,
     RemoteProcessTrainable,
 )
