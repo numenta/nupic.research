@@ -26,13 +26,11 @@ import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from nupic.research.archive.dynamic_sparse.common.dataloaders import (
-    PreprocessedSpeechDataLoader,
-    VaryingDataLoader,
-)
 from nupic.research.frameworks.pytorch.dataset_utils import CachedDatasetFolder
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 from nupic.research.frameworks.pytorch.tiny_imagenet_dataset import TinyImageNet
+
+from .dataloaders import PreprocessedSpeechDataLoader, VaryingDataLoader
 
 custom_datasets = {"TinyImageNet": TinyImageNet}
 

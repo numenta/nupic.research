@@ -23,11 +23,11 @@ import torch
 from tqdm import tqdm
 
 from nupic.research.archive.dynamic_sparse.models import BaseModel
-from nupic.research.frameworks.stochastic_connections.binary_layers import (
+from nupic.research.frameworks.backprop_structure.modules.binary_layers import (
     BinaryGatedConv2d,
     BinaryGatedLinear,
 )
-from nupic.research.frameworks.stochastic_connections.reparameterization_layers import (
+from nupic.research.frameworks.backprop_structure.modules.reparameterization_layers import (  # noqa: E501
     HardConcreteGatedConv2d,
     HardConcreteGatedLinear,
 )
