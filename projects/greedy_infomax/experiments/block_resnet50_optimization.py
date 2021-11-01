@@ -115,6 +115,50 @@ RESNET_50_ONE_CYCLE_LR_GRID_SEARCH.update(
     )
 )
 
+RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH= deepcopy(
+    RESNET_50_ONE_CYCLE_LR_GRID_SEARCH)
+RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH.update(dict(
+    wandb_args=dict(
+        project="greedy_infomax_full_resnet_onecycle",
+        name=f"onecycle_grid_search_sparse_70",
+    ),
+    epochs=10,
+    model_args=block_wise_full_resnet_50_sparse_70_args,
+    lr_scheduler_args=dict(
+        max_lr=tune.grid_search([0.0001, 0.0003, 0.001, 0.003]),
+        # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
+        div_factor=100,  # initial_lr = 0.01
+        final_div_factor=1000,  # min_lr = 0.0000025
+        pct_start=1.0 / 10.0,
+        epochs=10,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
+))
+
+RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH= deepcopy(
+    RESNET_50_ONE_CYCLE_LR_GRID_SEARCH)
+RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH.update(dict(
+    wandb_args=dict(
+        project="greedy_infomax_full_resnet_onecycle",
+        name=f"onecycle_grid_search_sparse_80",
+    ),
+    epochs=10,
+    model_args=block_wise_full_resnet_50_sparse_80_args,
+    lr_scheduler_args=dict(
+        max_lr=tune.grid_search([0.0001, 0.0003, 0.001, 0.003]),
+        # max_lr=tune.grid_search([0.19, 0.2, 0.21, 0.22, 0.213]),
+        div_factor=100,  # initial_lr = 0.01
+        final_div_factor=1000,  # min_lr = 0.0000025
+        pct_start=1.0 / 10.0,
+        epochs=10,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
+))
+
 NUM_EPOCHS = 100
 RESNET_50_ONE_CYCLE_LR_FULL = deepcopy(RESNET_50_ONE_CYCLE_LR_GRID_SEARCH)
 RESNET_50_ONE_CYCLE_LR_FULL.update(dict(
@@ -123,13 +167,13 @@ RESNET_50_ONE_CYCLE_LR_FULL.update(dict(
             name=f"onecycle_full",
     ),
     epochs=NUM_EPOCHS,
-    epochs_to_validate=[NUM_EPOCHS // 2, NUM_EPOCHS - 1,],
+    epochs_to_validate=[50, 100, 150, 200, 290, 295, 299],
     supervised_training_epochs_per_validation=100,
     lr_scheduler_args=dict(
         max_lr=0.0013, #found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
-        pct_start=1.0 / 10.0,
+        pct_start=3.0 / 10.0,
         epochs=NUM_EPOCHS,
         anneal_strategy="linear",
         max_momentum=1e-4,
@@ -145,13 +189,13 @@ RESNET_50_DENSE_ONE_CYCLE_300.update(dict(
             name=f"dense",
     ),
     epochs=NUM_EPOCHS,
-    epochs_to_validate=[100, 200, 290, 295, 299],
-    supervised_training_epochs_per_validation=100,
+    epochs_to_validate=[10, 25, 50, 100, 150, 200, 290, 295, 299],
+    supervised_training_epochs_per_validation=50,
     lr_scheduler_args=dict(
         max_lr=0.0013, #found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
-        pct_start=10.0 / 300.0,
+        pct_start=2.0 / 300.0,
         epochs=NUM_EPOCHS,
         anneal_strategy="linear",
         max_momentum=1e-4,
@@ -166,20 +210,40 @@ RESNET_50_SPARSE_70_ONE_CYCLE_300.update(dict(
             name=f"sparse_70",
     ),
     model_args=block_wise_full_resnet_50_sparse_70_args,
-    epochs=NUM_EPOCHS,
-    epochs_to_validate=[100, 200, 290, 295, 299],
-    supervised_training_epochs_per_validation=100,
     lr_scheduler_args=dict(
-        max_lr=0.0013, #found through grid search
+        max_lr=0.001, #found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
-        pct_start=10.0 / 300.0,
+        pct_start=2.0 / 300.0,
         epochs=NUM_EPOCHS,
         anneal_strategy="linear",
         max_momentum=1e-4,
         cycle_momentum=False,
     ),
 ))
+
+RESNET_50_SPARSE_70_ONE_CYCLE_100 = deepcopy(RESNET_50_SPARSE_70_ONE_CYCLE_300)
+RESNET_50_SPARSE_70_ONE_CYCLE_100.update(dict(
+    wandb_args=dict(
+            project="greedy_infomax_full_resnet_100",
+            name=f"sparse_70",
+    ),
+    epochs=100,
+    lr_scheduler_args=dict(
+        max_lr=0.001, #found through grid search
+        div_factor=100,  # initial_lr = 0.01
+        final_div_factor=1000,  # min_lr = 0.0000025
+        pct_start=3.0 / 100.0,
+        epochs=NUM_EPOCHS,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
+))
+
+
+
+
 RESNET_50_SPARSE_80_ONE_CYCLE_300= deepcopy(RESNET_50_SPARSE_70_ONE_CYCLE_300)
 RESNET_50_SPARSE_80_ONE_CYCLE_300.update(dict(
     wandb_args=dict(
@@ -194,7 +258,7 @@ RESNET_50_SPARSE_80_ONE_CYCLE_300.update(dict(
         max_lr=0.0013, #found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
-        pct_start=10.0 / 300.0,
+        pct_start=2.0 / 300.0,
         epochs=NUM_EPOCHS,
         anneal_strategy="linear",
         max_momentum=1e-4,
@@ -207,8 +271,11 @@ RESNET_50_SPARSE_80_ONE_CYCLE_300.update(dict(
 
 CONFIGS = dict(
     resnet_50_one_cycle_lr_grid_search=RESNET_50_ONE_CYCLE_LR_GRID_SEARCH,
+    resnet_50_sparse_70_one_cycle_lr_grid_search=RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH,
+    resnet_50_sparse_80_one_cycle_lr_grid_search=RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH,
     resnet_50_one_cycle_lr_full=RESNET_50_ONE_CYCLE_LR_FULL,
     resnet_50_dense_one_cycle_300=RESNET_50_DENSE_ONE_CYCLE_300,
     resnet_50_sparse_70_one_cycle_300=RESNET_50_SPARSE_70_ONE_CYCLE_300,
+    resnet_50_sparse_70_one_cycle_100=RESNET_50_SPARSE_70_ONE_CYCLE_100,
     resnet_50_sparse_80_one_cycle_300=RESNET_50_SPARSE_80_ONE_CYCLE_300,
 )

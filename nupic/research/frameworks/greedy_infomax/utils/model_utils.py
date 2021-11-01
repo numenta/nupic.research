@@ -25,6 +25,7 @@
 # ----------------------------------------------------------------------
 
 import torch.nn as nn
+from copy import deepcopy
 
 from nupic.research.frameworks.greedy_infomax.models.bilinear_info import (
     SparseBilinearInfo,
@@ -50,7 +51,10 @@ def _make_layer_config(
         stride=1,
         sparse_weights_class=SparseWeights2d,
         sparsity=None,
-        percent_on=None,):
+        percent_on=None,
+        greedy=False,
+        negative_samples=16,
+        k_predictions=5,):
     layer_config = []
     strides = [stride] + [1] * (num_blocks - 1)
     if sparsity is None:
@@ -76,9 +80,90 @@ def _make_layer_config(
                 save_checkpoint_file=None,
             )
         )
+        if greedy:
+            layer_config.append(
+                dict(
+                    model_class=SparseBilinearInfo,
+                    model_args=dict(
+                        in_channels=planes * block.expansion,
+                        out_channels=planes * block.expansion,
+                        negative_samples=negative_samples,
+                        k_predictions=k_predictions,
+                        sparse_weights_class=sparse_weights_class,
+                        sparsity=0.1,
+                    ),
+                    init_batch_norm=False,
+                    checkpoint_file=None,
+                    load_checkpoint_args=None,
+                    train=True,
+                    save_checkpoint_file=None,
+                )
+            )
+            layer_config.append(
+                dict(
+                    model_class=EmitEncoding,
+                    model_args=dict(channels=planes * block.expansion),
+                    init_batch_norm=False,
+                    checkpoint_file=None,
+                    load_checkpoint_args=None,
+                    train=False,
+                    save_checkpoint_file=None,
+                )
+            )
+            layer_config.append(
+                dict(
+                    model_class=GradientBlock,
+                    model_args=dict(),
+                    init_batch_norm=False,
+                    checkpoint_file=None,
+                    load_checkpoint_args=None,
+                    train=False,
+                    save_checkpoint_file=None,
+                )
+            )
         in_planes = planes * block.expansion
+    if not greedy:
+        layer_config.append(
+            dict(
+                model_class=SparseBilinearInfo,
+                model_args=dict(
+                    in_channels=planes * block.expansion,
+                    out_channels=planes * block.expansion,
+                    negative_samples=negative_samples,
+                    k_predictions=k_predictions,
+                    sparse_weights_class=sparse_weights_class,
+                    sparsity=0.1,
+                ),
+                init_batch_norm=False,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=True,
+                save_checkpoint_file=None,
+            )
+        )
+        layer_config.append(
+            dict(
+                model_class=EmitEncoding,
+                model_args=dict(channels=planes * block.expansion),
+                init_batch_norm=False,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=False,
+                save_checkpoint_file=None,
+            )
+        )
+        layer_config.append(
+            dict(
+                model_class=GradientBlock,
+                model_args=dict(),
+                init_batch_norm=False,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=False,
+                save_checkpoint_file=None,
+            )
+        )
     return layer_config
-
 
 def full_sparse_model_blockwise_config(
     negative_samples=16,
@@ -92,6 +177,7 @@ def full_sparse_model_blockwise_config(
     overlap=2,
     sparsity=None,
     percent_on=None,
+    greedy=False,
 ):
     if block_dims is None:
         block_dims = [3, 4, 6]
@@ -177,49 +263,64 @@ def full_sparse_model_blockwise_config(
             sparsity=encoder_sparsity,
             percent_on=encoder_percent_on,
             stride=first_stride,
+            greedy=greedy,
+            k_predictions=k_predictions,
+            negative_samples=negative_samples,
         ))
-        modules.append(
-            dict(
-                model_class=SparseBilinearInfo,
-                model_args=dict(
-                    in_channels=filters * block.expansion,
-                    out_channels=filters * block.expansion,
-                    negative_samples=negative_samples,
-                    k_predictions=k_predictions,
-                    sparse_weights_class=sparse_weights_class,
-                    sparsity=0.1,
-                ),
-                init_batch_norm=False,
-                checkpoint_file=None,
-                load_checkpoint_args=None,
-                train=True,
-                save_checkpoint_file=None,
-            )
-        )
-        modules.append(
-            dict(
-                model_class=EmitEncoding,
-                model_args=dict(channels=filters * block.expansion),
-                init_batch_norm=False,
-                checkpoint_file=None,
-                load_checkpoint_args=None,
-                train=False,
-                save_checkpoint_file=None,
-            )
-        )
-
-        modules.append(
-            dict(
-                model_class=GradientBlock,
-                model_args=dict(),
-                init_batch_norm=False,
-                checkpoint_file=None,
-                load_checkpoint_args=None,
-                train=False,
-                save_checkpoint_file=None,
-            )
-        )
     return modules
+
+#sparsity settings
+resnet_34_sparse_70_sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.7, conv2=0.7),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.1,  # dense weights
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            block4=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),  # dense
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            block4=dict(conv1=0.7, conv2=0.7),
+            block5=dict(conv1=0.7, conv2=0.7),
+            block6=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.01,  # dense
+        ),
+    ),
+resnet_34_sparse_80_sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.8, conv2=0.8),
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.1,  # dense weights
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            block4=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),  # dense
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            block4=dict(conv1=0.8, conv2=0.8),
+            block5=dict(conv1=0.8, conv2=0.8),
+            block6=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.01,  # dense
+        ),
+    ),
+
 
 
 # predefined configs
@@ -371,3 +472,8 @@ full_resnet_50_sparse_80 = full_sparse_model_blockwise_config(
     ),
     num_channels=[143, 143*2, 143*4]
 )
+
+full_resnet_50_greedy = full_sparse_model_blockwise_config(resnet_50=True,
+                                                           greedy=True)
+# full_resnet_50_sparse_70 = full_sparse_model_blockwise_config(resnet_50=True,
+#                                                               sparsity=False)
