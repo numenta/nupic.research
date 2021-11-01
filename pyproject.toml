@@ -21,7 +21,10 @@ exclude = '''
 minversion = '6.0'
 addopts = '-ra -n auto'
 testpaths = [
-    'tests/unit',
+    'tests',
+    'packages/self_supervised_learning/tests',
+    'packages/dendrites/tests',
+    'packages/dynamic_sparse/tests',
 ]
 filterwarnings = [
     'ignore:.*:DeprecationWarning'
