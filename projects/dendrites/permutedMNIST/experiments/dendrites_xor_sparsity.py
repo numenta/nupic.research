@@ -39,7 +39,7 @@ from nupic.research.frameworks.dendrites import (
     ZeroSegmentDendriticLayer,
 )
 from nupic.research.frameworks.dendrites import mixins as dendrites_mixins
-from nupic.research.frameworks.dendrites.experiments import (
+from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST

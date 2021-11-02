@@ -33,7 +33,7 @@ from nupic.research.frameworks.dendrites import (
     GatingDendriticLayer,
 )
 from nupic.research.frameworks.dendrites import mixins as dendrites_mixins
-from nupic.research.frameworks.dendrites.experiments import (
+from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
 from nupic.research.frameworks.vernon import mixins as vernon_mixins
