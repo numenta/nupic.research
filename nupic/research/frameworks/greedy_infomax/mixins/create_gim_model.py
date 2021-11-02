@@ -25,13 +25,15 @@ from pprint import pformat
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torch.nn as nn
 
 from nupic.research.frameworks.pytorch.model_utils import filter_modules
 from nupic.research.frameworks.greedy_infomax.models.gim_block import \
     GreedyInfoMaxBlock, InfoEstimateAggregator, EncodingAggregator
+from nupic.research.frameworks.greedy_infomax.models.utility_layers import PatchifyInputs
 
 
-class GreedyInfoMaxModel(object):
+class GreedyInfoMaxModel:
     """
     Mixin for running a Greedy InfoMax experiment. This mixin does multiple things:
     1. Adds a PatchifyInputs module at the beginning of the model
@@ -74,3 +76,34 @@ class GreedyInfoMaxModel(object):
 
     def setup_experiment(self, config):
         super().setup_experiment(config)
+        # Process config args
+        create_gim_model_args = config.get("create_gim_model_args", {})
+        gim_hooks_args = create_gim_model_args.get("gim_hooks_args", {})
+        info_estimate_args = create_gim_model_args.get("info_estimate_args", {})
+
+
+        # Collect information about which modules to apply hooks to
+        include_names = gim_hooks_args.pop("include_names", [])
+        include_modules = gim_hooks_args.pop("include_modules", [])
+        include_patterns = gim_hooks_args.pop("include_patterns", [])
+        filter_args = dict(
+            include_names=include_names,
+            include_modules=include_modules,
+            include_patterns=include_patterns,
+        )
+
+        # Get named modules for GreedyInfoMaxBlock and BilinearInfo parameters
+        named_modules = filter_modules(self.model, **filter_args)
+
+        self.add_gim_to_model(named_modules, info_estimate_args)
+
+
+    def add_gim_to_model(self, named_modules, info_estimate_args):
+        model = self.model
+        wrapped_model = nn.Sequential(
+            InfoEstimateAggregator(**info_estimate_args),
+            EncodingAggregator(),
+            PatchifyInputs(),
+            model)
+        self.model = wrapped_model
+
