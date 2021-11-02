@@ -24,9 +24,11 @@ import os
 import torch
 
 from experiment_classes import OMLExperiment
+from nupic.research.frameworks.meta_continual_learning.experiments import (
+    MetaContinualLearningExperiment,
+)
+from nupic.research.frameworks.meta_continual_learning.models import OMLNetwork
 from nupic.research.frameworks.pytorch.datasets import omniglot
-from nupic.research.frameworks.pytorch.models import OMLNetwork
-from nupic.research.frameworks.vernon import MetaContinualLearningExperiment
 
 
 # Alternative to run on a single GPU

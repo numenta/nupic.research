@@ -86,13 +86,19 @@ jobs:
           name: Get nupic.torch latest SHA
           command: |
             git ls-remote https://github.com/numenta/nupic.torch.git HEAD > nupic.torch.sha
+      - run:
+          name: Collect package dependencies
+          command: |
+            cat requirements.txt | grep 'packages' | cut -f2 -d ' ' | xargs -I {} cat {}/setup.cfg > packages.dependencies
+
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
       - run: pip show flake8-formatter-junit-xml || pip install --prefix ~/.local flake8-formatter-junit-xml
       - run: pip show nupic.torch || pip install --prefix ~/.local git+https://github.com/numenta/nupic.torch.git#egg=nupic.torch
-      - run: pip install --prefix ~/.local -e ".[dev,imagenet,dendrites,gsc]"
+      - run: pip show nupic.research || pip install --prefix ~/.local -r requirements.txt
+      - run: pip list
       - save_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
           paths:
             - ~/.local
       - persist_to_workspace:
@@ -107,12 +113,12 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
       - run:
           name: Check Style
           command: |
             mkdir -p test_results/flake8
-            ~/.local/bin/flake8 --show-source --format junit-xml --output-file test_results/flake8/results.xml packages nupic tests projects
+            ~/.local/bin/flake8 --show-source --format junit-xml --output-file test_results/flake8/results.xml packages src tests projects
       - store_test_results:
           path: test_results
 
@@ -125,7 +131,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
       - run:
           name: Run python tests
           environment:
@@ -133,9 +139,9 @@ jobs:
           command: |
             set -e
             cp -f .circleci/pytest.ini pytest.ini
-            TEST_FILES=$(circleci tests glob "tests/**/*.py" | circleci tests split --split-by=timings --show-counts)
             mkdir -p test_results/pytest
-            pytest $TEST_FILES
+            TEST_FILES=$(grep 'packages' requirements.txt | cut -d ' ' -f2 | xargs -I {} echo  '"{}/tests/**/*.py"' | xargs circleci tests glob "tests/**/*.py" | circleci tests split --split-by=timings --show-counts)
+            pytest -ra $TEST_FILES
       - store_test_results:
           path: test_results
 
@@ -147,7 +153,7 @@ jobs:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
-          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}
+          key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
       - run:
           name: Build wheel
           environment:

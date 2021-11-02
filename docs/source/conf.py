@@ -35,7 +35,15 @@
 import os
 import sys
 
-source_path = os.path.abspath("../..")
+# Add packages defined in 'requirements.txt' to source path
+with open("../../requirements.txt", "r") as fp:
+    requirements_txt = fp.read()
+for req in requirements_txt.splitlines():
+    if req.startswith("-e packages"):
+        source_path = os.path.abspath(f"../../{req}/src")
+        sys.path.insert(0, source_path)
+
+source_path = os.path.abspath("../../src")
 sys.path.insert(0, source_path)
 
 # Get version from package

@@ -37,9 +37,7 @@ from nupic.research.frameworks.pytorch.datasets import ContextDependentPermutedM
 from nupic.research.frameworks.pytorch.models import ModifiedInitStandardMLP, SparseMLP
 
 from .mlp import THREE_LAYER_MLP_10
-
-from.no_dendrites import NoDendriteExperiment
-
+from .no_dendrites import NoDendriteExperiment
 
 # 10 tasks, dense MLP, onehot context vector concatenated to the input
 THREE_LAYER_MLP_10_ONEHOT = deepcopy(THREE_LAYER_MLP_10)

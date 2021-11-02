@@ -17,6 +17,19 @@ exclude = '''
 )/
 '''
 
+[tool.pytest.ini_options]
+minversion = '6.0'
+addopts = '-ra -n auto'
+testpaths = [
+    'tests',
+    'packages/self_supervised_learning/tests',
+    'packages/dendrites/tests',
+    'packages/dynamic_sparse/tests',
+]
+filterwarnings = [
+    'ignore:.*:DeprecationWarning'
+]
+
 [tool.isort]
 multi_line_output = 3
 include_trailing_comma = true
@@ -28,5 +41,6 @@ known_first_party = ['nupic.research', 'nupic.torch', 'nupic.tensorflow']
 known_third_party = ['elasticsearch', 'dotenv', 'torch', 'tensorflow', 'tabulate',
                      'tqdm', 'wandb', 'transformers', 'tokenizers', 'datasets', 
                      'deepspeed', 'scipy', 'sklearn', 'seaborn', 'librosa',
-                     'pytorch_lightning', 'pretrainedmodels', 'ax', 'ptitprince']
+                     'pytorch_lightning', 'pretrainedmodels', 'ax', 'ptitprince',
+                     'sigopt', 'wandb']
 

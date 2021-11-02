@@ -24,7 +24,7 @@ import unittest
 import torch
 
 from nupic.research.frameworks.pytorch.model_utils import filter_modules
-from nupic.research.frameworks.pytorch.models import OMLNetwork, resnets
+from nupic.research.frameworks.pytorch.models import resnets
 
 
 class FilterParamsTest(unittest.TestCase):
@@ -37,40 +37,43 @@ class FilterParamsTest(unittest.TestCase):
         Test use of `include_names`.
         """
 
-        oml = OMLNetwork(num_classes=10)
-        named_modules = filter_modules(oml, include_names=["adaptation.0"])
-        self.assertTrue(len(named_modules) == 1)
-        self.assertTrue("adaptation.0" in named_modules)
-        self.assertIsInstance(named_modules["adaptation.0"], torch.nn.Linear)
+        resnet = resnets.resnet50(num_classes=10)
+        named_modules = filter_modules(resnet, include_names=["classifier"])
+        self.assertEqual(len(named_modules), 1)
+        self.assertIn("classifier", named_modules)
+        self.assertIsInstance(named_modules["classifier"], torch.nn.Linear)
 
     def test_name_not_included(self):
         """
         Test the case when a param name does not exist in the network.
         """
 
-        oml = OMLNetwork(num_classes=10)
-
-        named_params = filter_modules(oml, include_names=["adaptation.1"])
-        self.assertTrue(len(named_params) == 0)
+        resnet = resnets.resnet50(num_classes=10)
+        named_params = filter_modules(resnet, include_names=["adaptation.1"])
+        self.assertEqual(len(named_params), 0)
 
     def test_get_conv_modules_by_pattern_and_type(self):
         """
         Ensure `include_patterns` and `include_modules` yields the same result
         when they are meant to identify the same params.
         """
-        oml = OMLNetwork(num_classes=10)
+        resnet = resnets.resnet50(num_classes=10)
 
-        include_even_numbers = ["representation.\\d*[02468]"]
-        named_modules1 = filter_modules(oml, include_patterns=include_even_numbers)
-        self.assertTrue(len(named_modules1) == 7)  # 7 convs and a flatten layer
+        include_pooling_layers = ["features\\..*pool.*"]
+        named_modules1 = filter_modules(resnet, include_patterns=include_pooling_layers)
+        self.assertEqual(len(named_modules1), 2)
 
-        include_conv_and_flatten = [torch.nn.Conv2d, torch.nn.Flatten]
-        named_modules2 = filter_modules(oml, include_modules=include_conv_and_flatten)
-        self.assertTrue(len(named_modules2) == 7)
+        pooling_layers_types = [
+            torch.nn.modules.pooling.AdaptiveAvgPool2d,
+            torch.nn.modules.pooling.MaxPool2d,
+        ]
+        named_modules2 = filter_modules(
+            resnet, include_modules=pooling_layers_types)
+        self.assertEqual(len(named_modules2), 2)
 
         names1 = list(named_modules1.keys())
         names2 = list(named_modules2.keys())
-        self.assertTrue(names1 == names2)
+        self.assertEqual(names1, names2)
 
     def test_filter_out_resnet_linear_params(self):
         """
@@ -78,8 +81,8 @@ class FilterParamsTest(unittest.TestCase):
         """
         resnet = resnets.resnet50(num_classes=10)
         named_modules = filter_modules(resnet, include_modules=[torch.nn.Linear])
-        self.assertTrue(len(named_modules) == 1)
-        self.assertTrue("classifier" in named_modules)
+        self.assertEqual(len(named_modules), 1)
+        self.assertIn("classifier", named_modules)
 
 
 if __name__ == "__main__":

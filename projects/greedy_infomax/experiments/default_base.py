@@ -34,7 +34,8 @@ from nupic.research.frameworks.greedy_infomax.utils.data_utils import get_transf
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     multiple_log_softmax_nll_loss,
 )
-from nupic.research.frameworks.vernon.distributed import experiments, mixins
+from nupic.research.frameworks.self_supervised_learning.distributed import experiments
+from nupic.research.frameworks.vernon.distributed import mixins
 
 
 class GreedyInfoMaxExperiment(
