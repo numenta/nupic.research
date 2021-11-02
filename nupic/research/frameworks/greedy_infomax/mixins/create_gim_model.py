@@ -31,6 +31,7 @@ from nupic.research.frameworks.pytorch.model_utils import filter_modules
 from nupic.research.frameworks.greedy_infomax.models.gim_block import \
     GreedyInfoMaxBlock, InfoEstimateAggregator, EncodingAggregator
 from nupic.research.frameworks.greedy_infomax.models.utility_layers import PatchifyInputs
+from nupic.research.frameworks.greedy_infomax.models.gim_model import GIMModel
 
 
 class GreedyInfoMaxModel:
@@ -95,15 +96,7 @@ class GreedyInfoMaxModel:
         # Get named modules for GreedyInfoMaxBlock and BilinearInfo parameters
         named_modules = filter_modules(self.model, **filter_args)
 
-        self.add_gim_to_model(named_modules, info_estimate_args)
-
-
-    def add_gim_to_model(self, named_modules, info_estimate_args):
         model = self.model
-        wrapped_model = nn.Sequential(
-            InfoEstimateAggregator(**info_estimate_args),
-            EncodingAggregator(),
-            PatchifyInputs(),
-            model)
-        self.model = wrapped_model
+        self.model = GIMModel(model, named_modules, **info_estimate_args)
+
 
